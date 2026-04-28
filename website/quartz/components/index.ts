@@ -4,7 +4,6 @@ import FolderContent from "./pages/FolderContent"
 import NotFound from "./pages/404"
 import ArticleTitle from "./ArticleTitle"
 import Darkmode from "./Darkmode"
-import ReaderMode from "./ReaderMode"
 import Head from "./Head"
 import PageTitle from "./PageTitle"
 import ContentMeta from "./ContentMeta"
@@ -23,6 +22,11 @@ import Breadcrumbs from "./Breadcrumbs"
 import Comments from "./Comments"
 import Flex from "./Flex"
 import ConditionalRender from "./ConditionalRender"
+import HomepageStats from "./HomepageStats"
+import HomepageTags from "./HomepageTags"
+import HomepageRecent from "./HomepageRecent"
+import SidebarTags from "./SidebarTags"
+import PaperMeta from "./PaperMeta"
 
 export {
   ArticleTitle,
@@ -30,7 +34,6 @@ export {
   TagContent,
   FolderContent,
   Darkmode,
-  ReaderMode,
   Head,
   PageTitle,
   ContentMeta,
@@ -50,4 +53,9 @@ export {
   Comments,
   Flex,
   ConditionalRender,
+  HomepageStats,
+  HomepageTags,
+  HomepageRecent,
+  SidebarTags,
+  PaperMeta,
 }

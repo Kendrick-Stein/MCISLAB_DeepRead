@@ -4,7 +4,11 @@ import * as Component from "./quartz/components"
 export const sharedPageComponents: SharedLayout = {
   head: Component.Head(),
   header: [],
-  afterBody: [],
+  afterBody: [
+    Component.HomepageStats(),
+    Component.HomepageRecent(),
+    Component.HomepageTags(),
+  ],
   footer: Component.Footer({
     links: {
       GitHub: "https://github.com/Kendrick-Stein/MCISLAB_DeepRead",
@@ -14,11 +18,9 @@ export const sharedPageComponents: SharedLayout = {
 
 export const defaultContentPageLayout: PageLayout = {
   beforeBody: [
-    Component.ConditionalRender({
-      component: Component.Breadcrumbs(),
-      condition: (page) => page.fileData.slug !== "index",
-    }),
+    Component.Breadcrumbs(),
     Component.ArticleTitle(),
+    Component.PaperMeta(),
     Component.ContentMeta(),
     Component.TagList(),
   ],
@@ -31,11 +33,31 @@ export const defaultContentPageLayout: PageLayout = {
         { Component: Component.Darkmode() },
       ],
     }),
-    Component.Explorer(),
+    Component.Explorer({
+      folderDefaultState: "collapsed",
+      useSavedState: false,
+      mapFn: (node) => {
+        if (!node.isFolder) {
+          node.displayName = node.slugSegment
+        }
+      },
+      sortFn: (a, b) => {
+        const order = ["DomainMaps", "Papers", "Topics", "Ideas", "Projects"]
+        const aIdx = order.indexOf(a.displayName)
+        const bIdx = order.indexOf(b.displayName)
+        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx
+        if (aIdx !== -1) return -1
+        if (bIdx !== -1) return 1
+        if (a.slug?.startsWith("Papers/") && b.slug?.startsWith("Papers/")) {
+          return b.displayName.localeCompare(a.displayName)
+        }
+        return a.displayName.localeCompare(b.displayName)
+      },
+    }),
+    Component.SidebarTags(),
   ],
   right: [
     Component.DesktopOnly(Component.TableOfContents()),
-    Component.Backlinks(),
   ],
 }
 
@@ -50,7 +72,28 @@ export const defaultListPageLayout: PageLayout = {
         { Component: Component.Darkmode() },
       ],
     }),
-    Component.Explorer(),
+    Component.Explorer({
+      folderDefaultState: "collapsed",
+      useSavedState: false,
+      mapFn: (node) => {
+        if (!node.isFolder) {
+          node.displayName = node.slugSegment
+        }
+      },
+      sortFn: (a, b) => {
+        const order = ["DomainMaps", "Papers", "Topics", "Ideas", "Projects"]
+        const aIdx = order.indexOf(a.displayName)
+        const bIdx = order.indexOf(b.displayName)
+        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx
+        if (aIdx !== -1) return -1
+        if (bIdx !== -1) return 1
+        if (a.slug?.startsWith("Papers/") && b.slug?.startsWith("Papers/")) {
+          return b.displayName.localeCompare(a.displayName)
+        }
+        return a.displayName.localeCompare(b.displayName)
+      },
+    }),
+    Component.SidebarTags(),
   ],
   right: [],
 }

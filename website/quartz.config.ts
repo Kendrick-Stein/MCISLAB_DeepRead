@@ -10,8 +10,8 @@ const config: QuartzConfig = {
     analytics: null,
     locale: "en-US",
     baseUrl: "kendrick-stein.github.io/MCISLAB_DeepRead",
-    ignorePatterns: ["private", "templates", ".obsidian", "Workbench/**", "skills/**", "references/**", "docs/**", "*.canvas", "CLAUDE.md", "AGENTS.md"],
-    defaultDateType: "modified",
+    ignorePatterns: ["Templates/**", ".obsidian/**", "docs/**", "website/**", "Private/**", "private", "*.canvas", "CLAUDE.md", "AGENTS.md", "README.md", "skills/**", "references/**", "Workbench/**", "Meetings/**"],
+    defaultDateType: "published",
     theme: {
       fontOrigin: "googleFonts",
       cdnCaching: true,
@@ -30,6 +30,7 @@ const config: QuartzConfig = {
           secondary: "#284b63",
           tertiary: "#84a59d",
           highlight: "rgba(143, 159, 169, 0.15)",
+          textHighlight: "#fff23688",
         },
         darkMode: {
           light: "#161618",
@@ -40,6 +41,7 @@ const config: QuartzConfig = {
           secondary: "#7b97aa",
           tertiary: "#84a59d",
           highlight: "rgba(143, 159, 169, 0.15)",
+          textHighlight: "#b3aa0288",
         },
       },
     },
@@ -48,7 +50,7 @@ const config: QuartzConfig = {
     transformers: [
       Plugin.FrontMatter(),
       Plugin.CreatedModifiedDate({
-        priority: ["frontmatter", "git", "filesystem"],
+        priority: ["frontmatter", "filesystem"],
       }),
       Plugin.SyntaxHighlighting({
         theme: {
@@ -77,7 +79,6 @@ const config: QuartzConfig = {
       }),
       Plugin.Assets(),
       Plugin.Static(),
-      Plugin.Favicon(),
       Plugin.NotFoundPage(),
     ],
   },

@@ -1,34 +1,61 @@
-import { QuartzLayout } from "@jackyzha0/quartz"
-import * as Component from "@jackyzha0/quartz/components"
+import { PageLayout, SharedLayout } from "./quartz/cfg"
+import * as Component from "./quartz/components"
 
-const layout: QuartzLayout = {
-  header: {
-    title: "DeepRead",
-    subtitle: "AI Research Notebook",
-    links: [
-      { title: "Papers", href: "/Papers" },
-      { title: "Topics", href: "/Topics" },
-      { title: "Ideas", href: "/Ideas" },
-      { title: "Survey", href: "/Topics/GUIAgent-Survey" },
-    ],
-  },
-  footer: {
-    links: [
-      { title: "GitHub", href: "https://github.com/kendrickstein/MCISLAB_DeepRead" },
-    ],
-    text: "Built with Quartz",
-  },
+export const sharedPageComponents: SharedLayout = {
+  head: Component.Head(),
+  header: [],
+  afterBody: [],
+  footer: Component.Footer({
+    links: {
+      GitHub: "https://github.com/Kendrick-Stein/MCISLAB_DeepRead",
+    },
+  }),
+}
+
+export const defaultContentPageLayout: PageLayout = {
+  beforeBody: [
+    Component.Breadcrumbs(),
+    Component.ArticleTitle(),
+    Component.ContentMeta(),
+    Component.TagList(),
+  ],
   left: [
-    Component.PageList(),
-    Component.RecentNotes({ limit: 5 }),
+    Component.PageTitle(),
+    Component.MobileOnly(Component.Spacer()),
+    Component.Flex({
+      components: [
+        { Component: Component.Search(), grow: true },
+        { Component: Component.Darkmode() },
+      ],
+    }),
+    Component.Explorer({
+      folderDefaultState: "collapsed",
+    }),
   ],
   right: [
-    Component.TableOfContents(),
-    Component.Search(),
-    Component.Darkmode(),
+    Component.DesktopOnly(Component.TableOfContents()),
     Component.Backlinks(),
-    Component.Tags(),
   ],
 }
 
-export default layout
+export const defaultListPageLayout: PageLayout = {
+  beforeBody: [
+    Component.Breadcrumbs(),
+    Component.ArticleTitle(),
+    Component.ContentMeta(),
+  ],
+  left: [
+    Component.PageTitle(),
+    Component.MobileOnly(Component.Spacer()),
+    Component.Flex({
+      components: [
+        { Component: Component.Search(), grow: true },
+        { Component: Component.Darkmode() },
+      ],
+    }),
+    Component.Explorer({
+      folderDefaultState: "collapsed",
+    }),
+  ],
+  right: [],
+}

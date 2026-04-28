@@ -10,8 +10,8 @@ const config: QuartzConfig = {
     analytics: null,
     locale: "en-US",
     baseUrl: "kendrick-stein.github.io/MCISLAB_DeepRead",
-    ignorePatterns: ["Templates/**", ".obsidian/**", "docs/**", "website/**", "*.canvas", "CLAUDE.md", "AGENTS.md", "README.md", "skills/**", "references/**", "Workbench/**", "Meetings/**"],
-    defaultDateType: "published",
+    ignorePatterns: ["private", "templates", ".obsidian", "Workbench/**", "skills/**", "references/**", "docs/**", "*.canvas", "CLAUDE.md", "AGENTS.md"],
+    defaultDateType: "modified",
     theme: {
       fontOrigin: "googleFonts",
       cdnCaching: true,
@@ -48,7 +48,7 @@ const config: QuartzConfig = {
     transformers: [
       Plugin.FrontMatter(),
       Plugin.CreatedModifiedDate({
-        priority: ["frontmatter", "filesystem"],
+        priority: ["frontmatter", "git", "filesystem"],
       }),
       Plugin.SyntaxHighlighting({
         theme: {
@@ -77,6 +77,7 @@ const config: QuartzConfig = {
       }),
       Plugin.Assets(),
       Plugin.Static(),
+      Plugin.Favicon(),
       Plugin.NotFoundPage(),
     ],
   },

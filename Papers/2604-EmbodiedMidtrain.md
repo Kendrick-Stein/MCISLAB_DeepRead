@@ -1,5 +1,5 @@
 ---
-title: EmbodiedMidtrain: Bridging the Gap between Vision-Language Models and Vision-Language-Action Models via Mid-training
+title: "EmbodiedMidtrain: Bridging the Gap between Vision-Language Models and Vision-Language-Action Models via Mid-training"
 authors:
   - Yiyang Du
   - Zhanqiu Guo

@@ -1,5 +1,5 @@
 ---
-title: AgentSearchBench: A Benchmark for AI Agent Search in the Wild
+title: "AgentSearchBench: A Benchmark for AI Agent Search in the Wild"
 authors: []
 institute: []
 date_publish: 2026-04

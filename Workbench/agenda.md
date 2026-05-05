@@ -1,5 +1,5 @@
 ---
-last_updated: "2026-04-28"
+last_updated: "2026-05-04"
 updated_by: agenda-evolve
 active_topic: GUI Agent
 ---
@@ -18,9 +18,9 @@ active_topic: GUI Agent
 - **status**: exploring
 - **origin**: researcher-discovered
 - **hypothesis**: 架构级 multi-scale 设计（FPN + multi-resolution training + consistency loss）可以在不增加推理开销的前提下，显著提升 GUI grounding 在跨分辨率/跨设备场景下的鲁棒性
-- **evidence**: [[Topics/GUIAgent-Survey]], [[Papers/2604-GoClick]], [[Ideas/ScaleInvariant-Grounding-GUI]], [[2500-GuiActorCoordinateFree]]
+- **evidence**: [[Topics/GUIAgent-Survey]], [[Papers/2604-GoClick]], [[Ideas/ScaleInvariant-Grounding-GUI]], [[2500-GuiActorCoordinateFree]], [[Papers/2604-AutoGUIv2]] (dichotomy: fine-tuned grounding 强于通用 VLM)
 - **next_action**: 原型验证——在 GoClick encoder-decoder 架构上添加 FPN，在 ScreenSpot 多分辨率子集上测试 cross-resolution grounding accuracy；同时阅读 Qwen-GUI-3B 和 MEGA-GUI 了解现有 cross-resolution 方案的 baseline
-- **confidence**: 0.3
+- **confidence**: 0.35 (↑ from 0.3，AutoGUI-v2 dichotomy 证明 grounding 作为专门训练能力的价值)
 
 ### RL-based GUI Agent Training
 
@@ -28,9 +28,9 @@ active_topic: GUI Agent
 - **status**: exploring
 - **origin**: researcher-discovered
 - **hypothesis**: Rule-based RL（GRPO 风格）配合结构化 action reward，可以以 10x 更少的训练数据达到或超越 SFT 的 GUI action prediction 性能，且 OOD 泛化更强
-- **evidence**: [[Topics/GUIAgent-Survey]], [[2500-UiR1EnhancingEfficient]], [[Papers/2604-ClawGUI]], [[2025-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]], [[Ideas/ForkPoint-CreditAssignment-GUI]]
+- **evidence**: [[Topics/GUIAgent-Survey]], [[2500-UiR1EnhancingEfficient]], [[Papers/2604-ClawGUI]], [[2025-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]], [[Ideas/ForkPoint-CreditAssignment-GUI]], [[Papers/2604-AutoGUIv2]] (fine-tuning on agent data 对 grounding 有显著增益)
 - **next_action**: 阅读 SOLAR-RL 和 ProxMO（credit assignment 拥挤赛道的最新工作），确认差异化空间；若 ForkPoint 方向被证伪，考虑转向 rule-based reward design（更底层的贡献）
-- **confidence**: 0.25
+- **confidence**: 0.3 (↑ from 0.25，AutoGUI-v2 dichotomy 支持 fine-tuning value)
 
 ### Self-Improving Agent Reliability
 

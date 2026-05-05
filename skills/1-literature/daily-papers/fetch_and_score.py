@@ -136,7 +136,7 @@ def fetch_hf_papers(start_date, end_date) -> list[dict]:
     endpoint = "https://huggingface.co/api/daily_papers?sort=trending&limit=50"
     print(f"  Fetching hf-trending...", file=sys.stderr)
     raw = fetch_url(endpoint)
-    trending_cutoff = (datetime.now().date() - timedelta(days=30)).isoformat()
+    trending_cutoff = (datetime.utcnow().date() - timedelta(days=30)).isoformat()
     if raw:
         try:
             items = json.loads(raw)
@@ -260,7 +260,7 @@ def save_history(papers: list[dict], target_date, path: Path = DEFAULT_HISTORY_P
             existing_ids.add(aid)
 
     # 清理 30 天前的记录
-    cutoff = str((datetime.now().date() - timedelta(days=30)))
+    cutoff = str((datetime.utcnow().date() - timedelta(days=30)))
     history = [h for h in history if h.get("date", "") >= cutoff]
 
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -344,12 +344,21 @@ def main():
     parser.add_argument("--output", "-o", help="Output file path (default: stdout)")
     args = parser.parse_args()
 
+    # 使用 UTC 时间，避免请求超出 HF API 的服务器时间限制
+    # HF Daily API 数据更新有延迟（服务器时间限制），UTC 00:00-12:00 期间当天数据可能未就绪
+    utc_now = datetime.utcnow()
+    days = max(1, args.days)
     target_date = (
         datetime.strptime(args.date, "%Y-%m-%d").date()
         if args.date
-        else datetime.now().date()
+        else utc_now.date()
     )
-    days = max(1, args.days)
+
+    # 单天模式下，如果 UTC 时间在 00:00-12:00，自动回退到前一天（HF Daily 数据未更新）
+    if days == 1 and not args.date and utc_now.hour < 12:
+        target_date = target_date - timedelta(days=1)
+        print(f"  [INFO] UTC time {utc_now.hour:02d}:{utc_now.minute:02d} < 12:00, falling back to {target_date}", file=sys.stderr)
+
     start_date = target_date - timedelta(days=days - 1)
     top_n = min(TOP_N * days, 100)
 

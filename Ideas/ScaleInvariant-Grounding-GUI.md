@@ -1,7 +1,7 @@
 ---
 title: "Scale-Invariant GUI Grounding via Multi-Resolution Feature Pyramid"
 tags: [gui-agent, grounding, visual-representation, resolution-robustness]
-status: raw
+status: developing
 linked_project:
 date_updated: "2026-04-28"
 ---
@@ -76,3 +76,7 @@ date_updated: "2026-04-28"
 **Reasoning**: Better positioned than the Credit Assignment idea. FPN has a clear technical niche — no competitor uses explicit feature pyramids for GUI grounding, though many attack cross-resolution robustness from other angles. Lower engineering complexity and complementary nature reduce risk. Main weakness: FPN novelty is limited (mature CV technique), and it may not beat data augmentation alone. Start with minimal prototype: add FPN to GoClick + consistency loss.
 
 **Suggested next action**: Prototype FPN + GoClick on ScreenSpot multi-resolution subset to validate the architectural prior hypothesis.
+
+## Experiments
+
+- [[Experiments/2026-04-29-ScaleInvariantGroundingGUI]] — 验证 FPN + resolution-adaptive anchors 在跨分辨率 grounding 上的精度提升和退化减少

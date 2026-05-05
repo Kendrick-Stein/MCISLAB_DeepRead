@@ -7,6 +7,12 @@ survey: "[[Topics/GUIAgent-Survey]]"
 active_ideas: 3
 ---
 
+## 可视化演示
+
+[🌐 在线浏览 HTML 演示](/static/presentations/GUI-Agent/index.html) — 杂志风格翻页展示
+
+---
+
 ## 核心定义
 
 **GUI Agent** = 能够理解图形用户界面（屏幕截图/视频）、定位界面元素（grounding）、执行操作（点击/滚动/输入）、完成多步骤任务的视觉 Agent 系统。

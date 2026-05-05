@@ -2,7 +2,7 @@
 title: World Model Domain Map
 last_updated: "2026-04-28"
 status: active
-paper_count: 12
+paper_count: 19
 survey: "[[Topics/WorldModel-Survey]]"
 ---
 ## 核心定义
@@ -17,6 +17,7 @@ mindmap
     Paradigm
       Video World Model
       Deterministic Geometric
+      Robotic Policy Eval
       Environment Synthesis
       UI/GUI World Model
     Challenge
@@ -24,9 +25,11 @@ mindmap
       Memory Mechanism
       L3 Evolver
       Real-World Gap
+      3D Consistency
     Application
       Agent Training
       Synthetic Data
+      Policy Evaluation
       Planning & Reasoning
       Multi-Agent Simulation
 ```
@@ -39,12 +42,14 @@ mindmap
 - Wan2.1/Wan2.2: 视频生成基础模型
 - MultiWorld: Multi-agent multi-view extension
 - HybridMemory: 动态主体 memory 机制
+- **World-R1**: RL（Flow-GRPO）对齐 3D 约束
 
 **关键发现**:
 - 视频级预测噪声大，长期 rollout 误差累积
 - Memory 机制忽略动态主体的独立运动逻辑
+- RL 方式（World-R1）比架构修改更 scalable
 
-**关联**: [[2604-MultiWorld]], [[2603-HybridMemory]], [[2604-HYWorld2]]
+**关联**: [[2604-MultiWorld]], [[2603-HybridMemory]], [[2604-HYWorld2]], [[2604-WorldR1]]
 
 ### 2. Deterministic Geometric Environment (突破点)
 
@@ -60,7 +65,20 @@ mindmap
 
 **关联**: [[2604-SpatialEvo]]
 
-### 3. Environment Synthesis
+### 3. Robotic Policy Evaluation (新方向)
+
+**问题**: Robotic policy 评估不可规模化
+
+**方案**:
+- dWorldEval: Discrete diffusion world model + progress token
+- 统一 token space: vision + language + action
+- Sparse keyframe memory
+
+**优势**: Progress token 编码任务完成状态，与 L3 Evolver 概念关联
+
+**关联**: [[2604-dWorldEval]]
+
+### 4. Environment Synthesis
 
 **方案**:
 - Agent-World: MCP servers + PRD 采集，1,978 环境
@@ -72,7 +90,7 @@ mindmap
 
 **关联**: [[2604-AgentWorld]], [[2604-GenerativeWorldRenderer]]
 
-### 4. UI/GUI World Model
+### 5. UI/GUI World Model
 
 **应用**: 支持 GUI Agent planning
 
@@ -84,7 +102,7 @@ mindmap
 
 **关联**: [[2600-MobiledreamerGenerativeSketchWorld]], [[2500-UisimInteractiveImageBased]]
 
-### 5. Conceptual Framework (Survey)
+### 6. Conceptual Framework (Survey)
 
 **Taxonomy** (AgenticWorldModel):
 - **Levels**: L1 Predictor → L2 Simulator → L3 Evolver
@@ -102,6 +120,8 @@ mindmap
 | MCP-Mark | Environment synthesis | Agent-World 14B: 13.3% |
 | HM-World | Memory testing | HyDRA: 0.926 |
 | AndroidWorld | GUI Agent | MobileDreamer: +5.25% |
+| LIBERO | Policy evaluation | dWorldEval |
+| RoboTwin | Robotic manipulation | dWorldEval |
 
 ## 关键洞察
 
@@ -120,6 +140,12 @@ Agent-World、GenerativeWorldRenderer 都是工程整合
 ### Pattern 5: UI World Model 的 layout-first 设计正确
 UISim 的 decomposition 符合 UI 结构化本质
 
+### Pattern 6: RL for World Model 正在兴起
+World-R1（Flow-GRPO）、SpatialEvo（GRPO）都用 RL 而非架构修改
+
+### Pattern 7: Progress token 是有趣的新 idea
+dWorldEval 将任务完成状态编码进 world model
+
 ## 待解决问题
 
 1. L3 Evolver 实现：prediction 失败时如何自主修正？
@@ -128,6 +154,7 @@ UISim 的 decomposition 符合 UI 结构化本质
 4. DGE 适用边界扩展（室外/动态场景）
 5. Real-World vs Synthetic gap（JSON/CSV vs live API）
 6. World Model + GUI Agent grounding 结合
+7. Progress token 作为 L3 Evolver 触发信号？
 
 ## 下一步
 
@@ -137,3 +164,4 @@ UISim 的 decomposition 符合 UI 结构化本质
 | Memory | 跟进 HybridMemory 的真实场景验证 |
 | Environment | 监控 Agent-World 的 MCP-Mark 进展 |
 | UI World Model | 研究 MobileDreamer + grounding 结合 |
+| Policy Eval | 研究 dWorldEval progress token 与 L3 Evolver 关联 |

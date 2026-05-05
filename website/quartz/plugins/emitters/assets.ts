@@ -14,7 +14,16 @@ const filesToCopy = async (argv: Argv, cfg: QuartzConfig) => {
 const copyFile = async (argv: Argv, fp: FilePath) => {
   const src = joinSegments(argv.directory, fp) as FilePath
 
-  const name = slugifyFilePath(fp)
+  // Preserve .html extension for static HTML files (presentations)
+  const ext = path.extname(fp)
+  let name: string
+  if (ext === ".html") {
+    // Keep original path with .html extension
+    name = fp.replace(/\.html$/, "") // slugify without ext
+    name = name + ".html" // restore .html
+  } else {
+    name = slugifyFilePath(fp)
+  }
   const dest = joinSegments(argv.output, name) as FilePath
 
   // ensure dir exists

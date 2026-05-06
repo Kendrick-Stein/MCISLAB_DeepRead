@@ -67,6 +67,8 @@ gh api /repos/liqing-ustc/mindflow/contents/Topics --jq '.[].name' | grep -E '\.
    Write Papers/{filename}
    ```
 
+6. **YAML 前置校验**: 写入后检查 frontmatter 中含冒号的字段值是否已加双引号，若未加则立即用 Edit 修复（同 paper-digest 规范）。
+
 ### Step 5：合并 Survey
 
 对每个待导入 Survey：
@@ -110,6 +112,7 @@ gh api /repos/liqing-ustc/mindflow/contents/Topics --jq '.[].name' | grep -E '\.
 
 - [ ] 导入的论文笔记已出现在 `Papers/` 目录
 - [ ] 无已有笔记被覆盖（检查 mtime）
+- [ ] **YAML 前置校验通过**：所有导入文件的含冒号字段值已加双引号
 - [ ] Survey 合并后内容比合并前更完整
 - [ ] 日志已追加到 `Workbench/logs/YYYY-MM-DD.md`
 

@@ -76,7 +76,22 @@ allowed-tools: Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
 
 1. **写入文件**：用 Write 将笔记保存到 `Papers/YYMM-ShortTitle.md`。
 
-2. **追加日志**：用 Edit（或 Write 若文件不存在）将以下格式的 log entry 追加到 `Workbench/logs/YYYY-MM-DD.md`（日期为今天）：
+2. **YAML 前置校验**：写入后立即用 Bash 执行以下检查，确保 frontmatter 可被 Quartz 正确解析：
+
+   ```bash
+   f="Papers/YYMM-ShortTitle.md"
+   # 检查 title 等字段值中含冒号但未加引号的情况
+   awk '/^---$/{n++; next} n==1 && /^[a-z_]+:/{print}' "$f" | while read -r line; do
+     value=$(echo "$line" | sed 's/^[a-z_]*: *//')
+     if echo "$value" | grep -q ':' && ! echo "$value" | grep -q '^"'; then
+       echo "YAML ERROR: unquoted colon in value: $line"
+     fi
+   done
+   ```
+
+   若发现未加引号的字段，立即用 Edit 为该值加上双引号后重新检查。
+
+3. **追加日志**：用 Edit（或 Write 若文件不存在）将以下格式的 log entry 追加到 `Workbench/logs/YYYY-MM-DD.md`（日期为今天）：
 
    ```markdown
    ### [HH:MM] paper-digest
@@ -88,7 +103,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
 
    若日志文件不存在，先创建文件（包含一级标题 `# YYYY-MM-DD`），再追加 entry。
 
-3. **阅读队列**：若 source 来自阅读队列（`Workbench/queue.md` 的 Reading 部分），用 Edit 将对应条目标记为已完成（如在行首添加 `✓` 或删除该条目）。
+4. **阅读队列**：若 source 来自阅读队列（`Workbench/queue.md` 的 Reading 部分），用 Edit 将对应条目标记为已完成（如在行首添加 `✓` 或删除该条目）。
 
 ## Guard
 
@@ -100,6 +115,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
 
 - [ ] `Papers/YYMM-ShortTitle.md` 已创建且正文 >200 字
 - [ ] frontmatter 的 title、authors、date_publish 字段非空
+- [ ] **YAML 前置校验通过**：所有含冒号的字段值已加双引号（title、venue 等）
 - [ ] Summary 节非空且不超过 3 句话
 - [ ] 日志已追加到 `Workbench/logs/YYYY-MM-DD.md`
 

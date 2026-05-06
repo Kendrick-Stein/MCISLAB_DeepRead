@@ -97,6 +97,8 @@ python3 skills/1-literature/daily-papers/fetch_and_score.py \
 
 汇总论文点评，生成总结文件，保存到 `Workbench/daily/YYYY-MM-DD.md`（日期为目标日期）。若文件已存在，覆盖写入。
 
+写入后执行 YAML 前置校验：检查 frontmatter 中含冒号的字段值是否已加双引号，若未加则立即用 Edit 修复。
+
 **总结文件模版：**
 
 ```markdown

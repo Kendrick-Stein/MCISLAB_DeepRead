@@ -49,3 +49,15 @@
 - **directions_paused**: 0
 - **directions_abandoned**: 0
 - **reasoning**: AutoGUI-v2 dichotomy 发现（开源 grounding 强，商业 captioning 强）支持两个现有 direction：grounding 作为专门训练能力的价值，fine-tuning on agent data 的增益。更新 evidence + confidence 微调（0.3→0.35, 0.25→0.3）。Dichotomy 是 model selection 指南而非研究 hypothesis，不新增 direction。
+
+## 2026-05-06
+
+### [2026-05-06] agenda-evolve
+
+- **trigger**: autoresearch Round 3——SOLAR-RL + ProxMO 已读完，ForkPoint 从 12/25 降至 10/25，RL direction next_action 完成需更新
+- **insights_reviewed**: 2（evaluation shift validated, VLM dichotomy provisional）
+- **directions_added**: 0
+- **directions_updated**: 2（RL-based GUI Agent Training: 更新 next_action + evidence；GUI Grounding Robustness: 更新 next_action 标注 GoClick 代码阻塞）
+- **directions_paused**: 0
+- **directions_abandoned**: 0
+- **reasoning**: ProxMO 的 PSA (TF-IDF state similarity → soft baseline) 概念上与 ForkPoint 的 state change detection 高度重叠，SOLAR-RL 的 first failure point detection 本质就是 fork point detection。Credit assignment 赛道已有 6+ concurrent works。建议暂停 credit assignment 子方向，转向 rule-based reward design。Grounding direction 因 GoClick 代码未公开被阻塞，需寻找 GUI-Actor 等替代 baseline。

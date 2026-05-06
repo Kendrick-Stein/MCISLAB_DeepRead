@@ -1,5 +1,5 @@
 ---
-last_updated: "2026-05-04"
+last_updated: "2026-05-06"
 updated_by: agenda-evolve
 active_topic: GUI Agent
 ---
@@ -19,7 +19,7 @@ active_topic: GUI Agent
 - **origin**: researcher-discovered
 - **hypothesis**: 架构级 multi-scale 设计（FPN + multi-resolution training + consistency loss）可以在不增加推理开销的前提下，显著提升 GUI grounding 在跨分辨率/跨设备场景下的鲁棒性
 - **evidence**: [[Topics/GUIAgent-Survey]], [[Papers/2604-GoClick]], [[Ideas/ScaleInvariant-Grounding-GUI]], [[2500-GuiActorCoordinateFree]], [[Papers/2604-AutoGUIv2]] (dichotomy: fine-tuned grounding 强于通用 VLM)
-- **next_action**: 原型验证——在 GoClick encoder-decoder 架构上添加 FPN，在 ScreenSpot 多分辨率子集上测试 cross-resolution grounding accuracy；同时阅读 Qwen-GUI-3B 和 MEGA-GUI 了解现有 cross-resolution 方案的 baseline
+- **next_action**: 原型验证——GoClick 代码未公开（阻塞），需寻找替代方案：(1) 用 GUI-Actor (microsoft/GUI-Actor-2B-Qwen2-VL, 有开源代码) 作为 baseline 添加 FPN，或 (2) 从零搭建轻量 encoder-decoder grounding 模型。同时 MEGA-GUI 已读，Qwen-GUI-3B 非公开论文（实为 OpenCSG fine-tuned model，无 paper）
 - **confidence**: 0.35 (↑ from 0.3，AutoGUI-v2 dichotomy 证明 grounding 作为专门训练能力的价值)
 
 ### RL-based GUI Agent Training
@@ -28,9 +28,9 @@ active_topic: GUI Agent
 - **status**: exploring
 - **origin**: researcher-discovered
 - **hypothesis**: Rule-based RL（GRPO 风格）配合结构化 action reward，可以以 10x 更少的训练数据达到或超越 SFT 的 GUI action prediction 性能，且 OOD 泛化更强
-- **evidence**: [[Topics/GUIAgent-Survey]], [[2500-UiR1EnhancingEfficient]], [[Papers/2604-ClawGUI]], [[2025-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]], [[Ideas/ForkPoint-CreditAssignment-GUI]], [[Papers/2604-AutoGUIv2]] (fine-tuning on agent data 对 grounding 有显著增益)
-- **next_action**: 阅读 SOLAR-RL 和 ProxMO（credit assignment 拥挤赛道的最新工作），确认差异化空间；若 ForkPoint 方向被证伪，考虑转向 rule-based reward design（更底层的贡献）
-- **confidence**: 0.3 (↑ from 0.25，AutoGUI-v2 dichotomy 支持 fine-tuning value)
+- **evidence**: [[Topics/GUIAgent-Survey]], [[2500-UiR1EnhancingEfficient]], [[Papers/2604-ClawGUI]], [[2025-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]], [[Ideas/ForkPoint-CreditAssignment-GUI]], [[Papers/2604-AutoGUIv2]] (fine-tuning on agent data 对 grounding 有显著增益), [[Papers/2604-SOLAR-RL]] (first failure point detection, 3-stage reward shaping), [[Papers/2602-ProxMO]] (PSC+PSA, 90.6% ALFWorld, state similarity credit assignment)
+- **next_action**: ForkPoint 方向已评估 10/25（ProxMO PSA 概念重叠），建议暂停 credit assignment 子方向，转向 rule-based reward design（更底层、更少竞争）；需要 Supervisor 决策是否完全放弃 credit assignment
+- **confidence**: 0.3 (unchanged)
 
 ### Self-Improving Agent Reliability
 
@@ -65,9 +65,9 @@ active_topic: GUI Agent
 - **question**: 当前以 GUI Grounding Robustness 为 primary direction、RL Training 为 secondary、Self-Improving 为 monitoring 的优先级分配是否合理？是否需要调整？
 - **related_direction**: GUI Grounding Robustness, RL-based GUI Agent Training, Self-Improving Agent Reliability
 
-### Credit Assignment 方向是否继续 — 2026-04-28
+### Credit Assignment 方向是否继续 — 2026-05-06 更新
 
 - **raised_by**: agenda-evolve
-- **context**: ForkPoint-CreditAssignment idea 评估 12/25，WebSearch 发现 SOLAR-RL、GiGPO、ProxMO、ADMIRE 等 5+ concurrent works 在 2026 年初同时发表，方向极度拥挤
-- **question**: 是否继续投入 Credit Assignment 方向（需先读完 SOLAR-RL/ProxMO 确认差异化空间），还是转向 rule-based reward design 等更底层、更少竞争的 RL 子方向？
+- **context**: SOLAR-RL 和 ProxMO 已读完。ForkPoint 评估从 12/25 降至 10/25——ProxMO 的 PSA (TF-IDF state similarity → soft baseline) 概念上与 ForkPoint 的 state change detection 高度重叠，SOLAR-RL 的 first failure point detection 本质就是 fork point detection。Credit assignment 赛道已有 6+ concurrent works (SOLAR-RL, GiGPO, ProxMO, ADMIRE, DAPO, GUI-Shepherd)
+- **question**: 建议暂停 credit assignment 子方向，转向 rule-based reward design（更底层、更少竞争的 RL 子方向）。是否同意？或者是否有 credit assignment 的独特角度（如 GUI-specific visual state similarity）值得继续探索？
 - **related_direction**: RL-based GUI Agent Training

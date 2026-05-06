@@ -1,5 +1,5 @@
 ---
-title: GS-Playground: A High-Throughput Photorealistic Simulator for Vision-Informed Robot Learning
+title: "GS-Playground: A High-Throughput Photorealistic Simulator for Vision-Informed Robot Learning"
 authors:
   - Yufei Jia
   - Heng Zhang

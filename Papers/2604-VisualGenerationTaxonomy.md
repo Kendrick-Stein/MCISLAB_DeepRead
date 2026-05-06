@@ -1,5 +1,5 @@
 ---
-title: Visual Generation in the New Era: An Evolution from Atomic Mapping to Agentic World Modeling
+title: "Visual Generation in the New Era: An Evolution from Atomic Mapping to Agentic World Modeling"
 authors:
   - Keming Wu
   - Zuhao Yang

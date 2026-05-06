@@ -1,5 +1,5 @@
 ---
-title: Libra-VLA: Achieving Learning Equilibrium via Asynchronous Coarse-to-Fine Dual-System
+title: "Libra-VLA: Achieving Learning Equilibrium via Asynchronous Coarse-to-Fine Dual-System"
 authors:
   - Yifei Wei
   - Linqing Zhong

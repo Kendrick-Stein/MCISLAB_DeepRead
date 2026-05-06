@@ -1,5 +1,5 @@
 ---
-title: Odysseys: Benchmarking Web Agents on Realistic Long Horizon Tasks
+title: "Odysseys: Benchmarking Web Agents on Realistic Long Horizon Tasks"
 authors:
   - Lawrence Keunho Jang
   - Jing Yu Koh

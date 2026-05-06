@@ -1,5 +1,5 @@
 ---
-title: Vision-Language-Action Safety: Threats, Challenges, Evaluations, and Mechanisms
+title: "Vision-Language-Action Safety: Threats, Challenges, Evaluations, and Mechanisms"
 authors: ["Qi Li", "Bo Yin", "Weiqi Huang", "Ruhao Liu", "Bojun Zou", "Runpeng Yu", "Jingwen Ye", "Weihao Yu", "Xinchao Wang"]
 institute: ["National University of Singapore", "Monash University", "Peking University"]
 date_publish: 2026-04-26

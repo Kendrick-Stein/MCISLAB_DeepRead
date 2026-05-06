@@ -1,5 +1,5 @@
 ---
-title: AutoGUI-v2: A Comprehensive Multi-Modal GUI Functionality Understanding Benchmark
+title: "AutoGUI-v2: A Comprehensive Multi-Modal GUI Functionality Understanding Benchmark"
 authors: [待补充]
 institute: [待补充]
 date_publish: 2026-04-27

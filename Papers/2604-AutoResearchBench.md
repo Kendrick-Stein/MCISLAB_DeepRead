@@ -1,5 +1,5 @@
 ---
-title: AutoResearchBench: Benchmarking AI Agents on Complex Scientific Literature Discovery
+title: "AutoResearchBench: Benchmarking AI Agents on Complex Scientific Literature Discovery"
 authors: ["Lei Xiong", "Kun Luo", "Ziyi Xia", "Wenbo Zhang", "Jin-Ge Yao", "Zheng Liu", "Jingying Shao", "Jianlyu Chen", "Hongjin Qian", "Xi Yang", "Qian Yu", "Hao Li", "Chen Yue", "Xiaan Du", "Yuyang Wang", "Yesheng Liu", "Haiyu Xu", "Zhicheng Dou"]
 institute: ["Renmin University of China", "AutoResearchBench Team"]
 date_publish: 2026-04-28

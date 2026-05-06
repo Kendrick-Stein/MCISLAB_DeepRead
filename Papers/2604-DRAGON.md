@@ -1,5 +1,5 @@
 ---
-title: DRAGON: A Benchmark for Evidence-Grounded Visual Reasoning over Diagrams
+title: "DRAGON: A Benchmark for Evidence-Grounded Visual Reasoning over Diagrams"
 authors: [Anirudh Iyengar Kaniyar Narayana Iyengar, Tampu Ravi Kumar, Gaurav Najpande, Manan Suri, Dinesh Manocha, Puneet Mathur, Vivek Gupta]
 institute: [Arizona State University, Adobe Research, University of Maryland]
 date_publish: 2026-04-28

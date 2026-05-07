@@ -1,5 +1,5 @@
 ---
-title: Beyond SFT-to-RL: Pre-alignment via Black-Box On-Policy Distillation for Multimodal RL
+title: "Beyond SFT-to-RL: Pre-alignment via Black-Box On-Policy Distillation for Multimodal RL"
 authors:
   - Sudong Wang
   - Weiquan Huang

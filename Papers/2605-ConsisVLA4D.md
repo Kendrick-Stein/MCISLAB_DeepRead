@@ -1,5 +1,5 @@
 ---
-title: ConsisVLA-4D: Advancing Spatiotemporal Consistency in Efficient 3D-Perception and 4D-Reasoning for Robotic Manipulation
+title: "ConsisVLA-4D: Advancing Spatiotemporal Consistency in Efficient 3D-Perception and 4D-Reasoning for Robotic Manipulation"
 authors:
   - Wei Li
   - Jizhihui Liu

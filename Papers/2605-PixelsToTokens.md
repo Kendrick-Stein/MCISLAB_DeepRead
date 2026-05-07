@@ -1,5 +1,5 @@
 ---
-title: From Pixels to Tokens: A Systematic Study of Latent Action Supervision for Vision-Language-Action Models
+title: "From Pixels to Tokens: A Systematic Study of Latent Action Supervision for Vision-Language-Action Models"
 authors:
   - Yihan Lin
   - Haoyang Li

@@ -1,5 +1,5 @@
 ---
-last_updated: "2026-05-06"
+last_updated: "2026-05-07"
 updated_by: agenda-evolve
 active_topic: GUI Agent
 ---
@@ -18,9 +18,9 @@ active_topic: GUI Agent
 - **status**: exploring
 - **origin**: researcher-discovered
 - **hypothesis**: 架构级 multi-scale 设计（FPN + multi-resolution training + consistency loss）可以在不增加推理开销的前提下，显著提升 GUI grounding 在跨分辨率/跨设备场景下的鲁棒性
-- **evidence**: [[Topics/GUIAgent-Survey]], [[Papers/2604-GoClick]], [[Ideas/ScaleInvariant-Grounding-GUI]], [[2500-GuiActorCoordinateFree]], [[Papers/2604-AutoGUIv2]] (dichotomy: fine-tuned grounding 强于通用 VLM)
-- **next_action**: 原型验证——GoClick 代码未公开（阻塞），需寻找替代方案：(1) 用 GUI-Actor (microsoft/GUI-Actor-2B-Qwen2-VL, 有开源代码) 作为 baseline 添加 FPN，或 (2) 从零搭建轻量 encoder-decoder grounding 模型。同时 MEGA-GUI 已读，Qwen-GUI-3B 非公开论文（实为 OpenCSG fine-tuned model，无 paper）
-- **confidence**: 0.35 (↑ from 0.3，AutoGUI-v2 dichotomy 证明 grounding 作为专门训练能力的价值)
+- **evidence**: [[Topics/GUIAgent-Survey]], [[Papers/2604-GoClick]], [[Ideas/ScaleInvariant-Grounding-GUI]], [[2500-GuiActorCoordinateFree]], [[Papers/2604-AutoGUIv2]] (dichotomy: fine-tuned grounding 强于通用 VLM), [[Papers/2604-WindowsWorld]] (跨应用是独立瓶颈 L1 46% vs L2 14%，grounding 能力比 reasoning 更关键)
+- **next_action**: 实验已重设计为 GUI-Actor baseline（Experiments/2026-04-29-ScaleInvariantGroundingGUI 已更新），下一步：原型验证 FPN + multi-resolution training 在 ScreenSpot-Pro 上的效果
+- **confidence**: 0.4 (↑ from 0.35，WindowsWorld 跨应用瓶颈 evidence + grounding 关键性 evidence 支持方向重要性)
 
 ### RL-based GUI Agent Training
 
@@ -71,3 +71,10 @@ active_topic: GUI Agent
 - **context**: SOLAR-RL 和 ProxMO 已读完。ForkPoint 评估从 12/25 降至 10/25——ProxMO 的 PSA (TF-IDF state similarity → soft baseline) 概念上与 ForkPoint 的 state change detection 高度重叠，SOLAR-RL 的 first failure point detection 本质就是 fork point detection。Credit assignment 赛道已有 6+ concurrent works (SOLAR-RL, GiGPO, ProxMO, ADMIRE, DAPO, GUI-Shepherd)
 - **question**: 建议暂停 credit assignment 子方向，转向 rule-based reward design（更底层、更少竞争的 RL 子方向）。是否同意？或者是否有 credit assignment 的独特角度（如 GUI-specific visual state similarity）值得继续探索？
 - **related_direction**: RL-based GUI Agent Training
+
+### SGV 论文来源 — 2026-05-07
+
+- **raised_by**: autoresearch
+- **context**: Self-Improving direction next_action 指向"阅读 SGV (Self-Grounded Verification) 论文"。Vault 中 DomainMap 提到 SGV "20pp OSWorld 提升"，但无具体 paper URL 或 arxiv ID。Web search 未返回匹配结果。UI-Genie 论文已消化，未提及 SGV 论文。
+- **question**: 请提供 SGV (Self-Grounded Verification) 论文的 arxiv URL 或完整标题。如果该论文未公开发表或名称不同，请告知正确来源。
+- **related_direction**: Self-Improving Agent Reliability

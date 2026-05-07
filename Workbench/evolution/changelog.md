@@ -61,3 +61,15 @@
 - **directions_paused**: 0
 - **directions_abandoned**: 0
 - **reasoning**: ProxMO 的 PSA (TF-IDF state similarity → soft baseline) 概念上与 ForkPoint 的 state change detection 高度重叠，SOLAR-RL 的 first failure point detection 本质就是 fork point detection。Credit assignment 赛道已有 6+ concurrent works。建议暂停 credit assignment 子方向，转向 rule-based reward design。Grounding direction 因 GoClick 代码未公开被阻塞，需寻找 GUI-Actor 等替代 baseline。
+
+## 2026-05-07
+
+### [2026-05-07] agenda-evolve
+
+- **trigger**: autoresearch Round 2——WindowsWorld (05-06 digest) 提供新 evidence，实验已重设计为 GUI-Actor baseline
+- **insights_reviewed**: 2（evaluation shift validated, VLM dichotomy provisional）
+- **directions_added**: 0
+- **directions_updated**: 1（GUI Grounding Robustness: evidence 新增 WindowsWorld + next_action 更新为"实验已重设计"，confidence 0.35→0.4）
+- **directions_paused**: 0
+- **directions_abandoned**: 0
+- **reasoning**: WindowsWorld 跨应用瓶颈（L1 46% vs L2 14%）和"grounding 能力比 reasoning 更关键"的发现支持 GUI Grounding 方向的重要性。GoClick 阻塞已解决（实验重设计为 GUI-Actor baseline）。Confidence 提升 0.35→0.4。

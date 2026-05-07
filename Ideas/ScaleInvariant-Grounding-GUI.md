@@ -79,4 +79,4 @@ date_updated: "2026-04-28"
 
 ## Experiments
 
-- [[Experiments/2026-04-29-ScaleInvariantGroundingGUI]] — 验证 FPN + resolution-adaptive anchors 在跨分辨率 grounding 上的精度提升和退化减少
+- [[Experiments/2026-04-29-ScaleInvariantGroundingGUI]] — 验证 FPN + multi-resolution training 在 GUI-Actor baseline 上的跨分辨率 grounding 精度提升（2026-05-07: GoClick→GUI-Actor baseline 更新）

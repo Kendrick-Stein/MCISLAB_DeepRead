@@ -4,6 +4,7 @@ idea: "[[Ideas/ScaleInvariant-Grounding-GUI]]"
 tags: [gui-agent, grounding, visual-representation, resolution-robustness]
 status: planned
 date_created: "2026-04-29"
+date_updated: "2026-05-07"
 date_completed:
 ---
 ## Objective
@@ -12,42 +13,46 @@ date_completed:
 
 ## Setup
 
-- **代码**: 基于 GoClick encoder-decoder 架构，添加 FPN module
-- **数据**: ScreenSpot-Pro 跨分辨率子集（需确认是否存在，否则构造）
+- **代码**: 基于 GUI-Actor (microsoft/GUI-Actor-2B-Qwen2-VL) attention-based grounding 架构，添加 FPN module
+- **数据**: ScreenSpot-Pro（含多分辨率测试场景）
 - **环境**: 单卡 A100 或等效 GPU
 - **关键参数**: FPN levels P3-P7，resolution range [720p, 1080p, 1440p, 2K]
+- **更新原因**: GoClick 代码未公开（阻塞），改用 GUI-Actor（开源、有 HuggingFace checkpoint）
 
 ## Method
 
 ### 实验步骤
 
 1. **Baseline 架构搭建**
-   - 复现 GoClick encoder-decoder（230M 参数）
-   - 在 ScreenSpot train split 上训练，获得 baseline checkpoint
+   - 加载 GUI-Actor-2B-Qwen2-VL checkpoint（开源，HuggingFace）
+   - 验证 ScreenSpot-Pro baseline performance（预期 ~40.7）
+   - GUI-Actor 架构：VLM backbone + <ACTOR> token + attention-based action head
 
-2. **FPN 添加**
-   - 在 GoClick encoder 输出端添加 FPN（自顶向下 + 横向连接）
-   - FPN levels: P3-P7（对应 1/8 到 1/128 stride）
-   - Grounding head 在每个 level 独立预测，scale-aware fusion 合并
+2. **FPN 集成设计**
+   - 在 Qwen2-VL visual encoder 输出端插入 FPN（自顶向下 + 横向连接）
+   - FPN 输出 multi-scale feature maps → <ACTOR> token 在各 level 计算 attention
+   - Multi-level attention maps 通过 scale-aware fusion 合并（加权或 max-pooling）
+   - 关键：FPN 位于 visual encoder 和 <ACTOR> attention head 之间，保持 coordinate-free 设计
 
-3. **Resolution-Adaptive Anchors**
-   - Anchor 尺寸以屏幕相对坐标表示（宽度的 2%-80%）
-   - 替代固定像素值 anchor
+3. **Resolution-Adaptive Patch Supervision**
+   - GUI-Actor 的 Spatial-Aware Multi-Patch Supervision 自然支持区域级监督
+   - 增强：在不同分辨率下，目标元素映射到不同数量 patches，但 supervision 区域保持语义一致
 
 4. **Multi-Resolution Training**
-   - 训练时随机采样 3-5 种分辨率
-   - 同一 screenshot 以不同分辨率输入
-   - Consistency Loss: KL 散度约束不同分辨率预测一致
+   - 训练时随机采样 3-5 种分辨率（720p, 1080p, 1440p, 2K）
+   - 同一 screenshot resize 到不同分辨率输入
+   - Consistency Loss: KL 散度约束不同分辨率下 <ACTOR> attention 分布一致
 
 5. **Evaluation**
-   - ScreenSpot-Pro 跨分辨率 test set
+   - ScreenSpot-Pro 全集（含 unseen resolution/layout）
    - 分辨率压力测试：在 1080p 训练，在 720p/1440p/2K 测试
+   - 对比 GUI-Actor baseline（无 FPN）在分辨率变化下的退化曲线
 
 ### Baselines
 
-- **GoClick** (`[[Papers/Archive/2604-GoClick]]`): 单尺度 encoder-decoder，230M 参数
-- **MEGA-GUI** (`[[Papers/2500-MegaGuiMultiStage]]`): zoom-in pipeline，multi-stage
-- **GUI-Actor** (`[[2500-GuiActorCoordinateFree]]`): patch-level attention prediction
+- **GUI-Actor** (`[[Papers/2500-GuiActorCoordinateFree]]`): Coordinate-free attention-based grounding，Qwen2-VL backbone（开源，主 baseline）
+- **SeeClick** (`[[2400-SeeclickHarnessingGuiGrounding]]`): 单尺度 GUI grounding pre-training
+- **Qwen2.5-VL (通用 VLM)**: 无专门 grounding 训练，对比专门架构 vs 通用 VLM
 
 ## Results
 
@@ -74,74 +79,85 @@ date_completed:
 
 ### Variables
 
-- **自变量（Independent Variable）**: 是否添加 FPN + resolution-adaptive anchors（w/ FPN vs. w/o FPN）
+- **自变量（Independent Variable）**: 是否添加 FPN + multi-resolution training（w/ FPN vs. w/o FPN）
 - **因变量（Dependent Variable）**: 
-  - Grounding accuracy at different resolutions
+  - Grounding accuracy at different resolutions (ScreenSpot-Pro)
   - Cross-resolution accuracy degradation
 - **控制变量（Controlled Variable）**:
-  - Base model（GoClick encoder-decoder，230M）
+  - Base model（GUI-Actor-2B-Qwen2-VL，冻结 backbone）
   - Training data（ScreenSpot train split）
-  - Training epochs（固定）
+  - FPN 新增参数量（控制在 ~50M 以内）
   - Random seeds（固定 3 个种子取均值）
 
 ### Metrics
 
-- **Primary Metric**: Grounding accuracy on cross-resolution test set (%)
-  - 定义：正确定位目标元素的样本比例
-  - 细分：720p accuracy / 1080p accuracy / 1440p accuracy / 2K accuracy
+- **Primary Metric**: Grounding accuracy on ScreenSpot-Pro (%)
+  - 定义：正确定位目标元素的样本比例（coordinate-free 判定：目标 patch 被选中）
+  - 细分：按分辨率分组统计（低分辨率 / 标准分辨率 / 高分辨率）
   
 - **Secondary Metrics**:
   - Cross-resolution degradation: accuracy@1080p - accuracy@720p (%)
+  - OOD resolution accuracy（unseen resolution layout）
   - Inference latency (ms/sample) - 验证 FPN 是否增加推理开销
-  - Model size (MB) - 确认参数量仍在 on-device 范围
 
 ### Baselines
 
-1. **GoClick** (`[[Papers/Archive/2604-GoClick]]`)
-   - 230M encoder-decoder，单尺度
-   - 公平对比：相同参数规模、相同训练数据
+1. **GUI-Actor** (`[[Papers/2500-GuiActorCoordinateFree]]`)
+   - 2B Qwen2-VL backbone，coordinate-free attention-based grounding
+   - 公平对比：相同 backbone，相同训练数据，仅增加 FPN
    
-2. **MEGA-GUI** (`[[Papers/2500-MegaGuiMultiStage]]`)
-   - Zoom-in pipeline，推理时多阶段
-   - 对比点：架构级 FPN vs inference-time zoom
+2. **SeeCLICK** (`[[2400-SeeclickHarnessingGuiGrounding]]`)
+   - 单尺度 GUI grounding pre-training
+   - 对比点：multi-scale architecture vs single-scale pre-training
    
-3. **GUI-Actor** (`[[2500-GuiActorCoordinateFree]]`)
-   - Patch-level attention，coordinate-free
-   - 对比点：multi-scale architecture vs coordinate-free approach
+3. **Qwen2.5-VL (通用 VLM)**
+   - 无专门 grounding 训练
+   - 对比点：专门 grounding 架构 vs 通用 VLM
 
 ### Expected Outcome
 
 **假设成立（Hypothesis Confirmed）**:
-- w/ FPN 在 ScreenSpot-Pro 跨分辨率子集上 accuracy 比 GoClick baseline 提升 ≥20%（绝对值，如 50%→70%）
-- 分辨率从 1080p 降至 720p 时，精度退化 <5%（baseline 通常退化 15-20%）
-- 推理 latency 增加不超过 10%（FPN overhead minimal）
+- w/ FPN 在 ScreenSpot-Pro 上 accuracy 比 GUI-Actor baseline 提升 ≥5%（绝对值，如 40.7→45.7）
+- 分辨率从 1080p 降至 720p 时，精度退化 <5%（baseline 通常退化 10-15%）
+- OOD resolution accuracy 显著高于 baseline（证明 cross-resolution 泛化）
+- 推理 latency 增加不超过 15%（FPN overhead acceptable）
 
 **假设不成立（Hypothesis Refuted）**:
-- 若 accuracy 提升 <10% 且退化仍 >10%，说明 FPN 对 GUI grounding 的 resolution invariance 问题帮助有限
-- 解读：GUI 元素的尺度分布可能与自然图像不同，FPN level 分配需要专门调优
-- 下一步：分析 ScreenSpot 元素尺度分布，重新设计 FPN level；或结合 zoom-in 与 FPN
+- 若 accuracy 提升 <2% 且退化仍 >8%，说明 FPN 对 GUI-Actor 的 coordinate-free 设计帮助有限
+- 解读：GUI-Actor 的 patch-level attention 可能已经隐式处理了部分尺度变化，显式 FPN 增益不显著
+- 下一步：(1) 结合 FPN 与 zoom-in（MEGA-GUI 风格）做 hybrid；(2) 或转向 resolution-aware positional encoding（如 RULER）
 
 ### Risk & Mitigation
 
-1. **FPN 增加计算开销**
-   - 风险：multi-scale 特征提取可能抵消小模型的延迟优势
+1. **FPN 与 coordinate-free attention 不兼容**
+   - 风险：FPN 设计用于 dense prediction（如检测），GUI-Actor 是 sparse attention prediction，二者可能冲突
    - 概率：medium
-   - 应对：使用轻量 FPN 变体（BiFPN-lite）；训练时 multi-scale 作为正则化，推理时 single-scale
-   
-2. **ScreenSpot 跨分辨率子集不存在**
-   - 风险：需构造数据，增加实验成本
+   - 应对：先做 minimal prototype（仅加 FPN 到 visual encoder，保持 <ACTOR> attention 不变），验证兼容性
+
+2. **FPN 增加计算开销过高**
+   - 风险：multi-scale 特征提取显著增加推理 latency
    - 概率：medium
-   - 应对：在线 resize 即可，无需预生成；可先用 ScreenSpot 验证单尺度 baseline
-   
-3. **FPN 对 GUI 元素尺度分布不适配**
-   - 风险：GUI 元素尺度差异可能超出 FPN designed range（如 16×16 icon vs 全屏 banner）
+   - 应对：使用轻量 FPN（如 BiFPN-lite）；训练时 multi-scale，推理时可选 single-scale
+
+3. **GUI-Actor backbone frozen 导致 FPN 学习不充分**
+   - 风险：冻结 VLM backbone，FPN 新参数难以学到有效的 multi-scale representation
+   - 概率：low
+   - 应对：先 unfreeze FPN 相关层，观察效果；必要时可 unfreeze 部分 backbone
+
+4. **ScreenSpot 缺乏多分辨率标注**
+   - 风险：难以量化 cross-resolution 泛化
    - 概率：medium
-   - 应对：先分析 ScreenSpot 元素尺度分布，调整 anchor 和 FPN level 配置
+   - 应对：在线 resize 构造多分辨率测试；或补充 WindowsWorld benchmark（跨应用、多分辨率）
 
 ### Memory Reference
 
 **From patterns.md**:
-- Small specialized models can match large models on GUI grounding（GoClick 230M ≈ large VLM）→ 支持轻量化 baseline 选择
-- VLM capabilities are fragmented across sub-tasks → grounding 可能需要专门架构而非通用 VLM
+- Small specialized models can match large models on GUI grounding → 支持轻量化 baseline
+- VLM capabilities are fragmented across sub-tasks → grounding 需专门架构
+- Evaluation methodology shifting to multi-dimensional diagnosis → 需多维度 metric
 
-**No specific effective-methods/failed-directions memory file exists** - this experiment design is based on idea evaluation and paper analysis.
+**From insights.md**:
+- VLM grounding vs captioning capability dichotomy → fine-tuning on agent data 对 grounding 有增益
+
+**Update log**:
+- 2026-05-07: GoClick code unavailable → baseline 改为 GUI-Actor（开源、有 checkpoint）

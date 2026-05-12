@@ -5,7 +5,7 @@ institute: [SJTU, Alibaba]
 date_publish: 2026-05-05
 venue: arXiv
 tags: [computer-use, gui-agent, LLM, task-planning]
-url: https://arxiv.org/abs/2605.03596v1
+url: "https://arxiv.org/abs/2605.03596v1"
 code:
 rating: "3"
 date_added: 2026-05-06

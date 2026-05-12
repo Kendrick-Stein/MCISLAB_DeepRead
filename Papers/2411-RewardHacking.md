@@ -1,5 +1,5 @@
 ---
-title: Reward Hacking in Reinforcement Learning
+title: "Reward Hacking in Reinforcement Learning"
 authors: [Lilian Weng]
 institutes: [OpenAI (personal blog)]
 date_publish: 2024-11-28

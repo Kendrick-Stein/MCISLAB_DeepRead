@@ -5,7 +5,7 @@ institute: ["Tsinghua University", "Nanyang Technological University"]
 date_publish: 2026-05
 venue: arXiv
 tags: [gui-agent, world-model, VLM]
-url: https://arxiv.org/abs/2605.10347v1
+url: "https://arxiv.org/abs/2605.10347v1"
 code:
 rating: "2"
 date_added: 2026-05-12
@@ -70,3 +70,25 @@ GUI agents 在执行任务时面临环境理解的挑战——如何准确感知
 - Finding 3（post-hoc reflection 无效）与 "world model as verifier" 的主流叙事形成张力——如果不适合做 post-hoc 验证，最大价值在 training data augmentation 和 reward shaping
 - Xiaolin Hu（清华）+ Bo An（NTU）组合在 GUI agent 领域持续产出
 - 一篇扎实但 uninspiring 的实证工作，对后续研究有参考价值但不会改变方向
+
+## Mind Map
+
+```mermaid
+mindmap
+  root((MobileWorldModelGUI))
+    Problem
+      GUI agent 如何感知 UI 状态变化
+      Text-based representation 丢失视觉信息
+      World model 模态选择不明确
+    Method
+      4 种模态比较: delta text / full text / diffusion image / renderable code
+      分布内保真度评估
+      OOD 鲁棒性评估
+      Training data augmentation
+      Post-hoc self-reflection
+    Results
+      Renderable code 保真度最高
+      Text-based OOD 更鲁棒
+      World model 适合做 training data
+      Post-hoc reflection 效果有限
+```

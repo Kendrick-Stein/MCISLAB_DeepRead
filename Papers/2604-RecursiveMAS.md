@@ -1,5 +1,5 @@
 ---
-title: Recursive Multi-Agent Systems
+title: "Recursive Multi-Agent Systems"
 authors:
   - Xiyuan Yang
   - Jiaru Zou

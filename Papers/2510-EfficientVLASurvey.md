@@ -1,5 +1,5 @@
 ---
-title: A Survey on Efficient Vision-Language-Action Models
+title: "A Survey on Efficient Vision-Language-Action Models"
 authors: [Zhaoshu Yu, Bo Wang, Pengpeng Zeng, Haonan Zhang, Ji Zhang, Zheng Wang, Lianli Gao, Jingkuan Song, Nicu Sebe, Heng Tao Shen]
 institutes: [Tongji University, Southwest Jiaotong University, UESTC, University of Trento]
 date_publish: 2025-10-27

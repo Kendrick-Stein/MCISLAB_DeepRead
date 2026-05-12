@@ -1,12 +1,12 @@
 ---
-title: Step-level Optimization for Efficient Computer-use Agents
+title: "Step-level Optimization for Efficient Computer-use Agents"
 authors: ["Jinbiao Wei", "Kangqi Ni", "Yilun Zhao", "Guo Gan", "Arman Cohan"]
 institute: ["Yale NLP Lab", "University of North Carolina at Chapel Hill"]
 date_publish: 2026-04-29
 venue: arXiv
 tags: ["computer-use", "gui-agent", "agentic-RL"]
-url: https://arxiv.org/abs/2604.27151
-code: https://github.com/yale-nlp/StepWise
+url: "https://arxiv.org/abs/2604.27151"
+code: "https://github.com/yale-nlp/StepWise"
 rating: 4
 date_added: 2026-05-03
 ---

@@ -5,7 +5,7 @@ institute: [待补充]
 date_publish: 2026-04-27
 venue: arXiv
 tags: [gui-agent, VLM]
-url: https://arxiv.org/abs/2604.24441
+url: "https://arxiv.org/abs/2604.24441"
 code: 待补充
 rating: 4
 date_added: 2026-05-04

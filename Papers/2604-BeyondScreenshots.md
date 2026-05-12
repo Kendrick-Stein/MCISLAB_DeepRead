@@ -5,8 +5,8 @@ institute: [University of Michigan]
 date_publish: 2026-04-28
 venue: arXiv
 tags: [VLM, gui-agent, video-understanding]
-url: http://arxiv.org/abs/2604.26148v1
-code: https://github.com/publicationacc/AniMINT
+url: "http://arxiv.org/abs/2604.26148v1"
+code: "https://github.com/publicationacc/AniMINT"
 rating: "4"
 date_added: 2026-04-30
 ---

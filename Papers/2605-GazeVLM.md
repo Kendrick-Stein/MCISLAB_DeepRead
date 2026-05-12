@@ -1,12 +1,12 @@
 ---
-title: GazeVLM: Active Vision via Internal Attention Control for Multimodal Reasoning
+title: "GazeVLM: Active Vision via Internal Attention Control for Multimodal Reasoning"
 authors: []
 institute: []
 date_publish: 2026-05-12
 venue: arXiv
 tags: [VLM, embodied-reasoning]
-url: http://arxiv.org/abs/2605.07817v1
-code: https://github.com/opension/GazeVLM
+url: "http://arxiv.org/abs/2605.07817v1"
+code: "https://github.com/opension/GazeVLM"
 rating: 3
 date_added: 2026-05-12
 ---

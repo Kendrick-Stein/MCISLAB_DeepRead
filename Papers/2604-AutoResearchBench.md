@@ -5,8 +5,8 @@ institute: ["Renmin University of China", "AutoResearchBench Team"]
 date_publish: 2026-04-28
 venue: arXiv
 tags: ["auto-research", "LLM", "web-agent"]
-url: https://arxiv.org/abs/2604.25256
-code: https://github.com/CherYou/AutoResearchBench
+url: "https://arxiv.org/abs/2604.25256"
+code: "https://github.com/CherYou/AutoResearchBench"
 rating: 3
 date_added: 2026-04-29
 ---

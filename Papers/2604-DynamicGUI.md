@@ -1,11 +1,11 @@
 ---
-title: Benchmarking and Improving GUI Agents in High-Dynamic Environments
+title: "Benchmarking and Improving GUI Agents in High-Dynamic Environments"
 authors: [Enqi Liu, Liyuan Pan, Zhi Gao, Yan Yang, Chenrui Shi, Yang Liu, Jingrong Wu, Qing Li]
 institute: [Beijing Institute of Technology]
 date_publish: 2026-04-28
 venue: ACM MM 2026 (submitted)
 tags: [GUI-Agent, Benchmark, POMDP, Dynamic-Environment, VLM]
-url: http://arxiv.org/abs/2604.25380v1
+url: "http://arxiv.org/abs/2604.25380v1"
 code:
 rating: "3"
 date_added: 2026-04-29

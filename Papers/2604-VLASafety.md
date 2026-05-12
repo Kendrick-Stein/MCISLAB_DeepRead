@@ -5,8 +5,8 @@ institute: ["National University of Singapore", "Monash University", "Peking Uni
 date_publish: 2026-04-26
 venue: arXiv
 tags: ["VLA", "survey"]
-url: https://arxiv.org/abs/2604.23775
-code: https://github.com/LiQiiiii/Awesome-VLA-Safety
+url: "https://arxiv.org/abs/2604.23775"
+code: "https://github.com/LiQiiiii/Awesome-VLA-Safety"
 rating: "3"
 date_added: 2026-04-29
 ---

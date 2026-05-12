@@ -5,8 +5,8 @@ institute: ["MBZUAI", "University College London"]
 date_publish: 2026-04-14
 venue: arXiv
 tags: ["computer-use", "web-agent"]
-url: https://arxiv.org/abs/2604.14228
-code: https://github.com/VILA-Lab/Dive-into-Claude-Code
+url: "https://arxiv.org/abs/2604.14228"
+code: "https://github.com/VILA-Lab/Dive-into-Claude-Code"
 rating: 4
 date_added: 2026-04-28
 ---

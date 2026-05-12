@@ -5,8 +5,8 @@ institute: ["Allen Institute for AI", "University of Michigan"]
 date_publish: 2026-05-04
 venue: arXiv
 tags: ["VLA", "embodied-reasoning", "manipulation"]
-url: https://arxiv.org/abs/2605.02881
-code: https://github.com/allenai/molmo-act
+url: "https://arxiv.org/abs/2605.02881"
+code: "https://github.com/allenai/molmo-act"
 rating: "4"
 date_added: 2026-05-06
 ---

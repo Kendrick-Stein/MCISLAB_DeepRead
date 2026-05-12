@@ -5,7 +5,7 @@ institute: ["OpenBMB", "Tsinghua University"]
 date_publish: 2026-04
 venue: arXiv
 tags: [VLM]
-url: https://arxiv.org/abs/2604.27393
+url: "https://arxiv.org/abs/2604.27393"
 code:
 rating: "2"
 date_added: 2026-05-12
@@ -59,3 +59,25 @@ date_added: 2026-05-12
 - 9B 做边缘部署的工程价值大于学术 novelty
 - 与 Qwen3-Omni 的对比不公平——30B vs 9B，scale 差异太大
 - 需要全文确认：TAIL 策略的具体实现细节、proactive behavior 的触发机制
+
+## Mind Map
+
+```mermaid
+mindmap
+  root((MiniCPMo45))
+    Problem
+      Full-duplex 交互效率低
+      直接生成 speech token 退化严重
+      真正的全双工仍是假象
+    Method
+      Omni-Flow 统一流式框架
+      Text-only LLM backbone (Qwen3-8B)
+      Lightweight speech decoder (0.3B)
+      TAIL 策略时间对齐
+      Proactive behavior
+    Results
+      9B 参数 <12GB RAM
+      1.0s chunk size 延迟
+      Chunk size 0.2s 时崩溃
+      AlpacaEval 3.56→1.22
+```

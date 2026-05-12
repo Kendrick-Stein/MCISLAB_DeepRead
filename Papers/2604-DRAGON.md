@@ -5,7 +5,7 @@ institute: [Arizona State University, Adobe Research, University of Maryland]
 date_publish: 2026-04-28
 venue: arXiv
 tags: [VLM, scene-understanding]
-url: http://arxiv.org/abs/2604.25231v1
+url: "http://arxiv.org/abs/2604.25231v1"
 code:
 rating: 3
 date_added: 2026-04-29

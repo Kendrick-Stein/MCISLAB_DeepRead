@@ -1,5 +1,5 @@
 ---
-title: Visual Language Maps for Robot Navigation
+title: "Visual Language Maps for Robot Navigation"
 authors: [Chenguang Huang, Oier Mees, Andy Zeng, Wolfram Burgard]
 institutes: [University of Freiburg, Google Research, University of Technology Nuremberg]
 date_publish: 2022-10-11

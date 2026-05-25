@@ -73,3 +73,13 @@
 - **directions_paused**: 0
 - **directions_abandoned**: 0
 - **reasoning**: WindowsWorld 跨应用瓶颈（L1 46% vs L2 14%）和"grounding 能力比 reasoning 更关键"的发现支持 GUI Grounding 方向的重要性。GoClick 阻塞已解决（实验重设计为 GUI-Actor baseline）。Confidence 提升 0.35→0.4。
+
+### [2026-05-19] agenda-evolve
+
+- **trigger**: autoresearch Round 1——近期 digested papers (WorkspaceBench, DUDE, Skill1) 提供新 evidence
+- **insights_reviewed**: 2（evaluation shift validated, VLM dichotomy provisional）
+- **directions_added**: 0
+- **directions_updated**: 2（GUI Grounding Robustness: evidence 新增 WorkspaceBench，confidence 0.4→0.45；RL-based GUI Agent Training: evidence 新增 DUDE + Skill1，next_action 更新，confidence 0.3→0.35）
+- **directions_paused**: 0
+- **directions_abandoned**: 0
+- **reasoning**: WorkspaceBench 的 74 file types + 20K files 场景下 Heterogeneous File Understanding 和 Lineage Tracing 瓶颈进一步验证 grounding 在复杂环境中的重要性。DUDE 的 asymmetric reward (ω=10) 和 Skill1 的 frequency-based credit assignment 为 RL Training 方向的 reward design 提供新思路，虽然 credit assignment 子方向拥挤，但 reward design 角度仍有探索空间。

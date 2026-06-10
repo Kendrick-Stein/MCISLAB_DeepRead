@@ -22,7 +22,15 @@ def validate_frontmatter(filepath):
         if len(parts) < 3:
             return False, "Invalid frontmatter format"
 
-        yaml.safe_load(parts[1])
+        fm = yaml.safe_load(parts[1])
+
+        # Check field types
+        if 'institute' in fm and isinstance(fm['institute'], str):
+            return False, "institute must be a list, not a string"
+
+        if 'authors' in fm and isinstance(fm['authors'], str):
+            return False, "authors must be a list, not a string"
+
         return True, None
 
     except yaml.YAMLError as e:

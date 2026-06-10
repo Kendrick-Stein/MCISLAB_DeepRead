@@ -7,7 +7,8 @@ const PaperMeta: QuartzComponent = ({ fileData }: QuartzComponentProps) => {
 
   const fm = fileData.frontmatter as Record<string, any>
   const authors: string[] = fm?.authors ?? []
-  const institute: string[] = fm?.institute ?? []
+  const instituteRaw = fm?.institute ?? []
+  const institute: string[] = Array.isArray(instituteRaw) ? instituteRaw : [instituteRaw].filter(Boolean)
   const venue: string = fm?.venue ?? ""
 
   if (authors.length === 0 && institute.length === 0 && !venue) return <></>

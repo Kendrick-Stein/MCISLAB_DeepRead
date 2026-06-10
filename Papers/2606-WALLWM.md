@@ -1,47 +1,48 @@
 ---
-title: "WALL-WM: Carving World Action Modeling at the Event Joints"
+title: 'WALL-WM: Carving World Action Modeling at the Event Joints'
 authors:
-  - Shalfun Li
-  - Victor Yao
-  - Charles Yang
-  - Truth Qu
-  - Regis Cheng
-  - Ryan Yu
-  - Howard Lu
-  - Newton Von
-  - Vincent Chen
-  - Yohann Tang
-  - Maeve Zhang
-  - Ellie Ma
-  - Gody Li
-  - Sage Yang
-  - Lorien Shu
-  - J.W. Gao
-  - Ethan Chen
-  - Colin Ye
-  - Yu Sun
-  - Elise Mon
-  - PS Zhang
-  - Neo Li
-  - Lily Li
-  - James Wang
-  - Ping Yang
-  - Chris Pan
-  - Lucy Liang
-  - Hang Su
-  - Roy Gan
-  - Hao Wang
-  - Qian Wang
-institute: X Square Robot Team
+- Shalfun Li
+- Victor Yao
+- Charles Yang
+- Truth Qu
+- Regis Cheng
+- Ryan Yu
+- Howard Lu
+- Newton Von
+- Vincent Chen
+- Yohann Tang
+- Maeve Zhang
+- Ellie Ma
+- Gody Li
+- Sage Yang
+- Lorien Shu
+- J.W. Gao
+- Ethan Chen
+- Colin Ye
+- Yu Sun
+- Elise Mon
+- PS Zhang
+- Neo Li
+- Lily Li
+- James Wang
+- Ping Yang
+- Chris Pan
+- Lucy Liang
+- Hang Su
+- Roy Gan
+- Hao Wang
+- Qian Wang
+institute:
+- X Square Robot Team
 date_publish: 2026-06-01
 venue: arXiv
 tags:
-  - world-model
-  - VLA
-  - manipulation
-  - embodied-reasoning
+- world-model
+- VLA
+- manipulation
+- embodied-reasoning
 url: https://arxiv.org/abs/2606.01955
-code:
+code: null
 rating: 4
 date_added: 2026-06-07
 ---

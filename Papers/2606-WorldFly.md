@@ -1,5 +1,5 @@
 ---
-title: WorldFly: A World-Model-Based Vision-Language-Action Model for UAV Navigation
+title: "WorldFly: A World-Model-Based Vision-Language-Action Model for UAV Navigation"
 authors: [Shengtao Zheng, Kai Li, Weichen Zhang, Yu Meng, Chen Gao, Xinlei Chen, Yong Li, Xiao-Ping Zhang]
 institute: [Tsinghua Shenzhen International Graduate School, BNRist, Tsinghua University]
 date_publish: 2026-06-04

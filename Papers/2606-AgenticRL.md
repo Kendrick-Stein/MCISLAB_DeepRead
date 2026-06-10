@@ -1,5 +1,5 @@
 ---
-title: AgenticRL: Self-Refining Agentic Reinforcement Learning for Vision-Conditioned UAV Navigation
+title: "AgenticRL: Self-Refining Agentic Reinforcement Learning for Vision-Conditioned UAV Navigation"
 authors: ["Roohan Ahmed Khan", "Yasheerah Yaqoot", "Muhammad Ahsan Mustafa", "Dzmitry Tsetserukou"]
 institute: ["Skoltech (Skolkovo Institute of Science and Technology)"]  # 基于 Dzmitry Tsetserukou 已知 affiliation 推断，待原文确认
 date_publish: 2026-06-02

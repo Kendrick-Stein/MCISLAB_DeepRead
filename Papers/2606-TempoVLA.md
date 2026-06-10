@@ -1,5 +1,5 @@
 ---
-title: TempoVLA: Learning Speed-Controllable Vision-Language-Action Policies
+title: "TempoVLA: Learning Speed-Controllable Vision-Language-Action Policies"
 authors: ["Dong Jing", "Jingchen Nie", "Tianqi Zhang", "Jiaqi Liu", "Huaxiu Yao", "Zhiwu Lu", "Mingyu Ding"]
 institute: ["RUC", "FDU", "UNC"]
 date_publish: 2026-06-04

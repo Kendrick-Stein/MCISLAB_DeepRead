@@ -1,5 +1,5 @@
 ---
-title: AffordanceVLA: A Vision-Language-Action Model Empowering Action Generation through Affordance-Aware Understanding
+title: "AffordanceVLA: A Vision-Language-Action Model Empowering Action Generation through Affordance-Aware Understanding"
 authors:
   - Qize Yu
   - Jiadi You

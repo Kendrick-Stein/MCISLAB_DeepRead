@@ -1,5 +1,5 @@
 ---
-title: WALL-WM: Carving World Action Modeling at the Event Joints
+title: "WALL-WM: Carving World Action Modeling at the Event Joints"
 authors:
   - Shalfun Li
   - Victor Yao

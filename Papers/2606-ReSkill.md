@@ -1,5 +1,5 @@
 ---
-title: ReSkill: Reconciling Skill Creation with Policy Optimization in Agentic RL
+title: "ReSkill: Reconciling Skill Creation with Policy Optimization in Agentic RL"
 authors:
   - Zelin He
   - Haotian Lin

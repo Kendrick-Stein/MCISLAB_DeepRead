@@ -1,5 +1,5 @@
 ---
-title: Active Exploring like a Pigeon: Reinforcing Spatial Reasoning via Agentic Vision-Language Models
+title: "Active Exploring like a Pigeon: Reinforcing Spatial Reasoning via Agentic Vision-Language Models"
 authors: ["Wei Deng", "Xianlin Zhang", "Mengshi Qi"]
 institute: []
 date_publish: 2026-06-01

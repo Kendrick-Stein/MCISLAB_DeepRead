@@ -1,5 +1,5 @@
 ---
-title: MIRAGE: Mobile Agents with Implicit Reasoning and Generative World Models
+title: "MIRAGE: Mobile Agents with Implicit Reasoning and Generative World Models"
 authors:
   - Zhichao Yang
   - Yuanze Hu

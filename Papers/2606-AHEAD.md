@@ -1,5 +1,5 @@
 ---
-title: Intercepting the Future: Latent-Space Predictive World Model for Dynamic VLA Manipulation
+title: "Intercepting the Future: Latent-Space Predictive World Model for Dynamic VLA Manipulation"
 authors:
   - Shahram Najam Syed
   - Arthur Jakobsson

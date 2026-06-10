@@ -1,5 +1,5 @@
 ---
-title: PiL-World: A Chunk-Wise World Model for VLA Policy-in-the-Loop Evaluation
+title: "PiL-World: A Chunk-Wise World Model for VLA Policy-in-the-Loop Evaluation"
 authors: ["Chong Ma", "Taiyi Su", "Jian Zhu", "Jianjun Zhang", "Zitai Huang", "Yi Xu", "Hanli Wang"]
 institute: ["Tongji University", "AIRC, Midea Group"]
 date_publish: 2026-06-04

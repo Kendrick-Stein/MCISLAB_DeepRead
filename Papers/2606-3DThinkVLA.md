@@ -1,5 +1,5 @@
 ---
-title: 3DThinkVLA: Endowing Vision-Language-Action Models with Latent 3D Priors via 3D-Thinking-Guided Co-training
+title: "3DThinkVLA: Endowing Vision-Language-Action Models with Latent 3D Priors via 3D-Thinking-Guided Co-training"
 authors: [Jiaxin Shi, Xidong Zhang, Fucai Zhu, Zhe Li, Siyu Zhu, Weihao Yuan]
 institute: [Shanghai Jiao Tong University, Harbin Institute of Technology, Nanyang Technological University, Fudan University, Nanjing University, Daimon Robotics, Great Bay University]
 date_publish: 2026-06-03

@@ -60,6 +60,27 @@ ReadPaperMachine/
 - 直接让 Agent 执行 `/paper-digest <url>` 消化论文
 - 让 Agent 自主推进研究：`autoresearch`
 
+## Quality Assurance
+
+### YAML Frontmatter Validation
+所有 Papers/ 中的 markdown 文件都需要有效的 YAML frontmatter。系统包含两层验证：
+
+1. **Pre-commit Hook**（本地）：每次 `git commit` 自动检查
+2. **GitHub Actions**（CI/CD）：部署前检查，失败则中止
+
+**常见问题**：标题包含冒号需要加引号
+```yaml
+# ❌ 错误
+title: MIRAGE: Mobile Agents
+
+# ✅ 正确  
+title: "MIRAGE: Mobile Agents"
+```
+
+手动验证：`python3 scripts/validate-yaml.py`
+
+详见 [scripts/README.md](scripts/README.md)
+
 ## License
 
 MIT

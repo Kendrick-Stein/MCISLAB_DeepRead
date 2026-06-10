@@ -1,5 +1,5 @@
 ---
-title: Thinking with Imagination: Agentic Visual Spatial Reasoning with World Simulators
+title: "Thinking with Imagination: Agentic Visual Spatial Reasoning with World Simulators"
 authors:
   - Chenming Zhu
   - Jingli Lin

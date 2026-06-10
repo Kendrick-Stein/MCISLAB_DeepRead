@@ -1,5 +1,5 @@
 ---
-title: GeoAlign: Beyond Semantics with State-Guided Spatial Alignment in VLA Models
+title: "GeoAlign: Beyond Semantics with State-Guided Spatial Alignment in VLA Models"
 authors: [Yizhi Chen, Zhanxiang Cao, Xinyi Peng, Yixiao Zheng, Xiaxi Si, Yiheng Li, Liyun Yan, Keqi Zhu, Xueyun Chen, Shengcheng Fu, Tianyue Zhan, Yufei Jia, Jinming Yao, Yan Xie, Kun Wang, Cewu Lu, Yue Gao]
 institute: [Tongji University, Shanghai Innovation Institute, Shanghai Jiao Tong University, Zhejiang University, Jingdezhen Ceramic University, Tsinghua University, HONOR, University of Science and Technology of China]
 date_publish: 2026-06-02

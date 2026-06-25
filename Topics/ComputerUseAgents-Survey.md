@@ -1,9 +1,9 @@
 ---
 title: "Computer-Use Agents 领域调研"
 tags: [computer-use, gui-agent, VLM, RL]
-date_updated: "2026-04-02"
+date_updated: "2026-06-25"
 year_range: 2024-2026
-papers_analyzed: 23
+papers_analyzed: 26
 ---
 ## Overview
 
@@ -142,6 +142,21 @@ Computer-use Agent（也称 GUI Agent、OS Agent）是一类能够在数字设�
 
 8. **从 Computer-use 到 Embodied Agent 的迁移**：Computer-use agent 的 grounding、planning、error recovery 能力是否可以迁移到物理世界的 embodied agent？UI-TARS 的 System-2 reasoning 和 ComputerRL 的 Entropulse 是否适用于 VLA 训练？**这是连接 computer-use agent 与我们核心研究方向（VLA/Embodied AI）的关键桥梁**（建议加入 DomainMaps）。
 
+## 2026-06-25 Update：Personal CUA Safety 从 adversarial 转向 contextual disclosure
+
+近期 [[Papers/2606-MyPCBench]]、[[Papers/2606-BraveGuard]]、[[Papers/2606-AgentCIBench]] 共同说明，Computer-use Agent 的安全问题正在从“外部攻击 / prompt injection”扩展到“正常使用中的授权内越界”：
+
+- [[Papers/2606-MyPCBench]] 把 benchmark 推向 personal assistant setting：logged-in-like accounts、历史数据、跨应用个人上下文会显著增加任务复杂度。
+- [[Papers/2606-BraveGuard]] 说明安全风险常在 multi-step trajectory 中出现，prompt-level guard 看不到局部无害动作的组合风险。
+- [[Papers/2606-AgentCIBench]] 用 contextual integrity 明确测量 inappropriate disclosure：agent 是否把当前 task / recipient 不该接收的个人状态带到外部输出。
+
+这个更新对本 survey 的 Open Problems 有两个影响：
+
+1. **Safety & Reversibility** 需要扩展为 **Safety, Privacy & Reversibility**。不可逆动作之外，还要处理不可逆披露：发出去的消息、邮件、日程描述、报告摘要都可能泄漏不该流动的信息。
+2. **跨应用 Workflow** 不只是能力难题，也是 privacy boundary 难题。跨 app state 越丰富，agent 越容易因为 visual co-location、task ambiguity 或 recipient misalignment 而 over-disclose。
+
+建议后续将 personal CUA 的评估拆成三类指标：task success、contextual disclosure leakage、trajectory-level out-of-scope access。只看 pass rate 会高估可部署性。
+
 ## Paper Comparison
 
 | Paper | Venue | 技术路线 | 核心方法 | 关键结果 | 局限性 |
@@ -169,6 +184,9 @@ Computer-use Agent（也称 GUI Agent、OS Agent）是一类能够在数字设�
 | [[Papers/2504-TongUI\|TongUI]] | AAAI 2026 | Data Synthesis | 多模态教程→trajectory, 143K | ScreenSpot 83.4% | Teacher 蒸馏上限 |
 | [[Papers/2509-DARTGUI\|DART-GUI]] | arXiv | RL Infrastructure | 解耦异步 RL, 5.5× 环境利用率 | OSWorld 42.13% (7B>Claude) | 仅 OSWorld 评测 |
 | [[Papers/2511-GroundCUA\|GroundCUA]] | arXiv | Grounding Data | Dense annotation, 56K screenshots | 3B > 72B agentic | 标注成本高 |
+| [[Papers/2606-MyPCBench\|MyPCBench]] | arXiv | Personal Benchmark | Linux desktop + 17 simulated web apps + persona | Claude Opus 4.6 fully solves 55.4% | persona 单一，安全评估不足 |
+| [[Papers/2606-BraveGuard\|BraveGuard]] | arXiv | Safety Guard | threat mining + executable CUA tasks + trajectory supervision | AgentHazard 38.79% → 82.38% | guard 不等于 runtime intervention |
+| [[Papers/2606-AgentCIBench\|AgentCIBench]] | arXiv | Privacy Benchmark | contextual integrity + V_share/V_leak scoring | 平均 leakage 67.9% | 更偏 evaluation，process-level access 风险仍需补 |
 
 ## 调研日志
 - **Round 1**: 2026-04-02, 搜索 9 次，digest 12 篇（成功 12）

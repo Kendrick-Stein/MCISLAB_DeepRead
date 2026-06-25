@@ -3,7 +3,7 @@ title: Evidence-Dependent GUI Grounding
 tags: [gui-agent, VLM]
 status: raw
 linked_project:
-date_updated: "2026-06-24"
+date_updated: "2026-06-25"
 ---
 ## Hypothesis
 
@@ -18,11 +18,36 @@ date_updated: "2026-06-24"
 ## Related Work
 
 - [[Papers/2606-VisualFLIP]] - paired perturbation + Collapse Rate，用于测试 evidence dependence。
+- [GUI-Perturbed](https://arxiv.org/abs/2604.14262) - domain randomization 测 GUI grounding brittleness，发现 relational instructions 下 accuracy drop 27-56pp，说明单点 GUI grounding benchmark 会隐藏系统性脆弱性。
 - [[Papers/2604-AutoGUIv2]] - functional grounding/captioning dichotomy，说明 GUI capability 需要细粒度诊断。
 - [[Papers/2504-ScreenSpotPro]] - 更难 OOD grounding benchmark，但仍主要是单点 correctness。
 - [[Ideas/ScaleInvariant-Grounding-GUI]] - 关注跨尺度鲁棒性，本 idea 关注 counterfactual evidence dependence。
 
-**Novelty**: 3/5。closest works 已有 VisualFLIP 和 ScreenSpot-Pro，但把 paired flip 系统化迁移到 GUI action，并定义 Action Collapse Rate，仍有明确差异化。
+**Novelty**: 3/5。closest works 已有 VisualFLIP、GUI-Perturbed 和 ScreenSpot-Pro，但把 paired flip 系统化迁移到 GUI action，并定义 Action Collapse Rate，仍有明确差异化。
+
+## Evaluation — 2026-06-25
+
+**Novelty**: 3/5 — closest works: [[Papers/2606-VisualFLIP]], [[Papers/2604-AutoGUIv2]], [[Papers/2504-ScreenSpotPro]]
+
+VisualFLIP 已经定义 paired evidence flip + Collapse Rate；GUI-Perturbed 已经用 controlled perturbation 暴露 GUI grounding brittleness。因此 novelty 不在“用 perturbation 评估 grounding”，而在 action-level paired UI flip、Action Collapse Rate、以及对 GUI element semantics / disabled state / distractor swap 的专门 taxonomy。
+
+**Feasibility**: 4/5 — 可以从 ScreenSpot-Pro / OSWorld-G / synthetic UI variants 抽样构造 200-500 pairs，不需要训练新模型。难点是保证 perturbation minimal、gold action deterministic、编辑 artifact 不成为 confound。
+
+**Impact**: 4/5 — GUI Agent DomainMap 的核心 open question 是 robust grounding；Action Collapse Rate 能解释 single accuracy 高但长程点击失败的问题，比继续追 ScreenSpot 小幅 SOTA 更有诊断价值。
+
+**Risk**: 3/5 — 风险在于 paired UI 构造被质疑不自然，或模型 collapse 不显著。需要用真实 UI edits、人工 ambiguity check、以及 VisualFLIP-style pair accuracy / collapse 双指标降低风险。
+
+**Evidence**: 4/5 — [[Papers/2606-VisualFLIP]] 直接证明 MLLM 会在 task-critical evidence flip 后 collapse；GUI-Perturbed 证明 GUI grounding 对 relation / zoom perturbation 系统脆弱；[[Papers/2604-AutoGUIv2]] 的 plausible distractor failure 进一步支持 GUI-specific diagnostic benchmark 的必要性。
+
+**Total**: 18/25。
+
+**Reasoning**: 这是一个清晰、低成本、能产出 diagnostic insight 的 benchmark idea，但相邻工作已经很近。要成立，必须把贡献从“又一个 perturbation benchmark”收窄到 GUI action evidence dependence：同一 instruction 下，目标证据变化时 action 是否跟着变化。
+
+**Suggestions**:
+
+- 不要先做大数据集；先做 100 pair pilot，按 text swap / position swap / icon-label conflict / disabled state / distractor insertion 五类分层。
+- 直接复用 VisualFLIP 的 pair accuracy + Collapse Rate 结构，但把 answer bucket 改成 element/action bucket。
+- 与 ScreenSpot-Pro 的 high-resolution / small-target cases 交叉，验证 ACR 是否比 single accuracy 更能预测专业 GUI failure。
 
 ## Approach sketch
 

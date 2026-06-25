@@ -1,9 +1,9 @@
 ---
 title: Agent-Friendly Environment 调研与研究设想
 tags: [survey, gui-agent, environment-engineering, computer-use, web-agent, mobile-agent]
-date_updated: "2026-06-23"
+date_updated: "2026-06-25"
 year_range: 2023-2026
-papers_analyzed: 13
+papers_analyzed: 16
 ---
 
 # Agent-Friendly Environment 调研与研究设想
@@ -22,6 +22,29 @@ papers_analyzed: 13
 - 给 agent 手写 task-specific macro action，相当于 RPA shortcut。
 
 真正有研究价值的点在于：**不泄露任务答案，也不改变任务目标，只把环境中本来存在但对 agent 不可见、不可控、不可验证的部分结构化暴露出来**。这会改变 agent 的可观测性、可控性和可训练性，而不是简单增加提示词。
+
+## 2026-06-25 Update：Agent-Friendly 必须同时是 Privacy-Friendly
+
+6/24 之后新增的 [[Papers/2606-AgentCIBench]] 改变了 AFE 的安全边界判断：agent-facing state / verifier / world map 不是单向利好。它们能减少 hidden-state mismatch，也可能让 agent 更容易把 task-irrelevant personal state 带进外部输出。
+
+这一点与 [[Papers/2606-MyPCBench]] 和 [[Papers/2606-BraveGuard]] 形成三角证据：
+
+- [[Papers/2606-MyPCBench]]：personal context / logged-in-like state 是真实 CUA 能力轴。
+- [[Papers/2606-AgentCIBench]]：即使没有 adversary，CUA 在 normal-use personal tasks 中也会发生 context-inappropriate disclosure，平均 leakage 67.9%。
+- [[Papers/2606-BraveGuard]]：CUA safety 更适合做 trajectory-level monitoring，而不是 prompt-level classifier。
+
+因此 AFE Protocol 需要新增一条设计原则：
+
+> **Least-disclosure affordance**：环境可以暴露 state，但必须按 task scope、recipient、data category 和 action purpose 过滤；agent-facing state API 不应默认返回“所有可见个人状态”。
+
+对实验设计的直接影响：
+
+- `observe_state()` 需要区分 task-relevant state、visible-but-out-of-scope state、sensitive state。
+- `guard(action)` 不只检查 dangerous action，也要检查 answer-time leakage 和 out-of-scope inspection。
+- `trace()` 应记录 evidence provenance：agent 最终输出中的每条信息来自哪个 app/window/file/url，是否在 manifest scope 内。
+- AFE ablation 中必须加入 privacy metrics：Personalization Leakage Rate、Out-of-scope Inspection Rate、False Block Rate、Task Completion Retention。
+
+这也提示一个更窄的研究问题：**AFE 的核心不是暴露更多 state，而是暴露正确粒度、正确范围、可审计的 state**。
 
 ## 相关工作地图
 

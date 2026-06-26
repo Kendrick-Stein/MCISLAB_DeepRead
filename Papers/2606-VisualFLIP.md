@@ -5,75 +5,68 @@ authors:
   - Changrui Chen
   - Stefanos Zafeiriou
   - Jiankang Deng
-institute: []
+institute:
+  - "Imperial College London"
 date_publish: "2026-06-05"
 venue: arXiv
 tags: [VLM, spatial-reasoning]
 url: "https://arxiv.org/abs/2606.07872"
 code: "https://didizhu-judy.github.io/VisualFLIP/"
 rating: "4"
-date_added: "2026-06-24"
+date_added: "2026-06-26"
 ---
 ## Summary
 
-> [未获取全文，仅基于 arXiv abstract 与项目页]
-
-VisualFLIP 追问一个比 accuracy 更尖锐的问题：当 MLLM 答对视觉推理题时，它的答案是否真的依赖 task-critical visual evidence？它构造 1,374 组 same-question perturbation pairs，保持问题不变、最小改变关键视觉证据，使正确答案 deterministically flips，并用 pair accuracy 与 Collapse Rate 测模型是否随证据改变而更新答案。
+VisualFLIP 追问比 accuracy 更尖锐的问题：MLLM 答对视觉推理题时，预测是否真的依赖 task-critical visual evidence？它构造 687 组 same-question perturbation pairs（共 1,374 张图），保持问题不变、最小修改关键视觉证据使 gold answer 确定性翻转，用 Pair Accuracy 和 Collapse Rate 测模型是否随证据更新答案，并发现即使 frontier 模型也会在关键视觉变化后复读旧答案。
 
 ## Problem & Motivation
 
-> [未获取全文，仅基于 arXiv abstract 与项目页]
+主流多模态评测用 single-image accuracy，但"答对"并不保证模型真的看到了关键证据——模型可能靠 language priors、数据偏差或 memorization 答对。作者明确指出："a correct answer, even with an apparently detailed reasoning process, does not tell us whether the prediction is supported by the task-critical visual evidence." 即便有看似详细的 reasoning trace，也无法证明结论由视觉证据驱动。
 
-多模态评测常用 single-image accuracy，但正确答案并不保证模型真的看到了关键证据。模型可能靠语言先验、数据偏差或局部猜测答对；一旦图像证据被最小修改，模型仍可能复读之前的答案。
-
-VisualFLIP 的 motivation 是把“答对了吗”改成“答案是否受关键证据控制”。这对 GUI grounding 也很重要：agent 可能点击正确位置，但不一定真的理解目标元素，遇到相似 distractor 或 UI 改版就崩。
+VisualFLIP 把评测目标从"答对了吗"改成"答案是否受关键证据控制"：如果视觉证据确定性地改变了正确答案，模型的预测是否也随之改变？这是一个 behavioral / counterfactual 视角，对 GUI grounding 同样重要——agent 可能点对位置但并不真正理解目标元素，遇到 distractor 或 UI 改版就崩。
 
 ## Method
 
-> [未获取全文，仅基于 arXiv abstract 与项目页]
+**Paired perturbation 构造（四类）**：每对图只在 task-critical evidence 上做 minimal pixel-space 编辑，使 gold answer 确定性翻转（yo ≠ ye）：
+- **Cardinality Shift**：改变物体计数，保留推理模板。
+- **Attribute Mutation**：改变可见属性（颜色、数值、标签），保持周围 context 不变。
+- **Spatial Transformation**：移动或重定向承载答案的物体。
+- **Logic Re-mapping**：改变可见规则/对应关系（如镜像轴）。
 
-VisualFLIP 构造 paired benchmark：
+**数据构造四步**：(1) Identify Evidence——合成对用 13 个程序化模板的 symbolic state，真实图对用 KL-based masking 筛选视觉必要性并标注相关物体；(2) Plan Edit——选一类 perturbation，只改一个 load-bearing premise，question 固定；(3) Realize Image Pair——合成对从 symbolic state 渲染，真实图对做局部编辑；(4) Verify——人工确认 question 固定、answer 确定翻转、无其他承载变化，剔除 artifact 与 ceiling 样本。
 
-- 同一问题配两张图；
-- 两张图只在 task-critical visual evidence 上做最小 perturbation；
-- gold answer 必须 deterministic flip；
-- 覆盖 cardinality、attribute、spatial、logic tasks。
+**两个核心指标**：
+- **Pair Accuracy (Acc_p)**：两侧都答对才算正确，避免单侧猜中。
+- **Collapse Rate (CR)**：在模型至少答对一侧（competent）的条件下，是否对两张图重复同一个非空答案。CR 对称（交换图标签不变），条件于 competence 而非原图正确性。
 
-评估指标有两个：
-
-- **Pair accuracy**：两侧都答对才算正确，避免单侧猜中。
-- **Collapse Rate (CR)**：当模型至少答对一侧时，是否在两张图上重复同一个非空答案。
-
-作者还关注 sequential setting：如果 edited image 出现在 earlier answer 之后，某些模型 collapse 更严重，说明模型会被自己前序回答锚定。
+**Sequential setting (SeqCR)**：模型先答原图，再在同一对话中收到 perturbed image（同一问题），测原答案是否在 gold answer 翻转后仍然 persist——揭示模型被自己前序回答锚定。
 
 ## Key Results
 
-> [未获取全文，仅基于 arXiv abstract 与项目页]
-
-- 数据集包含 1,374 images arranged as same-question perturbation pairs。
-- 评估 24 个 MLLMs。
-- Pair accuracy 与 evidence dependence 相关但不同：capable models 仍会在关键视觉变化后不更新答案。
-- Sequential setting 下，edited image follow earlier answer 时，部分模型 collapse 更严重。
-
-abstract 未提供各模型具体排名和数值，因此这里不补造 leaderboards。
+- **数据集**：687 image pairs（1,374 张图）= 515 合成对（13 个 task templates）+ 172 真实图对（来自 MathVision），覆盖四类 perturbation、九种 task type。评估 **24 个 MLLM**（7 开源 + 5 tool-augmented 开源 + 12 闭源）。
+- **顶部模型（Pair Acc | CR）**：Gemini 3.5 Flash 81.2% | 7.3%；Qwen3.6-Plus 80.2% | 6.8%；GPT-5.5 78.6% | 5.8%。frontier 模型可把 collapse 压到 <8%。
+- **Tool-augmented 7B 模型反而最差**：~7–10% pair accuracy，42–53% CR——显式 pixel-level 操作并不自动转化为答案更新。
+- **高 accuracy 不等于 evidence dependence**：GPT-5-mini 45.3% accuracy 但 27.6% CR，Grok 4.3 52.5% | 18.4%；Pair Accuracy 与 competence-conditioned CR 在模型间独立变化。
+- **Sequential 放大 collapse**：Qwen3.6-Plus SeqCR 从 6.8%（independent）升到 39.2%（sequential）；Gemini 3.1 Pro 几乎不变（+1.3）。
+- **Locality control（Table 3）**：task-critical perturbation 引起答案改变约 76–96%，而 answer-irrelevant 编辑仅 2–40%，证明 CR 确实针对决定性证据。
+- **Salience 效应**：perturbed evidence 越显著，collapse 越低；pathfinding/connectivity 任务 CR 比 arithmetic 高 30+ 点。
+- 探索性 mitigation：Grounded Masking RL (GMRL)，用 masked/unmasked 分布的 KL 作为 reward 鼓励视觉必要性敏感（附录，初步结果）。
 
 ## Strengths & Weaknesses
 
-**Strengths**:
+**Strengths**：
+- **评估 formulation 很好**：paired flip + competence-conditioned CR 比单点 accuracy 更能 isolate grounding dependence，且 locality control 实验（76–96% vs 2–40%）有力证明指标针对的是决定性证据。
+- **指标可迁移**：Collapse Rate 可迁移到 GUI grounding、document QA、spatial reasoning。
+- **揭示 sequential bias**：多轮 agent 场景中前序答案锚定后续视觉判断（SeqCR 6.8→39.2），这是 GUI agent 真实 failure mode。
+- **反直觉发现有价值**：tool-augmented 模型 CR 反而更高，挑战"加 pixel 操作就更 grounded"的假设。
 
-- **评估 formulation 很好**：paired flip 比单点 accuracy 更能检测 grounding dependence。
-- **指标可迁移**：Collapse Rate 可迁移到 GUI grounding、document QA、spatial reasoning 等场景。
-- **揭示 sequential bias**：多轮 agent 场景中，前一轮答案会影响后一轮视觉判断，这是 GUI agent 真实 failure mode。
+**Weaknesses**：
+- **构造成本高**：保证 minimal perturbation 且 gold answer deterministic flip 依赖大量人工 verify，难规模化。
+- **诊断而非机理**：作者自承这是 behavioral diagnostic，无法 isolate language priors vs perception vs memorization。
+- **不直接测 action**：对 GUI agent 还需从 answer collapse 扩展到 click/action collapse。
+- **真实图覆盖有限**：172 真实图对来自 MathVision，部分 task type 的 denominator 偏小；SeqCR 用了不同分母。
 
-**Weaknesses**:
-
-- **构造成本较高**：需要保证 perturbation minimal 且 gold answer deterministic flip。
-- **不直接测 action**：对 GUI agent 来说，还需要从 answer collapse 扩展到 click/action collapse。
-- **领域覆盖未知**：abstract 中任务类型偏视觉推理，不确定是否包含文本密集 GUI 或真实 screen。
-
-**Impact**:
-
-VisualFLIP 支持一个研究判断：GUI/VLM evaluation 应从 “static correctness” 转向 “counterfactual evidence dependence”。这对 grounding robustness 比单纯提高 ScreenSpot accuracy 更有 insight。
+**Impact**：支持一个研究判断——GUI/VLM evaluation 应从 static correctness 转向 counterfactual evidence dependence。这对 grounding robustness 比单纯提高 ScreenSpot accuracy 更有 insight。
 
 ## Mind Map
 
@@ -85,23 +78,25 @@ mindmap
       Accuracy misses evidence dependence
       Sequential answer anchoring
     Method
-      Paired perturbation
-      Same question
-      Answer flips
-      Pair accuracy
-      Collapse Rate
+      Paired minimal perturbation
+      Same question gold answer flips
+      Pair Accuracy
+      Collapse Rate competence-conditioned
+      Sequential SeqCR
     Tasks
       Cardinality
       Attribute
       Spatial
       Logic
-    Implications
-      Counterfactual grounding
-      GUI action collapse
-      Evidence-dependent evaluation
+    Results
+      687 pairs 24 MLLMs
+      Frontier CR under 8
+      Tool-augmented CR 42-53
+      Sequential amplifies collapse
 ```
 
 ## Notes
 
-- 对 [[Ideas/ScaleInvariant-Grounding-GUI]] 的补充：除了跨分辨率一致性，还应测 counterfactual UI evidence dependence，例如同一 instruction 下交换 icon、text、position 后模型是否更新 click。
-- 可作为新 idea 的核心 metric：Action Collapse Rate。
+- 对 [[Ideas/ScaleInvariant-Grounding-GUI]] 的补充：除跨分辨率一致性外，还应测 counterfactual UI evidence dependence——同一 instruction 下交换 icon/text/position 后模型是否更新 click。
+- 可作为新 idea 的核心 metric：**Action Collapse Rate**——agent 在 UI 关键变化后是否仍重复旧 action，直接对应 VisualFLIP 的 sequential collapse。
+- tool-augmented 模型 CR 反而最高，是对 Think-with-Images / pixel-operation 范式的一个警示数据点，可与 [[Papers/Archive/2604-AdaptiveGrounding]] 的 over-trust 现象对照。

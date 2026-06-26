@@ -6,7 +6,9 @@ authors:
   - Xin Ye
   - Liu Ren
   - Chenyan Xiong
-institute: []
+institute:
+  - "Carnegie Mellon University (LTI)"
+  - "Bosch Research North America / BCAI"
 date_publish: 2026-04-21
 venue: arXiv
 tags:
@@ -15,94 +17,80 @@ tags:
   - manipulation
 url: https://arxiv.org/abs/2604.20012
 code:
-rating: 2
-date_added: 2026-04-28
+rating: 3
+date_added: 2026-06-26
 ---
 ## Summary
-> [未获取全文，仅基于 abstract]
 
-提出 VLM→VLA 的 mid-training 桥接阶段，通过数据分布对齐分析筛选最 VLA-aligned 的 VLM 数据进行中间训练，解决 off-the-shelf VLM 直接 finetune 成 VLA 时泛化能力损失的问题。
+提出 **EmbodiedMidtrain**：在 VLM→VLA 之间插入一个 mid-training 阶段，用一个轻量 **proximity estimator**（frozen VLM 特征上的二分类器）给 VLM 样本打"与 VLA 域接近度"分，选 top-k 组成 distribution-aligned 的 mid-training 混合数据，先 mid-train VLM 再做 VLA fine-tune。核心论点：决定下游 VLA 性能的不是 VLM 见过多少预训练数据，而是 mid-training 数据与 embodied 分布对齐得有多好。
 
 ## Problem & Motivation
-> [未获取全文，仅基于 abstract]
 
-**核心问题**：VLA 继承 VLM 的视觉语言能力，但大多数 VLA 直接使用未经 embodied domain 适配的 off-the-shelf VLM，限制了下游性能。
+VLA 普遍直接用 off-the-shelf VLM 当 backbone，但 VLM 预训练（caption / VQA / 文档理解）与 VLA 训练（机器人操作轨迹）分布严重不匹配：
 
-**关键发现**：
-- VLA 数据分布与更广泛的 VLM 分布之间存在显著 gap
-- VLA 数据占据紧凑区域，与 VLM 分布大部分分离
-- 对齐程度在不同 VLM 数据源之间和内部都有很大差异
+- 用 VLM 末层 hidden state + MMD 度量，VLA 数据形成**紧凑簇**，与广而散的 VLM 分布大体分离（cross-group MMD > within-group）。
+- 但 gap **非均匀**——少数 VLM 样本天然更接近 VLA，对齐是 spectrum 而非二元。
+- 已有工作（在 embodied benchmark 上 finetune VLM）的增益**不可靠地**迁移到 VLA 下游（Zhang et al. 2026）。
 
-**为什么重要**：直接 finetune VLM → VLA 会损失 generalization，需要中间桥接阶段来保持 VLM 的泛化能力同时适配 embodied 场景。
+因此需要 sample-wise 地把 VLM 训练分布重塑向 VLA 域。
 
 ## Method
-> [未获取全文，仅基于 abstract]
 
-**EmbodiedMidtrain 框架**：
+**Proximity-based data selection**（把选择建模为 domain-membership 问题）：
 
-1. **数据分布分析**：表征 VLM 和 VLA 数据之间的分布 gap，发现 VLA 数据占据与 VLM 分布大部分分离的紧凑区域
+- 在 frozen VLM 的 last hidden state 上训一个 learnable 打分器 + sigmoid，VLA 样本为正、VLM 样本为负，BCE 训练。由 Goodfellow 的经典结果，最优二分类器输出单调于 density ratio p_VLA/p_VLM，故按分数排序 ≈ 按密度比排序。
+- 对全部 VLM 候选打分、取 top-k 组成 curated mid-training 语料（保留多样性同时偏向 VLA 兼容样本）；early stop 在 90% val acc。
+- 在 InternVL3.5-1B、Qwen3VL-2B 上 mid-train（全参，batch 256，5000 步），再按 VLM4VLA 管线接两分支 MLP action decoder（连续臂动作 + 二值 gripper）做 VLA fine-tune。
+- 候选池：general（LAION-400M、CC-12M+BLIP、LLaVA-Instruct-665k、VCR）+ embodied（RefSpatial、EmbSpatial-Bench、Robo2VLM、RoboPoint）。
 
-2. **Mid-training Data Engine**：
-   - 轻量级可学习的 proximity estimator
-   - 从大型 VLM pool 中筛选最 VLA-aligned 的候选
-   - 在 curated mixture 上进行 mid-training
-
-3. **下游 VLA Fine-tuning**：在 mid-training 后进行 VLA 特定的 fine-tuning
-
-**数据选择机制**：Data engine 同时捕获 dataset-level 和 sample-level 的对齐信号，偏向 spatial reasoning 任务而非 text-centric 任务，同时保持 VLM 数据的多样性。
+整个 pipeline 轻量、可扩展、对 VLM/VLA 无架构改动。
 
 ## Key Results
-> [未获取全文，仅基于 abstract]
 
-- 在三个 robot manipulation benchmarks 上验证
-- Mid-training 在不同 VLM backbone 上一致提升性能
-- 达到与更大模型规模和训练预算的 expert VLAs 和 off-the-shelf VLMs 相当的结果
-- Mid-training 为 VLA fine-tuning 提供更强的初始化，收益从训练最早步骤就出现并在整个训练过程中扩大
-- 代码、数据和模型将开源
+- **三 benchmark 一致提升**（Calvin ABC-D avg len / SimplerEnv Bridge / Libero-10）：
+  - InternVL3.5-1B (1.1B)：3.173→**3.714** / 36.5→**56.3** / 39.0→**54.2**
+  - Qwen3VL-2B (2.1B)：3.205→**3.584** / 38.5→45.8 / 33.8→40.2
+- **小模型反超大模型**：mid-trained 1.1B 在 Calvin 上超过 expert VLA（OpenVLA 7.7B、π0 3.1B），并优于 Paligemma-1/2、KosMos-2 等 3–8× 大的 VLM；且只用 1.0M/4.1M/4.1M 样本（baseline 7.7M/25.6M/25.6M），预算仅一小部分。
+- **跨 backbone 可迁移**：用 InternVL3.5-1B 特征选出的数据，迁到 Qwen3VL-2B 仍一致增益。
+- **Ablation**：Random selection (Calvin 3.398) < Learned estimator (3.714)；hand-crafted 代理（feat-space dist 3.126、VLA-cond perplexity 3.159、delta perplexity 1.527）均不如 learned。
+- **Training dynamics**：mid-trained 从最早 checkpoint 就领先且差距随训练**扩大**——是更好的 initialization 而非短暂 head start；且该差异**不体现在 training loss**（两者 loss 相近）。
+- **选数据偏好**：RefSpatial 平均 proximity 最高、VCR 最低；estimator 学会偏好 spatial grounding/reasoning，压低 text-only VQA。
 
 ## Strengths & Weaknesses
-> [未获取全文，仅基于 abstract]
 
 **Strengths**：
-- 问题定义精准：识别出 VLM→VLA 直接迁移的性能 gap
-- 方法思路清晰：通过数据分布分析和数据选择解决对齐问题
-- 跨 backbone 验证：在不同 VLM backbone 上都有一致提升
-- 开源承诺：代码、数据、模型将发布
+- 把"VLM→VLA 迁移"重构为数据分布对齐问题，并给出可计算、无需人工领域知识的 proximity 信号（density-ratio 理论支撑）。
+- "小模型 + 对齐数据 < 大模型 + 海量数据"的 budget 对比有说服力；cross-backbone 迁移说明信号是分布层面的而非某模型特有。
+- training-loss 与下游性能脱钩的观察很有价值——提醒 loss 不足以衡量 initialization 质量。
 
 **Weaknesses**：
-- 缺少具体的 benchmark 数值和提升幅度（abstract 未量化）
-- Proximity estimator 的设计细节和训练方式未知
-- 与其他 mid-training/continual learning 方法的对比未知
-- Data engine 的计算开销和筛选效率未说明
-
-**潜在影响**：VLA 训练范式的重要改进，可能成为 VLM→VLA 迁移的标准 pipeline 组件。
+- 只在仿真 manipulation（Calvin/Simpler/Libero）验证，真机未测；action decoder 固定为 VLM4VLA 的两分支 MLP。
+- proximity estimator 的正样本来自"VLA fine-tune 数据的平衡混合"，对 target VLA 分布有依赖；换 target 任务族是否需重训 estimator 未充分讨论。
+- 仅 1.1B/2.1B 两个 backbone，更大规模是否仍有同等增益未知。
 
 ## Mind Map
-> [未获取全文，仅基于 abstract]
-
 ```mermaid
 mindmap
   root((EmbodiedMidtrain))
     Problem
-      VLM-VLA distribution gap
-      Off-the-shelf VLM not adapted for embodied
-      Direct finetune loses generalization
+      VLM-VLA distribution gap (MMD/t-SNE)
+      gap non-uniform = spectrum
+      embodied-VLM finetune不可靠迁移
     Method
-      Data distribution analysis
-      Mid-training data engine
-      Proximity estimator for VLA-aligned selection
-      Curated mixture pretraining
+      Proximity estimator
+        frozen VLM feature + sigmoid
+        VLA正/VLM负 BCE = density ratio
+      Top-k curated mid-train mixture
+      Mid-train VLM -> VLA finetune
     Results
-      3 robot manipulation benchmarks
-      Consistent improvement across backbones
-      Competitive with larger models
-      Spatial reasoning favored
+      InternVL3.5-1B反超7.7B expert
+      1/6训练预算
+      learned > random/hand-crafted
+      早期领先且差距扩大
 ```
 
 ## Notes
-> [未获取全文，仅基于 abstract]
 
-- 与 M²-VLA（同期论文）形成对比：两者都关注 VLM→VLA 的 gap，但 EmbodiedMidtrain 侧重数据选择和 mid-training，M²-VLA 侧重架构设计（MoL + MSM）
-- 关键问题：proximity estimator 如何训练？监督信号是什么？
-- 数据选择偏向 spatial reasoning 而非 text-centric 的发现很有价值，暗示 embodied 任务需要的能力与 VLM 预训练任务有偏移
-- 需要看全文确认与直接 finetune 的消融对比、以及与更多 baseline 的比较
+- 旧笔记基于 abstract，方向正确但缺全部数值；本次据全文补全 Table 1/2 数据、proximity estimator 的 density-ratio 机制、CMU+Bosch 机构信息。
+- 与"数据选择/对齐"主题相关：proximity-as-classifier 的思路可类比 [[Papers/2604-EmbodiedMidtrain]] 之外的 data-centric 训练；对 GUI/CUA 训练数据筛选（哪些 web/GUI 数据最接近目标 agent 分布）有借鉴。
+- 最有信息量的发现：**training loss 不反映 initialization 质量**——下游差距明显但 loss 几乎一致。

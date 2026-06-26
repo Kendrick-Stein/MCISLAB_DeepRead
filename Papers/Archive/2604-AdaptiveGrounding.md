@@ -1,121 +1,80 @@
 ---
 title: "Global Context or Local Detail? Adaptive Visual Grounding for Hallucination Mitigation"
 authors: ["Yubo Jiang", "Xin Yang", "Abudukelimu Wuerkaixi", "Zheming Yuan", "Xuxin Cheng", "Fengying Xie", "Zhiguo Jiang", "Cao Liu", "Ke Zeng", "Haopeng Zhang"]
-institute: ["Beihang University", "Meituan (Longcat Interaction Team)"]
-date_publish: 2025-07
-venue: "Findings of ACL 2025"
-tags: ["gui-agent", "VLM"]
+institute: ["Beihang University", "Meituan (Longcat Interaction Team)", "Tianmushan Laboratory"]
+date_publish: 2026-04
+venue: "arXiv"
+tags: ["VLM", "gui-agent"]
 url: "https://arxiv.org/abs/2604.24396"
 code:
 rating: 3
-date_added: 2026-04-28
+date_added: 2026-06-26
 ---
 ## Summary
 
-提出 Positive-and-Negative Decoding (PND)，一种 training-free 的推理框架，通过在每一步解码中对比正向视觉放大路径和负向 counterfactual 路径的输出，解决 VLM 的 object hallucination 问题。核心发现是 VLM 存在 attention deficit——视觉特征在解码时被系统性低估。
-
-> [未获取全文，以下内容基于 arXiv abstract 及多源搜索结果整理，Method 和 Key Results 节中的细节可能不完整]
+提出 **Active-Look**——一个 training-free、plug-and-play 的 Think-with-Images (TwI) 框架，把 TwI 形式化为"按预算获取视觉证据"。核心是用两个异构 grounding expert (GroundingDINO + OWLv2) 的 **disagreement 作为不确定性代理**，只对有争议的区域花预算做验证；并用 conflict-aware hybrid rendering（全局 highlight 保拓扑 + 对 doubtful 区域 selective zoom-in 补细节）化解 granularity–context trade-off。
 
 ## Problem & Motivation
 
-Vision-Language Models (VLM) 在生成文本描述时容易产生 object hallucination——即生成与视觉输入不一致的内容。根本原因在于 VLM 过度依赖语言先验 (linguistic priors)，而视觉特征在解码过程中被系统性低估（attention deficit）。
+LVLM 在多步推理时容易与视觉证据脱钩，产生 object-existence hallucination。Think-with-Images（生成 zoom 裁剪或 highlight 辅助视图）想缓解这一问题，但作者诊断出两个耦合失败模式：
 
-现有方法的局限：
-- 需要额外训练（如 RLHF、DPO），计算成本高
-- 一些 training-free 方法（如 contrastive decoding）设计了固定的干预策略，缺乏对全局上下文 vs 局部细节的自适应权衡
-- 多数方法只关注"减少幻觉"而忽略了描述质量（descriptive detail）的保持或提升
-
-核心问题：在解码时，如何自适应地平衡对 global context 和 local detail 的视觉 grounding，以同时减少幻觉并保持/提升描述质量？
+1. **Granularity–context trade-off**：zoom-in 提升局部细节但破坏全局拓扑/关系；highlight 保留全局上下文但对小物体缺乏分辨率。同一操作对一部分样本有益、对另一部分有害（performance bifurcation）。
+2. **Over-trust 失败**：TwI 依赖单一感知工具决定"看哪里"，工具一旦错误就是 single point of failure；naive 地并多个工具取并集会注入噪声 proposal，使证据质量反而下降、甚至低于标准 prompting。
 
 ## Method
 
-PND (Positive-and-Negative Decoding) 是一个 **training-free** 的 inference-time 干预框架，核心思路是通过双路径对比，在每一步 token 生成时引导模型输出视觉事实性文本。
+**Active-Look**（Algorithm 1，conflict-driven active verification）按 propose→select→render→reason 四步：
 
-**三个核心组件：**
+- **Hypothesis-driven Propose**：从 query 抽取 target concept，用两个异构 expert（GroundingDINO、OWLv2）各自产生 proposal，取并集为候选池，降低单检测器偏置。
+- **Consensus arbitration Select**：对两 expert 的 box 做 IoU 匹配，按 scene conflict ratio 自适应阈值，划分为 Trusted（两 expert 一致）与 Doubtful（仅一个 expert 提出 → 更模糊、更值得验证）。disagreement 即不确定性代理，是 intractable information-gain 目标的可计算 surrogate。
+- **Conflict-aware Render（"glance vs. stare"）**：渲染一张全局 highlighted 视图保拓扑，仅对 budget 内的 doubtful box 做 selective zoom-in，把视觉 token 预算花在争议区域。
+- **Multi-view Reason**：联合 global highlight + verified local crops 解码最终答案。
 
-1. **Positive Path（正向路径）**：利用多层 attention 放大显著视觉证据 (salient visual evidence)，直接对抗 attention deficit，鼓励模型生成视觉忠实的描述。这一路径确保模型"看见"图像中的关键物体。
-
-2. **Negative Path（负向路径）**：识别并主动降级核心物体特征，构造一个强的 counterfactual——即"如果模型没有正确关注这些视觉特征会怎样"。通过惩罚这种无根据的、依赖语言先验的生成行为，压制 hallucination 倾向。
-
-3. **Contrast（对比机制）**：在每个 decoding step，对比两条路径的输出概率分布，通过差异信号 (contrast signal) 调整最终的 token 概率，使生成结果偏向视觉事实性文本而非纯语言先验。
-
-**关键设计选择：**
-- 完全 training-free，不修改模型参数
-- Plug-and-play，可用于任意 VLM 架构的推理阶段
-- 在单次推理中同时运行两条路径（具体实现细节未知，可能涉及 attention manipulation 或 hidden state intervention）
-
-**与相关方法的区别：**
-- 对比 contrastive decoding（如 VCD）：PND 在单个模型内部构造正负路径，不需要额外模型
-- 对比 attention-based 方法（如 OPERA）：PND 通过 counterfactual 路径显式惩罚而非仅重加权 attention
+关键：完全 training-free、推理期即插即用；budget 约束的是 LVLM 的 visual token 消耗（非系统总延迟）。
 
 ## Key Results
 
-> [未获取全文，以下数据来自 abstract 及搜索结果摘要，具体数值和实验设置待核实]
-
-- **POPE benchmark**：最高 **6.5%** 准确率提升，达到 SOTA 水平
-- **MME**：在 perception 和 cognition 两个维度均有显著提升
-- **CHAIR**：object hallucination rate 大幅降低（具体 CHAIRs/CHAIRi 数值未获取）
-- **描述质量**：不仅减少幻觉，同时提升了描述的 detail 丰富度（即不是简单地让模型更保守/少说话）
-- **多架构泛化**：在 LLaVA (1.5)、InstructBLIP、InternVL、Qwen-VL 上均有效
-
-**消融实验**（未获取具体数据）：
-- 正负路径各自的贡献
-- 不同 attention layer 选择的影响
-- contrast weight 的敏感性分析（推测存在）
+- **POPE (Adversarial)**：一致优于 prompting 与单算子 TwI。LLaVA-1.5-7B +4.45% Acc、Qwen3-VL-8B 84.32→**89.26** Acc(+4.94%)；InternVL2-8B Recall 显著提升（selective zoom 找回漏检物体）。
+- **MME（Existence/Count/Position/Color）**：LLaVA-1.5-7B 总分 431.33→**516.66**，Count +30.33、Position +26.66。
+- **CHAIR（caption 幻觉）**：LLaVA-1.5-7B CHAIRs 53.0→**15.0**（句级幻觉相对降 71.7%）；InternVL2-8B 同时降幻觉(37.0→21.5)并升 Recall(62.3→64.7)。
+- **Ablation（关键反直觉）**：naive 并集双 expert (86.14% Acc) **低于**单用 Expert B (87.87%)——无结构聚合会传播冲突的 false positive；Consensus+Conflict 机制 (89.26%) 才把噪声转成确定性。
 
 ## Strengths & Weaknesses
 
-**Strengths:**
-- **Training-free 且即插即用**：无需任何训练或微调，可直接应用于现有 VLM 推理流程，实用性强
-- **核心 insight 有诊断价值**：attention deficit 的发现不仅驱动了 PND 的设计，也为理解 VLM hallucination 的机制提供了新视角
-- **同时提升准确性和描述质量**：避免了"以牺牲描述丰富度为代价减少幻觉"的常见 trade-off
-- **多架构泛化**：在 4 种不同架构的 VLM 上验证有效，表明方法抓住了 VLM 的共同弱点而非特定模型的 quirks
+**Strengths**：
+- 诊断扎实——先用 scale-based 实验证实 granularity–context trade-off（Zoom 对 Small 物体好、Highlight 对 Large 好），再用 noise injection 证实 over-trust 失败（noisy proposal 下 Simple 48.2% vs 53.6% baseline），由现象驱动设计。
+- "用 expert 分歧定位该验证哪里"是简洁且可计算的不确定性代理，避免对所有区域 exhaustive zoom。
+- training-free + 跨 3 类架构（LLaVA / Qwen3-VL / InternVL2）一致增益。
 
-**Weaknesses / 局限：**
-- **[推测]** 双路径推理增加计算开销：每一步 decoding 需要运行两条路径并计算对比，推理时间可能显著增加（论文中未见 overhead 分析）
-- **[推测]** 需要额外超参数调优：contrast weight、负向路径的 degradation 强度等需要针对不同模型调整
-- **[不知道]** 与同期 training-free 方法（如 VCD, DoLa, HALC, AGLA）的详细对比和定位
-- **[不知道]** 在 GUI grounding 等需要精确坐标/区域定位的场景下表现如何——论文聚焦于 caption/description 层面的 hallucination，而非 spatial grounding 任务
-
-**对领域的潜在影响：**
-- 为 hallucination mitigation 提供了新的视角：从"如何更好地融合视觉特征"转变为"如何诊断并纠正视觉特征的利用偏差"
-- 双路径 contrast 框架可以迁移到其他 modality grounding 问题（如 video, audio）
-- Adaptive grounding（全局 vs 局部）的概念对 GUI agent 的 visual grounding 策略设计有启发
+**Weaknesses**：
+- 依赖外部 grounding expert 的 recall——两个检测器都漏掉的稀有/抽象目标无法验证。
+- budget 只省 LVLM token，hypothesis-driven 阶段跑双 external expert 有固定计算开销（作者明确承认是"用预处理换 token 经济 + faithfulness"）。
+- conflict 仲裁主要面向 object existence / attribute，复杂 spatial reasoning、action understanding 的幻觉尚未覆盖。
 
 ## Mind Map
 ```mermaid
 mindmap
-  root((AdaptiveGrounding))
+  root((Active-Look))
     Problem
-      Object Hallucination in VLM
-      Attention Deficit
-      Language Prior Bias
+      Granularity-Context trade-off
+      Over-trust noisy proposals
     Method
-      PND Framework
-        Positive Path
-        Negative Path
-        Contrast Mechanism
-      Training-Free
-      Plug-and-Play
+      Dual heterogeneous experts
+        GroundingDINO + OWLv2
+      Disagreement = uncertainty
+      Consensus arbitration
+        Trusted vs Doubtful
+      Hybrid render
+        global Highlight
+        selective Zoom-in
     Results
-      POPE +6.5%
-      MME Improvement
-      CHAIR Reduction
-      Multi-Architecture
+      POPE Qwen3VL 84.3->89.3
+      CHAIR -71.7% rel
+      Union<single (ablation)
 ```
 
 ## Notes
 
-**与 GUI Grounding 的联系：**
-- PND 的核心概念——在 global context 和 local detail 之间自适应选择视觉 grounding 的粒度——与 GUI agent 中的 grounding 策略高度相关
-- GUI grounding 同样面临权衡：全局布局信息（screen structure, layout）vs 局部元素细节（button text, icon shape, bounding box）
-- PND 的"通过构造 counterfactual 诊断 attention deficit"的思路可以迁移到 GUI grounding：对于 GUI agent 的 grounding 错误，是否可以构造 counterfactual 来定位是全局理解不足还是局部细节遗漏？
-
-**值得跟进的问题：**
-1. PND 的 attention manipulation 具体如何实现？能否适配到 GUI-specific VLM（如 SeeClick, CogAgent）？
-2. "Adaptive" 的具体含义——是 per-sample 自适应还是 per-token 自适应？选择机制是什么？
-3. Negative path 中的 counterfactual 构造方式在其他 grounding 任务（如 spatial grounding, referring expression）中是否同样有效？
-4. 与 AGLA (CVPR 2025, Assembly of Global and Local Attention) 的方法有何异同？两者都关注 global vs local attention，但一个用 attention assembly，一个用 contrastive decoding
-
-**论文消化状态：**
-- 仅基于 abstract + web 摘要，待获取 PDF 全文后更新 Method / Key Results 节的具体数据和实验细节
+- **纠正**：旧笔记把本文误记为 "PND (Positive-and-Negative Decoding)" 的 dual-path contrastive decoding——与原文不符。本文是 **Active-Look**（dual-expert disagreement 驱动的 TwI active verification），已据全文重写。
+- **与 GUI grounding 的联系**：GUI grounding 同样面临 global layout vs local element detail 的权衡；"用多 grounder 分歧定位不确定区域，再选择性放大验证"的思路可迁移到 GUI element grounding 的 evidence-dependence 诊断（参见 [[Ideas/EvidenceDependence-GUIGrounding]]）。
+- 反直觉 ablation（盲目并工具会变差）对所有 multi-tool agent 设计是个警示：聚合需要冲突仲裁而非简单 union。

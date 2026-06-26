@@ -5,64 +5,62 @@ authors:
   - Andrew Keunwoo Jang
   - Jing Yu Koh
   - Ruslan Salakhutdinov
-institute: []
+institute:
+  - "Carnegie Mellon University"
 date_publish: "2026-06-15"
 venue: arXiv
 tags: [computer-use, gui-agent, web-agent]
 url: "https://arxiv.org/abs/2606.16748"
 code: "https://mypcbench.com"
 rating: "4"
-date_added: "2026-06-24"
+date_added: "2026-06-26"
 ---
 ## Summary
 
-> [未获取全文，仅基于 arXiv abstract]
-
-MyPCBench 把 computer-use agent 从通用、无个人上下文的 benchmark 推向 personal assistant 场景：一个带 17 个模拟真实 web apps 和 Linux desktop stack 的 persona 环境，覆盖 184 个来自真实社区请求的任务。它的重要性不在于又多了一个 benchmark，而在于指出 logged-in accounts、历史数据、跨应用个人上下文才是真实 CUA 的难点。
+MyPCBench 把 computer-use agent 从无个人上下文的 impersonal 评测推向 personal assistant 场景：以《The Office》Michael Scott 为 canonical persona，用一个含 17 个模拟真实 web app 的完整 Linux desktop（预登录账号、海量历史数据）+ 184 个源自真实社区请求的任务，评测 agent 能否在带个人历史和多应用状态的桌面里完成请求。最强的 Claude Opus 4.6 也仅 fully solve 55.4%，失败集中在 long-horizon、multi-app 任务。
 
 ## Problem & Motivation
 
-> [未获取全文，仅基于 arXiv abstract]
+现有 computer-use benchmark 多在 impersonal environment 中评测，刻意回避登录态、个人信息和跨 app 生活上下文。但真实部署要求 agent 在用户完整数字生活里工作——邮件、日程、文件、银行、餐厅都需要 logged-in account 与历史数据。作者指出 "a real personal assistant has to drive" 这些需要登录或个人信息的站点，而 live evaluation 通常排除这类功能，gap 在 web 任务上最宽（银行、餐厅、服务都需认证）。
 
-现有 computer-use benchmarks 多在 impersonal environment 中评估 agent，避免登录态、个人信息和跨 app 生活上下文。这让评估和实际部署之间存在明显断层：真实个人助理必须能在用户邮件、日程、文件、web account、历史偏好之间切换。Live web benchmark 通常无法安全、可复现地处理需要登录或个人数据的网站，而这些正是 personal assistant 的核心任务。
-
-MyPCBench 的问题 formulation 更接近真实产品：不是“agent 能否操作一个网页”，而是“agent 能否在一个具有个人历史和多应用状态的桌面中完成用户请求”。这会把隐私、权限、上下文引用、长轨迹恢复都推成 first-class challenge。
+MyPCBench 的 problem formulation 因此更接近真实产品：不是"agent 能否操作一个网页"，而是"agent 能否在一个有个人历史和多应用状态的桌面里完成用户请求"。这把隐私、权限、跨应用上下文引用、长轨迹恢复都推成 first-class challenge。
 
 ## Method
 
-> [未获取全文，仅基于 arXiv abstract]
+**Persona-based seeding**：以 Michael Scott 为 canonical persona，注入海量个人数据：1,812 笔银行交易、2,398 封邮件、679 个含每周循环的日历事件、2,526 条聊天/工作消息、126 次打车、402 单外卖、155 单零售、29 单生鲜、32 个餐厅预订。
 
-MyPCBench 构建了一个 canonical persona，使用《The Office》中的 Michael Scott 作为种子人物，将 Linux desktop 与 17 个模拟真实 web applications 组合成统一环境。任务来自 OpenClaw community 中真实请求的启发，最终形成 184 个任务。
+**17 个模拟 web app**：用完整 Next.js 实现镜像真实服务，覆盖 6 个 SimilarWeb 品类——Finance（Gringotts/Chase、BatBucks/Robinhood、SpeedTax/TurboTax）、Travel（Dinoco/Delta、Cheskepdia/Airbnb、eTaxi/Uber）、Food（HangryDash/DoorDash、TableFind/OpenTable）、Ecommerce（HooliShop/Amazon、Kwik-E-Mart/Instacart）、Tech/Productivity（HooliMail/Gmail、HooliCalendar、HooliWork/Slack、HooliChat/WhatsApp、LockedIn/LinkedIn、SprintBoard/Jira）、Gambling（OddsMarket/Polymarket）。
 
-评测接口统一为 computer + bash tool surface，因此模型既能通过 GUI 操作，也能用 shell 辅助完成部分任务。作者比较了 6 个闭源和开源权重模型，重点观察模型在 personalized multi-app task、长轨迹和个人上下文引用上的表现。
+**Linux desktop stack**：Ubuntu 24.04 VM + GNOME Shell，Firefox profile 含 10,746 条历史访问，预登录账号，226 张数据库表共 ~42,000 行 user-facing state；跨应用数据相互关联（一次出行会同时生成 Cheskepdia 预订、两笔 Gringotts 扣款、HooliCalendar 日程、两张 Dinoco 登机牌）。
 
-这条路线与 [[Papers/2605-SaaSBench]]、[[Papers/2606-CUAGym]]、[[Papers/2600-WebHarbor]] 互补：SaaSBench 强调真实 SaaS workflow，CUA-Gym 强调 verified RLVR tuple 生成，WebHarbor 强调 local mirror 和 reset；MyPCBench 则把 personal context 和 logged-in-like state 纳入环境设计。
+**184 个任务（6 类）**：源自人工审阅 OpenClaw community 2,749 个匿名 use case 后的真实请求启发——Bounded Action（35%，64）、Multi-Step Orchestration（26%，48）、Cross-Source Reconciliation（14%，25）、Aggregation & Reporting（12%，23）、Personal Lookup（7%，13）、Pattern Inference（6%，11）。68% 为 multi-application、40% 跨多个 SimilarWeb 品类。
+
+**评测接口（computer + bash）**：观测为 1280×800 screenshot + action history（保留最近 20 张）；动作为统一 pyautogui surface（click/type/key/scroll/drag/wait/screenshot/done/fail）。评分用 LLM-as-a-judge（Gemini 3.1 Flash-Lite）对整条轨迹按 rubric 打分（每任务 3–13 条、共 1,191 条加权），报告 Perfect Rate（全过，headline）、Rubric Score（加权部分分）、Trajectory Efficiency（rubric score / step）。
 
 ## Key Results
 
-> [未获取全文，仅基于 arXiv abstract]
-
-- Benchmark 包含 17 个 simulated real-world web applications、完整 Linux desktop stack 和 184 个任务。
-- 最强模型 Claude Opus 4.6 fully solves 55.4% tasks，是唯一超过 50% 的模型。
-- 失败主要集中在跨多应用任务和长轨迹任务；也就是说，personalization 不是背景设定，而是实际增加了组合复杂度。
+- **Model ranking（Perfect / Rubric Score）**：Claude Opus 4.6 **55.4% / 81.8**（avg 46.5 步，唯一过 50%，是次优的 1.4×）；Claude Sonnet 4.6 39.1 / 65.4；GPT-5.5 29.3 / 54.1；GPT-5.4 mini 19.0 / 48.8；Qwen 3.5 35B-A3B 7.6 / 42.5；Qwen 3.5 9B 2.7 / 7.0。
+- **按任务类型**：Opus 单 app 任务强（bounded action rubric 85.3%），但 reasoning-heavy 类下滑；pattern inference 上 Opus 94.7% 而 GPT-5.5 仅 59.1%；aggregation & reporting 上 Qwen 系塌到 0–1%。
+- **Scaling—apps 维度**：Perfect rate 随复杂度陡降。Opus 87.4%（1 app）→ 67.9%（7+ apps，−19.5）；GPT-5.5 67.3% → 19.5%（−47.8）；其余模型在 7+ apps 归零。
+- **Scaling—steps 维度**：Opus 接近 100 步预算仍在爬升；GPT 在第 60 步附近平台化；Qwen 第 25 步即饱和。
+- **失败五模式（共 884 条失败 rubric item）**：Premature DONE（354，GPT 主导 235）、Skipped Required App（323）、Surface Error Terminal（captcha/crash/modal，129）、Partial Artifact（表格开了没存，47）、Hallucinated Persona Data（编造数值，31，Qwen 主导）。
+- **家族特征**：Claude 倾向"console-script shortcuts"——用 bash/API 调用代替 UI，满足知识类 rubric 却漏掉 user-visible side-effect；GPT 在多应用协调完成前早停；Qwen 9B 在双工具 schema 下崩溃（rubric 从 20.2% 降到 7.0%）。
 
 ## Strengths & Weaknesses
 
-**Strengths**:
+**Strengths**：
+- **问题真实**：logged-in account、历史数据、personal context 是现有 live web/desktop benchmark 主动回避的难点，MyPCBench 把它做成核心轴。
+- **环境可复现且数据互关联**：用 simulated app 替真实账号，保留个人上下文结构（跨 app 关联记录），同时降低隐私与可复现风险；Docker 化、rubric 公开。
+- **评测拆解细致**：Perfect/Rubric/Efficiency 三指标 + 五类失败模式 + apps/steps 双维 scaling，能定位"在哪类复杂度上崩"，比单一 success rate 信息量大得多。
+- **揭示家族级 failure**：Claude 的 console-shortcut（满足知识但漏 side-effect）是很有价值的诊断——提示 rubric 必须查 user-visible 效果而非 agent 自述。
 
-- **问题真实**：logged-in accounts、历史数据、personal context 是现有 live web / desktop benchmark 主动回避的难点。
-- **环境可复现**：用 simulated web apps 代替真实个人账号，保留个人上下文结构，同时降低隐私和可复现性风险。
-- **与 agent-friendly environment 方向强相关**：personal assistant 场景天然需要 permission、state visibility、sandbox、privacy-aware verifier。
+**Weaknesses**：
+- **persona 单一**：一个 canonical persona 利于复现，但不能代表多用户、多文化、多职业的 personal context 分布。
+- **模拟应用真实性边界未知**：17 个 Next.js mock 与真实 SaaS 的功能复杂度差距未充分量化，可能低估真实站点的反爬/动态/边界 case。
+- **judge 依赖单一 LLM**：用 Gemini 3.1 Flash-Lite 做 grader，rubric 评分本身可能有 judge bias，尤其对 partial credit。
+- **隐私/over-disclosure 评测不足**：环境暴露大量 personal context，但评测重心在任务完成度，未系统评估 agent 是否泄漏与任务无关的个人状态。
 
-**Weaknesses**:
-
-- **persona 单一**：一个 canonical persona 有助于可复现，但不能代表多用户、多文化、多职业的 personal context 分布。
-- **模拟应用的真实性边界未知**：abstract 未说明 17 个 app 与真实 SaaS 的功能复杂度差距。
-- **安全/隐私 evaluation 可能不足**：benchmark 暴露 personal context，但 abstract 未说明是否系统评估 over-disclosure、permission violation 或无关信息泄漏。
-
-**Impact**:
-
-MyPCBench 提醒我们，agent-friendly environment 不能只关注 reset/verifier/RL throughput。真正部署 personal assistant 时，环境协议还必须支持 privacy-preserving state access、permission boundary 和 multi-app context provenance。
+**Impact**：提醒 agent-friendly environment 不能只关注 reset/verifier/RL throughput；部署 personal assistant 时，环境协议还须支持 privacy-preserving state access、permission boundary 和 multi-app context provenance。
 
 ## Mind Map
 
@@ -71,25 +69,28 @@ mindmap
   root((MyPCBench))
     Problem
       Impersonal benchmarks
-      Logged-in tasks缺失
-      Personal context难评估
+      Logged-in personal context缺失
+      gap widest on web tasks
     Method
-      Linux desktop
-      17 simulated web apps
       Michael Scott persona
-      184 real-request-inspired tasks
-      Computer plus bash tools
+      17 Next.js simulated apps
+      Linux desktop 42k rows state
+      184 tasks 6 categories
+      Computer plus bash judge by rubric
     Results
-      Best model 55.4 percent
-      Long trajectories fail
-      Multi-app tasks fail
+      Claude Opus 55.4 only above 50
+      apps scaling Opus 87 to 68 GPT 67 to 19
+      five failure modes 884 items
+      Claude console-shortcut漏side-effect
     Implications
       Personalization is a core axis
-      Privacy and permission need evaluation
-      Agent-friendly runtime needs context provenance
+      Privacy permission need evaluation
+      Runtime needs context provenance
 ```
 
 ## Notes
 
-- 对 [[Ideas/AgentFacing-WebRuntime]] 的直接补充：agent-facing affordance 在 personal setting 中必须最小化暴露 state，否则 verifier / state API 本身会变成 privacy leak。
-- 可以衍生一个 benchmark-independent metric：personalization leakage risk，即 agent 是否引用或泄漏与当前任务无关的 personal state。
+- 对 [[Ideas/AgentFacing-WebRuntime]] 的直接补充：agent-facing affordance 在 personal setting 中必须最小化暴露 state，否则 verifier / state API 本身会变成 privacy leak。MyPCBench 的 226 表 / 42k 行 state 正是这种 runtime 的具体形态。
+- 可衍生 benchmark-independent metric：**personalization leakage risk**——agent 是否引用或泄漏与当前任务无关的 personal state（论文未测，是明显空白）。
+- "Claude console-script shortcuts 满足知识 rubric 却漏 user-visible side-effect" 是重要诊断：rubric/verifier 设计必须校验真实状态变更，而非 agent 的自述结论——这对 [[Ideas/HybridVerifier-GUIRuntime]] 的 verifier 设计有直接启示。
+- 与 SaaSBench / CUA-Gym / WebHarbor 路线互补：它们强调 SaaS workflow / verified RLVR tuple / local mirror+reset，MyPCBench 独家把 personal context 与 logged-in-like state 纳入环境设计。

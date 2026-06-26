@@ -20,116 +20,85 @@ authors:
   - "Jiang, Sihang"
   - "Xiao, Yanghua"
 institute:
-  - "Fudan University, Knowledge Works Lab / A3 Lab"
-  - "Shenzhen Kuakua Jingling Technology Co."
+  - "Fudan University"
+  - "Shenzhen Aquaintelling Technology (Advantage AI Agent Lab, A3 Lab)"
 date_publish: "2026-04-18"
 venue: "arXiv"
 tags: ["agentic-RL", "task-planning", "LLM"]
 url: "https://arxiv.org/abs/2604.17091"
 code: "https://github.com/lsdefine/GenericAgent"
 rating: "4"
-date_added: "2026-04-28"
+date_added: "2026-06-26"
 ---
 ## Summary
 
-GenericAgent 提出**上下文信息密度最大化 (Contextual Information Density Maximization)** 作为长周期 LLM Agent 的核心设计原则：性能瓶颈不在上下文长度，而在有限预算内能维持多少决策相关信息。基于此构建了四个耦合组件（最小原子工具集、分层按需记忆、自我进化机制、上下文截断压缩），仅 ~3,300 行代码和 ~30K token 工作预算，在 SOP-bench / Lifelong AgentBench 上达到 100% 完成率，且在 token 消耗仅为同类系统 15%-35% 的前提下全面超越。
+GenericAgent (GA) 提出**上下文信息密度最大化 (context information density maximization)** 作为长周期 LLM Agent 的唯一设计原则：long-horizon 性能不由 context length 决定，而由有限预算内能维持多少 decision-relevant 信息决定。围绕该原则构建四个耦合组件（9 个原子工具、四层按需 hierarchical memory、reflection 驱动的 self-evolution、context truncation & compression），仅 ~3,300 行代码、<30K token 工作预算，在 SOP-Bench / Lifelong AgentBench 上达 100% 完成率，token 仅为同类系统的 15%-35%。
 
 ## Problem & Motivation
 
-作者识别出长周期 LLM Agent 的三种复合失败模式：(1) **位置偏差 (position bias)** 导致中间证据被淹没在长上下文尾部，(2) **无关内容** 主动稀释注意力并降低推理质量，(3) **有效上下文长度远小于标称窗口**——即使有 200K+ token 预算，实际可用的决策相关信息窗口远小于此。
+作者将长周期 Agent 的失败归因为两大根本挑战。**(1) Context explosion**：随交互延长，tool definitions、retrieved memories、原始观察不断累积，挤占 decision-relevant 信息的空间，这不仅是 token 成本问题，更直接损害推理质量——LLM 的 effective attention 有限，无关内容增多会让模型遗漏约束、混淆中间状态、产生并放大 hallucination。**(2) Experience accumulation & reuse**：长周期环境中 user preference、tool behavior、有效 action pattern 只能在 trial-and-error 中习得，但现有框架多把每个 episode 当作 stateless，即使引入 retrieval memory 也只存原始 log 而非蒸馏后的可复用知识，且缺乏 feedback 驱动的更新，导致 stale memory silently degrade。
 
-现有长周期 Agent 框架（如 Claude Code, OpenClaw）倾向于将大量历史、工具输出、技能说明塞入上下文，通过扩大上下文窗口来"硬扛"，但这本质上是用更高的 API 成本换取脆弱的性能。作者的核心论点是：**这是一个结构性约束（structural constraint），不是预算问题**。即使在无限上下文窗口的假想设定下，completeness（信息完整）和 conciseness（信息精炼）的张力依然不可调和——每多塞入一条无关信息都在稀释 attention 密度。
-
-提出 "structural trilemma"：completeness、conciseness、naturalness 三者无法同时满足，GenericAgent 的选择是牺牲 naturalness（接受结构化、非自然的记忆表示），在前两者之间建立新的均衡。
+核心论点提炼为 context engineering 的三个维度：**completeness**（决策所需信息必须显式在场）、**conciseness**（无关冗余必须剔除）、**naturalness**（表示需语义可读，是次要约束）。作者强调 completeness 与 conciseness 之间的张力是**结构性的 (structural)**，而非预算问题——即使 context window 无限，"多塞潜在相关信息提升 completeness 但削弱 conciseness""压缩提升 conciseness 但可能丢失 completeness"的矛盾依然存在。因此 context engineering 应被看作以 completeness/conciseness 为核心、naturalness 为约束的 constrained optimization，而非三方对等 trilemma。
 
 ## Method
 
-GenericAgent 的架构由四个紧密耦合的组件构成，所有设计决策都回溯到同一个原则——最大化上下文信息密度。
+GA 由统一 agent loop 驱动（核心循环仅 92 行）：每步将 global memory 与当前任务拼成 execution context，LLM 产出 output 或 tool call，结果以结构化信号回写系统状态；任务完成后将 execution trace 压缩成 long-term 表示存入共享 memory。四个核心组件：
 
-**1. 最小原子工具集 (Minimal Atomic Tool Set)**
+**1. Minimal Atomic Toolset（9 个原子工具）**
+分五类：File Operations（`file_read` / `file_patch` / `file_write`）、Code Execution（`code_run`，Python/Bash，每 turn 仅一次调用）、Web Interaction（`web_scan` / `web_execute_js`）、Memory Management（`update_working_checkpoint` / `start_long_term_update`）、Human-in-the-loop（`ask_user`）。理论上仅 `code_run` 即图灵完备、可复刻其余八个工具，因此其余工具非为扩展能力，而是降低决策成本的 shortcut——本质是 harness。工具最小化同时降低 prompt 开销与 policy 的 action-space 歧义。`web_scan` 内置 layout-analysis：clone live DOM、计算逐元素可见性、剔除被覆盖/隐藏元素后再序列化，比 raw DOM 降低约一个数量级 token。
 
-仅 9 个原子工具：`code_run`、`file_read/write/patch`、`web_scan`、`web_execute_js`、`ask_user`、`update_working_checkpoint`、`start_long_term_update`。
+**2. Hierarchical Memory（四层 + meta-memory）**
+功能上分 working memory（每 turn 注入、仅最小任务状态）、always-on memory（持久可见、压到最轻量的导航索引）、long-term memory（默认在 context 外、经 post-task consolidation 写入）。实现层为四层：**L1 index**（紧凑指针，always-on）、**L2 fact**（验证过的稳定事实）、**L3 SOP**（可复用流程：workflow、precondition、失败案例、recovery 策略）、**L4 raw session archive**（持久化追溯）。默认仅注入 meta-memory + L1，沿 L1→L2/L3 路由按需检索。关键不变量：**L1 只记录知识类别的"存在性"而非内容**，其描述长度逼近知识类别结构的 Kolmogorov complexity——因为 LLM 本身充当 decoder，知道"某能力存在"即可再花 tool call 取深层内容。写入用 triggered commit + 验证阶段，遵循 "No Execution, No Memory"。
 
-设计哲学：工具只提供**环境访问能力**，复杂行为通过组合泛化 (compositional generalization) 实现。`code_run` 是万能扩展口——理论上图灵完备，任何新能力无需新增工具，只需写代码。这直接降低工具说明占用的上下文预算。
+**3. Self-Evolution（演化策略而非工具）**
+固定 tool 层与可演化 knowledge 层分离，所有 task-specific 能力存于 SOP 文件与可复用脚本。质量控制靠 selective consolidation：raw trace 只存 L4，仅在子目标完成/错误恢复等里程碑触发显式 consolidation 才提升为 L3，且只保留经成功 tool 执行验证的信息。失败处理用三级 escalation：先局部修正重试 → 失败则换策略/补信息 → 全部失败则请求人类介入。能力演化分三阶段：Stage 1 自然语言执行 → Stage 2 SOP 蒸馏 → Stage 3 代码化执行，阶段跃迁由 memory 机制自主触发。GA 还支持 autonomous exploration：curriculum planner 按 breadth/depth/utility/innovation 四维加权打分（初始权重 0.3/0.2/0.3/0.2）选探索任务，再用 reflection-based adaptation 根据实际 usage 反向调权（预测高分但 30 天内 usage<3 则降权 10%）。
 
-**2. 五层分级按需记忆 (Hierarchical On-Demand Memory)**
+**4. Context Truncation & Compression（四级）**
+用字符域启发式 $B=\alpha W_{tokens},\ \alpha\approx 3$ 触发压缩。四级：(i) tool-output truncation（head-tail 截断，如 `code_run` 10K 字符上限）；(ii) tag-level compression（约每 5 turn 一次，重复 working-memory 块替换为 placeholder、reasoning/tool 标签内容截到 ~800 字符窗口，最近 10 条豁免，借此让 ~80% turn 命中 prompt cache）；(iii) message eviction（超预算时 FIFO 逐出至降到预算 60% 以下）；(iv) working-memory anchor（每次 tool 调用后注入最近 20 条 one-line 摘要 + turn 号 + `key_info` 块，evict 后成为长期记忆唯一来源）。
 
-| 层级 | 名称 | 内容 | 上下文策略 |
-|:-----|:-----|:-----|:-----------|
-| L0 | 元规则 (Meta Rules) | 不可变的基础行为规则和安全边界 | 始终注入 |
-| L1 | 记忆索引 (Insight Index) | 紧凑指针——不存内容，只存"存在性" | 默认展示 |
-| L2 | 全局事实 (Global Facts) | 跨任务稳定知识（用户偏好、环境配置） | 按需加载 |
-| L3 | 任务技能 / SOP | 已验证执行路径固化的可复用流程 | 按需加载 |
-| L4 | 会话归档 (Session Archive) | 原始历史记录持久化存储 | 工具调用检索 |
-
-关键设计：默认上下文中**仅注入 L0 + L1**。L1 是极简索引，不包含具体内容——Agent 看到的是"存在哪些知识"而非"知识的具体内容"，需要时通过工具调用路由到 L3/L4 的深层内容。这使得工作上下文始终紧凑。
-
-**3. 自我进化机制 (Self-Evolution / Skill Crystallization)**
-
-流水线：任务感知 → 自主探索 → 技能结晶 → 记忆召回。
-
-当 Agent 成功完成一个任务后，系统自动将其执行轨迹（action sequence、依赖、中间决策）转化为可复用的 SOP 文件和可执行代码，存入 L3 层。下次遇到类似任务时直接调用 SOP，无需重新探索。
-
-关键洞察：进化的是**策略**（如何组合工具完成特定子任务），而非工具本身。质量通过显式整合步骤控制——SOP 的生成需要经过验证步骤，确保结晶的 skill 是可靠的。
-
-**4. 上下文截断与压缩层 (Context Truncation & Compression)**
-
-四种粒度的压缩协同工作：
-- **工具输出截断**：限制单次工具调用的返回长度
-- **标签级压缩**：对 HTML/XML 等结构化输出做标签级裁剪
-- **消息驱逐 (message eviction)**：当上下文逼近 ~30K budget 时，按信息密度分数驱逐低价值历史消息
-- **工作记忆锚点 (working memory checkpoint)**：Agent 可主动调用 `update_working_checkpoint` 将当前关键状态写入持久化摘要，替换冗长的历史对话
+此外，CLI-as-primitive 的极简架构让 **Subagent Dispatch**（父 agent 跑 terminal 命令启动多个后台 GA 实例，天然 context 隔离 + map-reduce）与 **Reflect Mode**（外部脚本监测条件后向 CLI 派发任务，衍生 Watchdog 与 Scheduled Task）无需扩展核心架构即自然涌现。
 
 ## Key Results
 
-**任务完成率**
-- SOP-bench：**100%** 准确率
-- Lifelong AgentBench：**100%** 准确率
-- RealFinBench：**65%**（基线系统未报告具体数字，论文声称行业第一）
+**任务完成率与 token 效率（Table 2，Efficiency = Accuracy / Total Tokens(M)）**
+- SOP-Bench：GA (Claude Sonnet 4.6) 100%，2.08M total token，efficiency 0.48；Claude Code 仅 85%。
+- Lifelong AgentBench：GA 100%（241K total），efficiency 4.15；OpenClaw 70%（1.45M），Claude Code 75%（814K）。GA input token 仅 222K，是 Claude Code (800K) 的 27.7%、OpenClaw (1.43M) 的 15.5%。
+- RealFin-Benchmark：GA 65% 为全场最高（Claude Code Opus 60% / Sonnet 55%，Codex 60%，OpenClaw 35%），且 efficiency 5.70 远超对手。
 
-**Token 效率**
-- Token 消耗仅为同类主流 Agent 系统的 **15%-35%**
-- Lifelong AgentBench 上：GA 消耗 Claude Code 输入 token 的 **27.7%**，仅为 OpenClaw 的 **15.5%**，同时任务完成率更高 (100%)
-- 活跃工作上下文控制在 **~30K tokens**，约为同类框架的 1/6
+**Tool-use 效率（Table 4，5 个 long-horizon 任务）**
+GA 100% success，匹配 Claude Code（OpenClaw 80%），但仅用 188,829 token（Claude Code 537,413 的 35.1%、OpenClaw 633,101 的 29.8%），requests 32.6→11.0、tool calls 22.6→12.8。Claude Code 源码级有 53 个工具、OpenClaw 18 个 tool factory，而 GA 仅 9 个。
 
-**自进化效率**
-- 同一任务 9 轮重复执行后：Token 消耗减少 **89.6%**（22.2 万 → 2.3 万），模型调用次数减少 **84.4%**（32 次 → 5 次）
-- 跨 8 个网页任务：后续执行 Token 平均下降 **79.3%**，最高节省 **92.4%**
-- 同一任务重复 5 次：耗时从 102 秒降至 66 秒，Token 从 20 万腰斩至 10 万
+**Memory 系统**
+- 重复运行收敛：5 轮重复中 GA 运行时间 102s→~66s、token 200,439→100,000，而 CodeX/Claude Code/OpenClaw 基本持平。
+- Condensed memory ablation（SOP-Bench dangerous_goods，Table 5）：No-Memory 13.87% → Full-Memory(575 tok) 52.44% → Condensed(仅 165 tok) 66.48%，以最少 token 达最高 TSR。
+- LoCoMo 长期事实记忆（Table 6）：GA 在 Multi-Hop/Temporal/Open-Domain/Single-Hop 四类的 F1 与 BLEU-1 全面超过 Mem0、A-MEM、OpenClaw，且**无需 embedding model 或向量库**。
+- Context explosion（Table 7）：装 20 个 skill 高强度使用后对 "Hello" 的 full prompt 长度，GA 仅 2,298 token，而 Claude Code 22,821、CodeX 23,932、OpenClaw 43,321。
 
-**网页浏览 (BrowseComp-ZH 多跳推理)**
-- GenericAgent：准确率 **0.60**，Token ~0.26M
-- 基线主流 Agent 系统：准确率 0.20，Token ~0.76M
-- 准确率为基线的 **3 倍**，Token 仅为基线的 **1/3**
+**Self-evolution（LangChain GitHub 任务 9 轮，Table 8）**
+Round #1→#9：运行时间 7m30s→1m38s（-78.2%）、LLM calls 32→5（-84.4%）、total token 222,203→23,010（-89.6%）。#6–#9 进入 23K±1K 的稳定 codified 区间。跨 8 个 web 任务平均 token 下降 79.3%（61.0%-92.4%），高复杂度任务收益更大（OC 均值 >1M 的任务平均省 83.5%）。
 
-**上下文膨胀抵抗**
-- 安装 20 个技能并高强度使用后，仅 GA 有效防止了上下文膨胀
-- 长期记忆评估 (LoCoMo)：基于分层记忆架构确保了记忆的高效召回，显著优于对比系统
+**Web Browsing（Table 9，均用 Claude Opus 4.6）**
+WebCanvas：GA 0.834 (0.18M) vs OpenClaw 0.722 (0.71M)；BrowseComp-ZH：GA 0.60 vs OpenClaw 0.20（3 倍），token 0.47M vs 1.31M；Custom Tasks：GA 0.577 (0.26M) vs OpenClaw 0.500 (0.76M)。整体 2.9x-3.9x token 节省。
 
 ## Strengths & Weaknesses
 
 **Strengths**
 
-1. **概念简洁且统一**：上下文信息密度最大化是一条可以回溯所有设计决策的第一性原理，不是 ad-hoc 的技巧堆砌。"simple, scalable, generalizable" 的典范。
-2. **反直觉结论有实验支撑**：更低的 token 消耗 = 更好的任务性能。这个结论违反"更多上下文 = 更好理解"的直觉，但被多项实验一致验证，有 insight depth。
-3. **极简代码量 (3.3K 行) 是真正的 engineering contribution**：不是"我们写得更少所以更 elegant"，而是代码量少到 LLM 可以在每轮读自己的完整源码——这使 **架构自更新 (architecture self-update)** 成为可能。这是最小化设计的深层理由。
-4. **进化机制是"弱方法" (weak method)**：进化的是 SOP/策略而非模型参数——不需要梯度更新，不需要 RL training，只需在已验证的轨迹上模式提取。这是高 feasibility + high impact 的选择。
-5. **记忆系统设计有认知科学根基**：L0-L4 的分层结构天然映射到 human memory 的 procedural→semantic→episodic 分层，L1 作为"存在性索引"而非内容存储，对应 meta-memory 概念。
+1. **概念简洁且统一**：context information density maximization 是可回溯所有设计决策的第一性原理，论文进一步提炼出 agent 的 "minimal complete capability set"——tool interfacing / context management / memory formation 三者，对应任务流水线中信息密度被系统性削弱的三个环节。这是 "simple, scalable, generalizable" 的典范。
+2. **反直觉结论有扎实实验支撑**："在 long-horizon 设定下更低 token 消耗 = 更好任务性能"被多 benchmark 一致验证。作者的解释 insight 深刻：超过某点后多出的 token 不带来信息而是通过 positional bias / attention dilution / effective-window 收缩损害推理，token 消耗是 context management 质量的症状而非推理充分性的标志。
+3. **极简代码量是真正的 engineering contribution**：~3,300 行（核心 loop 92 行）对比 OpenClaw 约 53 万行（160 倍）。论文明确提出最小化的深层理由——足够小的代码库 LLM 可读可改，使 **architectural self-update** 成为 evolution 的第三维（继 skill consolidation、autonomous exploration 之后）。
+4. **memory 即验证/选择问题**：与 MemGPT、A-MEM 等以存储/检索为中心的工作不同，GA 把 memory 质量当作 verification + selection 问题，只把 behavior-changing 且验证过的信息提升为长期表示；LoCoMo 上无需向量库即超过 embedding 方法，是有说服力的反例。
 
 **Weaknesses & Open Questions**
 
-1. **仅基于 abstract 和二手来源，未读全文**：以下 weakness 分析基于公开信息推断，可能存在偏差。特别是 ablation 细节、failure case 分析、cross-model generalization 测试等需全文确认。
-2. **RealFinBench 仅 65%**：相比 SOP-bench/Lifelong AgentBench 的 100% 有显著落差。这可能说明 GenericAgent 在处理真实世界中高度开放、需要深度领域知识的任务时，最小工具集 + SOP 记忆的组合存在边界。需要全文确认失败模式是工具不足、SOP 匹配失败，还是 LLM 推理瓶颈。
-3. **SOP 质量退化风险 (SOP drift)**：自我进化声称"verified trajectory → reusable SOP"，但验证机制是否足够 robust？如果某次执行的 SOP 结晶包含了环境相关的偶然因素（例如特定的 CSS selector 恰好匹配），在新场景下可能会 silently fail。这是所有 self-improving system 共有的 distribution shift 问题。
-4. **最小工具集的表达能力边界**：9 个工具声称图灵完备（via code_run），但 code_run 的 turing-completeness 是理论上的——实际是否受限于 LLM 生成代码的能力、执行环境的安全性限制、以及某些需要专用接口的任务（如复杂 GUI 操作、系统级权限操作）？
-5. **比较基线的信息不完整**：论文称 GenericAgent 在多个 benchmark 上"显著优于领先系统"，但从公开材料看，比较对象的具体版本号和配置细节不明确。特别是 Claude Code 和 OpenClaw 的版本、使用的 LLM backbone 是否一致需要确认。
+1. **RealFin 仅 65%、SOP-Bench 在 Minimax M2.7 下降到 90%**：相比 Claude 配置的 100% 有落差，说明在真实世界高度开放、需深度领域知识的金融任务及较弱 backbone 上，最小工具集 + SOP 记忆的组合存在边界。论文未给出 RealFin 的 failure-mode 细分。
+2. **自评估机制的成熟度有限**：作者在 §3.3 Limitations 自承——reflection-based 权重调整是 preliminary、尚无长期数据证明跨真实工作流有效；self-improvement log 仍靠手工 curation；skill tree 的合并/弃用/重构仍全手工；30-round 执行上限使复杂研究任务需跨 session，session 间仅靠报告与 task-list 注释保持连续。这些都是 self-improving system 共有的 distribution-shift / 维护性隐患。
+3. **比较基线配置的可比性**：Table 2 中不同 benchmark 用不同 backbone（Claude Sonnet/Opus 4.6、Minimax M2.7、GPT-5.4），efficiency 比值仅在同 block 内可比；部分对照（如 Codex/CodeX）只在个别 benchmark 出现，跨系统的严格 apple-to-apple 仍有限。
+4. **char-budget 启发式对 CJK 不友好**：$\alpha\approx3$ 在 CJK 内容下严重低估实际 token，存在延迟 eviction 与 context overflow 风险，作者自己也指出这一点。
 
 **与 Self-Improving Agent Reliability 方向的相关性**
 
-GenericAgent 为 Self-Improving Agent Reliability 方向提供了重要的参考基线：
-- 其自我进化机制 (trajectory → SOP) 是一种**不同范式**的 self-improvement，与我们 agenda 中关注的 RL-based self-improving + verification debiasing 形成互补视角
-- L3 SOP 的"质量通过显式整合步骤控制"这个点直接触及了 Self-Improving Reliability 的核心 concern——如何确保自增强循环的产出是真正可靠的？GenericAgent 的方案是"验证步骤"，但细节需要在全文中确认
-- 如果 GenericAgent 的 SOP 质量验证是可迁移的机制，可能为我们的 Adversarial Verification idea 提供替代方案或组件
+GA 的 trajectory→SOP→code self-evolution 是一种**非 RL、非梯度**范式的 self-improvement，与 agenda 中 RL-based self-improving + verification debiasing 形成互补。其 "No Execution, No Memory" + triggered commit + 三级 failure escalation 直接回应了"如何确保自增强循环产出可靠"的核心 concern——质量靠"成功执行验证"而非对抗式校验，可作为 Adversarial Verification idea 的替代组件或对照基线。
 
 ## Mind Map
 
@@ -137,26 +106,27 @@ GenericAgent 为 Self-Improving Agent Reliability 方向提供了重要的参考
 mindmap
   root((GenericAgent))
     Problem
-      Long-horizon Agent 上下文崩溃
-      Structural Trilemma: Completeness vs Conciseness vs Naturalness
-      Token 预算不等于有效信息量
+      Context explosion 损害推理质量
+      Experience 跨 episode 流失
+      Completeness vs Conciseness 是结构性张力
     Method
-      最小原子工具集 (9 tools, 3.3K LoC)
-      五层分层按需记忆 L0-L4
-      自我进化: 轨迹 → SOP + 代码
-      上下文截断与压缩 (4 层)
+      9 个原子工具 (code_run 图灵完备)
+      四层 hierarchical memory L1-L4
+      Self-evolution: 自然语言→SOP→code
+      四级 truncation & compression
+      CLI primitive 衍生 subagent / reflect
     Results
-      SOP-bench / Lifelong AgentBench: 100%
-      Token: 15%-35% of baselines
-      9 轮进化后 Token -89.6%
-      BrowseComp: 3x baseline accuracy
-      ~30K token working budget
+      SOP-Bench / Lifelong AgentBench 100%
+      Token 15%-35% of baselines
+      9 轮进化 token -89.6%
+      LoCoMo 超 embedding 方法
+      BrowseComp-ZH 0.60 = 3x OpenClaw
 ```
 
 ## Notes
 
-- 与 HyMEM (Papers/2603-HybridSelfEvolvingStructured.md) 比较：两者都在做 memory + self-evolving，但 HyMEM 是 graph-structured memory for GUI agents，GenericAgent 是技能树 + 通用 agent。关系是 complementary 而非竞争——HyMEM 偏组织，GenericAgent 偏信息密度原则。
-- 与 UI-Mem (Papers/2600-UiMemSelfEvolving.md) 比较：UI-Mem 的 self-evolving 是 online RL 中更新 memory 参数，GenericAgent 的 self-evolving 是 trajectory → SOP 的模式提取。前者是 continuous learning，后者是 one-shot crystallization。互补。
-- 论文标注为 "V1.0"，暗示后续版本可能有扩展，值得跟踪。
-- 代码开源（MIT），GitHub 已有 6,200+ stars（截至 2026.04），社区活跃度良好。3.3K 行代码值得实际阅读以验证论文 claims。
-- Key open question: 如果 GenericAgent 的 SOP 进化机制确实可靠，是否能作为 Self-Improving Reliability 方向中对抗"偏差放大"的正面样本？
+- 与 HyMEM (Papers/2603-HybridSelfEvolvingStructured.md)：两者都做 memory + self-evolving，但 HyMEM 是 graph-structured memory for GUI agents，GA 是技能树 + 通用 agent。complementary：HyMEM 偏组织，GA 偏信息密度原则。
+- 与 UI-Mem (Papers/2600-UiMemSelfEvolving.md)：UI-Mem 的 self-evolving 是 online RL 更新 memory 参数，GA 是 trajectory→SOP 的模式提取。前者 continuous learning，后者 one-shot crystallization。互补。
+- 论文标注 "V1.0"，作者明确把 architectural self-update 列为未来工作，值得跟踪后续版本。
+- 实测要点：GA 的 `web_scan` DOM 剪枝（clone DOM + 可见性分析）是 web agent token 控制的可借鉴工程点；"L1 只存存在性、LLM 当 decoder" 的 meta-memory 设计是最值得迁移到 GUI agent 的 idea。
+- Key open question：GA 的 SOP 进化是否能作为 Self-Improving Reliability 方向中对抗"偏差放大"的正面样本？其 "No Execution, No Memory" 过滤是否足以防止 SOP 把环境偶然因素（如某 CSS selector）错误固化？

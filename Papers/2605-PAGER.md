@@ -114,7 +114,7 @@ mindmap
 ```
 
 ## Notes
-- **与 [[2025-macOSWorld- A Multilingual Interactive Benchmark for GUI Agents]] 对比**：macOSWorld 是 region-tolerant 范式的典型 benchmark，PAGER 指出这类 benchmark 无法评估 precision-sensitive 能力
+- **与 [[2506-macOSWorld- A Multilingual Interactive Benchmark for GUI Agents]] 对比**：macOSWorld 是 region-tolerant 范式的典型 benchmark，PAGER 指出这类 benchmark 无法评估 precision-sensitive 能力
 - **与 [[ScaleInvariant-Grounding-GUI]] idea 关联**：PAGER 的 pixel-level execution 面临 scale variance 问题（窗口大小变化导致坐标映射失效），可能受益于 scale-invariant grounding
 - **与 [[ForkPoint-CreditAssignment-GUI]] idea 关联**：PAGER 的 RL 用 geometric validity reward 做 credit assignment，但未显式建模 fork point（哪一步开始偏离正确轨迹）
 - **疑问**：为什么 parameter accuracy reward 的 ablation（w/o RL_param）几乎无效果？是否因为 geometric validity reward 已隐式包含参数精度信号？

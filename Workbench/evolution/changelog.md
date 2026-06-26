@@ -83,3 +83,24 @@
 - **directions_paused**: 0
 - **directions_abandoned**: 0
 - **reasoning**: WorkspaceBench 的 74 file types + 20K files 场景下 Heterogeneous File Understanding 和 Lineage Tracing 瓶颈进一步验证 grounding 在复杂环境中的重要性。DUDE 的 asymmetric reward (ω=10) 和 Skill1 的 frequency-based credit assignment 为 RL Training 方向的 reward design 提供新思路，虽然 credit assignment 子方向拥挤，但 reward design 角度仍有探索空间。
+
+## 2026-06-25
+
+### [2026-06-25] agenda-evolve
+
+- **trigger**: autoresearch (all topics)——6/23–6/25 积累的 agent-facing environment / personal CUA safety 工作（10+ paper notes、3 survey、2 report、4 idea）未反映到 5/19 起未更新的 agenda Active Directions
+- **insights_reviewed**: 0（insights.md 自 5/3 未 distill，最近一条 validated insight 已超 30 天且为 medium confidence——本轮证据主要来自 6/23–6/25 logs/reports/ideas，而非 insights.md；memory-distill 已 overdue）
+- **directions_added**: 2（Agent-Facing Environment Runtime: high, conf 0.4；Personal CUA Safety & Contextual Integrity: medium, conf 0.35）
+- **directions_updated**: 2（GUI Grounding Robustness: evidence 新增 EvidenceDependence-GUIGrounding + VisualFLIP，next_action 补充无训练 evidence-dependence 诊断备选；RL-based GUI Agent Training: evidence 新增 WebGym + AsyncWebRL + CUA-Gym）
+- **directions_paused**: 1（Self-Improving Agent Reliability: next_action 自 5/7 起卡在不可获取的 SGV 论文，verifier 主题已被 HybridVerifier-GUIRuntime 承接）
+- **directions_abandoned**: 0
+- **reasoning**: 过去三天研究重心明显从"GUI grounding/RL 模型侧"迁移到"环境 runtime 侧 + CUA 安全侧"——AgentFacing-WebRuntime/HybridVerifier (各 18/25)、PersonalizedSafety-CUA (20/25)、AgentCIBench (leakage 67.9%) 等高分证据均无对应 agenda 方向。新增两个方向使 agenda 重新对齐真实研究轨迹；Self-Improving 因前置依赖（SGV 论文）长期无法满足且主题被新方向覆盖而暂停。两个新方向与 GUI Grounding 是否合并、Personal CUA Safety 是否在 Mission scope 内，已作为 Discussion Topic 留给 Supervisor 决策（不擅自改 Mission）。
+
+### [2026-06-25] memory-distill
+
+- **period**: 2026-05-19 ~ 2026-06-25
+- **logs_processed**: 10（05-19, 05-22, 05-25, 06-07, 06-08, 06-10, 06-22, 06-23, 06-24, 06-25）
+- **new_patterns**: 5（verifier→agent-facing、skill-as-first-class-object、latent/weight-space token reduction、multimodal Clever Hans、personal CUA contextual disclosure）
+- **promoted_to_insight**: 3（L1→L2：verifier→agent-facing、skill-as-object 两个新 pattern 因 ≥3 独立来源即时晋升为 provisional insight；外加既有 workflow pattern 晋升）
+- **validated_insights**: 1（L2→L3：真实长程工作流远未饱和——5 个独立 benchmark 跨日期一致，既有 pattern 直接升 validated，confidence medium）
+- **queued_for_review**: 0（暂无 confidence>0.8 的 validated insight 触发 DomainMaps 晋升）

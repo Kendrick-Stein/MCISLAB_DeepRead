@@ -29,7 +29,7 @@ Agentic RL（Agent强化学习）是指将强化学习方法应用于智能体�
 
 ### 2.1 GRPO-based GUI Agent RL 路线
 
-**代表论文**：[[2500-UiR1EnhancingEfficient]]、[[2025-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]]、[[2500-CraftGuiCurriculumReinforced]]、[[2604-ClawGUI]]
+**代表论文**：[[2500-UiR1EnhancingEfficient]]、[[2500-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]]、[[2500-CraftGuiCurriculumReinforced]]、[[2604-ClawGUI]]
 
 **核心思路**：将 DeepSeek-R1 的 GRPO（Group Relative Policy Optimization）方法适配到 GUI Agent 场景，利用任务的可程序化验证特性设计 rule-based reward，实现少量高质量样本的高效 RL 训练。
 
@@ -65,7 +65,7 @@ Agentic RL（Agent强化学习）是指将强化学习方法应用于智能体�
 
 ### 2.3 Credit Assignment for Long-Horizon Tasks 路线
 
-**代表论文**：[[2604-SOLAR-RL]]、[[2026-Adaptive Milestone Reward for GUI Agents]]、[[2600-ContinualGuiAgents]]
+**代表论文**：[[2604-SOLAR-RL]]、[[2600-Adaptive Milestone Reward for GUI Agents]]、[[2600-ContinualGuiAgents]]
 
 **核心思路**：直接解决多步长程任务中稀疏奖励下的 credit assignment 问题，通过失败点检测、里程碑奖励、锚定奖励等机制将终点奖励转化为步级监督。
 
@@ -192,13 +192,13 @@ Agentic RL（Agent强化学习）是指将强化学习方法应用于智能体�
 
 ### Credit Assignment & Long-Horizon RL
 - [[2604-SOLAR-RL]] - SOLAR-RL: First failure point detection + 三阶段 reward alignment
-- [[2026-Adaptive Milestone Reward for GUI Agents]] - ADMIRE: Adaptive milestone reward
+- [[2600-Adaptive Milestone Reward for GUI Agents]] - ADMIRE: Adaptive milestone reward
 - [[2600-ContinualGuiAgents]] - GUI-AiF: Anchoring reward for continual learning
 - [[2600-UiVoyagerSelfEvolving]] - UI-Voyager: GRSD fork point detection
 
 ### GRPO-based GUI Agent RL
 - [[2500-UiR1EnhancingEfficient]] - UI-R1: Rule-based RL (136 samples)
-- [[2025-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]] - MobileRL: ADAGRPO (80.2% AndroidWorld)
+- [[2500-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]] - MobileRL: ADAGRPO (80.2% AndroidWorld)
 - [[2500-CraftGuiCurriculumReinforced]] - CRAFT-GUI: Curriculum + GRPO
 - [[2604-ClawGUI]] - ClawGUI: 首个开源 RL infrastructure
 

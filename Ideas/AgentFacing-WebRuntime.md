@@ -1,9 +1,9 @@
 ---
 title: Agent-Facing Web Runtime Affordances
 tags: [gui-agent, web-agent, computer-use, environment, research-idea]
-status: raw
+status: validated
 linked_project:
-date_updated: "2026-06-24"
+date_updated: "2026-06-25"
 ---
 ## Hypothesis
 
@@ -89,3 +89,25 @@ date_updated: "2026-06-24"
 - **被批评为 RPA / hand-crafted skills**：semantic actions 必须来自 route/schema/DOM/API/DB 等通用结构，不为单个任务手写 shortcut。
 - **WebHarbor / CUA-Gym-Hub realism 边界**：mock/mirror 结果可能不迁移到 live web。第一版应明确只证明 causal mechanism，后续再做 live-web sanity check。
 - **Verifier leak**：progress probe 可能间接泄露答案。需要将 evaluator-only API、agent-safe state probe、hidden task-specific verifier 三层严格分开。
+
+## Evaluation — 2026-06-25 (idea-evaluate, autoresearch round 3)
+
+外部检索更新（WebSearch）：
+- **ARE / Gaia2**（ICLR 2026, [arxiv 2602.11964](https://arxiv.org/pdf/2602.11964)）是最接近的环境工作：提供可复用 Verifier、区分 read vs write action（read 不计入 goal、可自由探索），且 Verifier 可用于任意 ARE 环境的 RLVR 训练。但其 Verifier 是 **oracle-based**（对照人工标注），并非把 state/verifier 作为 **non-oracle agent-facing affordance** 暴露给 actor——这正是本 idea 的差异点（C2.5 evaluator-only 对照 + agent-facing affordance 的因果 ablation）。
+- "non-oracle verifier" 术语目前主要出现在 PRM/ORM reasoning 文献，环境侧尚无系统把它做成 agent-facing runtime——空白仍在。
+
+五维评估：
+- **Novelty**: 3/5 — closest works: [[Papers/2600-WebHarbor]], [[Papers/2606-CUAGym]], ARE/Gaia2 (ICLR 2026), Plan-Then-Execute (typed website API)。环境/verifier 路线拥挤，但"agent-facing non-oracle affordance + evaluator-only 对照"的因果实验框架仍有区分。
+- **Feasibility**: 4/5 — 可从 WebHarbor mirror 或 CUA-Gym-Hub mock apps 起步，zero-training，主要工程是 adapter / state probe / verifier endpoint。
+- **Impact**: 4/5 — 若成立，为 web/CUA environment 研究补上"agent-facingness"维度，给 runtime/benchmark 设计提供可操作边界；直接支撑 agenda 的 Agent-Facing Environment Runtime 方向。
+- **Risk**: 3/5 — 主要失败模式：收益被 strong dynamic-prompt baseline 复现；semantic action 被视为 RPA shortcut。两者均已在 design 中设强对照与防作弊边界。
+- **Evidence**: 4/5（↑）— ARE/Gaia2 的 read/write + reusable verifier、OpenComputer 94.1% verifier alignment、ENVS 环境 oracle→SFT 共同强化"环境侧 state/verifier 重要"的先验；agent-facing 暴露仍缺直接实验。
+- **Total**: 18/25。
+
+**结论**：raw → **validated**。已通过文献调研验证差异化空间（agent-facing non-oracle affordance + evaluator-only 因果对照），feasibility 高，且是 agenda 新 #1 方向的 lead idea。下一步在 Supervisor 确认方向优先级后可进入 experiment-design（AFE-MiniSuite，C0–C7 ablation）。
+
+**Suggestions**：(1) 实验报告必须包含 ARE/Gaia2 式 read/write action 区分作为对照维度，明确"oracle verifier vs agent-facing non-oracle probe"的差别；(2) 把 strong dynamic-prompt baseline（affordance 文本原样塞入 prompt）作为最关键的 falsification 对照；(3) 优先只做 Web-only causal mechanism，避免跨平台 scope 膨胀。
+
+## Experiments
+
+- [[Experiments/2026-06-25-AgentFacing-WebRuntime]] — AFE-MiniSuite C0–C7 因果 ablation，验证 agent-facing non-oracle affordance 的 success/recovery 增益是否超过 dynamic-prompt 与 evaluator-only 对照

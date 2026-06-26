@@ -57,7 +57,7 @@ mindmap
 
 **优势**: Multimodal action distribution modeling
 
-**关联**: [[Papers/2026-SeedPolicy- Horizon Scaling via Self-Evolving Diffusion Policy for Robot Manipulation]]
+**关联**: [[Papers/2603-SeedPolicy- Horizon Scaling via Self-Evolving Diffusion Policy for Robot Manipulation]]
 
 ### 3. World Model for Planning
 

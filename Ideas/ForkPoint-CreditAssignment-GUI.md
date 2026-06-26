@@ -24,7 +24,7 @@ date_updated: "2026-05-06"
 - [[2600-UiMemSelfEvolving]] - Hierarchical Experience Memory，参数化 failure pattern 模板
 - [[2500-UiR1EnhancingEfficient]] - Rule-based action reward，证明稠密步级奖励在 GUI 场景高效
 - [[Papers/2604-ClawGUI]] - 首个开源 GUI Agent RL 基础设施
-- [[2025-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]] - ADAGRPO，difficulty-adaptive RL
+- [[2500-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]] - ADAGRPO，difficulty-adaptive RL
 - [[Papers/2604-SOLAR-RL]] - Semi-online RL，first failure point detection + 3-stage reward shaping，概念上最接近 fork point detection
 - [[Papers/2602-ProxMO]] - Proximity-based soft aggregation (TF-IDF state similarity → step-level baseline)，用轻量 state similarity 做 credit 分配，与 ForkPoint 的 state change detection 概念高度重叠
 

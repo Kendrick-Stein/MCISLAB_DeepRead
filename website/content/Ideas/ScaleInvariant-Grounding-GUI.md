@@ -25,7 +25,7 @@ date_updated: "2026-04-28"
 - [[2400-SeeclickHarnessingGuiGrounding]] - GUI grounding pre-training, screen-only input
 - [[2600-ContinualGuiAgents]] - Anchoring Point Reward for grounding under distribution shift
 - [[Papers/2604-AutoGUIv2]] - 揭示 VLM 在 grounding vs captioning 上的二分性
-- [[2025-MMBench-GUI- Hierarchical Multi-Platform Evaluation Framework for GUI Agents]] - 跨平台评测框架
+- [[2507-MMBench-GUI- Hierarchical Multi-Platform Evaluation Framework for GUI Agents]] - 跨平台评测框架
 
 **Novelty**: 将成熟的目标检测架构（FPN + multi-scale anchors）适配到 GUI grounding 的独特需求：(1) GUI 元素尺度差异极大（图标 16×16 到全屏 banner）；(2) 文本元素需要 sub-pixel 精度；(3) 需要在不同设备的极端分辨率变化下保持鲁棒。现有 GUI grounding 工作（GoClick, GUI-Actor, SeeClick）均未显式设计 multi-scale 架构。
 

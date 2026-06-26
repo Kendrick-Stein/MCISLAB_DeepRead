@@ -3,7 +3,7 @@ title: Hybrid Verifier-Grounded GUI Runtime
 tags: [gui-agent, computer-use, environment, verifier, research-idea]
 status: raw
 linked_project:
-date_updated: "2026-06-24"
+date_updated: "2026-06-25"
 ---
 ## Hypothesis
 
@@ -87,3 +87,22 @@ WeaveBench 显示真实 CUA 工作流不是 GUI-only：GUI+CLI+Code hybrid 比�
 - **Verifier coverage 不足**：如果 verifier 只能检查简单文件存在或字符串匹配，审稿人会质疑真实性。需要选择能明确跨通道验证的任务。
 - **Agent 不调用 affordance**：需要在 tool schema 和 instruction 中让 verifier affordance 成为自然工作流的一部分，但不能强迫到变成 hand-coded policy。
 - **和 WeaveBench 太近**：必须强调本工作不是新 judge，而是改变 agent 执行时可观测性/可验证性，并用 judge 仅作为测量工具。
+
+## Evaluation — 2026-06-25 (idea-evaluate, autoresearch round 3)
+
+外部检索更新（WebSearch）发现一个**近孪生工作**，显著影响 novelty：
+- **"Agentic Reward Modeling: Verifying GUI Agent via Online Proactive Interaction"**（[arxiv 2602.00575](https://arxiv.org/pdf/2602.00575)）：verifier agent 不被动相信 actor 的截图，而是用 Progressive Verification Mechanism 主动跨 GUI/CLI 通道探测——当 GUI 证据模糊时执行 shell 命令确认，抓住 actor 谎报成功。这与本 idea 的 cross-channel consistency check + evidence provenance 高度重叠。
+- 其余相邻工作：CUARewardBench（[2510.18596](https://arxiv.org/pdf/2510.18596)）、SWE-Marathon（[2606.07682](https://arxiv.org/html/2606.07682)，multi-channel verifier construction）、Gaia2（verifier hacking：embed code 淹没 LLM judge）。reward-hacking + 多通道验证赛道已较拥挤。
+- **本 idea 残留的差异点**：上述工作多为 **grader/verifier-facing**（评测或 reward modeling 时由第三方 verifier 主动核查）；本 idea 主张把 cross-channel verifier 作为 **actor 自用的 agent-facing runtime affordance**，并做"是否改变 actor 执行行为"的因果 ablation。但这一区分较 subtle，审稿人可能视为增量。
+
+五维评估（相对 6/24 inline 评估下调 Novelty）：
+- **Novelty**: 3/5（↓ from 4）— closest works: Agentic Reward Modeling (2602.00575, 近孪生), [[Papers/2606-WeaveBench]], [[Papers/2605-OpenComputer]], CUARewardBench, SWE-Marathon。
+- **Feasibility**: 3/5 — hybrid GUI+CLI+Code harness + verifier endpoints 工程量高于 Web-only AFE。
+- **Impact**: 4/5 — 若能显著降低 reward hacking，直接回应 CUA 可靠部署。
+- **Risk**: 3/5 — agent 可能忽略 affordance；verifier coverage 不足；与近孪生工作区分不清的 framing 风险（新增）。
+- **Evidence**: 4/5 — WeaveBench failure anatomy + OpenComputer verifier alignment + Agentic Reward Modeling 案例共同支撑 cross-channel 有效，但 agent-facing（actor 自用）仍缺直接实验。
+- **Total**: 17/25（↓ from 18）。
+
+**结论**：保持 **raw**（暂不晋升 validated）。核心 novelty 被 "Agentic Reward Modeling: Verifying GUI Agent" 近孪生工作削弱，需先把差异化收紧到一个可证伪的 framing 再晋升，避免 method worship / 增量贡献。
+
+**Suggestions**：(1) 把假设重写为可证伪对照：**agent-facing actor-self verifier（C4）vs 等强度的 grader-facing online verifier（Agentic Reward Modeling 复现）** —— 只有当"actor 在执行中自用 verifier"相比"第三方 verifier 事后/在线核查"在 reward-hacking rate 上有额外下降，本 idea 才成立；(2) 若该对照无显著差异，应将本方向并入 [[Ideas/AgentFacing-WebRuntime]] 的 verifier affordance 维度，而非独立 idea；(3) 与 agenda 方向 Agent-Facing Environment Runtime 共享 harness，降低工程成本。

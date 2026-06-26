@@ -280,7 +280,7 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 ### Diffusion Policy Papers
 
 - **Diffusion Policy**: "Diffusion Policy: Visuomotor Policy Learning via Action Diffusion" (Chi et al., arXiv 2303.04367)
-- [[Papers/2026-SeedPolicy- Horizon Scaling via Self-Evolving Diffusion Policy for Robot Manipulation]] - SeedPolicy with SEGA
+- [[Papers/2603-SeedPolicy- Horizon Scaling via Self-Evolving Diffusion Policy for Robot Manipulation]] - SeedPolicy with SEGA
 - **ACT**: "Action Chunking with transformers" (2023)
 
 ### World Model Papers
@@ -296,7 +296,7 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 
 ### Unified Agent Papers
 
-- [[Papers/2025-OmniActor- A Generalist GUI and Embodied Agent for 2D&3D Worlds]] - GUI + Embodied unified
+- [[Papers/2509-OmniActor- A Generalist GUI and Embodied Agent for 2D&3D Worlds]] - GUI + Embodied unified
 - [[Papers/2500-OmniactorGeneralistGuiEmbodied]] - Layer-heterogeneity MoE
 
 ### Safety Papers

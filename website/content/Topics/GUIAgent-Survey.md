@@ -29,7 +29,7 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 
 ### 2.1 Visual Grounding 路线
 
-**代表论文**：[[2400-SeeclickHarnessingGuiGrounding]]、[[2024-Ponder & Press- Advancing Visual GUI Agent towards General Computer Control]]、[[2500-GuiActorCoordinateFree]]、[[2400-ImprovedGuiGroundingVia]]
+**代表论文**：[[2400-SeeclickHarnessingGuiGrounding]]、[[2412-Ponder & Press- Advancing Visual GUI Agent towards General Computer Control]]、[[2500-GuiActorCoordinateFree]]、[[2400-ImprovedGuiGroundingVia]]
 
 **核心思路**：将 GUI grounding 作为独立的基础能力进行专门训练，而非依赖通用 VLM 的隐式定位能力。主要方法包括：
 
@@ -43,7 +43,7 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 
 ### 2.2 Self-Improving Agent 路线
 
-**代表论文**：[[2025-UI-TARS- Pioneering Automated GUI Interaction with Native Agents]]、[[2500-UiGenieSelfImproving]]、[[2600-UiVoyagerSelfEvolving]]、[[2600-UiMemSelfEvolving]]
+**代表论文**：[[2500-UI-TARS- Pioneering Automated GUI Interaction with Native Agents]]、[[2500-UiGenieSelfImproving]]、[[2600-UiVoyagerSelfEvolving]]、[[2600-UiMemSelfEvolving]]
 
 **核心思路**：建立数据-模型闭环，让 agent 通过自主探索、失败经验利用和迭代训练持续提升能力，而非依赖静态人工标注数据。
 
@@ -57,7 +57,7 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 
 ### 2.3 Reinforcement Learning 路线
 
-**代表论文**：[[2025-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]]、[[2500-UiR1EnhancingEfficient]]、[[2600-ContinualGuiAgents]]
+**代表论文**：[[2500-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]]、[[2500-UiR1EnhancingEfficient]]、[[2600-ContinualGuiAgents]]
 
 **核心思路**：将 GUI agent 训练从纯 SFT 转向可验证的 RL 优化，利用规则奖励或环境反馈直接优化可执行行为。
 
@@ -70,7 +70,7 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 
 ### 2.4 多模态融合与层次规划路线
 
-**代表论文**：[[2025-OmniActor- A Generalist GUI and Embodied Agent for 2D&3D Worlds]]、[[2500-MegaGuiMultiStage]]、[[2500-MobileuseGuiAgentHierarchical]]、[[2400-GuiodysseyComprehensiveDatasetCross]]
+**代表论文**：[[2509-OmniActor- A Generalist GUI and Embodied Agent for 2D&3D Worlds]]、[[2500-MegaGuiMultiStage]]、[[2500-MobileuseGuiAgentHierarchical]]、[[2400-GuiodysseyComprehensiveDatasetCross]]
 
 **核心思路**：结合视觉、语言、历史上下文多模态信息，建立分层规划架构，从高层任务分解到低层动作执行。
 
@@ -178,25 +178,25 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 
 **Visual Grounding**：
 - [[2400-SeeclickHarnessingGuiGrounding]] - SeeClick: GUI grounding pre-training
-- [[2024-Ponder & Press- Advancing Visual GUI Agent towards General Computer Control]] - Ponder & Press: Interpreter + Locator 框架
+- [[2412-Ponder & Press- Advancing Visual GUI Agent towards General Computer Control]] - Ponder & Press: Interpreter + Locator 框架
 - [[2500-GuiActorCoordinateFree]] - GUI-Actor: Coordinate-free grounding
 
 **Self-Improving Agent**：
-- [[2025-UI-TARS- Pioneering Automated GUI Interaction with Native Agents]] - UI-TARS: Native agent + iterative training
+- [[2500-UI-TARS- Pioneering Automated GUI Interaction with Native Agents]] - UI-TARS: Native agent + iterative training
 - [[2500-UiGenieSelfImproving]] - UI-Genie: Reward model + self-improvement
 - [[2600-UiVoyagerSelfEvolving]] - UI-Voyager: RFT + GRSD
 - [[2600-UiMemSelfEvolving]] - UI-Mem: Hierarchical experience memory
 
 **Reinforcement Learning**：
-- [[2025-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]] - MobileRL: ADAGRPO
+- [[2500-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]] - MobileRL: ADAGRPO
 - [[2500-UiR1EnhancingEfficient]] - UI-R1: Rule-based RL
 - [[2600-ContinualGuiAgents]] - Continual GUI Agents: Anchoring reward
 
 **多模态与层次规划**：
-- [[2025-OmniActor- A Generalist GUI and Embodied Agent for 2D&3D Worlds]] - OmniActor: GUI + Embodied unified
+- [[2509-OmniActor- A Generalist GUI and Embodied Agent for 2D&3D Worlds]] - OmniActor: GUI + Embodied unified
 - [[2500-MegaGuiMultiStage]] - MEGA-GUI: Multi-stage grounding
 - [[2400-GuiodysseyComprehensiveDatasetCross]] - GUIOdyssey: Cross-app dataset
-- [[2025-InfiGUIAgent- A Multimodal Generalist GUI Agent with Native Reasoning and Reflection]] - InfiGUIAgent: Native reasoning
+- [[2501-InfiGUIAgent- A Multimodal Generalist GUI Agent with Native Reasoning and Reflection]] - InfiGUIAgent: Native reasoning
 
 ### 6.2 Survey 与综述
 
@@ -205,7 +205,7 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 
 ### 6.3 Benchmark 论文
 
-- [[2025-MMBench-GUI- Hierarchical Multi-Platform Evaluation Framework for GUI Agents]] - MMBench-GUI
+- [[2507-MMBench-GUI- Hierarchical Multi-Platform Evaluation Framework for GUI Agents]] - MMBench-GUI
 - [[2500-ProbenchBenchmarkingGuiAgents]] - ProBench: Process-level evaluation
 
 ---

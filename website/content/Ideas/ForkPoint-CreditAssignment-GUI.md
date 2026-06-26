@@ -24,7 +24,7 @@ date_updated: "2026-04-28"
 - [[2600-UiMemSelfEvolving]] - Hierarchical Experience Memory，参数化 failure pattern 模板
 - [[2500-UiR1EnhancingEfficient]] - Rule-based action reward，证明稠密步级奖励在 GUI 场景高效
 - [[Papers/2604-ClawGUI]] - 首个开源 GUI Agent RL 基础设施
-- [[2025-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]] - ADAGRPO，difficulty-adaptive RL
+- [[2500-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]] - ADAGRPO，difficulty-adaptive RL
 
 **Novelty**: 区别于 UI-Voyager 的成组对比方法，本 idea 提出在单条轨迹内部通过 state-action mutual information 或 screenshot differencing 自动检测 fork point，无需 paired rollout。若成功，将使 credit assignment 从"需要多轨迹对比"简化为"单轨迹自监督"，大幅降低数据需求。
 

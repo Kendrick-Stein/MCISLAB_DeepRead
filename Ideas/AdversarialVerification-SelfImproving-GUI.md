@@ -21,7 +21,7 @@ date_updated: "2026-04-28"
 ## Related Work
 
 - [[2500-UiGenieSelfImproving]] - Reward model + agent 联合迭代自增强，closest work
-- [[2025-UI-TARS- Pioneering Automated GUI Interaction with Native Agents]] - Iterative training with reflective online traces
+- [[2500-UI-TARS- Pioneering Automated GUI Interaction with Native Agents]] - Iterative training with reflective online traces
 - [[2600-UiVoyagerSelfEvolving]] - Rejection Fine-Tuning + GRSD
 - [[2600-UiMemSelfEvolving]] - Hierarchical Experience Memory, failure pattern 参数化
 - [[Papers/2604-ClawGUI]] - 开源 GUI Agent RL 基础设施

@@ -40,7 +40,7 @@ date_created: "2026-06-25"
 
 ### Embodied AI / World Model
 
-- 本轮没有新增 digest。6/24 的 [[Papers/2601-TMoW]] 仍是主要 world-model update。
+- 本轮没有新增 digest。6/24 的 2601-TMoW 仍是主要 world-model update。
 - 对 GUI/CUA 的迁移启发仍是 runtime model routing：不同 app/site/personal context 可看作不同 transition / privacy regimes。
 
 ### Hyperbolic Manifold

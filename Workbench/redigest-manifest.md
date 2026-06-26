@@ -18,10 +18,9 @@ status: done
 | 2604-GoClick / VisualFLIP / AdaptiveGrounding / MyPCBench / BraveGuard / Skill1 / GenericAgent / HybridMemory / SpatialEvo / VLASafety（active 方向证据） | ✅ done | 全文重写，已去除 abstract-only marker |
 | 2604-AgenticWorldModel / HYWorld2 / MultiWorld / AgentWorld / Externalization / GenerativeWorldRenderer / Odysseys（World Model） | ✅ done | 全文重写 |
 | 2604-EmbodiedMidtrain / LLaDA2Uni（Archive/off-focus） | ✅ done | 全文重写 |
-| **2606-Harness1** | ⚠️ blocked | arxiv/html 与 ar5iv 均只渲染 ~800 词（abstract 级），无可用全文，保留原 abstract-only 笔记，未捏造 |
-| **2500-GuiAgentsSurvey** | ⚠️ blocked | 笔记无 arXiv id，无法定位来源；建议 Supervisor 提供 URL，或因 off-focus 直接删除 |
+| **2606-Harness1** | 🗑️ deleted (2026-06-26) | arxiv/html 与 ar5iv 均只渲染 ~800 词（abstract 级），无可用全文。Supervisor 决策：删除并解除引用（Topics/GUI-Environment-Survey、AgentFriendlyEnvironment-Survey、Reports/2026-06-24 中的 `[[2606-Harness1]]` 已 unlink 为纯文本，prose 讨论保留） |
+| **2500-GuiAgentsSurvey** | 🗑️ deleted (2026-06-26) | 笔记无 arXiv id，无法定位来源。Supervisor 决策：删除（Topics/GUIAgent-Survey 及 website 镜像中的 `[[2500-GuiAgentsSurvey]]` 已 unlink） |
 
-## 待 Supervisor 决策
+## 决策记录
 
-- **Harness1**：全文不可得。是否：(a) 保留 abstract-only，(b) 删除并从 agenda Env Runtime evidence 解除引用，(c) 提供可访问全文来源。
-- **GuiAgentsSurvey**：Archive/off-focus + 无 arxiv id。是否删除（并清其 DomainMap 引用）。
+2026-06-26 Supervisor：Harness1、GuiAgentsSurvey 两篇无法重抓全文的，**删除并解除引用**（已执行）。21 篇 cited abstract-only 最终：19 升级 + 2 删除，全部 resolved。

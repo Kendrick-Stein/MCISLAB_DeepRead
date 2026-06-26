@@ -220,7 +220,7 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 
 ### 6.2 Survey 与综述
 
-- [[2500-GuiAgentsSurvey]] - GUI Agents: A Survey (ACL Findings 2025)
+- GUI Agents Survey - GUI Agents: A Survey (ACL Findings 2025)
 - [[2500-TowardsTrustworthyGuiAgents]] - Towards Trustworthy GUI Agents
 
 ### 6.3 Benchmark 论文

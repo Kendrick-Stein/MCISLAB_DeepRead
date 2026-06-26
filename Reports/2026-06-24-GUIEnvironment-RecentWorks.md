@@ -22,7 +22,7 @@ sources:
   - "[[2605-EnvFactory]]"
   - "[[2509-DARTGUI]]"
   - "[[2606-RHO]]"
-  - "[[2606-Harness1]]"
+  - "Harness-1"
   - "[[2508-ComputerRL]]"
   - "OSWorld: https://arxiv.org/abs/2404.07972"
   - "[[2412-BrowserGymAgentLab]]"

@@ -86,7 +86,7 @@ GUI Environment（图形用户界面仿真/测试环境）是 GUI Agent 研究�
 
 ### 1.4 Harness 优化（Harness Optimization）
 
-**代表论文**：[[2606-RHO]] · [[2606-Harness1]] · [[2508-ComputerRL]]
+**代表论文**：[[2606-RHO]] · Harness-1 · [[2508-ComputerRL]]
 
 **核心思路**：从历史 trajectory 自动优化 harness（tools / prompts / skills）配置，无需外部标注。
 

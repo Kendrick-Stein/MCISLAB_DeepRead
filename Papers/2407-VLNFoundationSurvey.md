@@ -248,7 +248,7 @@ FM 在这三步都可以插入：
 - [[2204-SayCan]]：LLM + affordance 的指令分解，§4.1 的代表
 - [[2303-PaLME]]：embodied FM，§6 Agent Model 讨论的代表
 
-### 与 [[DomainMaps/VLN]] 的关系
+### 与 DomainMaps/VLN 的关系
 - 本 survey 写于 2024-07，截至 2026-04 的发展在 DomainMap 已更新：R2R-CE SOTA 从 survey 写作时的 ~55%（HAMT/DUET）被新一代（ETPNav 57%、NaVILA、PROSPECT 60.3%、Efficient-VLN 64.2%、GTA zero-shot 48.8%）超越；streaming VLA 路线和 VLN-R1 的 GRPO 训练在 survey 里完全没出现。所以本 survey 的"未来方向"部分（2D→3D、embodied FM）基本被验证，但它没预见到 **VLN → VLA unification** 这条路径。
 
 ---
@@ -291,7 +291,7 @@ FM 在这三步都可以插入：
 - Survey 的 **LAW 框架在 VLN 里很自然，但不直接迁移到 manipulation / VLA**——那里没有独立的 "human model"（指令通常更短、对话更少）。如果要用类似三分法组织 VLA survey，需要重新定义第二个模块——可能是 "Task Model" 或 "Skill Model"？可以作为 VLA-Survey 重构时的参考。
 - Survey 没有给出 VLN-CE 下 SOTA 在 sim vs real 的 gap 表，但 DomainMap/VLN.md 里已补充：NaVILA 54% sim → 88% real（不同 setup），GTA 48.8% zero-shot sim。可以把这部分作为 VLN DomainMap "sim-to-real" section 的 seed。
 - Survey 提到 **VLN-CE → Robo-VLN → waypoint predictor** 的三步演进，这正是现在 streaming VLA 取代 waypoint 路线的前置——survey 写作时 waypoint 还是 default，但 2025-26 streaming VLA 已尝试 skip 这一层。
-- **连接到 [[Topics/VLN-VLA-Unification]]**：survey 把 VLN 作为孤立任务，没有预见 VLN-VLA 结构收敛；这正是该 topic 的切入点。
+- **连接到 VLN-VLA Unification**：survey 把 VLN 作为孤立任务，没有预见 VLN-VLA 结构收敛；这正是该 topic 的切入点。
 
 ### Rating
 

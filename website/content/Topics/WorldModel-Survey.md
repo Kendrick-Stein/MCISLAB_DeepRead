@@ -62,7 +62,7 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 **代表工作**：
 - [[2604-AgentWorld]]：1,978 环境 / 19,822 工具，从 MCP servers + PRD 采集
 - [[2604-GenerativeWorldRenderer]]：4M 帧 RGB+G-buffer 数据集，从游戏截取
-- [[2604-OpenWorldLib]]：统一 inference framework（Library Paper，Rating 1）
+- OpenWorldLib：统一 inference framework（Library Paper，Rating 1）
 
 **核心思路**：大规模采集 + 合成环境
 

@@ -183,7 +183,7 @@ $$
 | Annealing | 高质量子集 + reflection tuning data | 收敛到 GUI 任务（产出 UI-TARS-SFT） |
 | DPO | online bootstrapping 的 preference pair | 区分 optimal/suboptimal（产出 UI-TARS-DPO） |
 
-总训练量 ~50B tokens，base 是 Qwen-2-VL（2B/7B/72B）——同期 GUI-VLM 工作（如 [[2312-CogAgent|CogAgent]]、[[2410-OSAtlas|OS-Atlas]]、[[2411-ShowUI|ShowUI]]）的 base 选择各异。
+总训练量 ~50B tokens，base 是 Qwen-2-VL（2B/7B/72B）——同期 GUI-VLM 工作（如 [[2312-CogAgent|CogAgent]]、[[2410-OSAtlas|OS-Atlas]]、[[2506-ShowuiOneVisionLanguage|ShowUI]]）的 base 选择各异。
 
 ---
 ## Results
@@ -244,9 +244,9 @@ $$
 
 ### 同期 native agent model（直接对比）
 - **[[2410-OSAtlas|OS-Atlas]]**：同样训练统一 GUI foundation model，UI-TARS 在 ScreenSpot-Pro 大幅超它（38.1 vs 18.9）
-- **[[2411-ShowUI|ShowUI]]**：unified vision-language-action GUI agent，关注效率
+- **[[2506-ShowuiOneVisionLanguage|ShowUI]]**：unified vision-language-action GUI agent，关注效率
 - **Aguvis**：双阶段训练 GUI agent，UI-TARS 在 Mind2Web 超 Aguvis-72B
-- **[[2401-SeeClick|SeeClick]]**：早期专注 GUI grounding 的 VLM，被并入 UI-TARS 训练数据
+- **[[2400-SeeclickHarnessingGuiGrounding|SeeClick]]**：早期专注 GUI grounding 的 VLM，被并入 UI-TARS 训练数据
 - **Claude Computer Use**：商用 framework 路线代表，UI-TARS 在 OSWorld 超它
 
 ### Framework 路线对比
@@ -256,7 +256,7 @@ $$
 
 ### 数据来源 / Benchmark
 - 训练数据：MM-Mind2Web、GUIAct、AITW、AITZ、AndroidControl、GUI-Odyssey、AMEX、MultiUI、Rico-SCA、CLAY、UIBERT、OmniACT、AutoGUI
-- Eval benchmark：VisualWebBench、WebSRC、ScreenQA-short、[[2504-ScreenSpotPro|ScreenSpot-Pro]] / ScreenSpot v1/v2、Mind2Web、AndroidControl、GUI Odyssey、[[2404-OSWorld|OSWorld]]、AndroidWorld
+- Eval benchmark：VisualWebBench、WebSRC、ScreenQA-short、[[2504-ScreenSpotPro|ScreenSpot-Pro]] / ScreenSpot v1/v2、Mind2Web、AndroidControl、GUI Odyssey、OSWorld、AndroidWorld
 
 ---
 ## 论文点评
@@ -264,7 +264,7 @@ $$
 ### Strengths
 
 1. **范式确立**：清晰划分 framework vs native model 两条路线，并用全面实验证明 native model 在规模化下完胜 framework，是 GUI agent 领域里程碑。后续工作（Aguvis、OS-Atlas、Operator、Claude Computer Use）的 framing 都受其影响。
-2. **数据飞轮闭环完整**：online bootstrap → 多级过滤 → reflection 标注 → DPO，构成可持续的 self-improvement 管道。这套思路是 [[2410-OSAtlas|OS-Atlas]]、[[2411-ShowUI|ShowUI]] 等同期工作没做完整的部分。
+2. **数据飞轮闭环完整**：online bootstrap → 多级过滤 → reflection 标注 → DPO，构成可持续的 self-improvement 管道。这套思路是 [[2410-OSAtlas|OS-Atlas]]、[[2506-ShowuiOneVisionLanguage|ShowUI]] 等同期工作没做完整的部分。
 3. **Post-Reflection 标注的 insight**：保留错误步、要求标注员"在错误已发生的前提下"标补救动作。这是 reflection tuning 比单纯 error correction 更有价值的一点——教模型 recover from error 而不是 avoid error。
 4. **System-1 vs System-2 的边界条件**：明确指出 thought 在单样本 in-domain 下反而有害，BoN 或 OOD 才显优势。这种诚实的 negative finding 是好品味，避免了 "thinking always helps" 的过度推销。
 5. **Scale ablation 翔实**：2B/7B/72B 三个尺寸 + offline/online 双轴比较，揭示 online benchmark 才能区分 model scale 的真实收益。
@@ -301,7 +301,7 @@ $$
 
 - 四阶段 GUI agent 演化框架（Rule-based → Framework → Native → Active Lifelong）成了 follow-up 工作引用 UI-TARS 时的标准 framing。
 - Post-reflection 的标注思路（让模型看到自己犯过的错并学会绕回正轨）是后续 RL-based GUI agent（如 UI-TARS-1.5、各种 Agentic RL 工作）的雏形。
-- "BoN 让 System-2 反超 System-1" 这个观察后来被 [[2404-OSWorld|OSWorld]] 等多个独立工作复现，是 inference-time scaling 在 agent 场景的早期证据。
+- "BoN 让 System-2 反超 System-1" 这个观察后来被 OSWorld 等多个独立工作复现，是 inference-time scaling 在 agent 场景的早期证据。
 - 与 ACU Survey 的六大 gap 对应：UI-TARS 在 generalization（pure-vision + unified action）、learning（iterative bootstrap）、planning（System-2）三个维度提供了具体方案，但 safety / reliability / evaluation 三个维度仍是 open。
 - 7B 在 OSWorld DPO 设置下能拿到 18.7（甚至超 Claude 14.9），如果部署成本是主要考量，7B 是合理选择；但 online 上 72B 拉开 7B 较多（22.7 vs 18.7），online 任务建议直接上 72B。
 - ❓ Reflection tuning 的核心数据是 model-generated trace + 人工纠错。这条路线在 RL fine-tuning 时代是否会被纯 RL（无人工纠错，靠 verifier reward）替代？UI-TARS-1.5 的方向值得追踪。

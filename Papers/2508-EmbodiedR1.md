@@ -323,7 +323,7 @@ V branch（visual trace）略优于 P branch（affordance points），作者归�
 - **核心 takeaway**：这篇是 RFT 在 embodied AI 上目前最 convincing 的应用之一。之前的 R1-style embodied work 大多停在 simulation 或单任务，本文是少数同时做了 11 benchmark + SIMPLEREnv + 真机 + 视觉扰动的工作。
 - **"Pointing as middle-layer abstraction" 这个设计哲学值得思考**：它本质上是把 robotics 的 "perception → planning → control" 三层中的 perception 输出从 "scene understanding" 升级到 "task-relevant spatial query"。这个抽象层级比 SayCan 的 affordance grounding 更细，比 Code-as-Policies 更结构化。
 - **可复用的 component**：(a) reward library 设计模式（$r_{\text{format}}, r_{\text{mask}}, r_{\text{dis}}, r_{\text{trace}}$ + task-specific weighted sum）可直接迁移到其他 multi-task RFT 训练；(b) "question-verification" 数据格式可作为构造 RFT 数据集的 template；(c) Embodied-Spatial-84K + ViRL-subset-18K 的 "spatial + general" 混合 curriculum 是对抗 catastrophic forgetting 的实用配方。
-- **对 [[DomainMaps/VLA|VLA]] 方向的影响**：如果 pointing-as-middle-representation 这条路径继续 scale（比如扩展到 dexterous manipulation、bimanual），可能会挑战 "VLA 必须是 end-to-end action policy" 的主流叙事——pointing + planner 可能是更 sample-efficient + 更可解释的方案。但需要看在 contact-rich / dexterous 任务上能否保持优势。
+- **对 VLA 方向的影响**：如果 pointing-as-middle-representation 这条路径继续 scale（比如扩展到 dexterous manipulation、bimanual），可能会挑战 "VLA 必须是 end-to-end action policy" 的主流叙事——pointing + planner 可能是更 sample-efficient + 更可解释的方案。但需要看在 contact-rich / dexterous 任务上能否保持优势。
 - > ❓ Embodied-R1 输出的 point 是 single-step 的（VTG 是 8 点轨迹），缺乏 closed-loop reactive 能力。如果接 closed-loop 控制（如每帧 re-query 一次 pointing），latency 会成为问题——3B VLM 的 inference 时间在真机循环中是否可接受？论文 appendix D 提到了 execution time 分析，需要确认。
 - **方法 vs 问题的权衡**：作者自己强调 "simple, scalable, generalizable"。Pointing 抽象确实简洁，RFT 训练也是成熟方法，但整套系统依赖外部 motion planner、depth sensor、相机标定，"零样本" 的边界其实是 perception 层面的零样本，不是整个系统的零样本。这是个对自己方法的诚实定位问题。
 

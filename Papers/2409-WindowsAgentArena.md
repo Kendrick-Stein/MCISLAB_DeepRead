@@ -15,14 +15,14 @@ date_added: 2026-04-21
 ## Summary
 
 > [!summary] WindowsAgentArena: Evaluating Multi-Modal OS Agents at Scale
-> - **核心**: 把 [[2404-OSWorld|OSWorld]] 框架移植到真实 Windows 11 OS 上，构建 154 个跨应用任务的 agent benchmark，并通过 Azure 容器化 VM 实现"全 benchmark 20 分钟跑完"的并行评估
+> - **核心**: 把 OSWorld 框架移植到真实 Windows 11 OS 上，构建 154 个跨应用任务的 agent benchmark，并通过 Azure 容器化 VM 实现"全 benchmark 20 分钟跑完"的并行评估
 > - **方法**: Docker + QEMU/KVM 封装 Win11 VM；任务 JSON 包含 setup script + 自动化 reward function；同时发布 Navi agent，用 SoM (Set-of-Marks) 把 UIA accessibility tree、OCR、icon detector、Omniparser 多源信息叠加到截图上喂 VLM
 > - **结果**: 最佳 Navi 配置 (UIA + Omniparser + GPT-4V-1106) 取得 19.5% 成功率，远低于人类 74.5%。Office / Windows Utils 几乎全 0%；Web Browser、Windows System 相对最好
 > - **Sources**: [paper](https://arxiv.org/abs/2409.08264) | [website](https://microsoft.github.io/WindowsAgentArena/) | [github](https://github.com/microsoft/WindowsAgentArena)
 > - **Rating**: 2 - Frontier（Windows OS agent 评测的代表性 benchmark + 可 scale 的云端评估基础设施，被后续 OS agent 工作作为重要参考，但 154 任务规模和 zero-shot-only 结果限制其成为 de facto 标准）
 
 **Key Takeaways:**
-1. **OS-level benchmark 的价值在 task realism + scalable eval**：跟 [[2404-OSWorld|OSWorld]] 区别不在 OS 选择本身，而在用 Azure ML job 把每个 task 分发到独立 VM，把单机串行的"几天"压到 20 分钟。
+1. **OS-level benchmark 的价值在 task realism + scalable eval**：跟 OSWorld 区别不在 OS 选择本身，而在用 Azure ML job 把每个 task 分发到独立 VM，把单机串行的"几天"压到 20 分钟。
 2. **SoM 质量是 zero-shot VLM agent 性能的关键瓶颈**：单纯像素 OCR/icon 检测 vs 加上 UIA accessibility tree，GPT-4V 的成功率从 12.5% 涨到 19.5%（相对提升 57%）。"看得懂屏幕" 比 "推理强" 更稀缺。
 3. **Visual-language mis-alignment 是常见 failure mode**：agent 文本说 "click 红色"，但选了 SoM ID 对应的黄色——VLM 训练分布里没有"上百个小标号的截图"这种数据。
 4. **Generalist VLM 远未饱和**：19.5% vs 74.5% human 的 gap，跟 OSWorld / AndroidWorld 的 gap 量级一致——说明 OS agent 的瓶颈不在 OS 选择，而在底层模型的 grounding 能力。
@@ -42,7 +42,7 @@ date_added: 2026-04-21
 1. **Modality / domain 受限**：text-only Q&A、web navigation、coding 各自为政，跟人类真实跨应用工作流脱节。
 2. **评估慢**：multi-step 任务串行跑完一遍 benchmark 要 days。OS 不是物理仿真，没法"加速时钟"——多个进程异步运行，仿真速度等于 wall clock。
 
-[[2404-OSWorld|OSWorld]] 已经把"真实 OS"塞进 benchmark，但聚焦 Linux，且并行只能在单机内开多 VMware VM（受单机内存/CPU 限制，最多个位数）。Windows 占 73% 桌面市场份额却没人做。WindowsAgentArena (WAA) 的定位就是 **Windows 版 [[2404-OSWorld|OSWorld]] + Azure-native 并行**。
+OSWorld 已经把"真实 OS"塞进 benchmark，但聚焦 Linux，且并行只能在单机内开多 VMware VM（受单机内存/CPU 限制，最多个位数）。Windows 占 73% 桌面市场份额却没人做。WindowsAgentArena (WAA) 的定位就是 **Windows 版 OSWorld + Azure-native 并行**。
 
 > ❓ "Windows 占 73% 市场" 作为研究 motivation 有点弱——真正的技术 motivation 应该是 Windows 上有 UIA accessibility tree 这种结构化信号，跟 Linux/macOS 的 a11y stack 行为差异大。论文没强调这点。
 
@@ -204,7 +204,7 @@ Navi 是 zero-shot prompted VLM agent，用 chain-of-thought prompting。每步�
 ## 关联工作
 
 ### 基于
-- **[[2404-OSWorld|OSWorld]]**：WAA 直接 fork OSWorld 的任务结构和 evaluator 设计，2/3 任务从 Linux 移植。OSWorld 是 WAA 的最重要前置工作。
+- **OSWorld**：WAA 直接 fork OSWorld 的任务结构和 evaluator 设计，2/3 任务从 Linux 移植。OSWorld 是 WAA 的最重要前置工作。
 - **Set-of-Marks (SoM) prompting**：把"在图上画标号 + 让 VLM 用标号交互"作为 grounding 范式，WAA 的 Navi 是 SoM 在 OS-level 任务上的扩展。
 - **dockur/windows**：Docker 镜像用 QEMU/KVM 跑 Windows VM 的开源方案，WAA 部署的底层依赖。
 
@@ -266,4 +266,4 @@ Navi 是 zero-shot prompted VLM agent，用 chain-of-thought prompting。每步�
 **Metrics** (as of 2026-04-24): citation=124, influential=19 (15.3%), velocity=6.39/mo; HF upvotes=48; github 856⭐ / forks=96 / 90d commits=0 / pushed 10d ago
 
 **分数**：2 - Frontier
-**理由**：WAA 作为 Windows OS agent 的代表性 benchmark，提供了可复现的云端并行评估基础设施（Strengths #1）和系统的 SoM ablation（Strengths #2），被后续 OS/GUI agent 工作作为重要参考；但相较 [[2404-OSWorld|OSWorld]] 已成为 Linux OS agent 的 de facto 标准（引用数与社区采纳显著更高），WAA 任务规模偏小（Weaknesses #1）、Win11 license 损害复现性（Weaknesses #4），在社区采纳度上尚未达到 Foundation 档，更符合 Frontier 定位——重要参考但非必读必引的奠基工作。
+**理由**：WAA 作为 Windows OS agent 的代表性 benchmark，提供了可复现的云端并行评估基础设施（Strengths #1）和系统的 SoM ablation（Strengths #2），被后续 OS/GUI agent 工作作为重要参考；但相较 OSWorld 已成为 Linux OS agent 的 de facto 标准（引用数与社区采纳显著更高），WAA 任务规模偏小（Weaknesses #1）、Win11 license 损害复现性（Weaknesses #4），在社区采纳度上尚未达到 Foundation 档，更符合 Frontier 定位——重要参考但非必读必引的奠基工作。

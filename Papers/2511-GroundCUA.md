@@ -182,9 +182,9 @@ RL 在 7B 上从 69.2 → 70.5（+1.3），3B 上从 66.4 → 68.4（+2.0）。
 
 ### 方法相关
 - RLOO: 来自 Ahmadian et al., 用作 critic-free policy optimization；与 GRPO 思路接近
-- [[2401-SeeClick|SeeClick]]: web grounding 的早期代表
-- [[2312-CogAgent|CogAgent]] / [[2411-ShowUI|ShowUI]]: 早期 GUI agent，代表 "vision+language+action" 的范式起点
-- [[2404-OSWorld|OSWorld]]: agentic 评估 benchmark
+- [[2400-SeeclickHarnessingGuiGrounding|SeeClick]]: web grounding 的早期代表
+- [[2312-CogAgent|CogAgent]] / [[2506-ShowuiOneVisionLanguage|ShowUI]]: 早期 GUI agent，代表 "vision+language+action" 的范式起点
+- OSWorld: agentic 评估 benchmark
 - [[2504-ScreenSpotPro|ScreenSpot-Pro]]: 主要 desktop benchmark，用于 SSPro 和 icon-level 分析
 
 ---

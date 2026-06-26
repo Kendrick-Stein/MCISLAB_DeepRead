@@ -185,7 +185,7 @@ $k \in \{\text{GUI-Browsing}, \text{GUI-General}, \text{Game}, \text{GUI-SDK}, \
 ### 3.1 Setup
 
 - **Backbone**: Seed-thinking-1.6 init，532M ViT + 23B active / 230B total MoE LLM
-- **GUI benchmarks**: [[2404-OSWorld|OSWorld]] (369 tasks)、WindowsAgentArena (150+)、TerminalBench (75/80)、SWE-Bench、AndroidWorld (116)、Online-Mind2Web (300, 136 sites)、BrowseComp-en/zh
+- **GUI benchmarks**: OSWorld (369 tasks)、WindowsAgentArena (150+)、TerminalBench (75/80)、SWE-Bench、AndroidWorld (116)、Online-Mind2Web (300, 136 sites)、BrowseComp-en/zh
 - **Game benchmarks**: 自家 15 Games Collection (in-domain) + LMGame-Bench (OOD, 6 经典)
 - **Baselines**: Claude 4 (Sonnet/Opus)、OpenAI o3、OpenAI CUA-o3、UI-TARS / UI-TARS-1.5、Gemini-2.5 Pro、Claude 3.7
 

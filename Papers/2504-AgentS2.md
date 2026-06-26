@@ -222,7 +222,7 @@ Failure 模式分布：planning > grounding > interaction > navigation > infeasi
 ### 方法相关
 - Mixture-of-Experts (Jacobs et al. 1991)：MoG 的灵感来源，但 gating 改为 Worker 显式 prompt 决策而非可学 router
 - [[2312-CogAgent|CogAgent]]: 早期视觉 GUI 模型，monolithic 路线
-- [[2404-OSWorld|OSWorld]]: 主评测环境
+- OSWorld: 主评测环境
 - [[2409-WindowsAgentArena|WindowsAgentArena]]: 跨 OS 评测
 - AgentStore (Jia et al. 2024)：另一种 "many specialist" 框架，组合的是 app-specific agent 而非 grounding expert
 - Cradle (Tan et al. 2024)：multi-agent 框架，分配责任到多个模型

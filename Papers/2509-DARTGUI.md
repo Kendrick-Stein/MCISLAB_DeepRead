@@ -17,7 +17,7 @@ date_added: 2026-04-21
 > [!summary] DART-GUI：把 GUI Agent RL 拆成四个异步模块 + 多粒度数据 curation
 > - **核心**：OSWorld 这种长 horizon、稀疏奖励、任务难度极度不均衡的 GUI 环境里，**RL wallclock 性能的 bottleneck 是 system + data，而不是算法本身**。DART 同时解这两条轴：四模块异步框架把 GPU/env 利用率推上去，四级 data curation 把有限算力压在真正产生信号的决策点上。
 > - **方法**：Env Cluster / Rollout Service / Data Manager / Trainer 完全解耦 + rollout-wise sampling + per-worker model sync；四级 curation：dynamic rollout N（task）、dynamic trajectory length（trajectory）、top-80% entropy step selection（step）、truncated importance sampling（token）。
-> - **结果**：DART-GUI-7B 在 [[2404-OSWorld|OSWorld]]-Verified 上以 **max 30 steps** 达到 **42.13% SR**（base [[2501-UITARS|UI-TARS-1.5-7B]] 100 steps 下 27.52%，+14.61 abs；open-source SOTA +7.34 abs），几乎与 Claude-4-Sonnet（100 steps, 41.39%）持平。效率：rollout GPU util 1.6×，env util 5.5×，training throughput 1.9×。
+> - **结果**：DART-GUI-7B 在 OSWorld-Verified 上以 **max 30 steps** 达到 **42.13% SR**（base [[2501-UITARS|UI-TARS-1.5-7B]] 100 steps 下 27.52%，+14.61 abs；open-source SOTA +7.34 abs），几乎与 Claude-4-Sonnet（100 steps, 41.39%）持平。效率：rollout GPU util 1.6×，env util 5.5×，training throughput 1.9×。
 > - **Sources**：[paper](https://arxiv.org/abs/2509.23866) | [website](https://computer-use-agents.github.io/dart-gui) | [github](https://github.com/computer-use-agents/dart-gui)
 > - **Rating**：2 – Frontier。GUI agent RL 场景下少有的**全流程开源 baseline**（代码 + checkpoint + SQL schema + Docker 都 release），OSWorld 绝对数值与 sample efficiency 提升都显著；但方法是工程巧思 + 已知 curation tricks 的组合，single-component algorithmic novelty 有限。
 
@@ -36,7 +36,7 @@ date_added: 2026-04-21
 
 ## 1. 问题与动机
 
-GUI agent（VLM-based，e.g. [[2501-UITARS|UI-TARS]]、[[2410-OSAtlas|OS-Atlas]]、Aguvis）在 [[2404-OSWorld|OSWorld]] 上需要长 horizon 多轮交互才能完成桌面任务（打开应用、编辑文件、切换窗口）。把 RL 用到这个场景面临两个结构性 bottleneck：
+GUI agent（VLM-based，e.g. [[2501-UITARS|UI-TARS]]、[[2410-OSAtlas|OS-Atlas]]、Aguvis）在 OSWorld 上需要长 horizon 多轮交互才能完成桌面任务（打开应用、编辑文件、切换窗口）。把 RL 用到这个场景面临两个结构性 bottleneck：
 
 1. **Pipeline coupling**：现有 RL 实现里 *action prediction → env step → data buffer → trainer* 是顺序阻塞的。GUI 任务单步要等浏览器 / OS 响应（秒级），整条 trajectory 几十分钟，coupled pipeline 让 GPU 大量空转。
 2. **Task difficulty heterogeneity + sparse reward**：同 batch 内任务难度差异大；简单任务容易过拟合，难任务大概率全 rollout 都 0 reward → 没有 learning signal。已有工作（GUI-R1、InfiGUI-R1、ARPO、ZeroGUI）在 OSWorld 上 RL 提升只有 2–4%，整体仍远落后 closed-source。
@@ -205,7 +205,7 @@ DART-GUI-7B 在**max 30 步**的限制下取得 **42.13%** OSWorld SR：
 
 ### 基于 / 前置
 - **[[2501-UITARS|UI-TARS-1.5-7B]]**（Qin et al. 2025）：policy 初始化，DART-GUI 直接继承 UI-TARS 的 action space（click/drag/hotkey/type/scroll/wait/finished）和 system prompt。
-- **[[2404-OSWorld|OSWorld]]**（Xie et al. 2024）：训练和评测环境，203 task 训练子集 follow ARPO 的 sampling methodology。
+- **OSWorld**（Xie et al. 2024）：训练和评测环境，203 task 训练子集 follow ARPO 的 sampling methodology。
 - **GRPO**（DeepSeek-Math / R1）：step-wise GRPO 是 DART trainer 的核心优化算法。
 - **DAPO**（Yu et al. 2025）：dynamic clip boundaries $\epsilon_\text{low}=0.2$、$\epsilon_\text{high}=0.28$ 直接 follow。
 - **High-entropy token selection**（Wang et al. 2025b）：step-level HE selection 是对这篇 token-level 工作的 multi-turn 推广。
@@ -267,7 +267,7 @@ DART-GUI-7B 在**max 30 步**的限制下取得 **42.13%** OSWorld SR：
 - **本 paper 的 contribution shape 更像一个 "engineering white paper" + "ablation-heavy RL recipe"**，而不是算法论文。对研究价值的正确 framing：它是后续 GUI agent RL 工作应该 compare / borrow code 的 baseline，而非应该 cite 为 "首次提出 X" 的 foundational 工作。
 - **对我 agent RL 研究的可迁移点**：(a) rollout-wise sampling + per-worker sync 是 long-horizon agent RL 的通用 recipe，值得迁移到 VLA / Embodied RL；(b) experience pool 兜底对所有 sparse-reward 任务都通用；(c) truncated IS 在任何 inference/training 引擎分离的设定下都必要。
 - **打开的问题**：(1) 如果把 max step 拉回 100 并继续训，SR 能否推到 50%+？(2) 实验 pool 的成功 trajectory 来自哪个 source？(3) 这套 curation 在 AndroidWorld / WebArena 上能否迁移？
-- **相关 vault 笔记**：[[2508-ComputerRL|ComputerRL]]（同期 async GUI RL）、[[2501-UITARS|UI-TARS]]（base policy）、[[2404-OSWorld|OSWorld]]（benchmark）、[[2508-OpenCUA|OpenCUA]]（open-source SFT baseline）。
+- **相关 vault 笔记**：[[2508-ComputerRL|ComputerRL]]（同期 async GUI RL）、[[2501-UITARS|UI-TARS]]（base policy）、OSWorld（benchmark）、[[2508-OpenCUA|OpenCUA]]（open-source SFT baseline）。
 
 ### Rating
 

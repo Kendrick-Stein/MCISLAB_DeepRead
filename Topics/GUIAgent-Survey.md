@@ -247,12 +247,12 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 
 - [[2412-AgentTrek]] - AgentTrek: Tutorial→trajectory，$0.55/trajectory
 - [[2412-OSGenesis]] - OS-Genesis: 逆向任务合成
-- [[2504-TongUI]] - TongUI: 多模态教程→143K trajectories
+- [[2500-TonguiInternetScaleTrajectories|TongUI]] - TongUI: 多模态教程→143K trajectories
 
 ### 6.8 Foundation Models
 
 - [[2410-OSAtlas]] - OS-Atlas: 13.58M grounding corpus，7B 超 GPT-4o
-- [[2411-ShowUI]] - ShowUI: UI-guided token selection，2B 接近 7B
+- [[2506-ShowuiOneVisionLanguage|ShowUI]] - ShowUI: UI-guided token selection，2B 接近 7B
 - [[2511-GroundCUA]] - GroundCUA: Dense annotation，3B 超 72B agentic
 - [[2508-OpenCUA]] - OpenCUA: 开源 pipeline + Reflective CoT
 - [[2510-ScalingAgents]] - Agent S3: BJudge + wide scaling，OSWorld 72.6% 超人类

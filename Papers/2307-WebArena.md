@@ -44,7 +44,7 @@ date_added: 2026-04-20
 
 WebArena 想要一次性对齐这四点：dynamic interaction + realistic environment + diverse human tasks + functional correctness。这是论文 Table 4 的核心 positioning。
 
-> 这个 framing 现在看依然是 web agent benchmark 设计的金科玉律，后续 [[2404-OSWorld|OSWorld]]、[[2409-WindowsAgentArena|Windows Agent Arena]] 基本是把同样的设计原则迁移到 OS 级。
+> 这个 framing 现在看依然是 web agent benchmark 设计的金科玉律，后续 OSWorld、[[2409-WindowsAgentArena|Windows Agent Arena]] 基本是把同样的设计原则迁移到 OS 级。
 
 ---
 
@@ -215,7 +215,7 @@ WebArena 是第一个四项都打勾的——这就是它能成为 web agent 标
 ### 后续生态
 - **VisualWebArena** (Koh et al. 2024, ACL 2024): 把 WebArena 扩展到 vision-language multimodal 任务，补全 visual grounding 维度
 - **WebArena-Infinity**: 自动化生成无限 evaluable web task
-- **[[2404-OSWorld|OSWorld]]**: 把 WebArena 的设计原则迁移到 OS 级（桌面应用 + 终端 + 浏览器）
+- **OSWorld**: 把 WebArena 的设计原则迁移到 OS 级（桌面应用 + 终端 + 浏览器）
 - **TheAgentCompany** (CMU 2024): 同作者团队的下一代 benchmark，加入 terminal use 和 coding，构造完整公司任务流
 
 ### 方法相关
@@ -230,7 +230,7 @@ WebArena 是第一个四项都打勾的——这就是它能成为 web agent 标
 
 ### Strengths
 
-1. **Benchmark 设计的范式贡献**：functional correctness + self-hosted real software + Docker reproducibility 这三件事的组合是后续所有严肃 web/OS agent benchmark（[[2404-OSWorld|OSWorld]]、Windows Agent Arena、TheAgentCompany）的模板
+1. **Benchmark 设计的范式贡献**：functional correctness + self-hosted real software + Docker reproducibility 这三件事的组合是后续所有严肃 web/OS agent benchmark（OSWorld、Windows Agent Arena、TheAgentCompany）的模板
 2. **真实任务分布**：基于作者真实浏览历史归纳的 4 类站点 + 多 tab + 工具组合，避免了人为构造任务的偏置
 3. **评估方法学清晰**：三档 string match + 程序化 state locator 的组合既覆盖了 short answer 又覆盖了 state mutation，且保留了多条正确路径的可能
 4. **Unachievable task 的引入**：把 hallucination 控制作为一等评估维度，比单纯 success rate 更接近 deployment reality
@@ -279,4 +279,4 @@ WebArena 是第一个四项都打勾的——这就是它能成为 web agent 标
 **Metrics** (as of 2026-04-24): citation=1146, influential=159 (13.9%), velocity=34.73/mo; HF upvotes=27; github 1443⭐ / forks=232 / 90d commits=0 / pushed 148d ago
 
 **分数**：3 - Foundation
-**理由**：WebArena 已成为 web agent 方向 de facto 标准评测——后续 AgentLab / BrowserGym 直接在其之上构建统一基础设施，[[2404-OSWorld|OSWorld]]、TheAgentCompany 等严肃 benchmark 复用其 "self-hosted real software + functional correctness + Docker reproducibility" 三件套（见 Strengths #1）。其方法论贡献（program-based state locator、unachievable task、multi-tab action space）被广泛沿用，任何 web/GUI agent 工作 related work 必引。相比 2 档的 frontier SOTA 方法，它的定位更底层——是方向的 building block 而不仅是 SOTA 候选。
+**理由**：WebArena 已成为 web agent 方向 de facto 标准评测——后续 AgentLab / BrowserGym 直接在其之上构建统一基础设施，OSWorld、TheAgentCompany 等严肃 benchmark 复用其 "self-hosted real software + functional correctness + Docker reproducibility" 三件套（见 Strengths #1）。其方法论贡献（program-based state locator、unachievable task、multi-tab action space）被广泛沿用，任何 web/GUI agent 工作 related work 必引。相比 2 档的 frontier SOTA 方法，它的定位更底层——是方向的 building block 而不仅是 SOTA 候选。

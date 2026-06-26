@@ -48,7 +48,7 @@ GUI agent 当前的研究多集中在 web、移动 app、通用桌面操作等"�
 
 > 这张图是文章的核心动机证据: 既然 accuracy 随目标变小线性掉, 那么 "把搜索空间缩小、把目标相对放大" 自然成为最直接的对策。这也直接铺垫了 ScreenSeekeR 的设计。
 
-之前的基准 ([[2401-SeeClick|ScreenSpot]]、VisualWebBench) 在两点上 underclaim: (i) 用裁剪后的局部图代替全屏; (ii) 用候选目标的多选题代替开放定位。专业场景的真实复杂度被绕过了。
+之前的基准 ([[2400-SeeclickHarnessingGuiGrounding|ScreenSpot]]、VisualWebBench) 在两点上 underclaim: (i) 用裁剪后的局部图代替全屏; (ii) 用候选目标的多选题代替开放定位。专业场景的真实复杂度被绕过了。
 
 ---
 
@@ -70,7 +70,7 @@ GUI agent 当前的研究多集中在 web、移动 app、通用桌面操作等"�
 - 每款应用由**至少 5 年使用经验的专家**录制, 在真实工作流中触发自定义截屏工具 (热键触发, 截图叠在屏上让标注者拖框 + 输入指令)。
 - **统一原生分辨率 ≥1080p, 关闭 monitor scaling, 双屏跨屏截图**。
 - **每个 instance 至少 2 名 annotator 复审** (任务有效性 + bbox 精度); 模糊指令必须改写到唯一目标。
-- 沿用 [[2401-SeeClick|SeeClick]] 的 text/icon 二分; 但收紧标准——**只有完全无文字 hint 时才标 icon**, 这对 AutoCAD / Office 这种 icon+label 混搭场景是关键的去歧义。
+- 沿用 [[2400-SeeclickHarnessingGuiGrounding|SeeClick]] 的 text/icon 二分; 但收紧标准——**只有完全无文字 hint 时才标 icon**, 这对 AutoCAD / Office 这种 icon+label 混搭场景是关键的去歧义。
 
 ### 2.3 统计
 
@@ -130,7 +130,7 @@ $$
 | ShowUI (2B)                    |     10.8 |      2.6 |         **7.7** |
 | OS-Atlas-4B                    |      5.0 |      1.7 |         **3.7** |
 | Qwen2-VL-7B                    |      2.5 |      0.2 |         **1.6** |
-| [[2401-SeeClick\|SeeClick]] (7B) |      1.8 |      0.0 |         **1.1** |
+| [[2400-SeeclickHarnessingGuiGrounding|SeeClick]] (7B) |      1.8 |      0.0 |         **1.1** |
 | GPT-4o                         |      1.3 |      0.0 |         **0.8** |
 | QwenVL-7B                      |      0.1 |      0.0 |         **0.1** |
 
@@ -177,7 +177,7 @@ ScreenSpot-Pro-CN 上 SOTA 的 OS-Atlas-7B 仅 16.8% (英文 18.9%), UGround 从
 ## 关联工作
 
 ### 基于
-- **[[2401-SeeClick|SeeClick]]**: ScreenSpot 的原始 benchmark + text/icon 二分类标签的来源, ScreenSpot-Pro 沿用其评测协议但把场景升级到专业高分屏
+- **[[2400-SeeclickHarnessingGuiGrounding|SeeClick]]**: ScreenSpot 的原始 benchmark + text/icon 二分类标签的来源, ScreenSpot-Pro 沿用其评测协议但把场景升级到专业高分屏
 - **V\* (Wu & Xie 2023)**: Iterative visual search for high-resolution images, ScreenSeekeR 的 recursive search 思路直接借鉴
 
 ### 对比 (作为 baseline)
@@ -185,13 +185,13 @@ ScreenSpot-Pro-CN 上 SOTA 的 OS-Atlas-7B 仅 16.8% (英文 18.9%), UGround 从
 - **UGround (7B)**: 通用视觉 grounding, 1344×1344 max resolution
 - **AriaUI (MoE 3.9B active)**: GUI grounding 专家
 - **[[2312-CogAgent|CogAgent]] (18B)**: 早期 GUI VLM
-- **[[2411-ShowUI|ShowUI]] (2B)**: 轻量级 GUI VLA
+- **[[2506-ShowuiOneVisionLanguage|ShowUI]] (2B)**: 轻量级 GUI VLA
 - **Qwen2-VL-7B / QwenVL-7B**: 通用 MLLM, 用作非 grounding-tuned 对照
 - **GPT-4o**: 既作 baseline 又作 ScreenSeekeR 的 planner——同一个模型在两个角色的对比 (0.8% vs. 48.1%) 是论文最有意思的实验
 
 ### 方法相关
 - **Iterative Narrowing (Nguyen 2024)**: 并发独立工作, ScreenSeekeR 的 planner-free baseline 之一
-- **[[2404-OSWorld|OSWorld]]**: 端到端 agent 评测 (含 planning + execution), ScreenSpot-Pro 显式选择不重叠这条赛道——分工明确, 一个评 grounding, 一个评 full agent
+- **OSWorld**: 端到端 agent 评测 (含 planning + execution), ScreenSpot-Pro 显式选择不重叠这条赛道——分工明确, 一个评 grounding, 一个评 full agent
 - **[[2408-OmniParser|OmniParser]]**: 另一类高分辨率 GUI 解析路线 (元素 detection + 描述), 与 ScreenSeekeR 形成 search vs. parse 的方法学对比
 - **[[2501-UITARS|UI-TARS]] / [[2509-UITARS2|UI-TARS-2]]**: 后续把 ScreenSpot-Pro 作为 grounding 能力的标准评测之一
 
@@ -209,7 +209,7 @@ ScreenSpot-Pro-CN 上 SOTA 的 OS-Atlas-7B 仅 16.8% (英文 18.9%), UGround 从
 
 ### Weaknesses
 
-1. **仅评估 grounding, 不评估 planning/execution**——作者承认这是为了规避商业软件的 license 风险 ([[2404-OSWorld|OSWorld]] 路线被显式排除)。但这意味着 ScreenSpot-Pro 上的 SOTA 不能直接外推到端到端 agent 性能。
+1. **仅评估 grounding, 不评估 planning/execution**——作者承认这是为了规避商业软件的 license 风险 (OSWorld 路线被显式排除)。但这意味着 ScreenSpot-Pro 上的 SOTA 不能直接外推到端到端 agent 性能。
 2. **ScreenSeekeR 推理成本不报告**: 多轮 GPT-4o planner + 多次 grounder 调用, 实际延迟和 token 成本对比 baseline 的差距应该是数量级的, 这对部署判断很关键, 但表里没有。
 3. **Planner 选择没消融**: 整个 search 框架的智能很大程度依赖 GPT-4o 的 GUI 知识, 换成 GPT-4o-mini / Claude / 开源 VLM 性能如何? 这个 ablation 缺位让 method 的 generalization claim 打折。
 4. **Icon 准确率天花板未解决**: ScreenSeekeR 把 icon 从 4.0% 拉到 22.4%, 但相对 text 64.1% 仍有 3× gap; 论文承认是数据问题但没给 actionable 解决方案。

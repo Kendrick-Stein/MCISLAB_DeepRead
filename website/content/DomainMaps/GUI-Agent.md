@@ -88,7 +88,7 @@ mindmap
 
 **空白**: Adversarial verifier 机制可提供外部纠错
 
-**关联论文**: [[2500-UiGenieSelfImproving]], [[2500-UiVoyagerSelfEvolving]]
+**关联论文**: [[2500-UiGenieSelfImproving]], [[2600-UiVoyagerSelfEvolving]]
 
 **Idea**: [[Ideas/AdversarialVerification-SelfImproving-GUI]]
 

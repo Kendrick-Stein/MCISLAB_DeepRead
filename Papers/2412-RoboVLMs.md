@@ -35,7 +35,7 @@ date_added: "2026-03-27"
 
 ## Problem & Motivation
 
-把 [[DomainMaps/VLA|VLA]] 当成 "VLM + 一些 action 适配层" 的做法已经成主流，但这条路径上几乎所有设计选择都缺乏 controlled comparison：
+把 VLA 当成 "VLM + 一些 action 适配层" 的做法已经成主流，但这条路径上几乎所有设计选择都缺乏 controlled comparison：
 
 - Backbone 各自为战（[[2307-RT2|RT-2]] 用 PaLI-X，[[2406-OpenVLA|OpenVLA]] 用 LLaVA，[[2410-Pi0|π0]] 用 PaliGemma，[[2405-Octo|Octo]] / GR-1 用自训 transformer），没人公平对比过
 - Action 表示分散：discrete token vs. 连续 MLP vs. diffusion / flow-matching head

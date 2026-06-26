@@ -20,7 +20,7 @@ GUI Environment（图形用户界面仿真/测试环境）是 GUI Agent 研究�
 
 ### 1.1 环境合成（Environment Synthesis）
 
-**代表论文**：[[2600-AgentWorld]] · [[2605-InfinitewebScalableWebEnvironment]] · [[2605-EnvFactory]]
+**代表论文**：[[2604-AgentWorld]] · [[2600-InfinitewebScalableWebEnvironment]] · [[2605-EnvFactory]]
 
 **核心思路**：自动化构建大规模、多样化的可执行环境，解决真实环境稀缺和人工构建成本高的问题。
 
@@ -37,7 +37,7 @@ GUI Environment（图形用户界面仿真/测试环境）是 GUI Agent 研究�
 
 ### 1.2 RL 训练基础设施（RL Training Infrastructure）
 
-**代表论文**：[[2605-MobileGym]] · [[2605-OpenComputer]] · [[2609-DARTGUI]]
+**代表论文**：[[2605-MobileGym]] · [[2605-OpenComputer]] · [[2509-DARTGUI]]
 
 **核心思路**：解决 GUI agent RL 训练的可验证性、并行效率和真实迁移问题。
 
@@ -62,7 +62,7 @@ GUI Environment（图形用户界面仿真/测试环境）是 GUI Agent 研究�
 
 ### 1.3 跨接口协同评测（Benchmark — Cross-Interface Coordination）
 
-**代表论文**：[[2606-WeaveBench]] · [[2606-WorkspaceBench]] · [[2600-OSWorld]]
+**代表论文**：[[2606-WeaveBench]] · [[2605-WorkspaceBench]] · OSWorld
 
 **核心思路**：设计能够真实评估 agent 在 GUI+CLI+Code 混合工作流中协同能力的 benchmark。
 

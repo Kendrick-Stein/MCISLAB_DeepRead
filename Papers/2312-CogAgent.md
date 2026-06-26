@@ -206,10 +206,10 @@ Mind2Web 从 41.4 → 54.2（+12.8）几乎完全来自 GUI / grounding 数据�
 - **AITW** (Rawles et al. 2023): 715k Android episode 的 mobile agent benchmark
 
 ### 后续影响
-- [[2401-SeeClick|SeeClick]]: 同方向的 vision-only GUI agent，更聚焦 element grounding；明确把 CogAgent 当 baseline
+- [[2400-SeeclickHarnessingGuiGrounding|SeeClick]]: 同方向的 vision-only GUI agent，更聚焦 element grounding；明确把 CogAgent 当 baseline
 - [[2408-OmniParser|OmniParser]]: 走另一条路——先 parse 出 structured screen representation 再喂 LLM，可以看作对 CogAgent 端到端方案的反向探索
 - [[2410-OSAtlas|OS-Atlas]]: 大规模 GUI grounding 模型，CCS400K 的精神继承者
-- [[2411-ShowUI|ShowUI]]: Visual GUI agent 的轻量化版本
+- [[2506-ShowuiOneVisionLanguage|ShowUI]]: Visual GUI agent 的轻量化版本
 
 ---
 

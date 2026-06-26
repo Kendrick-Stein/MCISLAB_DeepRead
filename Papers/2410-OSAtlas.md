@@ -23,7 +23,7 @@ date_added: 2026-04-20
 
 **Key Takeaways:**
 1. **GUI grounding 是数据问题**：开源 VLM 在 GUI 上落后于 GPT-4o 主要因为没在 GUI 截图上充分预训练；scale 13M element grounding corpus 之后，7B 模型 ScreenSpot 拿到 82+。
-2. **Cross-platform corpus 的工程价值**：作者把 Web 用 FineWeb URL + 整页 1920×1080 切片爬，desktop/mobile 用 AndroidEnv / [[2404-OSWorld|OSWorld]] + 物理机 + A11y tree（pyatspi/pywinauto/ApplicationServices）DFS/Random Walk 自动遍历——这套 infra 比方法本身更稀缺。
+2. **Cross-platform corpus 的工程价值**：作者把 Web 用 FineWeb URL + 整页 1920×1080 切片爬，desktop/mobile 用 AndroidEnv / OSWorld + 物理机 + A11y tree（pyatspi/pywinauto/ApplicationServices）DFS/Random Walk 自动遍历——这套 infra 比方法本身更稀缺。
 3. **Unified action space 是 OOD 的关键**：fine-tune 时把 17 个动作类型压到 10 个（合并 tap/click、home/press_home、type/input 等），ablation 显示去掉 unified action 在所有平台都掉点。
 4. **Web-only pre-training 不够 transfer**："不同 GUI 都遵循类似设计原则"这个直觉只对了一半——只用 web 数据预训 mobile/desktop grounding 仍掉点，desktop 数据有独立价值。
 5. **三种使用模式**：Grounding mode（替换 GPT-4o agent 里的坐标预测模块）、Action mode（端到端零样本预测下一步动作）、Agent mode（在下游任务上 SFT）；Grounding mode 配 GPT-4o 在 OSWorld 上表现最好。
@@ -76,7 +76,7 @@ Backbone 用两套：**InternVL-2-4B**（AnyRes 切 patch）和 **Qwen2-VL-7B**�
 | 平台 | 环境 | A11y API |
 |---|---|---|
 | Android | AndroidEnv | - |
-| Linux | [[2404-OSWorld\|OSWorld]] | pyatspi |
+| Linux | OSWorld | pyatspi |
 | Windows | 物理机 | pywinauto |
 | macOS | 物理机 | ApplicationServices |
 
@@ -121,11 +121,11 @@ ScreenSpot 还被作者重新审计——发现约 11.32% annotation 错误，�
 
 ![](https://arxiv.org/html/2410.23218v1/x4.png)
 
-### 3.2 Grounding Mode 应用：[[2404-OSWorld|OSWorld]]
+### 3.2 Grounding Mode 应用：OSWorld
 
 把 GPT-4o agent 里的坐标预测换成 OS-Atlas-Base：
 
-**Table 3. [[2404-OSWorld|OSWorld]] success rate (%).**
+**Table 3. OSWorld success rate (%).**
 
 | Model | Avg |
 |---|---|
@@ -136,7 +136,7 @@ ScreenSpot 还被作者重新审计——发现约 11.32% annotation 错误，�
 | **GPT-4o + OS-Atlas-Base-7B** | **14.63** |
 | Human | 72.36 |
 
-> 14.63 vs Human 72.36 的差距说明 grounding 不是 [[2404-OSWorld|OSWorld]] 的全部瓶颈——planner / long-horizon / error recovery 都有问题。OS-Atlas 的贡献限定在 grounding 这一环。
+> 14.63 vs Human 72.36 的差距说明 grounding 不是 OSWorld 的全部瓶颈——planner / long-horizon / error recovery 都有问题。OS-Atlas 的贡献限定在 grounding 这一环。
 
 ### 3.3 Agent Tasks（Action / Agent Mode）
 
@@ -196,7 +196,7 @@ OS-Atlas-7B 在 6 个 OOD benchmark 上全部超过 GPT-4o；SFT setting 下也�
 
 ### 基于
 - **InternVL-2-4B / Qwen2-VL-7B**：两个 backbone VLM。
-- **AndroidEnv / [[2404-OSWorld|OSWorld]]**：分别提供 Android 和 Linux 模拟环境。
+- **AndroidEnv / OSWorld**：分别提供 Android 和 Linux 模拟环境。
 - **FineWeb**：CommonCrawl 衍生的 URL 来源。
 - **Set-of-Mark prompting**：让 GPT-4o 标注 IG 数据时定位元素。
 

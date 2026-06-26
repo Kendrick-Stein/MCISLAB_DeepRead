@@ -256,8 +256,8 @@ Pre-Guard：keyword blocklist + Aegis (LlamaGuard fine-tune) 13 类安全分类�
 ### 方法相关
 - [[WorldModel|World Model]] domain map: Cosmos 是当前 video-based WFM 的 reference implementation
 - [[2411-WorldModelSurvey|World Model Survey]]: 综述里 "video-as-world" 路线的代表
-- [[2410-Pi0|π0]] / [[2406-OpenVLA|OpenVLA]] / [[VLA|VLA]] models: Cosmos 提供的是 video prediction backbone，VLA 是 policy backbone；二者天然互补
-- [[2503-CosmosReason1|CosmosReason1]] / [[2604-HYWorld2|HYWorld2]] / [[2604-OpenWorldLib|OpenWorldLib]] / [[2602-WorldVLALoop|WorldVLALoop]]: 后续基于或对标 Cosmos 的工作
+- [[2410-Pi0|π0]] / [[2406-OpenVLA|OpenVLA]] / VLA models: Cosmos 提供的是 video prediction backbone，VLA 是 policy backbone；二者天然互补
+- [[2503-CosmosReason1|CosmosReason1]] / [[2604-HYWorld2|HYWorld2]] / OpenWorldLib / [[2602-WorldVLALoop|WorldVLALoop]]: 后续基于或对标 Cosmos 的工作
 
 ---
 

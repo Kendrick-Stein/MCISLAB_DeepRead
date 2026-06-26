@@ -234,8 +234,8 @@ UniPlan 失败 ~16% 的分布：
 
 ### Notes
 
-- "VLM 局部 grounding + 符号 planner 全局 reasoning" 的分工是这篇 paper 最有 transferability 的 idea。值得问的下一步：能否把这套 factored injection 的设计原则套到 [[CUA|computer-use agent]] / GUI agent 上——把 UI 状态 grounding 给 VLM、长程任务规划交给某种符号 planner，避免 VLM 长链推理的 brittleness？
-- Programmatic AST rewrite 让 manipulation 域 → mobile manipulation 域是 syntax-level 操作，对 learned domain 几乎免费——这暴露了一个 underexploited 的方向：**学到的符号域可以被程序化扩展/组合**，而不必每个新场景都重学。这与 [[VLA|VLA]] 那条强调"端到端 scaling"的路线形成对比
+- "VLM 局部 grounding + 符号 planner 全局 reasoning" 的分工是这篇 paper 最有 transferability 的 idea。值得问的下一步：能否把这套 factored injection 的设计原则套到 computer-use agent / GUI agent 上——把 UI 状态 grounding 给 VLM、长程任务规划交给某种符号 planner，避免 VLM 长链推理的 brittleness？
+- Programmatic AST rewrite 让 manipulation 域 → mobile manipulation 域是 syntax-level 操作，对 learned domain 几乎免费——这暴露了一个 underexploited 的方向：**学到的符号域可以被程序化扩展/组合**，而不必每个新场景都重学。这与 VLA 那条强调"端到端 scaling"的路线形成对比
 - 全文最弱的 claim：在没真机演示的情况下声称 "tackles long-horizon mobile manipulation"。Symbolic planning 的 sim-to-real gap 与端到端 policy 不同，但仍存在——感知误差、低层控制失败的累积都不在评估里。如果真机上 plan 执行成功率掉到 50%，"83% SR" 就是误导
 - 一个开放问题：当 base domain 不是 UniDomain 这种"覆盖广、操作干净"的域时，AST rewrite 还能那么干净吗？如果原域里 anchor predicate 命名混乱、或 effect 不是简单的 add/delete，rewrite 规则的 robustness 会怎样？这是 generality claim 的真正考验
 

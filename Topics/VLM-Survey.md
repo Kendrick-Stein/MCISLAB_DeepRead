@@ -28,7 +28,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 ### 2.1 高分辨率视觉编码路线
 
-**代表论文**：[[2312-CogagentVisualLanguageModel]]、[[2400-MobileflowMultimodalLlmMobile]]、[[2400-SeeclickHarnessingGuiGrounding]]
+**代表论文**：[[2312-CogAgent|CogAgent]]、[[2400-MobileflowMultimodalLlmMobile]]、[[2400-SeeclickHarnessingGuiGrounding]]
 
 **核心思路**：针对 GUI、文档等文本密集场景，引入高分辨率视觉编码器（≥1120x1120），实现对小字号文本、细图标、密集控件的精准识别。
 
@@ -179,7 +179,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 ### 6.1 核心方法论文
 
 **高分辨率视觉编码**：
-- [[2312-CogagentVisualLanguageModel]] - CogAgent: 18B VLM, 1120x1120 dual-resolution encoder
+- [[2312-CogAgent|CogAgent]] - CogAgent: 18B VLM, 1120x1120 dual-resolution encoder
 - [[2400-MobileflowMultimodalLlmMobile]] - MobileFlow: 21B multimodal LLM for mobile GUI
 - [[2400-SeeclickHarnessingGuiGrounding]] - SeeClick: GUI grounding pre-training
 

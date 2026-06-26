@@ -79,5 +79,5 @@ mindmap
 ```
 
 ## Notes
-- 与 [[auto-research]] tag 下其他论文（The AI Scientist、Agent Laboratory）形成呼应——benchmark 为 downstream application 提供评估基础设施
+- 与 auto-research tag 下其他论文（The AI Scientist、Agent Laboratory）形成呼应——benchmark 为 downstream application 提供评估基础设施
 - 可思考：如何提升 agent 的 constraint decomposition + full-text comprehension 能力？是否需要 specialized retrieval model 而非 general web agent？

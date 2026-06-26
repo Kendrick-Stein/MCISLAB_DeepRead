@@ -180,7 +180,7 @@ Insight: 当前 VLM 在 long-horizon 任务上的瓶颈不是 grounding，而是
 - **Playwright**: 浏览器自动化 + trace recording 工具
 
 ### 对比
-- **[[2401-SeeClick|SeeClick]]**: 之前的 web grounding 工作；AgentTrek 在 ScreenSpot Web 上超过它（67.4 vs 44.7）
+- **[[2400-SeeclickHarnessingGuiGrounding|SeeClick]]**: 之前的 web grounding 工作；AgentTrek 在 ScreenSpot Web 上超过它（67.4 vs 44.7）
 - **[[2312-CogAgent|CogAgent]]**: 大规模 GUI VLM；AgentTrek 7B SFT 持平 18B CogAgent
 - **GPT-4 + [[2408-OmniParser|OmniParser]]**: 训练-free pipeline，AgentTrek SFT 后达到同水平
 - **AutoWebGLM**: in-domain RFT WebArena 18.20，AgentTrek 32B OOD 16.26

@@ -54,13 +54,13 @@ Computer-use Agent（也称 GUI Agent、OS Agent）是一类能够在数字设�
 **核心思路**：专注于 GUI grounding 这个核心瓶颈——给定截图和语言指令，精确定位目标 UI 元素。
 
 **代表工作**：
-- [[Papers/2401-SeeClick|SeeClick]]（Nanjing U, 2024.01, ACL 2024）：首次明确 grounding 是 visual agent 核心瓶颈，通过 continual pre-training 构建 grounding 模型，创建 ScreenSpot benchmark
+- [[2400-SeeclickHarnessingGuiGrounding|SeeClick]]（Nanjing U, 2024.01, ACL 2024）：首次明确 grounding 是 visual agent 核心瓶颈，通过 continual pre-training 构建 grounding 模型，创建 ScreenSpot benchmark
 - [[Papers/2511-GroundCUA|GroundCUA]]（Mila/ServiceNow, 2025.11）：构建高质量 dense annotation 数据集（56K 截图，64 元素/截图），GroundNext-7B 在 ScreenSpot-Pro 达 52.9%，3B 模型在 agentic 任务超 72B 模型
 - [[Papers/2504-ScreenSpotPro|ScreenSpot-Pro]]（NUS, 2025.04）：专业高分辨率 GUI grounding benchmark，揭示 icon 识别仅 4% 准确率的严峻挑战
 
 **Foundation Models & 感知工具**：
 - [[Papers/2410-OSAtlas|OS-Atlas]]（Shanghai AI Lab, 2024.10）：构建最大开源跨平台 GUI grounding 语料库（13.58M 元素，2.24M 截图），7B 模型在多个 zero-shot benchmark 超越 GPT-4o
-- [[Papers/2411-ShowUI|ShowUI]]（NUS/Microsoft, 2024.11, CVPR 2025）：轻量 2B 模型，核心创新 UI-guided token selection（connected graph 减 33% token），仅 256K 数据达 75.1% zero-shot grounding
+- [[2506-ShowuiOneVisionLanguage|ShowUI]]（NUS/Microsoft, 2024.11, CVPR 2025）：轻量 2B 模型，核心创新 UI-guided token selection（connected graph 减 33% token），仅 256K 数据达 75.1% zero-shot grounding
 - [[Papers/2408-OmniParser|OmniParser]]（Microsoft, 2024.08）：模块化屏幕解析工具（YOLOv8 检测 + BLIP-v2 icon 描述 + OCR + Set-of-Marks），作为 plug-in 增强任意 VLM 的 GUI agent 能力，ScreenSpot 73.0%
 
 **关键发现**：
@@ -77,7 +77,7 @@ Computer-use Agent（也称 GUI Agent、OS Agent）是一类能够在数字设�
 **代表工作**：
 - [[Papers/2412-AgentTrek|AgentTrek]]（XLANG Lab/HKU, 2024.12）：从互联网教程文本自动生成 web agent trajectories，三阶段 pipeline（教程采集→任务规范→VLM 执行+验证），成本仅 $0.55/trajectory，生成 10,398 条高质量轨迹
 - [[Papers/2412-OSGenesis|OS-Genesis]]（ACL 2025）：**逆向任务合成**——先让 agent 自由探索环境，再从交互轨迹逆向生成任务描述，解决传统 "先定义任务→再执行" 范式中的 task-environment mismatch 问题
-- [[Papers/2504-TongUI|TongUI]]（Shanghai AI Lab, 2025.04, AAAI 2026）：从互联网多模态教程（视频+文章）自动构建 GUI-Net 数据集（143K trajectories，5 OS，200+ apps），四阶段 pipeline（爬取→解析→匹配→标注），ScreenSpot 83.4%
+- [[2500-TonguiInternetScaleTrajectories|TongUI]]（Shanghai AI Lab, 2025.04, AAAI 2026）：从互联网多模态教程（视频+文章）自动构建 GUI-Net 数据集（143K trajectories，5 OS，200+ apps），四阶段 pipeline（爬取→解析→匹配→标注），ScreenSpot 83.4%
 - [[Papers/2508-OpenCUA|OpenCUA]] 的 AgentNet：人工标注 22.6K trajectories，配合 reflective CoT augmentation pipeline
 
 **关键趋势**：
@@ -162,13 +162,13 @@ Computer-use Agent（也称 GUI Agent、OS Agent）是一类能够在数字设�
 | Paper | Venue | 技术路线 | 核心方法 | 关键结果 | 局限性 |
 |:------|:------|:---------|:---------|:---------|:-------|
 | [[Papers/2312-CogAgent\|CogAgent]] | CVPR 2024 | Native Model | Dual-resolution cross-attention (224+1120) | Mind2Web 58.2% (首个视觉>HTML) | 18B 推理成本高 |
-| [[Papers/2401-SeeClick\|SeeClick]] | ACL 2024 | Grounding | Continual pre-training + ScreenSpot | ScreenSpot 53.4% | Action space 过简 |
-| [[Papers/2404-OSWorld\|OSWorld]] | NeurIPS 2024 | Benchmark | 真实 OS + execution-based eval | Human 72.36% vs Model 12.24% | 369 tasks 规模有限 |
+| [[2400-SeeclickHarnessingGuiGrounding|SeeClick]] | ACL 2024 | Grounding | Continual pre-training + ScreenSpot | ScreenSpot 53.4% | Action space 过简 |
+| OSWorld | NeurIPS 2024 | Benchmark | 真实 OS + execution-based eval | Human 72.36% vs Model 12.24% | 369 tasks 规模有限 |
 | [[Papers/2307-WebArena\|WebArena]] | ICLR 2024 | Benchmark | 4 个自托管网站 + functional eval | GPT-4 14.41% vs Human 78.24% | 仅 web 场景 |
 | [[Papers/2408-OmniParser\|OmniParser]] | arXiv | Perception Tool | YOLOv8 + BLIP-v2 + SoM | ScreenSpot 73.0% | 依赖外部 VLM |
 | [[Papers/2409-WindowsAgentArena\|WindowsAgentArena]] | arXiv | Benchmark | Windows VM + 154 tasks | Navi 19.5% vs Human 74.5% | 仅 Windows |
 | [[Papers/2410-OSAtlas\|OS-Atlas]] | arXiv | Foundation Model | 13.58M grounding corpus | 7B 超 GPT-4o zero-shot | 桌面泛化弱 |
-| [[Papers/2411-ShowUI\|ShowUI]] | CVPR 2025 | Lightweight Model | UI-guided token selection, 2B | 75.1% zero-shot, 256K 数据 | 高分辨率受限 |
+| [[2506-ShowuiOneVisionLanguage|ShowUI]] | CVPR 2025 | Lightweight Model | UI-guided token selection, 2B | 75.1% zero-shot, 256K 数据 | 高分辨率受限 |
 | [[Papers/2411-GUIAgentSurvey\|GUI Agent Survey]] | arXiv | Survey | 8 RQ, 500+ papers | 全景知识地图 | 批判分析偏浅 |
 | [[Papers/2412-AgentTrek\|AgentTrek]] | arXiv | Data Synthesis | Tutorial→trajectory, $0.55/traj | 10.4K trajectories, +230% | 仅 web |
 | [[Papers/2412-OSGenesis\|OS-Genesis]] | ACL 2025 | Data Synthesis | 逆向任务合成 | AndroidWorld 17.41% | 任务覆盖窄 |
@@ -181,7 +181,7 @@ Computer-use Agent（也称 GUI Agent、OS Agent）是一类能够在数字设�
 | [[Papers/2508-OSAgentsSurvey\|OS Agents Survey]] | ACL 2025 | Survey | 3 层框架, 33 benchmarks | 最全 OS agent 综述 | 时效受限 |
 | [[Papers/2509-UITARS2\|UI-TARS-2]] | arXiv | RL Training | Data flywheel + PPO 变体 | OSWorld 47.5% | VLM verifier 噪声 |
 | [[Papers/2510-ScalingAgents\|Agent S3]] | ICML | Test-time Scaling | BJudge + wide scaling | OSWorld 72.6% 超人类 | 多 rollout 假设 |
-| [[Papers/2504-TongUI\|TongUI]] | AAAI 2026 | Data Synthesis | 多模态教程→trajectory, 143K | ScreenSpot 83.4% | Teacher 蒸馏上限 |
+| [[2500-TonguiInternetScaleTrajectories|TongUI]] | AAAI 2026 | Data Synthesis | 多模态教程→trajectory, 143K | ScreenSpot 83.4% | Teacher 蒸馏上限 |
 | [[Papers/2509-DARTGUI\|DART-GUI]] | arXiv | RL Infrastructure | 解耦异步 RL, 5.5× 环境利用率 | OSWorld 42.13% (7B>Claude) | 仅 OSWorld 评测 |
 | [[Papers/2511-GroundCUA\|GroundCUA]] | arXiv | Grounding Data | Dense annotation, 56K screenshots | 3B > 72B agentic | 标注成本高 |
 | [[Papers/2606-MyPCBench\|MyPCBench]] | arXiv | Personal Benchmark | Linux desktop + 17 simulated web apps + persona | Claude Opus 4.6 fully solves 55.4% | persona 单一，安全评估不足 |

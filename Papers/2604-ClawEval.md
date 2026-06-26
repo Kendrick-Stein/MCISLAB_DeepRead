@@ -47,7 +47,7 @@ date_added: 2026-04-21
 | SWE-bench           |     ✗      |     ✗      |     ❖     |   ✗    |      ✗       |     ✓     |
 | [[2307-WebArena\|WebArena]] |     ❖      |     ✗      |     ❖     |   ✗    |      ✗       |     ✓     |
 | VisualWebArena      |     ✓      |     ✗      |     ❖     |   ✗    |      ✗       |     ✓     |
-| [[2404-OSWorld\|OSWorld]]   |     ✓      |     ✗      |     ✓     |   ✗    |      ✗       |     ✓     |
+| OSWorld   |     ✓      |     ✗      |     ✓     |   ✗    |      ✗       |     ✓     |
 | ToolBench           |     ✗      |     ✗      |     ❖     |   ✗    |      ✗       |     ✗     |
 | Terminal-Bench      |     ✗      |     ✗      |     ✓     |   ✗    |      ✗       |     ✓     |
 | PinchBench          |     ✗      |     ✗      |     ✗     |   ✗    |      ✗       |     ✓     |
@@ -254,7 +254,7 @@ Easy 上 Pass^3 跨度从 14% 到 75%（6 个模型间），Opus 4.6 在 Hard �
 
 ### 对比
 - [[2307-WebArena|WebArena]] / VisualWebArena：聚焦 web/desktop GUI navigation 单一模态，缺 safety / perturbation。
-- [[2404-OSWorld|OSWorld]]：full desktop sandbox，但没有 embedded safety constraint 与 controlled error injection，且 rubric 仍偏 final-state。
+- OSWorld：full desktop sandbox，但没有 embedded safety constraint 与 controlled error injection，且 rubric 仍偏 final-state。
 - SWE-bench / Terminal-Bench / ToolBench：单模态 + output-only grading，是 Claw-Eval 直接超越的对象。
 - AgentBench / GAIA：多领域聚合 benchmark，但都没做 trajectory auditing 与 perturbation。
 

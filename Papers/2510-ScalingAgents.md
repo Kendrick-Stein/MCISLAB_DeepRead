@@ -230,7 +230,7 @@ Judge Subset = 159 个"至少一对一错"的可改进任务。其中 35 个 BJu
 
 ### 方法相关
 - Test-time scaling for LLM reasoning (Wang et al., Snell et al.): wide BoN + reward model 的思路在 LLM reasoning 已用，本文把它适配到 long-horizon CUA trajectory。
-- [[2404-OSWorld|OSWorld]] / [[2409-WindowsAgentArena|WindowsAgentArena]] / AndroidWorld: 主要 benchmark。
+- OSWorld / [[2409-WindowsAgentArena|WindowsAgentArena]] / AndroidWorld: 主要 benchmark。
 - Mind2Web 2: web 领域 code-generated rubric judge，99% human agreement 但成本极高——BJudge 走了相反路线（不依赖 task-specific rubric）。
 
 ---

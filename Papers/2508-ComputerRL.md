@@ -235,7 +235,7 @@ $$
 ## 关联工作
 
 ### 基于
-- [[2404-OSWorld|OSWorld]]: benchmark + 环境基础，ComputerRL 重构其 VM 层做大规模并行。
+- OSWorld: benchmark + 环境基础，ComputerRL 重构其 VM 层做大规模并行。
 - DeepSeekMath / GRPO: 把 GRPO 推广到 step-level，用于 agent RL。
 - AgentRL framework: 异步 RL 训练框架，本文用其做 desktop agent 训练。
 - AgentBench: 环境接口标准化，用其 API 解耦 env 和 backend。

@@ -200,7 +200,7 @@ StreamVLN 在 **RGB-only** 设定下创 SOTA：
 - **Voxel-based representation**：spatial pruning 借鉴 3D 体素思路（与 voxel grid 表示类似但用于 token 选择）
 
 ### 跨任务参考
-- 详见 [[VLN]] domain map 中 streaming Video-LLM 一支
+- 详见 VLN domain map 中 streaming Video-LLM 一支
 
 ---
 

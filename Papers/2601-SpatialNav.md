@@ -237,7 +237,7 @@ Zero-shot VLN agents（NavGPT、Open-Nav、MapGPT 等）相比监督学习的 VL
 ### Notes
 
 - **关于 "zero-shot" 的语义漂移**：这篇是又一个把 zero-shot 概念扩张的例子。原版 VLN zero-shot 指 "no task-specific training"，但允许 pre-exploration + 离线建图 + fine-tune SpatialLM 后，"zero-shot" 的边界越来越模糊。值得想：**未来这类设定应该按 "online vs offline preparation"、"task-specific training vs generic perception fine-tuning" 等维度重新切分**，而不是继续用一个二元 zero-shot/supervised 分类
-- **Spatial map 的设计哲学**：head-up rotation + 7.68m radius + room-level granularity，这一组设计选择是 LLM-friendly 的（避免坐标变换、控制 attention budget、减少噪声）。这是 LLM-as-policy 范式下，**给 LLM 喂什么样的空间表示** 这个问题的一个具体答案。和我之前关注的 [[DomainMaps/SpatialRep|spatial representation]] 议题强相关
+- **Spatial map 的设计哲学**：head-up rotation + 7.68m radius + room-level granularity，这一组设计选择是 LLM-friendly 的（避免坐标变换、控制 attention budget、减少噪声）。这是 LLM-as-policy 范式下，**给 LLM 喂什么样的空间表示** 这个问题的一个具体答案。和我之前关注的 spatial representation 议题强相关
 - **失败模式分析的缺失**：Table 4 里 "text + RemObj 反而变差" 是个 high-information 的负结果，但论文没展开分析。如果有 case study 拆解 semantic ambiguity 具体长什么样，会更有教学价值
 - **可能的 follow-up 方向**：
   1. 把 SSG 喂给 supervised VLA / VLN 模型而不仅是 prompt-based，论文 Limitations 提到了，是个 open question

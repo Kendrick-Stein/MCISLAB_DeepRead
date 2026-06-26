@@ -1,6 +1,6 @@
 ---
 title: Vision-Language Navigation Survey
-description: 系统梳理 VLN 四条主流技术路线（graph-based、streaming VLA、zero-shot MLLM with EWR、GRPO-based RFT）及其性能对比、benchmark 格局与 open problems；作为 [[DomainMaps/VLN|VLN DomainMap]] 的 delta 报告，重点覆盖 2025–2026 的新进展
+description: 系统梳理 VLN 四条主流技术路线（graph-based、streaming VLA、zero-shot MLLM with EWR、GRPO-based RFT）及其性能对比、benchmark 格局与 open problems；作为 VLN DomainMap 的 delta 报告，重点覆盖 2025–2026 的新进展
 tags: [VLN, navigation, embodied-reasoning]
 date_updated: 2026-04-23
 year_range: 2022-2026
@@ -26,7 +26,7 @@ year_range: 2022-2026
 **为什么重要**：
 - **Language grounding 的最具体化 benchmark**：VLN 需要把抽象语言同时 ground 到**感知**（"through the door with the red handle"）、**动作**（"turn left 30 degrees"）和**状态**（"you should be facing the kitchen"），是 embodied multimodal reasoning 的集大成场景。
 - **Sim-to-real 的 accessible 训练场**：相对 manipulation，navigation 的 sim-to-real gap 可控、可量化（几何准确性远胜于接触物理），因此成为验证 VLM-based agent 真实世界可部署性的最佳起点。
-- **VLA / spatial intelligence 的前哨**：VLN 是 VLA 的 navigation 子集，其 hierarchical planning + language mid-level action 的架构直接对应 VLA 的 hierarchical inference（见 [[Topics/VLN-VLA-Unification]]），spatial representation 的研究结果（topological map、3D scene graph、3D fusion）对 manipulation 和 world model 同样有迁移价值。
+- **VLA / spatial intelligence 的前哨**：VLN 是 VLA 的 navigation 子集，其 hierarchical planning + language mid-level action 的架构直接对应 VLA 的 hierarchical inference（见 VLN-VLA Unification），spatial representation 的研究结果（topological map、3D scene graph、3D fusion）对 manipulation 和 world model 同样有迁移价值。
 
 **为什么适合现在做**：
 - 开源 Video-LLM（LLaVA-Video、Qwen2-VL、VILA）已到 7–8B 规模，在单张 A100 上可跑 VLN inference；
@@ -225,7 +225,7 @@ VLN 主流训练资源（按规模）：
 
 7. **Sim-to-real gap 的量化**：[[Papers/2407-VLNFoundationSurvey|2024 survey]] 已点出但至今无系统量化（"sim 60 → real 16–20% 掉幅多少由哪些因素造成"）。GTA（sim 48.8 → real 40%）和 NaVILA（sim 54 → real 88% on 不同 setup）提供了两种走向极端的 data point，但缺 controlled head-to-head。
 
-8. **VLN ↔ VLA 的结构同构**：[[Topics/VLN-VLA-Unification]] 指出 VLN 的 hierarchical planner + waypoint predictor 与 VLA 的 high-level planner + low-level action decoder 在架构上高度对应；[[Papers/2412-NaVILA|NaVILA]] 已经开始跨——把 VLN 重构为 navigation-focused VLA。但 **shared spatial representation**（topological map / 3D scene graph / voxel）能否直接服务 manipulation 仍是 open，ConceptGraphs / MTU3D 是候选但还未被系统验证。
+8. **VLN ↔ VLA 的结构同构**：VLN-VLA Unification 指出 VLN 的 hierarchical planner + waypoint predictor 与 VLA 的 high-level planner + low-level action decoder 在架构上高度对应；[[Papers/2412-NaVILA|NaVILA]] 已经开始跨——把 VLN 重构为 navigation-focused VLA。但 **shared spatial representation**（topological map / 3D scene graph / voxel）能否直接服务 manipulation 仍是 open，ConceptGraphs / MTU3D 是候选但还未被系统验证。
 
 9. **Benchmark 停滞与破局**：[[Papers/2512-VLNVerse|VLNVerse]] 直接指出 "new scenes = 0" 是 VLN 过去 5 年的真正瓶颈。263 个新场景是 first step，但能否成为 de facto 标准取决于社区采纳——目前 code 尚未完全开源，leaderboard 也未建立。
 
@@ -233,7 +233,7 @@ VLN 主流训练资源（按规模）：
 
 ## DomainMap 更新建议
 
-本次调研新增的可纳入 [[DomainMaps/VLN]] 的内容：
+本次调研新增的可纳入 DomainMaps/VLN 的内容：
 
 1. **新增 Established Knowledge 候选**：
    - "Recency-aware memory > uniform compression"（[[Papers/2512-EfficientVLN|Efficient-VLN]] ablation：R2R SR +2.6 / RxR SR +3.0）与 state-based memory 在长 trajectory 上崩（RxR -7 pt），这是 memory design 的可迁移 lesson。
@@ -261,7 +261,7 @@ VLN 主流训练资源（按规模）：
 - 主锚点: [[Papers/2407-VLNFoundationSurvey|Vision-and-Language Navigation Today and Tomorrow]] (TMLR 2024) — 采用其 LAW 框架（World / Human / Agent）作为结构参考，但本 Survey 由于 domain activity 以 2025-2026 为主，改按**技术路线**（4 条）而非 LAW 三分组织，以更贴合当前讨论。
 
 **方法论说明**：
-- 本 Survey 定位为 [[DomainMaps/VLN]] 的 delta 报告，DomainMap 已 Established 的内容不重述，聚焦 2025-2026 窗口内新方法、新 benchmark、新 debate；
+- 本 Survey 定位为 DomainMaps/VLN 的 delta 报告，DomainMap 已 Established 的内容不重述，聚焦 2025-2026 窗口内新方法、新 benchmark、新 debate；
 - SR / SPL 数字来自各论文笔记已验证过的表格；因各方法数据 regime 不同（是否用 ScaleVLN / MMC4 co-train），绝对数字对比需谨慎看 footnote；
 - "Zero-shot" 的定义在 [[Papers/2601-SpatialNav|SpatialNav]] 把 pre-exploration 纳入后有争议，本 Survey 保留其原标记但加 `*` 提示。
 

@@ -210,12 +210,12 @@ Specialized 在窄任务、弱 instruction conditioning 下高效；Foundation a
 - **GUI Agent Survey** (Wang et al.)：仅 mobile，本文 scope 更广
 
 ### Benchmark 与 Environment
-- [[2307-WebArena|WebArena]] / [[2404-OSWorld|OSWorld]]：被多次引用作为"真实复杂度" benchmark 代表
+- [[2307-WebArena|WebArena]] / OSWorld：被多次引用作为"真实复杂度" benchmark 代表
 - Mind2Web：作为 offline dataset 复杂度上限的代表
 - AndroidWorld：作者承认未纳入 dynamic 评估场景
 
 ### GUI Grounding 模型（survey 未充分讨论的相邻线）
-- [[2401-SeeClick|SeeClick]] 等：本文主要把 grounding 当 prompting 技巧（set-of-mark），未深入 grounding 模型这条 supply chain
+- [[2400-SeeclickHarnessingGuiGrounding|SeeClick]] 等：本文主要把 grounding 当 prompting 技巧（set-of-mark），未深入 grounding 模型这条 supply chain
 - [[2501-UITARS|UI-TARS]]：同月发布的端到端 GUI agent 模型，作为 commercial-leaning 系统被排除
 
 ### Foundation Agent 代表

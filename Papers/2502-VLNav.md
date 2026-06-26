@@ -220,7 +220,7 @@ baseline 几乎全军覆没——VLFM、Frontier 在 8% 量级；SG-Nav 因每�
 
 ### 方法相关
 - [[2412-NaVILA|NaVILA]]、[[2506-VLNR1|VLN-R1]]、[[2507-StreamVLN|StreamVLN]]: 同期 VLN 工作，对比 modular vs. end-to-end 路线
-- [[VLN]] DomainMap: 整体路线图
+- VLN DomainMap: 整体路线图
 
 ---
 
@@ -262,7 +262,7 @@ baseline 几乎全军覆没——VLFM、Frontier 在 8% 量级；SG-Nav 因每�
 ### Notes
 
 - **复用价值**：VL-Nav 的 "VLM remote async + lightweight detector local" 解耦工程模式可以直接迁移到 mobile manipulation 任务。big-VLM 不应该在控制 loop 里同步跑，这点论文给了很干净的工程样例。
-- **Best-view image memory** 这个 abstraction 值得追踪——它把 "什么时候 query VLM" 与 "用什么图像 query VLM" 解耦，比 frame-by-frame 输入要稳定且便宜得多。可以和 [[SpatialRep]] 里 spatial memory 的工作连起来读。
+- **Best-view image memory** 这个 abstraction 值得追踪——它把 "什么时候 query VLM" 与 "用什么图像 query VLM" 解耦，比 frame-by-frame 输入要稳定且便宜得多。可以和 SpatialRep 里 spatial memory 的工作连起来读。
 - **Reasoning-based VLN** 作为问题 framing：DARPA TIAMAT 是个有意思的 benchmark（多目标 + 抽象 + 大场景），但目前公开的任务量还小。如果未来扩展到 100+ 任务且开源，会成为 VLN 领域的 standard testbed。
 - **NeSy 的命名**：本文 NeSy 中的 "Symbolic" 是 "scene graph + heuristic scoring 项"，比 LogiCity 这种带规则推理引擎的 NeSy 弱一档。读者要警惕 "NeSy" 这个标签在 VLM 时代被泛化成 "structured memory + neural"。
 - **可考察的 follow-up**：(1) IBTP 在 false-positive detection 下的开销曲线；(2) 把 task planner 替换为更便宜的 LLM（不需要 vision）能不能保持性能；(3) 把 best-view image memory 扩展为可编辑/可遗忘的 lifelong memory。

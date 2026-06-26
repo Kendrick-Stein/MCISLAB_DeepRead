@@ -104,7 +104,7 @@ LTM 是连接"单 episode agent" 与 "lifelong learning agent" 的关键，但 s
 
 五个增强方向（**作者强调彼此不互斥，可叠加**）：
 
-1. **CV-based GUI grounding**：用 [[2408-OmniParser|OmniParser]] / UGround / Aria-UI / SAM / DINO 直接从 screenshot 出 element 列表与 bbox。表 VII-IX 列了十余个 grounding 模型（OmniParser、UGround、Aria-UI、Iris、AGUVIS、[[2401-SeeClick|SeeClick]]、ScreenSpot/-Pro 等）。
+1. **CV-based GUI grounding**：用 [[2408-OmniParser|OmniParser]] / UGround / Aria-UI / SAM / DINO 直接从 screenshot 出 element 列表与 bbox。表 VII-IX 列了十余个 grounding 模型（OmniParser、UGround、Aria-UI、Iris、AGUVIS、[[2400-SeeclickHarnessingGuiGrounding|SeeClick]]、ScreenSpot/-Pro 等）。
 2. **Multi-Agent**：specialization + collaboration（UFO 的 HostAgent + AppAgent、MMAC-Copilot 等）。
 3. **Self-Reflection**：ReAct 与 Reflexion 是两条主线——前者把反思嵌进每一步 reasoning，后者用语言形式 feedback 跨 episode 迭代。
 4. **Self-Evolution**：从 task trajectory 抽 demonstration / rule / new toolkit，回写到 LTM 与 fine-tuning 数据。
@@ -193,7 +193,7 @@ LTM 是连接"单 episode agent" 与 "lifelong learning agent" 的关键，但 s
 - 其他 GUI agent / LLM agent survey（§2 引用）：本作的差异化在 cookbook 视角与 desktop/Windows 第一手经验
 
 ### 核心组件相关
-- **Grounding**: [[2408-OmniParser|OmniParser]]、[[2401-SeeClick|SeeClick]]、UGround、Aria-UI、ScreenSpot
+- **Grounding**: [[2408-OmniParser|OmniParser]]、[[2400-SeeclickHarnessingGuiGrounding|SeeClick]]、UGround、Aria-UI、ScreenSpot
 - **Set-of-Mark prompting**: 通过视觉标注降低 LLM grounding 难度
 - **Self-Reflection**: ReAct、Reflexion
 - **CoT planning**: Chain-of-Thought
@@ -210,7 +210,7 @@ LTM 是连接"单 episode agent" 与 "lifelong learning agent" 的关键，但 s
 - 开源：Qwen-VL、LLaVA-NeXT、InternVL、Phi-3.5-V
 
 ### 与 vault 已有方向的连接
-- [[CUA|DomainMap: CUA]]：本 survey 是 CUA domain map 的天然 reference，可作为 entry point
+- DomainMap: CUA：本 survey 是 CUA domain map 的天然 reference，可作为 entry point
 - 与 [[2411-WorldModelSurvey|World Model Survey]] 平行——两者都是"先 cookbook 再 roadmap"风格
 
 ---

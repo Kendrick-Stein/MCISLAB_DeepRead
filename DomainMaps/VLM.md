@@ -45,7 +45,7 @@ mindmap
 
 **关键发现**: ≥1120x1120 输入是文本密集场景的必要条件
 
-**关联**: [[2312-CogagentVisualLanguageModel]], [[2400-MobileflowMultimodalLlmMobile]]
+**关联**: [[2312-CogAgent|CogAgent]], [[2400-MobileflowMultimodalLlmMobile]]
 
 ### 2. 理解-生成统一
 

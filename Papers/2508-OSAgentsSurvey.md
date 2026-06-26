@@ -228,7 +228,7 @@ OS Agent 被定义为：在 OS 提供的环境与接口下使用计算设备、�
 ### Foundation models 代表（survey 引用）
 - [[2410-OSAtlas|OS-Atlas]]：跨平台 GUI grounding foundation model
 - [[2312-CogAgent|CogAgent]]：高分辨率 GUI MLLM 改造范式的代表
-- [[2401-SeeClick|SeeClick]]：早期 GUI 领域 PT+SFT
+- [[2400-SeeclickHarnessingGuiGrounding|SeeClick]]：早期 GUI 领域 PT+SFT
 - AutoGLM、Ferret-UI、ScreenAI、UGround、ShowUI、MobileVLM、UI-Hawk、MobileFlow
 
 ### Frameworks 代表
@@ -237,7 +237,7 @@ OS Agent 被定义为：在 OS 提供的环境与接口下使用计算设备、�
 
 ### Benchmarks
 - Mobile：AndroidWorld、AndroidControl、AITW、AndroidArena、B-MoCA
-- Desktop：[[2404-OSWorld|OSWorld]]、[[2409-WindowsAgentArena|WindowsAgentArena]]、OfficeBench、ASSISTGUI、OmniACT
+- Desktop：OSWorld、[[2409-WindowsAgentArena|WindowsAgentArena]]、OfficeBench、ASSISTGUI、OmniACT
 - Web：[[2307-WebArena|WebArena]]、VisualWebArena、Mind2Web、Mind2Web-Live、WebShop、MiniWoB、WebLINX、WorkArena、MMInA
 
 ### 商业产品提及

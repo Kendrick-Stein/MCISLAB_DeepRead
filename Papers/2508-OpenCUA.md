@@ -42,7 +42,7 @@ Computer-use agent 的核心瓶颈是**高质量训练数据的缺乏**——现
 
 ### 1. AgentNet Tool：跨 OS 标注基础设施
 
-非侵入式后台运行的桌面端工具，支持 Windows / macOS / Ubuntu，采集三类信号：(1) 屏幕视频，(2) 鼠标和键盘信号，(3) accessibility tree。基于 DuckTrack、OpenAdapt（输入追踪）、OBS Studio（屏幕录制）、[[2404-OSWorld|OSWorld]] 框架（Axtree 解析）构建。
+非侵入式后台运行的桌面端工具，支持 Windows / macOS / Ubuntu，采集三类信号：(1) 屏幕视频，(2) 鼠标和键盘信号，(3) accessibility tree。基于 DuckTrack、OpenAdapt（输入追踪）、OBS Studio（屏幕录制）、OSWorld 框架（Axtree 解析）构建。
 
 **关键设计选择：放宽"all correct trajectory"要求**。前人工作要求所有 step 必须正确，但作者认为标注错误不全是坏事——只要识别得出，就能用来教模型 error detection 和 recovery。
 
@@ -228,7 +228,7 @@ OpenCUA-72B 额外使用 8K 由 o3 + Jedi 在 Ubuntu 环境中 rollout 的 traje
 ## 关联工作
 
 ### 基于
-- [[2404-OSWorld|OSWorld]]：评测 benchmark 与 Axtree parsing 框架直接复用，AgentNet 严格不重叠 OSWorld task 防止 leakage
+- OSWorld：评测 benchmark 与 Axtree parsing 框架直接复用，AgentNet 严格不重叠 OSWorld task 防止 leakage
 - Aguvis：CoT 三层结构（L1/L2/L3）的祖宗；OpenCUA 的 L2 reasoning + 反思训练是对 Aguvis 的关键扩展
 - ActRe：CoT 合成 pipeline 的另一个前置工作
 

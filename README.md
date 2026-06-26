@@ -22,8 +22,9 @@ ReadPaperMachine/
 ├── Projects/            # 项目追踪
 ├── Meetings/            # 会议记录
 │
+├── Experiments/         # 实验记录
 ├── Templates/           # 笔记模板
-├── skills/              # 科研 Skill 定义（13 个）
+├── skills/              # 科研 Skill 定义（17 个，7 类）
 ├── references/          # 协议文档
 │
 ├── Workbench/           # Researcher 工作状态
@@ -43,12 +44,13 @@ ReadPaperMachine/
 
 | 类别 | Skills |
 |:-----|:-------|
-| 1-literature | `paper-digest`, `literature-survey` |
+| 1-literature | `paper-digest`, `literature-survey`, `daily-papers` |
 | 2-ideation | `idea-generate`, `idea-evaluate` |
 | 3-experiment | `experiment-design`, `experiment-track`, `result-analysis` |
-| 4-writing | `draft-section`, `writing-refine` |
+| 4-writing | `draft-section`, `writing-refine`, `latex-citation-enhancer` |
 | 5-evolution | `memory-distill`, `agenda-evolve`, `memory-retrieve` |
-| 6-orchestration | `autoresearch` |
+| 6-orchestration | `autoresearch`, `research-team` |
+| 7-presentation | `domain-presentation` |
 
 每个 Skill 定义在 `skills/<category>/<name>/SKILL.md`，AI Agent 读取后按 Steps 执行，遵守 Guard 约束，通过 Verify 检查。
 

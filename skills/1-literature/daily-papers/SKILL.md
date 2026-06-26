@@ -40,6 +40,8 @@ python3 skills/1-literature/daily-papers/fetch_and_score.py \
 
 **检查输出**：确认文件存在且包含有效 JSON 数组。如果为空数组，检查 stderr 诊断问题（可能是周末 arXiv 无更新、网络问题等），告知用户原因后停止。
 
+**网络兜底**：`fetch_and_score.py` 的 HuggingFace Daily/Trending 与 arXiv API 抓取会先走本地 `urlopen`。若本地网络卡顿、超时或返回空内容，脚本会在存在 `LEXMOUNT_API_KEY` 时自动通过 Lexmount DOM dump 重试。key 只能来自环境变量或被 `.gitignore` 忽略的 `.env`，不得写入日志或总结文件。详细协议见 `references/network-fetch-fallback.md`。
+
 **历史去重**：脚本在 output 同目录维护 `.history.json`，单天模式自动过滤已总结过的论文（30 天窗口），多天模式跳过去重。每次运行后自动更新历史。
 
 ### Step 2：快速分流
@@ -57,6 +59,20 @@ python3 skills/1-literature/daily-papers/fetch_and_score.py \
 - **可跳过**：其他论文（弱相关，limited novelty，marginal improvement 等）
 
 每篇论文只需**一句话分流理由**，不写详细点评。
+
+#### 2c：入队必读论文（持久 backlog）
+
+把"要精读"论文写入 `Workbench/queue.json`，作为持久 backlog——这样即使本次 inline digest 未全部完成（论文太多 / 网络中断），剩余论文仍会留存，由 autoresearch 的 `paper-digest` 继续消费。
+
+收集"要精读"论文的 arXiv id（从 `.candidates.json` 的 url 中提取，如 `2605.21573`），运行：
+
+```bash
+python3 skills/1-literature/daily-papers/queue_ops.py enqueue \
+  --candidates Workbench/daily/.candidates.json \
+  --ids <id1> <id2> ...
+```
+
+脚本自动去重（已有笔记或已在队列的跳过）、自清理（已有笔记的 pending 任务剪除）、并按 `max_queue_size` 裁剪。Step 3 的 inline digest 落地笔记后，下次 enqueue 会自动剪除这些任务，无需手动标记完成。
 
 ### Step 3：每篇要精读论文 → 笔记 + 单篇点评
 

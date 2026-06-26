@@ -2,6 +2,18 @@
 
 This repository includes automated validation for YAML frontmatter in all markdown files to prevent build failures.
 
+## Lexmount Fetch Fallback
+
+`scripts/lexmount_fetch.py` is a no-dependency helper for paper retrieval when normal web access stalls or returns incomplete content.
+
+```bash
+export LEXMOUNT_API_KEY="..."
+python3 scripts/lexmount_fetch.py extract "https://arxiv.org/html/2604.06126" --format markdown
+python3 scripts/lexmount_fetch.py dump "https://arxiv.org/html/2604.06126" --engine lightmount_domstable --format text
+```
+
+Do not commit API keys. `.env` is ignored and can be used for local credentials. See `references/network-fetch-fallback.md`.
+
 ## Validation Points
 
 ### 1. Pre-commit Hook (Local)

@@ -3,7 +3,7 @@ name: literature-survey
 description: >
   当 Supervisor 说"调研""survey""了解研究现状"，或需要系统了解某主题的文献全貌时，搜索外部文献、批量 digest、综合生成调研报告
 argument-hint: "<topic> [scope]"
-allowed-tools: Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 ---
 
 ## Purpose
@@ -51,6 +51,14 @@ allowed-tools: Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
 3. **去重**：将每个候选论文的 title（转小写，去标点）与已知论文清单对比，跳过已在 vault 中的论文。
 4. **搜索轮数上限**：最多执行 **10 次 WebSearch**。若某些 query 返回结果质量低（无相关论文），提前停止该策略。
 
+**搜索/抓取兜底**：若 WebSearch 或 WebFetch 在 arXiv / HuggingFace 上卡顿，先读取 `references/network-fetch-fallback.md`。对已知标题可构造 arXiv search URL 或 HuggingFace paper URL 后用：
+
+```bash
+python3 scripts/lexmount_fetch.py extract "<url>" --format markdown
+```
+
+该兜底只用于恢复真实页面内容，不得用来凭空扩展候选论文；纳入候选的论文仍必须有可访问来源。
+
 搜索完成后，对所有候选论文进行筛选和排序：
 
 - **相关性**：与 topic 的直接相关程度
@@ -68,7 +76,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
 2. 输入为论文的 arXiv URL（优先）或论文标题。
 3. **跳过规则**：
    - 若 paper-digest 的去重检查发现 vault 已有该笔记，跳过。
-   - 若 WebFetch 无法获取论文内容（如非 arXiv 论文、付费墙），记录为"未能获取"并跳过，不阻塞流程。
+   - 若 WebFetch 无法获取论文内容（如非 arXiv 论文、付费墙），先按 paper-digest 的 Lexmount fallback 重试；仍失败才记录为"未能获取"并跳过，不阻塞流程。
 4. 记录每篇论文的 digest 结果：成功（文件路径）/ 跳过（原因）/ 失败（原因）。
 
 ### Step 5：综合分析

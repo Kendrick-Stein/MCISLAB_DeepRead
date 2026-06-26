@@ -3,7 +3,7 @@ name: paper-digest
 description: >
   当 Supervisor 给出论文或 blog 的 URL/标题/PDF/DOI，或阅读队列中有待处理条目时，消化内容并生成结构化笔记到 Papers/
 argument-hint: "[arXiv URL / blog URL / PDF path / title / DOI]"
-allowed-tools: Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 ---
 
 ## Purpose
@@ -25,6 +25,20 @@ allowed-tools: Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
 - **论文标题或关键词**：用 WebSearch 搜索（建议加上 `site:arxiv.org` 或 `filetype:pdf`），从结果中定位最可能的论文页面，再用 WebFetch 获取内容。
 - **DOI**（如 `10.1145/...`）：用 WebFetch 抓取 `https://doi.org/<DOI>`，跟随重定向到出版商页面。
 - **Blog URL**（非 arXiv/DOI 的普通网页链接）：用 WebFetch 抓取页面内容。从页面中提取作者、发布日期等元数据。
+
+**网络兜底协议**：若 WebFetch / WebSearch 卡住、返回空内容、只拿到 abstract、或 arXiv / HuggingFace 页面无法完整读取，读取 `references/network-fetch-fallback.md` 并启用 Lexmount fallback。关键约束：
+
+1. 不把 API key 写入笔记、日志、frontmatter 或可提交文件；只从 `LEXMOUNT_API_KEY` 或已被 `.gitignore` 忽略的 `.env` 读取。
+2. arXiv 全文优先尝试 `https://arxiv.org/html/<arxiv_id>`，再尝试 `https://ar5iv.labs.arxiv.org/html/<arxiv_id>`；用：
+   ```bash
+   python3 scripts/lexmount_fetch.py extract "<url>" --format markdown
+   ```
+3. 若 `extract` 结果仍不完整，再用 DOM dump 检查：
+   ```bash
+   python3 scripts/lexmount_fetch.py dump "<url>" --engine lightmount_domstable --format text
+   ```
+4. HuggingFace papers / model / dataset 页面或动态页面卡顿时，先 `extract` 公共页面；仍失败再 `dump --engine chrome_cdp`。
+5. Lexmount 也失败时，明确记录"未获取全文"，不得补写正文细节。
 
 从获取到的内容中提取以下元数据（如果全文无法获取，至少要获取 abstract）：
 

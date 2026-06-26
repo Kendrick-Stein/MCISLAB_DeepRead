@@ -2,7 +2,7 @@
 
 > 本文件是 ReadPaperMachine 的 single source of truth。
 
-**Last updated**: 2026-04-28
+**Last updated**: 2026-06-26
 
 ---
 
@@ -45,8 +45,9 @@ Markdown — 一切皆文件，一切可读，一切有版本控制
 
 ```
 ReadPaperMachine/
-├── Papers/              # 论文笔记（YYMM-ShortTitle.md）
+├── Papers/              # 论文笔记（YYMM-ShortTitle.md，Archive/ 存放被取代/降级的笔记）
 ├── Ideas/               # 研究 idea
+├── Experiments/         # 实验记录（YYYY-MM-DD-Name.md）
 ├── Projects/            # 项目追踪
 ├── Topics/              # 文献调研 / 跨论文分析报告
 ├── Reports/             # 生成的报告
@@ -64,7 +65,8 @@ ReadPaperMachine/
 │   ├── 3-experiment/    #   实验技能
 │   ├── 4-writing/       #   写作技能
 │   ├── 5-evolution/     #   进化技能
-│   └── 6-orchestration/ #   编排技能
+│   ├── 6-orchestration/ #   编排技能
+│   └── 7-presentation/  #   展示技能
 │
 ├── references/          # 协议文档
 │   ├── skill-protocol.md
@@ -89,6 +91,7 @@ ReadPaperMachine/
 |:---------|:------|:-----|
 | `1-literature` | `paper-digest` | 消化单篇论文 → Paper 笔记 |
 | | `literature-survey` | 主题级调研（搜索 + 批量 digest + 综合） |
+| | `daily-papers` | 抓取 HF Daily/Trending + arXiv，打分筛选 + 锐评 |
 | `2-ideation` | `idea-generate` | 从知识空白生成研究 idea |
 | | `idea-evaluate` | 评估 idea 可行性和新颖性 |
 | `3-experiment` | `experiment-design` | 设计实验方案 |
@@ -96,7 +99,37 @@ ReadPaperMachine/
 | | `result-analysis` | 分析实验结果，提取 insight |
 | `4-writing` | `draft-section` | 起草论文/报告章节 |
 | | `writing-refine` | 打磨已有文稿 |
+| | `latex-citation-enhancer` | 为 LaTeX 文档自动增强引用（基于 Papers/） |
 | `5-evolution` | `memory-distill` | 从日志蒸馏记忆 |
 | | `agenda-evolve` | 演化研究议程 |
 | | `memory-retrieve` | 从记忆库检索相关经验 |
 | `6-orchestration` | `autoresearch` | 核心研究循环 |
+| | `research-team` | 多 Agent 并行协作构建知识库 |
+| `7-presentation` | `domain-presentation` | Domain Map → HTML 可视化展示 |
+
+## 5. Conventions
+
+> 这些约定用于防止 vault 随产出增长而失序。新建/移动文件时遵守。
+
+### 5.1 Papers 命名
+
+- 规范文件名：`YYMM-ShortTitle.md`，`YY`=年份后两位、`MM`=arXiv/发表月份（如 2026-04 → `2604`）。
+- 月份未知时用 `00` 占位（如 `2500` = 2025 年月份未知）。**不要**用 4 位年份（`2025-`/`2026-`）作前缀——这是历史遗留写法，新笔记一律用 `YYMM`。
+- `ShortTitle` 用 PascalCase，去掉冒号/空格（`AutoGUI-v2` → `AutoGUIv2`）。
+
+### 5.2 Papers/Archive 策略
+
+- `Papers/` 根目录 = **当前 active focus** 的笔记，是每篇论文的**唯一 canonical 位置**。
+- `Papers/Archive/` = 已 digest 但**偏离当前研究重心**、或被更完整笔记取代的论文。
+- **不变量**：同一文件名不得同时存在于 `Papers/` 和 `Papers/Archive/`。re-digest 产生更完整版本时，保留 root 版、删除 Archive stub（历史可经 git 找回）。
+- 被 agenda/idea 作为 active evidence 引用的论文应放在 `Papers/` 根目录。
+
+### 5.3 Reports vs Topics
+
+- `Topics/` = **沉淀性**跨论文调研（`*-Survey.md`），与某个 DomainMap 长期对应，会被持续更新。
+- `Reports/` = **某一时点**生成的报告/提案（`YYYY-MM-DD-Name.md`）。其中 autoresearch 的周期性 pulse/update 属临时产物，可定期清理或归入子目录。
+
+### 5.4 Wikilink 风格
+
+- 引用论文优先用**纯文件名** `[[2604-GoClick]]`（Obsidian 按文件名解析，不受 Papers/ 还是 Papers/Archive/ 影响），避免写死路径 `[[Papers/2604-GoClick]]`（移动文件即断链）。
+- 文件名含空格/冒号会导致 wikilink 解析失败——引用前确认目标文件名符合 5.1。

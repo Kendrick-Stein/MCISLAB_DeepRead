@@ -23,7 +23,7 @@ autoresearch 是 MindFlow 的核心研究循环，实现了 PhD 导师制中 Res
 读取以下文件了解当前状态：
 
 1. `Workbench/agenda.md` — 当前研究方向、优先级、各 direction 的 next_action
-2. `Workbench/queue.md` — 待处理任务（Reading / Review / Questions / Experiments 四个部分）
+2. `Workbench/queue.json` — 待处理任务队列（JSON；每项 task 含 `task_type` / `status` / `priority`，关注 `status: pending` 的项）。注：`daily-papers` 的产出现以 markdown 形式写入 `Workbench/daily/YYYY-MM-DD.md`（评分 + 锐评），需一并查看最近的 daily 总结作为待读来源
 3. `Workbench/memory/insights.md` — 近期 insight（关注 status: validated 且近 30 天内的条目）
 4. `Workbench/memory/patterns.md` — 近期 pattern
 5. 用 Glob 列出最近 3 天的 `Workbench/logs/YYYY-MM-DD.md`，用 Read 读取，了解近期执行了什么（避免重复行动）
@@ -36,9 +36,9 @@ autoresearch 是 MindFlow 的核心研究循环，实现了 PhD 导师制中 Res
 
 | 状态信号 | 可能的行动 |
 |:--------|:----------|
-| queue 的 Reading 部分有待处理论文 | 读取 `skills/1-literature/paper-digest/SKILL.md` 并执行 |
+| queue.json 有 `status: pending` 的论文任务，或 `Workbench/daily/` 最近总结里有值得深读的论文 | 读取 `skills/1-literature/paper-digest/SKILL.md` 并执行 |
 | agenda 中某 direction 缺乏文献支撑（evidence 稀疏） | 读取 `skills/1-literature/literature-survey/SKILL.md` 并执行 |
-| vault 中有多篇相关论文但未做对比分析 | 读取 `skills/1-literature/cross-paper-analysis/SKILL.md` 并执行 |
+| vault 中有多篇相关论文但未做对比分析 | 读取 `skills/1-literature/literature-survey/SKILL.md` 并执行（其综合步骤即跨论文对比，产出 `Topics/*-Survey.md`） |
 | 近期有 Topics/*-Analysis.md 标注了知识空白 | 读取 `skills/2-ideation/idea-generate/SKILL.md` 并执行 |
 | Ideas/ 中有 status: raw 的 idea 待评估 | 读取 `skills/2-ideation/idea-evaluate/SKILL.md` 并执行 |
 | Ideas/ 中有 status: developing 的 idea 缺实验方案 | 读取 `skills/3-experiment/experiment-design/SKILL.md` 并执行 |
@@ -124,7 +124,7 @@ READ STATE:
   queue: Reading 为空
   vault: Papers/ 中有 5 篇 VLA 相关论文但未做对比
 
-JUDGE: queue 已清空，agenda direction 缺文献支撑 + vault 有多篇未对比论文 → 做跨论文分析
-ACT: 读取 skills/1-literature/cross-paper-analysis/SKILL.md，对比 VLA 相关论文
-LOG: round 3, action: cross-paper-analysis, outcome: Topics/VLA-FewShot-Analysis.md
+JUDGE: queue 已清空，agenda direction 缺文献支撑 + vault 有多篇未对比论文 → 做跨论文综合
+ACT: 读取 skills/1-literature/literature-survey/SKILL.md，综合对比 VLA 相关论文
+LOG: round 3, action: literature-survey, outcome: Topics/VLA-FewShot-Survey.md
 ```

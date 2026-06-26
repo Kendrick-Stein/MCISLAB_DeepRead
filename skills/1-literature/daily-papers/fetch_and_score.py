@@ -13,7 +13,9 @@ Stderr: 进度日志。Stdout: JSON array。
 """
 
 import argparse
+import html as html_lib
 import json
+import os
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -40,6 +42,28 @@ ATOM_NS = {
     "atom": "http://www.w3.org/2005/Atom",
     "arxiv": "http://arxiv.org/schemas/atom",
 }
+_DOTENV_LOADED = False
+
+
+def load_dotenv(path: Path | None = None) -> None:
+    global _DOTENV_LOADED
+    if _DOTENV_LOADED:
+        return
+    _DOTENV_LOADED = True
+
+    env_path = path or Path.cwd() / ".env"
+    if not env_path.exists():
+        return
+
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
 
 
 # ── 打分 ───────────────────────────────────────────────────────────────────
@@ -63,10 +87,83 @@ def fetch_url(url: str, timeout: int = 30) -> str:
     try:
         req = Request(url, headers={"User-Agent": "daily-papers-bot/1.0"})
         with urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8")
+            text = resp.read().decode("utf-8")
+            if text:
+                return text
+            print(f"  [WARN] fetch returned empty response {url}", file=sys.stderr)
     except Exception as e:
         print(f"  [WARN] fetch failed {url}: {e}", file=sys.stderr)
+
+    fallback = fetch_url_via_lexmount(url, timeout=timeout)
+    if fallback:
+        print(f"  [INFO] fetched via Lexmount fallback: {url}", file=sys.stderr)
+    return fallback
+
+
+def fetch_url_via_lexmount(url: str, timeout: int = 30) -> str:
+    load_dotenv()
+    api_key = os.environ.get("LEXMOUNT_API_KEY", "").strip()
+    if not api_key:
+        print("  [INFO] Lexmount fallback skipped: LEXMOUNT_API_KEY not set", file=sys.stderr)
         return ""
+
+    base_url = os.environ.get("LEXMOUNT_WEBFETCH_BASE_URL", "https://webfetch.lexmount.com").rstrip("/")
+    endpoint = f"{base_url}/v1/dom/dump"
+    payload = {
+        "url": url,
+        "options": {
+            "engine_preference": os.environ.get("LEXMOUNT_ENGINE_PREFERENCE", "http"),
+            "timeout_ms": max(timeout * 1000, 30000),
+            "filter_scripts_styles": False,
+        },
+    }
+
+    try:
+        req = Request(
+            endpoint,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "content-type": "application/json",
+                "X-API-Key": api_key,
+                "User-Agent": "daily-papers-bot/1.0",
+            },
+            method="POST",
+        )
+        with urlopen(req, timeout=max(timeout + 10, 30)) as resp:
+            raw = resp.read().decode("utf-8")
+    except Exception as e:
+        print(f"  [WARN] Lexmount fallback failed {url}: {e}", file=sys.stderr)
+        return ""
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return _html_to_text(raw)
+
+    if data.get("error"):
+        print(f"  [WARN] Lexmount fallback error {url}: {data['error']}", file=sys.stderr)
+        return ""
+
+    return _html_to_text(data.get("html", ""))
+
+
+def _html_to_text(raw_html: str) -> str:
+    text = (raw_html or "").strip()
+    if not text:
+        return ""
+
+    pre_match = re.search(r"<pre[^>]*>(.*?)</pre>", text, flags=re.IGNORECASE | re.DOTALL)
+    if pre_match:
+        return html_lib.unescape(pre_match.group(1)).strip()
+
+    if re.search(r"<[^>]+>", text):
+        text = re.sub(r"(?is)<(script|style).*?</\1>", "", text)
+        text = re.sub(r"(?i)<br\s*/?>", "\n", text)
+        text = re.sub(r"(?i)</(p|div|li|tr|h[1-6])>", "\n", text)
+        text = re.sub(r"<[^>]+>", "", text)
+        text = html_lib.unescape(text)
+
+    return text.strip()
 
 
 def _parse_hf_item(item: dict, source: str) -> tuple[str, dict] | None:

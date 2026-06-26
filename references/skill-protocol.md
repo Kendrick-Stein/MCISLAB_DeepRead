@@ -185,7 +185,7 @@ skills/
   1-literature/
     paper-digest/
       SKILL.md
-    cross-paper-analysis/
+    daily-papers/
       SKILL.md
     literature-survey/
       SKILL.md

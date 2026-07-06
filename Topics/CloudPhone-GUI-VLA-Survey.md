@@ -4,7 +4,7 @@ tags: [survey, gui-agent, VLA, cloud-phone, reliability, efficient-inference]
 date_updated: "2026-07-01"
 scope: "任务书技术诉求对齐版"
 evidence: "本地 notebook 论文笔记 + 远程论文/代码检索"
-keywords: [cloud phone, mobile gui, android agent, gui vla]
+keywords: [cloud phone, android agent, gui vla]
 domain_map: GUI-Agent
 ---
 

@@ -1,0 +1,1492 @@
+                                               RLFTSim: Realistic and Controllable Multi-Agent Traffic Simulation via
+                                                              Reinforcement Learning Fine-Tuning
+
+                                                       Ehsan Ahmadi1,2 Hunter Schofield2,3 Behzad Khamidehi2 Fazel Arasteh2
+                                                              Jinjun Shan3 Lili Mou1,4 Dongfeng Bai2 Kasra Rezaee2
+                                                                   1
+                                                                     University of Alberta 2 Huawei Technologies Canada
+                                                                      3
+                                                                        York University 4 Canada CIFAR AI Chair, Amii
+
+
+
+
+arXiv:2605.19033v1 [cs.RO] 18 May 2026
+                                                eahmadi@ualberta.ca {firstname.lastname}@huawei.com {hunterls, jjshan}@yorku.ca doublepower.mou@gmail.com
+
+
+
+                                                                  Abstract
+                                                                                                                                                                                 Ref. logits
+                                                                                                                                                Ref. Model     - D_KL
+
+                                             Supervised open-loop training has been widely adopted                                                                               Gen. logits
+
+
+                                         for training traffic simulation models; however, it fails to                                                        Reward Calculation with Distribution Matching
+
+
+
+
+                                                                                                                                  Gen. tokens
+                                         capture the inherently dynamic, multi-agent interactions                   Data                                                                                               R1
+                                         common in complex driving scenarios. We introduce RLFT-
+                                                                                                                                                                                                                       R2
+                                         Sim, a reinforcement-learning-based fine-tuning framework
+                                                                                                                                                                                                                       R3
+                                         that enhances scenario realism by aligning simulator roll-             History tokens                  Simulation
+                                                                                                                                                  Model
+                                                                                                                                                                                                             expert
+                                                                                                                                                                                                             rollout
+
+
+                                         outs with real-world data distributions and provides a                      Map
+
+
+                                         method for distilling goal-conditioned controllability in sce-         (Optional) goal                                  Policy Gradient Update
+                                         nario generation. We instantiate RLFTSim on top of a pre-
+                                         trained simulation model, design a reward that balances fi-           Figure 1. Post-training with RLFTSim. For a seed scenario from
+                                         delity and controllability, and perform comprehensive ex-             the dataset, multiple rollouts are generated. The main reward func-
+                                         periments on the Waymo Open Motion Dataset. Our re-                   tion is defined based on time-independent distribution matching
+                                         sults show improvements in realism, achieving state-of-the-           of the simulated scenarios and the expert demonstration in several
+                                         art performance. Compared with other heuristic search-                feature spaces. This closed-loop on-policy optimization enhances
+                                         based fine-tuning methods, RLFTSim requires significantly             realism beyond what open-loop imitation learning achieves alone.
+                                         fewer samples due to a proposed low-variance and dense
+                                         reward signal, and it directly addresses the realism align-
+                                         ment issue by design. We also demonstrate the effectiveness               In this work, we focus on the problem of microscopic
+                                         of our approach for distilling traffic simulation controllabil-       multi-agent traffic simulation, as we elaborate in § 3. This
+                                         ity through goal conditioning. The project page is available          problem has previously been addressed with rule-based
+                                         at https://ehsan-ami.github.io/rlftsim.                               simulators, which can provide various feedback signals
+                                                                                                               from kinematics and physics simulations [2, 10]. These
+                                                                                                               simulators control the agents either via replaying logged
+                                         1. Introduction                                                       trajectories or using simple rule-based models, such as the
+                                                                                                               constant-speed actor model or the Intelligent Driver Model
+                                         Simulation plays a major role in autonomous driving by                [30]. This, arguably, leads to a significant sim-to-real gap.
+                                         providing a controllable virtual environment for the test and         Even for the case of ground-truth data log replay, since the
+                                         development of autonomous vehicles (AVs). This is par-                agents’ behavior is not reactive, the simulation becomes un-
+                                         ticularly significant for rare accident scenarios that an AV          realistic when it faces closed-loop deployment.
+                                         should be capable of handling. Based on a statistical esti-               Recently, learning-based simulation models have been
+                                         mate in [15], verifying the safety aptitude of an AV requires         introduced to bridge the realism gap and generate a reactive
+                                         it to be capable of driving 2 million kilometers without fatal        multi-agent traffic simulation rollout, which is an episode
+                                         accidents to claim that it is as safe as humans. Consider-            of the simulation for all of the agents in a traffic scenario
+                                         ing the costs of such verification, the use of simulation is          [34, 44]. However, previous models are mostly trained in
+                                         justified to make the verification and development of AVs             an open-loop setting with imitation learning objectives [34,
+                                         feasible.                                                             44]. We argue that to make simulation models capable of
+
+
+                                                                                                           1
+overcoming distribution shifts caused by error accumulation           2. Related Works
+in closed-loop simulation and avoiding the causal confusion
+problem [1, 8], the training (or post-training) of a simulation       Learning-based Traffic Simulation Approaches.
+model needs to be done in a closed-loop environment.                  Learning-based models have emerged as a cornerstone for
+    An effective simulation model needs to be capable of              realistic traffic simulation, moving beyond heuristic rule-
+generating realistic data that accurately represents daily            based simulators that struggled with complex maneuvers
+driving scenarios to make its adoption worthwhile. While              and interactions [30]. Early works like [26] modeled multi-
+still imitating human agents, it needs to be aligned with traf-       agent driving behavior with implicit latent variables and
+fic rules and the physical constraints of the environment.            differentiable closed-loop training, significantly improving
+In the past, a combination of open-loop supervision via               realism over rule-based baselines. Imitation learning has
+imitation learning and closed-loop training via reinforce-            been widely adopted for traffic simulation [11, 13, 17, 42].
+ment learning has been used for ego-centric motion plan-              The Waymo Open Motion Dataset (WOMD) [9], nuPlan
+ning [19]. However, effective scaling of this approach for            [5], and similar datasets of millions of real trajectories
+multi-agent simulation models remains an open area of re-             have enabled training transformer-based models that treat
+search.                                                               multi-agent traffic simulation as a next-token prediction
+    In this work, inspired by the successful application of re-       problem [12, 22, 34, 38, 44]. SMART predicts the next
+inforcement learning with verifiable rewards for new skill            motion token for each agent conditioned on vectorized state
+learning in foundation models [25], we present a reinforce-           representations and map context [34]. By training on over
+ment learning-based fine-tuning approach for traffic simu-            a billion motion tokens from multiple datasets, SMART
+lation (RLFTSim) to address the physics and traffic-rules             achieved state-of-the-art realism in the WOMD Sim Agents
+alignment problem for a pre-trained model with an open-               Challenge. In this work, we utilize the superior power of
+loop imitation learning objective. We deal with the align-            SMART in traffic simulation by choosing it as a reference
+ment problem with a closed-loop post-training approach                model for alignment fine-tuning.
+(Fig. 1). Specifically, we focus on the Waymo Open Simu-              Model Alignment and Fine-Tuning. A key challenge in
+lation Challenge (WOSAC) and use its definition of realism            learned simulators is model alignment: ensuring the distri-
+meta-metric (RMM) as the optimization objective function              bution of simulated behaviors in closed-loop matches real-
+for RLFT. However, RMM in its original form is a sparse               world driving data. Pure behavior cloning suffers from the
+population-based signal calculated per group of 32 rollouts,          accumulation of errors during closed-loop deployment [24],
+making it sample-inefficient for direct use as a reward in            where small mistakes compound and drive agents to unseen
+RL. To overcome this issue, we present realism Meta-metric            or unrealistic states. In [39], Closest Among Top-K (CAT-K)
+Leave-One-Out (MLOO) as a low-variance and dense adap-                sampling is used to perturb the expert policy. By generating
+tation of the RMM for RL fine-tuning. To the best of our              multiple plausible next actions and selecting the one closest
+knowledge, this is the first successful application of the            to the ground-truth trajectory for training, it enables closed-
+RMM for RL fine-tuning in traffic simulation. We present              loop learning solely from offline demonstrations. However,
+theoretical variance scaling analysis that justify our pro-           the absence of explicit alignment objectives can limit adher-
+posed MLOO as a reward signal. Moreover, we discuss the               ence to traffic rules and physical constraints.
+issue of controllability in traffic simulation as a part of the           Reinforcement learning and other closed-loop fine-
+model alignment problem, and with the aid of hindsight ex-            tuning techniques have been explored to directly optimize
+perience replay (HER) [4], goal-conditioning, and RLFT,               behaviors in traffic simulation [14]. A core challenge is
+we present an approach to distill controllability.                    the lack of an explicit reward signal for human-like driv-
+    Our contributions are: (i) We introduce realism meta-             ing, making reward design difficult and often inadequate.
+metric as the reward signal for realism alignment with                To address this, recent work combines imitation learning
+closed-loop RL-based fine-tuning in multi-agent traffic sim-          with reinforcement learning. For instance, [19] shows that
+ulation (§ 4). (ii) We provide a theoretical variance analysis        fine-tuning an imitation-learned policy with safety rewards
+for the current WOSAC’s realism meta-metric, and we pro-              reduces collisions by over 38% in rare scenarios. However,
+pose MLOO to have a low-variance and dense reward sig-                this approach, focused on single-agent planning, does not
+nal (§ 4.1). (iii) We introduce the application of hindsight          directly extend to multi-agent traffic simulation.
+experience replay with RLFT for the behavior controllabil-                Recent studies have applied reinforcement learning from
+ity distillation with goal-conditioning in the simulation pro-        human preferences for traffic simulation alignment [6, 32].
+cess (§ 4.2). (iv) We conduct comprehensive experiments               However, they rely on costly human feedback, which limits
+showcasing the enhanced realism with RLFT to achieve the              scalability. A preliminary study in [29] shows that ranking
+state-of-the-art performance, and the distilled controllabil-         a traffic simulation can take over 40 seconds, making large-
+ity skills (§ 5).                                                     scale human preference annotation impractical.
+
+
+                                                                  2
+    To address the scalability limitation, [29] introduces             3. Background
+Direct Preference Alignment from Occupancy Measure
+Feedback (DPA-OMF) for post-training realism alignment.                Multi-Agent Traffic Simulation.              We formulate
+While this method avoids extra annotation, it is sample in-            multi-agent traffic behavior modeling as a Contex-
+efficient as it depends on oversampling traffic simulation             tual Markov Decision Process defined by the tuple
+rollouts and only uses a subset of them. Moreover, it is cat-          of (St , At , St+1 , Rt+1 , C, G) with discrete time steps
+egorized as an offline method, which comes with limitations            t ∈ [1, T ]. The state St = {Stj′ | j ≤ Na , t′ ≤ t}
+compared to on-policy methods [28]. In contrast, RLFTSim               captures the finite-horizon history of up to Na agents, the
+is an on-policy method that, by using MLOO as the reward               joint action At = {Ajt ∈ V | j ≤ Na } denotes their
+signal, effectively utilizes all simulation rollouts for closed-       tokenized decisions over the discrete vocabulary V, and
+loop realism alignment.                                                the reward is represented as Rt+1 ∈ R. The context
+                                                                       includes vectorized static and dynamic map features
+                                                                       C = {M ∈ RNm ×Dm , L ∈ RNtl ×Dtl }, where M is the
+Controllability in Learned Simulators and Goal Condi-                  static map information comprising up to Nm downsampled
+tioning. Beyond realism, an important frontier is control-             vector points with the feature dimension Dm , and L is
+lability: the ability to steer the simulator or specify condi-         the dynamic map information including the past temporal
+tions so that generated traffic scenarios meet particular re-          states of up to Ntl traffic light states with the feature di-
+quirements. Early learned simulators mostly acted as black             mension Dtl . The optional goal specification G = {xjg }j∈G
+boxes, generating unconstrained traffic patterns. Now, there           defines target objectives for a subset G ⊆ {1, . . . , Na } of
+is a growing demand for methods to control what scenarios              agents, where xjg represents the goal coordinate for agent
+are produced. One promising direction is goal-conditioning             j. The simulation is categorized as goal-free if G = ∅, and
+of agent policies. For example, [43] factors their policy              goal-conditioned otherwise.
+into high-level goal generation and low-level trajectory ex-
+                                                                       WOSAC Realism Meta-Metric (RMM). The Waymo
+ecution. By conditioning each agent on an explicit goal,
+                                                                       Open Simulation Challenge evaluates simulator realism us-
+the simulator can ensure diversity without sacrificing re-
+                                                                       ing a meta-metric [20] that compares feature distributions
+alism. Similarly, [36] introduces configurable latent vari-
+                                                                       between simulated and real trajectories. Given N = 32
+ables, such as destinations and driver “personality” traits, to
+                                                                       simulated rollouts {τi }N i=1 and a ground-truth trajectory
+modulate each agent’s behavior, enabling simulations that
+                                                                       τ ∗ , RMM extracts kinematic features (e.g., speed, accel-
+span from aggressive to cautious driving styles on demand.
+                                                                       eration), interactive features (e.g., distance to other agents,
+Hierarchical imitation frameworks such as [35] also im-
+                                                                       time-to-collision), and map-based features (e.g., distance to
+prove control by decoupling strategic decisions from mi-
+                                                                       road boundary), discretizing them into K = 20 bins to com-
+cromanagement. Another approach to achieve controllabil-
+                                                                       pute:
+ity over agents is by integrating language models to enable
+promptable simulation as in [27].
+                                                                                                                           |V1 |
+                                                                                         D
+                                                                                         X            Y
+                                                                                                                     ∗
+                                                                               RMM =           wd           P̂d,a (kd,a,t )        ,   (1)
+   Conditioning behavior on explicit goals in autonomous                                 d=1       (a,t)∈V
+driving spans paradigms from target-driven prediction [40]
+to goal-based planning [3]. While goals are often task-
+specific and not trivial to define, [18] surveys various               where P̂d,a (k) is the empirical probability of agent a’s fea-
+formulations of goal-conditioned reinforcement learning,               ture dimension d ∈ {1, . . . , D} at bin k using the simu-
+                                                                                        ∗
+where goals are treated as desired properties or features of           lated rollouts, kd,a,t indicates the ground-truth bin, wd is the
+agent behavior. In the context of autonomous driving, many             weight for feature dimension d, and V is the set of (agent,
+motion prediction benchmarks [9, 33] define a miss rate                time) pairs for evaluation. Higher RMM values indicate
+metric that evaluates how well a model can predict trajec-             better alignment with real-world behavior. The complete
+tories that result in final agent states close to ground truth.        RMM formulation is detailed in Appendix A.1.
+In [7], agent rollouts are explicitly conditioned on the final
+coordinates of the ground-truth trajectories and optimized             REINFORCE Leave-One-Out (RLOO). RLOO [16] pro-
+using a sparse reward aligned with these metrics. Building             vides variance-reduced policy gradients by using bias-free
+upon these works, we aim to distill controllability within the         leave-one-out baselines. For N rollouts from the same
+SMART simulator while maintaining its ability to produce                     P the advantage of rollout i is computed as Ri −
+                                                                       context,
+                                                                         1
+highly realistic rollouts.                                             N −1     j̸=i Rj , where rewards are computed independently
+                                                                       for each rollout.
+
+
+                                                                   3
+4. Traffic Simulation Alignment with Rein-                             of RMM). While RMM provides a comprehensive evalua-
+   forcement Learning                                                  tion of traffic rollouts, its direct application as a reward sig-
+                                                                       nal is problematic. As a mapping from a set of 32 rollouts
+In this section, we present RLFTSim, a reinforcement                   to a single scalar value, RMM is inherently sparse, which
+learning-based fine-tuning approach for traffic simulation             leads to sample inefficiency in RL training. Therefore, de-
+alignment. RLFTSim operates in two distinct modes to ad-               spite being the official metric for realism in the leading sim-
+dress different simulation requirements: goal-free simula-             ulation benchmark, it has not been used as an optimization
+tion for pure realism alignment, and goal-conditioned sim-             target for RL. A naı̈ve remedy for the sparsity problem is to
+ulation for controllability while maintaining realism. Our             compute RMM over smaller groups of rollouts (e.g., N =4
+post-training pipeline takes a pre-trained imitation learning          instead of 32), yielding more reward values per batch; how-
+model and fine-tunes it using reinforcement learning with              ever, each RMM estimate is based on fewer samples, thus
+carefully designed reward signals.                                     potentially destabilizing training due to higher variance.
+   The foundation of our approach lies in addressing a fun-
+                                                                       Meta-metric Leave-One-Out (MLOO). To achieve a bet-
+damental challenge: how to create an effective reward sig-
+                                                                       ter density-variance trade-off, we introduce a dense per-
+nal for RL-based simulation alignment. While RMM pro-
+                                                                       rollout reward signal, RMMMLOO
+                                                                                                   i    , defined as:
+vides a comprehensive measure of traffic realism, its di-
+rect use as a reward signal is problematic due to sparsity                                          N
+                                                                                                 1 X
+and variance issues. We introduce the Meta-metric Leave-                       RMMMLOO
+                                                                                  i    =               RMM−j − RMM−i ,              (2)
+One-Out (MLOO) method as a dense, low-variance replace-                                          N j=1
+ment that enables sample-efficient training for both simula-
+tion modes. Beyond pure realism, many practical applica-               where RMM−j is the realism meta-metric computed on the
+tions require controllable simulations for targeted scenario           set             excluding the j-th rollout. By construction,
+                                                                       PNof rolloutsMLOO
+testing and safety validation. For such cases, we extend                  i=1 RMM    i      = 0; the RMMMLOO i       signal measures
+our approach with goal-conditioned simulation, combining               each rollout’s relative contribution rather than estimating
+MLOO with an auxiliary goal attainment reward to enable                the scalar RMM directly.
+controllable agent behaviors without sacrificing realism.                  Our optimization uses REINFORCE with RMMMLOO         i
+   We structure our method as follows: First, we address the           as the per-rollout reward and Kullback–Leibler (KL) diver-
+challenges of using RMM as a reward signal and introduce               gence regularization against the pre-trained reference model
+MLOO as our core contribution (§ 4.1). Then, we present                to maintain training stability (Appendix B). Below, we for-
+the architectural extensions and training strategies required          malize two theoretical properties of the MLOO gradient
+for goal-conditioned simulation, including goal condition-             component: the resulting policy-gradient estimator is unbi-
+ing mechanisms and hindsight experience replay (§ 4.2).                ased (Proposition 1), and MLOO achieves quadratic vari-
+                                                                       ance reduction in N compared to per-rollout alternatives
+4.1. Low-Variance and Dense Reward Signal with                         (Proposition 2–3). The leave-one-out construction targets
+      Meta-metric Leave-One-Out                                        E[RMM(τ1:N −1 )], i.e., the expected RMM on N −1 roll-
+                                                                       outs rather than N ; the difference is negligible for large N .
+A key challenge in using RL for traffic simulation alignment           Detailed proofs are provided in Appendix A.2.
+is designing an effective reward signal. A natural choice is
+to minimize the Average Distance Error (ADE) between the               Proposition 1 (Unbiased gradient estimation with MLOO).
+simulated trajectories and the ground-truth trajectory. Al-            Let τ1:N = (τ1 , . . . , τN ) be N i.i.d. rollouts sampled from
+though this objective is used in the closed-loop RL fine-              the policy πθ . Applying REINFORCE with per-rollout re-
+tuning [21], we argue that ADE is not a good choice as a               ward RMMMLOOi         as defined in Eq. 2, the policy-gradient
+reward signal for this setting. Once the agents diverge from           estimator
+the ground-truth trajectory due to the stochasticity of the                              N
+                                                                                         X
+simulation model, the ADE does not always provide good                              g=         ∇θ log πθ (τi ) RMMMLOO              (3)
+                                                                                                                  i
+corrective supervision. For instance, suppose that an agent                              i=1
+is involved in a safety-critical situation in a simulation roll-
+out; in this case, the most realistic next action may not be to        is an unbiased estimator of ∇θ E[RMM(τ1:N −1 )].
+return abruptly to a pre-recorded ground-truth trajectory.
+                                                                           Having established unbiasedness, we now analyze the
+    RMM aims to capture the distribution of realistic driving          variance scaling of MLOO — the property that determines
+behaviors using a comprehensive set of features [20]. It is            its practical effectiveness for RL training.
+less sensitive to the stochasticity of the simulation model as
+it relaxes the requirement of following the expert behavior            Assumption 1. Let B = {B1 , . . . , BK } be a partition of
+at each time step (see Appendix A.1 for a detailed definition          the feature space into K bins. We assume:
+
+
+                                                                   4
+1. Feature observations across time steps are independent.             N − 1 rollouts excluding rollout i. Let RMMi denote the
+2. The ground-truth trajectory τ ∗ , via the empirical his-            single-rollout realism meta-metric computed from rollout τi
+   togram of per-timestep feature values, induces a target             alone, i.e., evaluating Eq. 1 with N =1; by Proposition 2,
+   distribution p = (p1 , . . . , pK ) where pk = Pr[f ∗ ∈ Bk ].       Var(RMMi ) = O(1/T ). Define:
+3. The simulator produces samples from a proposal distri-
+                                                                                                   N
+   bution q = (q1 , . . . , qK ) where qk = Pr[f (sim) ∈ Bk ].                                 1 X
+4. The support condition holds: supp(p) ⊆ supp(q).                            RMMMLOO
+                                                                                 i    =              RMM−j − RMM−i ,               (5)
+                                                                                               N j=1
+Remark 1. Independence of time steps, Assumption 1.1,                                                       1 X
+is a deliberate simplification assumption considered in the                    RMMRLOO
+                                                                                  i    = RMMi −                 RMMj .             (6)
+                                                                                                          N −1
+                                                                                                                  j̸=i
+original definition of Waymo Realism Meta-Metric, and it
+provides crucial flexibility, preventing the metric from re-
+                                                                       Then the variances satisfy:
+ducing to an overly strict measure of ground-truth imitation
+at each time step [20]. Likewise, inter-agent correlations                                                1
+                                                                                                                        
+within a rollout (e.g., from interactive features) may further                       Var(RMMMLOO
+                                                                                            i    )=O                         ,     (7)
+                                                                                                        N 2T
+inflate the variance constants.                                                                         
+                                                                                                        1
+                                                                                     Var(RMMRLOO
+                                                                                            i    ) = O      .                      (8)
+   To facilitate the variance analysis, we model the actual                                             T
+RMM computation where the simulator generates rollouts
+directly from distribution q, while αk represents fixed em-               MLOO’s quadratic variance reduction versus RLOO’s
+pirical frequencies from the ground truth trajectory.                  constant variance relative to inverse number of rollouts pro-
+   First, we establish baseline variance scaling for the real-         vides substantial advantages for RL training stability, pro-
+ism meta-metric itself. This provides the foundation for un-           vided N̂eff scales reasonably with the number of rollouts N .
+derstanding how leave-one-out methods improve upon di-                 Even with moderate simulator-ground truth mismatch, this
+rect meta-metric usage. Throughout, Var(·) denotes vari-               scaling difference translates to more stable policy gradient
+ance over the simulated rollouts.                                      estimates in practice, as empirically validated in § 5.3.
+
+Proposition 2 (Variance Scaling with Simulator Bias). Un-              4.2. Controllability with Goal Conditioning
+der Assumption 1, for N rollouts of length T , the realism
+                                                                       State-of-the-art traffic simulation world models aim to cap-
+meta-metric Eq. 1 satisfies
+                                                                       ture realistic driving behaviors by maximizing the RMM.
+                                                                     While this provides a multi-modal traffic simulation model
+            Var(RMM) = O (N̂eff · T )−1 ,               (4)
+                                                                       that can generate rollouts over likely driving distributions,
+                                                                       the specific behaviors of individual agents remain stochas-
+where N̂eff = N/κ̂ is the effective sample size, κ̂ =                  tic, and targeted scenarios cannot be explored.
+                            PK       2
+maxd κd ≥ 1, and κd =          k=1 αk,d /qk,d measures the                 To distill controllability from an existing simulator, we
+mismatch between the simulator bin probabilities qk,d and              perform goal-conditioned fine-tuning (GCFT), enabling the
+the ground-truth bin frequencies αk,d for feature dimension            simulation model to attend to externally provided goals. We
+d.                                                                     explore multiple ways of extending a model’s observation
+                                                                       to include goal states to find a balance between simulation
+Remark 2. When qk,d = αk,d for all k, d (perfect simu-
+                                                                       controllability and realism.
+lator), κd = 1 for every d, so N̂eff = N and we recover
+O((N T )−1 ) scaling. The effective sample size N̂eff de-              Goal Definition. We identify two specific goal criteria rep-
+creases as the worst-case mismatch across feature dimen-               resenting hard and soft goals during training. In the case
+sions increases, reflecting the variance penalty when the              of the hard target, agent i is considered to have reached its
+simulator is biased relative to the ground truth.                      goal, xig = (xig , ygi ) if its final displacement is within 2.0
+                                                                       meters of the goal coordinate. For the soft target, the agent
+   Secondly, we analyze a key comparison: how do MLOO                  is considered to have passed its goal if it passes within 2.0
+and RLOO perform relative to each other? The critical in-              meters of the goal coordinate at any point during the simula-
+sight is that MLOO achieves quadratic variance reduction               tion rollout. Since goal coordinates are often related to map
+with more rollouts, while RLOO’s variance remains con-                 information, we also introduce the notion of a goal poly-
+stant.                                                                 line, Pgi , defined as the polyline whose origin is closest to
+                                                                       the agent’s specified goal coordinate:
+Proposition 3 (Variance of MLOO and RLOO Estimators).
+Under Assumption 1, let {RMM−i }N i=1 be leave-one-out
+meta-metric estimates where RMM−i is computed using                                     Pgi = arg min m − xig ,                    (9)
+                                                                                                 m∈M
+
+
+                                                                   5
+Table 1. Traffic simulation benchmarking results. Results are                           Algorithm 1 Stochastic Target Augmentation
+based on WOSAC leaderboard1 evaluation on the private test split.                       Input: Scenario set D, policy model πθ , group size NG .
+We also present the results for our reference model (SMART). (↑)
+                                                                                        Output: Augmented Dataset D∗ .
+indicates that larger values are better. Bold and underline indicate
+the best and second best values, respectively2 . † indicates our re-                     1: Initialize augmented dataset D ∗
+trained version of the reference model.                                                  2: for (Xg , C, S<t ) ∼ D do ▷ Get goals, context, history
+                                                                                         3:     for i = 1, · · · , NG do     ▷ Sample NG rollouts
+ Model                            RMM↑     Kinematic↑   Interactive↑   Map-based↑        4:          τi ← πθ (Xg , C, S<t )
+ TrafficBotsV1.5 [37]             0.7167     0.4304       0.7114         0.8871          5:     end for
+ VBD [13]                         0.7375     0.4169       0.7819         0.8636
+ MVTE [31]                        0.7469     0.4503       0.7706         0.8859          6:     τ ∗ ← arg maxτ ∈{τ }NG RMM(τ ).             ▷ eq. 1
+                                                                                                                           j j=1
+ Trajeglish [22]                  0.7409     0.4166       0.7845         0.8703
+ KiGRAS [42]                      0.7761     0.4691       0.8064         0.9126          7:     X̂g ← τT∗         ▷ Get terminal state of best rollout
+ DRoPE-Traj [41]                  0.7786     0.4779       0.8065         0.9144
+ GUMP [11]                        0.7596     0.4780       0.7887         0.8832          8:     Store (X̂g , C, S<t , S≥t ) in D∗
+ BehaviorGPT [44]                 0.7637     0.4333       0.7997         0.9064          9: end for
+ UniMM [17]                       0.7839     0.4914       0.8089         0.9188
+ TrajTok [38]                     0.7861     0.4887       0.8116         0.9231         10: return D ∗ .
+ SMART-tiny [34]                  0.7755     0.4759       0.8039         0.9102
+ SMART-tiny [34] (ref. model)†    0.7824     0.4854       0.8089         0.9180
+ SMART-tiny CAT-K [39]            0.7856     0.4931       0.8106         0.9205
+ RLFTSim (ours)                   0.7867     0.4927       0.8129         0.9210         Realism Alignment. The objective of performing GCFT is
+                                                                                        to distill simulation controllability while keeping the real-
+                                                                                        istic simulation behavior. The per-rollout reward combines
+where M represents the set of all map polyline points.                                  MLOO with a goal-reaching signal:
+The goal polyline does not change the target goal coor-
+dinate, but provides additional contextual information for                                          RiGCFT = (1 − λ) RMMMLOO
+                                                                                                                        i    + λ Rigoal ,                     (10)
+goal-conditioned control.
+                                                                                        where Rigoal is the mean binary goal-reaching reward over
+Goal Representation. We explore two methods for includ-                                 evaluated agents and λ ∈ [0, 1] balances realism and con-
+ing goal information in the agent’s observation: i) agent to-                           trollability (Appendix B). This combined reward is used
+ken embedding concatenation (cat), which directly appends                               in the same REINFORCE framework as the goal-free case
+continuous goal coordinates to the agent’s state, and ii) posi-                         (§ 4.1).
+tional encoding indication (ind), which extends the relative
+positional encoding between the agent and road tokens with                              5. Experiments
+a binary indicator for the goal polyline. Detailed implemen-
+tations are provided in Appendix A.3.                                                   In this section, first we discuss the experimental setup
+                                                                                        (§ 5.1), then we present the results of our experiments to
+Hindsight Experience Replay. Reaching specific goals
+                                                                                        answer several research questions: RQ1: Is reinforcement
+can be a rare event, leading to sparse rewards. We take in-
+                                                                                        learning-based post-training with the proposed meta-metric
+spiration from Hindsight Experience Replay (HER) to aug-
+                                                                                        Leave-One-Out reward signal effective in enhancing the re-
+ment data samples with new goals that the model is capa-
+                                                                                        alism of simulated traffic rollouts? (§ 5.2) RQ2: Can we
+ble of reaching. Algorithm 1 describes this process for a
+                                                                                        use the self-supervised reconstruction error objective to en-
+given dataset. Specifically, a group of rollouts is generated
+                                                                                        hance the realism of simulated scenarios? (§ 5.3) RQ3: Is
+from the same history prior, S<t . In each step of the roll-
+                                                                                        there an effective approach to condition rollouts on specific
+out, trajectory tokens are selected by performing tempera-
+                                                                                        goals? (§ 5.4) RQ4: Can we distill behavior controllability
+ture sampling over the top 32 trajectory tokens, providing
+                                                                                        into a base simulation model with a proper reward design?
+stochastic rollouts. After generating a group of rollouts, the
+                                                                                        (§ 5.4, Appendix C.3)
+best rollout based on the RMM is selected, and the termi-
+nal states for each agent in this rollout are used as alter-                            5.1. Experimental Setup
+nate goals, X̂g = {x̂jg }j∈G , to augment the dataset. When
+training on these samples, we update the observed states                                We use the Waymo Open Motion Dataset as it provides
+of the rollouts such that the original goal, xig , is replaced                          the standard benchmark for WOSAC evaluation and con-
+                                                                                        tains large-scale real-world driving trajectories necessary
+with the alternative goal, x̂ig , and recompute the policy ra-
+                   πθ (S i |S i ,x̂i ,C)                                                    1 For consistent comparison, we present the results for all models using
+tio, r̂i,t (θ) = πθ (S≥t  <t g
+                      i |S i ,xi ,C) , following the hindsight pol-                     the meta-metric weights of v2025. Since the traffic light violation likeli-
+                        ≥t       <t   g
+icy gradient framework [23]. This improves sample effi-                                 hood was not present in the previous years, we assume this metric is 1 for
+                                                                                        all models.
+ciency by providing intermediary goals in challenging sce-                                  2 The bolding and underlining are done assuming that the private test
+narios where agents may not be able to reach the ground-                                set results have standard error values in a similar range as the validation
+truth goal, and can be used for either soft or hard goals.                              set results in Tab. 2.
+
+
+                                                                                    6
+Table 2. Ablation study on the reward function on the full valida-                                                            Table 3. Effect of goal representation and reward criterion on con-
+tion set. Standard errors are shown in parentheses.                                                                           trollability and realism, evaluated on the full WOMD validation
+                                                                                                                              split. Bold and underline indicate the best and second best values,
+ Reward                            RMM↑           Kinematic↑        Interactive↑      Map-based↑         minADE↓              respectively. Standard errors are shown in parentheses.
+ SMART-tiny [34] (ref. model)   0.7804 (3.2e-4)   0.4904 (5.2e-4)   0.8032 (4.1e-4)   0.9167 (5.6e-4)   1.3016 (4.2e-3)
+ minADERLOO                     0.7801 (3.3e-4)   0.4897 (5.2e-4)   0.8032 (4.1e-4)   0.9161 (5.8e-4)   1.3202 (4.5e-3)
+ RMMRLOO                        0.7821 (3.3e-4)   0.4913 (5.1e-4)   0.8065 (4.2e-4)   0.9169 (6.0e-4)   1.3229 (4.4e-3)        (Goal rep., Goal criterion)      Passing Miss Rate ↓   Kinematic ↑       Interactive ↑     Map-Based ↑         RMM ↑
+ RMMMLOO                        0.7830 (3.3e-4)   0.4924 (5.0e-4)   0.8070 (4.1e-4)   0.9182 (5.7e-4)   1.3150 (4.4e-3)        Goal-Free (RLFTSim)                 16.631 (9.8e-2)    0.4924 (5.0e-4)   0.8070 (4.1e-4)   0.9182 (5.7e-4)   0.7830 (3.3e-4)
+ Col.+Off.+ADE                  0.7803 (3.3e-4)   0.4896 (5.2e-4)   0.8039 (4.1e-4)   0.9162 (5.9e-4)   1.3313 (4.5e-3)
+ Collision+Offroad              0.7786 (3.5e-4)   0.4891 (5.2e-4)   0.8037 (4.2e-4)   0.9117 (6.4e-4)   1.3461 (4.3e-3)        (Concatenation, Soft)               10.473 (6.5e-2)    0.4794 (4.9e-4)   0.8045 (4.1e-4)   0.9134 (6.0e-4)   0.7776 (3.3e-4)
+                                                                                                                               (Concatenation, Hard)               14.978 (9.1e-2)    0.4791 (4.9e-4)   0.8045 (4.1e-4)   0.9129 (6.1e-4)   0.7774 (3.3e-4)
+                                                                                                                               (Indication, Soft)                   9.180 (5.9e-2)    0.4887 (4.9e-4)   0.8068 (4.1e-4)   0.9175 (5.7e-4)   0.7819 (3.2e-4)
+                                                                                                                               (Indication, Hard)                  13.393 (8.2e-2)    0.4916 (5.1e-4)   0.8068 (4.2e-4)   0.9179 (5.8e-4)   0.7827 (3.4e-4)
+
+
+for multi-agent simulation. The SMART-tiny base model
+is trained for 32 epochs on WOMD following [34]. For the                                                                                           10 1
+RLFT step, we use the learning rate 3e-6, target KL diver-                                                                                         10 2
+gence of 0.01 nats, 4 rollouts, and a batch size of 8. For
+the evaluation, the number of rollouts is set to 32 following                                                                                      10 3
+
+
+
+                                                                                                                                 Reward Variance
+the original configuration of the WOSAC’s meta-metric. A                                                                                           10 4
+more detailed discussion of implementation details is given
+                                                                                                                                                   10 5
+in Appendix B.
+                                                                                                                                                   10 6
+5.2. Simulation Realism Benchmarking
+                                                                                                                                                   10 7     Fitted curve for MLOO ( /N²)
+The evaluation results for the simulation challenge are pro-                                                                                                MLOO (Ours)
+                                                                                                                                                   10 8     RLOO
+vided in Tab. 1. We use SMART-tiny as our base model
+                                                                                                                                                          2 4       8               16                                                 32
+[34]. Then, after RL-based fine-tuning for 1 epoch, we                                                                                                                  Number of Simulation Rollouts (N)
+get the SMART-RLFTSim model. Compared to the base
+model, we can see that the realism meta-metric across all di-                                                                 Figure 2. Empirical reward variance of MLOO and RLOO on the
+mensions has improved (bottom row). Our model achieves                                                                        validation set, computed over rollouts per scenario for varying N .
+state-of-the-art performance in realism meta-metric (the pri-                                                                 Shaded regions represent ±1 std. in log space.
+mary metric) and the interactive metric, including over
+SMART-tiny CAT-K [39], another fine-tuning method that
+                                                                                                                              in optimizing their own objectives, they do not lead to an
+also uses SMART-tiny as its base model. RLFTSim in
+                                                                                                                              effective improvement in realism at the near-optimal stage.
+Tab. 1 uses RMMMLOO (§ 4.1) as the reward signal for
+                                                                                                                              A detailed comparison including per-scenario paired t-tests
+goal-free RL fine-tuning.
+                                                                                                                              is provided in Appendix C.2, confirming that RMMMLOO
+5.3. Alternative Reward Signals for Realism En-                                                                               significantly outperforms the other reward formulations.
+     hancement                                                                                                                Empirical Reward Variance Scaling Analysis. We em-
+Here, we study whether using an imitation-based reward                                                                        pirically validate our theoretical findings on the variance
+objective from the pre-training stage is effective for real-                                                                  scaling properties of MLOO and RLOO reward signals by
+ism alignment. We use the minimum Average Distance Er-                                                                        analyzing the reward variance as a function of the number
+ror (minADE) as a measure of how closely the simulated                                                                        of rollouts (N ). Using the pre-trained SMART-tiny model,
+rollouts align with the ground-truth trajectories. Another                                                                    we compute reward statistics for a varying number of roll-
+imitation-based reward objective is the cross-entropy be-                                                                     outs. The results, presented in Fig. 2, show that MLOO not
+tween the predicted trajectories and the ground-truth tra-                                                                    only yields significantly lower reward variance values but
+jectories in token space. However, since tokenization in-                                                                     also exhibits a variance that scales according to 1/N 2 . To
+troduces error, we opt to use the minADE metric with the                                                                      visually confirm this trend, we fit a f (N ) = α/N 2 curve to
+RLOO formulation as the reward signal for this experiment.                                                                    the MLOO variance data. In contrast, the RLOO reward’s
+The results are given in Tab. 2; directly optimizing the meta-                                                                variance does not scale effectively with the number of roll-
+metric via RMMMLOO is more effective for realism align-                                                                       outs, plateauing for larger values of N . This confirms that
+ment than the imitation-based minADE reward. We also                                                                          MLOO provides a more stable and scalable reward signal,
+conduct a post-training experiment with meta-metric as the                                                                    which is crucial for efficient fine-tuning.
+signal and the RLOO formulation. Both the MLOO and
+RLOO reward signals are effective in realism enhancement,
+                                                                                                                              5.4. Goal-Conditioned Controllability
+with MLOO slightly outperforming RLOO. We also exper-                                                                         We train four GCFT variants on the realism-aligned RLFT-
+iment with using heuristic reward functions using two com-                                                                    Sim model (§ 5.2), crossing two goal representations, con-
+binations of collision rate, off-road rate, and minADE val-                                                                   catenation and indication (§ 4.2), with two goal-reaching
+ues following [10]. Although these functions are effective                                                                    criteria, soft and hard. Ground-truth final positions serve as
+
+
+                                                                                                                          7
+         Expert                  SMART-tiny          RLFTSim (Ours)                     SMART-tiny          RLFTSim (Ours)                       RLFTSim (Ours)
+                                                                                                            GCFT (cat, hard)                     GCFT (ind, hard)
+
+
+
+
+                                                                                                                               Closest to goal
+                                                                                                                                  for U-turn
+
+
+
+
+                                                                                (b-1)                     (b-2)                              (b-3)
+
+                                                                                        SMART-tiny          RLFTSim (Ours)                       RLFTSim (Ours)
+                                                                                                            GCFT (cat, hard)                     GCFT (ind, hard)
+
+                                                                                    Fails to reach goal
+
+
+                          Collision & Off-road
+
+                                                                                                                                                 Closest to goal
+                                                                                                                                                     for left turn
+
+
+
+
+         (a-1)                        (a-2)                (a-3)                (b-4)                     (b-5)                              (b-6)
+
+Figure 3. Qualitative Evidence of RLFTSim Effectiveness. (a) Realism Enhancement: Comparison of baseline SMART-tiny (a-2)
+vs. RLFTSim (a-3) on a challenging intersection scenario. The baseline model generates unrealistic off-road behavior (red trajectory) and
+a collision with cross-traffic, while RLFTSim produces realistic lane-following behavior that respects traffic rules. (b) Controllability
+Distillation: Two sets of realistic simulation rollouts of the fine-tuned model are shown for a fixed seed scenario, conditioned on different
+goal points (magenta points): a U-turn goal (top row) and a left-turn goal (bottom row). In GCFT rollouts, the ego vehicle, depicted with
+an orange border, achieves the goal point while maintaining realistic interactions with other agents.
+
+
+goals evaluated via the WOMD miss rate definition [9].                    6. Conclusion
+   As shown in Tab. 3, all GCFT methods improve goal
+passing over the baseline. Indication-based observation                   We present RLFTSim, an RL fine-tuning framework that
+maintains higher realism than concatenation, and the soft                 enhances realism in traffic simulation and enables goal-
+goal reward yields the best passing rates across both obser-              conditioned scenario generation. Our approach leverages
+vation approaches.                                                        the realism meta-metric as a reward signal and introduces
+   In Appendix C.3, we further analyze the controllabil-                  Meta-metric Leave-One-Out to provide low-variance, dense
+ity of the GCFT models by proposing kinematic perturba-                   rewards for sample-efficient training. Evaluated on the
+tion and alternative maneuver benchmarks, where we eval-                  Waymo Open Motion Dataset, RLFTSim achieves state-of-
+uate the ability of models to reach goals different from the              the-art performance across realism metrics while consum-
+ground-truth end states. In these benchmarks, our GCFT                    ing significantly fewer samples due to MLOO’s dense re-
+models outperform the baseline across different driving be-               ward signal compared to supervised and closed-loop fine-
+haviors.                                                                  tuning baselines. We employ Hindsight Experience Re-
+                                                                          play for goal-conditioned controllability distillation, en-
+5.5. Qualitative Analysis                                                 abling flexible scenario generation while maintaining real-
+Fig. 3 demonstrates the effectiveness of both RLFTSim                     ism.
+components. Panel (a) shows a representative failure case
+where the baseline SMART-tiny (a-2) generates unrealistic                 Limitations and Future Work. The use of token-based
+off-road behavior and a collision with cross-traffic, while               representation, which chunks trajectories into half-second
+RLFTSim (a-3) produces realistic lane-following that re-                  segments, potentially reduces responsiveness in highly
+spects traffic rules. Panel (b) illustrates controllability dis-          dynamic traffic scenarios. Goal-conditioned fine-tuning
+tillation: identical initial conditions produce distinct realis-          achieves reasonable but imperfect controllability, with room
+tic behaviors when conditioned on different goals (U-turn                 for improvement in goal-reaching rates. Moreover, RMM
+vs. left-turn), validating that GCFT enables goal-directed                is a proxy for realism, and its saturation may partly reflect
+simulation without compromising realism. These exam-                      inadequacies in the metric itself rather than true conver-
+ples illustrate our quantitative improvements in Tab. 1 and               gence of simulator quality; developing better realism met-
+Tab. 3. Additional qualitative examples are available in Ap-              rics would further benefit RL-based alignment. As a direc-
+pendix C.5, and the corresponding videos are available on                 tion for future work, the MLOO formulation is applicable
+the project page.                                                         to other population-based metrics beyond RMM.
+
+
+                                                                      8
+References                                                                    phony: Learning realistic and diverse agents for autonomous
+                                                                              driving simulation. In ICRA, 2022. 2
+ [1] Ehsan Ahmadi, Soheil Alizadeh, Ray Mercurius, and Amir              [15] Nidhi Kalra and Susan M. Paddock. Driving to safety:
+     Rasouli. Curb your attention: Causal attention gating for                How many miles of driving would it take to demonstrate au-
+     robust trajectory prediction in autonomous driving. In ICRA,             tonomous vehicle reliability? Transportation Research Part
+     2025. 2                                                                  A: Policy and Practice, 94:182–193, 2016. 1
+ [2] Montgomery Alban, Ehsan Ahmadi, Randy Goebel, and                   [16] Wouter Kool, Herke van Hoof, and Max Welling. Buy 4
+     Amir Rasouli. Getting SMARTER for motion planning in                     REINFORCE samples, get a baseline for free! In DeepRL-
+     autonomous driving systems. In IEEE IV, 2025. 1                          StructPred@ICLR, 2019. 3
+ [3] Stefano V. Albrecht, Cillian Brewitt, John Wilhelm, Balint          [17] Longzhong Lin, Xuewu Lin, Kechun Xu, Haojian Lu, Lichao
+     Gyevnar, Francisco Eiras, Mihai Dobre, and Subramanian                   Huang, Rong Xiong, and Yue Wang. Revisit mixture mod-
+     Ramamoorthy. Interpretable goal-based prediction and plan-               els for multi-agent simulation: Experimental study within a
+     ning for autonomous driving. In ICRA, 2021. 3                            unified framework, 2025. arXiv:2501.17015. 2, 6
+ [4] Marcin Andrychowicz, Filip Wolski, Alex Ray, Jonas                  [18] Minghuan Liu, Menghui Zhu, and Weinan Zhang. Goal-
+     Schneider, Rachel Fong, Peter Welinder, Bob McGrew, Josh                 conditioned reinforcement learning: Problems and solutions.
+     Tobin, OpenAI Pieter Abbeel, and Wojciech Zaremba. Hind-                 In IJCAI, 2022. 3
+     sight experience replay. In NeurIPS, 2017. 2                        [19] Yiren Lu, Justin Fu, George Tucker, Xinlei Pan, Eli Bron-
+ [5] Holger Caesar, Juraj Kabzan, Kok Seang Tan, Whye Kit                     stein, Rebecca Roelofs, Benjamin Sapp, Brandyn White,
+     Fong, Eric Wolff, Alex Lang, Luke Fletcher, Oscar Bei-                   Aleksandra Faust, Shimon Whiteson, Dragomir Anguelov,
+     jbom, and Sammy Omari. NuPlan: A closed-loop ML-                         and Sergey Levine. Imitation is not enough: Robustifying
+     based planning benchmark for autonomous vehicles, 2022.                  imitation with reinforcement learning for challenging driv-
+     arXiv:2106.11810. 2                                                      ing scenarios. In IROS, 2023. 2
+ [6] Yulong Cao, Boris Ivanovic, Chaowei Xiao, and Marco                 [20] Nico Montali, John Lambert, Paul Mougin, Alex Kuefler,
+     Pavone. Reinforcement learning with human feedback for                   Nick Rhinehart, Michelle Li, Cole Gulino, Tristan Em-
+     realistic traffic simulation. In ICRA, 2024. 2                           rich, Zoey Yang, Shimon Whiteson, Brandyn White, and
+ [7] Daphne Cornelisse and Eugene Vinitsky. Human-compatible                  Dragomir Anguelov. The Waymo Open Sim Agents Chal-
+     driving agents through data-regularized self-play reinforce-             lenge. In NeurIPS, 2023. 3, 4, 5, 11
+     ment learning. Reinforcement Learning Journal, 1, 2024. 3           [21] Zhenghao Peng, Wenjie Luo, Yiren Lu, Tianyi Shen, Cole
+ [8] Pim de Haan, Dinesh Jayaraman, and Sergey Levine. Causal                 Gulino, Ari Seff, and Justin Fu. Improving agent behaviors
+     confusion in imitation learning. In NeurIPS, 2019. 2                     with RL fine-tuning for autonomous driving. In ECCV, 2024.
+                                                                              4
+ [9] Scott Ettinger, Shuyang Cheng, Benjamin Caine, Chenxi
+                                                                         [22] Jonah Philion, Xue Bin Peng, and Sanja Fidler. Trajeglish:
+     Liu, Hang Zhao, Sabeek Pradhan, Yuning Chai, Ben Sapp,
+                                                                              Traffic modeling as next-token prediction. In ICLR, 2024. 2,
+     Charles Qi, Yin Zhou, Zoey Yang, Aurelien Chouard, Pei
+                                                                              6
+     Sun, Jiquan Ngiam, Vijay Vasudevan, Alexander McCauley,
+                                                                         [23] Paulo Rauber, Avinash Ummadisingu, Filipe Mutz, and
+     Jonathon Shlens, and Dragomir Anguelov. Large scale in-
+                                                                              Jürgen Schmidhuber. Hindsight policy gradients. In ICLR,
+     teractive motion forecasting for autonomous driving : The
+                                                                              2019. 6
+     Waymo open motion dataset. In ICCV, 2021. 2, 3, 8
+                                                                         [24] Stéphane Ross, Geoffrey Gordon, and Drew Bagnell. A re-
+[10] Cole Gulino, Justin Fu, Wenjie Luo, George Tucker, Eli
+                                                                              duction of imitation learning and structured prediction to no-
+     Bronstein, Yiren Lu, Jean Harb, Xinlei Pan, Yan Wang, Xi-
+                                                                              regret online learning. In AISTATS, 2011. 2
+     angyu Chen, et al. Waymax: An accelerated, data-driven
+                                                                         [25] Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao
+     simulator for large-scale autonomous driving research. In
+                                                                              Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, Y. K. Li,
+     NeurIPS, 2023. 1, 7
+                                                                              Y. Wu, and Daya Guo. DeepSeekMath: Pushing the limits
+[11] Yihan Hu, Siqi Chai, Zhening Yang, Jingyu Qian, Kun Li,                  of mathematical reasoning in open language models, 2024.
+     Wenxin Shao, Haichao Zhang, Wei Xu, and Qiang Liu. Solv-                 arXiv:2402.03300. 2
+     ing motion planning tasks with a scalable generative model.         [26] Simon Suo, Sebastian Regalado, Sergio Casas, and Raquel
+     In ECCV, 2024. 2, 6                                                      Urtasun. TrafficSim: Learning to simulate realistic multi-
+[12] Yihan Hu, Siqi Chai, Zhening Yang, Jingyu Qian, Kun Li,                  agent behaviors. In CVPR, 2021. 2
+     Wenxin Shao, Haichao Zhang, Wei Xu, and Qiang Liu. Solv-            [27] Shuhan Tan, Boris Ivanovic, Yuxiao Chen, Boyi Li, Xin-
+     ing motion planning tasks with a scalable generative model.              shuo Weng, Yulong Cao, Philipp Kraehenbuehl, and Marco
+     In ECCV, 2024. 2                                                         Pavone. Promptable closed-loop traffic simulation. In CoRL,
+[13] Zhiyu Huang, Zixu Zhang, Ameya Vaidya, Yuxiao Chen,                      2024. 3
+     Chen Lv, and Jaime Fernández Fisac. Versatile behav-               [28] Yunhao Tang, Daniel Zhaohan Guo, Zeyu Zheng, Daniele
+     ior diffusion for generalized traffic agent simulation, 2024.            Calandriello, Yuan Cao, Eugene Tarassov, Rémi Munos,
+     arXiv:2404.02524. 2, 6                                                   Bernardo Ávila Pires, Michal Valko, Yong Cheng, and Will
+[14] Maximilian Igl, Daewoo Kim, Alex Kuefler, Paul Mougin,                   Dabney. Understanding the performance gap between online
+     Punit Shah, Kyriacos Shiarlis, Dragomir Anguelov, Mark                   and offline alignment algorithms, 2024. arXiv:2405.08448.
+     Palatucci, Brandyn White, and Shimon Whiteson. Sym-                      3
+
+
+                                                                     9
+[29] Thomas Tian and Kratarth Goel. Direct post-training prefer-           [43] Ziyuan Zhong, Davis Rempe, Danfei Xu, Yuxiao Chen,
+     ence alignment for multi-agent motion generation model us-                 Sushant Veer, Tong Che, Baishakhi Ray, and Marco Pavone.
+     ing implicit feedback from pre-training demonstrations. In                 Guided conditional diffusion for controllable traffic simula-
+     ICLR, 2025. 2, 3                                                           tion. In ICRA, 2023. 3
+[30] Martin Treiber, Ansgar Hennecke, and Dirk Helbing. Con-               [44] Zikang Zhou, Haibo Hu, Xinhong Chen, Jianping Wang,
+     gested traffic states in empirical observations and micro-                 Nan Guan, Kui Wu, Yung-Hui Li, Yu-Kai Huang, and
+     scopic simulations. Phys. Rev. E, 2000. 1, 2                               Chun Jason Xue. BehaviorGPT: Smart agent simulation for
+[31] Yu Wang, Tiebiao Zhao, and Fan Yi. Multiverse Trans-                       autonomous driving with next-patch prediction. In NeurIPS,
+     former: 1st place solution for Waymo open sim agents chal-                 2024. 1, 2, 6
+     lenge 2023, 2023. arXiv:2306.11868. 6                                 [45] Daniel M. Ziegler, Nisan Stiennon, Jeffrey Wu, Tom B.
+[32] Yuting Wang, Lu Liu, Maonan Wang, and Xi Xiong.                            Brown, Alec Radford, Dario Amodei, Paul Christiano, and
+     Reinforcement learning from human feedback for lane                        Geoffrey Irving. Fine-tuning language models from human
+     changing of autonomous vehicles in mixed traffic, 2024.                    preferences, 2019. arXiv:1909.08593. 15
+     arXiv:2408.04447. 2
+[33] Benjamin Wilson, William Qi, Tanmay Agarwal, John Lam-
+     bert, Jagjeet Singh, Siddhesh Khandelwal, Bowen Pan, Rat-
+     nesh Kumar, Andrew Hartnett, Jhony Kaesemodel Pontes,
+     Deva Ramanan, Peter Carr, and James Hays. Argoverse 2:
+     Next generation datasets for self-driving perception and fore-
+     casting. In NeurIPS Datasets and Benchmarks, 2021. 3
+[34] Wei Wu, Xiaoxin Feng, Ziyan Gao, and Yuheng KAN.
+     SMART: Scalable multi-agent real-time motion generation
+     via next-token prediction. In NeurIPS, 2024. 1, 2, 6, 7, 15,
+     16, 17
+[35] Danfei Xu, Yuxiao Chen, Boris Ivanovic, and Marco Pavone.
+     BITS: Bi-level imitation for traffic simulation. In ICRA,
+     2023. 3
+[36] Zhejun Zhang, Alexander Liniger, Dengxin Dai, Fisher Yu,
+     and Luc Van Gool. TrafficBots: Towards world models for
+     autonomous driving simulation and motion prediction. In
+     ICRA, 2023. 3
+[37] Zhejun Zhang, Christos Sakaridis, and Luc Van Gool.
+     TrafficBots V1.5: Traffic simulation via conditional VAEs
+     and transformers with relative pose encoding, 2024.
+     arXiv:2406.10898. 6, 18
+[38] Zhiyuan Zhang, Xiaosong Jia, Guanyu Chen, Qifeng Li, and
+     Junchi Yan. TrajTok: Technical report for 2025 Waymo open
+     sim agents challenge, 2025. arXiv:2506.21618. 2, 6
+[39] Zhejun Zhang, Peter Karkus, Maximilian Igl, Wenhao Ding,
+     Yuxiao Chen, Boris Ivanovic, and Marco Pavone. Closed-
+     loop supervised fine-tuning of tokenized traffic models. In
+     CVPR, 2025. 2, 6, 7, 15
+[40] Hang Zhao, Jiyang Gao, Tian Lan, Chen Sun, Ben Sapp,
+     Balakrishnan Varadarajan, Yue Shen, Yi Shen, Yuning Chai,
+     Cordelia Schmid, Congcong Li, and Dragomir Anguelov.
+     TNT: Target-driven trajectory prediction. In CoRL, 2020.
+     3
+[41] Jianbo Zhao, Taiyu Ban, Zhihao Liu, Hangning Zhou,
+     Xiyang Wang, Qibin Zhou, Hailong Qin, Mu Yang, Lei
+     Liu, and Bin Li. DRoPE: Directional rotary position
+     embedding for efficient agent interaction modeling, 2025.
+     arXiv:2503.15029. 6
+[42] Jianbo Zhao, Jiaheng Zhuang, Qibin Zhou, Taiyu Ban, Ziyao
+     Xu, Hangning Zhou, Junhe Wang, Guoan Wang, Zhiheng Li,
+     and Bin Li. KiGRAS: Kinematic-driven generative model
+     for realistic agent simulation. IEEE Robotics and Automa-
+     tion Letters, 2025. 2, 6
+
+
+                                                                      10
+      RLFTSim: Realistic and Controllable Multi-Agent Traffic Simulation via
+                     Reinforcement Learning Fine-Tuning
+                                                       Supplementary Material
+A. Methodological Details                                                      valid time steps}. Larger values of RMM indicate that the
+                                                                               simulator’s distribution of kinematic, interactive, and map-
+A.1. Detailed RMM Formulation                                                  based features more closely aligns with real-world behavior.
+We provide the complete derivation of the WOSAC’s Real-
+ism Meta-Metric (RMM) [20] that was summarized in § 3.
+                                                                               A.2. Proofs and Mathematical Derivations
+   To compute the WOSAC meta-metric, let {τi }N        i=1 be                  Proof of Proposition 1. Starting from the definition of g,
+N = 32 simulator rollouts sharing the same history and                                     N
+                                                                                                "
+map context, each of length T time steps, and let τ ∗ de-
+                                                                                          X
+                                                                                  E[g] =     E ∇θ log πθ (τi )
+note the corresponding ground-truth trajectory. For each                                     i=1
+rollout τi and each timestep t ∈ {1, . . . , T }, we extract a                                     
+                                                                                                    N
+                                                                                                                     #                  (S5)
+D-dimensional feature vector:                                                                    1 X
+                                                                                              ×       RMM−j − RMM−i  .
+                                                                                                 N j=1
+                (i)      (i)    (i)            (i) 
+               ft     = f1,t , f2,t , . . . , fD,t ,               (S1)
+                                                                               Expanding the two terms gives
+whose components include:                                                                       " N                    !      #
+• Kinematic features: linear/angular speed and accelera-                                    N
+                                                                                        1 X         X
+  tion                                                                          E[g] =         E        ∇θ log πθ (τi ) RMM−j
+                                                                                       N j=1        i=1
+• Interactive features: closest distance to other agents,                                                                                (S6)
+  time-to-collision (TTC), and accident indication                                           N
+                                                                                             X
+• Map-based features: distance to road boundary, off-road                                −         E[∇θ log πθ (τi ) RMM−i ] .
+  indication, and traffic light violation                                                    i=1
+
+   We compute the same per-timestep features ft∗ for the                       Step 1: The leave-one-out subtraction term has zero ex-
+ground-truth trajectory. Each feature dimension d is dis-                      pectation. Fix any i ∈ {1, . . . , N }. Since RMM−i is com-
+cretized into bins {Bd,a,k }Kk=1 , where a is the agent index,                 puted from τ−i , it depends only on the rollout set excluding
+and K = 20 is the number of bins.                                              τi . Because the rollouts are sampled i.i.d., τi is independent
+   Given the seed scenario and its group of simulated roll-                    of τ−i . Therefore, by the tower property,
+outs, we first form time-dependent empirical distributions:
+                                                                                    E[∇θ log πθ (τi ) RMM−i ] =
+                           N
+                                                                                                                                         (S7)
+                        1 X  (i)                                                              Eτ−i [RMM−i Eτi [∇θ log πθ (τi )]] .
+          P̂d,a,t (k) =       1 fd,a,t ∈ Bd,a,k ,                  (S2)
+                        N i=1                                                  Using the score-function identity
+                                                                                                            Z
+where 1{·} is the indicator function.                                           Eτi ∼πθ [∇θ log πθ (τi )] = πθ (τi )∇θ log πθ (τi ) dτi
+   Then, we marginalize time to obtain a time-                                                                Z                         (S8)
+independent histogram:                                                                                    = ∇θ πθ (τi ) dτi = 0,
+                                   T
+                               1X                                              we obtain
+                P̂d,a (k) =          P̂d,a,t (k).                  (S3)
+                               T t=1
+                                                                                               E[∇θ log πθ (τi ) RMM−i ] = 0.            (S9)
+                     ∗                    ∗
+   Finally, letting fd,a,t fall into bin kd,a,t when observed                  Since this holds for every i,
+on the ground truth, the WOSAC realism meta-metric is de-
+                                                                                             N
+fined as a weighted sum of per-dimension geometric means:                                    X
+                                                                                                   E[∇θ log πθ (τi ) RMM−i ] = 0.       (S10)
+                                                     |V1 |                                 i=1
+              D
+                                                                               Hence,
+              X              Y
+                                              ∗
+    RMM =             wd             P̂d,a (kd,a,ta
+                                                     )        ,   (S4)
+                                                                                           N
+                                                                                               " N                  !     #
+              d=1         (a,ta )∈V
+                                                                                        1 X      X
+                                                                                 E[g] =       E      ∇θ log πθ (τi ) RMM−j .
+where each weight wd ≥ 0 reflects the relative importance                               N j=1    i=1
+of feature d, and V = {(a, ta ); a ∈ eval. agents, ta ∈                                                                                 (S11)
+
+                                                                          11
+Step 2: Apply the score-function identity to the joint dis-         This estimator directly measures the empirical frequency of
+tribution. Because
+               QN the joint rollout distribution factorizes         simulator features in bin k.
+as πθ (τ1:N ) = i=1 πθ (τi ), we have                               Step 2: Unbiasedness. Since samples are drawn from the
+        N
+                                                                    simulator distribution q, we have EXℓ ∼q [1{Xℓ = k}] = qk .
+        X                                                           By linearity of expectation,
+              ∇θ log πθ (τi ) = ∇θ log πθ (τ1:N ).    (S12)
+        i=1                                                                          S
+                                                                            h i    1X
+Therefore,                                                            EXℓ ∼q Pek =     EXℓ ∼q [1{Xℓ = k}] = qk . (S18)
+                                                                                   S
+                                                                                           ℓ=1
+                 N
+          1 X
+   E[g] =       E[∇θ log πθ (τ1:N ) RMM−j ] .         (S13)         Step 3: Variance and covariance of the estimator. Since
+          N j=1
+                                                                    samples are independent and drawn from a multinomial dis-
+                                                                    tribution with parameters (S, q1 , . . . , qK ), the variance is:
+Now fix j. Writing ∇θ log πθ (τ1:N ) = ∇θ log πθ (τj ) +
+∇θ log πθ (τ−j ), the τj component contributes zero by                                      1
+the same argument as Step 1 (independence of τj and                       VarXℓ ∼q [Pek ] = · VarXℓ ∼q [1{Xℓ = k}]                     (S19)
+                                                                                            S
+RMM−j ).       The remaining score ∇θ log πθ (τ−j ) and                                     1
+RMM−j both depend only on τ−j , so the score-function                                     = qk (1 − qk )                               (S20)
+                                                                                            S
+identity on the marginal πθ (τ−j ) gives                                                    qk (1 − qk )
+                                                                                          =              .                             (S21)
+ E[∇θ log πθ (τ1:N ) RMM−j ] = ∇θ E[RMM−j ].          (S14)                                      S
+
+Substituting this into the previous display yields                    For the covariance structure, consider i ̸= j:
+                                                                                          "   S                  S
+                                                                                                                            #
+                             N                                                              1               1
+                       1 X
+                                                                                              X                 X
+               E[g] =        ∇θ E[RMM−j ]                           Cov[Pei , Pej ] = Cov       1{Xℓ = i},         1{Xℓ = j}
+                       N j=1                                                                S               S
+                                                                                               ℓ=1                       ℓ=1
+                                                    (S15)                                                                            (S22)
+                                N
+                             1 X
+                                                                                   1
+                     = ∇θ E       RMM−j  .                                     =   Cov[1{X = i}, 1{X = j}]                           (S23)
+                             N j=1                                                 S
+                                                                                   1
+Step 3: Relate the objective to expected RMM on N − 1                            = E[1{X = i}1{X = j}]
+                                                                                   S
+rollouts. By exchangeability, each RMM−j has the same                                1
+distribution as the meta-metric computed on N − 1 i.i.d.                           − E[1{X = i}]E[1{X = j}]                            (S24)
+                                                                                     S
+rollouts. Hence,                                                                         1
+                                                                                 = 0 − qi qj                                           (S25)
+       
+             N
+                                                                                       S
+          1 X                                                                        qi qj
+     E         RMM−j  = E[RMM(τ1:N −1 )] .     (S16)                           =−                                                    (S26)
+         N j=1                                                                        S
+                                                                    where Eq. S25 uses 1{X = i}1{X = j} = 0 for i ̸= j.
+This proves the claim.
+                                                                    Step 4: Variance inflation and effective sample size. The
+                                                                    variance of each bin estimator depends on how the simula-
+                 PD 2. The full RMM Eq. 1 is a finite
+Proof of Proposition
+weighted sum        d=1 wd RMMd over D feature dimen-
+                                                                    tor distribution q matches the ground truth frequencies α.
+                                                                                                               PK α2
+sions. We first establish the O((Neff · T )−1 ) bound for           Define the variance inflation factor κ = k=1 qkk , which
+                                          QK
+each per-feature component RMMd = k=1 Pekαk , written               measures the mismatch between ground truth frequencies α
+as RMM for brevity, then lift to the aggregate (Step 6). We         and simulator distribution q. Here we can derive the follow-
+proceed in six steps.                                               ing bounds on κ:
+Step 1: Direct multinomial sampling estimator. Fix fea-                Lower bound:        By Cauchy-Schwarz     inequality with
+ture d and drop subscripts for clarity. Let S = N T be the
+                                                                                                             √            √
+                                                                    vectors u = √αq11 , . . . , √αqKK and v = ( q1 , . . . , qK ):
+total sample size from N rollouts of length T . The simula-
+tor generates S independent feature observations {Xℓ }Sℓ=1               K
+                                                                                          !2         K
+                                                                                                                !   K
+                                                                                                                               !
+directly from the simulator distribution q, where each Xℓ
+                                                                         X αk √                      X α2   k
+                                                                                                                    X
+                                                                           √ · qk              ≤                          qk       .   (S27)
+falls in bin k with probability qk . The empirical histogram                qk                             qk
+                                                                         k=1                         k=1            k=1
+estimator is
+                                                                               PK           PK
+                              S                                        Since    k=1 αk =         k=1 qk = 1, we get:
+                             1X
+                     Pek =             1{Xℓ = k}.     (S17)
+                             S
+                                 ℓ=1
+                                                                                      12 ≤ κ · 1      ⇒         κ ≥ 1.                 (S28)
+
+
+                                                               12
+                                                                                                                        !2         
+   Equality holds when αk = qk for all k (perfect simula-                                              K
+                                                                                                   1  X 2 1 − qk  X
+                                                                                                                     K         K
+                                                                                                                               X
+tor). When the simulator is biased, κ > 1.                                                       =       αk      −     αk    −   αk2 
+                                                                                                   S         qk
+   Upper bound: Since αk ≤ 1 and qk > 0 for all k in the                                                   k=1                      k=1            k=1
+support, we have:                                                                                                                                        (S38)
+                                                                                                      "K                             K
+                                                                                                                                              !#
+                                  K                                                                  1 X      1 − qk                 X
+                                  X α2    k                 1                                    =               αk2  − 1−      αk2                      (S39)
+                         κ=                   ≤                     .          (S29)                 S          qk
+                                        qk        mink:qk >0 qk                                        k=1                  k=1
+                                  k=1                                                                "K                        #
+                                                                                                                        
+                                                                                                   1 X 2 1 − qk
+   The effective sample size is defined as Neff = N                                              =         αk          +1 −1                             (S40)
+                                                  κ , giving                                       S               qk
+us the bounds:                                                                                         k=1
+                                                                                                     "K            #
+                                                                                                   1 X αk2
+                             N · min qk ≤ Neff ≤ N.                            (S30)             =             −1                                        (S41)
+                                   k:qk >0                                                         S       qk
+                                                                                                       k=1
+                                                                                                                                  
+Step 5: Meta-metric                                                                                κ−1          κ           1
+               QK variance. The meta-metric has the                                              =       =O            =O            .                   (S42)
+form RMM = k=1 Pekαk where αk are fixed ground truth                                                 S          NT          Neff T
+               PK
+frequencies and k=1 αk = 1. Taking logarithms:
+                                                                                            Finally, applying the delta method to RMM                       =
+                                                 K
+                                                 X                                          exp(log(RMM)):
+                        log(RMM) =                       αk log(Pek ).         (S31)
+                                                                                                     Var[RMM] ≈ (RMM)2 · Var[log(RMM)]
+                                                 k=1                                                                      
+                                                                                                                      1
+   By the first-order delta method, since Var[log(Pek )] ≈                                                    =O             .                           (S43)
+                                                                                                                    Neff T
+ Var[P
+     ek ]                                           Cov[P
+                                                        ei ,P
+                                                            ej ]
+        = Var[2Pk ] and Cov[log(Pei ), log(Pej )] ≈
+                e
+                                                                 ,
+(E[Pek ])2              qk                                                   qi qj          Step 6: Lifting to the aggregate. Each per-feature com-
+we have:                                                                                    ponent satisfies Var(RMMd ) = O((Neff,d · T )−1 ) where
+                                                  "K
+                                                   X
+                                                                         #                  Neff,d
+                                                                                                P= N/κd . By the sub-additivity of standard deviation
+       Var[log(RMM)] = Var                                 αk log(Pek )        (S32)        and d wd = 1,
+                                                   k=1                                             P                   P      2
+                     K                                                                         Var( d wd RMMd ) ≤ ( d wd ) max Var(RMMd )
+                     X                                                                                                                    d
+                 =           αk2 Var[log(Pek )]                                                                              = max Var(RMMd )
+                     k=1                                                                                                        d
+                                                                                                                                         
+                                                                                                                                     1
+                         X
+                     +            αi αj Cov[log(Pei ), log(Pej )]              (S33)                                         =O             ,            (S44)
+                           i̸=j                                                                                                   N̂eff T
+                     K
+                     X             Var[Pek ]                                                where N̂eff = N/ maxd κd . The bounds from Step 4
+                 =           αk2
+                                     qk2                                                    give 1 ≤ κd ≤ 1/ min qk,d for each d, so maxd κd ≤
+                     k=1                                                                                                  k:
+                                                                                                                       qk,d >0
+                         X              Cov[Pei , Pej ]                                                                                  
+                     +            αi αj                 .                      (S34)        1/ min qk,d and hence N̂eff ∈ N · min qk,d , N .
+                                           qi qj                                               k,d:                                    k,d:
+                           i̸=j                                                               qk,d >0                                 qk,d >0
+
+   Substituting the variance and covariance formulas from                                   Proof of Proposition 3. We establish the variance bounds
+Step 3:                                                                                     for both estimators using approximations suitable for the
+                                                                                            leave-one-out setting.
+                                    K
+                                    X           qk (1 − qk )/S                              Step 1: Variance of MLOO. From Proposition 2, each
+ Var[log(RMM)] =                          αk2                                               RMM−i has variance Var(RMM−i ) = O(1/((N − 1)T )).
+                                                      qk2
+                                    k=1
+                                                                                               The MLOO estimator can be written as:
+                 X             −qi qj /S
+             +           αi αj                                                 (S35)                                     N
+                                qi qj                                                                              1 X
+                 i̸=j                                                                          RMMMLOO
+                                                                                                  i    =                 RMM−j − RMM−i                   (S45)
+             K
+                                                                                                                   N j=1
+             X             1 − qk X       1
+       =             αk2         −  αi αj                                      (S36)                1 X        1
+                            Sqk           S                                                     =       RMM−j + RMM−i − RMM−i                            (S46)
+             k=1                          i̸=j                                                      N          N
+                                                                                                       j̸=i
+                      K
+             1  X 2 1 − qk X                                                                       1 X         N −1
+       =          αk       −  αi αj                                           (S37)            =       RMM−j −      RMM−i .                             (S47)
+             S         qk                                                                           N            N
+                     k=1                          i̸=j                                                   j̸=i
+
+
+                                                                                       13
+                                                                     D
+   Since the leave-one-out estimates are correlated (they            T for some constant D > 0. Because rollouts are i.i.d., the
+share N − 2 common rollouts), we need to account for co-             RMMi are independent, hence:
+variances. Let σ 2 = Var(RMM−i ) = (NC−1)T var
+                                                for some                                                                            
+constant Cvar > 0. For i ̸= j, we approximate the covari-                                                         1    X
+ance between RMM−i and RMM−j as proportional to the                    Var(RMMRLOO
+                                                                              i    ) = Var RMMi −                            RMMj 
+                                                                                                                N −1
+fraction of shared rollouts:                                                                                           j̸=i
+                                                                                                                                  (S57)
+                              N −2 2
+  Cov(RMM−i , RMM−j ) ≈            ·σ                                                                                        
+                              N −1                                                                      1 X
+                              N −2    Cvar                                 = Var(RMMi ) + Var                  RMMj  (S58)
+                            =      ·         . (S48)                                                  N −1
+                                                                                                           j̸=i
+                              N − 1 (N − 1)T                                                                   
+  Therefore:                                                                           1             X
+                                                                           = τ2 +             2
+                                                                                                Var     RMMj         (S59)
+                                                                                    (N − 1)
+ Var(RMMMLOO i       )                                                                                   j̸=i
+                                                                                      1
+                                               
+            1   X              N  −    1                                   = τ2 +          · (N − 1)τ 2                           (S60)
+ = Var               RMM−j −            RMM−i         (S49)                     (N − 1)2
+           N                      N
+                j̸=i                                                                τ2
+                                                                           = τ2 +                                                 (S61)
+                                                                                  N −1
+                            
+     1           X                (N − 1)2
+ = 2 Var              RMM−j  +              Var(RMM−i )                     Nτ2
+    N                                   N2                                 =                                                      (S62)
+                 j̸=i                                                        N −1
+                                                                                ND
+                                                
+           N −1                    X                                       =           .                                          (S63)
+    −2·             Cov RMM−i ,         RMM−j         (S50)                (N − 1)T
+            N2
+                                    j̸=i
+                                                                     Since NN−1 is bounded (specifically, 1 < NN−1 ≤ 2 for
+     1                                        N −2 2
+ = 2 (N − 1)σ 2 + (N − 1)(N − 2) ·                   σ               N ≥ 2), we have:
+    N                                         N −1
+                  2
+                                                                                                         
+       (N − 1) 2           N −1                 N −2 2                                      RLOO           1
+    +               σ −2·          · (N − 1) ·         σ                          Var(RMMi       )=O           .
+           N2                N2                 N −1                                                       T
+                                                        (S51)
+     1                                                              A.3. Goal Conditioning Architectures
+ = 2 (N − 1) + (N − 1)(N − 2)2 /(N − 1) σ 2
+                                                    
+    N                                                                Here we provide further implementation details on the goal
+       (N − 1)2 2          (N − 1)(N − 2) 2                          conditioning methods discussed in § 4.2.
+    +         2
+                    σ −2·                     σ         (S52)
+           N                      N2                                 Agent Token Embedding Concatenation. An intuitive
+     1 
+ = 2 (N − 1) + (N − 2)2 σ 2                                          method of including goal information in the observation
+                                
+    N                                                                is to directly include the goal coordinate, xig , or the rela-
+       (N − 1)2 2          (N − 1)(N − 2) 2                          tive goal position, rig = (rgi , ϕig ), in the observed state for
+    +               σ −2·                     σ         (S53)
+           N2                     N2                                 each agent, St = {Sti′ ||xig | i ≤ Na , t′ ≤ t}, where || de-
+       2 
+     σ                                                               notes concatenation. However, since the domain of goals
+ = 2 N − 1 + (N − 2)2 + (N − 1)2
+    N                                                                is expansive, it can be difficult for a model to learn an ap-
+    −2(N − 1)(N − 2)]                                   (S54)        propriate feature vector. This is because goal coordinates
+     σ 2                                                            are continuous, and the concatenation process further in-
+ = 2 N − 1 + ((N − 2) − (N − 1))2
+                                             
+                                                        (S55)        creases the dimensionality of the embedding vector, which
+    N
+     σ2                   N σ2     σ2          Cvar                  increases the fine-tuning iterations required to generalize.
+ = 2 [N − 1 + 1] =             =         =              .
+    N                     N2        N      N (N − 1)T                Positional Encoding Indication. Instead of including goal
+                                                        (S56)        coordinates in the input of the agent token embedding en-
+                                                                     coder, an alternative method is to extend the relative posi-
+Step 2: Variance of RLOO. The RLOO estimator is:                     tional encoding (RPE) to include a binary categorical em-
+                              1 X                                    bedding that indicates whether the relationship between
+       RMMRLOO
+             i    = RMMi −           RMMj .
+                            N −1                                     agent i and road token j is a goal relationship, which oc-
+                                         j̸=i
+                                                                     curs when j = Pgi . Although this also requires introducing
+   Since RMMi evaluates the meta-metric on a single roll-            new parameters similar to extending the agent token embed-
+out (N =1, S=T ), Proposition 2 gives τ 2 = Var(RMMi ) =             dings, since the input domain is binary, arguably it is easier
+
+
+                                                                14
+Table S1. Hyperparameter sweep ranges explored for RLFTSim.            Table S2. Extended Benchmarking. Top: Performance scaling
+Final values are highlighted in bold.                                  comparison of our RLFTSim vs. CAT-K [39] with the number
+                                                                       of fine-tuning epochs. † indicates a weaker reference model with
+      Hyperparameter                    Values swept                   only 1 epoch of pre-training. Middle: Stronger realism enhance-
+      Learning rate                  1e-6, 3e-6, 1e-5, 3e-5            ment with a weaker reference model. Bottom: Max realism meta-
+      Adam β1                               0.9, 0.95                  metric for the ground truth trajectories.
+      Warmup steps                          100, 500
+      Entropy bonus                         0.0, 0.01                   Model                           Epoch   RMM↑      Kinematic↑   Interactive↑   Map-based↑
+
+      Training rollouts per update          2, 4, 6, 8                  SMART-tiny [34] (ref. model)    0.00    0.77692    0.48329      0.80288        0.91135
+                                                                                                        0.25    0.78137    0.49008      0.80807        0.91348
+      Weight decay                          0.0, 0.01                   SMART-tiny RLFTSim (Ours)
+                                                                                                        0.50    0.78183    0.48953      0.80922        0.91364
+                                                                                                        1.00    0.78166    0.49001      0.80897        0.91321
+      Batch size                             8,16,32                                                    1.50    0.78113    0.48926      0.80873        0.91242
+      Gradient clipping                        1.0                                                      0.25    0.78093    0.49107      0.80435        0.91644
+                                                                                                        0.50    0.78101    0.49093      0.80492        0.91603
+      KL controller: horizon                    5                       SMART-tiny CAT-K [39]           1.00    0.78091    0.49124      0.80499        0.91547
+      KL controller: min                      1e-3                                                      2.00    0.78086    0.49087      0.80498        0.91556
+                                                                                                        5.00    0.77983    0.48991      0.80534        0.91270
+      KL controller: max                      1e+3                      †SMART-tiny [34] (ref. model)   0.00    0.75073    0.46441      0.76797        0.89220
+      KL controller: target                0.005,0.01                                                   0.50    0.76368    0.46924      0.78618        0.90301
+                                                                        †SMART-tiny RLFTSim (Ours)      1.00    0.76360    0.46851      0.79099        0.89701
+      Sync. ref. model: steps                  500                                                      1.50    0.76421    0.46721      0.79045        0.90018
+      Sync. ref. model: alpha                 0.005                     Oracle                          NA      0.82925    0.54976      0.85227        0.95935
+      GCFT goal reward weight λ             0.1, 0.5
+
+                                                                       of type vehicle, pedestrian, and cyclist. Each scenario has
+for a model to learn during the fine-tuning stage. Further-            a length of 9.1 seconds, consisting of 1.1 seconds for the
+more, given that goal indication is binary and tied to individ-        history input length and 8 seconds for the future simulation
+ual polylines, an agent can be unconditioned by providing              horizon.
+no goal indication for any polyline. This allows the simu-
+lation for that agent to solely focus on maintaining realism.          Evaluation Protocol. The results in Tab. 1 are based on the
+Thus, this method enables a hybrid style simulation where              private test split of the WOSAC leaderboard. Unless oth-
+some agents can be conditioned on particular goals while               erwise specified, all ablation studies and analysis are con-
+others remain unconditioned.                                           ducted on a randomly selected 20% subset of the WOMD
+                                                                       validation split (8,800 scenarios). For realism evaluation,
+B. Implementation Details                                              we generate 32 rollouts per scenario following the WOSAC
+                                                                       protocol3 . The agents that only appear in future time steps
+Model Training. We train SMART-tiny models on the                      are excluded from the simulation and evaluation. The eval-
+Waymo Open Motion Dataset for 32 epochs following the                  uation metrics by default are only based on the specified
+implementation and hyperparameters in [34]. For the base               evaluation agent IDs (the ego vehicle and up to 8 agents
+model training, we use standard supervised learning with               tagged as tracks to predict in the WOMD). Although the
+cross-entropy loss for next-token prediction. For the RLFT             other agents are not evaluated, they are included in the sim-
+post-training stage, we use the configuration in Tab. S1.              ulation and indirectly affect the evaluation metrics for the
+We use the adaptive KL controller from [45] to control                 selected agents.
+the KL divergence between the model’s output distribution              GCFT Reward Design. For both soft and hard goals, we
+and the pre-trained model’s output distribution, and sus-              assign a binary reward to each agent, indicating whether the
+tain model training stability; its hyperparameters are set as          agent successfully passes (soft target) or reaches (hard tar-
+in Tab. S1. For the GCFT post-training stage, the hyper-               get) its designated goal. The final goal-reaching reward for
+parameter configuration is kept the same; however, to en-              a scenario is computed by averaging this binary signal over
+sure that realism is maintained while improving controlla-             the ego agent and all agents labeled as tracks to predict.
+bility, we use a reward weight of λ=0.1 (Eq. 10). More
+aggressive goal conditioning can be achieved with higher               C. Additional Experimental Results
+lambda values. Experiments for both the base model pre-
+training and fine-tuning are conducted on a server with Intel          C.1. Extended Realism Benchmarking
+Xeon Platinum 8180 CPU @2.50GHz, 728GB RAM, and                        In Tab. S2, we provide a more detailed analysis of RLFT-
+8x NVIDIA V100 GPUs each with 32GB GPU memory.                         Sim’s fine-tuning performance. The results show that
+Dataset. We use the Waymo Open Motion Dataset for train-               RLFTSim achieves a higher peak RMM score (0.7818)
+ing and evaluation. WOMD has 486,995/44,097/44,920                     compared to our re-trained SMART-tiny CAT-K model
+scenarios in the training/validation/test splits, respectively.          3 More details can be found in https://waymo.com/open/
+
+Each scenario contains up to 128 agents, including agents              challenges/2025/sim-agents/
+
+
+                                                                  15
+Table S3. Heuristic rewards for the realism meta-metric. All                                               Table S4. Paired t-test on per-scenario RMM scores from the
+metrics are evaluated on the ego vehicle and agents tagged as                                              full validation set (Tab. 2) at significance threshold α = 10−3 .
+tracks to predict (up to 9 agents). (↑) indicates that larger                                               + / − indicates row is significantly better/worse than column;
+values are better, and (↓) indicates smaller values are better.                                            ∼ indicates no significant difference.
+Miss rate is computed with the passing goal criterion. Bold and
+underline indicate the best and second best values, respectively.                                                                                           DE                                  +O
+                                                                                                                                                                                                      d
+                                                                                                                                                                                      O            ffr
+                                                                                                                                      O        OO      Of             od     nA                        oa
+                                                                                                                                     LO                  f.+            el      DE R
+                                RMM ↑    Collision (%) ↓   Offroad (%) ↓   ADE (m) ↓   minADE (m) ↓                                        M RL              A                            Co
+ Reward                                                                                                                          MM                              f. m               LO      llis
+                                                                                                                                                    Co                                          ion
+ SMART-tiny [34] (ref. model)   0.7769        5.67            15.14          2.59          1.30                                 RM        RM          l.+        Re          mi
+ RMMMLOO                        0.7818        4.53            14.71          2.55          1.31
+ Collision-offroad-ADE          0.7788        4.93            14.73          2.39          1.32             RMMMLOO                        +            +         +               +             +
+ Collision-offroad              0.7769        4.51            13.95          2.62          1.36
+                                                                                                            RMMRLOO              −                      +         +               +             +
+                                                                                                            Col.+Off.+ADE        −         −                      ∼               +             +
+                                                                                                            Ref. model           −         −            ∼                         +             +
+                                                                                                            minADERLOO           −         −            −         −                             +
+(0.7810) using their public implementation on the same ref-                                                 Collision+Offroad    −         −            −         −               −
+
+erence model. While the margin of improvement over the
+strong baseline may seem modest, it is important to con-
+textualize this within the performance ceiling. The base                                                   capture the distribution of realistic behaviors measured by
+SMART-tiny model already achieves an RMM of 0.7769,                                                        RMM. These results validate our design choice of using
+which is approaching the oracle score of 0.8293, defined                                                   MLOO as the primary reward signal, as it optimizes the of-
+as the RMM computed when ground-truth trajectories are                                                     ficial benchmark metric (RMM) while maintaining reason-
+used as rollouts. As a model’s performance nears this up-                                                  able performance across all other metrics, including colli-
+per bound, further gains become increasingly challenging                                                   sion rates, offroad rates, and trajectory errors.
+to achieve. We observe that both RLFTSim and the re-                                                           While Tab. 2 reports standard errors of the mean RMM,
+trained CAT-K baseline reach their peak RMM within the                                                     these marginal intervals do not account for the paired struc-
+first epoch of fine-tuning, after which performance plateaus.                                              ture of the evaluation: all methods are assessed on the same
+    The effectiveness of RLFTSim is more prominently il-                                                   scenarios. A two-sided paired t-test on per-scenario RMM
+lustrated when applied to a weaker starting model, as a                                                    differences across N =44,097 validation scenarios is there-
+diagnostic experiment. As shown in the middle section                                                      fore more powerful, as it removes inter-scenario variance.
+of Tab. S2, when fine-tuning a less-optimized SMART-                                                       Tab. S4 reports the resulting pairwise outcomes. RMMMLOO
+tiny model (†SMART-tiny), which is only pre-trained for                                                    significantly outperforms all other reward formulations.
+1 epoch, with a starting RMM of 0.7507, RLFTSim deliv-
+ers a substantial performance boost, increasing the RMM to                                                 C.3. Extended Controllability Analysis
+0.7642 (+1.8%). This demonstrates our method’s capability
+to enhance the realism of the base model, while the margin                                                 Here we provide more analysis on the controllability bench-
+of improvement is dependent on the starting performance of                                                 marking discussed in § 5.4 and present detailed results. A
+the base model.                                                                                            key motivation for a controllable simulator is the ability to
+                                                                                                           provide externally supplied behaviors to individual agents,
+C.2. Heuristic Rewards                                                                                     especially those diverging from the agent’s original trajec-
+                                                                                                           tory. To probe this capability, we introduce two benchmarks
+Tab. S3 presents a comprehensive comparison of different                                                   that assess how effectively a simulation can be conditioned
+reward formulations for RL-based traffic simulation align-                                                 on novel, goal-directed behaviors.
+ment. The results demonstrate the effectiveness of our
+proposed RMMMLOO reward signal compared to heuristic                                                       Kinematic Controllability. This benchmark tests the
+alternatives. While the collision-offroad reward achieves                                                  ego’s ability to reach goal coordinates displaced in time
+the lowest collision (4.51%) and offroad (13.95%) rates,                                                   from its ground-truth endpoint by a signed horizon H ∈
+it sacrifices overall realism, as evidenced by its lower                                                   {−3, . . . , +3} seconds (Fig. S1d). For H < 0, the goal
+RMM score (0.7769), which is tied with the base model.                                                     is the ground-truth position at time T + H; for H > 0, it
+In contrast, RMMMLOO achieves the best RMM (0.7818),                                                       is obtained by propagating the ground-truth kinematic state
+demonstrating superior alignment with realistic driving                                                    at T with a constant-velocity bicycle model for H seconds.
+behaviors while maintaining competitive safety metrics.                                                    H = 0 is the unperturbed ground-truth goal.
+The collision-offroad-ade reward, which combines safety                                                        Both hard-reward GCFT variants, (cat, hard) and (ind,
+metrics with trajectory accuracy, achieves the best ADE                                                    hard), outperform the baseline SMART-tiny across the full
+(2.39m), but still underperforms RMMMLOO in overall re-                                                    range and on both sides of H = 0. Concatenation (cat)
+alism. Notably, the base model achieves the best mi-                                                       leads indication (ind) across tested horizons, consistent
+nADE (1.30m), suggesting that pre-trained imitation learn-                                                 with the hard-reward ordering on the maneuver benchmark
+ing models excel at trajectory accuracy but may not fully                                                  (Tab. S5).
+
+
+                                                                                                      16
+                                      100                                                                                        100
+                                                               SMART-tiny                                                                                                 SMART-tiny
+                                                               SMART-tiny RLFTSim (ind, soft)                                                                             SMART-tiny RLFTSim (ind, soft)
+                                                               SMART-tiny RLFTSim (ind, hard)                                                                             SMART-tiny RLFTSim (ind, hard)
+                                       80                                                                                            80
+
+
+                                       60                                                                                            60
+
+                      Frequency (%)                                                                             Frequency (%)
+                                       40                                                                                            40
+
+
+                                       20                                                                                            20
+
+
+                                        0                                                                                            0
+                                            Pass Rate                    Reach Rate                                                              Pass Rate                              Reach Rate
+
+                                                (a) Ground-truth maneuvers                                                                               (b) Mixed maneuvers
+
+
+                                      100                                                                                     80.0
+                                                                                                                                                                                    SMART-tiny
+                                                               SMART-tiny                                                                                                           SMART-tiny RLFTSim (cat, hard)
+                                                               SMART-tiny RLFTSim (ind, soft)                                 77.5                                                  SMART-tiny RLFTSim (ind, hard)
+                                                               SMART-tiny RLFTSim (ind, hard)
+                                      80
+                                                                                                                              75.0
+
+
+
+
+                                                                                                     Goal Reaching Rate (%)
+                                                                                                                              72.5
+                                      60
+
+                      Frequency (%)
+                                                                                                                              70.0
+
+                                      40                                                                                      67.5
+
+                                                                                                                              65.0
+                                      20
+                                                                                                                              62.5
+
+
+                                       0                                                                                      60.0
+                                                                                                                                          H=-3   H=-2    H=-1        H=0         H=+1      H=+2        H=+3
+                                            Pass Rate                    Reach Rate                                                                        Kinematic Perturbation (s)
+
+
+                                                 (c) Alternative maneuvers                                                                         (d) Kinematic controllability
+
+
+Figure S1. Controllability benchmark performance across various experimental conditions: (a) all goals are set to ground-truth maneuvers,
+(b) goals are randomly sampled from all maneuvers, (c) goals are exclusively sampled from alternative maneuvers, and (d) simulation
+controllability with kinematic perturbations. GCFT models consistently outperform the baseline across all conditions, demonstrating
+effective controllability distillation.
+
+
+Maneuver Controllability. We construct a benchmark of                                                 Table S5. Analysis on maneuver controllability benchmark. Tar-
+100 scenarios from the WOMD evaluation set in which                                                   gets are only chosen from the set that does not contain the ground-
+the ego vehicle has multiple valid maneuvers. For each                                                truth maneuver. Only the ego vehicle is evaluated. Note that lower
+                                                                                                      absolute goal completion rates are expected as GT maneuvers are
+scenario, we manually select alternative goal coordinates
+                                                                                                      excluded from the benchmark.
+(§ 4.2) corresponding to one of six maneuver types: drive
+straight, left turn, right turn, left U-turn, and lane change left                                                                                                                                        Goal Completion Rate
+                                                                                                                                                 Method
+or right. The benchmark contains both ground-truth and al-                                                                                                                                     Reach Rate (%) ↑       Pass Rate (%) ↑
+
+ternative maneuvers. Alternative maneuvers are harder than                                                                                       SMART-tiny [34] (ref. model)                           35.37             42.89
+                                                                                                                                                 RLFTSim (cat, soft)                                    37.59             75.34
+ground-truth ones: the latter come from the pre-training dis-                                                                                    RLFTSim (cat, hard)                                    50.00             68.37
+                                                                                                                                                 RLFTSim (ind, soft)                                    38.78             64.46
+tribution, while the former require generalization beyond it.                                                                                    RLFTSim (ind, hard)                                    44.22             50.68
+
+    Fig. S1 shows goal-completion rates for the two GCFT
+(ind) variants against the baseline SMART-tiny across three
+goal-set conditions of increasing difficulty: all goals match-
+ing the ground-truth maneuver (Fig. S1a), a half-half mix
+of ground-truth and alternative goals (Fig. S1b), and alter-
+                                                                                                      (Eq. 10). All four GCFT variants improve upon the baseline
+native goals only (Fig. S1c). GCFT (ind) remains compet-
+                                                                                                      SMART-tiny with pass rate gains (8–32 percentage points)
+itive with the baseline when goals match the ground truth,
+                                                                                                      larger than reach rate gains (2–15 percentage points). Con-
+and outperforms it under both the mixed and alternative-
+                                                                                                      catenation (cat) dominates indication (ind) in three of the
+only conditions, where the model must simulate maneuvers
+                                                                                                      four (metric, reward) cells; the exception is soft-reward
+different from this scenario’s recorded ground truth.
+                                                                                                      reach rate, where (ind) slightly leads. The hard reward at-
+   Tab. S5 reports goal-completion rates, based on their                                              tains the best reach rate (50.0%, cat, hard) and the soft re-
+definition in § 4.2, on the alternative-only condition after                                          ward the best pass rate (75.3%, cat, soft), matching their
+20K GCFT steps and with a goal reward weight of λ=0.1                                                 respective reward definitions (§ 4.2).
+
+
+                                                                                                17
+Table S6. Model agnosticism ablation study. Experiments are
+done using 20% of the WOMD validation split.
+
+ Model                             RMM↑      Kinematic↑   Interactive↑   Map-based↑
+ TrafficBots V1.5 [37]             0.71743    0.42712      0.73166        0.86502
+ TrafficBots V1.5 RLFTSim (Ours)   0.72305    0.43209      0.73773        0.87043
+
+
+
+
+C.4. Model Agnosticism
+To demonstrate the capability of RLFTSim to be model-
+agnostic, we fine-tune the TrafficBots V1.5 [37] model us-
+ing RLFTSim to enhance the performance further. Tab. S6
+also compares the TrafficBots V1.5 model after 1 epoch of
+pre-training with the TrafficBots V1.5 RLFTSim model af-
+ter a further fine-tuning for 12,000 steps. Pre-training fol-
+lows the default configuration of [37], and for RLFTSim
+post-training, we reuse the hyperparameters from Tab. S1.
+The improved RMM from 0.7174 to 0.7231 shows that
+RLFTSim extends beyond the discrete-token SMART base-
+line to a continuous-action, VAE-based architecture for
+TrafficBots V1.5.
+C.5. Extended Qualitative Examples
+The collision and off-road examples (Fig. S2, Fig. S3,
+Fig. S4, Fig. S5) show how RLFTSim addresses safety vio-
+lations present in the baseline SMART-tiny model. The pre-
+trained model generates vehicle-pedestrian collisions, rear-
+end crashes, right-of-way violations, and off-road excur-
+sions, while RLFTSim produces behaviors that respect traf-
+fic rules and adhere to drivable areas. These improvements
+correspond to the enhanced interactive and map-based met-
+rics reported in Tab. 1.
+    The goal-conditioned examples (Fig. S6, Fig. S7,
+Fig. S8) showcase how GCFT distills controllability in the
+simulation, allowing for specific goals to be specified that
+the fine-tuned model is capable of reaching.
+
+
+
+
+                                                                                      18
+                             Expert                      Pre-trained Model                      Post-trained model
+                                                         SMART-tiny                             RLFTSim (Ours)
+
+
+
+
+                                                                   Collision with pedestrian
+
+
+
+
+                               (a)                                   (b)                                      (c)
+
+Figure S2. Qualitative Sample - Collision 1. In the simulation for the pre-trained model (b), the vehicle entering the circle fails to yield
+to the pedestrian and collides with it. There is no collision in the case of the expert data (a) and RLFTSim (c).
+
+
+
+
+                             Expert                      Pre-trained Model                      Post-trained model
+                                                         SMART-tiny                             RLFTSim (Ours)
+
+
+
+
+                                                       Rear-end                                No collision
+                                                       Collision
+
+                               (a)                                   (b)                                      (c)
+
+Figure S3. Qualitative Sample - Collision 2. (b) For the pre-trained model, there is a rear-end collision between two vehicles in the
+focused zone. (c) However, the post-trained model avoids this accident.
+
+
+
+
+                                                                      19
+                             Expert                       Pre-trained Model                    Post-trained model
+                                                          SMART-tiny                           RLFTSim (Ours)
+
+
+
+
+                                                              The passing                             The parked vehicle
+                                                              vehicle slows down,                     waits to enter the road
+                                                              but still cannot avoid                  to avoid collision.
+                                                              collision.
+
+
+
+
+                                (a)                                 (b)                                   (c)
+
+Figure S4. Qualitative Sample - Collision 3. (a) The parked vehicle starts to move forward, but does not enter the road to avoid a collision.
+(b) For the pre-trained model, the parked vehicle attempts to enter the road, which leads to a collision with the passing vehicle. The passing
+vehicle tries to slow down, but it cannot avoid the collision. (c) The parked vehicle waits for the road to clear and then enters the road.
+
+
+
+
+                             Expert                       Pre-trained Model                    Post-trained model
+                                                          SMART-tiny                           RLFTSim (Ours)
+
+
+
+
+                                                    Vehicle goes off-road
+
+
+                                (a)                                 (b)                                   (c)
+
+Figure S5. Qualitative Sample - Off-road 1. (b) The cyclist does not respect the drivable area and goes off-road. For the expert data (a)
+and the RLFTSim model (c), the cyclist adheres to the drivable area.
+
+
+
+
+                                                                     20
+                                 Stop at red light                                       Right turn at red light
+
+
+
+
+                                         (a)                                                       (b)
+
+
+
+Figure S6. Qualitative Sample - GCFT Red Light Fine-tuning with GCFT enables greater control over scenario diversity. In this example,
+the base model only produces rollouts where the ego vehicle stops at the red light. In contrast, GCFT allows for the generation of rollouts
+where the ego performs either a right turn at the red light (b) or a full stop (a).
+
+
+
+
+                                Stop sign right turn                                     Stop sign left turn
+
+
+
+
+                                         (a)                                                     (b)
+
+
+
+Figure S7. Qualitative Sample - GCFT Stop Sign Fine-tuning with GCFT enables greater control over scenario diversity. In this example,
+the base model only produces rollouts where the ego vehicle turns right after stopping. In contrast, GCFT allows for the generation of
+rollouts where the ego vehicle can turn either right (a) or left (b) at the stop sign.
+
+
+
+
+                                                                    21
+                            Parking lot move forward                                   Parking lot stationary
+
+
+
+
+                                       (a)                                                      (b)
+                             Parking lot right turn 1                                 Parking lot right turn 2
+
+
+
+
+                                       (c)                                                      (d)
+
+
+Figure S8. Qualitative Sample - GCFT Parking Lot Fine-tuning with GCFT allows for behavior creation from otherwise static objects.
+In the base SMART model, the ego vehicle always remains stationary in this scenario. After GCFT, we can specify for the agent to move
+forward (a), remain stationary (b), or perform a right turn (c & d).
+
+
+
+
+                                                                 22
+

@@ -1,0 +1,651 @@
+                      This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                   Except for this watermark, it is identical to the accepted version;
+                             the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+  SyncMos: Scalable Motion Synchronisation for Multi-Agent Scene Interaction
+
+ Lingxiao Li1, * Dongwon Kim1,2, * Lingyan Ruan1                       Bin Chen1 Taesoo Kwon2                 Taehyun Rhee1,†
+                        1                                              2
+                          University of Melbourne                        Hanyang University
+             lingxiao1@student.unimelb.edu.au; tuna831@hanyang.ac.kr; lingyan.ruan@unimelb.edu.au;
+                    bin.chen@unimelb.edu.au; taesoo@hanyang.ac.kr; taehyun.rhee@unimelb.edu.au
+
+
+
+
+                             Abstract                                    Interactions involving multiple 3D humans or agents re-
+                                                                      quire not only spatial reasoning but also precise temporal
+    Text-guided motion generation in 3D scenes has ad-                coordination, where actions such as handing, receiving, or
+vanced the synthesis of human–scene interactions, con-                reacting depend on the causal order and synchronisation be-
+tributing to embodied AI, scene understanding, and virtual            tween participants. Recent work has explored the synthesis
+agent simulation. While recent studies have begun explor-             of multi-agent and human–scene interactions [5, 12, 13],
+ing multi-agent scenarios, achieving temporally synchro-              showing promising progress in modelling complex collab-
+nised interactions among multiple agents remains an open              orative behaviours. However, most existing methods are
+challenge. Existing methods are often limited in flexibility          restricted to a fixed number of agents or rely on pairwise
+and scalability when handling diverse interaction contexts.           relationships, which limits scalability as new interaction
+We present a method that enables synchronised multi-agent             or relationship configurations require retraining or model
+interaction using a single-agent motion synthesis model               redesign. Furthermore, temporal synchronisation across
+through two key components: a text-guided dependency-                 agents is often under-explored, leading to timing misalign-
+aware story planner and a temporal synchronisation mod-               ments or inconsistent interactions, such as when agents
+ule. The story planner interprets natural language instruc-           hand over or receive objects, even if individual motions ap-
+tions into structured event sequences with temporal depen-            pear realistic.
+dencies. Our synchronisation module, built upon time-                    We introduce SyncMos, a scalable framework for tem-
+warping control and diffusion posterior sampling, aligns              porally synchronised multi-agent motion generation in 3D
+interaction timing across agents without retraining. Exper-           scene interaction. SyncMos builds on a single-agent dif-
+imental results demonstrate that the proposed framework               fusion model and comprises two key components. First,
+effectively models temporal dependencies and causal or-               a text-guided dependency-aware story planner inter-
+der between events. Evaluations across diverse interac-               prets natural-language instructions into structured event se-
+tion types show improved temporal alignment and coher-                quences with temporal dependencies. Second, a novel tem-
+ent multi-agent motion generation consistent with textual             poral synchronisation module aligns interaction timing
+instructions.                                                         across agents through time-warping control and diffusion
+                                                                      posterior sampling. By leveraging a single-agent model
+                                                                      without retraining for specific pairwise or group relation-
+1. Introduction                                                       ships, SyncMos achieves scalability across varying num-
+                                                                      bers of agents, while ensuring consistent timing and coordi-
+Generating coordinated human motion within complex 3D                 nation in complex interaction contexts.
+scenes is a fundamental yet challenging goal in computer              Our main contributions are as follows:
+vision, machine learning, and embodied AI. Recent ad-
+                                                                      • We introduce a two-stage framework that extends
+vances in text-guided motion synthesis have enabled con-
+                                                                        single-agent motion generators to scalable and temporally
+trollable character behaviours that respond to scene context
+                                                                        synchronised multi-agent human–scene interactions.
+and natural-language instructions [4, 9, 22]. While these
+                                                                      • We develop a text-guided event planner based on a large
+approaches achieve promising results for single-agent mo-
+                                                                        language model that structures natural-language instruc-
+tion generation, extending them to multi-agent interactions
+                                                                        tions into temporally ordered dependencies.
+presents additional challenges.
+                                                                      • We propose a temporal synchronisation mechanism
+  * These authors contributed equally.                                  that achieves consistent cross-agent coordination through
+  † Corresponding author.                                               time-warping control and diffusion-based constraints,
+
+
+
+                                                               8174
+  without additional retraining.                                         a                                               Motion
+                                                                                                                        generator
+The framework is model-agnostic and can be integrated                                                     Agent #1
+                                                                        Text input                         event
+with existing single-agent diffusion-based motion genera-                                                            Low-level motion
+                                                                                                                      synchronisation
+tors to provide scalable solutions for temporally scheduled                                               Agent #N
+                                                                                                           event
+multi-human 3D scene interaction.                                                       High-level                       Motion
+                                                                                     event planer (LLM)                 generator
+                                                                        Scene data
+
+2. Related Work
+                                                                        Figure 1. Overall architecture. The framework first interprets
+2.1. Human motion synthesis                                             the user’s input via a high-level planner, and low-level controller
+                                                                        synchronizes the timing of each-character.
+Recent advances in human motion synthesis stem from im-
+provements in dataset fidelity [14, 23] and the emergence of
+diffusion-based generative models [17, 21]. These models
+synthesise realistic motion from various inputs, including              constraint-based editing. Recent deep learning models in-
+action labels [7], text [17], and 3D scene context [1, 16].             troduce spatial conditioning for motion synthesis [10], yet
+Beyond single-agent motion, recent work extends to hu-                  temporal control remains more challenging since shifting
+man–human [12] and human–scene interactions [9]. In-                    one action requires globally consistent adjustment across
+terGen [12] produces realistic two-person interactions but              frames. InterGen [12] learns two-character interactions
+relies on fixed-size joint modelling, limiting scalability to           without explicit timing control but still struggles to produce
+larger groups or dynamic agent counts. LINGO [9] enables                synchronised or temporally diverse behaviours. Our frame-
+autoregressive motion synthesis in structured 3D scenes,                work addresses this limitation through diffusion-based tem-
+generating long-horizon human–scene interactions. How-                  poral control using Diffusion Posterior Sampling (DPS) [6]
+ever, existing single-agent models, including LINGO, lack               on a pre-trained single-character motion model.
+mechanisms for temporally aligned multi-agent coordina-
+tion. In contrast, our work introduces SyncMos, a gen-
+eral framework that combines an LLM-based dependency-
+                                                                        3. Overview
+aware event planner with a diffusion-based synchronisation
+module, achieving scalable and temporally coherent multi-
+                                                                        Figure 1 illustrates the overall architecture of SyncMos,
+agent interaction without retraining.
+                                                                        a scalable framework for temporally synchronised multi-
+2.2. LLM-based Scene-level Agent Planning                               agent motion generation from free-form textual instruc-
+                                                                        tions. The framework consists of two main components: a
+Large Language Models (LLMs) have demonstrated strong                   high-level event planner and a low-level motion synchro-
+capabilities in reasoning, planning, and few-shot learn-                nisation module.
+ing [15, 18]. Recent works have leveraged LLMs for
+scene-level human action planning. Digital Life Project                    The high-level event planner analyses the user’s textual
+(DLP) [3] constructs autonomous virtual humans with                     instruction using a large language model to extract struc-
+lifelike social behaviours, but its focus is on simulat-                tured event descriptions with temporal and causal depen-
+ing digital life rather than generating coordinated mo-                 dencies. It also integrates 3D scene context, such as object
+tions. Sitcom-Crafter [5] introduces a plot-driven frame-               segmentation, spatial relations, and scene geometry to gen-
+work that integrates diverse interactions within 3D environ-            erate an ordered sequence of actions across multiple agents.
+ments, though it remains limited to two-character scenar-               The resulting plan specifies which actions each agent per-
+ios. Event-Driven Storytelling [13] decomposes complex                  forms and the corresponding temporal schedule.
+narratives into sequential events for scalable multi-character             The low-level motion synchronisation module synthe-
+behaviour generation in 3D scenes, yet lacks explicit tem-              sises detailed motion sequences for each agent using a
+poral dependency modelling and precise synchronisation                  single-agent diffusion-based generative model conditioned
+across agents. In contrast, our framework models both                   on the planned events. To ensure temporal consistency
+sequential and parallel event dependencies and achieves                 across agents, this module incorporates a time-warping
+cross-agent synchronisation through time-warping control.               mechanism and Diffusion Posterior Sampling (DPS) [6] to
+                                                                        align motion timing and interaction phases. Through this
+2.3. Temporal Motion Synchronisation                                    two-level architecture, SyncMos extends single-agent mo-
+Precise temporal coordination is essential for generating               tion generation frameworks to coordinated multi-agent sce-
+natural and coherent motion. Classical methods such as                  narios without retraining, providing a scalable and mod-
+motion warping [20] and Laplacian optimisation [11] ad-                 ular approach for generating temporally synchronised hu-
+just timing in captured sequences through interpolation and             man–scene interactions.
+
+
+
+                                                                 8175
+                                                                                             Event 1                 Event N
+                                                         Dependency-aware                     Target                  Target
+                                                                                                                                               Event manager
+                     User instruction                                                        position                position
+                                                           story planner                      Motion                  Motion
+                                                                                            description             description
+
+
+
+
+                                        Top-down                                                                                   Single event
+                                         view grid
+                                                                                                                                   Locomotion phase          Action phase
+                                                      Agent A   1   2           3                    Top-view
+                                                                1           2   3   4
+                                                                                                                                      Position and
+                                                      Agent B                                     spatial reasoner                                          text instruction
+                                                                                                                                      target object
+                                          
+                     Scene                            Agent C   1       2
+                                        Scene graph
+
+
+  Figure 2. The high-level event planner overview. The high-level planner organizes dependencies while determining event locations.
+
+
+4. Text-guided Event Planner                                                            motion generation process (see Fig. 3). Users can specify
+                                                                                        where an action should occur by referencing grid coordi-
+The high level text-guided event planner generates a struc-                             nates (e.g., “at grid (10, 18)”), while the Top-View Spatial
+tured event graph G from user-provided instructions T , pro-                            Reasoner leverages the same coordinate to infer plausible
+viding explicit temporal and spatial constraints for low-level                          spatial configurations. For example, placing two interacting
+motion generation. As shown in the Figure 2, the planner                                characters at reachable and physically coherent distances.
+consists of three sub-modules: Scene Understanding Mod-                                 This design provides both intuitive user control and geo-
+ule, Dependency-Aware Story Planner, and Top-View Spa-                                  metrically grounded reasoning for motion synthesis.
+tial Reasoner.
+                                                                                        4.2. Dependency-Aware Story Planner
+                                                                                        Given the scene description D from the Scene Understand-
+                                                                                        ing Module and the user-provided narrative text T , the plan-
+                                                                                        ner converts high-level text into a structured event depen-
+                         User Instruction:
+                          Amir hands over                                               dency graph that organises all actions and their temporal
+                            the bottle to                                               relations.
+                          Benjamin at grid
+                              [10,18].
+                                                                                              G = (E, R), \quad E = \{ e_i \}_{i=1}^{N}, \quad R = R_{\text {seq}} \cup R_{\text {par}}, 
+
+                                                                                        where E denotes the set of single-actor events, and
+                                                                                        R encodes their temporal dependencies. Each event
+                                                                                        ei = (actori , event descriptioni ) specifies who
+Figure 3. The top-view grid provides a unified 2D spatial coor-                         performs the action and what it entails, for example, “pick
+dinate system for grounding instructions. The instruction “Amir                         up bottle 1 using right hand”. This explicit representation
+hands over the bottle to Benjamin at grid (10, 18)” specifies an                        provides concrete cues for downstream motion generation.
+action location on the grid (left), which corresponds to the same                           To infer the dependency set R, we adopt a few-shot,
+position in the 3D scene (right). This grounding enables spatial                        prompt-based strategy and Chain-of-thought prompting
+consistency in later motion generation stages.
+                                                                                        [19]. The LLM is prompted in two stages within a sin-
+                                                                                        gle response: (1) list all required single-actor events condi-
+                                                                                        tioned on (D, T ); and (2) infer their temporal dependencies
+4.1. Scene Understanding Module                                                         by following structured exemplars. Two dependency types
+The Scene Understanding Module extracts both semantic                                   are demonstrated in the exemplars:
+and geometric information from the input 3D scene S. It                                 • Sequential:{"after":e i,"before":e j}, repre-
+adopts an LLM-based scene describer [13] to capture rela-                                  senting causal or prerequisite actions (e.g., pick up →
+tional semantics among objects (e.g., “the chair is near the                               hand over);
+table”, “the bottle is on the counter”) and to produce a tex-                           • Parallel:{"parallel":[e i,e j]}, representing
+tual scene description D of the the given scene.                                           synchronized interactions (e.g., giver and receiver acting
+   We further introduce a top-view grid representation M                                   simultaneously).
+that encodes spatial occupancy and navigable regions in                                 By exposing these templates in-context, the LLM learns to
+a 2D image, providing a consistent coordinate system for                                generate, in a single output, both the event list E and a
+subsequent spatial reasoning. The top-view grid acts as a                               machine-readable dependency set R that unifies semantic
+shared spatial interface between user instructions and the                              context and temporal reasoning.
+
+
+
+                                                                                8176
+    We evaluate the planner’s effectiveness in Sec 6.1 by                                        Input
+                                                                                                                                          ❄️          Loop 
+
+comparing its dependency accuracy and event ordering with                                                                     Diffusion              AR Step
+an Event-Driven Storytelling baseline [13]. Additional de-
+                                                                                                                                                                      save state
+tails are provided in the supplementary material.                                                                       Intermediate state
+
+
+                                                                                                                         Concat predicted poses
+4.3. Top-View Spatial Reasoner                                                                                                    Auto-Regressive  
+
+                                                                                                                               Preliminary Estimation 
+
+While the Story Planner defines the semantic and tempo-                                                                              (Section 5.1)
+                                                                                                                                                                                     State
+ral order of events, it does not specify where these actions                                                                                                                        Buffer
+                                                                                                 Sync 
+occur. The Top-View Spatial Reasoner bridges this gap                                        Parameter
+                                                                                                                            Time warping Interpolation
+
+
+by grounding each abstract event into a concrete position
+                                                                                                                      Warped target poses (for refinement)
+within the scene. It grounds these textual events into con-
+crete spatial locations within the 3D environment, providing                                                               Intermediate state
+                                                                                                                                                                      load state
+the necessary spatial input for the subsequent motion gen-
+eration module.                                                                                                                                ❄️         Loop 
+
+                                                                                                                           Diffusion with DPS
+    Given the top-down view grid and object positions, the                                                                                              AR Step
+
+
+reasoner predicts plausible target locations for each char-                                      Final  
+                                                                                                                                Final pose
+acter and object interaction. It leverages spatial occupancy                                   Motion                                                                 request state
+                                                                                                                          Temporally Guided Refinement
+
+and accessibility constraints to ensure non-overlapping po-                                                                          (Section 5.2)
+sitions, continuity across consecutive events, and consis-
+tency with the physical environment (e.g., the waiter re-                                  Figure 4. The temporal synchronisation model produces prelimi-
+mains near the same table when serving and collecting                                      nary motion estimates for each character, which are subsequently
+dishes).                                                                                   synchronised using temporally guided refinement.
+    For each event ei , the reasoner predicts a grounded rep-
+resentation
+                                                                                           Algorithm 1 Auto-Regressive Preliminary Estimation
+          g_i = (\texttt {grid}_i, \texttt {action}_i, \texttt {hand\_target}_i)           Require: LINGO conditioning c, total denoise steps T , in-
+where gridi indicates the 2D position on the scene                                           termediate step 0 < t < T , initial prior poses p′(0) , p′(1)
+map, actioni specifies the executed action label, and                                      Ensure: Intermediate state buffer B, preliminary estima-
+                                                                                                                         (2)     (3)                           (k)
+hand targeti optionally refers to the interacted object.                                     tion D = {p′(0) , p′(1) , p̂0 , p̂0 , · · · , p̂0 }
+This spatial grounding provides explicit positional and in-                                  B ← init buffer()
+teraction cues for the motion generation model. Implemen-                                    D ← {p′(0) , p′(1) }
+tation details are provided in the supplementary material.                                   while True do
+                                                                                                             (0)  (1)           (n)
+                                                                                                 xT ← {pT , pT , · · · , pT }                                                    \triangleright  pure noise
+                                                                                                             ′(0)  ′(1)          (n)
+5. Temporal synchronisation model                                                                xT ← {p , p , · · · , pT }                                                        \triangleright  inpainting
+                                                                                                 for i=T down to t+1 do \triangleright  reverse diffusion process
+We extend single-agent diffusion-based motion genera-
+                                                                                                      z ∼ N (0, I)
+tors to produce temporally aligned multi-agent interactions
+                                                                                                      xi−1 = µθ (xi , i, c) + σi · z
+guided by event-level plans. Our synchronisation frame-
+                                                                                                 end for
+work is model-agnostic and operates atop existing auto-
+                                                                                                 ϵ̂ ← Mθ (xt , t, c)
+regressive motion models. In practice, we adopt LINGO [9]
+                                                                                                 x̂0 ← predict(xt , t, ϵ̂)
+as the motion backbone, while the proposed framework can
+                                                                                                 D ← concat(D, x̂0 )
+be applied to other diffusion-based generators without re-
+                                                                                                 B ← concat(B, {xt , T, t, c})                                   \triangleright  backup state
+training.
+                                                                                                 if scheduler(c, x̂0 ) returns terminate then
+    The method consists of two stages: (1) auto-regressive
+                                                                                                      break
+preliminary estimation, which produces coarse motion se-
+                                                                                                 end if
+quences guided by planned events; and (2) temporally                                                                (n−1)      (n)
+                                                                                                 p′(0) , p′(1) ← p̂0       , p̂0               \triangleright  to next segment
+guided refinement, which aligns timing across agents via
+                                                                                             end while
+time-warping control and constraint-guided diffusion re-
+                                                                                                   return D, B
+finement, achieving scalable synchronised motion genera-
+tion.
+5.1. Auto-Regressive Preliminary Estimation                                                vides a foundation for later temporal correction. The ini-
+The first stage produces a coarse preliminary motion se-                                   tial two poses p′(0) and p′(1) are fixed, and subsequent
+quence D that follows the high-level event plan and pro-                                   poses are generated autoregressively in fixed-length seg-
+
+
+
+                                                                                    8177
+Algorithm 2 Temporally Guided Refinement                                                                                                                                                                                                         5.2. Temporally Guided Refinement
+Require: preliminary estimation D, intermediate state                                                                                                                                                                                            The second pass refines the preliminary sequence D by en-
+  buffer B, target frame l, target frame difference δ, time                                                                                                                                                                                      forcing global temporal consistency across agents. Simple
+  warp function τ ()                                                                                                                                                                                                                             time-warping can shift key event timings but often intro-
+                                                           (2)            (k)
+Ensure: Final motion X = {p′(0) , p′(1) , p0 · · · , p0 }                                                                                                                                                                                        duces unnatural distortions, as it does not respect the gener-
+  y = τ (D, l, δ)                \triangleright  spline-based timewarping                                                                                                                                                                        ative prior of the diffusion model. To correct timing while
+  X ← {}                                                                                                                                                                                                                                         preserving motion realism, we treat the time-warped trajec-
+  for state in B do                                                                                                                                                                                                                              tory as a noisy temporal observation and refine it through a
+      xt , t, T, c ← state                                                                                                                                                                                                                       constraint-guided denoising process built on the stored in-
+      xt+t′ = add noise(xt , t′ )                                                                                                                                                                                                                termediate states in buffer B.
+      for i from t + t′ down to 1 do                               \triangleright  DPS
+           z ∼ N (0, I)     √
+           x̂0 = √1α¯i (xi − 1 − ᾱi ϵθ (xi , i))                                                                                                                                                                                                Timewarping. We first construct a target sequence y by
+           xi−1 ← µθ (xi , t) − λ∇xi ||y − x̂0 ||2 + σi · z                                                                                                                                                                                      applying spline-based timewarping to the preliminary esti-
+      end for                                                                                                                                                                                                                                    mate D (Algorithm 1, Fig. 4). The total sequence length is
+      X ← concat(X, x0 )                                                                                                                                                                                                                         kept fixed, and temporal adjustments are made by pulling
+  end for                                                                                                                                                                                                                                        or pushing specific keyframes. A frame index l indicates
+       return X                                                                                                                                                                                                                                  the key event to modify, and δ defines the desired temporal
+                                                                                                                                                                                                                                                 offset. Pulling a frame earlier compresses preceding mo-
+                                                                                                                                                                                                                                                 tion segments, while pushing it later stretches them. We
+ments (each of length n):                                                                                                                                                                                                                        use classical Motion Warping [20] to obtain an explicit but
+                                                                                                                                                                                                                                                 potentially noisy target trajectory y.
+                               \mathcal D=\{ \mathbf {p'^{(0)},p'^{(1)}, \hat {p}_0^{(2)},\hat {p}_0^{(3)}, \cdots , \hat {p}_0^{(k)}\}}. 
+As shown in Algorithm 1, LINGO receives conditioning
+                                                                                                                                                                                                                                                 Constraint-guided diffusion refinement. To enforce
+terms c that include (1) target positions relative to the cur-
+                                                                                                                                                                                                                                                 timing consistency while maintaining natural motion, we
+rent segment, (2) voxelised scene information, and (3) se-
+                                                                                                                                                                                                                                                 refine each motion segment using a gradient-guided denois-
+mantic text embeddings with timing encodings [9]. We ini-
+                                                                                                                                                                                                                                                 ing process. Given the target sequence y, we impose a sim-
+tialise sampling from pure noise:
+                                                                                                                                                                                                                                                 ple L2 timing constraint:
+                                                      \mathbf {x_T} = \{\mathbf {p'^{(0)},p'^{(1)}, \cdots ,p_T^{(n)}}\}, 
+                                                                                                                                                                                                                                                                                          C(\mathbf {\hat {x}_0}) = \|\mathbf {y} - \mathbf {\hat {x}_0}\|^2.                                    (3)
+and run reverse diffusion until an intermediate timestep t
+to obtain xt . Because this stage aims only to generate a                                                                                                                                                                                           For each segment, we retrieve its intermediate diffusion
+usable coarse trajectory, we denote only a partial number of                                                                                                                                                                                     state from the buffer B, which stores the partially denoised
+diffusion steps (t = 30). From the partially denoised sample,                                                                                                                                                                                    sample xt and associated metadata. Before refinement, we
+the predicted clean estimate x̂0 is obtained with the DDPM                                                                                                                                                                                       reintroduce controlled noise via a forward diffusion step
+[8] reconstruction:                                                                                                                                                                                                                              (q-sampling), allowing the model to explore feasible mo-
+                                                                                                                                                                                                                                                 tion variations while remaining consistent with the diffusion
+       \mathbf {\hat {x}_0} = \hat {x}_0(\mathbf {x_t},t) = \frac {1}{\sqrt {\bar {\alpha }}} \left (\mathbf {x_t} -\sqrt {1-\bar {\alpha }}\,\epsilon _{\theta }(\mathbf {x_t}, t)\right ). \label {eqn:preliminaryestimation}     (1)          prior. We then apply gradient-guided denoising to steer the
+                                                                                                                                                                                                                                                 reconstruction toward satisfying the timing constraint:
+   To balance quality and runtime, we regulate the denois-
+ing depth using difference x̂0 − x0 :                                                                                                                                                                                                                       \mathbf {x_{i-1}} \gets \mu _{\theta }(\mathbf {x_i}, i) - \lambda \nabla _{x_i} C(\mathbf {\hat {x}_0}) + \sigma _i \mathbf {z},    (4)
+
+                                        \mathbf {\hat {x}_0} - \mathbf {x_0} = \frac {\sqrt {1-\bar {\alpha }}}{\sqrt {\bar {\alpha }}} \left (\mathbf {\epsilon } - \epsilon _{\theta }\left (\mathbf {x_t}, t\right )\right ).    (2)          where µθ is the predicted denoised mean, σi is the noise
+                                                                                                                                                                                                                                                 variance, z ∼ N (0, I) is Gaussian noise, and λ controls the
+For
+√
+       LINGO (linear beta, T = 100), using t = 30 (                                                                                                                                                                                              influence of the temporal constraint. This refinement step
+  1−ᾱ
+  √
+    ᾱ
+         ≈ 0.3) yields stable preliminary trajectories suit-                                                                                                                                                                                     adjusts the temporal position of key events while preserving
+able for refinement. Unlike standard autoregressive diffu-                                                                                                                                                                                       the smoothness and coherency generated by the diffusion
+sion pipelines that fully denoise each segment before mov-                                                                                                                                                                                       model.
+ing on, we intentionally stop early and store intermediate                                                                                                                                                                                           Through this two-stage process, preliminary autoregres-
+states, including xt , timestep metadata, and conditioning                                                                                                                                                                                       sive prediction followed by constraint-guided refinement,
+terms, in a buffer B. These states are later reused for tem-                                                                                                                                                                                     our system achieves global temporal synchronisation across
+porally guided refinement.                                                                                                                                                                                                                       agents without retraining the underlying motion model.
+
+
+
+                                                                                                                                                                                                                                          8178
+6. Results                                                                                (a) Synchronization                          (b) Dependency
+                                                                                          Event-Driven Storytelling        250k
+
+
+
+                                                                        Token Usage
+                                                                                          Ours                             200k
+The experimental design for SyncMos is motivated by
+                                                                                                                           150k
+the challenge of scaling multi-agent object-mediated inter-                                                                100k
+action. Unlike existing methods often limited to dyadic                                                                    50k
+person-to-person interaction, our goal is to demonstrate                                                                   0
+                                                                                      5     10    15    20    25      30          5   10   15   20   25   30
+that a modular decomposition, utilizing LLM-based plan-                                   Number of Events                            Number of Events
+ners and time synchronisable motion synthesis, can achieve
+                                                                        Figure 5. Token usage vs. number of events for (a) Synchronisa-
+global coordination and dependency consistency without                  tion and (b) Dependency scenarios, comparing Event-Driven Sto-
+the need for task-specific retraining.                                  rytelling with our planner. Each point represents the total token
+   Consequently, We evaluate SyncMos at three levels: (1)               usage per scenario.
+the Dependency-Aware Story Planner against state-of-the-
+art and baseline LLM planners; (2) the Temporal Synchro-
+nisation Model via ablations and controlled timing edits (no            age grows rapidly beyond eight events due to redundant re-
+direct prior work); and (3) the full system in an end-to-end            generation, whereas ours remains nearly constant, demon-
+setting to verify that planned dependencies and timings are             strating superior scalability with narrative complexity.
+realised in the generated motions.
+                                                                        6.2. Temporal synchronisation model evaluation
+6.1. Dependency-Aware Story Planner
+                                                                        We quantitatively evaluate the proposed temporal synchro-
+Experiment Setup We evaluate the planner on a custom                    nisation model using a controlled timing adjustment experi-
+benchmark of 30 multi-character narratives spanning three               ment focused on object-grasping motions. This experiment
+scene types, House, Office, and Restaurant with two to five             corresponds to the most challenging dependency scenarios
+agents per scenario. Two example scenes are visualized in               described in Sec. 6.1, where precise temporal alignment is
+Fig. 6. The benchmark comprises two subsets: Synchro-                   essential for coordinated multi-agent actions.
+nisation (15 scenarios) testing parallel multi-agent actions,
+and Dependency (15 scenarios) testing long-horizon causal
+chains. Each scenario includes a ground-truth event graph               Experiment Setup Scene data from the LINGO dataset
+G = (E, R) with annotated sequential and parallel rela-                 are used to construct 15 distinct test cases, each beginning
+tions. We compare against the Event-Driven Storytelling                 from a shared initial pose and targeting objects at different
+baseline [13], which autoregressively generates events with-            spatial locations. The reference grasp timing is defined as
+out explicit global dependency modelling. Planner back-                 the frame when the wrist joint first reaches within a distance
+bones include GPT-4o and Qwen-3 (235B/8B). We report                    threshold of the target object.
+Event Coverage (EC), Dependency Accuracy (DA), Passed                      We test timing control with offsets of ±0.5 s, ±1.0 s,
+Scenarios (PS), and Scenario Pass Rate (SPR). Further de-               and ±1.5 s relative to this reference, executing each of the
+tails are in Supplementary Material.                                    15 test cases 10 times per offset condition. A trial is con-
+                                                                        sidered successful if the resulting temporal error is within
+                                                                        0.1 s of the desired offset. Temporal alignment between
+Results and Analysis Table 1 shows consistent gains over                the preliminary estimation and the refined motion is mea-
+the baseline across backbones. On the Synchronisation sub-              sured using Dynamic Time Warping (DTW)[2], and a trial
+set, our planner improves dependency accuracy by up to                  is marked as failed if the generated motion diverges or be-
+21.5 p.p. (68.4 → 89.9 %, Qwen-3-235B), reflecting bet-                 comes unstable, indicated by an abnormally large DTW dis-
+ter handling of concurrent multi-agent actions. On the De-              tance between the two sequences.
+pendency subset, which stresses long causal chains, depen-
+dency accuracy increases from 11.8–20.5% to 80–97%,
+and scenario pass rate rises from near zero to as high as               Results and Analysis Table 2 summarises the success
+80% (GPT-4o). Qualitatively, the planner preserves inde-                rates for timing control under different offset magnitudes.
+pendence between unrelated sub-events, triggers dependent               Our model achieves over 70% success for adjustments
+actions only after prerequisites (e.g., receive before drink),          within ±1.0 s and up to 88% for smaller offsets (±0.5 s).
+and yields clearer per-event role assignment.                           However, performance degrades near motion boundaries,
+    Token usage, which reflects reasoning efficiency and                where large offsets cause instability in the diffusion process,
+runtime cost, is shown in Figure 5. In synchronisation sce-             reducing success rates to approximately 35–40%. These re-
+narios, our planner maintains roughly 10k tokens per case               sults demonstrate that the proposed synchronisation module
+with stable EC, DA, and SPR as the number of events in-                 can reliably adjust action timing without retraining, main-
+creases. In dependency scenarios, the baseline’s token us-              taining stability across moderate timing variations.
+
+
+
+                                                                 8179
+Table 1. Planner performance on Synchronisation and Dependency subsets across LLM backbones. Metrics: Event Coverage (EC),
+Dependency Accuracy (DA), Passed Scenarios (PS), and Scenario Pass Rate (SPR).
+
+ Model                        GPT-4o                                                                     GPT-4o-mini                             Qwen-3-235B                             Qwen-3-8B
+ Metrics   EC(%)           DA(%)   PS                          SPR(%)                EC(%)              DA(%)   PS            SPR(%)    EC(%)   DA(%)    PS     SPR(%)     EC(%)        DA(%)   PS     SPR(%)
+   Synchronisation Test Set
+ Baseline   88.2     67.1                       5/15               33.3               89.8                    71.4     5/15    33.3      88.7    68.4   5/15     33.3       77.3         46.8   4/15    26.7
+ Ours      100.0     86.3                       8/15               53.3               100.0                   67.2     5/15    33.3      99.7    89.9   8/15     53.3       99.1         62.1   4/15    26.7
+   Dependency Test Set
+ Baseline  89.3     20.5                       0/15                 0.0                78.1                   16.2     0/15     0.0      78.4    17.2   1/15     6.7        73.9         11.8   1/15     6.7
+ Ours      99.3     96.9                      12/15                80.0                95.2                   80.4     7/15    46.7      93.3    84.4   10/15    66.7       98.6         81.7   7/15    46.7
+
+
+
+Table 2. Success rate (%) for grasp timing control under different                                                                    where each agent hands an object to the next. This setup
+temporal offsets.                                                                                                                     naturally tests whether temporal errors accumulate and
+                                                                                                                                      whether spatial handover quality deteriorates as the inter-
+    Model              Positive Offset (s) Negative Offset (s)                                                                        action chain becomes longer. We vary the number of agents
+                       +0.5 +1.0                         +1.5               -0.5 -1.0                           -1.5
+                                                                                                                                                              N \in \{2, 3, 5, 10\}, 
+    LINGO     0.0 0.0                                     0.0               0.0 0.0                             0.0
+    Ours(SR) 84.7 78.0                                   76.0               88.0 75.3                           37.3                  and run the full SyncMos pipeline, including dependency-
+                                                                                                                                      aware event planning, spatial grounding, motion genera-
+Table 3. Statistical Results of timewarp model under different tem-                                                                   tion, and temporal refinement, to synthesise complete multi-
+poral offsets (Frame Shift)                                                                                                           agent handover sequences.
+                                                                                                                                         We report three metrics that jointly capture temporal and
+      Offset          mean                     std                  25%                  50%                   75%                    spatial stability:
+        -1.5         -1.260                  0.404                   -1.4                 -1.4                  -1.3                   • Temporal Synchronisation Magnitude (TSM): num-
+        -1.0         -0.837                  0.262                   -1.0                 -0.9                  -0.9                     ber of frames each agent need to be shifted from its orig-
+        -0.5         -0.434                  0.186                   -0.5                 -0.5                  -0.4                     inal best-contact moment for synchronisation.
+         0.5          0.454                  0.414                    0.4                  0.5                   0.5                   • Temporal Synchronisation Error (TSE): the deviation
+         1.0          0.944                  0.459                    0.9                  1.0                   1.1                     between the planned and realised handover frames for
+         1.5          1.430                  0.437                    1.5                  1.5                   1.6                     each pair of agents.
+                                                                                                                                       • Contact Distance (CD): the minimum summed wrist-
+                                                                                                                                         to-target distance at the interaction moment, indicating
+    Table 3 reports the realised frame shift relative to each                                                                            handover quality.
+intended offset. The DTW alignment used for success-rate
+evaluation is also applied here, and motions exceeding a                                                                                  Figure 6 plots these metrics as a function of the number
+predefined DTW threshold are excluded. As shown in the                                                                                of agents. Across both scenes, TSM increases only mildly
+table, the interquartile range (25%–75%) is narrow and con-                                                                           as N grows high, while TSE remains stable with no ev-
+sistent across all conditions, indicating stable variability in                                                                       idence of temporal error accumulation, even in 10-agent
+the refined trajectories. This suggests that the reduced suc-                                                                         chains. This indicates that SyncMos prevents timing drift
+cess rate in the −1.5 s condition is primarily due to insuffi-                                                                        along longer dependency paths, and that the refinement step
+cient temporal shift rather than increased dispersion in tra-                                                                         introduces only small, localised perturbations to the under-
+jectory outcomes. For preliminary estimation, we use a par-                                                                           lying motion. Meanwhile, Contact Distance remains within
+tial denoising step of t = 30, and a detailed analysis of                                                                             a reasonably stable range across high agent counts, confirm-
+partial-step behaviour is provided in the supplementary ma-                                                                           ing that spatial handover quality does not degrade as more
+terial.                                                                                                                               agents participate. Minor differences between scenes are
+                                                                                                                                      attributable to layout complexity, but the general trend re-
+6.3. Multi-Agent Scalability Evaluation                                                                                               mains consistent across environments.
+To evaluate the scalability and end-to-end robustness of                                                                                  These results demonstrate that SyncMos scales reliably
+SyncMos, we analyse chained handover interactions with                                                                                to larger groups of agents: temporal alignment remains sta-
+varying numbers of agents across two scenes (House and                                                                                ble, dependency order is preserved, and handover quality is
+Restaurant). Each motion sequence forms a linear depen-                                                                               maintained even for 10-agent chains, highlighting SyncMos
+dency chain,                                                                                                                          as an effective and lightweight post-generation synchroni-
+                                                                                                                                      sation module. More test cases are in the supplementary
+               \text {agent}_1 \rightarrow \text {agent}_2 \rightarrow \cdots \rightarrow \text {agent}_N,                            material.
+
+
+
+                                                                                                                              8180
+                    House                                                    TSM & TSE vs # Agent                                                 CD vs # Agent
+                                                                  20                                                                  1.0
+                                                                                                        TSM
+
+
+
+
+                                                                                                               Contact Distance (m)
+                                                                                                        TSE                           0.8
+
+
+
+                                             TSM / TSE (frames)
+                                                                  15
+                                                                                                                                      0.6
+                                                                  10
+                                                                                                                                      0.4
+                                                                   5                                                                  0.2
+                                                                   0 2   3          5                     10                          0.0 2   3       5              10
+                                                                                 Number of Agents                                                 Number of Agents
+                  Restaurant                                                 TSM & TSE vs # Agent                                                 CD vs # Agent
+                                                                  20                                                                  1.0
+                                                                                                        TSM
+
+
+
+
+                                                                                                               Contact Distance (m)
+                                                                                                        TSE                           0.8
+
+
+
+                                             TSM / TSE (frames)
+                                                                  15
+                                                                                                                                      0.6
+                                                                  10
+                                                                                                                                      0.4
+                                                                   5                                                                  0.2
+                                                                   0 2   3          5                     10                          0.0 2   3       5              10
+                                                                                 Number of Agents                                                 Number of Agents
+
+Figure 6. Multi-agent scalability across two scenes. We plot TSM, TSE, and CD metrics as the number of agents increases, with each row
+showing results from one scene.
+
+
+7. Conclusion                                                                             These backbone-specific artifacts are independent of our
+                                                                                          synchronisation mechanism, and we expect SyncMos
+We introduced SyncMos, a framework for generating tem-                                    to benefit directly from future advances in single-agent
+porally synchronized multi-agent motion using a single-                                   diffusion-based motion generators. While the framework
+agent diffusion model and an LLM-based dependency-                                        is model-agnostic, extending the evaluation to additional
+aware planner. The planner extracts structured event se-                                  motion models is an important next step. Future work
+quences with sequential and parallel relations, and the pro-                              also includes incorporating physics- or contact-aware
+posed temporal synchronisation module aligns cross-agent                                  constraints, enabling tighter feedback between planning
+timing through time-warping and diffusion-based refine-                                   and generation, and expanding the system to more diverse
+ment. Experiments on multi-agent scenarios demonstrate                                    or interactive settings.
+that SyncMos can enforce temporal dependencies and pro-
+duce coordinated behaviors without requiring multi-agent
+model training.                                                                           Impact and value SyncMos introduces a novel formula-
+                                                                                          tion for synchronised multi-agent motion generation by co-
+Limitation and futurework Although SyncMos                                                ordinating multiple agents without requiring a multi-agent
+achieves consistent temporal alignment, several limitations                               model. By combining single-agent generation with plan-
+remain. Large timing adjustments may reduce refinement                                    ning and temporal refinement, the method reduces model
+stability, and LLM-based planning can introduce errors                                    complexity and offers practical utility across applications.
+in long or ambiguous narratives. The current synchro-                                     We expect SyncMos to provide a useful basis for future
+nisation module performs time-warping within a fixed                                      work on scalable scene-level interactions.
+motion duration and cannot modify the overall motion
+length. Extending the method to support temporal scaling                                  8. Acknowledgements
+of the motion itself remains an interesting direction for
+                                                                                          This work was supported by the Culture, Sports and
+future work. The current 2D spatial grounding also                                        Tourism R&D Program through the Korea Creative Con-
+limits fine-grained 3D contact reasoning.        Moreover,                                tent Agency grant funded by the Ministry of Culture,
+because our current implementation relies on LINGO                                        Sports and Tourism, South Korea (Project Number: RS-
+as the single-agent backbone, the generated motions are                                   2024-00399136). This work was also supported by the
+naturally constrained by the limitations of that model.                                   Institute of Information and Communications Technology
+
+
+
+                                                                                   8181
+Planning and Evaluation (IITP) grant (No.               RS-2020-                  telling with multiple lifelike humans in a 3d scene. In Int.
+II201373).                                                                        Conf. Comput. Vis., 2025. 1, 2, 3, 4, 6
+                                                                             [14] Jing Lin, Ailing Zeng, Shunlin Lu, Yuanhao Cai, Ruimao
+References                                                                        Zhang, Haoqian Wang, and Lei Zhang. Motion-x: A large-
+                                                                                  scale 3d expressive whole-body human motion dataset. Adv.
+ [1] Joao Pedro Araújo, Jiaman Li, Karthik Vetrivel, Rishi Agar-                 Neural Inform. Process. Syst., 2023. 2
+     wal, Jiajun Wu, Deepak Gopinath, Alexander William Clegg,
+                                                                             [15] OpenAI.        Gpt-4 technical report.       arXiv preprint
+     and Karen Liu. Circle: Capture in rich contextual environ-
+                                                                                  arXiv:2303.08774, 2023. 2
+     ments. In IEEE Conf. Comput. Vis. Pattern Recog., 2023.
+                                                                             [16] Omid Taheri, Vasileios Choutas, Michael J Black, and Dim-
+     2
+                                                                                  itrios Tzionas. Goal: Generating 4d whole-body motion for
+ [2] Donald J. Berndt and James Clifford. Using dynamic time
+                                                                                  hand-object grasping. In IEEE Conf. Comput. Vis. Pattern
+     warping to find patterns in time series. In Proceedings of the
+                                                                                  Recog., 2022. 2
+     3rd International Conference on Knowledge Discovery and
+                                                                             [17] Guy Tevet, Sigal Raab, Brian Gordon, Yoni Shafir, Daniel
+     Data Mining, 1994. 6
+                                                                                  Cohen-or, and Amit Haim Bermano. Human motion diffu-
+ [3] Zhongang Cai, Jianping Jiang, Zhongfei Qing, Xinying Guo,
+                                                                                  sion model. In Int. Conf. Learn. Represent., 2023. 2
+     Mingyuan Zhang, Zhengyu Lin, Haiyi Mei, Chen Wei, Ruisi
+     Wang, Wanqi Yin, Liang Pan, Xiangyu Fan, Han Du, Peng                   [18] Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier
+     Gao, Zhitao Yang, Yang Gao, Jiaqi Li, Tianxiang Ren, Yukun                   Martinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste
+     Wei, Xiaogang Wang, Chen Change Loy, Lei Yang, and Zi-                       Rozière, Naman Goyal, Eric Hambro, Faisal Azhar, et al.
+     wei Liu. Digital life project: Autonomous 3d characters                      Llama: Open and efficient foundation language models.
+     with social intelligence. In IEEE Conf. Comput. Vis. Pattern                 arXiv preprint arXiv:2302.13971, 2023. 2
+     Recog., 2024. 2                                                         [19] Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten
+ [4] Zhi Cen, Huaijin Pi, Sida Peng, Zehong Shen, Minghui                         Bosma, Fei Xia, Ed Chi, Quoc V Le, Denny Zhou, et al.
+     Yang, Zhu Shuai, Hujun Bao, and Xiaowei Zhou. Gener-                         Chain-of-thought prompting elicits reasoning in large lan-
+     ating human motion in 3d scenes from text descriptions. In                   guage models. In Adv. Neural Inform. Process. Syst., 2022.
+     IEEE Conf. Comput. Vis. Pattern Recog., 2024. 1                              3
+ [5] Jianqi Chen, Panwen Hu, Xiaojun Chang, Zhenwei Shi,                     [20] Andrew Witkin and Zoran Popovic. Motion warping. In
+     Michael Kampffmeyer, and Xiaodan Liang. Sitcom-crafter:                      SIGGRAPH Conference Papers, 1995. 2, 5
+     A plot-driven human motion generation system in 3d scenes.              [21] Lixing Xiao, Shunlin Lu, Huaijin Pi, Ke Fan, Liang Pan,
+     In Int. Conf. Learn. Represent., 2025. 1, 2                                  Yueer Zhou, Ziyong Feng, Xiaowei Zhou, Sida Peng, and
+ [6] Hyungjin Chung, Jeongsol Kim, Michael Thompson Mc-                           Jingbo Wang. Motionstreamer: Streaming motion genera-
+     cann, Marc Louis Klasky, and Jong Chul Ye. Diffusion pos-                    tion via diffusion-based autoregressive model in causal latent
+     terior sampling for general noisy inverse problems. In Int.                  space. In Int. Conf. Comput. Vis., 2025. 2
+     Conf. Learn. Represent., 2023. 2                                        [22] Hongwei Yi, Justus Thies, Michael J. Black, Xue Bin Peng,
+ [7] Chuan Guo, Xinxin Zuo, Sen Wang, Shihao Zou, Qingyao                         and Davis Rempe. Generating human interaction motions in
+     Sun, Annan Deng, Minglun Gong, and Li Cheng. Ac-                             scenes with text control. In Eur. Conf. Comput. Vis., 2024. 1
+     tion2motion: Conditioned generation of 3d human motions.                [23] Yuhong Zhang, Jing Lin, Ailing Zeng, Guanlin Wu, Shun-
+     In ACM Int. Conf. Multimedia, 2020. 2                                        lin Lu, Yurong Fu, Yuanhao Cai, Ruimao Zhang, Haoqian
+ [8] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising dif-                    Wang, and Lei Zhang. Motion-x++: A large-scale multi-
+     fusion probabilistic models. In Adv. Neural Inform. Process.                 modal 3d whole-body human motion dataset. arXiv preprint
+     Syst., 2020. 5                                                               arXiv:2501.05098, 2025. 2
+ [9] Nan Jiang, Zimo He, Zi Wang, Hongjie Li, Yixin Chen,
+     Siyuan Huang, and Yixin Zhu. Autonomous character-scene
+     interaction synthesis from text instruction. In SIGGRAPH
+     Asia Conference Papers, 2024. 1, 2, 4, 5
+[10] Korrawe Karunratanakul, Konpat Preechakul, Supasorn
+     Suwajanakorn, and Siyu Tang. Guided motion diffusion for
+     controllable human motion synthesis. In Int. Conf. Comput.
+     Vis., 2023. 2
+[11] Manmyung Kim, Kyunglyul Hyun, Jongmin Kim, and Jehee
+     Lee. Synchronized multi-character motion editing. ACM
+     Trans. Graph., 2009. 2
+[12] Han Liang, Wenqian Zhang, Wenxuan Li, Jingyi Yu, and Lan
+     Xu. Intergen: Diffusion-based multi-human motion genera-
+     tion under complex interactions. Int. J. Comput. Vis., 2024.
+     1, 2
+[13] Donggeun Lim, Jinseok Bae, Inwoo Hwang, Seungmin Lee,
+     Hwanhee Lee, and Young Min Kim. Event-driven story-
+
+
+
+
+                                                                      8182
+

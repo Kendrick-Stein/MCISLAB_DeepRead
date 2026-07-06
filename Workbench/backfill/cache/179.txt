@@ -1,0 +1,1505 @@
+                                                                  Your Large Vision-Language Model Only Needs
+                                                                   A Few Attention Heads For Visual Grounding
+
+                                                                Seil Kang   Jinyeong Kim Junhyeok Kim Seong Jae Hwang
+                                                                                      Yonsei University
+                                                                  {seil, jinyeong1324, timespt, seongjae}@yonsei.ac.kr
+
+
+
+
+arXiv:2503.06287v1 [cs.CV] 8 Mar 2025
+                                                                 Abstract                                           GT              Average            L14 H24          L14 H13
+
+
+                                        Visual grounding seeks to localize the image region cor-
+                                        responding to a free-form text description. Recently, the
+                                        strong multimodal capabilities of Large Vision-Language
+                                        Models (LVLMs) have driven substantial improvements in
+                                                                                                              Expression: the pizza mouth.                                Mask:
+                                        visual grounding, though they inevitably require fine-tuning
+                                        and additional model components to explicitly generate
+                                        bounding boxes or segmentation masks. However, we dis-
+                                        cover that a few attention heads in frozen LVLMs demon-
+                                        strate strong visual grounding capabilities. We refer to these
+                                        heads, which consistently capture object locations related
+                                                                                                              Expression: guy in the right.                               Mask:
+                                        to text semantics, as localization heads. Using localiza-
+                                        tion heads, we introduce a straightforward and effective
+                                        training-free visual grounding framework that utilizes text-
+                                        to-image attention maps from localization heads to identify
+                                        the target objects. Surprisingly, only three out of thousands
+                                        of attention heads are sufficient to achieve competitive lo-          Expression: girl on outer seat long hair no sleeves on.     Mask:
+                                        calization performance compared to existing LVLM-based
+                                        visual grounding methods that require fine-tuning. Our find-         Figure 1. Visualization of the text-to-image attention maps from
+                                        ings suggest that LVLMs can innately ground objects based            LLaVA-1.5-7B [35]. While the average attention map initially
+                                        on a deep comprehension of the text-image relationship, as           seems uninformative for localization, a closer examination reveals
+                                        they implicitly focus on relevant image regions to generate          that LVLM possesses built-in localization heads that consistently
+                                                                                                             capture key areas of an image corresponding to the referring text,
+                                        informative text outputs. All the source codes will be made
+                                                                                                             regardless of sample variations. L14 H24 refers to the 24th atten-
+                                        available to the public.                                             tion head in the 14th layer of the LVLM.
+
+                                                                                                             rent LVLM-based visual grounding methods require ex-
+                                        1. Introduction                                                      plicit fine-tuning of LVLMs with additional visual ground-
+                                        Visual grounding is a task that, given textual descriptions,         ing datasets and modifications to model components to en-
+                                        identifies and localizes relevant objects within an image,           able the generation of bounding boxes [6, 61, 68] or seg-
+                                        producing outputs such as bounding boxes [39, 70] or seg-            mentation masks [26, 45, 65, 74].
+                                        mentation masks [18]. Recently, this vision-language task,               Despite the interesting integration of LVLMs in previous
+                                        which inherently requires a deep understanding of the rela-          visual grounding works, a fundamental question remains:
+                                        tionship between images and text, has seen significant ad-           since LVLMs generate text outputs that imply an under-
+                                        vancements with the emergence of powerful Large Vision-              standing of specific image regions, is it possible to explicitly
+                                        Language Models (LVLMs) [28, 35, 36, 56]. However,                   observe this mechanism in action? In other words, we ask
+                                        since LVLMs are primarily designed to generate text out-             whether we can extract how the LVLMs “focus” on spe-
+                                        puts, directly leveraging them as a vision-language tool to          cific image regions corresponding to given text descriptions
+                                        identify and localize objects within an image (i.e., visual          for visual grounding. A natural first approach to addressing
+                                        grounding) presents technical challenges. Inevitably, cur-           this question might be to examine the text-to-image atten-
+
+
+                                                                                                         1
+tion maps, which reveal how a text description attends to             (a) Fine-tuning based methods              Specialized token
+
+different image patches. To explore this, we visualize the
+average attention maps of LVLMs across various layers and                                                          [SEG]      SAM
+
+heads—a common method in ViTs [11, 73] and diffusion                                              LVLM
+                                                                                                                  Language description
+models (DMs) [4, 17, 54]—anticipating that they would                   “Can you segment
+capture the regions associated with the referring text. How-           the left white horse
+                                                                                                                    [0.4,0.3,0.7,0.9]
+                                                                       one next to black?”
+ever, unlike the interpretable attention patterns observed in
+ViTs and DMs, the text-to-image attention maps in LVLMs
+                                                                      (b) Training-free method (Ours)
+appear sparse and contain significant noise, as illustrated in
+the second column of Fig. 1. This suggests that the current                                       LVLM
+                                                                                                                               SAM
+use of LVLM attention maps may struggle to accurately pin-
+point relevant objects for visual grounding.                                                       layer 𝑙
+                                                                                              ⋯              ⋯
+    However, interestingly, our work reveals that not the av-          “left white horse                         Attention
+erage of the attention maps, but some small subset of at-                 one next to                              map
+                                                                             black.”
+tention heads are capable of providing tangible and precise
+text-image attention maps. In particular, we find that a few          Figure 2. Comparison of LVLM frameworks for visual ground-
+attention heads in LVLMs consistently capture regions in              ing. (a) Existing methods generally fine-tune a LVLM to leverage
+images corresponding to the referred text, regardless of the          specialized tokens (e.g., [SEG]) or language descriptions for visual
+samples. We refer to these heads as localization heads. For           grounding. (b) Our framework utilizes the attention maps of only
+example, as presented in the third and fourth columns of              a few localization heads from frozen LVLMs.
+Fig. 1, the attention maps of the 24th head of the 14th layer
+(L14 H24) and the 13th head of the 14th layer (L14 H13)               identifying regions that are relevant and coherent with the
+in LLaVA-1.5-7B [35] consistently highlight the regions of            text expression. To the best of our knowledge, we are the
+interest based on the referred text.                                  first to identify the localization properties of specific atten-
+    In this work, we introduce how we systematically iden-            tion heads in LVLMs.
+tify such localization heads based on two explicit criteria.              In summary, our contributions are as follows:
+(1) We measure how much each attention head focuses on                • We discover that the specific attention heads in LVLMs
+the image by calculating the attention sum and only select               have the capability for visual grounding, which we refer
+the heads that dominantly attend to the image. (2) Among                 to as localization heads.
+these heads, the ones that specifically pay attention to a cer-       • We propose a simple yet effective framework for LVLM-
+tain region of the image, which is measured by spatial en-               based training-free visual grounding with localization
+tropy [2], are considered to effectively localize the referred           heads. The attention maps from a few localization heads
+object. We validate that the selected localization heads con-            are utilized to predict the bounding box or mask of the
+sistently capture objects closely associated with the text.              referred object.
+    With our localization heads, we introduce a simple yet            • We evaluate our approach across various LVLMs. Our
+effective training-free visual grounding framework. The at-              framework demonstrates superior performance by a large
+tention maps from the localization heads are assembled to                margin compared to other training-free methods and even
+predict the bounding box or mask of the referred object. No-             performs comparably to fine-tuned methods.
+tably, only three localization heads are enough to localize
+the referred object within the image, suggesting that they
+                                                                      2. Related Works
+are highly specialized to attend to relevant image regions.           Visual Grounding. Visual grounding aims to identify the
+As shown in Fig. 2, in contrast to existing fine-tuning based         region in the image based on a free-form natural language
+methods, our framework is training-free, eliminating the              expression [5], which has expanded the scope of detection
+need for additional fine-tuning LVLMs for visual ground-              and segmentation tasks to a more realistic scenario [50, 66].
+ing tasks.                                                            Two prominent tasks within visual grounding are Referring
+    We validate our approach across ten different LVLMs               Expression Comprehension (REC) [39, 70] and Referring
+with varying parameter counts, architectures, and training            Expression Segmentation (RES) [18, 34]. REC focuses on
+datasets, demonstrating its broad applicability. Our frame-           localizing a referred object in an image and generating a
+work outperforms the existing training-free methods by sig-           bounding box, while RES further requires a pixel-level seg-
+nificant margins. Furthermore, our method performs com-               mentation mask. In order to address these tasks, numerous
+parably to specially fine-tuned LVLMs for visual ground-              studies have been conducted to explore effective methods
+ing tasks (e.g., LISA [26]). The results indicate that LVLMs          that consider both text and visual information simultane-
+can serve as effective text-referring localizers, intrinsically       ously [23, 29, 33, 42, 49, 62, 67, 75].
+
+
+                                                                  2
+Application of LVLMs in Grounding Tasks. Recently, vi-             putes the attention weights as:
+sual grounding has been significantly advanced by leverag-
+                                                                                                               QK ⊤
+                                                                                                                     
+ing the outstanding vision-language processing capabilities                   Attnℓ,h (Z ℓ−1 ) = softmax       √          .     (1)
+of LVLMs. To incorporate LVLMs into visual grounding                                                             dh
+tasks, existing methods include visual grounding datasets          Note that the attention weights reflect the similarity between
+in the training process and implement additional com-              the query Q and key K matrices.
+ponents to extract localization information. For example,
+                                                                   Investigation of Image-Text Interaction. Considering that
+LISA [26] introduces [SEG] token as a mask embedding
+                                                                   LLM decoding operates in an auto-regressive manner, in-
+and generates a segmentation mask using additional mask
+                                                                   formation flows from preceding tokens to subsequent ones,
+decoder [24]. F-LMM [64] leverages the attention weights
+                                                                   resulting in the final token to encapsulate the context of the
+of frozen LVLMs, but still requires training its mask re-
+                                                                   entire sentence [20, 59]. Thus, we posit that the query vec-
+finement modules on visual grounding datasets. In contrast,
+                                                                   tor of the last input text token qtxt serves as a representa-
+we propose a training-free visual grounding method that di-
+                                                                   tive query for the whole sentence. For example, in the sen-
+rectly utilizes LVLMs.
+                                                                   tence “the pizza mouth.” in Fig. 1, the query vector of the
+Training-Free Visual Grounding. Given the high per-                last token [.] is utilized in our experiments. To investigate
+formance of multimodal foundation models across di-                image-text interactions, we examine the attention weights
+verse vision-language tasks, training-free visual ground-          of where the query is qtxt and keys are image tokens. Specif-
+ing emerges as a new research direction. Existing training-        ically, considering a slight modification of Eq. (1), for the
+free methods typically apply internal features or attention        attention weights aℓ,h at layer ℓ and head h with qtxt as a
+maps from CLIP [44] or Text-to-Image Diffusion Models              query token:
+(DMs) [47]. CLIP-based methods typically employ off-the-
+                                                                                                  qtxt K ⊤
+                                                                                                          
+                                                                                                                  2
+shelf models [24, 46] to generate region proposals and se-                      ℓ,h
+                                                                              a = softmax          √         ∈ RP +L ,        (2)
+lect the most relevant bounding box [52] or mask [53, 71]                                              dh
+based on the CLIP similarity score with the text query. On
+                                                                   we focus on the first P 2 components, aℓ,h [1 : P 2 ], for our
+the other hand, DM-based methods utilize the residue of the
+                                                                   analysis. In the following sections of this paper, this will
+text-to-image diffusion process (e.g., the attention map) to
+                                                                   also be denoted as Lℓ Hh for simplicity. For example, L5
+predict the segmentation mask [3, 40]. Our work advances
+                                                                   H3 refers to the third attention head in the fifth layer of the
+this line of research by introducing the first LVLM-based
+                                                                   LVLM.
+training-free visual grounding framework.
+                                                                   4. Towards Discovering Localization Heads
+3. Background
+                                                                   Recent studies [9, 57, 76] have shown that the attention
+Notation. Large Vision-Language Models (LVLMs) typi-               heads exhibit distinct characteristics, motivating us to find
+cally consist of three main components: a vision encoder,          specific heads possessing the potential to serve as effec-
+a projector, and a large language model. For an input im-          tive text referring localizers. In this section, we propose at-
+age Xv , the vision encoder and the projector transform the        tention sum and spatial entropy in Sec. 4.1 as two criteria
+                                                       2
+image into a sequence of visual embedding Zv ∈ RP ×d ,             for selecting such heads. Through experiments in Sec. 4.2,
+where P 2 is the number of flattened image tokens and d is         we validate that the heads capturing objects correspond-
+the hidden dimension. Similarly, an input text Xt is con-          ing to the text description can be successfully identified
+verted into a sequence of token embeddings Zt ∈ RL×d ,             based on the proposed criteria. Note that the first two lay-
+where L is the number of tokens in the text. The visual and        ers of the LLM are consistently excluded in our analy-
+textual embeddings are concatenated as Z 0 = [Zv ; Zt ] ∈          ses, as the early layers are known to operate differently
+     2
+R(P +L)×d and fed into the large language model (LLM)              from the other layers [25]. To demonstrate the generalizabil-
+as the input embeddings.                                           ity of our findings, we conduct experiments across various
+Multi-Head Self-Attention. The input embeddings Z 0                LVLMs [7, 8, 30, 35, 36, 38, 69] and datasets [18, 22]. De-
+pass through a series of decoder blocks, which consists            tails of the experimental setup and more results are provided
+of multi-head self-attention and feed-forward neural net-          in the Appendix Sec. A. and C., respectively.
+work module. Specifically, we focus on the attention heads,        4.1. Criteria to Find Localization Heads
+as these are the only components where tokens interact.
+In layer ℓ and head h, the hidden state from the previous          Our final goal is to identify heads that excel in text referring.
+layer Z ℓ−1 is projected into query Q, key K, and value            To achieve this, we propose two criteria in this section.
+          2
+V ∈ R(P +L)×dh matrices, where dh is the hidden dimen-             Criterion 1: Attention Sum. To identify heads that pre-
+sion of the attention head. Then, the attention head com-          dominantly focus on the overall image, we first consider
+
+
+                                                               3
+                 LLaVA-1.5-7B                    LLaVA-1.5-13B                    L18 H10
+
+                                                                                                   Binarize           𝐶2
+
+Average 𝑆img                      Average 𝑆img
+         ℓ,ℎ                               ℓ,ℎ
+                                                                                                              𝐶1
+                                                                                                                                               Low 𝐻(𝑨𝑙,ℎ )
+                                                                                  L32 H10
+                                                                                                                           𝐶2
+                                                                                                   Binarize   𝐶1 𝐶3
+                  Head Index                       Head Index                                                 𝐶4
+                                                                                                                 𝐶5                           High 𝐻(𝑨𝑙,ℎ )
+               DeepSeek-VL-1.3B                  DeepSeek-VL-7B
+                                                                                                                                             𝑃(𝐶)
+
+                                                                          Figure 4. Illustration of the process for calculating spatial entropy.
+
+Average 𝑆img                      Average 𝑆img
+         ℓ,ℎ                               ℓ,ℎ                            The attention map is binarized, and the spatial entropy is computed
+                                                                          based on the sizes of its connected components {Ci }N   i=1 .
+
+
+
+
+                                                                                                                                         “the guy sitting
+                  Head Index                       Head Index                                                               ⋰          down
+                                                                                                                                     “left    to the
+                                                                                                                                           white          ⋰
+                                                                                                                                                     right”
+                                                                                                                                                  horse
+                                                                                 LVLM                                              “left white horse
+                                                                                                                                   onewhite
+                                                                                                                                 “left    next to black”
+                                                                                                                                               horse
+                    ℓ,h
+Figure 3. Average Simg  values for each attention head. We sort the                                                               one next to black”
+                                                                                                                                one next to black.”
+                              ℓ,h                         ℓ,h
+heads in ascending order of Simg  . Attention heads with Simg ≥τ                                           Image 𝑿v                       Text 𝑿t
+are considered to effectively attend to the image, where τ is the                   Collect all attention maps
+threshold determined by the maximum curvature in the graph.
+                                                                                                                                                              No
+                 ℓ,h      PP 2 ℓ,h                                                                                 ⋯                           ℓ,ℎ
+                                                                                                                                              𝑆img ≥
+attention sum Simg   =       i=1 a   [i], which quantifies the
+                                                                                   L3  L3 L3 L3 ⋯                               ⋰            Yes              Discard
+relevance of image information to qtxt within individual at-                       H1
+                                    ℓ,h                                     L3      L3 H2
+                                                                                        L3 H3
+                                                                                            L3 H4                  L32
+tention heads. Then, the average Simg    for each head is com-              H1          H2    H3      H4           H32                        Evaluate 𝐻(𝑨ℓ,ℎ )
+puted across 1,000 random samples from RefCOCO [22]
+training set.                                                                                       Select 10 heads with the lowest 𝐻(𝑨ℓ,ℎ )
+                                                            ℓ,h
+    As shown in Fig. 3, most attention heads exhibit low Simg
+
+
+                                                                                                                                                                         Selection frequency
+values, indicating that relatively few heads contribute sig-                                                       ⋯
+nificantly to the model’s text-image interaction. To distin-                        L3       L3      L3       L3
+                                                                                                               ⋯                ⋰
+                          ℓ,h
+guish heads with high Simg    from those with low values, we                L14 H1
+                                                                                 L14 H2
+                                                                                      L14 H3
+                                                                                           L18 H4                     L21
+set the threshold τ at the point of the maximum curvature                   H24 H13 H26 H10                           H1                                        ⋯
+in the graph (e.g., τ = 0.24 in LLaVA-1.5-7B [35]). We
+                         ℓ,h                                                                       Calculate selection frequency across samples
+deem the heads with Simg      ≥ τ to effectively attend to im-
+age. While we adopt the maximum curvature as a practical                  Figure 5. Overview of finding localization heads. We first identify
+choice, we note that our analysis remains robust across a                 heads with high attention sum. Then, we evaluate spatial entropy
+range of reasonable τ values. For analyses using alternative              for each head and select 10 heads with the lowest spatial entropy.
+τ values, please refer to Appendix Sec. C.                                We repeat this process for 1,000 image-text pairs and calculate the
+                                                                          selection frequency of each head.
+Criterion 2: Spatial Entropy. For an attention head to be
+considered effective at focusing on objects, it must not only             as:
+have a high attention sum value for the image but also con-                                                        N
+                                                                                                                   X
+centrate its attention specifically around the objects. Since                                H(Aℓ,h ) = −                   P (Ci ) log P (Ci ),                        (3)
+it is reasonable to assume that the object patches tend to                                                         i=1
+stay near each other [51, 58, 72], we evaluate how locally a                                       PN
+cluster is formed in each attention map through spatial en-               where P (Ci ) = |Ci |/ i=1 |Ci |. As a result, an attention
+tropy [2, 41] to identify localization heads.                             map Aℓ,h is considered effectively localized if it exhibits
+    Fig. 4 presents an example of how spatial entropy is cal-             low spatial entropy. For more mathematical details on spa-
+culated. First, we reshape the attention weights aℓ,h [1 : P 2 ]          tial entropy, please refer to the Appendix Sec. B.
+into a P × P attention map Aℓ,h . The attention map is bina-
+                                                                          4.2. Finding Localization Heads via Criteria
+rized by assigning a value of 1 to elements above the mean
+and 0 to those below it [41]. Next, we identify connected                 In this section, we utilize the two criteria described earlier
+components Ci [14], defined as a set of coordinates con-                  to select a small subset of attention heads. Then, we demon-
+nected via 8-neighbors. Then, for the set of N connected                  strate that the selected heads effectively capture objects rel-
+components {Ci }N   i=1 , the spatial entropy H is calculated             evant to the text.
+
+
+                                                                      4
+                            LLaVA-1.5-7B              LLaVA-1.5-13B                       DeepSeek-VL-1.3B                           DeepSeek-VL-7B
+
+           Selection
+
+
+         Frequency (%)
+   (a)
+
+
+
+
+              IoU
+   (b)
+
+
+                         Ranks of Head Index       Ranks of Head Index                    Ranks of Head Index                      Ranks of Head Index
+Figure 6. (a) Selection frequency of individual heads. Only a few heads exhibit high selection frequency, suggesting that their attention maps
+are consistently well-localized. We calculate the selection frequency five times and report the average and standard deviation. (b) Scatter
+plot illustrating the relationship between selection frequency rank and each head’s average IoU. Heads with higher selection frequency tend
+to show higher IoU values, indicating that they capture text semantics more effectively. The Spearman correlation coefficient (ρ) between
+rank and IoU is displayed in the top-right corner. The results of the Spearman correlation are statistically significant (p < 0.001).
+
+                                                                                                                    Localization Gaussian
+    To begin with, we rank all attention heads in order of                  LVLM                                      Heads      Smoothing
+how well they meet our criteria. Specifically, for 1,000 ran-                         ⋯                 ⋯
+                                                                                                                    L14 H24
+                                                                          Layer 14
+                                                                                                                                             SAM
+dom image-text samples from the RefCOCO [22] training                                L14 H1   ⋯     L14 H32
+                                              ℓ,h
+set, we retain all the heads that satisfy Simg    ≥ τ . Among
+                                                                                                                    L14 H13
+                                                                                      ⋯                 ⋯
+these heads, we calculate the frequency with which each
+                                                                                               “left white horse
+head exhibits the 10-lowest spatial entropy across the sam-
+                                                                                                                    L14 H26
+                                                                                              one next to black.”
+
+ples to identify heads consistently exhibiting low spatial en-
+tropy. We refer to this metric as the selection frequency. The
+                                                                          Figure 7. Our training-free visual grounding framework. Attention
+overall process is illustrated in Fig. 5, and the results are re-
+                                                                          maps of localization heads are assembled into a combined map,
+ported in Fig. 6(a). Now, we assign ranks to each head based
+                                                                          which is then used to define the bounding box or segmentation
+on their selection frequency, with higher-ranked heads be-                mask.
+ing those with high selection frequency. For example, in
+Fig. 6(a), with LLaVA-1.5-7B [35], head L14 H24 ranks                     trend consistently appears across various LVLMs (see Ap-
+first, followed by head L14 H13 in second place.                          pendix Sec. C. for trends across more LVLMs), we claim
+                                                                          that localization heads are an innate property of LVLMs.
+   Finally, we aim to demonstrate that higher-ranked heads
+are more effective at capturing objects relevant to the text.
+To this end, we binarize the attention maps of each head to               5. Visual Grounding with Localization Heads
+obtain pseudo-masks and measure the IoU between these                     In the previous section, we demonstrated that our criteria ef-
+pseudo-masks and the ground truth (GT) masks. Then, we                    fectively identifies text-referring localization heads. Build-
+visualize the relationship between head ranks, derived from               ing on this, we propose a simple yet effective method to
+Fig. 6(a), and their IoU values as a scatter plot, shown in               solve visual grounding tasks using these localization heads.
+Fig. 6(b). Note that only the heads with a selection fre-                     Specifically, our objective is to perform visual ground-
+quency of at least 1% are considered in this analysis.                    ing tasks, given an LVLM. To achieve this, the localiza-
+    As visualized in Fig. 6(b), attention heads with higher               tion heads of the LVLM must first be identified. Follow-
+selection frequency tend to exhibit higher average IoU. We                ing the process we described in Sec. 4.2 and Fig. 5, we
+also calculate the Spearman correlation coefficient to quan-              rank the heads based on the selection frequency and select
+titatively evaluate the relationship between the selection                the heads with the k-highest rank. Subsequently, an image-
+frequency and IoU. The correlation coefficients are above                 text pair for which a mask is to be generated is fed into the
+0.7 for all LVLMs, indicating strong positive correlations.               LVLM, and attention maps are extracted from the localiza-
+This trend becomes increasingly evident for heads with                    tion heads.
+higher ranks, leading us to conclude that a small number                      As illustrated in Fig. 7, Gaussian smoothing is applied
+of top-ranked heads strongly capture semantic information.                to each attention map of the localization head to pre-
+We refer to these heads as localization heads. Since the                  serve detailed localization information while minimizing
+
+
+                                                                      5
+Table 1. Comparison of our method with existing fine-tuning based Table 2. Comparison of our method with existing fine-tuning based
+and training-free methods on the REC (Referring Expression Com- and training-free methods on the RES (Referring Expression Seg-
+prehension) task. All fine-tuning based methods are trained on the mentation) task. All fine-tuning based methods, except for LISA [26]
+training set of the corresponding datasets. Best performance is col- and GSVA [65], are trained on the training set of the corresponding
+ored in red for fine-tuning and in blue for training-free methods.   datasets. Red and blue colors are used as in Tab. 1.
+                       RefCOCO          RefCOCO+         RefCOCOg                                RefCOCO          RefCOCO+          RefCOCOg
+      Method                                                                    Method
+                       val testA testB val testA testB   val    test                             val testA testB val testA   testB val     test
+ Fine-tuning based methods                                                 Fine-tuning based methods
+ MDETR [21]          86.8 89.6 81.4 79.5 84.1 70.6       81.6   80.9       LAVT [67]           72.7 75.8 68.8 62.1 68.4      55.1   61.2   62.1
+ SeqTR [77]          87.0 90.2 83.6 78.7 84.5 71.9       82.7   83.4       ReLA [34]           73.8 76.5 70.2 66.0 71.0      57.7   65.0   66.0
+ G-DINO [37]         89.2 91.9 86.0 81.1 87.4 74.7       84.2   84.9       UniRef++ [63]       79.1 82.1 77.5 68.4 74.0      61.5   71.4   72.8
+ ONE-PEACE [60] 92.6 94.2 89.3 88.8 92.2 83.2            89.2   89.3       UNINEXT [31]        82.2 83.4 81.3 72.5 76.4      66.2   74.4   76.4
+ UNINEXT [31]        92.6 94.3 91.5 85.2 89.6 79.8       88.7   89.4       Fine-tuning based methods w/ LVLMs
+ Fine-tuning based methods w/ LVLMs                                        LISA-7B [26]        74.1 76.5 71.1 62.4 67.4      56.5   66.4   68.5
+ Shikra-7B [6]       87.0 90.6 80.2 81.6 87.4 72.1       82.3   82.2       GSVA-7B [65]        76.4 77.4 72.8 64.5 67.7      58.6   71.1   72.0
+ Ferret-7B [68]      87.5 91.4 82.5 80.8 87.4 73.1       83.9   84.8       LISA-13B [65]       73.4 76.2 69.5 62.3 66.6      56.3   68.2   68.5
+ Shikra-13B [6]      87.8 91.1 81.8 82.9 87.8 74.4       82.6   83.2       GSVA-13B [65]       77.7 79.9 74.2 68.0 71.5      61.5   73.2   73.9
+ Ferret-13B [68]     89.5 92.4 84.4 82.8 88.1 75.2       85.8   86.3       GLaMM [45]          79.5 83.2 76.9 75.9 78.7      68.8   76.8   78.4
+ CogVLM-17B [61] 92.8 94.8 89.0 88.7 92.9 83.4           89.8   90.8       PSALM [74]          83.6 84.7 81.6 72.9 75.5      70.1   73.8   74.4
+ Training-free methods                                                     Training-free methods
+ ReCLIP [52]         45.8 46.1 47.1 47.9 50.1 45.1       59.3 59.0         Yu et al. [71]      24.9 23.6 24.7 26.2 24.9      25.8 31.1 31.0
+ Han et al. [15]     49.4 47.8 51.7 48.9 50.0 46.9       61.0 60.0         TAS [53]            29.5 30.3 28.2 33.2 38.8      28.0 35.8 36.2
+ GroundVLP [48]      65.0 73.5 55.0 68.8 78.1 57.3       74.7 75.0         Ref-Diff [40]       35.2 37.4 34.5 35.6 38.7      31.4 38.6 37.5
+ Training-free methods w/ LVLMs (Ours)                                     Training-free methods w/ LVLMs (Ours)
+ DeepSeek-VL-1.3B 73.2 77.7 70.7 62.0 66.7 57.1          65.2   69.3       DeepSeek-VL-1.3B 56.3 57.0 52.7 51.2 55.5         49.2   52.3   55.8
+ Mini-Gemini-2B      74.0 77.5 71.1 62.5 67.8 59.3       65.1   69.3       Mini-Gemini-2B      59.8 60.3 55.5 56.3 59.9      51.8   55.1   60.3
+ InternVL-6B         85.2 86.4 78.5 78.0 83.3 71.9       81.1   80.5       InternVL-6B         62.1 65.8 60.9 62.2 65.5      55.5   63.5   65.4
+ Yi-VL-6B            85.1 86.8 78.4 78.9 84.2 72.2       80.5   80.9       Yi-VL-6B            62.5 65.8 60.7 61.0 65.3      56.0   64.0   67.0
+ DeepSeek-VL-7B 85.3 87.2 81.0 77.8 83.9 73.5            81.1   82.8       DeepSeek-VL-7B 73.9 76.6 70.7 63.1 66.1           56.5   64.0   68.9
+ ShareGPT4V-7B       86.1 87.1 80.5 79.7 86.2 71.3       82.4   82.9       ShareGPT4V-7B       73.5 76.7 70.1 59.4 63.8      55.9   60.7   65.1
+ LLaVA-7B            80.3 83.5 77.4 74.5 80.2 69.3       77.5   77.1       LLaVA-7B            65.4 66.2 61.1 59.9 63.2      52.7   59.7   63.3
+ LLaVA-1.5-7B        86.5 89.8 80.2 80.1 86.3 71.9       82.3   83.0       LLaVA-1.5-7B        74.2 76.5 70.4 62.5 65.2      56.0   64.2   68.1
+ LLaVA-13B           82.8 85.3 79.8 79.3 82.4 73.0       79.8   79.5       LLaVA-13B           66.8 68.0 63.7 62.3 66.9      57.3   65.0   68.2
+ LLaVA-1.5-13B       87.2 90.0 83.3 82.7 88.5 74.0       84.3   85.5       LLaVA-1.5-13B       76.1 78.9 72.8 64.1 67.1      57.3   67.7   69.0
+
+
+potential random noise. The resulting maps are assembled                    Yi-VL [69], ShareGPT4V [7], LLaVA [36], and LLaVA-
+through element-wise summation to produce the combined                      1.5 [35], with model sizes ranging from 1.3B to 13B. The
+map. This combined map is then binarized to produce the                     number of localization heads is fixed to k = 3 for all mod-
+pseudo-mask. Finally, the largest rectangle encompassing                    els.
+the pseudo-mask is identified and can be used as a bounding                 Benchmarks. To assess visual grounding capabilities, we
+box. Additionally, this bounding box can serve as a prompt                  conduct experiments on Referring Expression Comprehen-
+for SAM [24] to address the segmentation task. Additional                   sion (REC) and Referring Expression Segmentation (RES)
+details on the algorithm used to find the bounding box are                  tasks. REC requires the model to predict the bounding box
+provided in Appendix. Sec. B, and the ablation study on                     of the referred object, while RES requires the segmentation
+Gaussian smoothing is presented in Appendix. Sec. D.                        mask. We use the RefCOCO, RefCOCO+ [22], and Ref-
+                                                                            COCOg [18] datasets. We further evaluate the performance
+6. Experiments                                                              of our method on the more challenging scenario, Reason-
+                                                                            ing Segmentation (ReasonSeg) [26], which requires com-
+In this section, we verify whether the localization head dis-               plex reasoning or world knowledge. For the REC task, we
+covered through our selection process ensures robust perfor-                report the performance using Acc@0.5 metric, which is the
+mance on well-known visual grounding benchmarks. Addi-                      standard detection metric for REC. For the RES and Rea-
+tionally, we conduct ablation studies to validate the settings              sonSeg task, cIoU is used as the evaluation metric.
+of our method.                                                              Baselines. We compare our method with existing fine-
+                                                                            tuning based and training-free approaches. The fine-tuning
+6.1. Experimental Setup
+                                                                            based methods include visual grounding specialist mod-
+Models. We apply our approach across ten LVLMs to                           els [21, 31, 34, 37, 63, 67, 77], along with fine-tuned
+validate its broad applicability. The main experiments in-                  LVLMs for object localization [6, 61, 68] or segmentation
+clude DeepSeek-VL [38], Mini-Gemini [30], InternVL [8],                     tasks [26, 45, 65, 74]. The training-free methods include
+
+
+                                                                       6
+                   Referring Expression Comprehension                                                                  Referring Expression Segmentation
+                Fine-tuning   Training-free                        Ours                                           Fine-tuning     Training-free                        Ours
+     GT                                                                                               GT
+                Shikra-13B      ReCLIP        DeepSeek-VL-7B   LLaVA-1.5-7B   LLaVA-1.5-13B                       LISA-13B           ZS-RS        DeepSeek-VL-7B   LLaVA-1.5-7B   LLaVA-1.5-13B
+
+
+
+
+ Expression: nut and carrot section to the right of the meat section. Bounding Box:               Expression: left partial box.                                                     Mask:
+
+
+
+
+ Expression: one with finger in mouth.                                Bounding Box:               Expression: fourth remote from left.                                              Mask:
+
+
+
+
+ Expression: the white chair on bottom.                               Bounding Box:               Expression: doughnut on left second from front.                                   Mask:
+Figure 8. Qualitative results of our framework with the baseline models. LVLMs successfully localize the referred objects in various
+challenging scenarios including multiple similar objects, non-salient objects, and complex spatial relations.
+
+Table 3. Comparison of our framework with LISA [26] on the Rea-                                        Fig. 8 compares the qualitative results of our method
+sonSeg (Reasoning Segmentation) benchmark.                                                         with those of the baseline models. The results demonstrate
+                                          val                    test                              that LVLMs can accurately identify the correct object re-
+              Method                                                                               gions, even in challenging scenarios where multiple similar
+                                      overall       short      long      overall
+                                                                                                   objects are present, or when the referred object is not promi-
+    LISA-7B [26]                       52.3         48.5       48.9       48.8
+    LISA-13B [26]                      60.3         50.0       50.9       50.8                     nently centered in the image. According to [52], CLIP-
+    LLaVA-1.5-7B (Ours)                52.4         48.0       49.1       48.7                     based methods struggle to interpret orientation descriptors
+    LLaVA-1.5-13B (Ours)               60.5         48.7       51.0       49.9                     (e.g., “left”). Therefore, they have to manually decompose
+                                                                                                   the referring expression into multiple components [71] or
+CLIP-based methods [15, 48, 52, 53, 71] and DM-based                                               rely on post-processing steps that use the object’s spatial
+method [40]. More details on the experimental setup are                                            information [53]. In contrast, our framework can directly
+provided in the Appendix Sec. A.                                                                   predict the bounding box or segmentation mask of the re-
+                                                                                                   ferred object without carefully designed post-processing
+6.2. Main Results                                                                                  steps, with the help of the strong text comprehension ca-
+                                                                                                   pabilities of LVLMs. More qualitative results are provided
+REC and RES. Tab. 1 and Tab. 2 present the results of our                                          in the Appendix Sec. E.
+method and the baseline models on the REC and RES tasks,
+                                                                                                   Reasoning Segmentation. Tab. 3 shows the results of our
+respectively. Our framework achieves substantial improve-
+                                                                                                   method and LISA [26] on the ReasonSeg. For a fair compar-
+ments over the existing training-free methods. Surprisingly,
+                                                                                                   ison, we compare both methods using the same backbone
+our method performs comparably to the fine-tuned LVLMs,
+                                                                                                   model, LLaVA-1.5 [35]. Our method performs comparably
+even though our method does not require additional train-
+                                                                                                   to LISA and sometimes outperforms it. The results suggest
+ing. For example, in the REC task, the best performance of
+                                                                                                   that the localization heads in LVLMs are generalizable to
+our approach achieves results on par with Shikra [6] and
+                                                                                                   various visual grounding tasks, including those that require
+Ferret [68], which share the same base LLMs as LLaVA-
+                                                                                                   complex reasoning or world knowledge.
+1.5 [35], but are fine-tuned for localization tasks. A similar
+finding is observed with LISA [26] in the RES task. The
+                                                                                                   6.3. Ablation Studies
+results indicate that frozen LVLMs can effectively localize
+the referred object without any additional training, due to                                        Number of Localization Heads. In our main experiments,
+the presence of localization heads.                                                                we set the number of localization heads to k = 3. Here, we
+   Notably, the visual grounding capability is enhanced                                            investigate the effect of varying k on visual grounding per-
+as the model evolves. First, performance consistently im-                                          formance. Tab. 4 presents the results of our framework with
+proves as model size increases (1.3B to 13B). Second,                                              different k values. We observe that the performance gener-
+updates in architecture and training data (e.g., LLaVA to                                          ally improves as k increases from 1 to 3, indicating that top-
+LLaVA-1.5) also boost performance. This observation sug-                                           3 heads complement each other to provide more accurate
+gests that the grounding ability of LVLMs could be further                                         localization. However, increasing k further does not guaran-
+enhanced with larger models and more diverse training data.                                        tee better performance, implying that additional heads may
+
+
+                                                                                              7
+Table 4. Ablation study on the number of localization heads (k) on                Attention map
+the RefCOCO validation set for the RES task.                                    (Localization head)      Prediction             GT
+
+                                      k (# of Localization Heads)
+            Method
+                                    1       2      3      4        5
+    DeepSeek-VL-1.3B               55.1    56.3   56.3   55.3     51.2
+    MiniGemini-2B                  58.0    58.5   59.8   59.1     54.2
+    InternVL-6B                    61.3    61.8   62.1   61.0     55.7
+    Yi-VL-6B                       61.8    62.1   62.5   62.6     55.4
+    DeepSeek-VL-7B                 70.1    72.2   73.9   73.0     65.3
+    ShareGPT4V-7B                  70.3    72.4   73.5   73.5     60.8                          Expression: third from right.
+    LLaVA-7B                       62.7    63.1   65.4   65.3     57.7
+    LLaVA-1.5-7B                   70.3    73.1   74.2   74.1     65.4       Figure 9. Failure case of the LLaVA-1.5-13B [35] in visual
+    LLaVA-13B                      63.5    64.7   66.8   66.4     57.8       grounding. The text-to-image attention map from a localization
+    LLaVA-1.5-13B                  71.7    75.7   76.1   76.0     65.7       head (L15 H39) shows where the model focuses, helping to under-
+    Average                        64.5    66.0   67.1   65.4     58.9       stand the model’s failure.
+
+                                                                             method shows worse results than the fixed method. While
+Table 5. Ablation study on the validation of criteria and selection
+                                                                             our criteria identify attention maps exhibiting apparent clus-
+methods for localization heads. The results are reported on the Re-
+fCOCO validation set and LLaVA-1.5-13B.                                      ters, they do not ensure that these clusters are formed around
+                                                                             text semantics. As a result, the greedy method may select
+              Criteria               Selection                               heads that are localized but not text-referred. In contrast,
+                                                     REC        RES
+        ℓ,h
+       Simg      H(A     ℓ,h
+                               )   Fixed   Greedy                            our method involves a statistical analysis (i.e., selection fre-
+        ✓                                    ✓       23.7       18.8         quency). This ensures that the localization heads are gen-
+                    ✓                        ✓       29.8       21.5         uinely text-referred, consistently focusing on text-related
+        ✓           ✓                        ✓       67.4       63.8         regions rather than arbitrarily clustered areas.
+        ✓                           ✓                23.9       19.3
+                    ✓               ✓                31.3       25.7         6.4. Understanding LVLMs When They Fail
+        ✓           ✓               ✓                87.2       76.1         Here, we briefly discuss how localization heads may also
+                                                                             help us better understand LVLMs. Specifically, localization
+introduce noise or redundancy. It is worth noting that the                   heads allow us to identify where LVLMs focus when they
+optimal k trend remains consistent across different LVLMs.                   fail to ground the correct object. Fig. 9 illustrates an exam-
+The results suggest that similar numbers of attention heads                  ple where the model fails to predict the correct object, the
+are responsible for localization of referred objects in various              third banana from the right. As shown in the first column
+LVLMs, even though the total number of heads and model                       of Fig. 9, the text-to-image attention map from a localiza-
+architectures differ.                                                        tion head focuses on both the third and fourth bananas
+Validation of Criteria and Selection Methods for Local-                      from the right. This observation suggests that LVLMs strug-
+ization Heads. In Sec. 4.1, we propose two criteria, at-                     gle with pinpointing the exact location of objects. These
+               ℓ,h
+tention sum Simg   and spatial entropy H(Aℓ,h ), to identify                 findings show the localization head’s potential to provide
+localization heads. Then, we select the fixed top-k heads                    a transparent understanding of where the LVLMs focus.
+based on the selection frequency, as described in Sec. 4.2.
+We ablate the effectiveness of each criterion and validate                   7. Conclusion
+selection methods. For criterion ablation, we evaluate the                   In this work, we identify localization heads within various
+performance of our method using each criterion individ-                      LVLMs via criteria, which exhibit strong visual ground-
+                                                       ℓ,h
+ually: (1) selecting heads with either the highest Simg    or                ing capabilities in response to textual queries. We then pro-
+                     ℓ,h
+(2) the lowest H(A ) only. For selection validation, we                      pose a simple yet effective training-free framework that as-
+compare the performance of our method (denoted as the                        sembles the text-to-image attention maps from a few local-
+‘fixed’ method for comparison) with ‘greedy’ selection,                      ization heads to predict bounding boxes and segmentation
+where the top-k heads are selected and aggregated per sam-                   masks for text-relevant regions in the image. Our approach
+ple. Further details regarding the settings are provided in                  achieves competitive performance compared to fine-tuning
+Appendix Sec. A.                                                             based methods. Therefore, we conclude that LVLMs can act
+    Tab. 5 shows the results of these ablation studies. The                  as text-referring localizers for visual grounding tasks with
+performance drops significantly when only one criterion is                   their inherent property under the attention mechanisms. We
+used, indicating that both criteria are essential for identi-                hope that our work opens up new possibilities for analyzing
+fying localization heads. Furthermore, the greedy selection                  and utilizing the attention mechanisms of LVLMs.
+
+
+                                                                         8
+References                                                                [14] Costantino Grana, Daniele Borghesani, and Rita Cucchiara.
+                                                                               Optimized block-based connected components labeling with
+ [1] Jinze Bai, Shuai Bai, Shusheng Yang, Shijie Wang, Sinan                   decision trees. IEEE Transactions on Image Processing, 19
+     Tan, Peng Wang, Junyang Lin, Chang Zhou, and Jingren                      (6):1596–1609, 2010. 4
+     Zhou. Qwen-vl: A versatile vision-language model for un-
+                                                                          [15] Zeyu Han, Fangrui Zhu, Qianru Lao, and Huaizu Jiang.
+     derstanding, localization, text reading, and beyond. 2023. 16
+                                                                               Zero-shot referring expression comprehension via structural
+ [2] Michael Batty. Spatial entropy. Geographical Analysis, 6(1):
+                                                                               similarity between images and captions. In Proceedings of
+     1–31, 1974. 2, 4, 13
+                                                                               the IEEE/CVF Conference on Computer Vision and Pattern
+ [3] Ryan Burgert, Kanchana Ranasinghe, Xiang Li, and                          Recognition, pages 14364–14374, 2024. 6, 7
+     Michael S Ryoo. Peekaboo: Text to image diffusion models
+                                                                          [16] Shuting He, Henghui Ding, Chang Liu, and Xudong
+     are zero-shot segmentors. arXiv preprint arXiv:2211.13224,
+                                                                               Jiang. Grec: Generalized referring expression comprehen-
+     2022. 3
+                                                                               sion. arXiv preprint arXiv:2308.16182, 2023. 15
+ [4] Mingdeng Cao, Xintao Wang, Zhongang Qi, Ying Shan, Xi-
+                                                                          [17] Amir Hertz, Ron Mokady, Jay Tenenbaum, Kfir Aberman,
+     aohu Qie, and Yinqiang Zheng. Masactrl: Tuning-free mu-
+                                                                               Yael Pritch, and Daniel Cohen-Or. Prompt-to-prompt im-
+     tual self-attention control for consistent image synthesis and
+                                                                               age editing with cross attention control. arXiv preprint
+     editing. In Proceedings of the IEEE/CVF International Con-
+                                                                               arXiv:2208.01626, 2022. 2
+     ference on Computer Vision, pages 22560–22570, 2023. 2
+                                                                          [18] Ronghang Hu, Marcus Rohrbach, and Trevor Darrell. Seg-
+ [5] Khyathi Raghavi Chandu, Yonatan Bisk, and Alan W Black.
+                                                                               mentation from natural language expressions. In Computer
+     Grounding ‘grounding’ in NLP. In Findings of the Asso-
+                                                                               Vision–ECCV 2016: 14th European Conference, Amsterdam,
+     ciation for Computational Linguistics: ACL-IJCNLP 2021,
+                                                                               The Netherlands, October 11–14, 2016, Proceedings, Part I
+     pages 4283–4305, Online, 2021. Association for Computa-
+                                                                               14, pages 108–124. Springer, 2016. 1, 2, 3, 6, 13
+     tional Linguistics. 2
+ [6] Keqin Chen, Zhao Zhang, Weili Zeng, Richong Zhang, Feng              [19] Andrew Jaegle, Felix Gimeno, Andy Brock, Oriol Vinyals,
+     Zhu, and Rui Zhao. Shikra: Unleashing multimodal llm’s ref-               Andrew Zisserman, and Joao Carreira. Perceiver: General
+     erential dialogue magic. arXiv preprint arXiv:2306.15195,                 perception with iterative attention. In International confer-
+     2023. 1, 6, 7                                                             ence on machine learning, pages 4651–4664. PMLR, 2021.
+                                                                               16
+ [7] Lin Chen, Jinsong Li, Xiaoyi Dong, Pan Zhang, Conghui He,
+     Jiaqi Wang, Feng Zhao, and Dahua Lin. Sharegpt4v: Improv-            [20] Nick Jiang, Anish Kachinthaya, Suzie Petryk, and Yossi
+     ing large multi-modal models with better captions. arXiv                  Gandelsman. Interpreting and editing vision-language rep-
+     preprint arXiv:2311.12793, 2023. 3, 6, 14, 16                             resentations to mitigate hallucinations.      arXiv preprint
+ [8] Zhe Chen, Jiannan Wu, Wenhai Wang, Weijie Su, Guo Chen,                   arXiv:2410.02762, 2024. 3
+     Sen Xing, Muyan Zhong, Qinglong Zhang, Xizhou Zhu,                   [21] Aishwarya Kamath, Mannat Singh, Yann LeCun, Gabriel
+     Lewei Lu, et al. Internvl: Scaling up vision foundation mod-              Synnaeve, Ishan Misra, and Nicolas Carion.            Mdetr-
+     els and aligning for generic visual-linguistic tasks. In Pro-             modulated detection for end-to-end multi-modal understand-
+     ceedings of the IEEE/CVF Conference on Computer Vision                    ing. In Proceedings of the IEEE/CVF international confer-
+     and Pattern Recognition, pages 24185–24198, 2024. 3, 6,                   ence on computer vision, pages 1780–1790, 2021. 6
+     14, 16                                                               [22] Sahar Kazemzadeh, Vicente Ordonez, Mark Matten, and
+ [9] Kevin Clark, Urvashi Khandelwal, Omer Levy, and Christo-                  Tamara Berg. Referitgame: Referring to objects in pho-
+     pher D. Manning. What does BERT look at? an analysis of                   tographs of natural scenes. In Proceedings of the 2014 con-
+     BERT’s attention. In Proceedings of the 2019 ACL Workshop                 ference on empirical methods in natural language processing
+     BlackboxNLP: Analyzing and Interpreting Neural Networks                   (EMNLP), pages 787–798, 2014. 3, 4, 5, 6, 13
+     for NLP, pages 276–286, Florence, Italy, 2019. Association           [23] Seoyeon Kim, Minguk Kang, Dongwon Kim, Jaesik Park,
+     for Computational Linguistics. 3                                          and Suha Kwak. Extending clip’s image-text alignment to
+[10] Explosion AI. spaCy: Industrial-strength Natural Language                 referring image segmentation. In Proceedings of the 2024
+     Processing in Python. 15                                                  Conference of the North American Chapter of the Associa-
+[11] Wei Gao, Fang Wan, Xingjia Pan, Zhiliang Peng, Qi Tian,                   tion for Computational Linguistics: Human Language Tech-
+     Zhenjun Han, Bolei Zhou, and Qixiang Ye. Ts-cam: Token                    nologies (Volume 1: Long Papers), pages 4611–4628, 2024.
+     semantic coupled attention map for weakly supervised object               2
+     localization. In Proceedings of the IEEE/CVF international           [24] Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao,
+     conference on computer vision, pages 2886–2895, 2021. 2                   Chloe Rolland, Laura Gustafson, Tete Xiao, Spencer White-
+[12] Cristina González, Nicolás Ayobi, Isabela Hernández, José             head, Alexander C Berg, Wan-Yen Lo, et al. Segment any-
+     Hernández, Jordi Pont-Tuset, and Pablo Arbeláez. Panoptic               thing. In Proceedings of the IEEE/CVF International Con-
+     narrative grounding. In Proceedings of the IEEE/CVF Inter-                ference on Computer Vision, pages 4015–4026, 2023. 3, 6
+     national Conference on Computer Vision, pages 1364–1373,             [25] Vedang Lad, Wes Gurnee, and Max Tegmark. The remark-
+     2021. 15                                                                  able robustness of llms: Stages of inference? arXiv preprint
+[13] Ronald L. Graham. An efficient algorithm for determining                  arXiv:2406.19384, 2024. 3
+     the convex hull of a finite planar set. Info. Proc. Lett., 1:        [26] Xin Lai, Zhuotao Tian, Yukang Chen, Yanwei Li, Yuhui
+     132–133, 1972. 14                                                         Yuan, Shu Liu, and Jiaya Jia. Lisa: Reasoning segmentation
+
+
+                                                                      9
+     via large language model. In Proceedings of the IEEE/CVF            [38] Haoyu Lu, Wen Liu, Bo Zhang, Bingxuan Wang, Kai
+     Conference on Computer Vision and Pattern Recognition,                   Dong, Bo Liu, Jingxiang Sun, Tongzheng Ren, Zhuoshu Li,
+     pages 9579–9589, 2024. 1, 2, 3, 6, 7, 13                                 Hao Yang, et al. Deepseek-vl: towards real-world vision-
+[27] Hugo Laurençon, Lucile Saulnier, Léo Tronchon, Stas Bek-               language understanding. arXiv preprint arXiv:2403.05525,
+     man, Amanpreet Singh, Anton Lozhkov, Thomas Wang,                        2024. 3, 6, 15, 16
+     Siddharth Karamcheti, Alexander M. Rush, Douwe Kiela,               [39] Junhua Mao, Jonathan Huang, Alexander Toshev, Oana
+     Matthieu Cord, and Victor Sanh. Obelics: An open web-scale               Camburu, Alan L Yuille, and Kevin Murphy. Generation
+     filtered dataset of interleaved image-text documents, 2023.              and comprehension of unambiguous object descriptions. In
+     16                                                                       Proceedings of the IEEE conference on computer vision and
+[28] Junnan Li, Dongxu Li, Silvio Savarese, and Steven Hoi.                   pattern recognition, pages 11–20, 2016. 1, 2
+     Blip-2: Bootstrapping language-image pre-training with              [40] Minheng Ni, Yabo Zhang, Kailai Feng, Xiaoming Li, Yiwen
+     frozen image encoders and large language models. In In-                  Guo, and Wangmeng Zuo. Ref-diff: Zero-shot referring im-
+     ternational conference on machine learning, pages 19730–                 age segmentation with generative models. arXiv preprint
+     19742. PMLR, 2023. 1, 16                                                 arXiv:2308.16777, 2023. 3, 6, 7
+[29] Ruiyu Li, Kaican Li, Yi-Chun Kuo, Michelle Shu, Xiaojuan            [41] Elia Peruzzo, Enver Sangineto, Yahui Liu, Marco De Nadai,
+     Qi, Xiaoyong Shen, and Jiaya Jia. Referring image seg-                   Wei Bi, Bruno Lepri, and Nicu Sebe. Spatial entropy as an
+     mentation via recurrent refinement networks. In Proceed-                 inductive bias for vision transformers. Machine Learning,
+     ings of the IEEE Conference on Computer Vision and Pattern               113(9):6945–6975, 2024. 4, 13
+     Recognition, pages 5745–5753, 2018. 2                               [42] Koutilya Pnvr, Bharat Singh, Pallabi Ghosh, Behjat Sid-
+[30] Yanwei Li, Yuechen Zhang, Chengyao Wang, Zhisheng                        diquie, and David Jacobs. Ld-znet: A latent diffusion ap-
+     Zhong, Yixin Chen, Ruihang Chu, Shaoteng Liu, and Jiaya                  proach for text-based image segmentation. In Proceedings
+     Jia. Mini-gemini: Mining the potential of multi-modality                 of the IEEE/CVF International Conference on Computer Vi-
+     vision language models. arXiv preprint arXiv:2403.18814,                 sion, pages 4157–4168, 2023. 2
+     2024. 3, 6, 14, 15, 16                                              [43] Dustin Podell, Zion English, Kyle Lacey, Andreas
+[31] Fangjian Lin, Jianlong Yuan, Sitong Wu, Fan Wang, and                    Blattmann, Tim Dockhorn, Jonas Müller, Joe Penna,
+     Zhibin Wang. Uninext: Exploring a unified architecture for               and Robin Rombach. Sdxl: Improving latent diffusion
+     vision recognition. In Proceedings of the 31st ACM Interna-              models for high-resolution image synthesis. In The Twelfth
+     tional Conference on Multimedia, pages 3200–3208, 2023.                  International Conference on Learning Representations. 16,
+     6                                                                        24
+[32] Tsung-Yi Lin, Michael Maire, Serge Belongie, James Hays,            [44] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+     Pietro Perona, Deva Ramanan, Piotr Dollár, and C Lawrence               Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+     Zitnick. Microsoft coco: Common objects in context. In                   Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning
+     Computer Vision–ECCV 2014: 13th European Conference,                     transferable visual models from natural language supervi-
+     Zurich, Switzerland, September 6-12, 2014, Proceedings,                  sion. In International conference on machine learning, pages
+     Part V 13, pages 740–755. Springer, 2014. 13                             8748–8763. PMLR, 2021. 3
+[33] Chenxi Liu, Zhe Lin, Xiaohui Shen, Jimei Yang, Xin Lu,              [45] Hanoona Rasheed, Muhammad Maaz, Sahal Shaji, Abdel-
+     and Alan Yuille. Recurrent multimodal interaction for refer-             rahman Shaker, Salman Khan, Hisham Cholakkal, Rao M
+     ring image segmentation. In Proceedings of the IEEE inter-               Anwer, Eric Xing, Ming-Hsuan Yang, and Fahad S Khan.
+     national conference on computer vision, pages 1271–1280,                 Glamm: Pixel grounding large multimodal model. In Pro-
+     2017. 2                                                                  ceedings of the IEEE/CVF Conference on Computer Vision
+[34] Chang Liu, Henghui Ding, and Xudong Jiang. Gres: Gen-                    and Pattern Recognition, pages 13009–13018, 2024. 1, 6, 15
+     eralized referring expression segmentation. In Proceedings          [46] Shaoqing Ren, Kaiming He, Ross Girshick, and Jian Sun.
+     of the IEEE/CVF conference on computer vision and pattern                Faster r-cnn: Towards real-time object detection with region
+     recognition, pages 23592–23601, 2023. 2, 6, 15                           proposal networks. IEEE transactions on pattern analysis
+[35] Haotian Liu, Chunyuan Li, Yuheng Li, and Yong Jae Lee.                   and machine intelligence, 39(6):1137–1149, 2016. 3
+     Improved baselines with visual instruction tuning. In Pro-          [47] Robin Rombach, Andreas Blattmann, Dominik Lorenz,
+     ceedings of the IEEE/CVF Conference on Computer Vision                   Patrick Esser, and Björn Ommer. High-resolution image
+     and Pattern Recognition, pages 26296–26306, 2024. 1, 2, 3,               synthesis with latent diffusion models. In Proceedings of
+     4, 5, 6, 7, 8, 15, 16, 23, 24                                            the IEEE/CVF conference on computer vision and pattern
+[36] Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee.                 recognition, pages 10684–10695, 2022. 3
+     Visual instruction tuning. Advances in neural information           [48] Haozhan Shen, Tiancheng Zhao, Mingwei Zhu, and Jian-
+     processing systems, 36, 2024. 1, 3, 6, 14, 16                            wei Yin. Groundvlp: Harnessing zero-shot visual grounding
+[37] Shilong Liu, Zhaoyang Zeng, Tianhe Ren, Feng Li, Hao                     from vision-language pre-training and open-vocabulary ob-
+     Zhang, Jie Yang, Qing Jiang, Chunyuan Li, Jianwei Yang,                  ject detection. In Proceedings of the AAAI Conference on
+     Hang Su, et al. Grounding dino: Marrying dino with                       Artificial Intelligence, pages 4766–4775, 2024. 6, 7
+     grounded pre-training for open-set object detection. arXiv          [49] Hengcan Shi, Hongliang Li, Fanman Meng, and Qingbo Wu.
+     preprint arXiv:2303.05499, 2023. 6                                       Key-word-aware network for referring expression image seg-
+
+
+                                                                    10
+     mentation. In Proceedings of the European Conference on                     Song, et al. Cogvlm: Visual expert for pretrained language
+     Computer Vision (ECCV), pages 38–54, 2018. 2                                models. arXiv preprint arXiv:2311.03079, 2023. 1, 6
+[50] Mohit Shridhar, Dixant Mittal, and David Hsu. Ingress: In-             [62] Zhaoqing Wang, Yu Lu, Qiang Li, Xunqiang Tao, Yan-
+     teractive visual grounding of referring expressions. The In-                dong Guo, Mingming Gong, and Tongliang Liu. Cris: Clip-
+     ternational Journal of Robotics Research, 39(2-3):217–232,                  driven referring image segmentation. In Proceedings of
+     2020. 2                                                                     the IEEE/CVF conference on computer vision and pattern
+[51] Oriane Siméoni, Gilles Puy, Huy V Vo, Simon Roburin,                       recognition, pages 11686–11695, 2022. 2
+     Spyros Gidaris, Andrei Bursuc, Patrick Pérez, Renaud                  [63] Jiannan Wu, Yi Jiang, Bin Yan, Huchuan Lu, Zehuan
+     Marlet, and Jean Ponce. Localizing objects with self-                       Yuan, and Ping Luo. Uniref++: Segment every refer-
+     supervised transformers and no labels. arXiv preprint                       ence object in spatial and temporal spaces. arXiv preprint
+     arXiv:2109.14279, 2021. 4                                                   arXiv:2312.15715, 2023. 6
+[52] Sanjay Subramanian, William Merrill, Trevor Darrell, Matt              [64] Size Wu, Sheng Jin, Wenwei Zhang, Lumin Xu, Wentao Liu,
+     Gardner, Sameer Singh, and Anna Rohrbach. ReCLIP: A                         Wei Li, and Chen Change Loy. F-lmm: Grounding frozen
+     strong zero-shot baseline for referring expression compre-                  large multimodal models. arXiv preprint arXiv:2406.05821,
+     hension. In Proceedings of the 60th Annual Meeting of the                   2024. 3, 15
+     Association for Computational Linguistics (Volume 1: Long              [65] Zhuofan Xia, Dongchen Han, Yizeng Han, Xuran Pan, Shiji
+     Papers), pages 5198–5215, Dublin, Ireland, 2022. Associa-                   Song, and Gao Huang. Gsva: Generalized segmentation
+     tion for Computational Linguistics. 3, 6, 7                                 via multimodal large language models. In Proceedings of
+[53] Yucheng Suo, Linchao Zhu, and Yi Yang. Text augmented                       the IEEE/CVF Conference on Computer Vision and Pattern
+     spatial aware zero-shot referring image segmentation. In                    Recognition, pages 3858–3869, 2024. 1, 6
+     Findings of the Association for Computational Linguistics:             [66] Li Xu, Mark He Huang, Xindi Shang, Zehuan Yuan, Ying
+     EMNLP 2023, pages 1032–1043, Singapore, 2023. Associa-                      Sun, and Jun Liu. Meta compositional referring expression
+     tion for Computational Linguistics. 3, 6, 7                                 segmentation. In Proceedings of the IEEE/CVF Conference
+[54] Raphael Tang, Linqing Liu, Akshat Pandey, Zhiying Jiang,                    on Computer Vision and Pattern Recognition, pages 19478–
+     Gefei Yang, Karun Kumar, Pontus Stenetorp, Jimmy Lin,                       19487, 2023. 2
+     and Ferhan Ture. What the daam: Interpreting stable diffu-             [67] Zhao Yang, Jiaqi Wang, Yansong Tang, Kai Chen, Heng-
+     sion using cross attention. arXiv preprint arXiv:2210.04885,                shuang Zhao, and Philip HS Torr. Lavt: Language-aware
+     2022. 2                                                                     vision transformer for referring image segmentation. In Pro-
+[55] OpenGVLab Team. Internvl2, 2024. 16                                         ceedings of the IEEE/CVF Conference on Computer Vision
+[56] Shengbang Tong, Ellis Brown, Penghao Wu, Sanghyun                           and Pattern Recognition, pages 18155–18165, 2022. 2, 6
+     Woo, Manoj Middepogu, Sai Charitha Akula, Jihan Yang,                  [68] Haoxuan You, Haotian Zhang, Zhe Gan, Xianzhi Du, Bowen
+     Shusheng Yang, Adithya Iyer, Xichen Pan, et al. Cambrian-                   Zhang, Zirui Wang, Liangliang Cao, Shih-Fu Chang, and
+     1: A fully open, vision-centric exploration of multimodal                   Yinfei Yang. Ferret: Refer and ground anything anywhere
+     llms. arXiv preprint arXiv:2406.16860, 2024. 1                              at any granularity. arXiv preprint arXiv:2310.07704, 2023.
+[57] Elena Voita, David Talbot, Fedor Moiseev, Rico Sennrich,                    1, 6, 7
+     and Ivan Titov. Analyzing multi-head self-attention: Spe-              [69] Alex Young, Bei Chen, Chao Li, Chengen Huang, Ge Zhang,
+     cialized heads do the heavy lifting, the rest can be pruned. In             Guanwei Zhang, Heng Li, Jiangcheng Zhu, Jianqun Chen,
+     Proceedings of the 57th Annual Meeting of the Association                   Jing Chang, et al. Yi: Open foundation models by 01. ai.
+     for Computational Linguistics, pages 5797–5808, Florence,                   arXiv preprint arXiv:2403.04652, 2024. 3, 6, 14, 16
+     Italy, 2019. Association for Computational Linguistics. 3              [70] Licheng Yu, Patrick Poirson, Shan Yang, Alexander C Berg,
+[58] Feng Wang, Jieru Mei, and Alan Yuille. Sclip: Rethink-                      and Tamara L Berg. Modeling context in referring expres-
+     ing self-attention for dense vision-language inference. In                  sions. In Computer Vision–ECCV 2016: 14th European Con-
+     European Conference on Computer Vision, pages 315–332.                      ference, Amsterdam, The Netherlands, October 11-14, 2016,
+     Springer, 2025. 4                                                           Proceedings, Part II 14, pages 69–85. Springer, 2016. 1, 2
+[59] Lean Wang, Lei Li, Damai Dai, Deli Chen, Hao Zhou, Fan-                [71] Seonghoon Yu, Paul Hongsuck Seo, and Jeany Son. Zero-
+     dong Meng, Jie Zhou, and Xu Sun. Label words are an-                        shot referring image segmentation with global-local context
+     chors: An information flow perspective for understanding in-                features. In Proceedings of the IEEE/CVF Conference on
+     context learning. In Proceedings of the 2023 Conference on                  Computer Vision and Pattern Recognition, pages 19456–
+     Empirical Methods in Natural Language Processing, pages                     19465, 2023. 3, 6, 7
+     9840–9855, Singapore, 2023. Association for Computational              [72] Sukmin Yun, Hankook Lee, Jaehyung Kim, and Jinwoo Shin.
+     Linguistics. 3                                                              Patch-level representation learning for self-supervised vision
+[60] Peng Wang, Shijie Wang, Junyang Lin, Shuai Bai, Xi-                         transformers. In Proceedings of the IEEE/CVF conference
+     aohuan Zhou, Jingren Zhou, Xinggang Wang, and Chang                         on computer vision and pattern recognition, pages 8354–
+     Zhou.      One-peace: Exploring one general representa-                     8363, 2022. 4
+     tion model toward unlimited modalities. arXiv preprint                 [73] Bowen Zhang, Zhi Tian, Quan Tang, Xiangxiang Chu, Xi-
+     arXiv:2305.11172, 2023. 6                                                   aolin Wei, Chunhua Shen, et al. Segvit: Semantic segmen-
+[61] Weihan Wang, Qingsong Lv, Wenmeng Yu, Wenyi Hong, Ji                        tation with plain vision transformers. Advances in Neural
+     Qi, Yan Wang, Junhui Ji, Zhuoyi Yang, Lei Zhao, Xixuan                      Information Processing Systems, 35:4971–4982, 2022. 2
+
+
+                                                                       11
+[74] Zheng Zhang, Yeyao Ma, Enming Zhang, and Xiang
+     Bai. Psalm: Pixelwise segmentation with large multi-modal
+     model. arXiv preprint arXiv:2403.14598, 2024. 1, 6
+[75] Wenliang Zhao, Yongming Rao, Zuyan Liu, Benlin Liu,
+     Jie Zhou, and Jiwen Lu. Unleashing text-to-image diffu-
+     sion models for visual perception. In Proceedings of the
+     IEEE/CVF International Conference on Computer Vision,
+     pages 5729–5739, 2023. 2
+[76] Zifan Zheng, Yezhaohui Wang, Yuxin Huang, Shichao
+     Song, Bo Tang, Feiyu Xiong, and Zhiyu Li. Attention
+     heads of large language models: A survey. arXiv preprint
+     arXiv:2409.03752, 2024. 3
+[77] Chaoyang Zhu, Yiyi Zhou, Yunhang Shen, Gen Luo, Xingjia
+     Pan, Mingbao Lin, Chao Chen, Liujuan Cao, Xiaoshuai Sun,
+     and Rongrong Ji. Seqtr: A simple yet universal network for
+     visual grounding. In European Conference on Computer Vi-
+     sion, pages 598–615. Springer, 2022. 6
+
+
+
+
+                                                                  12
+                      Appendix                                              descriptions (e.g., “the container used for drinking, lo-
+                                                                            cated next to the plate”) or longer sentences (e.g., “Find
+A. Experimental Details                                                     the item on the table that someone would use to hold liq-
+                                                                            uid, often paired with a saucer”). These queries demand
+Experimental Setting. All experiments and evaluations are                   advanced reasoning and a deeper understanding of con-
+conducted on a single NVIDIA GeForce RTX A6000 48GB                         textual and world knowledge. All reasoning segmentation
+GPU. We only use the inference stage of the models without                  results were evaluated using the ReasonSeg benchmark,
+any fine-tuning or training.                                                which includes both the validation set and test set. Perfor-
+Analysis Setting. In Sec. 4, we identify and analyze lo-                    mance was measured across short queries, long queries,
+calization heads in various LVLMs. We use the RefCOCO                       and overall, following the same experimental setup as
+training set to prevent validation set leakage. To calculate                LISA [26] to ensure consistency in comparisons.
+the selection frequency of individual heads, we randomly                 Ablation Studies Setting. In Sec. 6.3, we ablate the effec-
+select 1,000 image-text pair samples from the RefCOCO                    tiveness of each criterion and validate the selection meth-
+training set and average the results over five trials to validate        ods. In this section, we provide details of the ablation stud-
+consistency. When analyzing the selection frequency and                  ies.
+IoU, we binarize the attention weights by assigning 1 above                  For criterion ablation, we consider two approaches: (1)
+the mean value and 0 below it and calculate the IoU be-                  selecting heads based solely on the highest Simgℓ,h
+                                                                                                                             values, or
+tween the binarized attention weights and the ground-truth
+                                                                         (2) selecting heads based solely on the lowest H(Aℓ,h ) val-
+mask. We repeat this process for 1,000 image-text pairs and
+                                                                         ues. In approach (1), we select the 10 heads with the highest
+average the IoU scores.                                                    ℓ,h
+                                                                         Simg   values and calculate their selection frequency. Simi-
+Dataset Details. We evaluate our method on the following
+                                                                         larly, in approach (2), we select the 10 heads with the lowest
+datasets:
+                                                                         H(Aℓ,h ) values and calculate their selection frequency.
+• RefCOCO, RefCOCO+ [22], and RefCOCOg [18]
+                                                                             For selection validation, we introduce the ‘greedy’ se-
+   datasets, sourced from MS-COCO [32], offer a collec-
+                                                                         lection method, which selects the top-k heads per sample
+   tion of referring expressions and associated images. Re-
+                                                                         without considering the overall selection frequency. When
+   fCOCO consists of 19,994 images paired with 142,210
+                                                                         applying the greedy selection method and criterion (1) si-
+   expressions, while RefCOCO+ includes 19,992 images
+                                                                         multaneously, we select the top-k heads with the highest
+   and 141,564 expressions. RefCOCOg, on the other hand,                   ℓ,h
+                                                                         Simg   values for each sample. Criterion (2) is applied in a
+   contains 26,771 images and 104,560 expressions. The
+                                                                         similar manner, simultaneously selecting the top-k heads
+   expressions in RefCOCO and RefCOCO+ are generally
+                                                                         with the lowest H(Aℓ,h ) values for each sample.
+   concise, with an average of 1.6 nouns and 3.6 words
+   per expression. In contrast, RefCOCOg features more de-
+                                                                         B. Detailed Description of Algorithms
+   scriptive expressions, averaging 2.8 nouns and 8.4 words.
+• ReasonSeg: The dataset and benchmark for reasoning                     B.1. Spatial Entropy
+   segmentation were first introduced in LISA [26]. The re-
+                                                                         Spatial entropy [2] adjusts the probability of attention being
+   sulting ReasonSeg benchmark consists of 1,218 image-
+                                                                         focused in a region by factoring in the size of that region, en-
+   instruction-mask data samples, which are further divided
+                                                                         suring fair comparison across areas of different sizes. Note
+   into three splits: training (239 samples), validation (200
+                                                                         that, our spatial entropy calculation is based on the previ-
+   samples), and test (779 samples).
+                                                                         ous work [41] which validated the effectiveness of spatial
+Main Experiments Setting. We evaluate our method on the
+                                                                         entropy in image attention maps within vision transformer.
+following tasks:
+                                                                         We begin by computing the image attention map Aℓ,h as
+• Referring Expression Comprehension (REC) and Refer-
+                                                                         follows:
+   ring Expression Segmentation (RES): The datasets eval-
+   uated for the main results in Sec.6.2 include RefCOCO                             Aℓ,h = ReLU reshape(aℓ,h ) − m ,
+                                                                                                                           
+                                                                                                                                      (4)
+   (validation, test-A, test-B), RefCOCO+ (validation, test-
+   A, test-B), and RefCOCOg (validation, test). All evalua-              where the ReLU function is applied after reshaping by
+   tions were conducted using the UNC split.                             P × P , and it retains only those values in aℓ,h that are
+• Reasoning Segmentation (ReasonSeg): Reasoning Seg-                     greater than the mean m. Next, we identify the connected
+   mentation was first introduced in LISA [26]. This task                components CAℓ,h = {C1 , C2 , . . . , Cn } from Aℓ,h :
+   shares a similar formulation with the referring expression                      CAℓ,h = ConnectedComponents(Aℓ,h ),               (5)
+   segmentation task but is considerably more challenging.
+   The key distinction lies in the complexity of the query text          where the connected components are determined by ap-
+   in reasoning segmentation. Rather than simple phrases                 plying an 8-connectivity relation among the non-zero el-
+   (e.g., “the blue mug”), the queries involve more nuanced              ements of Aℓ,h . Each connected component Cn (with
+
+                                                                    13
+1 ≤ n ≤ N ) in CAℓ,h is defined as the set of coordi-                       Average Attention Sum in More LVLMs. We extend
+nates Cn = {(x1 , y1 ), (x2 , y2 ), . . . , (xkn , ykn )} for the n-        Fig. 3 in the main paper to demonstrate that relatively few
+th component, where kn = |Cn | represents the cardinality,                  attention heads significantly contribute to the model’s text-
+or the number of elements, in Cn . Finally, we calculate the                image interaction. As shown in Fig. 11, the trend of the aver-
+                                                                                  ℓ,h
+spatial entropy H(Aℓ,h ) as follows:                                        age Simg  values remains consistent across different LVLMs.
+                                                                            Selection Frequency and IoU in More LVLMs. Similar
+                             N
+                             X                                              to the above, we extend Fig. 6 in the main paper to cover
+            H(Aℓ,h ) = −           P (Cn ) log P (Cn ),         (6)
+                                                                            additional LVLMs. Fig. 12 presents the selection frequency
+                             n=1
+                                                                            and a scatter plot of selection frequency rank versus IoU for
+where this entropy is computed using Shannon’s entropy                      each attention head across various LVLMs. The results con-
+formula. Here, P (Cn ) represents the probability of observ-                firm that our observations hold consistently across different
+ing each connected component Cn within Aℓ,h . The proba-                    LVLMs.
+bility P (Cn ) for each component Cn is defined as:
+                                                                            C.2. Robustness of Localization Head Selection
+                                     |Cn |
+                    P (Cn ) = PN                ,               (7)         In this section, we validate the robustness of our localization
+                                    n=1 |Cn |                               head selection method across different threshold values (τ )
+where P (Cn ) is calculated by dividing the area of Cn by                   and the number of selected heads (N ). The experiments be-
+the total area of all components in Aℓ,h . This provides a                  low indicate that localization head selection is not sensitive
+normalized measure of spatial focus. The resulting spatial                  to the choice of τ or N .
+entropy H(Aℓ,h ) ranges from 0 to 1. A value of 0 indi-                     Threshold τ . Fig. 3 in the main paper presents the average
+cates that attention is completely focused on a single re-                  Simg values for each attention head, setting the threshold τ
+gion, while a value of 1 suggests that attention is evenly                  at the point where the maximum curvature is observed. We
+distributed across the image. This measure thus enables us                  select maximum curvature as the threshold to reduce the
+to evaluate the dispersion of the model’s attention across                  need for manual tuning; however, other τ values can also be
+different regions within the image.                                         considered. Therefore, we further validate that plausible τ
+                                                                            values can give consistent results with the maximum curva-
+B.2. Details of Our Framework                                               ture. To this end, we calculate the selection frequency of the
+In this section, we provide a detailed description of our                   heads based on different τ values and compare them with
+framework, described in Sec. 5 of the main paper.                           the results obtained using the maximum curvature. The re-
+Binarization of the Attention Map. The attention map is                     sults are presented in Fig. 13. We observe that the same lo-
+binarized by setting values above the mean to 1. This ap-                   calization heads are consistently selected across different τ
+proach effectively highlights the most significant regions of               values, indicating that our analysis results are robust to the
+the attention map.                                                          choice of τ .
+Gaussian Smoothing. Gaussian smoothing is applied using                     Number of Heads N . In Fig. 6(a) of the main paper, we se-
+a kernel size of k = 7 and a standard deviation of σ =                      lect the 10 heads with the lowest H(Aℓ,h ) values and repeat
+1.0. These parameters ensure a balance between smoothing                    the process for 1,000 image-text pairs to calculate the selec-
+effects and detail preservation.                                            tion frequency. We also investigate the effect of selecting
+Convex Hull Algorithm for Bounding Box. To deter-                           different numbers of heads (N ) on the selection frequency.
+mine the bounding box in an assembled attention map from                    We conduct experiments from N = 1 to N = 14 and com-
+the localization heads, we employ the convex hull algo-                     pare the results with the selection frequency obtained using
+rithm [13]. In cases where multiple convex hulls are present                N = 10 (default setting). As shown in Fig. 14, we can ob-
+within the same attention map, we retain only the largest                   tain the same top-3 localization heads consistently across
+convex hull. Subsequently, we calculate the smallest tight                  different N values, suggesting that the selection of localiza-
+bounding box that encloses the retained convex hull and we                  tion heads is robust to the choice of N .
+use it as the final bounding box.
+                                                                            D. More Experiments
+C. More Analysis on Localization Heads
+                                                                            D.1. Comparison with Baseline Models
+C.1. Extended Analysis Across More LVLMs
+                                                                            Most LVLMs, including the LLaVA [36] family, likely en-
+In this section, we extend the analysis of localization                     code localization knowledge in their pretrained weights,
+heads in Sec. 4 of the main paper to more LVLMs, in-                        possibly due to pretraining with bounding box coordinates
+cluding InternVL [8], LLaVA [36], Mini-Gemini [30],                         or visual instruction prompts [36]. In Tab. 6, we compare
+ShareGPT4V [7], and Yi-VL [69].                                             baseline models and our proposed method, revealing the
+
+
+                                                                       14
+      Table 6. Comparison performance to baseline models                  Table 8. Ablation study on Gaussian smoothing parameters (σ and
+ REC (RefCOCOg) DeepSeekVL-1.3B LLaVA-1.5-7B LLaVA-1.5-13B
+                                                                          κ). The performance is evaluated using the RefCOCO validation
+    Baseline          1.5           2.92         5.28                     set (UNC split) with the LLaVA-1.5-13B [35].
+      Ours            65.2          82.3         84.3
+                                                                                                   σ (standard deviation)
+                                                                                  Task
+Table 7. Performance comparison between F-LMM [64] and our                                 0.0   0.4     0.8    1.0    1.4   1.8
+method on the RES task. We note that F-LMM models are trained                    REC      85.5   86.8 87.2 87.2 86.8         84.3
+on the training set of Referring Expression Segmentation datasets.               RES      74.3   75.2 76.1 76.1 75.2         72.7
+
+                       RefCOCO         RefCOCO+       RefCOCOg                                          κ (kernel size)
+      Method                                                                      Task
+                                                                                           1      3        5       7    9     11
+                       val testA testB val testA testB val   test
+                                                                                 REC      85.5   86.5    86.5 87.2 87.2      87.2
+ F-LMM (Fine-tuning on RES)
+                                                                                 RES      74.3   75.2    75.2 76.1 76.1      76.1
+ DeepSeek-VL-1.3B 75.0 78.1 69.5 62.8 70.8 56.3 68.2         68.5
+ Mini-Gemini-2B       75.0 78.6 69.3 63.7 71.4 53.3 67.3     67.4
+ DeepSeek-VL-7B 76.1 78.8 72.0 66.4 73.2 57.6 70.1           70.4         Table 9. Performance comparison with F-LMM [64] on the
+ LLaVA-1.5-7B         75.2 79.1 71.9 63.7 71.8 54.7 67.1     68.1         PNG [12] benchmark.
+ Ours (Training-free)
+ DeepSeek-VL-1.3B 56.3 57.0 52.7 51.2 55.5 49.2 52.3         55.8                           PNG (all)       Ours   F-LMM
+ Mini-Gemini-2B       59.8 60.3 55.5 56.3 59.9 51.8 55.1     60.3                        DeepSeekVL-7B      66.7     65.7
+ DeepSeek-VL-7B 73.9 76.6 70.7 63.1 67.1 56.5 64.0           68.9
+ LLaVA-1.5-7B         74.2 76.5 70.4 62.5 65.2 56.0 64.2     68.1
+                                                                          gests that the localization heads have competitive poten-
+                                                                          tial with the specialized mask decoder modules for visual
+baseline models’ poor localization accuracy, likely due to                grounding tasks, especially in relatively larger LVLMs.
+their focus on describing objects rather than precise local-
+ization. Moreover, the localization head might provide only
+indirect support when text generation unfolds in its usual                D.3. Gaussian Smoothing Ablation
+course. As a result, it becomes difficult for the model to di-            When assembling the attention map in the localization head
+rectly output accurate object or region coordinates required              (see Sec. 5 of the main paper), we apply Gaussian smooth-
+for visual grounding, unless the information from this head               ing to the attention map to minimize potential random noise.
+is explicitly scrutinized. Thus, the localization head’s prac-            In this section, we conduct an ablation study on the parame-
+tical value can be realized as long as it is integrated with our          ters of Gaussian smoothing to better understand the robust-
+proposed method.                                                          ness of our framework across different values of standard
+                                                                          deviation σ and kernel size κ. For the experiments, LLaVA-
+D.2. Comparision with F-LMM                                               1.5-13B [35] was evaluated using the RefCOCO validation
+We compare our method with F-LMM [64], which also                         set (UNC split).
+leverages the attention weights of frozen LVLMs for vi-                       The results are presented in Tab. 8. Regardless of the se-
+sual grounding. The differences between F-LMM and our                     lected σ and κ, Gaussian smoothing consistently enhances
+method are as follows. First, F-LMM still requires fine-                  performance in almost all cases. The findings highlight that
+tuning its mask decoder modules on visual grounding                       the framework is robust to varying choices of σ and κ. Fur-
+datasets (i.e., referring expression segmentation datasets).              thermore, even when using the basic attention map of lo-
+Second, F-LMM uses all attention heads without consid-                    calization heads without Gaussian smoothing (σ = 0 or
+ering the relative importance of each, leaving the decoder                κ = 1), the performance remains competitive, with only
+modules to interpret the entire set of attention weights. In              a 1.9% drop compared to the best case. This demonstrates
+contrast, our approach requires no fine-tuning and directly               that Gaussian smoothing only serves as an auxiliary post-
+utilizes a few selected attention heads that are particularly             processing step for refining the attention map from local-
+useful for localizing objects in the image. Furthermore, our              ization heads.
+framework provides a transparent understanding of where
+the model focuses through localization heads, which is not                D.4. Multi-Object Grounding Tasks
+available in F-LMM.
+    Tab. 7 presents the performance comparison between F-                 Beyond single-object tasks, our pipeline also suggests
+LMM and our method on the RES task. In smaller LVLMs                      promise for multi-object grounding. We utilize spaCy [10]
+(e.g., DeepSeek-VL-1.3B [38] and Mini-Gemini-2B [30]),                    to extract noun tokens for generating attention maps (see
+F-LMM outperforms our method. However, in relatively                      Fig. 10), obtaining comparable results on the PNG bench-
+larger LVLMs (e.g., DeepSeek-VL-7B [38] and LLaVA-                        mark [12], with improvements observed relative to F-LMM
+1.5-7B [35]), our method demonstrates performance com-                    (see Tab. 9). Similarly, we believe this approach holds
+parable to F-LMM, with only a slight gap. This result sug-                promise for extension to other various tasks [16, 34, 45].
+
+
+                                                                     15
+                                                                           Segmentation Results.          girl                boy
+E. More Qualitative Results
+                                                                         girl
+We present more qualitative results of our framework, in-                                      boy
+cluding the performance of 10 LVLMs [7, 8, 30, 35, 36, 38,
+69], with parameter numbers ranging from 1.3B to 13B, on
+visual grounding tasks. Fig. 15, Fig. 16, and Fig. 17 present
+the qualitative results of our method on the Referring Ex-
+pression Comprehension (REC), Referring Expression Seg-                 Figure 10. Multi-object segmentation results from the localization
+mentation (RES), and Reasoning Segmentation tasks, re-                  heads of DeepSeekVL-7B, along with the corresponding raw at-
+spectively. The results demonstrate that only a few selected            tention maps.
+localization heads are sufficient to accurately localize ob-
+jects in the image based on the text query. Our method ef-
+fectively localizes objects in various scenarios.                          Second, our method is less suitable for LVLMs or meth-
+                                                                        ods that do not preserve spatial information in images (e.g.,
+F. Applications                                                         pooling) [1, 19, 27, 28, 55]. These methods make it chal-
+                                                                        lenging to explicitly obtain image attention maps. To collect
+F.1. Real World Application                                             the attention map, a reverse computation is required to de-
+                                                                        termine the order in which image tokens were input during
+Fig. 18 illustrates that the localization heads effectively cap-        processing. We leave the application of our framework to
+ture the region or object of interest in images from the                these methods for future exploration.
+real world, based on the provided expressions. This result
+demonstrates the robustness of the localization heads across
+various types of data.
+
+F.2. Image Editing
+Fig. 19 presents the results of image inpainting performed
+by integrating Stable Diffusion XL (SDXL) [43]. The
+frozen LVLM generates a segmentation mask correspond-
+ing to the expression, and this mask, along with an addi-
+tional text prompt, is used as input to the diffusion model to
+generate the desired image. These results demonstrate that
+the segmentation mask corresponding to the referred text,
+output by a small number of localization heads from the
+frozen LVLM, can serve as guidance for diffusion models.
+This compatibility enables its application in image editing
+tasks.
+
+G. Limitations
+We propose a simple yet effective framework for training-
+free visual grounding, which leverages the localization
+heads of LVLMs. Our framework successfully localizes ob-
+jects in images based on text queries without requiring any
+fine-tuning and achieves superior performance compared to
+existing training-free methods. However, our method still
+has some limitations that could be addressed in future work.
+   First, our work, as illustrated in Fig. 10, reveals the po-
+tential for multi-object grounding; however, the establish-
+ment of a formalized pipeline or the development of a more
+streamlined implementation remains limited. The task of
+rendering the identified localization head more practical,
+user-friendly, and adaptable across a diverse range of ap-
+plications continues to pose a significant challenge. This
+presents a compelling avenue for future research.
+
+
+                                                                   16
+                                               InternVL-6B        LLaVA-7B                    LLaVA-13B
+
+
+
+
+                             Average 𝑆img
+                                      ℓ,ℎ           = 0.32
+                                                                       = 0.23                      = 0.18
+
+
+
+
+                                                Head Index        Head Index                   Head Index
+
+                                              Mini-Gemini-2B    ShareGPT4V-7B                   Yi-VL-6B
+
+
+
+
+                             Average 𝑆img
+                                      ℓ,ℎ
+                                                                                                 = 0.42
+                                                                     = 0.28
+                                                 = 0.22
+
+
+
+
+                                                Head Index        Head Index                   Head Index
+
+                     ℓ,h
+ Figure 11. Average Simg values for each attention head in more LVLMs. τ is set at the point where the maximum curvature is observed.
+
+                                             InternVL-6B            LLaVA-7B                         LLaVA-13B
+
+
+               Selection
+
+
+             Frequency (%)
+
+
+
+
+                                                    𝜌 = 0.787               𝜌 = 0.783                       𝜌 = 0.736
+
+                   IoU
+
+
+
+
+                                            Mini-Gemini-2B       ShareGPT4V-7B                        Yi-VL-6B
+
+
+               Selection
+
+
+             Frequency (%)
+
+
+
+
+                                                    𝜌 = 0.784               𝜌 = 0.727                       𝜌 = 0.721
+                   IoU
+
+
+
+
+Figure 12. Selection frequency of individual heads and scatter plot of selection frequency rank versus each head’s average IoU in more
+LVLMs. The Spearman correlation coefficient (ρ) between the selection frequency rank and the average IoU is displayed in the top-right
+corner of each plot. The observed Spearman correlation are statistically significant (p < 0.001) for all LVLMs.
+
+
+                                                                  17
+                                                                 LLaVA-1.5-7B
+                                                maximum
+                                              = curvature             = 0.1                     = 0.2
+
+
+
+
+                                            = 0.4                     = 0.6                     = 0.8
+
+
+
+
+                                                                LLaVA-1.5-13B
+                                                maximum
+                                              = curvature             = 0.1                     = 0.2
+
+
+
+
+                                            = 0.4                     = 0.6                     = 0.8
+
+
+
+
+                                                              DeepSeek-VL-1.3B
+                                                maximum
+                                              = curvature             = 0.1                     = 0.2
+
+
+
+
+                                            = 0.4                     = 0.6                     = 0.8
+
+
+
+
+                                                               DeepSeek-VL-7B
+                                                maximum
+                                              = curvature             = 0.1                     = 0.2
+
+
+
+
+                                            = 0.4                     = 0.6                     = 0.8
+
+
+
+
+Figure 13. Selection frequency of individual heads across different τ values. τ represents the threshold for the sum of each head’s attention
+map. Our analysis focuses on heads with attention map sums greater than τ , which are selected as targets for selection frequency evaluation.
+In the main paper, we select the threshold where the maximum curvature is observed. The top-3 localization heads remain consistent across
+different τ values, demonstrating the robustness of our analysis to variations in τ .
+
+                                                                     18
+                                                                  LLaVA-1.5-7B
+                                𝑁=1                       𝑁=2                        𝑁=4                      𝑁=6
+
+                 Selection
+
+
+               Frequency (%)
+
+
+
+
+                                𝑁=8                      𝑁 = 10                      𝑁 = 12                   𝑁 = 14
+
+                 Selection
+
+
+               Frequency (%)
+
+
+
+
+                                                                   LLaVA-1.5-13B
+                                𝑁=1                       𝑁=2                        𝑁=4                      𝑁=6
+
+                 Selection
+
+
+               Frequency (%)
+
+
+
+
+                                𝑁=8                      𝑁 = 10                      𝑁 = 12                   𝑁 = 14
+
+                 Selection
+
+
+               Frequency (%)
+
+
+
+
+                                                                  DeepSeek-VL-1.3B
+
+                 Selection
+                                𝑁=1                       𝑁=2                        𝑁=4                      𝑁=6
+
+
+
+               Frequency (%)
+
+
+
+
+                                𝑁=8                      𝑁 = 10                      𝑁 = 12                   𝑁 = 14
+                 Selection
+
+
+               Frequency (%)
+
+
+
+
+                                                                  DeepSeek-VL-7B
+                                𝑁=1                       𝑁=2                        𝑁=4                      𝑁=6
+
+                 Selection
+
+
+               Frequency (%)
+
+
+
+
+                                𝑁=8                      𝑁 = 10                      𝑁 = 12                   𝑁 = 14
+
+                 Selection
+
+
+               Frequency (%)
+
+
+
+
+Figure 14. Selection frequency of individual heads across different N values. N refers to the number of selected heads based on the lowest
+H(Aℓ,h ) values. Default setting is N = 10. The top-3 localization heads are consistent across different N values, indicating the robustness
+of localization head selection to the choice of N .
+                                                                     19
+                               Expression:     Expression:     Expression:      Expression:        Expression:     Expression:
+                               pillow behind   red train       laptop to the    zebra on the       the wonderful   left man
+                               kid.            middle right.   right of the     left that is not   father in the   standing in
+                                                               other laptop.    grazing.           middle he is    black.
+                                                                                                   glorious.
+
+
+
+GT
+
+
+
+
+LLaVA-7B
+
+
+
+
+LLaVA-13B
+
+
+
+
+LLaVA-1.5-7B
+
+
+
+
+LLaVA-1.5-7B
+
+
+
+
+DeepSeek-1.3B
+
+
+
+
+DeepSeek-7B
+
+
+
+
+InternVL-6B
+
+
+
+
+ShareGPT4V-7B Mini-Gemini-2B
+
+
+
+
+Yi-VL-6B
+
+
+
+                                        Figure 15. Qualitative results of Referring Expression Comprehension.
+                                                                           20
+                               Expression:   Expression:    Expression:   Expression:     Expression:     Expression:
+                               front row     zebra whos     wood floor at top left sheep. top left        giraffe on the
+                               second from   full body is   the bottom of                 banana.         far right.
+                               left.         shown.         photo.
+
+
+
+GT
+
+
+
+
+LLaVA-7B
+
+
+
+
+LLaVA-13B
+
+
+
+
+LLaVA-1.5-7B
+
+
+
+
+LLaVA-1.5-7B
+
+
+
+
+DeepSeek-1.3B
+
+
+
+
+DeepSeek-7B
+
+
+
+
+InternVL-6B
+
+
+
+
+ShareGPT4V-7B Mini-Gemini-2B
+
+
+
+
+Yi-VL-6B
+
+
+
+                                        Figure 16. Qualitative results of Referring Expression Segmentation.
+                                                                        21
+LLaVA-1.5-13B with only three attention heads (L15 H39, L16 H30, L7 H2)
+           Expression:
+           In gymnastics competitions, athletes
+                                                                                        Expression:
+           perform a variety of acrobatic movements
+                                                                                        If we were attending a car show and
+           using different apparatus. Regarding the
+                                                                                        desired to sit down and observe the
+           picture, what equipment could be utilized
+                                                                                        displayed cars, where might we locate a
+           by athletes to accomplish challenging and
+                                                                                        suitable place to relax?
+           impressive movements such as flips and
+           vaults?
+
+                                                                                        Expression:
+           Expression:                                                                  In modern cuisine, food decoration plays
+           What item in the picture could be utilized as                                an important role in enhancing the dining
+           the accessory that people typically wear                                     experience. Based on the picture, which
+           around their neck for elegant formal attire?                                 food item is most likely to be used for
+                                                                                        decoration purposes?
+
+
+
+
+                                                                                        Expression:
+           Expression:                                                                  What is the item in this picture that could
+           Something used for playing music.                                            be utilized to hit the ball during a game of
+                                                                                        tennis?
+
+
+
+
+           Expression:
+                                                                                        Expression:
+           During an air show, pilots perform various
+                                                                                        In horse riding, it is crucial to have control
+           aerial maneuvers to entertain the audience.
+                                                                                        and direction over the horse. What object
+           What spectacle in the picture indicates that a
+                                                                                        in the picture is typically used for guiding
+           pilot is performing a spectacular and dazzling
+                                                                                        and controlling the movements of a horse?
+           aerial stunt?
+
+
+                                                                                        Expression:
+                                                                                        Please identify which object in the picture
+           Expression:                                                                  could serve as a toy for a dog, as dogs
+           The frictional part used for igniting.                                       relish playing with a variety of different
+                                                                                        toys that are specifically designed for
+                                                                                        biting and chewing.
+
+
+
+                                     Figure 17. Qualitative results of Reasoning Segmentation.
+
+
+
+
+                                                                22
+           LLaVA-1.5-13B with only three attention heads (L15 H39, L16 H30, L7 H2)
+
+
+
+
+                     Original Image               Expression: a father and the youngest.
+
+
+
+
+                     Original Image               Expression: Ohtani Shohei.
+
+
+
+
+                     Original Image               Expression: Bruno Mars.                Expression: Blackpink Rose.
+
+
+
+
+                     Original Image               Expression: an Electric-type           Expression: a Pokémon Trainer.
+                                                  Pokémon.
+
+Figure 18. Qualitative results of real-world image segmentation. LLaVA-1.5-13B [35] uses only three attention heads (L15 H39, L16 H30,
+L7 H2) as localization heads to produce a precise segmentation masks related to the text expressions. The whitened regions in the images
+represent the segmentation mask output by the model.
+
+
+
+
+                                                                  23
+                    Original Image                   Expression: apple inside a bowl.                 Prompt: strawberry
+
+
+
+
+                    Original Image                       Expression: guy skating.                    Prompt: spider man
+
+Figure 19. Qualitative results of generating the desired image through integration with a diffusion model [43]. Given an original image, our
+method generates a mask from the LVLM based on the text describing the desired modifications. This mask is then used as guidance for a
+diffusion model to perform image editing. Using the segmentation mask obtained through the localization head of the frozen LVLM [35],
+it is possible to generate semantic objects that align with the prompt at the specified mask locations.
+
+
+
+
+                                                                    24
+

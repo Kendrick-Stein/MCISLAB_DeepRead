@@ -1,0 +1,759 @@
+                                               Masking Matters: Unlocking the Spatial Reasoning Capabilities of LLMs
+                                                              for 3D Scene-Language Understanding
+
+                                                                         Yerim Jeon, Miso Lee, WonJun Moon, Jae-Pil Heo*
+                                                                                    Sungkyunkwan University
+                                                                       {1357j, dlalth557, wjun0830, jaepilheo}@skku.edu
+
+
+
+
+arXiv:2512.02487v2 [cs.CV] 24 Mar 2026
+                                                                    Abstract                                    Object Token                Instruction Token                  Obj-Obj / Obj-Inst Interaction
+
+
+
+                                         Recent advances in 3D scene-language understanding have                                                           Self-Attention                       Self-Attention
+                                                                                                                                                           w/ Causal Mask                  w/ Geo Mask & Inst Mask
+                                         leveraged Large Language Models (LLMs) for 3D reason-                                                ···
+
+                                         ing by transferring their general reasoning ability to 3D
+                                         multi-modal contexts. However, existing methods typically          What color is the table
+                                                                                                                                                             Token Order
+                                         adopt standard decoders from language modeling, which              surrounded by the
+                                                                                                                                                            Feed-Forward                         Feed-Forward
+                                                                                                            chairs?
+                                         rely on a causal attention mask. This design introduces two
+                                         fundamental conflicts in 3D scene understanding: sequen-                                                            Coral Blue                              Light Green
+
+                                         tial bias among order-agnostic 3D objects and restricted         Point Cloud and Instruction                  Conventional Decoder                     Our Decoder
+                                         object-instruction attention, hindering task-specific reason-                     (a) Comparison of Mask Designs for LLM Decoder
+                                         ing. To overcome these limitations, we propose 3D Spatial                                                       Baseline          Ours
+                                                                                                                               Multi3DRefer                                              Multi3DRefer
+                                         Language Instruction Mask (3D-SLIM), an effective mask-                                (F1@0.25)
+                                                                                                                                     63.7
+                                                                                                                                                                                          (F1@0.25)
+                                                                                                                                                                                              63.9
+                                         ing strategy that replaces the causal mask with an adap-          ScanRefer
+                                                                                                                       54.1
+                                                                                                                                                    Multi3DRefer
+                                                                                                                                               58.7 (F1@0.5)
+                                                                                                                                                                      ScanRefer
+                                                                                                                                                                                              60.5
+                                                                                                                                                                                                              Multi3DRefer
+                                                                                                                                                                                                         58.8 (F1@0.5)
+                                                                                                           (Acc@0.5)                 59.6                             (Acc@0.5) 54.8
+                                         tive attention mask tailored to the spatial structure of 3D                        49.5             54.8                                      51.1            55.5
+
+                                         scenes. Our 3D-SLIM introduces two key components: a                              55.3               78.1
+                                                                                                          ScanRefer 59.6                          84.2 Scan2Cap      ScanRefer 61.0 56.9                81.5 85.0 Scan2Cap
+                                         Geometry-adaptive Mask that constrains attention based on       (Acc@0.25)
+                                                                                                                                  53.7
+                                                                                                                                                         (C@0.5)    (Acc@0.25)                                     (C@0.5)
+                                                                                                                                            88.3                                         54.5    84.4
+                                         spatial density rather than token order, and an Instruction-                         55.9           94.0                                      56.0        88.5
+                                                                                                                       SQA3D                 ScanQA                               SQA3D                ScanQA
+                                         aware Mask that enables object tokens to directly access                       (EM)                 (CIDER)                               (EM)                (CIDER)
+
+                                         instruction context. This design allows the model to pro-                                Vicuna                                                   Qwen2
+                                         cess objects based on their spatial relationships while being                     (b) Performance Improvement across LLM Decoders
+                                         guided by the user’s task. 3D-SLIM is simple, requires no
+                                         architectural modifications, and adds no extra parameters,      Figure 1. Comparison of Mask Designs and Impact on Perfor-
+                                         yet it yields substantial performance improvements across       mance. (a) Unlike conventional causal masking that reinforces
+                                         diverse 3D scene-language tasks. Extensive experiments          the input order, 3D-SLIM introduces Geo Mask and Inst Mask to
+                                                                                                         capture spatial structures and encode task-oriented object repre-
+                                         across multiple benchmarks and LLM baselines validate
+                                                                                                         sentations for enhanced 3D reasoning. (b) When integrated with
+                                         its effectiveness and underscore the critical role of decoder
+                                                                                                         various LLM decoders, 3D-SLIM consistently improves perfor-
+                                         design in 3D multi-modal reasoning. The code is available       mance across multiple benchmarks.
+                                         at https://github.com/Jyerim/3D-SLIM .
+
+                                                                                                         answering). With the emergence of Large Language Mod-
+                                         1. Introduction                                                 els (LLMs), research has moved toward unified frameworks
+                                                                                                         capable of handling multiple tasks within a single model.
+                                         3D scene-language understanding aims to jointly interpret
+                                                                                                            Recently, Chat-Scene [13] introduced an Object-Centric
+                                         3D environments and natural language, serving as a funda-
+                                                                                                         3D LLM framework that decomposes an input 3D scene into
+                                         mental basis for multi-modal reasoning in applications such
+                                                                                                         a set of object proposals using a pretrained detector [21].
+                                         as robotic navigation and embodied agents. Traditionally,
+                                                                                                         Each object is represented by an identifier token and its
+                                         3D scene-language tasks have relied on specialized, task-
+                                                                                                         instance-level 3D and 2D features, enabling object-centric
+                                         specific models (e.g., grounding, captioning, and question-
+                                                                                                         reasoning via LLMs [10, 36]. Following this paradigm,
+                                           * Corresponding author                                        Inst3D-LMM [31] incorporates 2D-3D feature interactions
+into object-level representations, and 3DGraphLLM [32]              • We demonstrate the effectiveness and high applicability
+further models semantic relationships among objects. These            of 3D-SLIM across various baselines and multiple 3D
+works have achieved promising performance with compact                scene-language tasks.
+yet expressive scene representations.
+    However, this significant progress has been largely con-        2. Related Work
+fined to input representation, leaving the decoder architec-
+ture relatively underexplored. Current approaches borrow            3D Scene-Language Understanding. 3D scene under-
+decoders directly from language modeling [10, 36], neglect-         standing has emerged as a key computer vision task, enabling
+ing their inherent mismatch with 3D data. We identify two           models to interpret complex 3D environments and solve di-
+fundamental conflicts arising from the standard causal mask.        verse spatial reasoning problems based on user instructions.
+First, it imposes a sequential dependency on object tokens,         This field involves fundamental 3D vision-language tasks,
+which contradicts the order-agnostic nature of 3D scenes.           such as 3D visual grounding [4, 33], 3D dense captioning [7],
+This forces the model to learn spurious order-dependent             and 3D question answering [2, 18], which require a com-
+correlations, although 3D scenes are intrinsically organized        prehensive understanding of spatial structures and semantic
+by spatial relationships rather than input order. Second, the       relationships within 3D scenes. Early approaches [5, 17, 30]
+causal mask limits essential interaction between object to-         tackled these challenges with task-specific models, while
+kens and the instruction tokens, compelling the model to            subsequent studies [3, 15, 38] proposed unified frameworks
+process the entire 3D scene before integrating the user’s           that jointly handle multiple tasks. However, these approaches
+instruction, leading to inefficient reasoning pathways.             still rely on task-specific heads, limiting their flexibility for
+    To overcome these limitations, we propose 3D Spatial            more generalized user instructions.
+Language Instruction Mask (3D-SLIM), a masking strategy
+that replaces the causal mask with an adaptive attention mask
+tailored to the spatial structure of 3D scenes, as illustrated in   Large Language Models for 3D Scene Understanding.
+Fig. 1. We first introduce a Geometry-adaptive Mask (Geo            Motivated by the powerful generalization capabilities of
+Mask), which models local object relationships by adap-             Large Language Models (LLMs) [1, 10, 36], numerous stud-
+tively determining the attention scope based on each object’s       ies have investigated extending LLMs to 3D scene under-
+spatial density. This mask dynamically adjusts the attention        standing. The key challenge in this extension is to construct
+range, permitting more accessible neighbors in object-dense         3D scene representations that are well aligned with the in-
+areas to capture rich local context while restricting them          put modality of LLMs. To address this challenge, recent
+in sparse areas to prevent attending to irrelevant, distant         studies have evolved into three main directions based on
+objects. Subsequently, we introduce an Instruction-aware            how 3D scenes are represented. One line of research focuses
+Mask (Inst Mask) that enables direct attention from object          on point-based representations [9, 11, 37], which project
+tokens to the instruction tokens. This modification allows the      multi-view image features onto 3D point or voxel spaces to
+model to leverage the instruction context during processing         construct dense geometric representations. Another direction
+each object, thereby decoding the scene into an effective,          explores video-based representations [20, 27, 35], treating
+task-adapted representation.                                        multi-view images as video sequences and injecting 3D in-
+                                                                    formation into video LLMs [28, 34] to leverage their strong
+    3D-SLIM is a simple yet highly effective masking strat-
+                                                                    multi-modal reasoning capabilities. In contrast, object-based
+egy that directly substitutes the standard causal mask. This
+                                                                    approaches [6, 12–14, 16, 29, 31, 32] abstract 3D scenes into
+design enables seamless integration into various LLM de-
+                                                                    object-centric representations and assign identifiers for each
+coders without any architectural modifications or additional
+                                                                    object to facilitate direct reference and grounding. While all
+parameters. The generality and effectiveness of our method
+                                                                    these approaches primarily focus on input-level organization,
+have been validated through extensive experiments across
+                                                                    our work shifts the focus toward decoder design, tailoring
+diverse baselines on multiple 3D scene-language tasks, as
+                                                                    it to jointly process complex 3D scene representations and
+shown in Fig. 1. We believe this work provides new insights
+                                                                    language instructions.
+into the underlying importance of decoder design for advanc-
+ing 3D scene-language understanding.
+    Our key contribution can be summarized as follows:              3. Preliminary and Motivation
+• We identify two major issues in the conventional LLM de-          Task Definition. As depicted in Fig. 2, 3D scene-
+   coders: spurious order-dependent correlations and limited        language understanding integrates 3D perception with
+   interaction between instruction and object tokens.               natural-language reasoning to interpret complex 3D environ-
+• We propose a 3D Spatial Language Instruction Mask (3D-            ments. Given a 3D scene and a user instruction, the model
+  SLIM), an efficient and easily integrable solution to ad-         learns to identify referred objects [4, 33], describes specified
+  dress both issues.                                                targets [7], or answers questions [2, 18]. Such tasks require
+                                                   Visual Grounding                    3D Point Clouds   Multi-View Images User Instructions
+                                        User: Is there a blue bed next to a                  ···                ···                ···
+                                        wooden table? If yes, give its object ID.
+
+             <OBJ005>                   Assistant: Yes, <OBJ005>.
+                                                                                              Input Construction
+           <OBJ000>                                Dense Captioning                         (3D/2D Encoders, etc.)
+
+                                        User: Describe <OBJ000>’s appearance
+                                        and relations to nearby objects.                                  LLM Decoder
+                                        Assistant: This is an L-shaped sofa
+                                        beside the ottoman and in front of TV.                                                Text Output
+
+           (a) Examples of 3D Scene-Language Understanding                                 (b) Object-Centric 3D LLM Framework
+
+Figure 2. Overview of 3D Scene-Language Understanding and an Object-Centric Framework. (a) Examples of 3D reasoning tasks,
+including visual grounding and dense captioning. Object identifiers (e.g., <OBJ000>) are utilized to reference and ground target objects
+during the conversation. (b) The object-centric 3D LLM consists of an input construction module and an LLM decoder. Unlike prior works
+focusing on input construction, we emphasize the decoder to enhance 3D reasoning.
+
+
+understanding objects’ visual appearance and their spatial                 Motivation. Although extensive efforts have focused on
+and semantic relationships within the scene.                               organizing input sequences, the decoder design for 3D scene
+                                                                           understanding has remained underexplored. Specifically, the
+                                                                           causal masking mechanism in conventional decoders fun-
+Object-Centric Scene Understanding. Our work builds                        damentally conflicts with the order-agnostic nature of 3D
+upon object-centric 3D LLM frameworks [13, 31, 32], which                  scenes. While crucial for text, where token order encodes
+provide a representative pipeline for 3D scene-language un-                syntax and semantics, the causal mask is misaligned with
+derstanding. This pipeline consists of two stages, as illus-               3D object tokens that have no inherent sequential order.
+trated in Fig. 2:                                                          This property forces an artificial sequential interaction, caus-
+                                                                           ing the decoder to prioritize the arbitrary input order over
+(1) Input Construction forms object-centric representations
+                                                                           the scene’s underlying geometric relationships. Moreover,
+by decomposing the 3D scene into object proposals using a
+                                                                           the causal constraint blocks interaction between object and
+pretrained detector [21] and encoding each object with geo-
+                                                                           instruction tokens, hindering the integration of linguistic
+metric, visual and relational cues. Object identifiers are then
+                                                                           cues into scene interpretation. This disconnection forces the
+assigned to these objects and incorporated into the language
+                                                                           model to interpret scenes independently of the instruction,
+model’s vocabulary to reason with explicit object references.
+                                                                           leading to inefficient cross-modal reasoning. These limita-
+The resulting set of object tokens (each containing an identi-
+                                                                           tions highlight the need for a decoder tailored to the spatial
+fier and its features) is arranged together with system and in-
+                                                                           and multi-modal characteristics of 3D scene-language under-
+struction tokens, forming a complete multi-modal sequence
+                                                                           standing, as elaborated in Sec. 4.
+for the LLM decoder, which is structured in the specific
+order of [system, objects, instruction].
+(2) LLM Decoder serves as the core reasoning module,                       4. Method
+processing the multi-modal input sequences to generate task-
+                                                                           To address the aforementioned challenges, we propose 3D
+specific outputs. Following the standard design of decoder-
+                                                                           Spatial Language Instruction Mask (3D-SLIM) to tailor
+only architectures [1, 10, 23, 24, 36], the decoder operates in
+                                                                           LLM decoders for 3D scene understanding. As illustrated
+an auto-regressive manner, where each token attends only to
+                                                                           in Fig. 3, 3D-SLIM is composed of two specialized mask-
+preceding ones by applying a causal mask in self-attention.
+                                                                           ing schemes designed to govern object-object and object-
+Given that Q, K, V ∈ Rn×d are the query, key, and value
+                                                                           instruction interactions. First, we introduce the Geometry-
+matrices derived from the input sequence  X,  T
+                                                  the attention
+                                                                          adaptive Mask (Geo Mask) to promote interaction among
+                                           QK
+weights are computed as A = softmax         √
+                                              d
+                                                 + M    , where            spatially proximate objects. By considering both distance
+n and d denotes the sequence length and feature dimension,                 and local object density, this mask supports a geometrically
+respectively. The mask M is defined such that its elements                 grounded understanding of the 3D scene’s internal structure.
+Mpq = −∞ for p < q, which ensures that the resulting                       Subsequently, we apply the Instruction-aware Mask (Inst
+attention weight matrix A is lower triangular.                             Mask) to facilitate direct interaction between instruction and
+                           Obj Token                                                      −∞                                                                 Obj-Obj                                                         Inst-Inst         Inst-Obj                                                                                 Obj-Inst                                                                                   C: Chairs                                   T: Table
+
+                                                                                                                                                                                    ···                                                                                                                                                                                                                                               C                       T
+                                                                                                                                                                                                                                  𝐾      Spatial Proximity                                                                                                                                                                                                                 𝐾    Cross Modality
+                                                                                                                                                                                                                                            Sparse
+                                                                                                                                            ···
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   T
+
+                                                                                                                                                                                                                                                                                                                              C                                                                                                                                                                                                    C
+                                                                                                                                                                                                                                            Dense
+   Instruction: How many chairs                                                                                                                                                                                                                                                                                               T
+   are placed around the table?                                                                                                                         𝑄                                                                                                                                                                                    𝑄
+ (a) Point Cloud and Instruction                                                                                                                                               (b) Geometry-adaptive Mask                                                                                                                                                                    (c) Instruction-aware Mask
+
+Figure 3. Overview of 3D Spatial Language Instruction Mask (3D-SLIM). (a) Illustration of the input 3D point cloud and user instruction,
+which are subsequently encoded as object and instruction tokens. For simplicity, only a small subset of object and instruction tokens is
+depicted. (b) The Geometry-adaptive Mask dynamically modulates object-object attention based on spatial proximity and local density;
+objects in denser regions attend to an expanded set of neighbors, whereas those in sparse areas focus on fewer neighbors. (c) The Instruction-
+aware Mask enables object-instruction attention, which enhances scene understanding by focusing on instruction-relevant content (e.g.,
+"chairs", "table").
+
+
+object tokens. Both components seamlessly integrate into                                                                                                                                                                                   dij = ∥ci − cj ∥2 corresponds to the L2 distance between
+existing decoders, requiring no architectural modifications.                                                                                                                                                                               object centers. ρmin and ρmax indicate the minimum and
+                                                                                                                                                                                                                                           maximum local density values across all objects, and ρ̃ is
+Geometry-adaptive Mask. The causal mask imposes se-                                                                                                                                                                                        the corresponding min-max normalized density that supports
+quential dependencies among object tokens, which contra-                                                                                                                                                                                   relative local density comparison within the scene. Thus, ob-
+dicts the order-agnostic nature of 3D scenes. A naïve solution                                                                                                                                                                             jects with smaller average distances to others exhibit higher
+is to allow full attention across all object tokens; however,                                                                                                                                                                              local object density.
+this relaxation of sequential constraints disregards the in-                                                                                                                                                                                  Subsequently, we compute the adaptive number of local
+herent local structure of 3D scenes by treating all object                                                                                                                                                                                 neighbors and the corresponding attentive neighborhood for
+relationships uniformly. In contrast, humans tend to interpret                                                                                                                                                                             each object as follows:
+3D scenes by grouping nearby objects according to spatial
+                                                                                                                                                                                                                                                 \begin {aligned} k_i &= \operatorname {round}\big ((k_{\max } - k_{\min })\cdot \tilde {\rho _i} + k_{\min }\big ), \\ \Omega _i &= \operatorname {TopK}(\{-d_{ij} \mid j \in \{1, \dots , N\} \setminus \{i\}\}, k_i), \\ \end {aligned} \label {eq:adaptive_local_neighbors} 
+proximity [26], thereby grasping complex 3D scenes through                                                                                                                                                                                                                                                                                                                                                                                                                                                                             (2)
+the formation of locally coherent structures. We suggest that
+incorporating this proximity bias into the model can enable                                                                                                                                                                               where ki ∈ [kmin , kmax ] defines the adaptive attention range
+more effective reasoning about the spatial structure of 3D                                                                                                                                                                                for i-th object, round(·) denotes rounding to the nearest
+scenes. Motivated by this idea, we design a Geo Mask that                                                                                                                                                                                 integer, and TopK(D, k) is the operation that selects the
+adaptively adjusts the attention scope based on local object                                                                                                                                                                              indices of k largest elements in D, respectively. Using the
+density.                                                                                                                                                                                                                                  neighbor set Ωi , the attention mask that determines object-
+    Concretely, Geo Mask specifies a local neighborhood                                                                                                                                                                                   to-object interactions is finally defined as:
+to model spatially proximate relationships among objects.
+However, pre-defined thresholds (e.g., number of objects and
+fixed distance) are insufficient for identifying local neigh-                                                                                                                                                                                                                            \begin {aligned} &M_{ij}^{\mathcal {O}} =\begin {cases} 0, & j \in \Omega _i \text { or } j=i,\\ -\infty , & \text {otherwise.} \end {cases} \end {aligned} \label {eq:nnmask}                                                                (3)
+bors, as 3D scenes have non-uniform spatial object density,
+containing both densely clustered and sparsely distributed                                                                                                                                                                                 It captures the structure of non-uniform 3D scenes by per-
+regions. To handle this variation, Geo Mask begins by esti-                                                                                                                                                                                mitting broader attention in dense regions while limiting it in
+mating the local density around each object, from which an                                                                                                                                                                                 sparse ones. This behavior can be interpreted as a geometry-
+adaptive number of neighboring objects is inferred. Specifi-                                                                                                                                                                               aware scene graph that dynamically adjusts local connectiv-
+cally, the local density of i-th object is computed as:                                                                                                                                                                                    ity based on spatial density.
+
+      \begin {aligned} \rho _{i}&=\sqrt {3}-\frac {1}{N-1}\sum _{j:j \neq i}d_{ij}, \ \\tilde {\rho }_{i}= \frac {\rho _{i} - \rho _{\min }}{\rho _{\max } - \rho _{\min }}, \\ \end {aligned} \label {eq:local_density}       (1)        Instruction-aware Mask. Humans naturally interpret vi-
+                                                                                                                                                                                                                                           sual scenes through linguistic cues. In other words, when
+where i, j ∈ [1, N ] denote the object indices within the                                                                                                                                                                                  given a question or instruction, they focus on regions rel-
+object token set O, N is the total number of objects, and                                                                                                                                                                                  evant to the described context. From this perspective, we
+claim that instruction-aware object encoding is crucial for                                                                                                                                                            on the validation sets for all benchmarks, while for SQA3D
+effective multi-modal reasoning in LLMs, yet this process is                                                                                                                                                           we additionally follow the standard practice of reporting test
+hindered by the causal mask.                                                                                                                                                                                           set performance.
+   To address this issue, the Inst Mask is introduced, al-
+lowing attention from object tokens to instruction tokens.                                                                                                                                                             Metrics. We follow the standard evaluation metrics used
+Specifically, the Inst Mask overrides the object-instruction                                                                                                                                                           in previous works [13, 31, 32] for each benchmark. For Scan-
+block of the attention mask M by replacing the −∞ entries                                                                                                                                                              Refer, we report Acc@0.25 and Acc@0.5, which indicate
+with zeros. The Inst Mask is defined as:                                                                                                                                                                               the percentage of predictions whose 3D IoU with the ground-
+                                                                                                                                                                                                                       truth bounding box exceeds 0.25 and 0.5, respectively. For
+              \begin {aligned} &M_{ij}^{\mathcal {I}} =\begin {cases} 0, & i \in \mathcal {O} \text { and } j \in \mathcal {I},\\ M_{ij}, & \text {otherwise,} \end {cases} \end {aligned} \label {eq:nnmask}    (4)   Multi3DRefer, we use F1@0.25 and F1@0.5, combining
+                                                                                                                                                                                                                       precision and recall under the same IoU thresholds. For
+where O and I denotes the object and instruction token sets,                                                                                                                                                           Scan2Cap, evaluation is based on C@0.5 (CIDEr@0.5)
+respectively. This simple adjustment restores the instruction-                                                                                                                                                         and B-4@0.5 (BLEU-4@0.5), which measure the similar-
+to-object attention pathway, aligning object representations                                                                                                                                                           ity between generated and reference captions conditioned
+with the linguistic context for more effective cross-modal                                                                                                                                                             on the 3D IoU threshold of 0.5. For ScanQA, we report
+understanding.                                                                                                                                                                                                         C (CIDEr) [25] and B-4 (BLEU-4) [19], assessing the lin-
+                                                                                                                                                                                                                       guistic similarity between predicted and reference answers.
+                                                                                                                                                                                                                       Finally, for SQA3D, we adopt EM (Exact Match) [18] and
+Training Objective. Following Chat-Scene [13], we unify
+                                                                                                                                                                                                                       EM-R (Refined Exact Match) [14], where EM requires exact
+all 3D scene-language tasks into a single input-output format,
+                                                                                                                                                                                                                       matching with the ground-truth answer, and EM-R denotes
+facilitating the model’s ability to handle diverse task formu-
+                                                                                                                                                                                                                       a refined protocol for answer matching.
+lations within one framework. Under this unified prompt,
+the model is trained solely with the cross-entropy loss that                                                                                                                                                           5.2. Implementation Details
+supervises text generation conditioned on the multi-modal
+inputs. Given the input sequence X (consisting of the sys-                                                                                                                                                             We assess the effectiveness and adaptability of 3D-SLIM
+tem message, scene representation, and user instruction), the                                                                                                                                                          by integrating it into two representative frameworks, Chat-
+training objective minimizes the negative log-likelihood of                                                                                                                                                            Scene [13] and 3DGraphLLM [32]. For hyperparameters, we
+the target sequence Y :                                                                                                                                                                                                adopt their original configurations. All models are fine-tuned
+                                                                                                                                                                                                                       with LoRA using the AdamW optimizer (weight decay 0.02),
+                                                                                                                                                                                                                       and Non-Maximum Suppression (NMS) with a mask IoU
+             \begin {aligned} &\mathcal {L} = - \sum _{l=1}^{m}\text {log}P(Y_l|Y_{[1,\ldots , l-1]}, X), \end {aligned} \label {eq:objective}                                                                   (5)   threshold of 0.9 is applied. We set the batch size to 32 for
+                                                                                                                                                                                                                       Chat-Scene and 8 for 3DGraphLLM, with learning rates of
+where m denotes the number of tokens in the target sequence,                                                                                                                                                           5e−6 and 2e−5 , respectively. For Geo Mask, we empirically
+and Y1,...,l−1 represents the sequence of the previous l − 1                                                                                                                                                           set the lower and upper bounds of the attentive neighborhood
+tokens in the response.                                                                                                                                                                                                to kmin = 2 and kmax = 10, respectively. All experiments
+                                                                                                                                                                                                                       are conducted on 2 NVIDIA RTX Pro6000 GPUs.
+5. Experiments
+                                                                                                                                                                                                                       5.3. Comparison with the State-of-the-Art
+5.1. Datasets and Metrics                                                                                                                                                                                              Tab. 1 provides a comprehensive comparison between our
+Datasets. We conduct experiments on five widely used                                                                                                                                                                   method and state-of-the-art approaches, including (1) point-
+benchmarks for 3D scene-language understanding. For                                                                                                                                                                    based models [9, 11, 37], which aggregate 2D image features
+visual grounding, we evaluate on ScanRefer [4] and                                                                                                                                                                     in the point or voxel space; (2) video-based models [20, 27,
+Multi3DRefer [33], which aim to identify single-object                                                                                                                                                                 35], which treat multi-view images as video sequences; and
+and multi-object targets, respectively. For dense caption-                                                                                                                                                             (3) object-based models [6, 12–14, 16, 29, 31, 32], which
+ing, we use Scan2Cap [7], which assesses how well the                                                                                                                                                                  decompose 3D scenes into object-level representations. Our
+model describe each object’s appearance and its spatial rela-                                                                                                                                                          approach is evaluated on two object-centric frameworks:
+tions with surrounding objects. For question answering, we                                                                                                                                                             Chat-Scene [13] and 3DGraphLLM [32].
+adopt ScanQA [2] and SQA3D [18], which target free-form                                                                                                                                                                    Compared with video-based models, our model achieves
+question-answering and situated reasoning, respectively. All                                                                                                                                                           higher accuracy on visual grounding tasks (ScanRefer and
+benchmarks are built upon ScanNet [8], a large-scale indoor                                                                                                                                                            Multi3DRefer), but shows lower performance on question-
+dataset providing 3D point clouds, RGB-D sequences, and                                                                                                                                                                answering tasks (ScanQA and SQA3D). We conjecture that
+instance-level segmentation annotations. It contains 1513                                                                                                                                                              this performance gap arises from differences in the under-
+scenes in total, with 1201 used for training and 312 for vali-                                                                                                                                                         lying language models. Object-based approaches rely on
+dation. Following prior works [13, 31, 32], we report results                                                                                                                                                          LLMs [10, 36] trained primarily on text data, whereas video-
+                                                                 3D Visual Grounding                 3D Captioning            3D Question-Answering
+    Method                              LLM                 ScanReferval       Multi3DReferval        Scan2Capval      ScanQAval   SQA3Dval       SQA3Dtest
+                                                        Acc@0.25 Acc@0.5 F1@0.25 F1@0.5             C@0.5 B-4@0.5       C    B-4 EM EM-R EM EM-R
+    Expert Models
+    ScanRefer [4]                         ✗               37.3          24.3      -           -      -        -         -      -      -       -       -        -
+    ScanQA [2]                            ✗                -             -        -           -      -        -        64.9   10.1    -       -       -        -
+    Scan2Cap [7]                          ✗                -             -        -           -     81.3     43.4       -      -      -       -       -        -
+    SQA3D [18]                            ✗                -             -        -           -      -        -         -      -      -       -      46.6      -
+    3DJCG [3]                             ✗               49.6          37.3      -           -     49.5     31.0       -      -      -       -       -        -
+    3D-VLP [15]                           ✗               51.4          39.5      -           -     54.9     32.3      67.0   11.1    -       -       -        -
+    M3DRef-CLIP [33]                      ✗               51.9          44.7     42.8        38.4    -        -         -      -      -       -       -        -
+    3D-VisTA [38]                         ✗               50.6          45.5      -           -     66.9     34.0      72.9   13.1    -       -      48.5      -
+    PQ3D [39]                             ✗                -            51.2      -          50.1   80.3     36.0      87.8    -      -       -      47.1      -
+    Point-Based Representation
+    3D-LLM [11]                     BLIP2-flant5          30.3           -            -       -      -        -        69.4   12.0    -       -       -        -
+    Scene-LLM [9]                   Llama-2-7B             -             -            -       -      -        -        80.0   12.0    -       -      54.2      -
+    LLaVA-3D [37]                  LLaVA-7B-v1.5          54.1          42.4          -       -     79.2     41.1      91.7    -      -       -      55.6     57.6
+    Video-Based Representation
+    Qwen2-VL-7B† [28]            Qwen2-VL-7B               -             -        -           -      -        -       53.9     3.0    -       -      40.7     46.7
+    LLaVA-Video-7B† [34]     LLaVA-Video-7B-Qwen2          -             -        -           -      -        -       88.7     3.1    -       -      48.5      -
+    GPT4Scene-HDM [20]           Qwen2-VL-7B              62.6          57.0     64.5        59.8   86.3     40.6     96.3    15.5    -       -      59.4     62.4
+    Video-3D LLM [35]        LLaVA-Video-7B-Qwen2         58.1          51.7     58.0        52.7   83.8     41.3     102.1   16.4    -       -      58.6      -
+    Ross3D [27]              LLaVA-Video-7B-Qwen2         61.1          54.5     59.6        54.3   81.3     43.4     107.0   17.9    -       -      63.0     65.7
+    Object-Based Representation
+    Chat-3D [29]                    Vicuna-7B-v0           -             -        -           -      -        -        53.2    6.4    -       -       -        -
+    Chat-3D v2 [12]                Vicuna-7B-v1.5         42.5          38.4     45.1        41.6   63.9     31.8      87.6   14.0    -       -      54.7      -
+    Grounded 3D-LLM [6]            Tiny-Vicuna-1B         47.9          44.1     45.2        40.6   70.6     35.5      72.7   13.4    -       -       -        -
+    LEO [14]                       Vicuna-7B-v1.1          -             -        -           -     68.4     36.9      80.0   11.5    -       -      50.0     52.4
+    Inst3D-LMM [31]                Vicuna-7B-v1.5         57.8          51.6     58.3        53.5   79.7     38.3      88.6   14.9    -       -       -        -
+    Robin3D [16]                   Vicuna-7B-v1.5         60.8          55.1     64.9        59.7   87.2     38.4       -       -    56.0    58.6    56.9     59.8
+    Chat-Scene [13]                 Vicuna-7B-v1.5        55.5          50.2     57.1        52.4   77.1     36.3      87.7   14.3   53.2    56.1    54.6     57.5
+    Chat-Scene + Ours               Vicuna-7B-v1.5        59.6          54.1     63.7        58.7   84.2     38.0      94.0   15.2   55.9    58.9    55.5     58.2
+    3DGraphLLM [32]               Llama3-8B-Instruct      62.4          56.6     64.7        59.9   81.0     36.5      88.8   15.9   55.9     -       -        -
+    3DGraphLLM + Ours             Llama3-8B-Instruct      64.1          57.7     67.3        62.0   82.2     37.3      88.2   15.8   56.8    59.7    56.1     59.1
+
+
+Table 1. Performance comparison on 3D scene-language understanding benchmarks. The table shows the evaluation results of Expert
+models and three types of Generalist models: Point-based, Video-based, and Object-based models. "EM" stands for top-1 exact match and
+"EM-R" means the refined exact match following [14]. † indicates zero-shot performance and − denotes unavailable results.
+
+                                                 ScanReferval   Multi3DReferval Scan2Capval ScanQAval                                              SQA3Dval
+     Method
+                                              Acc@0.25 Acc@0.5 F1@0.25 F1@0.5 C@0.5 B-4@0.5 C    B-4                                              EM EM-R
+     Vicuna-7B-v1.5 [36]                         55.3            49.5          59.6         54.8      78.1          35.6      88.3    14.1        53.7      56.4
+     Vicuna-7B-v1.5 + Ours                       59.6            54.1          63.7         58.7      84.2          38.0      94.0    15.2        55.9      58.9
+     Llama3-8B-Instruct [10]                     59.8            53.9          61.9         57.2      83.9          38.1      82.5    14.1        56.1      59.1
+     Llama3-8B-Instruct + Ours                   61.8            55.7          64.3         59.2      85.1          38.8      85.1    15.6        56.3      59.2
+     Qwen2-7B-Instruct [1]                       56.9            51.1          60.5         55.5      81.5          37.7      84.4    14.9        54.5      57.4
+     Qwen2-7B-Instruct + Ours                    61.0            54.8          63.9         58.8      85.0          38.9      88.5    15.9        56.0      59.2
+     Qwen3-8B-Instruct [22]                      57.5            51.5          61.3         56.5      78.8          36.7      83.0    14.6        54.7      58.3
+     Qwen3-8B-Instruct + Ours                    61.7            55.8          64.5         59.6      83.6          38.7      84.8    15.0        55.7      59.2
+
+Table 2. Performance across LLM Decoders. The table shows the performance of 3D-SLIM with different LLM decoders under the
+Chat-Scene framework.
+
+
+based methods adopt MLLMs [28, 34] further trained on                                     ing, which proves highly effective for advancing 3D scene
+large-scale image and video QA datasets, which equip them                                 understanding.
+with stronger multi-modal reasoning capabilities. Indeed,
+MLLMs already exhibit strong zero-shot results on ScanQA                                  5.4. Ablation Study
+and SQA3D without any fine-tuning, as illustrated in the                                  Effectiveness with different LLMs. Tab. 2 demonstrates
+first two rows of the video-based section in Tab. 1. As                                   that 3D-SLIM consistently boosts performance across di-
+for object-based methods, our model consistently surpasses                                verse LLM backbones, including Vicuna-7B [36], Llama3-
+prior baselines, with particularly notable improvements in                                8B [10], and Qwen2-7B [1]. When applied to Vicuna-7B, 3D-
+visual grounding. These results underscore the importance                                 SLIM yields notable improvements across all benchmarks.
+of adapting the decoder’s attention mechanism to 3D reason-                               Similar performance gains are also observed with Llama3-
+                                      ScanReferval   Multi3DReferval Scan2Capval ScanQAval                           SQA3Dval
+         Row Method
+                                   Acc@0.25 Acc@0.5 F1@0.25 F1@0.5 C@0.5 B-4@0.5 C    B-4                           EM EM-R
+         A0     Causal Mask           55.3         49.5       59.6       54.8      78.1      35.6     88.3 14.1 53.7       56.4
+                          †
+         B0     Full Mask             55.9         50.3       60.1       55.3      76.5      35.3     87.9 15.1 53.2       55.9
+         C0     Full Mask             56.2         50.5       61.2       56.0      78.4      36.0     90.9 14.8 54.8       57.6
+         C1     Diagonal Mask         56.4         50.6       60.5       55.6      78.6      36.4     92.9 14.9 53.9       56.7
+         D0     Fixed-N Mask          57.5         51.7       61.6       56.6      81.9      36.7     91.6 15.0 55.3       58.0
+         D1     Geo Mask (Ours)       58.6         53.1       62.0       57.3      82.4      37.0     94.2 15.0 55.9       58.6
+
+Table 3. Ablation study on Decoder Masking Strategies. The table presents the results of different masking strategies under the Chat-Scene
+framework. A0 (Causal Mask) is the standard causal mask adopted in existing LLM decoders. B0 (Full Mask† ) is the full attention applied
+over the entire mask. C0 (Full Mask), C1 (Diagonal), D0 (Fixed-N Mask), and D1 (Geo Mask) are the strategies applied to the object-object
+block of the mask.
+
+                                     ScanReferval   Multi3DReferval Scan2Capval ScanQAval                           SQA3Dval
+          Geo Mask Inst Mask
+                                  Acc@0.25 Acc@0.5 F1@0.25 F1@0.5 C@0.5 B-4@0.5 C    B-4                           EM EM-R
+              ·             ·         55.3        49.5       59.6       54.8      78.1      35.6     88.3   14.1   53.7   56.4
+              ✓             ·         58.6        53.1       62.0       57.3      82.4      37.0     94.2   15.0   55.9   58.6
+              ·             ✓         57.6        51.8       62.0       57.0      81.1      36.4     91.1   14.9   55.1   58.0
+              ✓             ✓         59.6        54.1       63.7       58.7      84.2      38.0     94.0   15.2   55.9   58.9
+
+Table 4. Ablation study on 3D-SLIM. To evaluate the contribution of each component, we conduct ablation studies on Geometry-adaptive
+Mask (Geo Mask) and Instruction-aware Mask (Inst Mask) within the Chat-Scene framework.
+
+
+8B and Qwen3-8B, demonstrating consistent enhancements                  reasoning. Based on this assumption, the object-object at-
+across both grounding and reasoning tasks. These results                tention block is examined through two variants: C0 (Full
+highlight that 3D-SLIM operates as a decoder-agnostic and               Mask), which enables all-to-all interactions, and C1 (Di-
+broadly effective module for 3D scene understanding.                    agonal Mask), which blocks all inter-object attention. The
+                                                                        results confirm that removing the causal constraint from this
+Analysis of Decoder Masking Strategies. To confirm the                  block is beneficial. However, they also show an interesting
+effectiveness of our Geometry-adaptive Mask (Geo Mask),                 observation: the Full Mask performs almost identically to
+we compare several alternative designs in Tab. 3. All ex-               the Diagonal Mask. This suggests that while removing the
+periments are conducted on the Chat-Scene baseline using                sequential constraint is a step in the right direction, merely
+Vicuna-7B as the decoder LLM. Note that the Instruction-                expanding the attention scope to be all-to-all is insufficient
+aware Mask (Inst Mask) is excluded to isolate the influence             to capture the structural cues essential for spatial reasoning.
+of Geo Mask design choices.                                             (3) Modeling Local Spatial Relationships. The preced-
+(1) Full Attention on All Tokens. This experiment investi-              ing analyses reveal the limitations of naïve mask modifica-
+gates whether applying full attention to all tokens, without            tions, underscoring the need for explicit locality guidance.
+any dedicated mask, can recover the spatial and cross-modal             To explore this, we compare two locality-based masking
+dependencies lost due to the causal mask. The standard                  strategies: D0 (Fixed-N Mask), which connects each ob-
+causal mask (A0) is compared with a full attention vari-                ject to its predefined top-5 nearest neighbors, and D1 (Geo
+ant (B0). Although full attention removes artificial order              Mask), which adapts the attentive neighborhood according
+and restores cross-modal interactions, empirical results show           to each object’s local spatial density. As shown in Tab. 3,
+that it leads to performance drops in captioning and question-          both variants surpass the C0 (Full Mask) and C1 (Diag-
+answering tasks (Scan2Cap, ScanQA, and SQA3D). This                     onal Mask), demonstrating that explicit locality guidance
+indicates that fully unmasked attention fails to provide useful         improves spatial structure modeling. Moreover, Geo Mask
+structural cues and can even hinder decoder reasoning.                  consistently outperforms Fixed-N Mask, highlighting that
+(2) Removing the Object Order Constraint. The next anal-                adjusting the attention range based on local density provides
+ysis focuses on whether relaxing the causal constraint for              a more accurate understanding of non-uniform 3D structures
+object-object interactions helps the decoder exploit object-            and strengthens spatial reasoning in complex scenes.
+level relations. This is motivated by the assumption that
+the causal mask is essential for non-object tokens (e.g., sys-          Component-level Analysis. To validate the contribution
+tem and text prompts) but may overly restrict object-centric            of each component in 3D-SLIM, we conduct ablation stud-
+                                  ScanReferval   Multi3DReferval Scan2Capval ScanQAval                                          SQA3Dval
+           Row kmin , kmax
+                               Acc@0.25 Acc@0.5 F1@0.25 F1@0.5 C@0.5 B-4@0.5 C    B-4                                          EM EM-R
+            R0        0, 5        57.0        51.1       60.8       55.6            81.4            37.1       89.3   14.5    55.2        58.3
+            R1       0, 10        57.5        51.6       61.8       56.7            83.2            37.4       90.3   14.4    55.3        58.2
+            R2       2, 10        58.6        53.1       62.0       57.3            82.4            37.0       94.2   15.0    55.9        58.6
+            R3       2, 20        58.8        53.1       62.2       57.1            82.8            37.0       92.4   14.3    55.2        58.9
+
+Table 5. Attention Range for Geo Mask. Performance of the Geo Mask with different attentive neighborhood bounds (kmin , kmax ) on the
+Chat-Scene baseline.
+
+
+ies on Chat-Scene baseline. As reported in Tab. 4, both Geo                  Instruction             Input 3D Scene       3D-SLIM           Chat-Scene
+                                                                                                                                                            High
+Mask and Inst Mask consistently improve overall perfor-
+mance. Moreover, when applied together, they yield ad-                What is next to the table
+                                                                      beneath the tv? Answer
+ditional gains, reaching state-of-the-art results on visual           the question using a
+                                                                      single word or phrase.
+grounding benchmarks. This complementary behavior sug-
+gests that the two masking schemes address distinct yet coop-         3D Question Answering           GT: trash can     Pred: trash can      Pred: bench    Low
+erative aspects of 3D scene decoding, emphasizing the need                                                                                                  High
+to model both the spatial structure and instruction awareness         What is the ID of the
+in 3D scene understanding.                                            object that matches the
+                                                                      description “this is a
+                                                                      black cabinet. it is to the
+                                                                      left of a white cabinet”?
+Attention Range for Geo Mask. Tab. 5 presents
+                                                                       3D Visual Grounding            GT: <OBJ010>     Pred: <OBJ010>      Pred: <OBJ073>   Low
+an ablation of the Geo Mask’s attentive neighborhood
+bounds (kmin , kmax ) on the Chat-Scene baseline. First, com-
+                                                                     Figure 4. Visualization of LLM attention map. In the instruction,
+paring R0 (kmin = 0, kmax = 5) and R1 (0, 10) shows that             key cues for answering the question are highlighted in yellow.
+overly narrow bounds limit information exchange between              The attention map is colored by activation intensity, where yellow
+nearby objects, whereas larger ranges enable richer spatial in-      represents high values and purple represents low ones. The green
+teractions and improve performance. Furthermore, R2 (2,10)           box in the second row denote the GT object, whereas the red ones
+reveals that ensuring a minimum neighborhood (kmin ) sta-            indicate the predicted objects.
+bilizes attention, especially for the object in sparse regions,
+leading to consistent gains. However, R3 (2, 20) indicates
+that excessively large upper bounds (kmax ) cause attention          cabinet in isolation, failing to encode its spatial relationship
+to spread too widely, resulting in degraded performance.             to the white cabinet and thus selecting the wrong object.
+Overall, the range of [2, 10] offers the most balanced perfor-
+mance across all benchmarks, and we adopt these values as            6. Conclusion
+our default configuration.                                           In this work, we identified a fundamental conflict in existing
+                                                                     3D scene-language frameworks: the standard LLM decoder
+Qualitative Results. To examine how the model allocates              imposes spurious sequential dependency on inherently order-
+attention to perform its tasks, we visualize the attention maps      agnostic 3D objects and blocks object-instruction interac-
+from the output tokens to the 3D object tokens, computed             tions crucial for task-specific reasoning. Motivated by this
+by averaging attention weights across all layers and heads,          limitation, we proposed 3D-SLIM, a simple, parameter-free
+as shown in Fig. 4. The first row shows that 3D-SLIM accu-           masking strategy. 3D-SLIM replaces the standard causal
+rately interprets the complex spatial phrase "next to the table      mask with two specialized components: (1) Geometry-
+beneath the tv" for the question-answering task. 3D-SLIM             adaptive Mask (Geo Mask) that models object-object inter-
+precisely focuses on the trash can and its surrounding region,       actions based on spatial proximity and local density, and (2)
+which is consistent with the instructions. In contrast, Chat-        Instruction-aware Mask (Inst Mask) that enables object to-
+Scene mainly attends to salient nouns such as "table" and            kens to directly attend to instruction tokens, facilitating task-
+"tv", missing the contextual meaning and producing an incor-         guided scene representation. Extensive experiments demon-
+rect answer. For the second example, the visual grounding            strated that 3D-SLIM consistently improves object-centric
+task, the scene includes two black cabinets, where the model         frameworks, highlighting the importance of decoder design
+must identify the one "to the left of a white cabinet". 3D-          in 3D-LLMs. We believe 3D-SLIM provides strong founda-
+SLIM correctly focuses on the described region and grounds           tion for future 3D multi-modal models, paving the way for
+the target object by capturing the relational context between        more capable and efficient spatial reasoning in applications
+the two cabinets. In contrast, Chat-Scene attends to a black         like embodied AI and robotics.
+Acknowledgements                                                           Information Processing Systems, 36:20482–20494, 2023. 2,
+                                                                           5, 6
+This work was supported in part by MSIT/IITP                          [12] Haifeng Huang, Zehan Wang, Rongjie Huang, Luping Liu,
+(No.    RS-2022-II220680,   RS-2020-II201821,   RS-                        Xize Cheng, Yang Zhao, Tao Jin, and Zhou Zhao. Chat-3d
+2019-II190421,      RS-2024-00459618,      RS-2024-                        v2: Bridging 3d scene and large language models with object
+00360227, RS-2024-00437633, RS-2024-00437102,                              identifiers. CoRR, 2023. 2, 5, 6
+RS-2025-25442569),    MSIT/NRF     (No.    RS-2024-                   [13] Haifeng Huang, Yilun Chen, Zehan Wang, Rongjie Huang,
+00357729), and KNPA/KIPoT (No. RS-2025-25393280).                          Runsen Xu, Tai Wang, Luping Liu, Xize Cheng, Yang Zhao,
+                                                                           Jiangmiao Pang, et al. Chat-scene: Bridging 3d scene and
+                                                                           large language models with object identifiers. Advances in
+References                                                                 Neural Information Processing Systems, 37:113991–114017,
+ [1] Qwen2 technical report. 2024. 2, 3, 6                                 2024. 1, 3, 5, 6
+                                                                      [14] Jiangyong Huang, Silong Yong, Xiaojian Ma, Xiongkun
+ [2] Daichi Azuma, Taiki Miyanishi, Shuhei Kurita, and Motoaki
+                                                                           Linghu, Puhao Li, Yan Wang, Qing Li, Song-Chun Zhu, Baox-
+     Kawanabe. Scanqa: 3d question answering for spatial scene
+                                                                           iong Jia, and Siyuan Huang. An embodied generalist agent in
+     understanding. In proceedings of the IEEE/CVF conference
+                                                                           3d world. In Proceedings of the 41st International Conference
+     on computer vision and pattern recognition, pages 19129–
+                                                                           on Machine Learning, pages 20413–20451, 2024. 2, 5, 6
+     19139, 2022. 2, 5, 6
+                                                                      [15] Zhao Jin, Munawar Hayat, Yuwei Yang, Yulan Guo, and
+ [3] Daigang Cai, Lichen Zhao, Jing Zhang, Lu Sheng, and Dong
+                                                                           Yinjie Lei. Context-aware alignment and mutual masking for
+     Xu. 3djcg: A unified framework for joint dense captioning
+                                                                           3d-language pre-training. In Proceedings of the IEEE/CVF
+     and visual grounding on 3d point clouds. In Proceedings of
+                                                                           Conference on Computer Vision and Pattern Recognition,
+     the IEEE/CVF conference on computer vision and pattern
+                                                                           pages 10984–10994, 2023. 2, 6
+     recognition, pages 16464–16473, 2022. 2, 6
+                                                                      [16] Weitai Kang, Haifeng Huang, Yuzhang Shang, Mubarak Shah,
+ [4] Dave Zhenyu Chen, Angel X Chang, and Matthias Nießner.                and Yan Yan. Robin3d: Improving 3d large language model
+     Scanrefer: 3d object localization in rgb-d scans using natural        via robust instruction tuning. In Proceedings of the IEEE/CVF
+     language. In European conference on computer vision, pages            International Conference on Computer Vision, pages 3905–
+     202–221. Springer, 2020. 2, 5, 6                                      3915, 2025. 2, 5, 6
+ [5] Sijin Chen, Hongyuan Zhu, Mingsheng Li, Xin Chen, Peng           [17] Jingzhou Luo, Yang Liu, Weixing Chen, Zhen Li, Yaowei
+     Guo, Yinjie Lei, Gang Yu, Taihao Li, and Tao Chen. Vote2cap-          Wang, Guanbin Li, and Liang Lin. Dspnet: Dual-vision scene
+     detr++: Decoupling localization and describing for end-to-end         perception for robust 3d question answering. In Proceedings
+     3d dense captioning. IEEE Transactions on Pattern Analysis            of the Computer Vision and Pattern Recognition Conference,
+     and Machine Intelligence, 46(11):7331–7347, 2024. 2                   pages 14169–14178, 2025. 2
+ [6] Yilun Chen, Shuai Yang, Haifeng Huang, Tai Wang, Runsen          [18] Xiaojian Ma, Silong Yong, Zilong Zheng, Qing Li, Yitao
+     Xu, Ruiyuan Lyu, Dahua Lin, and Jiangmiao Pang. Grounded              Liang, Song-Chun Zhu, and Siyuan Huang. Sqa3d: Situated
+     3d-llm with referent tokens. arXiv preprint arXiv:2405.10370,         question answering in 3d scenes. In The Eleventh Interna-
+     2024. 2, 5, 6                                                         tional Conference on Learning Representations. 2, 5, 6
+ [7] Zhenyu Chen, Ali Gholami, Matthias Nießner, and Angel X          [19] Kishore Papineni, Salim Roukos, Todd Ward, and Wei-Jing
+     Chang. Scan2cap: Context-aware dense captioning in rgb-               Zhu. Bleu: a method for automatic evaluation of machine
+     d scans. In Proceedings of the IEEE/CVF conference on                 translation. In Proceedings of the 40th annual meeting of the
+     computer vision and pattern recognition, pages 3193–3203,             Association for Computational Linguistics, pages 311–318,
+     2021. 2, 5, 6                                                         2002. 5
+ [8] Angela Dai, Angel X Chang, Manolis Savva, Maciej Hal-            [20] Zhangyang Qi, Zhixiong Zhang, Ye Fang, Jiaqi Wang,
+     ber, Thomas Funkhouser, and Matthias Nießner. Scannet:                and Hengshuang Zhao. Gpt4scene: Understand 3d scenes
+     Richly-annotated 3d reconstructions of indoor scenes. In              from videos with vision-language models. arXiv preprint
+     Proceedings of the IEEE conference on computer vision and             arXiv:2501.01428, 2025. 2, 5, 6
+     pattern recognition, pages 5828–5839, 2017. 5                    [21] Jonas Schult, Francis Engelmann, Alexander Hermans, Or
+ [9] Rao Fu, Jingyu Liu, Xilun Chen, Yixin Nie, and Wenhan                 Litany, Siyu Tang, and Bastian Leibe. Mask3d: Mask trans-
+     Xiong. Scene-llm: Extending language model for 3d visual un-          former for 3d semantic instance segmentation. In 2023
+     derstanding and reasoning. arXiv preprint arXiv:2403.11401,           IEEE International Conference on Robotics and Automation
+     2024. 2, 5, 6                                                         (ICRA), pages 8216–8223. IEEE, 2023. 1, 3
+[10] Aaron Grattafiori, Abhimanyu Dubey, Abhinav Jauhri, Ab-          [22] Qwen Team. Qwen3 technical report, 2025. 6
+     hinav Pandey, Abhishek Kadian, Ahmad Al-Dahle, Aiesha            [23] Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Mar-
+     Letman, Akhil Mathur, Alan Schelten, Alex Vaughan, et al.             tinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste Roz-
+     The llama 3 herd of models. arXiv preprint arXiv:2407.21783,          ière, Naman Goyal, Eric Hambro, Faisal Azhar, et al. Llama:
+     2024. 1, 2, 3, 5, 6                                                   Open and efficient foundation language models. arXiv
+[11] Yining Hong, Haoyu Zhen, Peihao Chen, Shuhong Zheng,                  preprint arXiv:2302.13971, 2023. 3
+     Yilun Du, Zhenfang Chen, and Chuang Gan. 3d-llm: Injecting       [24] Hugo Touvron, Louis Martin, Kevin Stone, Peter Albert, Am-
+     the 3d world into large language models. Advances in Neural           jad Almahairi, Yasmine Babaei, Nikolay Bashlykov, Soumya
+     Batra, Prajjwal Bhargava, Shruti Bhosale, et al. Llama 2:       [37] Chenming Zhu, Tai Wang, Wenwei Zhang, Jiangmiao Pang,
+     Open foundation and fine-tuned chat models. arXiv preprint           and Xihui Liu. Llava-3d: A simple yet effective pathway to
+     arXiv:2307.09288, 2023. 3                                            empowering lmms with 3d-awareness. CoRR, 2024. 2, 5, 6
+[25] Ramakrishna Vedantam, C Lawrence Zitnick, and Devi              [38] Ziyu Zhu, Xiaojian Ma, Yixin Chen, Zhidong Deng, Siyuan
+     Parikh. Cider: Consensus-based image description evalu-              Huang, and Qing Li. 3d-vista: Pre-trained transformer for 3d
+     ation. In Proceedings of the IEEE conference on computer             vision and text alignment. In Proceedings of the IEEE/CVF
+     vision and pattern recognition, pages 4566–4575, 2015. 5             International Conference on Computer Vision, pages 2911–
+[26] Johan Wagemans, James H Elder, Michael Kubovy, Stephen E             2921, 2023. 2, 6
+     Palmer, Mary A Peterson, Manish Singh, and Rüdiger Von der      [39] Ziyu Zhu, Zhuofan Zhang, Xiaojian Ma, Xuesong Niu, Yixin
+     Heydt. A century of gestalt psychology in visual perception:         Chen, Baoxiong Jia, Zhidong Deng, Siyuan Huang, and Qing
+     I. perceptual grouping and figure–ground organization. Psy-          Li. Unifying 3d vision-language understanding via prompt-
+     chological bulletin, 138(6):1172, 2012. 4                            able queries. In European Conference on Computer Vision,
+[27] Haochen Wang, Yucheng Zhao, Tiancai Wang, Haoqiang                   pages 188–206. Springer, 2024. 6
+     Fan, Xiangyu Zhang, and Zhaoxiang Zhang. Ross3d: Recon-
+     structive visual instruction tuning with 3d-awareness. arXiv
+     preprint arXiv:2504.01901, 2025. 2, 5, 6
+[28] Peng Wang, Shuai Bai, Sinan Tan, Shijie Wang, Zhihao Fan,
+     Jinze Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin
+     Ge, et al. Qwen2-vl: Enhancing vision-language model’s
+     perception of the world at any resolution. CoRR, 2024. 2, 6
+[29] Zehan Wang, Haifeng Huang, Yang Zhao, Ziang Zhang, and
+     Zhou Zhao. Chat-3d: Data-efficiently tuning large language
+     model for universal dialogue of 3d scenes. CoRR, 2023. 2, 5,
+     6
+[30] Yanmin Wu, Xinhua Cheng, Renrui Zhang, Zesen Cheng,
+     and Jian Zhang. Eda: Explicit text-decoupling and dense
+     alignment for 3d visual grounding. In Proceedings of the
+     IEEE/CVF conference on computer vision and pattern recog-
+     nition, pages 19231–19242, 2023. 2
+[31] Hanxun Yu, Wentong Li, Song Wang, Junbo Chen, and Jianke
+     Zhu. Inst3d-lmm: Instance-aware 3d scene understanding
+     with multi-modal instruction tuning. In Proceedings of the
+     Computer Vision and Pattern Recognition Conference, pages
+     14147–14157, 2025. 1, 2, 3, 5, 6
+[32] Tatiana Zemskova and Dmitry Yudin. 3dgraphllm: Combining
+     semantic graphs and large language models for 3d scene
+     understanding. In Proceedings of the IEEE/CVF International
+     Conference on Computer Vision, pages 8885–8895, 2025. 2,
+     3, 5, 6
+[33] Yiming Zhang, ZeMing Gong, and Angel X Chang.
+     Multi3drefer: Grounding text description to multiple 3d ob-
+     jects. In Proceedings of the IEEE/CVF International Confer-
+     ence on Computer Vision, pages 15225–15236, 2023. 2, 5,
+     6
+[34] Yuanhan Zhang, Jinming Wu, Wei Li, Bo Li, Zejun Ma, Ziwei
+     Liu, and Chunyuan Li. Video instruction tuning with synthetic
+     data. CoRR, 2024. 2, 6
+[35] Duo Zheng, Shijia Huang, and Liwei Wang. Video-3d llm:
+     Learning position-aware video representation for 3d scene
+     understanding. In Proceedings of the Computer Vision and
+     Pattern Recognition Conference, pages 8995–9006, 2025. 2,
+     5, 6
+[36] Lianmin Zheng, Wei-Lin Chiang, Ying Sheng, Siyuan
+     Zhuang, Zhanghao Wu, Yonghao Zhuang, Zi Lin, Zhuohan
+     Li, Dacheng Li, Eric Xing, et al. Judging llm-as-a-judge with
+     mt-bench and chatbot arena. Advances in neural information
+     processing systems, 36:46595–46623, 2023. 1, 2, 3, 5, 6
+      Masking Matters: Unlocking the Spatial Reasoning Capabilities of LLMs
+                     for 3D Scene-Language Understanding
+                                               Supplementary Material
+7. Qualitative Analysis                                            regions. By contrast, 3D-SLIM associates the lamp token
+                                                                   with nearby objects, aligning its attention pattern with the
+We further analyze how the model allocates attention by vi-        actual 3D arrangement rather than the token order.
+sualizing attention maps averaged over all layers and heads,          For Obj→Inst attention, Chat-Scene assigns zero weight
+as shown in Fig. 5. This analysis allows us to (i) inspect         to all instruction tokens, so the lamp token is encoded with-
+activation patterns between 3D objects and instruction to-         out any guidance from the instruction. In comparison, 3D-
+kens, (ii) examine how a reference object token attends to         SLIM places high attention on key phrases such as “above”
+other objects to encode spatial relations, and (iii) observe       and “table”, indicating that instruction cues are directly re-
+how the reference token interacts with instruction tokens to       flected in the lamp token representation. Taken together,
+incorporate textual cues.                                          these observations highlight that 3D-SLIM leverages both
+                                                                   spatial structure among object tokens and semantic guidance
+3D Visual Grounding. In the first example, the scene con-          from the instruction, which enables the model to infer the
+tains two red throw pillows, and the model must identify the       correct answer.
+one described by “to the right of it is another red throw pil-
+low”. 3D-SLIM correctly grounds the target as <OBJ016>,
+whereas Chat-Scene incorrectly selects <OBJ000>. To un-
+derstand this difference, we examine their attention patterns.
+   Chat-Scene adopts a causal mask that prevents each object
+token from attending to later tokens in the sequence. Since
+<OBJ000> is the first object token, the causal mask forces its
+Obj→Obj attention to all other object tokens to be zero. As
+a result, the token relies solely on itself and fails to capture
+the spatial relation between the two pillows. The causal
+mask also suppresses Obj→Inst attention, limiting access to
+instruction tokens and weakening the effect of textual cues.
+   In contrast, 3D-SLIM combines Geo Mask, which in-
+jects spatial proximity into object-object attention, with Inst
+Mask, which explicitly permits object-instruction interac-
+tion. The Obj→Obj attention of <OBJ016> is concentrated
+around the target region, reflecting the underlying 3D struc-
+ture. Meanwhile, its Obj→Inst attention strongly activates
+keywords such as “red", "throw", "pillow", “couch" and
+“another", showing that the model effectively incorporates
+the instruction. Overall, this qualitative comparison indi-
+cates that 3D-SLIM mitigates the spurious order-dependent
+correlations introduced by the causal mask and restores in-
+formative interactions between instruction and object tokens,
+leading to more reliable performance on the grounding task.
+
+3D Question-Answering. In the second example, the cor-
+rect answer to the question is "White lamp". We manually
+identify the corresponding object token (<OBJ006>) and
+visualize its Obj→Obj and Obj→Inst attention.
+   For Obj→Obj attention, Chat-Scene restricts the lamp to-
+ken to attending only to objects preceding it in the sequence.
+This constraint prevents the token from focusing on spatially
+relevant neighbors and instead shifts attention toward distant
+                          Input 3D Scene & Instruction                           Attention map       Obj → Obj Attn                Obj → Inst Attn
+                                                                                                                            High                       High
+                                                                                           
+
+
+                                                             Chat-Scene
+                                                                          Obj
+
+
+
+
+  3D Visual Grounding
+                                                                          Inst
+                                                                                                          Pred : <OBJ000>
+                                                                                     Obj    Inst                            Low                        Low
+
+                                           GT: <OBJ016>                                                                     High                       High
+
+                          What’s the ID of the object that                                 
+
+                                                             3D-SLIM
+                                                                          Obj
+                          corresponds to the description
+                          “this is a red throw pillow on
+                          couch. to the right of it is
+                          another red throw pillow”?                      Inst
+                                                                                                          Pred : <OBJ016>
+                                                                                     Obj    Inst                            Low                        Low
+                                                                                                                            High                       High
+
+                                                                                            
+
+                                                             Chat-Scene
+                                                                          Obj
+
+
+
+
+  3D Question-Answering
+                                                                          Inst
+                                                                                                          Pred : Window
+                                                                                     Obj     Inst                           Low                        Low
+                                                                                                                            High                       High
+
+                                          GT: White lamp                                    
+
+                                                             3D-SLIM
+                                                                          Obj
+                          What is on the wall above the
+                          table? Answer the question
+                          using a single word or phrase.                  Inst
+                                                                                                           Pred : Lamp
+                                                                                     Obj     Inst                           Low                        Low
+
+
+Figure 5. Attention map over 3D objects and instruction. For simplicity, the attention map is computed over all object and instruction
+tokens except the system tokens, where yellow indicates high values and purple indicates low ones. The green boxes labeled ① and ②
+correspond to the regions used for Obj→Obj Attn and Obj→Inst Attn. Obj→Obj Attn displays where the reference object token focuses
+within the 3D scene. For visual grounding, the reference is the model-predicted object; for question answering, it is a manually identified
+target object. Gray points indicate background. Obj→Inst Attn visualizes how the reference token attends to instruction tokens, with red and
+yellow indicating high and low activations.
+

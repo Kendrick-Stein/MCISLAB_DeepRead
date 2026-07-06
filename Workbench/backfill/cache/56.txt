@@ -1,0 +1,627 @@
+                     This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                  Except for this watermark, it is identical to the accepted version;
+                            the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+    TopoMA: Topology-Guided Multi-Agent Dense RGB 3D Reconstruction via
+                           Distributed Inference
+
+                        Xuanxuan Zhang1 , ShuHui Shi2 , Tianxiang Zhang1 , Zhetao Guo3 ,
+                                             Huang Zixuan1 , You Li1∗
+                     1
+                       Wuhan University 2 Xi’an Jiaotong University 3 Cloudspace Technology
+
+
+                                                                              Agent 4
+                                                      Agent 1
+                                                                                  4
+
+                                                                      1
+
+                                                      Agent 2
+
+                                                                2
+                                                                                  Agent 3
+        RTK Traj
+                                                                                  3
+
+             Ground Truth                                 TopoMA (Ours)                                        Perspective Scene
+                                 1                                        2                                3                              4
+
+
+
+
+                                                                    Detail Scene
+Figure 1. Large-scale real-world multi-agent experiment of TOPOMA. Left: RTK-based ground-truth trajectories overlaid on a satellite
+map. Middle: pointclouds of the four agents and their corresponding coverage areas. Right: perspective view of the reconstructed 3D
+scene. Bottom: zoomed-in views of four marked road segments along the reconstructed trajectory.
+
+
+                            Abstract                                              laboration. TOPOMA explicitly models the spatial topo-
+                                                                                  logical structure of the scene and tightly couples it with
+Multi-agent 3D reconstruction, as a key technology for                            end-to-end representation learning, thereby jointly solving
+large-scale VR/AR, robot swarms, and digital twins, has                           core challenges such as inter-agent spatial alignment and
+attracted growing attention. Recent end-to-end 3D recon-                          submap fusion. Concretely, we introduce topology skeleton
+struction methods achieve strong performance in single-                           modeling and optimization, decentralized loop closure, and
+agent scenarios, but they are difficult to directly extend                        topology-guided residual transport, and build upon them a
+to multi-agent collaborative settings, where they often suf-                      fully distributed inference architecture in which each agent
+fer from unstable tracking, excessive memory consumption,                         can independently store, reconstruct, and incrementally
+and frequent loop-closure failures, thus failing to meet real-                    optimize its map while collaborating through lightweight
+time and large-scale deployment requirements. To address                          topological information. Extensive experiments demon-
+these issues, we propose TOPOMA, a real-time end-to-end                           strate that, compared with existing methods, TOPOMA
+3D reconstruction framework tailored for multi-agent col-                         achieves consistently higher trajectory accuracy, recon-
+                                                                                  struction quality, robustness, and topological consistency,
+   * represents corresponding author. The first two authors contribute
+equally to this paper.
+
+
+
+
+                                                                          21784
+showing superior adaptability and scalability.                       multi-agent field deployments, showing that TOPOMA
+                                                                     outperforms current state-of-the-art single-agent and
+                                                                     multi-agent baselines.
+1. Introduction
+Multi-agent 3D reconstruction underpins large-scale               2. Related work
+VR/AR, robot swarms, and digital twins[9, 10, 18, 37].            Learning-based Pointmap Representations. Learning-
+Single-agent coverage of complex environments is ineffi-          based pointmap representations have advanced monocu-
+cient. Collaboration is required to share workload[17, 34],       lar dense 3D reconstruction by using deep learning mod-
+accelerate exploration, and handle occlusions. Yet or-            els to predict dense 3D point clouds from image pairs or
+ganizing and fusing observations in large, topologically          video sequences[1, 4, 19, 32, 40]. For instance, MASt3R-
+complex scenes remains challenging. Existing end-to-end           SLAM[25] leverages a two-view 3D reconstruction prior
+methods[3, 25, 31, 33], designed for a single camera and          for real-time monocular reconstruction without calibration
+trajectory, perform well in single-agent settings but degrade     but faces computational and memory challenges in large-
+in multi-agent scenarios, with unstable tracking, high mem-       scale environments. SLAM3R[23] uses a sliding win-
+ory usage, and frequent loop-closure failures[5, 13, 16, 20].     dow mechanism for high-quality reconstruction but suf-
+In practice, they either maintain independent maps with           fers from drift in longer sequences. TTT3R[3] improves
+severe scale drift and inconsistencies, or centralize com-        long-sequence pose estimation with Test-Time Training ,
+putation on a server that saturates GPU/CPU resources,            optimizing model states at inference time, though large
+while loop closure still relies on local geometric heuristics     datasets still require further optimization. VGGT-Long[7]
+without enforcing global topological consistency across           addresses memory and computational bottlenecks in large-
+agents[36, 36, 39, 41].                                           scale sequences with a chunk and align framework but
+    To address these limitations, we propose TOPOMA,              still demands high GPU memory. VGGT-SLAM[24] opti-
+a real-time end-to-end map-first 3D reconstruction frame-         mizes over the SL(4) manifold for consistent submap align-
+work for multi-agent collaboration. Instead of paralleliz-        ment, though its complexity impacts real-time performance.
+ing single-agent SLAM, TOPOMA learns and updates a                These methods have evolved from offline pairwise predic-
+scene-level topology skeleton that guides tracking and op-        tion to real-time single-agent reconstruction, but they still
+timization under communication constraints and heteroge-          struggle with collaborative challenges like inter-agent scale
+neous trajectories. This skeleton summarizes connectivity         unification and resource distribution, motivating the need
+and geometry between submaps from different agents and            for a multi-agent reconstruction framework grounded in
+directly steers attention, fusion, and optimization, enabling     pointmap priors[2, 14, 19, 27].
+globally consistent reconstruction with modest resources.             Multi-agent Collaborative Reconstruction. Recent
+On top of this representation, three topology-driven com-         advancements in multi-agent collaborative reconstruction
+ponents (topology skeleton construction, decentralized loop       have improved large-scale 3D tasks[5, 12, 26, 30, 35]. CP-
+closure, and topology-guided residual transport) define a         SLAM[18] boosts collaboration using neural point-cloud
+fully distributed architecture where each agent maintains         representation and a distributed-to-centralized learning
+and refines its local map via lightweight topological mes-        strategy but struggles with overhead. MAGiC-SLAM[37]
+sages, so that corrections propagated along the skeleton al-      uses 3D Gaussian representations for multi-agent collabo-
+low updates from one agent to benefit the others.                 ration and loop closure, though it has limitations in large-
+    The main contributions of this work are summarized as         scale environments. MNE-SLAM[10] introduces a fully
+follows:                                                          distributed framework, reducing reliance on central servers,
+• We propose TOPOMA, a mapping-first end-to-end 3D                though communication and fusion issues remain. Learning-
+   reconstruction framework for multi-agent collaboration         based pointmap fusion offers a more efficient solution
+   that jointly models scene topology, geometry, and camera       by leveraging learned pointmaps, reducing computational
+   poses for accurate, real-time, and scalable reconstruction.    and memory costs. Compared to NeRF and Gaussian
+• We design three topology-driven modules (topology               methods[8, 11, 21, 22, 29, 38], pointmap fusion is more
+   skeleton construction, decentralized loop closure, and         flexible and efficient in large-scale, dynamic scenes, en-
+   topology-guided residual transport) and integrate them         abling global consistency in 3D reconstruction and offering
+   into a fully distributed architecture where each agent op-     a promising direction for multi-agent collaboration.
+   timizes its local map while communicating only compact
+   topological summaries, alleviating scale drift, memory         3. Methods
+   bottlenecks, and communication overhead.
+• We conduct extensive evaluations on outdoor driving,            In this section, we introduce methods of TOPOMA. We
+   synthetic indoor, real indoor datasets, and large-scale        begin in 3.1 by introducing Topology Skeleton Mod-
+
+
+
+                                                             21785
+Figure 2. Overview of TOPOMA. Mapping: RGB observations are tokenized and aggregated to build a topology-aware skeleton, which
+is unified with geometric cues to recover consistent structure and scale. Tracking: Agents perform local loop detection, update topology
+constraints, and apply topology-consistent loop closures through frontend/back-end topology transformers, ensuring coherent multi-agent
+pose estimation.The system runs fully distributed, allowing each agent to maintain local submaps while progressively achieving global
+topological consistency.
+
+
+eling and Optimization for coherent structure recovery                  equation:
+and scale-stable fusion via topology–geometry unifica-
+tion; 3.2 presents Decentralized Loop Closure for asyn-                             (Pm,t , Fm,t ) ← fθcausal (Xm,t ; Cm ),         (1)
+chronous, server-free relocalization through local detec-              where Cm is the KV-cache for agent am , which stores pre-
+tion and topology-consistent correction; 3.3 details Resid-            viously generated point clouds and map tokens for reuse
+ual Transport, which compresses and propagates residual                during subsequent updates.
+constraints to define the end-to-end objective and enable                 To enforce topological consistency in the causal in-
+lightweight communication.                                             cremental attention, we regularize features using pairwise
+                                                                       topological distances. We first compute the topological in-
+3.1. Topology-Geometric Modeling and Optimiza-                         variant matrix
+      tion
+                                                                                          Dtopo = {dtopo M
+                                                                                                    mn }m,n=1 ,                     (2)
+In end-to-end multi-agent 3D reconstruction, traditional
+collaborative methods cannot satisfy the requirements of               where dtopo
+                                                                              mn denotes the topological distance between views
+unified, end-to-end optimization. We therefore adopt a                 based on persistent homology. We then measure similarity
+topology-driven approach that learns features from spatial             between views (m, t) and (n, s) as
+structures and enforces spatial consistency during network
+                                                                                        A(m,t),(n,s) = ⟨ϕm,t , ϕn,s ⟩,
+updates: the front-end uses causal incremental attention for
+local updates, while the back-end applies global attention             build the similarity graph G, and extract the topological
+for global and topological optimization                                skeleton T = (V, ET ) via a maximum spanning tree with
+    For each agent, when receiving the RGB images Xm,t ,               candidate back edges. Then point clouds are fused when
+the causal attention mechanism of the front-end module                 the topological similarity between two views exceeds a pre-
+fθcausal is used to generate local point clouds Pm,t and map           defined threshold, and we additionally perform fusion every
+tokens Fm,t . This process is described by the following               100 frames to ensure regular global updates.
+
+
+
+                                                                21786
+   Next, Pm,t and Fm,t generated by each agent are col-
+lected into a global memory pool Z, represented as:
+
+                Z = {ϕ(Pm,t , Fm,t )}m,t ,               (3)
+
+where ϕ(·) is a function that maps local point clouds and
+features into a unified token representation.
+   Before global optimization, we compute a topological
+similarity score Smn between point clouds Pm,t and Pn,t
+using persistent-homology-based descriptors:
+                                                                    Figure 3. Illustration of loop closure effect. On the left is the
+                Smn = ψtopo (Pm,t , Pn,t ),              (4)        drifting reconstruction before loop closure. The middle shows our
+                                                                    multi-agent loop detection on the topology skeleton, which iden-
+where ψtopo is the topological similarity function and fuse         tifies consistent loop candidates across agents. On the right is the
+the two point clouds during global optimization only when           fixed result after applying our loop closure, yielding a globally
+Smn > τ , where τ is a predefined threshold.                        aligned and geometrically consistent map.
+   The global attention mechanism computes the correla-
+tion between all tokens in the global memory pool Z. The
+                                                                      The final global alignment of point clouds or poses is
+standard multi-head attention mechanism is formulated as
+                                                                    computed as:
+follows:                                                                               new             old
+                                                                                     Tm,t  = ∆Tm,t ◦ Tm,t  ,             (9)
+        Q = WQ Z,      K = WK Z,        V = WV Z,        (5)        where Tm,tnew
+                                                                                  is the updated pose of agent m at time t, and
+                                                                     old
+                                                                    Tm,t is the previous pose. The symbol ◦ represents the com-
+where Q, K, V represent the query, key, and value matrices,         position (multiplication) of transformations.
+respectively, obtained by applying linear transformations to
+the token collection Z.                                                              Pglobal =
+                                                                                               X
+                                                                                                         new
+                                                                                                  wm,t Tm,t  Pm,t .         (10)
+   We use topological similarity as an attention bias, en-                                        m,t
+couraging the model to focus on topologically similar point
+                                                                                global
+clouds. The topological regularized attention weight is             where P       is the globally aligned point cloud, obtained
+                                                                                                     new
+computed as:                                                        by applying the updated poses Tm,t   to the local point clouds
+                             ⊤                                    Pm,t and weighted by the fusion weights wm,t .
+                              Qi Kj        topo
+                      exp      √
+                                 d
+                                     −  λ dij                          3.2. Decentralized Loop Closure
+            αij = P            ⊤                   ,   (6)
+                                Qi Kj ′        topo
+                      j ′ exp
+                                  √
+                                    d
+                                        −  λ d ij ′                    In multi-agent 3D reconstruction, classical methods depend
+                                                                       on costly global optimization for pose estimation and loop
+where dtopo                                                            closure, and degrade in dynamic scenes. We instead adopt
+        ij denotes the topological distance (or similarity)
+between tokens i and j, and λ controls the strength of the             an end-to-end, topology-driven design that enforces loop
+topological regularization.                                            closure through topological consistency, preserving spatial
+   The updated token representation z̃i is computed by ap-             and geometric accuracy,as illustrated in Fig.3
+plying the topologically weighted attention to the values:                For each pair of views (m, t) and (n, s), we compute a
+                                                                       loop score from their map tokens
+                            X
+                      z̃i =    αij Vj ,                  (7)                                                            
+                                                                                   s(m,t),(n,s) = σ floop (Fm,t , Fn,s ) ,    (11)
+                             j
+
+                                                                       where floop (·, ·) is a small MLP on concatenated tokens
+where αij is the attention weight between tokens i and j,
+                                                                       and σ(·) is a sigmoid. To suppress spurious matches, we
+and Vj is the value corresponding to token j.
+                                                                       add a topology-aware gate on the skeleton in Sec. 3.1. Let
+   These updated tokens are then used to regress global
+                                                                       dtopo
+                                                                        (m,t),(n,s) be the geodesic distance between the two nodes;
+pose corrections and fusion weights for all agents:
+                                                                       a loop edge is accepted only if
+              (∆Tm,t , wm,t ) = hθ (z̃k(m,t) ),          (8)               s(m,t),(n,s) ≥ τloop         dtopo
+                                                                                                  and    (m,t),(n,s) ≤ δtopo ,     (12)
+where ∆Tm,t represents the pose correction for agent m at              with τloop and δtopo the appearance and topology thresholds.
+time t, and wm,t is the fusion weight for the point cloud of           The surviving pairs define
+agent m at time t. The function hθ is the network used to                                
+perform the regression.                                                         Eloop = ((m, t), (n, s)) Eq. (12) holds ,      (13)
+
+
+
+                                                               21787
+which augments the tree edges ET and anchors loop closure
+on the topology skeleton.                                                     ◼ Residual Transport                              Transport Efficiency
+                                                                                                                                                              ◼ Lo
+   Given globally aggregated tokens z̃i , the back-end re-
+fines poses via topology-regularized corrections on the
+                                                                                               Shared
+mapping-stage skeleton. For each agent am at time t, we                                     Information
+
+
+predict a pose increment and a fusion weight from the cor-
+responding updated token:
+                                                                              𝒓𝑷𝒐𝒊𝒏𝒕𝒎𝒂𝒑   𝒓𝑫𝒆𝒑𝒕𝒉     𝒓𝑻𝒐𝒑𝒐   𝒓𝑪𝒐𝒍𝒐𝒓                                             Bef
+                                            
+               (∆Tm,t , wm,t ) = hθ z̃k(m,t) ,               (14)
+
+where ∆Tm,t ∈ Sim(3) is the pose correction for agent m                  Figure 4. Residual transport and efficiency analysis. Left:
+at time t, wm,t is the confidence for fusing its local point             schematic of our residual transport module, where agents ex-
+cloud, and hθ (·) is a lightweight regression head.                      change shared information derived from pointmap, depth, topol-
+                                                                        ogy and color residuals to achieve consistent updates. Right: line
+   For loop edge e = (m, t), (n, s) ∈ ET ∪ Eloop on the                  plot of memory usage versus input frames demonstrates that our
+topology skeleton, the relative pose induced by the current              residual transport maintains efficient GPU and CPU usage as the
+estimates is                                                             sequence grows.
+                               −1
+                        T̃e = Tn,s Tm,t ,               (15)
+while the network provides a loop-consistent relative pose               matched samples j ∈ Ωe . We compress these per-sample
+T̂e from the corresponding token pair. Applying T̃e and                  residuals into a single edge descriptor
+T̂e to the associated pointmap, depth and color fields yields                           
+                                                                                            depth color pointmap topo
+                                                                                                                            
+multi-modal residuals for each matched sample j ∈ Ωe :                       re = gedge {re,j    , re,j , re,j  , re,j }j∈Ωe , (19)
+
+             depth              color
+                                                                         where gedge (·) is a permutation-invariant aggregator. For
+            re,j   = De − Dj , re,j   = Ce − Cj ,                        each node v = (m, t) ∈ V, we further aggregate descriptors
+            pointmap              topo
+                                                             (16)
+           re,j      = Pe − Pj , re,j  = Te − Tj ,                       of all incident edges:
+                                                                                          uv = gnode ({re | e ∈ ET ∪ Eloop , e ∋ v}) ,                 (20)
+where De , Ce , Pe , Te are the depth, color, pointmap and
+topology values induced by the current loop estimate on                  yielding a node-level residual descriptor uv .
+edge e, and Dj , Cj , Pj , Tj are the corresponding targets at              To propagate information along the skeleton, we perform
+the matched sample j.                                                    topology-aware message passing. Let N (v) be the neigh-
+   We then define a topology-regularized global refinement               bors of v on T ; the transported residual at v is
+objective
+                                                                                                     X
+                                                                                             ũv =         βv,u uu ,            (21)
+                     X                                                                                               u∈N (v)
+                                    depth 2           color 2
+           X
+Epose =                     λdepth re,j   2
+                                            + λcolor re,j   2               where the transport weights βv,u satisfy
+         e∈ET ∪Eloop j∈Ωe
+                                                                                        X
+                                                                                             βv,u = 1, βv,u = ftopo dtopo
+                                                                                                                          
+                                                                                                                     v,u ,                             (22)
+                                        2
+                                 pointmap            topo2
+                                                                                          u∈N (v)
+                  +λpointmap re,j         2
+                                            + λtopo re,j  2
+                                                             ,
+                                                                         and ftopo (·) is a monotonically decreasing function of the
+                                                            (17)
+where λdepth , λcolor , λpointmap , λtopo control the relative           geodesic distance dtopo
+                                                                                              v,u on the topology skeleton. In prac-
+
+strength of depth, color, pointmap and topological consis-               tice, we root T at a designated anchor agent aref and
+tency. This multi-modal residual is what drives the pose                 transport residuals toward this anchor, concentrating global
+increments ∆Tm,t in Eq. (14).                                            residual information in a single agent; other agents only
+                                                                         keep local summaries, which reduces overall memory us-
+   In practice, a few gradient-descent steps on Epose are un-
+                                                                         age, as illustrated on the right side of Fig.4.
+rolled inside the global attention block, yielding updated
+                                                                            The transported residuals ũv serve as an additional su-
+poses
+                      new                 old                            pervision signal for the Transformer back-end. They should
+                    Tm,t  = ∆Tm,t ◦ Tm,t      ,             (18)
+                                                                         be consistent with the original node residuals uv and with
+where ◦ denotes composition of transformations.                          the pose increments predicted from global tokens z̃k(m,t) in
+                                                                         Eq. (14). We define a residual-transport loss
+3.3. Residual Transport                                                               X                  2                           2
+                                                                         Etrans =              ũv −uv 2 +µ hθ (z̃k(m,t) )−gθ (ũv ) 2 ,
+From Sec. 3.2, each edge e = ((m, t), (n, s)) ∈ ET ∪ Eloop                                v=(m,t)∈V
+carries depth, color, pointmap, and topology residuals on                                                                                              (23)
+
+
+
+                                                                    21788
+Figure 5. Large-scale outdoor reconstruction results on the KITTI dataset. Four representative sequences are shown, where the first column
+presents reconstructions produced by OURS, and the remaining columns show outputs from VGGT-Long[7], TTT3R[3], SLAM3R[23],
+MASt3R-SLAM[25], and VGGT-SLAM[24].
+
+
+where gθ (·) maps transported residuals to pose-space cor-               sequence is split, and the methods are simulated in a
+rections, and µ balances the two terms. In our implementa-               multi-agent environment. For multi-agent methods, we
+tion, the heaviest supervision and optimization are applied              use MAGiC-SLAM[37] and CP-SLAM[18] for compari-
+to nodes belonging to the anchor agent aref , which concen-              son, evaluating performance in collaborative multi-agent
+trates global corrections on a single agent and further lowers           settings.
+per-agent memory requirements. The total back-end objec-
+tive becomes                                                             4.2. Results and Analysis
+                 Etotal = Epose + λtrans Etrans ,            (24)        Scene reconstruction and tracking. In our experiments,
+                                                                         OURS significantly outperforms existing single-agent and
+where Epose is the multi-modal pose refinement energy in                 multi-agent methods. As shown in Tab. 1, on the KITTI[15]
+Eq. (17) and λtrans controls the strength of residual transport          dataset our method achieves lower RMSE and Mean on sev-
+regularization. As in Sec. 3.2, a few steps of gradient de-              eral sub-sequences, with particularly strong trajectory ac-
+scent on Etotal are unrolled inside the global attention block.          curacy on KITTI-07, thanks to topology skeleton model-
+                                                                         ing and optimization that mitigates scale drift and accumu-
+4. Experiments                                                           lated errors through global topological consistency. Tab. 2
+                                                                         further shows better surface reconstruction on ScanNet[6],
+4.1. Experimental Setup                                                  where our method attains lower Depth L1 and Acc in mul-
+We conduct experiments on the KITTI[15], Replica[28],                    tiple sequences and notably outperforms VGGT-Long [7]
+and ScanNet[6] datasets, evaluating trajectory accuracy                  by reducing errors from viewpoint changes and inter-agent
+and reconstruction accuracy. Trajectory accuracy is com-                 information inconsistencies via topological consistency op-
+pared using RMSE and Mean, while reconstruction ac-                      timization. In complex indoor scenes of Replica[28], our
+curacy is assessed with Accuracy (ACC) and Depth                         method alleviates global inconsistency, maintaining high-
+L1. We compare several single-agent methods: VGGT-                       fidelity point cloud fusion and robust geometric alignment.
+Long[7], TTT3R[3], SLAM3R[23], MASt3R-SLAM[25],                          Qualitative results in Figs. 5 and 6 confirm these gains, with
+and VGGT-SLAM[24]. To ensure fair comparison, each                       sharper details and better alignment than other state-of-the-
+
+
+
+                                                                 21789
+Table 1. Tracking results on the KITTI odometry dataset [15], evaluated using RMSE and Mean ATE (meters). All methods follow
+identical sequence-splitting and global Sim(3) alignment. Each sequence is evaluated five times, and all reported values are averaged over
+these runs. The final “Average” column is computed across all sequences. [TL] indicates tracking lost. All other quantitative tables in this
+paper follow the same evaluation protocol unless otherwise specified. Best results are highlighted as first , second , and third .
+
+                       KITTI-05          KITTI-07          KITTI-08              KITTI-09         KITTI-10
+Method                                                                                                           Avg. RMSE↓ Avg. Mean↓
+                  RMSE↓ Mean↓         RMSE↓ Mean↓ RMSE↓ Mean↓                RMSE↓ Mean↓       RMSE↓ Mean↓
+
+VGGT-Long            8.57    6.45       9.75    7.56     45.32     36.29      36.59    30.16    21.57    17.93      24.36         19.68
+TTT3R              20.64     18.69      5.75     4.82    89.78     72.93      58.36    48.67    39.21    35.68      42.75         36.16
+SLAM3R             25.32     21.32     50.63    40.62   160.23     126.24     63.78    52.68    58.61    53.79      71.71         58.93
+MASt3R-SLAM        49.26     45.39     89.66    75.24   110.76      95.47     80.35    65.33    92.37    88.20      84.48         73.93
+VGGT-SLAM          [TL]      [TL]      120.34   97.25    [TL]       [TL]      [TL]     [TL]     68.12    57.27      94.23         77.26
+Ours                7.25      5.85      3.95     3.67    45.51     36.98      30.63    24.66    25.20    20.44      22.51         18.32
+
+
+              OURS                  VGGT-LONG              TTT3R                  SLAM3R            MAST3R-SLAM             VGGT-SLAM
+
+
+
+000
+
+
+
+
+054
+
+
+
+
+059
+
+
+
+
+233
+
+
+
+
+Figure 6. Indoor reconstruction results on the ScanNet[6].The first column shows reconstructions produced by TOPOMA, while the
+remaining columns display outputs from VGGT-Long[7], TTT3R[3], SLAM3R[23], MASt3R-SLAM[25], and VGGT-SLAM[24].
+
+
+art methods, demonstrating that TopoMa effectively handles                  ours loop closure), and Ours. As shown in Tab. 4, NoLoop
+multi-agent collaboration and improves reconstruction ac-                   attains the highest FPS and the lowest GPU/CPU usage,
+curacy and robustness in large-scale scenarios.                             since it performs only local tracking, but suffers from the
+                                                                            largest ATE due to unchecked drift. NaiveLoop and ICP re-
+4.3. Ablation Studies                                                       duce ATE compared to NoLoop by introducing additional
+In this section, we conduct various experiments to verify the               long-range constraints, yet their accuracy remains clearly
+effectiveness of our method.                                                worse than ours: NaiveLoop tends to introduce spurious
+                                                                            loops between topologically distant views, while ICP is sen-
+    Loop Closure We ablate the loop-closure design in
+                                                                            sitive to local minima and scale inconsistencies, so both still
+TopoMa with five variants: NoLoop (no loop closure),
+                                                                            produce noticeable global misalignment. Single-Loop fur-
+NaiveLoop (the loop closure method of MAST3R[25]), ICP
+                                                                            ther improves ATE by leveraging strong single-agent loop
+(submaps fusion by ICP), Single-Loop (single agent with
+
+
+
+                                                                   21790
+Table 2. Reconstruction accuracy on ScanNet[6]. We evaluate per-scene and averaged Depth L1[cm] and Accuracy (Acc)[cm] metrics.
+Lower is better.
+
+                      ScanNet-000              ScanNet-054                    ScanNet-059            ScanNet-465            ScanNet-233
+Method                                                                                                                                         Avg. Depth L1↓ Avg. Acc↓
+                   Depth L1↓      Acc↓    Depth L1↓       Acc↓          Depth L1↓       Acc↓      Depth L1↓       Acc↓    Depth L1↓   Acc↓
+VGGT-Long             89.23       32.78      106.86       46.97              42.81      25.19       25.73         20.49     39.53     18.62         60.83         28.81
+TTT3R                 31.97       17.35       40.87       19.59              17.15      18.47       19.84         19.69     20.56      9.82         26.08         16.99
+SLAM3R                19.49       12.31      13.92            9.68           18.27      15.13       18.49         19.64     25.39     10.46         19.11         13.44
+MASt3R-SLAM           8.19         9.27      11.24        10.45              15.97      16.47       21.39         18.37     21.78     8.35          15.71         12.58
+VGGT-SLAM             9.15         8.36      12.49        13.45              18.46      15.77       20.45         17.46     8.47      7.94          13.80         12.60
+Ours                  7.92         7.31      11.21            9.47           15.08      14.23       18.37         17.26     8.39      7.29          12.19         11.10
+
+
+
+Table 3. Tracking accuracy on the Replica[28] dataset measured                                  Table 5. Ablation on residual transport.We conduct experiments
+by RMSE [cm] for single-agent and multi-agent settings. Averages                                on apartment-00 of Replica [28] to verify the effectiveness of our
+are computed across all scenes.                                                                 method, and all reported values are averaged over 5 runs.
+
+ Methods              apartment-02   frlapart-04   hotel-00    office-01      Average            Methods           ATE[cm] ↓   FPS[Hz] ↑     GPU Usage[GB] ↓   CPU Usage[GB] ↓
+ Single-Agent Methods                                                                            NoTrans-Center      14.82       5.83             6.50              11.00
+ VGGT-Long[7]                 1.23        14.01       10.90           6.50       8.16            NoTrans-Single      18.34       7.42             5.10               8.50
+ TTT3R[3]                     4.56         6.83        4.95           8.12       6.12            MNE-SLAM            16.71       6.01             6.80              10.50
+ SLAM3R[23]                   2.79        0.47         1.56           3.37       2.05            Trans-500           12.32       6.57             6.00               9.80
+ MASt3R-SLAM[25]             0.82          1.36       0.74            4.80       1.93            Ours                10.48       6.23             5.90               9.93
+ VGGT-SLAM[24]                1.26         0.58        1.47          1.35       1.17
+ Multi-Agent Methods
+ MAGiC-SLAM[37]              0.84         0.57        1.35            1.49      1.06
+ CP-SLAM[18]                  1.89         0.76        1.67          1.26        1.39           NoTrans-Center and MNE-SLAM improve accuracy over
+ Ours                        0.85         0.31        0.38           0.59       0.53            NoTrans-Single, yet rely on centralized or heavy-weight fu-
+                                                                                                sion, which increases GPU/CPU usage and reduces FPS
+Table 4. Ablation on Loop Closure. We conduct experiments                                       compared with our distributed variants. Trans-500 bene-
+on apartment-00 of Replica [28] to verify the effectiveness of our                              fits from topology-aware residual transport and further im-
+method, and all reported values are averaged over 5 runs.                                       proves ATE with moderate overhead, but its coarse fusion
+                                                                                                interval still leaves noticeable drift between fusion steps.
+ Methods       ATE[cm] ↓      FPS[hz] ↑   GPU Usage[GB] ↓            CPU Usage[GB] ↓
+ NoLoop          23.81          7.35           5.10                       8.20                  In contrast, Ours attains the best overall accuracy while
+ NaiveLoop       17.94          6.82           5.50                       9.10                  maintaining competitive FPS and the lowest resource us-
+ ICP             15.73          6.70           5.40                       9.40
+ Single-Loop     11.68          6.45           5.80                       9.70                  age among the fusion-based settings, indicating that dense,
+ Ours            10.45          6.21           5.92                       9.96                  topology-aware residual transport with lightweight, fre-
+                                                                                                quent fusion is crucial for accurate and efficient server-free
+                                                                                                multi-agent reconstruction.
+closure and therefore ranks second in accuracy, but it cannot
+exploit complementary viewpoints from other agents and                                          5. Conclusions
+provides no guarantee on multi-agent consistency. In con-
+trast ,ours attains the lowest ATE while keeping FPS com-                                       We propose TOPOMA, a topology-first end-to-end multi-
+parable to other loop-enabled settings and only slightly in-                                    agent 3D reconstruction framework. By learning a scene-
+creasing GPU/CPU usage over the lightest baselines, show-                                       level topology skeleton and combining topology skeleton
+ing that our loop closure method is key to globally consis-                                     modeling and optimization, decentralized loop closure, and
+tent multi-agent reconstruction without sacrificing real-time                                   topology-guided residual transport in a fully distributed ar-
+efficiency.                                                                                     chitecture, TOPOMA enables agents to maintain and refine
+    Residual Transport We ablate the residual transport                                         their own maps with only lightweight topological commu-
+with five variants in Tab. 5: NoTrans-Center (centralized                                       nication, achieving globally consistent reconstruction under
+fusion without transport), NoTrans-Single (fully indepen-                                       realistic bandwidth constraints. The current framework is
+dent agents), MNE-SLAM[10], Trans-500 (our transport                                            designed for static or near-static scenes, and its performance
+but coarse fusion every 500 frames), and Ours (full trans-                                      can still be degraded by strong dynamic object interference,
+port with lightweight, frequent fusion). From Tab. 5,                                           which we leave as an important direction for future work.
+NoTrans-Single achieves the highest FPS and the lowest                                          We believe that incorporating explicit dynamic modeling
+GPU/CPU usage, but also leads to the worst ATE, showing                                         into the topology skeleton and residual transport will fur-
+that purely local tracking cannot ensure global consistency.                                    ther improve robustness in highly dynamic environments.
+
+
+
+                                                                                        21791
+6. Acknowledgments                                                        Chen. Neslam: Neural implicit mapping and self-supervised
+                                                                          feature tracking with depth completion and denoising. IEEE
+This work is partly supported by the National Natural Sci-                Transactions on Automation Science and Engineering, 2025.
+ence Foundation of China (42274052) and the Wuhan Nat-                    2
+ural Science Foundation Project (2025041001010363).                  [12] Yinan Deng, Yujie Tang, Yi Yang, Danwei Wang, and
+                                                                          Yufeng Yue. Macim: Multi-agent collaborative implicit
+References                                                                mapping. IEEE Robotics and Automation Letters, 9(5):
+                                                                          4369–4376, 2024. 2
+ [1] Yohann Cabon, Lucas Stoffl, Leonid Antsfeld, Gabriela           [13] Siyan Dong, Kai Xu, Qiang Zhou, Andrea Tagliasacchi,
+     Csurka, Boris Chidlovskii, Jerome Revaud, and Vincent                Shiqing Xin, Matthias Nießner, and Baoquan Chen. Multi-
+     Leroy. Must3r: Multi-view network for stereo 3d recon-               robot collaborative dense scene reconstruction. ACM Trans-
+     struction. In Proceedings of the Computer Vision and Pattern         actions on Graphics (TOG), 38(4):1–16, 2019. 2
+     Recognition Conference, pages 1050–1060, 2025. 2
+                                                                     [14] Bardienus Pieter Duisterhof, Lojze Zust, Philippe Weinza-
+ [2] Xingyu Chen, Yue Chen, Yuliang Xiu, Andreas Geiger, and              epfel, Vincent Leroy, Yohann Cabon, and Jerome Revaud.
+     Anpei Chen. Easi3r: Estimating disentangled motion from              Mast3r-sfm: a fully-integrated solution for unconstrained
+     dust3r without training. arXiv preprint arXiv:2503.24391,            structure-from-motion. In 2025 International Conference on
+     2025. 2                                                              3D Vision (3DV), pages 1–10. IEEE, 2025. 2
+ [3] Xingyu Chen, Yue Chen, Yuliang Xiu, Andreas Geiger, and         [15] Andreas Geiger, Philip Lenz, and Raquel Urtasun. Are we
+     Anpei Chen. Ttt3r: 3d reconstruction as test-time training.          ready for autonomous driving? the kitti vision benchmark
+     arXiv preprint arXiv:2509.26645, 2025. 2, 6, 7, 8                    suite. In 2012 IEEE conference on computer vision and pat-
+ [4] Chong Cheng, Sicheng Yu, Zijian Wang, Yifan Zhou, and                tern recognition, pages 3354–3361. IEEE, 2012. 6, 7
+     Hao Wang. Outdoor monocular slam with global scale-             [16] Guillaume Hardouin, Julien Moras, Fabio Morbidi, Julien
+     consistent 3d gaussian pointmaps. In Proceedings of the              Marzat, and El Mustapha Mouaddib. A multirobot sys-
+     IEEE/CVF International Conference on Computer Vision,                tem for 3-d surface reconstruction with centralized and dis-
+     pages 26035–26044, 2025. 2                                           tributed architectures. IEEE Transactions on Robotics, 39
+ [5] Hoi Chuen Cheng, Frederick Ziyang Hong, Babar Hussain,               (4):2623–2638, 2023. 2
+     Yiru Wang, and Chik Patrick Yue. Development of multi-          [17] Sirui Hong, Mingchen Zhuge, Jonathan Chen, Xiawu Zheng,
+     agent-based indoor 3d reconstruction. Computers, Materials           Yuheng Cheng, Jinlin Wang, Ceyao Zhang, Zili Wang,
+     & Continua, 81(1), 2024. 2                                           Steven Ka Shing Yau, Zijuan Lin, et al. Metagpt: Meta pro-
+ [6] Angela Dai, Angel X Chang, Manolis Savva, Maciej Hal-                gramming for a multi-agent collaborative framework. In The
+     ber, Thomas Funkhouser, and Matthias Nießner. Scannet:               Twelfth International Conference on Learning Representa-
+     Richly-annotated 3d reconstructions of indoor scenes. In             tions, 2023. 2
+     Proceedings of the IEEE conference on computer vision and       [18] Jiarui Hu, Mao Mao, Hujun Bao, Guofeng Zhang, and
+     pattern recognition, pages 5828–5839, 2017. 6, 7, 8                  Zhaopeng Cui. Cp-slam: Collaborative neural point-based
+ [7] Kai Deng, Zexin Ti, Jiawei Xu, Jian Yang, and Jin Xie.               slam system. Advances in Neural Information Processing
+     Vggt-long: Chunk it, loop it, align it–pushing vggt’s lim-           Systems, 36:39429–39442, 2023. 2, 6, 8
+     its on kilometer-scale long rgb sequences. arXiv preprint       [19] Nikhil Keetha, Norman Müller, Johannes Schönberger,
+     arXiv:2507.16443, 2025. 2, 6, 7, 8                                   Lorenzo Porzi, Yuchen Zhang, Tobias Fischer, Arno
+ [8] Tianchen Deng, Guole Shen, Tong Qin, Jianyu Wang, Wen-               Knapitsch, Duncan Zauss, Ethan Weber, Nelson Antunes,
+     tao Zhao, Jingchuan Wang, Danwei Wang, and Weidong                   et al. Mapanything: Universal feed-forward metric 3d re-
+     Chen. Plgslam: Progressive neural scene represenation                construction. arXiv preprint arXiv:2509.13414, 2025. 2
+     with local to global bundle adjustment. In Proceedings of       [20] Pierre-Yves Lajoie, Karthik Soma, Haechan Mark Bong, Al-
+     the IEEE/CVF Conference on Computer Vision and Pattern               ice Lemieux-Bourque, Rongge Zhang, Vivek Shankar Varad-
+     Recognition, pages 19657–19666, 2024. 2                              harajan, and Giovanni Beltrame. Multi-robot decentral-
+ [9] Tianchen Deng, Guole Shen, Xun Chen, Shenghai Yuan,                  ized collaborative slam in planetary analogue environments:
+     Hongming Shen, Guohao Peng, Zhenyu Wu, Jingchuan                     Dataset, challenges, and lessons learned. IEEE Transactions
+     Wang, Lihua Xie, Danwei Wang, et al. Mcn-slam: Multi-                on Field Robotics, 2025. 2
+     agent collaborative neural slam with hybrid implicit neu-       [21] Mingrui Li, Shuhong Liu, Heng Zhou, Guohao Zhu, Na
+     ral scene representation. arXiv preprint arXiv:2506.18678,           Cheng, Tianchen Deng, and Hongyu Wang. Sgs-slam: Se-
+     2025. 2                                                              mantic gaussian splatting for neural dense slam. In European
+[10] Tianchen Deng, Guole Shen, Chen Xun, Shenghai Yuan,                  Conference on Computer Vision, pages 163–179. Springer,
+     Tongxin Jin, Hongming Shen, Yanbo Wang, Jingchuan                    2024. 2
+     Wang, Hesheng Wang, Danwei Wang, et al. Mne-slam:               [22] Mingrui Li, Shuhong Liu, Tianchen Deng, and Hongyu
+     Multi-agent neural slam for mobile robots. In Proceedings            Wang. Densesplat: Densifying gaussian splatting slam with
+     of the Computer Vision and Pattern Recognition Conference,           neural radiance prior. arXiv preprint arXiv:2502.09111,
+     pages 1485–1494, 2025. 2, 8                                          2025. 2
+[11] Tianchen Deng, Yanbo Wang, Hongle Xie, Hesheng Wang,            [23] Yuzheng Liu, Siyan Dong, Shuzhe Wang, Yingda Yin, Yan-
+     Rui Guo, Jingchuan Wang, Danwei Wang, and Weidong                    chao Yang, Qingnan Fan, and Baoquan Chen. Slam3r: Real-
+
+
+
+
+                                                                21792
+     time dense scene reconstruction from monocular rgb videos.      [36] Chao Yu, Xinyi Yang, Jiaxuan Gao, Huazhong Yang, Yu
+     In Proceedings of the Computer Vision and Pattern Recogni-           Wang, and Yi Wu. Learning efficient multi-agent cooper-
+     tion Conference, pages 16651–16662, 2025. 2, 6, 7, 8                 ative visual exploration. In European Conference on Com-
+[24] Dominic Maggio, Hyungtae Lim, and Luca Carlone. Vggt-                puter Vision, pages 497–515. Springer, 2022. 2
+     slam: Dense rgb slam optimized on the sl(4) manifold. 2025.     [37] Vladimir Yugay, Theo Gevers, and Martin R Oswald. Magic-
+     2, 6, 7, 8                                                           slam: Multi-agent gaussian globally consistent slam. In Pro-
+[25] Riku Murai, Eric Dexheimer, and Andrew J. Davison.                   ceedings of the Computer Vision and Pattern Recognition
+     Mast3r-slam: Real-time dense slam with 3d reconstruction             Conference, pages 6741–6750, 2025. 2, 6, 8
+     priors. 2024. 2, 6, 7, 8                                        [38] Kai Zhang, Sai Bi, Hao Tan, Yuanbo Xiangli, Nanxuan Zhao,
+                                                                          Kalyan Sunkavalli, and Zexiang Xu. Gs-lrm: Large recon-
+[26] Patrik Schmuck and Margarita Chli. Ccm-slam: Robust and
+                                                                          struction model for 3d gaussian splatting. In European Con-
+     efficient centralized collaborative monocular simultaneous
+                                                                          ference on Computer Vision, pages 1–19. Springer, 2024. 2
+     localization and mapping for robotic teams. Journal of Field
+     Robotics, 36(4):763–781, 2019. 2                                [39] Tianjun Zhang, Lin Zhang, Yang Chen, and Yicong Zhou.
+                                                                          Cvids: A collaborative localization and dense mapping
+[27] You Shen, Zhipeng Zhang, Yansong Qu, and Liujuan Cao.
+                                                                          framework for multi-agent based visual-inertial slam. IEEE
+     Fastvggt: Training-free acceleration of visual geometry
+                                                                          transactions on image processing, 31:6562–6576, 2022. 2
+     transformer. arXiv preprint arXiv:2509.02560, 2025. 2
+                                                                     [40] Wei Zhang, Qing Cheng, David Skuddis, Niclas Zeller,
+[28] Julian Straub, Thomas Whelan, Lingni Ma, Yufan Chen, Erik            Daniel Cremers, and Norbert Haala. Hi-slam2: Geometry-
+     Wijmans, Simon Green, Jakob J Engel, Raul Mur-Artal, Carl            aware gaussian slam for fast monocular scene reconstruction.
+     Ren, Shobhit Verma, et al. The replica dataset: A digital            arXiv preprint arXiv:2411.17982, 2024. 2
+     replica of indoor spaces. arXiv preprint arXiv:1906.05797,
+                                                                     [41] Iana Zhura, Denis Davletshin, Nipun Dhananjaya Weer-
+     2019. 6, 8
+                                                                          akkodi Mudalige, Aleksey Fedoseev, Robinroy Peter, and
+[29] Guangming Wang, Lei Pan, Songyou Peng, Shaohui Liu,                  Dzmitry Tsetserukou. Neuroswarm: Multi-agent neural 3d
+     Chenfeng Xu, Yanzi Miao, Wei Zhan, Masayoshi Tomizuka,               scene reconstruction and segmentation with uav for optimal
+     Marc Pollefeys, and Hesheng Wang. Nerfs in robotics: A               navigation of quadruped robot. In 2023 IEEE International
+     survey. The International Journal of Robotics Research,              Conference on Systems, Man, and Cybernetics (SMC), pages
+     page 02783649251374246, 2024. 2                                      2525–2530. IEEE, 2023. 2
+[30] Hengyi Wang, Jingwen Wang, and Lourdes Agapito. Co-
+     slam: Joint coordinate and sparse parametric encodings for
+     neural real-time slam. In Proceedings of the IEEE/CVF Con-
+     ference on Computer Vision and Pattern Recognition, pages
+     13293–13302, 2023. 2
+[31] Jianyuan Wang, Minghao Chen, Nikita Karaev, Andrea
+     Vedaldi, Christian Rupprecht, and David Novotny. Vggt: Vi-
+     sual geometry grounded transformer. In Proceedings of the
+     Computer Vision and Pattern Recognition Conference, pages
+     5294–5306, 2025. 2
+[32] Qianqian Wang, Vickie Ye, Hang Gao, Weijia Zeng, Jake
+     Austin, Zhengqi Li, and Angjoo Kanazawa. Shape of mo-
+     tion: 4d reconstruction from a single video. In Proceedings
+     of the IEEE/CVF International Conference on Computer Vi-
+     sion, pages 9660–9672, 2025. 2
+[33] Shuzhe Wang, Vincent Leroy, Yohann Cabon, Boris
+     Chidlovskii, and Jerome Revaud. Dust3r: Geometric 3d vi-
+     sion made easy. In Proceedings of the IEEE/CVF Conference
+     on Computer Vision and Pattern Recognition, pages 20697–
+     20709, 2024. 2
+[34] Xiaohao Xu, Feng Xue, Shibo Zhao, Yike Pan, Sebastian
+     Scherer, and Xiaonan Huang. Mac-ego3d: Multi-agent
+     gaussian consensus for real-time collaborative ego-motion
+     and photorealistic 3d reconstruction. In Proceedings of the
+     Computer Vision and Pattern Recognition Conference, pages
+     854–863, 2025. 2
+[35] Phuc Nguyen Xuan, Thanh Nguyen Canh, Huu-Hung
+     Nguyen, Nak Young Chong, and Xiem HoangVan. A sur-
+     vey on collaborative slam with 3d gaussian splatting. arXiv
+     preprint arXiv:2510.23988, 2025. 2
+
+
+
+
+                                                                21793
+

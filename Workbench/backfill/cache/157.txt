@@ -1,0 +1,789 @@
+                      This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                   Except for this watermark, it is identical to the accepted version;
+                             the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+                            Learning 3D Representations for Spatial Intelligence
+                                    from Unposed Multi-View Images
+
+         Bo Zhou1 , Qiuxia Lai3 , Zeren Sun1 , Xiangbo Shu1 , Yazhou Yao1 , Wenguan Wang2B
+             1
+                 Nanjing University of Science and Technology, 2 Zhejiang University, 3 Communication University of China,
+                                           https://bobochow.github.io/UniSplat
+
+
+
+                             Abstract                                                                                       3D Gaussian
+                                                                                 Pose-    Geometry Reconstruction
+                                                                                                                            Camera Pose
+                                                                                  free   Transformer
+                                                                                                                           3D Point Map
+Robust 3D representation learning forms the perceptual                              (a) Supervised 3D Representation Learning
+foundation of spatial intelligence, enabling downstream
+tasks in scene understanding and embodied AI. However,                                                  Reconstruction
+                                                                                 Pose- Multi-view         with NeRF
+learning such representations directly from unposed multi-                               MAE
+                                                                                required                  Downstream          Spatial
+view images remains challenging. Recent self-supervised                                                      Tasks         Intelligence
+methods attempt to unify geometry, appearance, and seman-                    (b) Previous Self-supervised 3D Representation Learning
+tics in a feed-forward manner, but they often suffer from                                                                   3D Gaussian
+                                                                                                        Reconstruction
+weak geometry induction, limited appearance detail, and                                                                     Camera Pose   Proj
+inconsistencies between geometry and semantics. We intro-                        Pose-     Geometry                        3D Point Map
+                                                                                  free      MAE          Downstream          Spatial
+duce UniSplat, a feed-forward framework designed to ad-
+                                                                                                            Tasks         Intelligence
+dress these limitations through three complementary com-                   (c) Proposed feed-forward 3D Representation Learning (Ours)
+ponents. First, we propose a dual-masking strategy that                Figure 1. Comparison of three key 3D representation learning
+strengthens geometry induction in the encoder. By mask-                paradigms: supervised geometry reconstruction, self-supervised
+ing both encoder and decoder tokens, and targeting de-                 neural reconstruction, and our novel feed-forward framework.
+coder masks toward geometry-rich regions, the model is
+forced to infer structural information from incomplete vi-             tations [4, 5, 36, 53, 55, 60]. This trend demands repre-
+sual cues, yielding geometry-aware representations even                sentations that unify spatial layouts, semantic contexts, and
+under unposed inputs. Second, we develop a coarse-to-                  visual details. Such integration forms the foundation of spa-
+fine Gaussian splatting strategy that reduces appearance-              tial intelligence, defined as the capacity to construct and
+semantics inconsistencies by progressively refining the ra-            reason about the physical world [59]. This intelligence is
+diance field. Finally, to enforce geometric–semantic consis-           essential for embodied agents to navigate, manipulate, and
+tency, we introduce a pose-conditioned recalibration mech-             plan within complex environments. Achieving this funda-
+anism that interrelates the outputs of multiple heads by re-           mentally requires robust 3D perception to build comprehen-
+projecting predicted 3D point and semantic maps into the               sive models of the environment encompassing geometry,
+image plane using estimated camera parameters, and align-              appearance, and semantics [71]. However, deriving such
+ing them with corresponding RGB and semantic predic-                   effective 3D representations directly from unposed multi-
+tions to ensure cross-task consistency, thereby resolving ge-          view images remains an open challenge.
+ometry–semantic mismatches. Together, these components                     Supervised feed-forward reconstruction methods infer
+yield unified 3D representations that are robust to unposed,           geometry, appearance, and semantics directly from images
+sparse-view inputs and generalize across diverse tasks, lay-           using ground-truth supervision (Fig.1(a)). Neural Radiance
+ing a perceptual foundation for spatial intelligence.                  Fields (NeRFs)[37] and their extensions [2, 38] achieve
+                                                                       high-fidelity novel-view synthesis but require calibrated
+                                                                       multi-view images and frequently rely on per-scene opti-
+1. Introduction                                                        mization. 3D Gaussian Splatting [25] accelerates training
+                                                                       and rendering via explicit primitives, inspiring both pose-
+Recent advances in visual intelligence highlight the need
+                                                                       aware [7, 9, 47, 56] and pose-free pipelines [21, 45, 51, 61].
+to retain structured spatial information in learned represen-
+                                                                       Simultaneously, semantic scene fields [13, 29, 40, 67]
+  B Corresponding author.                                              advance 3D semantic understanding, whereas geometry-
+
+
+
+                                                                 22550
+focused approaches predict camera poses or dense point             tions from incomplete visual cues.
+maps to recover the structure of the scene [27, 49, 52, 66].     • We propose a coarse-to-fine Gaussian splatting strategy
+However, most supervised methods require ground-truth              that hierarchically refines the radiance field. This strategy
+geometry or calibration and treat geometry, appearance, and        enhances consistency between appearance and semantics,
+semantics in isolation, lacking the unified representations        producing high-fidelity visual representations.
+necessary for spatial intelligence.                              • We design a pose-conditioned recalibration mechanism
+    Self-supervised approaches mitigate reliance on expen-         that reprojects 3D point maps and semantic maps onto
+sive 3D annotations by constructing geometry priors from           the image plane using estimated camera poses. Aligning
+unlabeled images. Inspired by 2D representation learn-             these projections with RGB and semantic predictions en-
+ing, masked autoencoding [1, 12, 18] and contrastive objec-        forces spatial coherence across tasks.
+tives [8, 16] have been extended to 3D (Fig.1(b)) to promote
+cross-view invariance and reconstruction consistency[54,         2. Related Work
+70, 71]. While novel-view synthesis frequently serves as
+a training signal, many methods assume dense video super-        2.1. Supervised 3D Representation Learning
+vision and degrade in sparse-view regimes [3, 15]. Recent        Supervised feed-forward approaches aim to recover geom-
+pose-free self-supervised methods jointly estimate cameras       etry, appearance, and semantics in a single pass using ex-
+and scene structures [22, 24], highlighting the importance       plicit supervision such as target-view rendering signals or
+of a consistent spatial frame. Nevertheless, most methods        external priors. These methods allow fast inference without
+still suffer from weak geometry induction, limited appear-       per-scene optimization [25, 34, 41, 68]. A key distinction
+ance details, and inconsistencies between geometry and se-       lies in their dependence on camera poses. Pose-required
+mantics. This motivates frameworks that explicitly couple        models assume known intrinsic and extrinsic characteristics
+geometry, appearance, semantics, and camera estimation to        during both training and testing. They often rely on epipo-
+establish a consistent perceptual basis for embodied AI.         lar constraints, cost volumes, or pose-conditioned embed-
+    To address these challenges, we propose UniSplat             dings, achieving strong photometric quality [6, 7, 9, 47, 56–
+(Fig. 1(c)), a feed-forward framework designed to learn uni-     58, 64]. However, these methods depend on computation-
+fied 3D representations from unposed multi-view images.          ally expensive Structure-from-Motion (SfM) preprocessing
+The proposed framework introduces three key innovations.         and may fail when pose estimation is unreliable.
+First, a dual-masking strategy enforces geometry-aware fea-          Pose-free models remove pose inputs at inference but
+ture learning by masking tokens in both the encoder and the      still require posed supervision or fixed targets during train-
+decoder. By targeting decoder masks toward geometry-rich         ing. Within this family, research has diverged by task em-
+regions, this strategy strengthens geometry induction from       phasis. Geometry-focused models predict camera param-
+incomplete visual evidence. Second, a coarse-to-fine Gaus-       eters or dense point maps aligned with the scene struc-
+sian splatting strategy hierarchically refines the radiance      ture [23, 27, 30, 49, 52, 66]. Appearance-focused methods
+field. This progressive enhancement of appearance details        directly predict per-pixel Gaussians in a canonical space,
+facilitates the production of high-fidelity visual representa-   resolving scale by encoding intrinsics [21, 45, 51, 61].
+tions. Finally, a pose-conditioned recalibration mechanism       Semantics-focused approaches lift 2D vision-language fea-
+enforces consistency between geometry and semantics by           tures into a 3D-consistent field, enabling open-vocabulary,
+interrelating predictions from the decoder. Unlike conven-       view-consistent segmentation [13, 29, 44]. Parallel ef-
+tional multi-task learning, in which each head operates in-      forts such as UniForward [48] and Uni3R [46] attempt to
+dependently, the proposed design utilizes estimated camera       unify geometry, semantics, and appearance in a single feed-
+poses to reproject 3D point maps and semantic maps onto          forward pipeline with knowledge distillation. While these
+the 2D image plane. Aligning these reprojected maps with         strands are beginning to converge, the reliance on posed
+the corresponding RGB and semantic predictions ensures           training combined with unposed inference can lead to resid-
+cross-task coherence and resolves mismatches between ge-         ual inconsistencies, motivating the development of self-
+ometry and semantics. Experiments conducted on diverse           supervised alternatives.
+benchmarks for 3D scene understanding and embodied AI
+confirm consistent performance gains, thereby validating         2.2. Self-supervised 3D Representation Learning
+the generalization ability of the proposed framework.            Self-supervised approaches aim to reduce the reliance
+    Our contributions can be summarized as follows:              on costly 3D labels by learning 3D representations di-
+• We introduce a dual-masking strategy that applies mask-        rectly from raw multi-view images. Early methods ex-
+   ing to tokens in both the encoder and the decoder. Bi-        tended ideas from 2D representation learning: con-
+   asing the decoder masks toward geometry-rich regions          trastive learning encouraged view-invariant features [8, 16],
+   encourages the formation of geometry-aware representa-        while masked autoencoding and cross-view completion pro-
+
+
+
+                                                             22551
+ 3.2 Dual Masking Strategy                                                                   3.3 Coarse-to-Fine Gaussian Splatting Strategy
+                                                    Coarse Cam Head
+                                                                                                Anchor Head
+
+                                                    Coarse GS Head
+                                                                                               Semantic Head
+
+                             Multi-view                                       Cross-view
+                              Encoder                                          Decoder        Appearance Head
+
+
+                                                                                             3.4 Pose-conditioned Recalibration
+                                                                                                        Mechanism
+
+                                          Gaussian-Guided Geometric Masking
+                                                                                                Camera Head                             Projection
+     Camera Token       Gaussian Latent Token       Visible Encoder Token    Mask Token
+                                                                                               3D Point Head
+     Visible Decoder Token        Anchor Gaussian       Sem Gaussian        App Gaussian
+
+
+Figure 2. Overview of the proposed UniSplat framework. UniSplat integrates a dual-masking strategy for geometry induction (§3.2),
+a coarse-to-fine Gaussian splatting strategy for appearance refinement (§3.3), and a pose-conditioned recalibration mechanism for geome-
+try–semantic consistency (§3.4).
+
+moted reconstruction and correspondence [1, 12, 18, 54,                            delity via coarse-to-fine Gaussian splatting, enforces geom-
+70, 71]. These methods improved feature learning, but                              etry–semantic consistency with pose-conditioned recalibra-
+they often lacked strict global 3D consistency and produced                        tion, and combines self-supervised learning with knowledge
+representations that were more view-aligned than spatially                         distillation, yielding robust 3D representations that transfer
+grounded. Another line of work employed novel view                                 effectively to scene understanding and embodied AI tasks.
+synthesis as a self-supervisory signal, where models were
+trained to render unseen target views and match them pho-                          3. Methodology
+tometrically [3, 15]. Although this supervision tied predic-
+tions more directly to 3D structure and improved geome-                            3.1. Overview
+try–appearance coupling, most approaches assumed known
+                                                                                   We propose UniSplat, a framework for 3D representation
+or pre-estimated camera poses or leveraged video meta-
+                                                                                   learning that takes unposed multi-view images as input. As
+data to simplify correspondence. Moreover, they typically
+                                                                                   illustrated in Fig. 2, the model is composed of a transformer
+require dense video streams and re-render nearby frames,
+                                                                                   encoder and a multi-head decoder. To process the input, a
+which limits robustness in sparse-view settings and con-
+                                                                                   dual-masking strategy (§3.2) is applied, which utilizes ran-
+strains applicability to real-world scenarios.
+                                                                                   dom masking in the encoder and geometry-aware masking
+                                                                                   in the decoder to strengthen geometry induction. Subse-
+    More recently, pose-free self-supervised methods seek
+                                                                                   quently, a coarse-to-fine Gaussian splatting strategy (§3.3)
+to remove this dependency by jointly estimating cameras
+                                                                                   decodes the latent representations produced by the model
+and scenes directly from raw, unposed image collections.
+                                                                                   into multi-level Gaussian parameters. This process ren-
+RayZer [22] exemplifies this direction with a transformer-
+                                                                                   ders and reconstructs the RGB appearance and the seman-
+based latent renderer that couples camera and scene re-
+                                                                                   tic field of the scene. Finally, a pose-conditioned recalibra-
+covery in a predict-then-render loop. SelfSplat [24] em-
+                                                                                   tion mechanism (§3.4) is introduced to enforce the consis-
+ploys explicit Gaussian splatting, predicting depth and pose
+                                                                                   tency between 2D and 3D representations. This mechanism
+with separate modules, which yields interpretable outputs
+                                                                                   leverages the camera parameters predicted by the pose head
+but less coherent alignment. Latent models offer flexi-
+                                                                                   and the 3D point clouds generated by the 3D point head
+bility, while explicit ones provide interpretability and ef-
+                                                                                   to project the 3D structures back into the 2D image plane,
+ficient rendering; both highlight a shift toward joint cam-
+                                                                                   thereby aligning them with the corresponding 2D predic-
+era–scene learning. Despite this progress, current pose-free
+                                                                                   tions. The training objectives are introduced in §3.5.
+methods still suffer from weak geometry induction, limited
+appearance detail, and geometry–semantic inconsistencies,
+                                                                                   3.2. Dual Masking Strategy
+underscoring the need for frameworks that explicitly cou-
+ple all three aspects with camera estimation in a consis-                          To strengthen geometry induction, UniSplat employs a
+tent 3D reference frame. In this paper, we propose UniS-                           dual-masking strategy inspired by [50] that applies mask-
+plat, a feed-forward framework that strengthens geometry                           ing to both encoder and decoder tokens. By targeting de-
+induction through dual-masking, enhances appearance fi-                            coder masks toward geometry-rich regions, the model is
+
+
+
+                                                                             22552
+                                                                                                     v V
+encouraged to infer global 3D structure from incomplete vi-               Subsequently, Zvis = {Zvis    }v=1 is fed into the decoder.
+sual cues rather than overfitting to trivial textures.                        By selectively hiding structurally important features, this
+Stage 1: Initial Masking and Augmented Encoding.                          dual masking forces the decoder to reconstruct them from
+    Given a set of unposed multi-view images I = {I v ∈                   sparse evidence by reasoning about the underlying 3D spa-
+  H×W ×3 V
+R          }v=1 , we partition each image into patch tokens               tial structure rather than relying on local texture completion,
+X = {X v ∈ RNp ×D }Vv=1 , where V is the number of views,                 thereby improving geometry-aware representation learning.
+Np is the number of patches, and D is the latent dimen-
+sion. A 2D random mask Menc     v
+                                  (ρe ) with masking ratio ρe                3.3. Coarse-to-Fine Gaussian Splatting Strategy
+                     v
+is applied to each X :                                                   A central challenge in Gaussian-based 3D scene under-
+                                                                         standing is the granularity mismatch between semantic and
+                   v           v
+                  Xvis = (1 − Menc ) ⊙ Xv,                         (1)   appearance representations: semantic fields are coarse by
+                                                                         nature, while appearance fields require dense, fine-grained
+where Nvis denotes the number of visible patches after
+                                                                         primitives to capture textures and lighting. To reconcile
+masking, typically satisfying Nvis = (1−ρe )Np . This yields
+                                                                         this, UniSplat introduces a coarse-to-fine Gaussian splat-
+the visible token set Xvis = {Xvis v
+                                      ∈ RNvis ×D }Vv=1 . Fol-
+                                                                         ting strategy that progressively refines scene representa-
+lowing [22], the encoder Enc is augmented with learnable
+                           v                                             tions from global structure to fine detail.
+camera tokens Tvis = {Tcam     ∈ RD }Vv=1 and Gaussian la-
+                                                                             The decoder takes as input the visible tokens Zvis , up-
+tent tokens Tcoarse = {Tcoarse ∈ RNg ×D }Vv=1 , where Ng is
+                         v
+                                                                                                  ′                                        ′
+                                                                         dated camera tokens Tcam    , Gaussian latent tokens Tcoarse           ,
+the number of latent Gaussians. The encoder processes the
+                                                                         and learnable masked tokens Tmask . Through a multi-head
+concatenated token sequence [Xvis , Tcam , Tcoarse ] as follows:                                                                           ′′
+                                                                         design, it produces refined Gaussian latent tokens Tcoarse             ,
+                 ′
+       [Yvis , Tcam     ′
+                    , Tcoarse ] = Enc([Xvis , Tcam , Tcoarse ]),   (2)   which are subsequently decoded by hierarchical Gaussian
+                                                                         heads for appearance and semantics.
+where Yvis = {Yvis v
+                     ∈ RD×Nvis }Vv=1 are encoded features,                   Building on these outputs, our coarse-to-fine Gaussian
+  ′        D×V                                     ′                     splatting proceeds in three stages. First, the Anchor Gaus-
+Tcam ∈ R         are updated camera tokens, and Tcoarse  ∈
+R Ng ×D×V
+            are updated Gaussian latent tokens.                          sian Head predicts anchor Gaussians Ganchor (µ′ , ϵ, γ) from
+Stage 2: Gaussian-Guided Geometric Masking. Next,                          ′′
+                                                                         Tcoarse , where µ′ ∈ R3 denotes center position, ϵ ∈ R11
+encoded features are used to guide a second geometry-                    is the geometric feature, and γ ∈ R64 is the semantic fea-
+                                                   ′                     ture. Similar to Scaffold-GS [34], each anchor Gaussian
+aware masking pass. Updated camera tokens Tcam          are
+passed to a Coarse Camera Head:                                          serves as a base from which multiple semantic Gaussians
+                                                                         are derived by applying learned position offsets, enabling
+                                       ′
+                  Ccoarse = Headcoarse
+                                cam (Tcam ),                       (3)   richer coverage of the local scene context. Next, the Se-
+                                                                         mantic Gaussian Head expands each anchor into semantic
+                     v
+where Ccoarse = {Ccoarse    ∈ R9 }Vv=1 encodes the intrinsics            Gaussians Gsem (µ′ + ∆′ , θ′ , σ ′ , r′ , s′ , γ ′ ) by predicting off-
+                                                         ′
+and extrinsics of images. In parallel, Gaussian tokens Tcoarse           sets ∆′ ∈ R3 , coarse appearance attributes (θ′ ∈ R3 , σ ′ ∈
+together with Ccoarse are passed to a Coarse Gaussian Head,              R+ , r′ ∈ R4 , s′ ∈ R3 ), and semantic features γ ′ ∈ R64 .
+forming a preliminary geometric Gaussian field Ggeo :                    These semantic Gaussians can be rasterized into 2D maps:
+                                          ′
+      Ggeo (µ, σ, r, s, β) = Headcoarse
+                                 gauss (Tcoarse , Ccoarse ),       (4)                 S=
+                                                                                            XNs
+                                                                                                    σi′ γi′
+                                                                                                            Yi−1
+                                                                                                                      (1 − σj′ ),             (7)
+                                                                                                       i=1             j=1
+where each Gaussian has the center position µ ∈ R3 , opac-
+                                                                         where Ns is the number of semantic Gaussians (Ns =10Ng
+ity σ ∈ R+ , rotation r ∈ R4 , scale s ∈ R3 , and learnable
+                                                                         in our implementation). Finally, each semantic Gaussian
+importance score β ∈ R+ . To identify the most struc-
+                                                                         acts as a new anchor to diffuse a denser set of fine-grained
+turally critical regions, we render a geometric importance
+                                                                         appearance Gaussians Gapp , with refined attributes (θ′′ ∈
+map J ∈ RH×W ×V via alpha blending:
+                                                                         R3 , σ ′′ ∈ R+ , r′′ ∈ R4 , s′′ ∈ R3 ) predicted by the Appear-
+                     XNg                Yi−1                             ance Gaussian Head, predicted offsets ∆′′ ∈ R3 and fine-
+              J =              σi β i          (1 − σj ).          (5)   grained semantic features γ ′′ ∈ R64 . The whole process can
+                         i=1             j=1
+                                                                         be summarized as:
+For each patch, an average importance score is obtained by
+pooling pixel values from J . Patches exceeding the dual                        Ganchor (µ′ , ϵ, γ) ⇒ Gsem (µ′ + ∆′ , θ′ , σ ′ , r′ , s′ , γ ′ )
+                                                                                                                                                     (8)
+masking threshold ρd are selected, defining a geometry-                                       ⇒ Gapp (µ′′ + ∆′′ , θ′′ , σ ′′ , r′′ , s′′ , γ ′′ ).
+                 v
+aware mask Mdec    (ρd ). Applying this second mask to the
+visible tokens from the first stage yields:                              By progressively refining anchor, semantic, and appearance
+                                                                         Gaussians, this strategy resolves the granularity mismatch
+                    v           v         v
+                   Zvis = (1 − Mdec ) ⊙ Yvis .                     (6)   between coarse semantics and fine textures.
+
+
+
+                                                                     22553
+            Project            Warp
+                                               Pixel-wise              RH×W ×64 }Vv=1 , which is aligned with the rendered seman-
+                                           Recalibration Error                            v
+                                                                       tic map Frend = {Frend }Vv=1 from Gsem :
+                                                                                            V
+                                                                                            X H×W                v           v
+                                                                                                                Fproj, j · Frend, j
+                                                                                               X                                              
+                                                                           Lrecalib sem =              1−      v              v                   . (10)
+                                                                                            v=1 j=1
+                                                                                                             ∥Fproj, j ∥ · ∥Frend, j ∥
+
+                        Projected       Warped         Rendered            The overall recalibration objective combines both terms:
+3D Point Map
+                      2D Coordinates   2D Results     2D Results
+  Figure 3. Pose-conditioned recalibration mechanism (§3.4).                          Lrecalib = Lrecalib geo + Lrecalib sem .                      (11)
+3.4. Pose-conditioned Recalibration Mechanism                           By enforcing both geometric and semantic alignment in the
+To ensure geometric–semantic consistency, UniSplat intro-               2D image plane, the recalibration mechanism ensures con-
+duces a pose-conditioned recalibration mechanism. This                  sistency between geometry and semantics, which is crucial
+component aligns predictions from different heads by re-                for producing coherent 3D scene representations.
+projecting 3D outputs into the image plane using estimated
+camera parameters and minimizing their discrepancy with
+                                                                        3.5. Training Objectives
+2D renderings, thereby enforcing cross-task coherence.                  Self-supervision from input views provides an essential
+    For pose-conditioned recalibration, the decoder outputs             learning signal, but it alone is insufficient for reliable 3D
+                          ′′                   ′′
+updated visible tokens Zvis  , camera tokens Tvis , and masked          modeling. Thus, we adopt a composite objective that com-
+tokens Tmask , which are further consumed by a Point Head               bines self-supervision with knowledge distillation, lever-
+and a Camera Head. The Point Head uses a Dense Predic-                  aging geometric and semantic priors from large-scale pre-
+tion Transformer (DPT) to regress per-view 3D point maps                trained foundation models to strengthen learning while
+P = {P v ∈ RH×W×3 }Vv=1 , while the Camera Head predicts                avoiding the need for expensive 3D labels. The overall ob-
+                                        v
+refined camera parameters Cfinal = {Cfinal ∈ R9 }Vv=1 . These           jective is a weighted sum of four terms:
+predictions provide the geometric cues required by the re-
+calibration mechanism.                                                              Ltotal = Lrgb + Lsem + Lgeo + Lrecalib .                        (12)
+    UniSplat produces two complementary types of 3D pre-
+                                                                       Photometric Reconstruction Loss ensures that the ren-
+dictions: 3D Gaussian fields (Gapp for appearance and Gsem                                  v
+                                                                       dered appearance Irend   from Gapp matches the input views
+for semantics) and 3D point maps P. To ensure consis-                    v
+                                                                       I . It combines an L1 loss with the LPIPS perceptual met-
+tency among these predictions, the recalibration mechanism
+                                                                       ric for image quality [65]:
+projects 3D maps back into 2D, as shown in Fig. 3. Since
+the projected coordinates Q = {Qv ∈ RH×W ×2 }Vv=1 are                                V
+                                                                                     X
+                                                                                              v
+                                                                                                   − I v ∥ + LLPIPS (Irend
+                                                                                                                      v
+                                                                                                                           , Iv) .
+                                                                                                                                
+continuous, values are interpolated via differentiable bilin-               Lrgb =          ∥Irend                                                  (13)
+                                                                                     v=1
+ear sampling from four neighboring pixels to obtain warped
+                     v
+results Iproj = {Iproj   ∈ RH×W ×3 }Vv=1 , which are then              Semantic Distillation Loss transfers open-vocabulary se-
+                                                         v             mantic knowledge from a frozen 2D vision–language model
+compared with Gaussian-rendered results Irend = {Irend       ∈
+  H×W ×3 V                                                             (VLM) into the 3D semantic Gaussians. For each view v,
+R          }v=1 to compute the pixel-wise recalibration er-
+                                                                                                           v
+ror, as shown in Fig. 3. This procedure forces appearance,             we extract a semantic feature map FVLM   from the input im-
+semantics, and geometry to converge toward a consistent                age I v using the VLM’s image encoder (e.g., LSeg [28])
+                                                                                                                             v
+scene representation.                                                  and align it with the rendered semantic feature map Frender .
+Geometric Recalibration. For each view v, the 3D point                 The loss is defined as one minus the cosine similarity be-
+map P v is projected to 2D using the refined camera param-             tween these 2D semantic features:
+eters Cfinal . We then measure consistency with the rendered                          V H×W                   v           v
+RGB image from the appearance field Gapp via a pose-                                                        Frender, j · Fvlm, j
+                                                                                      X  X                                            
+                                                                             Lsem =                1−      v              v               .         (14)
+conditioned reprojection loss:                                                        v=1 j=1
+                                                                                                        ∥Frender, j ∥ · ∥Fvlm, j ∥
+                  V H×W
+ Lrecalib geo =
+                  X  X
+                              v
+                            ∥Irend,j − Proj(Cfvinal , Pjv )∥,           Geometric Prior Loss. Following [23], we transfer ge-
+                  v=1 j=1
+                                                                        ometric knowledge from a frozen VGGT [49] teacher,
+                                                       (9)              which provides pseudo ground-truth camera parameters C̃ v
+where Proj(·) is the projection operator.                               and point maps P̃ v , to regularize camera estimation and
+Semantic Recalibration. To align semantic information,                  strengthen 3D structure learning. Camera parameters are
+we build a 3D semantic point map Psem by associating each               regularized via a Huber loss:
+3D point in Psem with its semantics. Similarly, projecting                                    XV
+                                                     v
+Psem to 2D yields a semantic projection Fproj = {Fproj   ∈                            Lpose =          C̃ v − Cfinal
+                                                                                                               v
+                                                                                                                     ϵ
+                                                                                                                       .     (15)
+                                                                                                      v=1
+
+
+
+
+                                                                   22554
+Table 1. Quantitative comparison on ScanNet [11]. (§4.2) We evaluate performance on novel view synthesis (NVS), depth estimation
+(DE), and open-vocabulary semantic segmentation (OVSS).
+                                           Source View                    Target View
+   Methods             Recon. Time↓      OVSS          DE         OVSS               NVS
+                      SfM Per-Scene mIoU↑ Acc.↑ rel↓ τ ↑ mIoU↑ Acc.↑ PSNR↑ SSIM↑ LPIPS↓
+   LSeg [28]          N/A      N/A  0.4701 0.7891    -    -  0.4819 0.7927     -      -      -
+   NeRF-DFF [26]     20.52s    1min 0.4540 0.7173 27.68 9.61 0.4037 0.6755 19.86 0.6650 0.3629
+   Feature-3DGS [68] 20.52s 18mins 0.4453 0.7276 12.95 21.07 0.4223 0.7174 24.49 0.8132 0.2293
+   pixelSplat [6]    20.52s 0.064s     -      -      -    -     -      -     24.89 0.8392 0.1641
+   LSM [13]               0.108s    0.5034 0.7740 3.38 67.77 0.5078 0.7686 24.39 0.8072 0.2506
+   Ours                   0.041s    0.5563 0.8277 3.10 69.13 0.5625 0.8334 25.65 0.8782 0.1353
+
+3D scene geometry is distilled using:                                 Implementation Details. UniSplat is built upon a ViT-
+            V
+                                                                      L backbone pre-trained on ScanNet and ScanNet++ [62],
+            X H×W
+               X                                                      equipped with a multi-task decoder. To circumvent explicit
+ Lpoint =             e v · ∥P̃ v − P v ∥ + ∥U
+                      U                      e v − U v ∥, (16)
+                       j       j     j        j     j
+            v=1 j=1
+                                                                      3D supervision, we leverage LSeg and VGGT teachers to
+                                                                      generate pseudo ground-truth semantics and geometry. All
+where Ue v denotes the confidence score of the point map.             experiments are optimized using AdamW with a base learn-
+         j
+The full geometric prior loss combines these terms:                   ing rate of 1 × 10−4 and a 30-epoch warm-up schedule.
+                                                                      Training is conducted for 300 epochs on 8 NVIDIA A100
+               Lgeo = λpose Lpose + λpoint Lpoint ,      (17)         GPUs. For fair comparison with baseline methods, the input
+where λpose and λpoint are set to 10.0 and 1.0.                       resolution is fixed at 256 × 256. The dual-masking strategy
+                                                                      adopts masking ratios of 0.5 for both encoder and decoder.
+4. Experiments                                                        Each anchor Gaussian yields 10 derived Gaussians, and the
+                                                                      number of coarse Gaussian tokens Tcoarse is set to 256.
+4.1. Experimental Setup
+To comprehensively evaluate the effectiveness of our uni-                4.2. Results on 3D Vision Tasks
+fied 3D representation, we test UniSplat in two distinct do-             Table 1 shows results compared to pose-based baselines
+mains: (1) traditional 3D vision tasks to assess the quality             (NeRF-DFF [26], Feature-3DGS [68], pixelSplat [6]) and
+of scene reconstruction, and (2) embodied AI tasks to eval-              the pose-free baseline LSM [13].
+uate the utility of the learned features as a visual backbone            Open-Vocabulary 3D Segmentation. As presented in Ta-
+for downstream robotic control policies.                                 ble 1 and Figure 4, UniSplat sets a new pose-free state-
+3D Vision Tasks. Following LSM, we evaluate UniSplat’s                   of-the-art. On source views, it reaches 0.5563 mIoU and
+scene understanding capabilities on 40 unseen scenes from                0.8277 mAcc, surpassing LSM by +5.3/+5.4 points. On tar-
+the ScanNet [11] dataset. We assess five core tasks: Novel               get views, it attains 0.5625 mIoU and 0.8334 mAcc, im-
+View Synthesis (PSNR, SSIM, LPIPS), Open-Vocabulary                      proving over LSM by +5.5/+6.5 points and exceeding the
+3D Segmentation (mIoU, mAcc), Depth Estimation (Abs                      2D LSeg baseline while providing cross-view consistency
+Rel, Inlier Ratio), relative pose estimation (AUC), and                  that 2D methods lack.
+cross-dataset generalization.                                            Novel View Synthesis. Without SfM or per-scene fit-
+Embodied AI Tasks. We use the pre-trained ViT en-                        ting, UniSplat delivers the best image quality among compa
+coder from UniSplat as a frozen feature extractor and eval-              methods: 25.65 PSNR, 0.8782 SSIM, and 0.1353 LPIPS
+uate it on the largest-scale embodied intelligence bench-                on target views. This outperforms LSM, the generaliz-
+mark, which spans 268 tasks across 8 simulators. The                     able pixelSplat that assumes known cameras, and the opti-
+evaluation covers both single-task (VC-1 [35], Franka                    mized Feature-3DGS. Gains indicate that geometry-aware
+Kitchen [17], Meta-World [63]) and language-conditioned                  masking and progressive semantic-to-appearance render-
+multi-task (RLBench [19], LIBERO [33]) scenarios, uti-                   ing yield sharper, more faithful novel views. Furthermore,
+lizing a variety of policies including MLPs, Diffusion,                  to evaluate rendering quality, we train our model on the
+and Transformers. We compare against a diverse set of                    RealEstate10K [69] datasets. Figure 5 shows a qualitative
+leading visual representation learning models, including                 comparison of the novel view synthesis on RealEstate10K.
+vision-centric (MAE [18], DINOv2 [39]), multi-modal                      Depth Estimation. UniSplat achieves best performance on
+(CLIP [42], EVA [14], InternViT [10]), and embodied-                     source views, improving over LSM. Methods optimized per
+specific (VC-1 [35], MVP [43], SPA [71]) approaches.                     scene remain far behind in geometry. We provide visualiza-
+Please refer to the Appendix for details.                                tions of feature maps and depth maps in Fig. 6.
+
+
+
+                                                                 22555
+  Table 2. Quantitative comparison on various embodied AI tasks. (§4.3) The number in parentheses denotes the number of tasks.
+                Methods    Vision-Centric           Multi-Modal                 Embodied-Specific
+  Benchmarks              MAE      DINOv2 CLIP         EVA InternViT MVP         VC-1      SPA      Ours
+            AD (2)       58.0±2.0 47.3±3.1 48.7±3.1 58.0±6.0 53.3±3.1 53.3±4.2 54.0±4.0 60.0±4.0 61.7±4.3
+            MW (5)       90.0±4.6 84.0±3.7 77.1±3.2 90.7±0.9 84.0±3.7 93.6±5.2 87.5±3.8 93.3±2.0 94.3±3.1
+  VC-1
+            DMC (5)      74.4±1.8 64.5±2.5 53.9±3.6 62.7±2.8 53.3±0.4 69.4±2.6 65.3±3.6 71.1±5.0 75.8±4.5
+            TF (2)       73.0±0.5 68.5±0.4 56.1±1.6 67.2±0.2 65.2±1.6 73.2±0.8 70.9±1.1 73.6±2.0 75.6±1.7
+            Group 1 (35)   78.3      78.2     76.8     75.2     74.1     76.2     80.1     80.5     81.2
+  RLBench
+            Group 2 (36)   57.7      56.1     55.7     57.0     54.9     56.3     55.7     61.2     63.3
+     Meta-World (48)     67.8±1.7 56.3±0.6 66.7±1.7 63.7±1.3 57.5±1.7 66.4±1.7 68.6±1.5 69.2±1.7 70.9±1.3
+            Object (10) 71.7±13.1 64.7±9.9 50.2±7.0 73.2±6.0 67.7±6.0 63.7±4.8 69.7±7.2 76.7±5.3 78.4±6.1
+            Spatial (10) 57.2±2.9 36.3±11.8 32.2±0.6 59.3±7.7 48.3±6.4 58.0±6.2 50.5±7.5 50.0±3.8 59.7±5.8
+  LIBERO Goal (10)       54.3±6.0 22.2±2.3 30.3±3.2 56.8±2.9 58.8±4.5 63.8±2.8 57.5±6.6 65.3±2.5 67.3±2.3
+            10 (10)      41.2±4.5 28.3±3.0 27.5±3.9 43.3±2.8 38.2±1.3 39.0±0.9 39.7±3.5 40.2±3.6 42.4±3.5
+            90 (90)      29.9±2.0 27.5±2.2 29.4±2.0 31.3±2.3 23.8±1.8 32.1±3.5 30.6±3.3 32.2±1.6 34.7±2.7
+    Franka-Kitchen (5)   42.7±2.6 40.9±6.4 30.8±3.3 37.3±1.3 28.5±1.7 34.3±6.1 37.5±3.5 40.6±1.9 44.5±2.6
+
+Table 3. Quantitative comparison of relative pose estimation          baselines. On VC-1, UniSplat attains top scores across
+on RealEstate10K [69] and ACID [32]. (§4.2)                           AD, MW, DMC, and TF. It sets new records on RLBench
+                    RealEstate10K                ACID                 (81.2%/63.3% for Group 1/2) and Meta-World (70.9%),
+  Methods       5◦ ↑    10◦ ↑ 20◦ ↑      5◦ ↑    10◦ ↑   20◦ ↑
+                                                                      while achieving strong gains in all LIBERO splits, includ-
+  DUSt3R       0.329    0.537   0.691    0.113   0.273   0.469        ing 78.4% on Object, 59.7% on Spatial, and 67.3% on Goal,
+  MASt3R       0.351    0.557   0.701    0.159   0.362   0.524
+  NoPoSplat    0.568    0.737   0.839    0.342   0.504   0.653        with robust results on LIBERO-90. On Franka Kitchen,
+  SelfSplat    0.223    0.413   0.589    0.213   0.372   0.541        it reaches 44.5%, surpassing prior methods. These results
+  Ours         0.607    0.748   0.842    0.354   0.516   0.661        show that the unified 3D representation transfers effectively
+                                                                      to varied control tasks without task-specific tuning.
+Table 4. Quantitative comparison of Cross-dataset Generaliza-
+tion on ACID [32] and DTU [20]. (§4.2) All models are trained
+                                                                         Images        GT      Feature 3DGS    LSM          Ours
+on RealEstate10K [69] (indoor scenes) and evaluated on ACID
+(outdoor scenes) and DTU (object-centric scenes) datasets.
+                       ACID                    DTU
+ Methods      PSNR↑    SSIM↑ LPIPS↓     PSNR↑ SSIM↑ LPIPS↓
+ pixelSplat   25.477   0.770    0.207   15.067   0.539   0.341
+ MVSplat      25.525   0.773    0.199   14.542   0.537   0.324
+ NoPoSplat    25.765   0.776    0.199   17.899   0.629   0.279
+ SelfSplat    22.204   0.686    0.316   13.249   0.434   0.441
+ Ours         25.983   0.786    0.188   16.852   0.587   0.269
+
+
+Relative Pose Estimation. We evaluate the relative pose
+estimation performance on the RealEstate10K and ACID
+datasets, following [61]. As shown in Table 3, our method
+outperforms all baselines across all thresholds, demonstrat-
+                                                                      Figure 4. Qualitative comparison of novel-view segmentation
+ing the effectiveness of our 3D representation in capturing           on ScanNet. (§4.2) Follwing [13], we map thousands of ScanNet
+accurate camera poses from unposed multi-view images.                 labels into 8 common categories for visualization. The dense 2D
+Cross-Dataset Generalization. Trained on RealEstate10K                GT labels are obtained by projecting sparse 3D annotations, so
+and evaluated on ACID and DTU, UniSplat generalizes well              some regions are inevitably incomplete or missing.
+across domains (Table 4), achieving top PSNR / SSIM /
+LPIPS without extra tuning. This demonstrates robust ge-
+ometry and appearance transfer under varied conditions.               4.4. Ablation Studies
+                                                                      Ablation on Key Components. Table 5 shows that every
+4.3. Results on Embodied AI Tasks                                     component matters. Removing semantic distillation col-
+As shown in Table 2, UniSplat consistently outperforms                lapses segmentation while keeping appearance nearly in-
+vision-centric (MAE, DINOv2), multi-modal (CLIP, EVA,                 tact, underscoring its role for open-vocabulary semantics.
+InternViT), and embodied-specific (MVP, VC-1, SPA)                    Camera recalibration and geometric prior losses are critical
+
+
+
+                                                                 22556
+ Ref.          GT      pixelSplat   NoPoSplat     SelfSplat       Ours            Table 6. Ablation on data scale. (§4.4) We evaluate the effect
+                                                                                  of progressively adding more training data from different datasets,
+                                                                                  including ScanNet++ [62], RealEstate10K [69], and DL3DV [31].
+                                                                                     Exp ID    Datasets          mIoU↑       Acc.↑     PSNR↑     rel↓
+                                                                                     (1)       ScanNet           0.5603      0.8297     25.48    3.18
+                                                                                     (2)       (1) + ScanNet++   0.5625      0.8334     25.65    3.10
+                                                                                     (3)       (2) + RE10K       0.5717      0.8414     25.79    3.02
+                                                                                     (4)       (3) + DL3DV       0.5755      0.8437     25.83    2.93
+
+                                                                                  Table 7. Ablation on the number of input views. (§4.4) We fix
+                                                                                  the view range and evaluate under varying numbers of input views.
+                                                                                      #Views      mIoU↑     Acc.↑     PSNR↑           SSIM↑      rel↓
+ Figure 5. Qualitative comparison of NVS on RE10K. (§4.2)                             3           0.5574    0.8292     23.83          0.7683     4.12
+                                                                                      6           0.5846    0.8451     24.47          0.8138     3.79
+        Ref.        Novel View          Feature               Depth                   8           0.6027    0.8454     25.03          0.8652     3.30
+                                                                                      10          0.6227    0.8514     25.12          0.8723     3.21
+
+                                                                                       Table 8. Ablation on different mask Strategies. (§4.4)
+                                                                                     Type of Me    ρe    Type of Md    ρd     mIoU↑     PSNR↑     rel↓
+                                                                                      Random      0.50      N/A        0      0.5412     24.64    3.45
+                                                                                       Croco      0.90      N/A        0      0.5498     25.12    3.37
+                                                                                      Random      0.50     3D GS      0.30    0.5511     25.42    3.23
+                                                                                      Random      0.50     3D GS      0.50    0.5625     25.65    3.10
+                                                                                      Random      0.50     3D GS      0.75    0.5470     25.10    3.38
+                                                                                      Random      0.75     3D GS      0.50    0.5284     24.55    3.56
+                                                                                      Random      0.75     3D GS      0.75    0.5231     24.21    3.62
+
+
+                                                                                  cating that while additional viewpoints help, the marginal
+  Figure 6. Visualizations of feature and depth on ScanNet.                       benefit reduces once sufficient coverage is achieved.
+                                                                                  Ablation on Mask Strategy. As shown in Table 8, Croco
+Table 5. Ablation on core components. (§4.4) Each row removes                     masking [54] surpasses random masking under similar set-
+one component to evaluate its contribution.                                       tings but remains weaker than our geometry-aware two-
+  Variant                     mIoU↑      Acc.↑        PSNR↑           rel↓        stage masking strategy. For random masking, overly low ρe
+                                                                                  yields insufficient spatial reasoning, while excessively high
+  Full UniSplat               0.5625     0.8334        25.65          3.10
+  w/o Self-sup.               0.5263     0.8110        24.40          3.74        ρe hinders learning. The geometry-aware mask consistently
+  w/o Dual Mask               0.5462     0.8275        24.74          3.27        improves both segmentation and reconstruction, indicating
+  w/o Coarse-to-Fine          0.5374     0.8239        24.93          3.34        the balanced masking facilitates 3D representation learning.
+  w/o Lrecalib                0.5287     0.8186        24.35          3.52
+  w/o Lsem                    0.0214     0.0811        24.82          3.24        5. Conclusion
+  w/o Lgeo                    0.5442     0.8261        24.23          3.59
+                                                                                  We introduced UniSplat, a feed-forward framework that
+                                                                                  learns unified 3D representations directly from unposed
+for geometry and rendering. Geometry-aware dual mask                              multi-view images. UniSplat addresses the key limita-
+and coarse-to-fine Gaussians splatting strategy yield con-                        tions of prior methods through three complementary com-
+sistent gains. Disabling self-supervised learning for appear-                     ponents: a dual-masking strategy that strengthens geometry
+ance degrades all metrics.                                                        induction by enforcing structure reasoning from incomplete
+Scale Up with More Training Data. Table 6 demon-                                  cues, a coarse-to-fine Gaussian splatting strategy that pro-
+strates that expanding the training dataset can significantly                     gressively refines scene appearance to capture both global
+enhance model generalization and robustness. Larger, di-                          structure and fine detail, and a pose-conditioned recalibra-
+verse datasets expose the model to varied patterns, reducing                      tion mechanism that enforces geometric–semantic consis-
+overfitting and improving performance on unseen data.                             tency by aligning multi-head predictions in a shared spatial
+Ablation on the Number of Input Views. As shown in Ta-                            frame. Together, these designs enable UniSplat to produce
+ble 7, increasing input views improves both segmentation                          coherent, high-fidelity 3D representations that are robust to
+and reconstruction. More views provide richer geometric                           sparse-view settings and transferable across domains. Ex-
+and appearance cues, enhancing scene understanding and                            tensive experiments on both 3D vision benchmarks and em-
+rendering quality. Gains diminish beyond 8 views, indi-                           bodied AI tasks confirm its effectiveness and versatility.
+
+
+
+                                                                             22557
+Acknowledgement.        This work was supported by Zhe-               [12] Zibin Dong, Fei Ni, Yifu Yuan, Yinchuan Li, and Jianye Hao.
+jiang Provincial Natural Science Foundation of China (No.                  Embodiedmae: A Unified 3d Multi-Modal Representation
+LR26F020002), National Natural Science Foundation of                       for Robot Manipulation. arXiv preprint arXiv:2505.10105,
+China (No.      62372405, 62472222, 62306292, U25A20442                    2025. 2, 3
+and 62427808), Fundamental Research Funds for the Central             [13] Zhiwen Fan, Jian Zhang, Wenyan Cong, Peihao Wang,
+Universities (226-2025-00057), the State Key Laboratory of                 Renjie Li, Kairun Wen, Shijie Zhou, Achuta Kadambi,
+Brain Cognition and Brain-inspired Intelligence Technology                 Zhangyang Wang, Danfei Xu, Boris Ivanovic, Marco
+(No. SKLBI-K2025004), the Natural Science Foundation of                    Pavone, and Yue Wang. Large Spatial Model: End-to-end
+Jiangsu Province (No. BK20240080), the National Defense                    Unposed Images to Semantic 3d. In NeurIPS, 2024. 1, 2, 6,
+Science and Technology Industry Bureau Technology Infras-                  7
+tructure Project (JSZL2024606C001), and Science and Tech-             [14] Yuxin Fang, Wen Wang, Binhui Xie, Quan Sun, Ledell Wu,
+nology Project of Jiangsu Geological Bureau (No. 2025KJ09).                Xinggang Wang, Tiejun Huang, Xinlong Wang, and Yue
+                                                                           Cao. Eva: Exploring the limits of masked visual representa-
+                                                                           tion learning at scale. In CVPR, 2023. 6
+References                                                            [15] Yang Fu, Sifei Liu, Amey Kulkarni, Jan Kautz, Alexei A
+                                                                           Efros, and Xiaolong Wang. Colmap-free 3d gaussian splat-
+ [1] Hangbo Bao, Li Dong, Songhao Piao, and Furu Wei. Beit:
+                                                                           ting. In CVPR, 2024. 2, 3
+     Bert pre-training of image transformers. In ICLR, 2022. 2, 3
+ [2] Jonathan T Barron, Ben Mildenhall, Matthew Tancik, Peter         [16] Jean-Bastien Grill, Florian Strub, Florent Altché, Corentin
+     Hedman, Ricardo Martin-Brualla, and Pratul P Srinivasan.              Tallec, Pierre Richemond, Elena Buchatskaya, Carl Doersch,
+     Mip-nerf: A multiscale representation for anti-aliasing neu-          Bernardo Avila Pires, Zhaohan Guo, Mohammad Ghesh-
+     ral radiance fields. In ICCV, 2021. 1                                 laghi Azar, et al. Bootstrap your own latent-a new approach
+                                                                           to self-supervised learning. NeurIPS, 2020. 2
+ [3] Wenjing Bian, Zirui Wang, Kejie Li, Jia-Wang Bian, and
+     Victor Adrian Prisacariu. Nope-nerf: Optimising neural ra-       [17] Abhishek Gupta, Vikash Kumar, Corey Lynch, Sergey
+     diance field with no pose prior. In CVPR, 2023. 2, 3                  Levine, and Karol Hausman. Relay policy learning: Solving
+                                                                           long-horizon tasks via imitation and reinforcement learning.
+ [4] Xinhao Cai, Qiuxia Lai, Gensheng Pei, Xiangbo Shu,
+                                                                           arXiv preprint arXiv:1910.11956, 2019. 6
+     Yazhou Yao, and Wenguan Wang. Cycle-consistent learning
+     for joint layout-to-image generation and object detection. In    [18] Kaiming He, Xinlei Chen, Saining Xie, Yanghao Li, Piotr
+     ICCV, 2025. 1                                                         Dollár, and Ross Girshick. Masked autoencoders are scalable
+                                                                           vision learners. In CVPR, 2022. 2, 3, 6
+ [5] Xinhao Cai, Liulei Li, Gensheng Pei, Tao Chen, Jinshan Pan,
+     Yazhou Yao, and Wenguan Wang. Unbiased object detection          [19] Stephen James, Zicong Ma, David Rovick Arrojo, and An-
+     beyond frequency with visually prompted image synthesis.              drew J Davison. Rlbench: The robot learning benchmark &
+     In ICLR, 2026. 1                                                      learning environment. IEEE Robotics and Automation Let-
+ [6] David Charatan, Sizhe Lester Li, Andrea Tagliasacchi, and             ters, 2020. 6
+     Vincent Sitzmann. pixelsplat: 3d gaussian splats from image      [20] Rasmus Jensen, Anders Dahl, George Vogiatzis, Engin Tola,
+     pairs for scalable generalizable 3d reconstruction. In CVPR,          and Henrik Aanæs. Large scale multi-view stereopsis evalu-
+     2024. 2, 6                                                            ation. In CVPR, 2014. 7
+ [7] Anpei Chen, Zexiang Xu, Fuqiang Zhao, Xiaoshuai Zhang,           [21] Hanwen Jiang, Zhenyu Jiang, Yue Zhao, and Qixing Huang.
+     Fanbo Xiang, Jingyi Yu, and Hao Su. Mvsnerf: Fast general-            Leap: Liberate sparse-view 3d modeling from camera poses.
+     izable radiance field reconstruction from multi-view stereo.          ICLR, 2024. 1, 2
+     In ICCV, 2021. 1, 2                                              [22] Hanwen Jiang, Hao Tan, Peng Wang, Haian Jin, Yue Zhao,
+ [8] Ting Chen, Simon Kornblith, Mohammad Norouzi, and Ge-                 Sai Bi, Kai Zhang, Fujun Luan, Kalyan Sunkavalli, Qix-
+     offrey Hinton. A simple framework for contrastive learning            ing Huang, and Georgios Pavlakos. Rayzer: A Self-
+     of visual representations. In ICML, 2020. 2                           supervised Large View Synthesis Model. arXiv preprint
+ [9] Yuedong Chen, Haofei Xu, Chuanxia Zheng, Bohan Zhuang,                arXiv:2505.00702, 2025. 2, 3, 4
+     Marc Pollefeys, Andreas Geiger, Tat-Jen Cham, and Jianfei        [23] Lihan Jiang, Yucheng Mao, Linning Xu, Tao Lu, Kerui Ren,
+     Cai. Mvsplat: Efficient 3d gaussian splatting from sparse             Yichen Jin, Xudong Xu, Mulin Yu, Jiangmiao Pang, Feng
+     multi-view images. In ECCV, 2024. 1, 2                                Zhao, Dahua Lin, and Bo Dai. Anysplat: Feed-forward
+[10] Zhe Chen, Jiannan Wu, Wenhai Wang, Weijie Su, Guo Chen,               3d Gaussian Splatting from Unconstrained Views. arXiv
+     Sen Xing, Muyan Zhong, Qinglong Zhang, Xizhou Zhu,                    preprint arXiv:2505.23716, 2025. 2, 5
+     Lewei Lu, et al. Internvl: Scaling up vision foundation mod-     [24] Gyeongjin Kang, Jisang Yoo, Jihyeon Park, Seungtae Nam,
+     els and aligning for generic visual-linguistic tasks. In CVPR,        Hyeonsoo Im, Sangheon Shin, Sangpil Kim, and Eunbyung
+     2024. 6                                                               Park. Selfsplat: Pose-Free and 3d Prior-Free Generalizable
+[11] Angela Dai, Angel X Chang, Manolis Savva, Maciej Hal-                 3d Gaussian Splatting. In CVPR, 2025. 2, 3
+     ber, Thomas Funkhouser, and Matthias Nießner. Scannet:           [25] Bernhard Kerbl, Georgios Kopanas, Thomas Leimkühler,
+     Richly-annotated 3d reconstructions of indoor scenes. In              and George Drettakis. 3d gaussian splatting for real-time
+     CVPR, 2017. 6                                                         radiance field rendering. ACM TOG, 2023. 1, 2
+
+
+
+
+                                                                  22558
+[26] Sosuke Kobayashi, Eiichi Matsumoto, and Vincent Sitz-                  matable neural radiance fields for modeling dynamic human
+     mann. Decomposing nerf for editing via feature field dis-              bodies. In ICCV, 2021. 1
+     tillation. NeurIPS, 2022. 6                                       [41] Minghan Qin, Wanhua Li, Jiawei Zhou, Haoqian Wang, and
+[27] Vincent Leroy, Yohann Cabon, and Jerome Revaud. Ground-                Hanspeter Pfister. Langsplat: 3d Language Gaussian Splat-
+     ing Image Matching in 3d with MASt3R. In ECCV, 2025. 2                 ting. In CVPR, 2024. 2
+[28] Boyi Li, Kilian Q. Weinberger, Serge J. Belongie, Vladlen         [42] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+     Koltun, and René Ranftl. Language-driven Semantic Seg-                Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+     mentation. In ICLR, 2022. 5, 6                                         Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learn-
+[29] Qijing Li, Jingxiang Sun, Liang An, Zhaoqi Su, Hong-                   ing transferable visual models from natural language super-
+     wen Zhang, and Yebin Liu. Semanticsplat: Feed-Forward                  vision. In ICLR, 2021. 6
+     3d Scene Understanding with Language-Aware Gaussian               [43] Ilija Radosavovic, Tete Xiao, Stephen James, Pieter Abbeel,
+     Fields. arXiv preprint arXiv:2506.09565, 2025. 1, 2                    Jitendra Malik, and Trevor Darrell. Real-world robot learn-
+[30] Zhiqi Li, Chengrui Dong, Yiming Chen, Zhangchi Huang,                  ing with masked visual pre-training. In CoRL, 2023. 6
+     and Peidong Liu. Vicasplat: A Single Run is All You               [44] Yu Sheng, Jiajun Deng, Xinran Zhang, Yu Zhang, Bei Hua,
+     Need for 3d Gaussian Splatting and Camera Estimation from              Yanyong Zhang, and Jianmin Ji. Spatialsplat: Efficient Se-
+     Unposed Video Frames. arXiv preprint arXiv:2503.10286,                 mantic 3d from Sparse Unposed Images. arXiv preprint
+     2025. 2                                                                arXiv:2505.23044, 2025. 2
+[31] Lu Ling, Yichen Sheng, Zhi Tu, Wentian Zhao, Cheng Xin,           [45] Brandon Smart, Chuanxia Zheng, Iro Laina, and V.
+     Kun Wan, Lantao Yu, Qianyu Guo, Zixun Yu, Yawen Lu,                    Prisacariu. Splatt3r: Zero-shot Gaussian Splatting from Un-
+     et al. Dl3dv-10k: A large-scale scene dataset for deep                 calibrated Image Pairs. arXiv preprint arXiv:2408.13912,
+     learning-based 3d vision. In CVPR, 2024. 8                             2024. 1, 2
+[32] Andrew Liu, Richard Tucker, Varun Jampani, Ameesh                 [46] Xiangyu Sun, Liu Liu, Seungtae Nam, Gyeongjin Kang, Wei
+     Makadia, Noah Snavely, and Angjoo Kanazawa. Infinite                   Sui, Zhizhong Su, Wenyu Liu, Xinggang Wang, Eunbyung
+     nature: Perpetual view generation of natural scenes from a             Park, et al. Uni3r: Unified 3d reconstruction and semantic
+     single image. In ICCV, 2021. 7                                         understanding via generalizable gaussian splatting from un-
+[33] Bo Liu, Yifeng Zhu, Chongkai Gao, Yihao Feng, Qiang Liu,               posed multi-view images. arXiv preprint arXiv:2508.03643,
+     Yuke Zhu, and Peter Stone. Libero: Benchmarking knowl-                 2025. 2
+     edge transfer for lifelong robot learning. NeurIPS, 2023. 6       [47] Jiaxiang Tang, Zhaoxi Chen, Xiaokang Chen, Tengfei Wang,
+[34] Tao Lu, Mulin Yu, Linning Xu, Yuanbo Xiangli, Limin                    Gang Zeng, and Ziwei Liu. Lgm: Large multi-view gaus-
+     Wang, Dahua Lin, and Bo Dai. Scaffold-GS: Structured 3d                sian model for high-resolution 3d content creation. In ECCV,
+     Gaussians for View-Adaptive Rendering. In CVPR, 2024. 2,               2024. 1, 2
+     4                                                                 [48] Qijian Tian, Xin Tan, Jingyu Gong, Yuan Xie, and Lizhuang
+[35] Arjun Majumdar, Karmesh Yadav, Sergio Arnaud,                          Ma. Uniforward: Unified 3d scene and semantic field re-
+     Yecheng Jason Ma, Claire Chen, Sneha Silwal, Aryan                     construction via feed-forward gaussian splatting from only
+     Jain, Vincent-Pierre Berges, Tingfan Wu, Jay Vakil, Pieter             sparse-view images. arXiv preprint arXiv:2506.09378, 2025.
+     Abbeel, Jitendra Malik, Dhruv Batra, Yixin Lin, Oleksandr              2
+     Maksymets, Aravind Rajeswaran, and Franziska Meier.               [49] Jianyuan Wang, Minghao Chen, Nikita Karaev, Andrea
+     Where are we in the search for an Artificial Visual Cortex             Vedaldi, Christian Rupprecht, and David Novotný. Vggt:
+     for Embodied Intelligence? In NeurIPS, 2023. 6                         Visual Geometry Grounded Transformer. In CVPR, 2025. 2,
+[36] Junzhu Mao, Yang Shen, Jinyang Guo, Yazhou Yao, Xian-                  5
+     sheng Hua, and Hengtao Shen. Prune and merge: Efficient           [50] Limin Wang, Bingkun Huang, Zhiyu Zhao, Zhan Tong, Yi-
+     token compression for vision transformer with spatial infor-           nan He, Yi Wang, Yali Wang, and Yu Qiao. Videomae V2:
+     mation preserved. IEEE TMM, 2025. 1                                    Scaling Video Masked Autoencoders with Dual Masking. In
+[37] Ben Mildenhall, Pratul P Srinivasan, Matthew Tancik,                   CVPR, 2023. 3
+     Jonathan T Barron, Ravi Ramamoorthi, and Ren Ng. Nerf:            [51] Peng Wang, Hao Tan, Sai Bi, Yinghao Xu, Fujun Luan,
+     Representing scenes as neural radiance fields for view syn-            Kalyan Sunkavalli, Wenping Wang, Zexiang Xu, and Kai
+     thesis. Communications of the ACM, 2021. 1                             Zhang. Pf-lrm: Pose-free large reconstruction model for
+[38] Thomas Müller, Alex Evans, Christoph Schied, and Alexan-              joint pose and shape prediction. ICLR, 2024. 1, 2
+     der Keller. Instant neural graphics primitives with a multires-   [52] Shuzhe Wang, Vincent Leroy, Yohann Cabon, Boris
+     olution hash encoding. ACM TOG, 41(4):1–15, 2022. 1                    Chidlovskii, and Jerome Revaud. Dust3r: Geometric 3d Vi-
+[39] Maxime Oquab, Timothée Darcet, Théo Moutakanni, Huy                  sion Made Easy. In CVPR, 2024. 2
+     Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez,            [53] Wenguan Wang, Yi Yang, and Yunhe Pan. Visual knowledge
+     Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, et al.             in the big model era: Retrospect and prospect. Frontiers of
+     Dinov2: Learning robust visual features without supervision.           Information Technology & Electronic Engineering, 2025. 1
+     arXiv preprint arXiv:2304.07193, 2023. 6                          [54] Philippe Weinzaepfel, Vincent Leroy, Thomas Lucas, Ro-
+[40] Sida Peng, Junting Dong, Qianqian Wang, Shangzhan                      main Brégier, Yohann Cabon, Vaibhav Arora, Leonid Ants-
+     Zhang, Qing Shuai, Xiaowei Zhou, and Hujun Bao. Ani-                   feld, Boris Chidlovskii, Gabriela Csurka, and Jérôme Re-
+
+
+
+
+                                                                   22559
+     vaud. Croco: Self-Supervised Pre-training for 3d Vision        [69] Tinghui Zhou, Richard Tucker, John Flynn, Graham Fyffe,
+     Tasks by Cross-View Completion. In NeurIPS, 2022. 2, 3, 8           and Noah Snavely.       Stereo magnification: Learning
+[55] Han Xiao, Wenzhao Zheng, Sicheng Zuo, Peng Gao, Jie                 view synthesis using multiplane images. arXiv preprint
+     Zhou, and Jiwen Lu. Spatialformer: Towards Generalizable            arXiv:1805.09817, 2018. 6, 7, 8
+     Vision Transformers with Explicit Spatial Understanding. In    [70] Haoyi Zhu, Honghui Yang, Xiaoyang Wu, Di Huang, Sha
+     ECCV, 2024. 1                                                       Zhang, Xianglong He, Tong He, Hengshuang Zhao, Chun-
+[56] Haofei Xu, Anpei Chen, Yuedong Chen, Christos Sakaridis,            hua Shen, Yu Qiao, and Wanli Ouyang. Ponderv2: Pave the
+     Yulun Zhang, Marc Pollefeys, Andreas Geiger, and Fisher             Way for 3d Foundation Model with A Universal Pre-training
+     Yu. Murf: multi-baseline radiance fields. In CVPR, 2024. 1,         Paradigm. arXiv preprint arXiv:2310.08586, 2023. 2, 3
+     2                                                              [71] Haoyi Zhu, Honghui Yang, Yating Wang, Jiange Yang,
+[57] Haofei Xu, Songyou Peng, Fangjinhua Wang, Hermann                   Limin Wang, and Tong He. Spa: 3d Spatial-Awareness En-
+     Blum, Daniel Barath, Andreas Geiger, and Marc Pollefeys.            ables Effective Embodied Representation. In ICLR, 2025. 1,
+     Depthsplat: Connecting Gaussian Splatting and Depth. In             2, 3, 6
+     CVPR, 2024.
+[58] Yinghao Xu, Zifan Shi, Wang Yifan, Hansheng Chen,
+     Ceyuan Yang, Sida Peng, Yujun Shen, and Gordon Wet-
+     zstein. Grm: Large gaussian reconstruction model for ef-
+     ficient 3d reconstruction and generation. In ECCV, 2024. 2
+[59] Jihan Yang, Shusheng Yang, Anjali W. Gupta, Rilyn Han, Li
+     Fei-Fei, and Saining Xie. Thinking in Space: How Multi-
+     modal Large Language Models See, Remember, and Recall
+     Spaces. In CVPR, 2025. 1
+[60] Zhenyu Yang, Gensheng Pei, Yazhou Yao, Tianfei Zhou,
+     Lizhong Ding, and Fumin Shen. Changetitans: Towards re-
+     mote sensing change detection with neural memory. IEEE
+     TGRS, 2025. 1
+[61] Botao Ye, Sifei Liu, Songyou Peng, Haofei Xu, Xueting Li,
+     Ming-Hsuan Yang, and Marc Pollefeys. No Pose, No Prob-
+     lem: Surprisingly Simple 3d Gaussian Splats from Sparse
+     Unposed Images. In ICLR, 2025. 1, 2, 7
+[62] Chandan Yeshwanth, Yueh-Cheng Liu, Matthias Nießner,
+     and Angela Dai. Scannet++: A high-fidelity dataset of 3d
+     indoor scenes. In ICCV, 2023. 6, 8
+[63] Tianhe Yu, Deirdre Quillen, Zhanpeng He, Ryan Julian,
+     Karol Hausman, Chelsea Finn, and Sergey Levine. Meta-
+     world: A benchmark and evaluation for multi-task and meta
+     reinforcement learning. In CoRL, 2020. 6
+[64] Kai Zhang, Sai Bi, Hao Tan, Yuanbo Xiangli, Nanxuan Zhao,
+     Kalyan Sunkavalli, and Zexiang Xu. Gs-lrm: Large recon-
+     struction model for 3d gaussian splatting. In ECCV, 2024.
+     2
+[65] Richard Zhang, Phillip Isola, Alexei A Efros, Eli Shechtman,
+     and Oliver Wang. The unreasonable effectiveness of deep
+     features as a perceptual metric. In CVPR, 2018. 5
+[66] Shangzhan Zhang, Jianyuan Wang, Yinghao Xu, Nan Xue,
+     Christian Rupprecht, Xiaowei Zhou, Yujun Shen, and Gor-
+     don Wetzstein. Flare: Feed-forward Geometry, Appearance
+     and Camera Estimation from Uncalibrated Sparse Views. In
+     CVPR, 2025. 2
+[67] Shuaifeng Zhi, Tristan Laidlow, Stefan Leutenegger, and An-
+     drew J Davison. In-place scene labelling and understanding
+     with implicit scene representation. In ICCV, 2021. 1
+[68] Shijie Zhou, Haoran Chang, Sicheng Jiang, Zhiwen Fan, Ze-
+     hao Zhu, Dejia Xu, Pradyumna Chari, Suya You, Zhangyang
+     Wang, and Achuta Kadambi. Feature 3dgs: Supercharging
+     3d Gaussian Splatting to Enable Distilled Feature Fields. In
+     CVPR, 2024. 2, 6
+
+
+
+
+                                                                22560
+

@@ -1,0 +1,920 @@
+                                            Fine-Grained Post-Training Quantization for Large Vision Language Models
+                                                          with Quantization-Aware Integrated Gradients
+
+                                                     Ziwei Xiang1,2 *, Fanhu Zeng1,2 *, Hongjian Fang3 *, Rui-Qi Wang4 , Renxing Chen2 ,
+                                                               Yanan Zhu5 , Yi Chen1,2,6 , Peipei Yang1,2† , Xu-Yao Zhang1,2†
+                                           1
+                                               State Key Laboratory of Multimodal Artificial Intelligence Systems, CASIA 2 School of Artificial Intelligence, UCAS
+                                           3
+                                               Beijing National Research Center for Information Science and Technology 4 Institute of Artificial Intelligence, USTB
+
+
+
+
+arXiv:2603.17809v1 [cs.CV] 18 Mar 2026
+                                                                5
+                                                                  School of Artificial Intelligence, Beihang University 6 Zhongguancun Academy
+
+
+                                                                                                                                       Layer 1 Token Sensitivity                        Layer 16 Token Sensitivity
+                                                                     Abstract
+
+                                         Large Vision Language Models (LVLMs) have achieved re-
+                                                                                                                  Channel Index                                    Channel Index
+                                         markable success in a range of downstream tasks that re-
+                                         quire multimodal interaction, but their capabilities come
+                                         with substantial computational and memory overhead,
+                                         which hinders practical deployment. Among numerous ac-
+                                         celeration techniques, post-training quantization is a pop-
+
+                                                                                                                  Sensitivity weight                               Sensitivity weight
+                                         ular and effective strategy for reducing memory cost and
+                                         accelerating inference. However, existing LVLM quanti-
+                                         zation methods typically measure token sensitivity at the
+                                                                                                                                            Token Index                                         Token Index
+                                         modality level, which fails to capture the complex cross-
+                                         token interactions and falls short in quantitatively measur-             Figure 1. Token-level quantization sensitivity across layers in
+                                         ing the quantization error at the token level. As tokens                 the form of heatmap and curves. At layers 1 and 16, we show
+                                         interact within the model, the distinction between modal-                both the token-level sensitivity heatmap and its channel-averaged
+                                         ities gradually diminishes, suggesting the need for fine-                line curve for special, vision, and text tokens, measured using our
+                                         grained calibration. Inspired by axiomatic attribution in                Quantization-aware Integrated Gradients (QIG).
+                                         mechanistic interpretability, we introduce a fine-grained                performance across various downstream areas like image
+                                         quantization strategy on Quantization-aware Integrated                   captioning [14], visual question answering [32], and so
+                                         Gradients (QIG), which leverages integrated gradients to                 on [12]. Meanwhile, the computation and latency scale
+                                         quantitatively evaluate token sensitivity and push the gran-             steeply with model size, especially in the era where models
+                                         ularity from modality level to token level, reflecting both              with billions of parameters are commonplace, which limits
+                                         inter-modality and intra-modality dynamics. Extensive                    their practical application in real-world scenarios. To ad-
+                                         experiments on multiple LVLMs under both W4A8 and                        dress this, the main approaches include pruning [18, 30, 43],
+                                         W3A16 settings show that our method improves accu-                       distillation [15], and quantization [10, 23]. Among them,
+                                         racy across models and benchmarks with negligible la-                    post-training quantization (PTQ) [10, 24, 50] provides a
+                                         tency overhead. For example, under 3-bit weight-only                     feasible approach to accelerate inference. By applying
+                                         quantization, our method improves the average accuracy of                weight-only or weight-activation quantization, it reduces
+                                         LLaVA-onevision-7B by 1.60%, reducing the gap to its full-               memory usage and computation overload while minimiz-
+                                         precision counterpart to only 1.33%. The code is available               ing reconstruction error with a small calibration set, thereby
+                                         at https://github.com/ucas-xiang/QIG.                                    maintaining task performance and achieving strong accu-
+                                                                                                                  racy–efficiency trade-offs in a training-free manner.
+                                                                                                                     Quantization has made great progress in large language
+                                         1. Introduction                                                          models for efficient inference [37, 45], with techniques
+                                                                                                                  such as rotation [22] and channel scaling [23]. Build-
+                                         Large Vision Language Models (LVLMs) [3, 26] have
+                                                                                                                  ing on these advances, recent LVLM quantization methods
+                                         greatly advanced in recent years and exhibit astonishing
+                                                                                                                  exploit multimodal structure to improve performance [21,
+                                           * Equal contribution. † Corresponding to: ppyang, xyz @nlpr.ia.ac.cn   39, 46]. MBQ [21] introduces a gradient-based objective
+that reweights reconstruction errors across modalities, mit-                 highlighting its practical efficiency. Our main contributions
+igating inter-modality imbalance. QSLAW [39] designs a                       are summarized as follows:
+quantization-aware scale learning framework with a multi-                    • We reveal the complex interaction between modalities in
+modal warmup for efficient instruction tuning. Q-VLM [35]                      LVLM quantization, highlighting the necessity of fine-
+performs block-level joint optimization guided by activa-                      grained sensitivity measurements for multimodal inputs.
+tion entropy to reduce greedy mismatch.                                      • We introduce the concept of axiomatic attribution
+    Despite the great progress in LVLM quantization, sev-                      and develop Quantization-aware Integrated Gradients, a
+eral issues remain to be tackled. (1) The complex interac-                     quantization-specific sensitivity estimation method that
+tion between modalities makes the distribution largely vary                    provides token-level attributions of quantization error and
+in different layers and modalities. As illustrated in Fig. 1,                  directly guides fine-grained post-training quantization.
+token sensitivity differs not only between modalities (inter-                • We conduct extensive experiments on various multimodal
+modality) but also within a modality (intra-modality) and                      benchmarks to comprehensively demonstrate the superi-
+across depth, suggesting that modality-level quantization is                   ority and effectiveness of our method.
+insufficient to capture token-wise dynamics in LVLMs; (2)
+There remains a gap between the quantized model and the                      2. Related Work
+original model. This naturally calls for a fine-grained anal-
+ysis of how each token contributes to quantization-induced                   2.1. Large Vision Language Models
+output perturbations. Existing methods avoid token-level                     Large vision language models bridge vision and language
+analysis, which may be attributed to the weak correlation                    by projecting image features into the Large Language Mod-
+between common proxies such as attention and the true                        els (LLMs) input space [2, 20, 44]. Representative archi-
+quantization error, as well as their tendency to overlook                    tectures such as LLaVA [19], InternVL [8], and Qwen-
+the most influential tokens. This limitation underscores the                 VL [3] encode an image using a Vision Transformer [9]
+need for a direct and effective way to define token-level sen-               or CLIP encoder [29] into a sequence of visual patch to-
+sitivity for PTQ.                                                            kens. These visual tokens are then combined with text to-
+    Motivated by this, we aim to explore fine-grained LVLM                   kens and task-specific special tokens (e.g., <bos>, <eos>,
+quantization and push the quantitative measurement of                        and the <image> token, which demarcates visual content)
+granularity from the modality level to the token level. We                   into a unified input sequence. This heterogeneous multi-
+draw on the concept of axiomatic attribution [1] from mech-                  modal sequence allows the LLM to process and reason over
+anistic interpretability [5], which enables us to effectively                information from both modalities [3, 8, 19]. Unlike works
+analyze the perturbation sensitivity of each token by cal-                   proposing new architectures for better modality alignment,
+culating the integrated gradients [34] during calibration.                   we focus on efficient acceleration for LVLMs.
+Concretely, we calculate the Quantization-aware Integrated
+Gradients (QIG) from the quantized reference input to the                    2.2. Post-Training Quantization
+actual input, thereby obtaining a token-level sensitivity                    Post-training quantization (PTQ) [11, 31, 51] is a widely
+score that quantifies the influence of each input token on the               adopted compression technique that converts full-precision
+final model quantization error1 . Additionally, we further ap-               weights and activations into lower-bit representations with-
+ply a robust IQR-based clipping to suppress extreme token                    out requiring retraining. In LLMS, several representative
+importance values and stabilize the sensitivity estimation                   PTQ approaches have been proposed [22, 23, 38]. RTN
+during quantization. Empirically, QIG strongly correlated                    applies simple rounding-to-nearest quantization as a strong
+with actual quantization errors, validating its suitability as a             baseline, AWQ [23] introduces activation-aware weight
+proxy signal for guiding fine-grained quantization.                          quantization to preserve salient channels, GPTQ [10] mini-
+    We conduct comprehensive experiments on multiple                         mizes layer-wise reconstruction error through second-order
+open-source LVLMs for both weight-only and weight-                           approximation, and SmoothQuant [38] balances activation
+activation quantization. The results show that our method                    and weight ranges to stabilize quantization during infer-
+delivers consistent gains on various multimodal bench-                       ence. Recently, PTQ has been extended to LVLMs to reduce
+marks. For example, under 3-bit weight-only quantiza-                        their multimodal inference cost [21, 40]. However, existing
+tion, our method improves the average accuracy of LLaVA-                     works mainly aim to achieve balanced quantization across
+onevision-7B by 1.60%, reducing the gap to its full-                         modalities or layers, while the uneven token-wise sensitiv-
+precision counterpart to only 1.33%. These results demon-                    ity within each layer remains largely underexplored.
+strate that our method can significantly improve the accu-
+racy of quantized LVLMs with negligible latency overhead,                    2.3. Interpretability and Token Sensitivity
+    1 The completeness property of quantization-aware integrated gradients   Interpretability research aims to elucidate how the inter-
+is proved in Appendix A.                                                     nal components of deep models interact to produce specific
+                                                                                                                  Massive outliers
+
+Layer1
+
+
+
+
+                                                              Sub-layer divergence                               Layer heterogeneity
+
+
+                 Token variability
+
+Layer16
+
+
+
+
+                 Attention Out                  Attention QKV                          MLP Up                    MLP Down
+Figure 2. Visualization of activation distributions in InternVL2-8B during calibration. We visualize two representative layers and four
+linear sub-layers. In each panel, the horizontal axis denotes token positions in the multimodal sequence and the vertical axis indexes
+hidden channels; color encodes the average activation magnitude per token–channel pair over the calibration set. The plots reveal four
+recurring phenomena: massive activations, layer heterogeneity, sub-layer divergence, and token variability. These patterns indicate that
+coarse modality-level sensitivity modeling is insufficient, motivating our token-level sensitivity weighting.
+
+behaviors [25], offering a causal understanding beyond in-             ods perform channel-wise equalization (CWE) [38] on both
+put–output correlations [4]. Intervention-based methods an-            the weight and activation matrices.
+alyze model behavior by modifying inputs or intermediate                   Let X = [X1 , . . . , XT ] ∈ Rd×T denote the activation
+activations. Occlusion Sensitivity [42] measures the influ-            matrix of a transformer block, where each column Xi ∈ Rd
+ence of each input region on model predictions by system-              is the embedding of the i-th token in a sequence of length
+atically occluding local areas of the input, while Activa-             T . Let W ∈ Rm×d be the weight matrix of a linear sub-
+tion Patching [48] examines causal mediation within mod-               layer, where m denotes the output dimension of this linear
+els by substituting activations between corrupted and clean            sub-layer. Let E ∈ Rd denote the channel-wise scaling fac-
+forward passes. In contrast, gradient-based methods esti-              tors applied along the hidden dimension d. We use “∗” to
+mate feature importance using gradient information, such as            denote channel-wise (per-channel) scaling of W and X by
+                                                                       E. Specifically, CWE searches for optimal scaling factors E
+Integrated Gradients (IG) [34] and SmoothGrad [33]. Al-
+                                                                       by minimizing the mean squared error (MSE) between the
+though these approaches have achieved notable success in               quantized and original outputs of each transformer block.
+model analysis and visualization, most studies remain cen-             The optimization objective for weight-activation quantiza-
+tered on interpretability itself rather than directly exploiting       tion can be formulated as:
+interpretability signals for model optimization.
+                                                                                                                                2
+                                                                         E∗ = arg min QW (W ∗ E) QX (E−1 ∗ X) − WX 2 , (1)
+3. Method                                                                          E
+
+
+3.1. Preliminaries                                                      where QW (·) and QX (·) denote the quantization functions
+Existing PTQ methods automatically search for optimal                  for weights and activations, respectively.
+quantization hyperparameters by minimizing the recon-                     This formulation aims to jointly optimize the scaling
+struction error of each transformer block during a calibra-            of weights and activations, ensuring that quantization pre-
+tion process. Building on reconstruction-aware calibration,            serves the representational capacity of each transformer
+recent weight–activation (WA) PTQ approaches [21, 38]                  block. For simplicity, we use WxAy to indicate the quan-
+aim to quantize both weights and activations to low preci-             tization format, where x and y represent the bit-widths for
+sion while maintaining model quality. To alleviate the large           weight and activation, respectively. For example, W4A8 de-
+quantization error caused by activation outliers, these meth-          notes quantizing weights to 4 bits and activations to 8 bits.
+                                                                               Modality-Balanced Quantization                Fine-Grained Quantization (Ours)
+   Sensitivity Type           Granularity          Accuracy (%)
+                            Modality-level            57.36                         Vision          Text       Special           Vision       Text       Special
+   Gradient-based             Token-level             55.78                                      “A photo of <bos>,<image>                 “A photo of <bos>,<image>
+                                                                                                 Polar bear” …                             Polar bear” …
+                         Token-level (+ special)      55.65
+                            Modality-level            56.43
+   Attention-based            Token-level             57.12
+                         Token-level (+ special)      57.52                                  Multi-modal Token                         Multi-modal Token
+
+                            Modality-level            56.81                                                                                  VLM
+   Perturbation-based                                                                             VLM
+                         Token-level (+ special)      57.72
+                                                                              Modality-level                SFT              Token-level         QIG
+                                                                              sensitivity                                    sensitivity
+Table 1. Comparison of modality-level and token-level sensitivity
+estimation strategies on VizWiz (W4A8, InternVL2-8B).
+3.2. Sensitivity Differences Between Modalities and
+      Tokens
+                                                                              Figure 3. Comparison between modality-balanced quantization
+Quantization sensitivity characterizes the degree to which a                  and our fine-grained quantization. Different colors indicate token
+token or layer is affected by quantization noise. Since the                   types. Unlike MBQ, which assigns modality-level sensitivity, our
+dynamic range of activations determines the quantization                      method computes token-level sensitivity via Quantization-aware
+                                                                    Layer N
+scaling factor, activation statistics provide a practical  proxy              Integrated Gradients (QIG) during calibration, enabling more ef-
+                                                   token                      fective quantization.
+for estimating sensitivity. Therefore, before estimating𝜆𝑖   sen-
+sitivity explicitly, we first analyze activation distributions to
+understand the origins of sensitivity differences.                              attention scores. Modality-level sensitivity aggregates
+                                                                                scores within each modality, while token-level sensitivity
+    From Fig. 2, we observe four recurring phenomena
+                                                                                directly uses per-token attention statistics.
+across two layers (Layer1 and Layer16) and four linear
+                                                                              • Perturbation-based sensitivity. Sensitivity is obtained
+sub-layers (Attention Out, Attention QKV, MLP Up, MLP
+                                                                                by perturbing tokens and measuring the change of block’s
+Down): (i) Massive outliers, large activation outliers per-
+                                                                                outputs. Modality-level sensitivity jointly perturbs all vi-
+sist across layers, forcing quantizers to widen the dynamic
+                                                                                sual or all textual tokens, whereas token-level sensitivity
+range; (ii) Layer heterogeneity, different Transformer lay-
+                                                                                uses a leave-one-out scheme over individual tokens.
+ers display distinct activation behaviors; (iii) Sub-layer di-
+vergence, even within the same Transformer block, differ-                         Tab. 1 shows three trends. (1) Gradient-based token-
+ent sub-layers exhibit heterogeneous activation characteris-                  level weighting performs worse than modality-level,
+tics; and (iv) Token variability, within the same sub-layer,                  showing that SFT gradients do not correlate with quanti-
+activations vary substantially across tokens, causing quanti-                 zation sensitivity. Once quantization noise is introduced,
+zation to affect different tokens unevenly. These findings                    the gradient distribution changes, and the mismatch ac-
+reveal that quantization sensitivity is not only modality-                    cumulates over depth. (2) Attention-based sensitivity
+dependent (vision vs. language) but also highly token-                        gives only modest and unstable gains, which is consis-
+dependent. However, existing LVLM quantization meth-                          tent with the attention-sink phenomenon [16], where certain
+ods model sensitivity only at the modality level and implic-                  tokens receive spuriously high attention. (3) Perturbation-
+itly assume equal sensitivity for all tokens within a modal-                  based sensitivity performs best, as it directly measures the
+ity. We hypothesize that overlooking token-level sensitivity                  model’s response to quantization noise, but it requires re-
+variations fundamentally limits the performance of current                    peated forward passes and is computationally expensive.
+LVLM quantization strategies.                                                     These observations suggest that token-level sensitivity
+    To examine whether fine-grained sensitivity modeling is                   can improve quantization when it is estimated accurately,
+necessary, we run controlled experiments on InternVL2-                        yet gradient- and attention-based proxies are misaligned
+8B (W4A8), keeping all quantization hyperparameters and                       with quantization error, and perturbation-based estimation
+calibration data fixed and varying only the sensitivity esti-                 is too costly to use directly. This motivates the fine-grained
+mation strategy. We compare three approaches:                                 quantization method introduced in the next section.
+• Gradient-based sensitivity. Following MBQ [21], sen-
+                                                                              3.3. Fine-Grained Quantization
+  sitivity is estimated from gradients of the supervised fine-
+  tuning (SFT) loss. At the modality level, one sensitivity                   Building on this analysis, we propose our fine-grained
+  value is assigned to visual tokens and one to textual to-                   method. As illustrated in Fig. 3, prior modality-based
+  kens. At the token level, each token (vision, text, and                     PTQ methods assign uniform sensitivity weights to all to-
+  special) receives an individual score.                                      kens within a modality. However, token-level sensitivity is
+• Attention-based sensitivity. Sensitivity is derived from                    highly heterogeneous, varying across tokens, layers, and ar-
+chitectures. Modality-level weighting fails to capture this          apply interquartile range (IQR) clipping [6] to obtain the
+granularity, leading to suboptimal quantization. To address          clipped score:
+this, we introduce a token-level sensitivity estimator that
+adaptively prioritizes more vulnerable tokens during cali-             C(QIGi ) = clip (QIGi , Q1 − 1.5 · IQR, Q3 + 1.5 · IQR)     (4)
+bration, improving overall quantization quality. We term
+                                                                     where Q1 and Q3 are the first and third quartiles, and
+this fine-grained quantization.
+                                                                     IQR = Q3 − Q1 . We then normalize these scores to obtain
+    Motivated by interpretability and attribution principles,
+                                                                     the token importance coefficients:
+we draw on axiomatic attribution [1], which naturally quan-
+tifies each token’s contribution to model behavior and thus                                    C(QIGi )
+serves as a suitable foundation for measuring token impor-                             λ i = PT            ,                       (5)
+tance during quantization. We start from the classical Inte-                                  j=1 C(QIGj )
+
+grated Gradients (IG) [34], which measures the cumulative            ensuring that the coefficients sum to one.
+contribution of each token along the straight path from a ref-          We integrate QIG into CWE to optimize the equalization
+erence input x′ to the actual input x, where f (·, ·) denotes        factors. Keeping the WA quantization scheme in Eq. (1)
+the output of the block:                                             unchanged, we reweight each token’s reconstruction error
+                                      Z 1                            by its importance score λi . The objective function becomes:
+                              ′             ∂f (xα , w)
+          IG(x) = (x − x )                              dα,   (2)                                                                  2
+                                       0       ∂xα                    E∗ = arg minE
+                                                                                      PT
+                                                                                       i=1 λi   QW (W ∗ E) QX (E−1 ∗ Xi ) − WXi 2 .
+               ′                  ′                                                                                          (6)
+where xα = x + α(x − x ) and f (·, w) denotes the full-
+                                                                     where Xi represent the i-th input token activation of each
+precision model. Eq. (2) reflects token contributions to the
+                                                                     linear layer. For weight-only quantization, it becomes:
+full-precision prediction; however, it does not reveal how
+sensitive the quantization-induced error is to each token.            E∗ = arg minE
+                                                                                      PT                                      2
+                                                                                                QW (W ∗ E) (E−1 ∗ Xi ) − WXi 2 .   (7)
+                                                                                       i=1 λi
+   To align the attribution with quantization, we instead
+explain the output gap between the full-precision model                  In this way, the scale search is biased towards tokens
+and the quantized model. Let xq denote the reference in-             that are empirically more sensitive to quantization, while
+put along the attribution path and let wq be the quantized
+                                                                     the overall CWE framework remains unchanged. Beyond
+weights. In our main setting of joint weight–activation
+quantization, xq corresponds to the quantized input; in the          offering a more fine-grained, token-level sensitivity analy-
+case of weight-only quantization, activations remain in full         sis, our approach improves performance while introducing
+precision and xq reduces to the zero baseline. At this               virtually no additional computational cost.
+step, we shift the IG objective from attributing the model’s
+absolute prediction to attributing the prediction difference         4. Experiment
+caused by quantization, allowing us to isolate the impact of
+quantization errors. We define the token-level Quantization-         4.1. Experimental Setup
+aware Integrated Gradients (QIG) as:                                 Implementation Details. In line with prior studies [21,
+                       Z 1                                           23, 38], we apply per-token activation quantization and
+                             ∂ (f (xα , w) − f (xα , wq ))
+  QIG(x) = (x − xq )                                       dα, (3)   per-channel weight quantization. Given that W8A8 quan-
+                        0                ∂xα
+                                                                     tization has been established as lossless in precision by
+ with xα = xq + α(x − xq ). Here, QIG(x) is a token-                 SmoothQuant [38], our primary evaluation in this paper
+wise attribution vector, and QIGi (x) denotes the attribu-           focuses on W4A8 and W3A16. All experiments are con-
+tion score of the i-th token, quantifying how much restor-           ducted on a single NVIDIA A800 GPU (80GB).
+ing that token from its quantized representation reduces the         Calibration Datasets. Following prior work, we adopt the
+output discrepancy between f (x, w) and f (x, wq ). Intu-            improved COCO Caption dataset from ShareGPT4V [7]
+itively, a token with a large QIG has a disproportionately           and randomly sample 128 image–caption pairs for calibra-
+strong influence on the quantization error. Small perturba-          tion. Each pair is formatted according to the conversational
+tions in this token’s embedding can significantly alter the          prompt style of the target LVLM.
+output discrepancy between f (x, w) and f (x, wq ). Com-             Models. We conduct both W3A16 and W4A8 quanti-
+pared to IG, QIG is directly tied to the error that actually         zation on numerous leading open-source LVLMs, includ-
+appears in PTQ, and it also satisfies a completeness property        ing LLaVA-onevision-7B [19], Qwen2-VL-7B [36], and
+analogous to IG, for which we provide a formal derivation            InternVL2-8B/26B [8]. For the LLaVA-onevision series,
+in Appendix A.                                                       we select versions that adopt Qwen2 as the language model
+    However, raw QIG values are often heavy-tailed, caus-            backbone and SigLIP-400M [47] as the vision encoder.
+ing a few extreme tokens to dominate optimization. To sup-           Baselines. For weight-only quantization, we compare our
+press such outliers while preserving relative importance, we         method with vanilla round-to-nearest (RTN), AWQ [23],
+             Model            Bitwidth       Method       VizWiz     MMMU        ChartQA      AI2D     ScienceQA      Avg.
+                                FP16             -         60.41       49.22       80.04      81.31       95.88       73.37
+                                             RTN           59.12       43.67       68.88      78.92       94.55       69.03
+                                             GPTQ          54.87       42.33       73.72      76.81       92.12       67.97
+                               W3A16         AWQ           58.65       42.89       74.08      77.92       82.20       67.15
+      LLaVA-onevision-7B                     MBQ           57.99       44.00       76.84      78.47       94.89       70.44
+                                           QIG (Ours)      62.82       45.78       77.20      79.11       95.29       72.04
+                                             RTN           58.10       42.89       71.00      77.82       94.10       68.78
+                                              SQ           55.67       42.00       66.28      77.20       93.51       66.93
+                                W4A8
+                                             MBQ           58.13       44.78       74.92      78.27       94.70       70.16
+                                           QIG (Ours)      59.10       45.00       74.52      78.30       94.25       70.23
+                                FP16             -         60.86       48.56       82.64      82.42       97.07       74.31
+                                             RTN           55.95       43.89       79.24      80.51       96.28       71.17
+                                             GPTQ          59.79       43.11       76.40      76.65       94.30       70.05
+                               W3A16         AWQ           58.14       45.56       74.42      79.47       95.88       70.70
+         InternVL2-8B                        MBQ           59.33       46.02       80.04      79.66       95.93       72.20
+                                           QIG (Ours)      59.55       46.22       80.04      79.73       96.03       72.31
+                                             RTN           56.68       43.00       78.96      79.02       96.22       70.80
+                                              SQ           55.56       44.78       77.96      76.59       95.88       70.15
+                                W4A8
+                                             MBQ           57.36       45.67       78.00      79.47       96.38       71.38
+                                           QIG (Ours)      58.33       47.33       78.16      79.63       96.73       72.04
+                                FP16             -         68.34       51.22       81.40      80.12       85.03       73.22
+                                             RTN           65.02       44.67       73.64      76.33       81.06       68.14
+                                             GPTQ          67.73       44.44       76.20      74.87       81.76       69.00
+                               W3A16         AWQ           66.24       45.89       77.08      77.53       81.01       69.56
+         Qwen2-VL-7B                         MBQ           66.62       46.48       79.18      77.81       81.85       70.15
+                                           QIG (Ours)      67.12       47.11       77.76      77.88       81.61       70.30
+                                             RTN           58.71       45.44       74.16      77.01       79.62       66.99
+                                              SQ           47.60       43.78       70.88      76.07       78.98       63.46
+                                W4A8
+                                             MBQ           60.17       44.89       76.92      76.49       78.93       67.48
+                                           QIG (Ours)      58.85       46.00       76.68      77.17       80.17       67.77
+
+Table 2. Overall comparison of full-precision and post-training quantization methods on three representative LVLMs under W3A16 and
+W4A8. RTN and SQ are naive PTQ baselines, MBQ is the modality-balanced baseline, and QIG is the proposed fine-grained quantization
+method. Bold numbers indicate the best performance, and underlined numbers indicate the second best in each column.
+
+GPTQ [10], and MBQ [21] under W3A16, all employ-                   4.2. Main Results
+ing channel-wise equalization and group-wise asymmetric
+quantization (group size 128). For weight-activation quan-         Tab. 2 reports the performance of different PTQ meth-
+tization, we evaluate RTN, SmoothQuant [38], and MBQ               ods on three representative LVLMs under both weight-
+under W4A8, also with channel-wise equalization. Follow-           only (W3A16) and weight–activation (W4A8) quantization.
+ing SmoothQuant, we use per-token symmetric quantization           Generic LLM PTQ methods underperform naive RTN
+for activations and per-channel symmetric quantization for         on LVLMs. Across all three models, the naive RTN base-
+weights to utilize low-precision tensor cores.                     line already causes a moderate drop (about 4% on av-
+Datasets. To comprehensively assess the performance of             erage) compared with FP16, indicating that 3-bit weight
+our quantized models, we follow the LMMs-Eval [49]                 quantization is non-trivial for LVLMs. However, GPTQ
+protocol and evaluate on multiple vision–language bench-           and SmoothQuant (SQ), which are strong PTQ methods
+marks. In particular, MMMU [41] and ScienceQA [27] are             for pure LLMs, do not reliably improve performance in
+used to test visual reasoning, VizWiz [13] to examine real-        this multimodal setting. Under W3A16, GPTQ often lags
+world perception, and ChartQA [28] and AI2D [17] to eval-          behind RTN in terms of average accuracy (e.g., LLaVA-
+uate the understanding of structured visual information.           onevision-7B and InternVL2-8B), and under W4A8, SQ is
+    Model        Bitwidth   Method   ChartQA   MMMU    VizWiz      baseline    Attribution objective     ChartQA       VizWiz
+                  FP16        -       86.44    52.78   65.65
+                                                                      0                 f (x)               73.87       61.73
+                            MBQ       84.44    49.78   63.51
+                  W4A8                                                0             f (x) − f (0)           74.30       62.31
+ InternVL2-26B              Ours      85.24    50.22   63.91
+                                                                      xq                f (x)               74.12       61.52
+                            MBQ       84.48    51.67   63.33
+                 W3A16
+                            Ours      85.12    50.89   64.14
+                                                                      xq           f (x) − f (xq )          74.52       62.82
+
+
+Table 3. Quantization on InternVL2-26B: MBQ vs. Ours under      Table 4. Ablation of the integrated-gradients configuration for
+W3A16/W4A8.                                                     token-wise sensitivities, varying the reference baseline x′ (0 vs.
+                                                                xq ) and attribution objective (task output f (x) vs. quantization-
+                                                                error outputs f (x)−f (0) or f (x)−f (xq )). Results are on LLaVA-
+consistently worse than RTN on all three models. In other
+                                                                onevision-7B with W4A8; the last row is our QIG formulation and
+words, directly applying PTQ methods designed for LLMs          performs best (higher is better).
+to LVLMs, while ignoring cross-modal statistical character-
+istics, may perform no better than simple round-to-nearest
+and can even degrade performance. This observation under-       proposed fine-grained post-training quantization scales to
+scores the importance of leveraging multimodal information      larger LVLMs, we further apply it to InternVL2-26B and
+when designing quantization strategies for LVLMs.               compare it with MBQ under both W4A8 and W3A16 con-
+Fine-grained token-level sensitivity weighting beyond           figurations. As shown in Tab. 3, our method yields clear
+modality-level quantization. Modality-aware quantization        gains over MBQ on ChartQA and VizWiz for both bitwidth
+provides a strong starting point for quantizing LVLMs. The      settings, while maintaining comparable performance on
+MBQ baseline reweights the reconstruction errors of the vi-     MMMU. Under the W4A8 configuration, our approach re-
+sion and language modalities to alleviate their inherent im-    covers most of the FP16 accuracy, keeping the performance
+balance during quantization. As a result, MBQ achieves          drop within 3% on all benchmarks. Even under the more
+consistent improvements of about 1% on average over RTN         aggressive W3A16 setting, our method still surpasses MBQ
+and GPTQ across three models and both bitwidths. How-           on ChartQA and VizWiz and remains within 2% of the FP16
+ever, modality-level balancing remains coarse, since tokens     model across all tasks, despite using 3-bit weights. These
+within the same modality can exhibit different sensitivities    results demonstrate that the proposed fine-grained quantiza-
+to quantization. This limitation motivates the fine-grained     tion strategy scales reliably to LVLMs with tens of billions
+token-level sensitivity weighting proposed in our method.       of parameters and can be deployed at larger model sizes
+                                                                without incurring substantial performance degradation.
+    To further address the limitations of modality-level
+sensitivity modeling, our method introduces fine-grained
+                                                                4.3. Ablation Study and Further Analysis
+token-level sensitivity weighting. Across six quantized
+configurations, including three foundation models and two       We conduct ablation studies to examine the effectiveness of
+bitwidth settings, our method consistently achieves the         fine-grained quantization, framework generality, and quan-
+highest average accuracy. Compared with MBQ, it brings          tization efficiency. The results show that each design com-
+an additional average gain of about 0.5%. For example,          ponent contributes measurable performance gains while
+on LLaVA-onevision-7B, the average accuracy improves            introducing negligible additional computational overhead.
+from 70.44% to 72.04% under W3A16 and from 70.16%               Additional experimental results, including more ablation
+to 70.23% under W4A8. Similar steady improvements are           studies, are presented in the Appendix C.
+observed on InternVL2-8B and Qwen2-VL-7B under both             Sensitivity Ablation of Fine-Grained Quantization. In
+bitwidths. Moreover, across all benchmarks and quantized        Sec. 3.3, we present our quantization-aware integrated gra-
+configurations in Tab 2, our method either achieves the best    dients, which depart from the standard formulation in two
+performance or remains the second best among all PTQ            key aspects: the choice of reference baseline and the scalar
+baselines. The gains are particularly clear on challenging      objective whose gradients are integrated along the path.
+benchmarks. On VizWiz and MMMU, our method sur-                 To evaluate the contribution of these components to fine-
+passes MBQ by around 1% on average, which suggests              grained quantization, we perform an ablation study over
+that token-level weighting better preserves sensitive visual    both the baseline and the objective used to compute token-
+and reasoning tokens. This improvement may stem from            wise sensitivities. We evaluate four configurations of Inte-
+estimating token-wise sensitivity rather than using a sin-      grated Gradients on LLaVA-onevision-7B under the W4A8
+gle weight per modality, enabling finer control over token      setting, and report downstream accuracies on ChartQA and
+importance. Qualitative visualizations in the Appendix D        VizWiz in Tab. 4. We ablate over two choices: the base-
+show that, under the same quantization settings, our method     line x′ ∈ {0, xq } and the attribution objective g(x) ∈
+yields more accurate answers than MBQ.                          {f (x), f (x) − f (0), f (x) − f (xq )}. Our QIG formulation
+Scaling to Larger Models.           To assess whether the       corresponds to the configuration with baseline x′ = xq and
+   Model      Bitwidth   Method     ChartQA    AI2D    VizWiz                                        GPU Hours
+                                                                    Model Size
+   LLaVA        FP16        -        80.04     81.31    60.41                         MBQ      Leave One Out         Ours
+ -onevision              GPTQ        73.72     76.81    54.87
+    -7B       W3A16                                                 InternVL2-8B      0.55     2.07 (+91 min)    0.58 (+2.0 min)
+                         + Ours      74.12     76.65    56.95       InternVL2-26B     0.95    4.20 (+ 195 min)   0.99 (+2.5 min)
+                FP16        -        82.64     82.42    60.86
+ InternVL2                                                         Table 6. Quantization time (in GPU hours) of differnet models
+     -8B                 GPTQ        76.40     76.65    59.79
+              W3A16                                                using a single A800 80GB GPU. Fine-Grained Quantization incurs
+                         + Ours      78.12     78.47    60.57
+                                                                   negligible overhead compared to baseline methods.
+Table 5. Results of combining our fine-grained quantization with
+GPTQ under the W3A16.
+                                                                   ciency of our fine-grained quantization, we measure the to-
+objective g(x) = f (x) − f (x ).q                                  tal quantization time required to process each model under
+    From the results in Tab. 4, we observe that both compo-        different configurations. For comparison, we include the
+nents of QIG contribute to the final performance. Under the        baseline MBQ [21] and the perturbation-based Leave-One-
+zero baseline, switching the objective from the task output        Out strategy. The metric reports the total wall-clock GPU
+f (x) to the error f (x)−f (0) already yields consistent gains     hours spent during the calibration and scale-search stages,
+on ChartQA (+0.43%) and VizWiz (+0.58%). Changing the              including activation collection and layer-wise optimization.
+baseline from 0 to xq while keeping the task-output objec-             As shown in Tab. 6, our fine-grained method intro-
+tive provides a small improvement on ChartQA (73.87% to            duces only negligible overhead compared to MBQ, ap-
+74.12%) but slightly hurts VizWiz (61.73% to 61.52%). In           proximately two additional minutes for both InternVL2-
+contrast, combining the quantized baseline with the error          8B and InternVL2-26B, while achieving consistent accu-
+objective f (x) − f (xq ) leads to the best results on both        racy improvements. In contrast, the Leave-One-Out ap-
+datasets, achieving 74.52% on ChartQA and 62.82% on                proach, while also effective in measuring quantization er-
+VizWiz. These trends indicate that integrating the quan-           ror at the token level, incurs high computational cost, con-
+tized input and explicitly attributing the quantization error      suming about 3–4 × more GPU time due to repeated for-
+are both important for obtaining reliable token-wise sensi-        ward passes for each token perturbation. These results ver-
+tivities for post-training quantization.                           ify that the proposed fine-grained quantization effectively
+                                                                   balances interpretability, accuracy, and computational effi-
+Combine Fine-Grained Quantization with GPTQ. To
+                                                                   ciency, making it effective across different architectures and
+further demonstrate the generality of our fine-grained quan-
+                                                                   scalable to larger LVLMs in real deployment scenarios.
+tization strategy, we incorporate it into the GPTQ frame-
+work [10], which minimizes layer-wise reconstruction er-
+ror through second-order approximation using the Hessian
+                                                                   5. Conclusion
+matrix H = X ⊤ X. In our adaptation, we introduce a                In this work, we revisited post-training quantization for
+token-aware modification by replacing the Hessian with             LVLMs and showed that conventional modality-level sen-
+H ′ = X ⊤ ΛX, where Λ = diag(λ1 , λ2 , . . . , λT ) represents     sitivity modeling is fundamentally insufficient. Our anal-
+the token importance coefficients derived from our fine-           ysis of cross-token interactions reveals that tokens within
+grained attribution mechanism. This reweighting allows             the same modality exhibit substantial differences in quan-
+GPTQ to emphasize activations from quantization-sensitive          tization sensitivity. To bridge this granularity gap, we in-
+tokens while maintaining the overall optimization structure.       troduced Quantization-aware Integrated Gradients (QIG),
+Notably, the modification requires no additional calibration       an attribution-based framework that decomposes the quan-
+data and incurs negligible computation overhead, making it         tization error between full-precision and quantized mod-
+a plug-and-play enhancement to standard GPTQ.                      els into token-level contributions. By integrating from the
+    As shown in Tab. 5, combining fine-grained weight-             quantized input and applying robust clipping, QIG pro-
+ing with GPTQ consistently improves quantization perfor-           vides stable importance scores that effectively guide fine-
+mance on both LLaVA-onevision-7B and InternVL2-8B                  grained quantization. Our approach outperforms existing
+under the W3A16 setting. For instance, our fine-grained            PTQ methods across diverse benchmarks. Under 3-bit
+variant achieves 56.95% on VizWiz for LLaVA-onevision-             weight-only quantization, it improves the average accuracy
+7B, surpassing vanilla GPTQ by 2.08%, and brings no-               of LLaVA-onevision-7B by 1.60%, reducing the gap to its
+table gains on ChartQA and AI2D for both models. This              full-precision counterpart to just 1.33%. We believe this
+strongly demonstrates the effectiveness and scalability of         token-aware, attribution-guided view of quantization of-
+our method, highlighting the advantages and necessity of           fers a practical path toward deploying compact yet reliable
+fine-grained quantization.                                         LVLMs and motivates future work on unified, token-level
+Quantization Efficiency. To evaluate the practical effi-           compression in real-world systems.
+References                                                           [13] Danna Gurari, Qing Li, Abigale J Stangl, Anhong Guo, Chi
+                                                                          Lin, Kristen Grauman, Jiebo Luo, and Jeffrey P Bigham.
+ [1] Marco Ancona, Enea Ceolini, Cengiz Öztireli, and Markus             Vizwiz grand challenge: Answering visual questions from
+     Gross. Towards better understanding of gradient-based attri-         blind people. In Proceedings of the IEEE conference on
+     bution methods for deep neural networks. In International            computer vision and pattern recognition, pages 3608–3617,
+     Conference on Learning Representations, 2018. 2, 5                   2018. 6
+ [2] Anas Awadalla, Irena Gao, Josh Gardner, Jack Hessel, Yusuf
+                                                                     [14] Danna Gurari, Yinan Zhao, Meng Zhang, and Nilavra Bhat-
+     Hanafy, Wanrong Zhu, Kalyani Marathe, Yonatan Bitton,
+                                                                          tacharya. Captioning images taken by people who are blind.
+     Samir Gadre, Shiori Sagawa, et al. Openflamingo: An open-
+                                                                          In European Conference on Computer Vision, pages 417–
+     source framework for training large autoregressive vision-
+                                                                          434. Springer, 2020. 1
+     language models. arXiv preprint arXiv:2308.01390, 2023.
+                                                                     [15] Geoffrey Hinton, Oriol Vinyals, and Jeff Dean. Distill-
+     2
+                                                                          ing the knowledge in a neural network. arXiv preprint
+ [3] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin
+                                                                          arXiv:1503.02531, 2015. 1
+     Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun
+                                                                     [16] Seil Kang, Jinyeong Kim, Junhyeok Kim, and Seong Jae
+     Tang, et al. Qwen2. 5-vl technical report. arXiv preprint
+                                                                          Hwang. See what you are told: Visual attention sink in large
+     arXiv:2502.13923, 2025. 1, 2
+                                                                          multimodal models. arXiv preprint arXiv:2503.03321, 2025.
+ [4] Gabriela Ben Melech Stan, Estelle Aflalo, Raanan Yehezkel
+                                                                          4
+     Rohekar, Anahita Bhiwandiwalla, Shao-Yen Tseng,
+     Matthew Lyle Olson, Yaniv Gurwicz, Chenfei Wu, Nan              [17] Aniruddha Kembhavi, Mike Salvato, Eric Kolve, Minjoon
+     Duan, and Vasudev Lal. Lvlm-intrepret: An interpretability           Seo, Hannaneh Hajishirzi, and Ali Farhadi. A diagram is
+     tool for large vision-language models. In Proceedings of             worth a dozen images. In European conference on computer
+     the IEEE/CVF Conference on Computer Vision and Pattern               vision, pages 235–251. Springer, 2016. 6
+     Recognition, pages 8182–8187, 2024. 3                           [18] Zhenglun Kong, Yize Li, Fanhu Zeng, Lei Xin, Shvat Mes-
+ [5] Leonard Bereska and Efstratios Gavves.            Mechanistic        sica, Xue Lin, Pu Zhao, Manolis Kellis, Hao Tang, and
+     interpretability for ai safety–a review.       arXiv preprint        Marinka Zitnik. Token reduction should go beyond effi-
+     arXiv:2404.14082, 2024. 2                                            ciency in generative models–from vision, language to mul-
+ [6] Chris Chatfield. Exploratory data analysis. European journal         timodality. arXiv preprint arXiv:2505.18227, 2025. 1
+     of operational research, 23(1):5–13, 1986. 5                    [19] Bo Li, Yuanhan Zhang, Dong Guo, Renrui Zhang, Feng Li,
+ [7] Lin Chen, Jinsong Li, Xiaoyi Dong, Pan Zhang, Conghui                Hao Zhang, Kaichen Zhang, Peiyuan Zhang, Yanwei Li, Zi-
+     He, Jiaqi Wang, Feng Zhao, and Dahua Lin. Sharegpt4v:                wei Liu, et al. Llava-onevision: Easy visual task transfer.
+     Improving large multi-modal models with better captions.             arXiv preprint arXiv:2408.03326, 2024. 2, 5
+     arXiv preprint arXiv:2311.12793, 2023. 5                        [20] Dongxu Li, Junnan Li, and Steven Hoi. Blip-diffusion: Pre-
+ [8] Zhe Chen, Jiannan Wu, Wenhai Wang, Weijie Su, Guo Chen,              trained subject representation for controllable text-to-image
+     Sen Xing, Muyan Zhong, Qinglong Zhang, Xizhou Zhu,                   generation and editing. Advances in Neural Information Pro-
+     Lewei Lu, et al. Internvl: Scaling up vision foundation mod-         cessing Systems, 36:30146–30166, 2023. 2
+     els and aligning for generic visual-linguistic tasks. In Pro-   [21] Shiyao Li, Yingchun Hu, Xuefei Ning, Xihui Liu, Ke Hong,
+     ceedings of the IEEE/CVF conference on computer vision               Xiaotao Jia, Xiuhong Li, Yaqi Yan, Pei Ran, Guohao Dai,
+     and pattern recognition, pages 24185–24198, 2024. 2, 5               et al. Mbq: Modality-balanced quantization for large vision-
+ [9] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov,               language models. In Proceedings of the Computer Vision and
+     Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner,                  Pattern Recognition Conference, pages 4167–4177, 2025. 1,
+     Mostafa Dehghani, Matthias Minderer, Georg Heigold, Syl-             2, 3, 4, 5, 6, 8
+     vain Gelly, et al. An image is worth 16x16 words: Trans-        [22] Haokun Lin, Haobo Xu, Yichen Wu, Jingzhi Cui, Yingtao
+     formers for image recognition at scale. arXiv preprint               Zhang, Linzhan Mou, Linqi Song, Zhenan Sun, and Ying
+     arXiv:2010.11929, 2020. 2                                            Wei. Duquant: Distributing outliers via dual transformation
+[10] Elias Frantar, Saleh Ashkboos, Torsten Hoefler, and Dan              makes stronger quantized llms. Advances in Neural Infor-
+     Alistarh.      Gptq: Accurate post-training quantization             mation Processing Systems, 37:87766–87800, 2024. 1, 2
+     for generative pre-trained transformers. arXiv preprint         [23] Ji Lin, Jiaming Tang, Haotian Tang, Shang Yang, Wei-Ming
+     arXiv:2210.17323, 2022. 1, 2, 6, 8                                   Chen, Wei-Chen Wang, Guangxuan Xiao, Xingyu Dang,
+[11] Amir Gholami, Sehoon Kim, Zhen Dong, Zhewei Yao,                     Chuang Gan, and Song Han. Awq: Activation-aware weight
+     Michael W Mahoney, and Kurt Keutzer. A survey of quan-               quantization for on-device llm compression and accelera-
+     tization methods for efficient neural network inference. In          tion. Proceedings of machine learning and systems, 6:87–
+     Low-power computer vision, pages 291–326. Chapman and                100, 2024. 1, 2, 5
+     Hall/CRC, 2022. 2                                               [24] Yang Lin, Tianyu Zhang, Peiqin Sun, Zheng Li, and
+[12] Haiyang Guo, Fanhu Zeng, Ziwei Xiang, Fei Zhu, Da-                   Shuchang Zhou.         Fq-vit: Post-training quantization
+     Han Wang, Xu-Yao Zhang, and Cheng-Lin Liu. Hide-                     for fully quantized vision transformer. arXiv preprint
+     llava: Hierarchical decoupling for continual instruction tun-        arXiv:2111.13824, 2021. 1
+     ing of multimodal large language model. arXiv preprint          [25] Zihao Lin, Samyadeep Basu, Mohammad Beigi, Varun Man-
+     arXiv:2503.12941, 2025. 1                                            junatha, Ryan A Rossi, Zichao Wang, Yufan Zhou, Sriram
+     Balasubramanian, Arman Zarei, Keivan Rezaei, et al. A sur-      [38] Guangxuan Xiao, Ji Lin, Mickael Seznec, Hao Wu, Julien
+     vey on mechanistic interpretability for multi-modal founda-          Demouth, and Song Han. Smoothquant: Accurate and effi-
+     tion models. arXiv preprint arXiv:2502.17516, 2025. 3                cient post-training quantization for large language models. In
+[26] Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee.             International conference on machine learning, pages 38087–
+     Visual instruction tuning. Advances in neural information            38099. PMLR, 2023. 2, 3, 5, 6
+     processing systems, 36, 2024. 1                                 [39] Jingjing Xie, Yuxin Zhang, Mingbao Lin, Liujuan Cao, and
+[27] Pan Lu, Swaroop Mishra, Tanglin Xia, Liang Qiu, Kai-Wei              Rongrong Ji. Advancing multimodal large language models
+     Chang, Song-Chun Zhu, Oyvind Tafjord, Peter Clark, and               with quantization-aware scale learning for efficient adapta-
+     Ashwin Kalyan. Learn to explain: Multimodal reasoning via            tion. In Proceedings of the 32nd ACM International Confer-
+     thought chains for science question answering. Advances              ence on Multimedia, pages 10582–10591, 2024. 1, 2
+     in Neural Information Processing Systems, 35:2507–2521,         [40] Jie Yu, Songping Mai, Peng Zhang, Yucheng Jiang, and Jian
+     2022. 6                                                              Cheng. Activation and weight distribution balancing for op-
+[28] Ahmed Masry, Do Xuan Long, Jia Qing Tan, Shafiq Joty,                timal post-training quantization in learned image compres-
+     and Enamul Hoque. Chartqa: A benchmark for question an-              sion. In Proceedings of the 33rd ACM International Confer-
+     swering about charts with visual and logical reasoning. arXiv        ence on Multimedia, pages 7959–7967, 2025. 2
+     preprint arXiv:2203.10244, 2022. 6                              [41] Xiang Yue, Yuansheng Ni, Kai Zhang, Tianyu Zheng, Ruoqi
+[29] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya                   Liu, Ge Zhang, Samuel Stevens, Dongfu Jiang, Weiming
+     Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,                Ren, Yuxuan Sun, et al. Mmmu: A massive multi-discipline
+     Amanda Askell, Pamila Mishkin, Jack Clark, Gretchen                  multimodal understanding and reasoning benchmark for ex-
+     Krueger, and Ilya Sutskever. Learning transferable visual            pert agi. In Proceedings of the IEEE/CVF Conference
+     models from natural language supervision. In Proceedings             on Computer Vision and Pattern Recognition, pages 9556–
+     of the 38th International Conference on Machine Learning,            9567, 2024. 6
+     pages 8748–8763. PMLR, 2021. 2                                  [42] Matthew D Zeiler and Rob Fergus. Visualizing and under-
+[30] Yongming Rao, Wenliang Zhao, Benlin Liu, Jiwen Lu, Jie               standing convolutional networks. In European conference on
+     Zhou, and Cho-Jui Hsieh. Dynamicvit: Efficient vision                computer vision, pages 818–833. Springer, 2014. 3
+     transformers with dynamic token sparsification. Advances        [43] Fanhu Zeng and Deli Yu. M2m-tag: Training-free many-
+     in neural information processing systems, 34:13937–13949,            to-many token aggregation for vision transformer accelera-
+     2021. 1                                                              tion. In Workshop on Machine Learning and Compression,
+[31] Yihua Shao, Deyang Lin, Fanhu Zeng, Minxi Yan, Muyang                NeurIPS 2024, 2024. 1
+     Zhang, Siyu Chen, Yuxuan Fan, Ziyang Yan, Haozhe Wang,          [44] Fanhu Zeng, Haiyang Guo, Fei Zhu, Li Shen, and Hao Tang.
+     Jingcai Guo, et al. Tr-dq: Time-rotation diffusion quantiza-         Robustmerge: Parameter-efficient model merging for mllms
+     tion. arXiv preprint arXiv:2503.06564, 2025. 2                       with direction robustness. In The Thirty-ninth Annual Con-
+[32] Amanpreet Singh, Vivek Natarjan, Meet Shah, Yu Jiang,                ference on Neural Information Processing Systems, 2025. 2
+     Xinlei Chen, Devi Parikh, and Marcus Rohrbach. Towards          [45] Fanhu Zeng, Deli Yu, Zhenglun Kong, and Hao Tang. Token
+     vqa models that can read. In Proceedings of the IEEE Con-            transforming: A unified and training-free token compres-
+     ference on Computer Vision and Pattern Recognition, pages            sion framework for vision transformer acceleration. arXiv
+     8317–8326, 2019. 1                                                   preprint arXiv:2506.05709, 2025. 1
+[33] Daniel Smilkov, Nikhil Thorat, Been Kim, Fernanda Viégas,      [46] Fanhu Zeng, Fei Zhu, Haiyang Guo, Xu-Yao Zhang, and
+     and Martin Wattenberg. Smoothgrad: removing noise by                 Cheng-Lin Liu. Modalprompt: Towards efficient mul-
+     adding noise. arXiv preprint arXiv:1706.03825, 2017. 3               timodal continual instruction tuning with dual-modality
+[34] Mukund Sundararajan, Ankur Taly, and Qiqi Yan. Axiomatic             guided prompt. In Proceedings of the 2025 Conference on
+     attribution for deep networks. In International conference on        Empirical Methods in Natural Language Processing, pages
+     machine learning, pages 3319–3328. PMLR, 2017. 2, 3, 5,              12137–12152, 2025. 1
+     1                                                               [47] Xiaohua Zhai, Basil Mustafa, Alexander Kolesnikov, and
+[35] Changyuan Wang, Ziwei Wang, Xiuwei Xu, Yansong Tang,                 Lucas Beyer. Sigmoid loss for language image pre-training.
+     Jie Zhou, and Jiwen Lu. Q-vlm: Post-training quantization            In Proceedings of the IEEE/CVF international conference on
+     for large vision-language models. Advances in Neural Infor-          computer vision, pages 11975–11986, 2023. 5
+     mation Processing Systems, 37:114553–114573, 2024. 2            [48] Fred Zhang and Neel Nanda. Towards best practices of ac-
+[36] Peng Wang, Shuai Bai, Sinan Tan, Shijie Wang, Zhihao Fan,            tivation patching in language models: Metrics and methods.
+     Jinze Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin              arXiv preprint arXiv:2309.16042, 2023. 3
+     Ge, Yang Fan, Kai Dang, Mengfei Du, Xuancheng Ren, Rui          [49] Kaichen Zhang, Bo Li, Peiyuan Zhang, Fanyi Pu,
+     Men, Dayiheng Liu, Chang Zhou, Jingren Zhou, and Jun-                Joshua Adrian Cahyono, Kairui Hu, Shuai Liu, Yuanhan
+     yang Lin. Qwen2-vl: Enhancing vision-language model’s                Zhang, Jingkang Yang, Chunyuan Li, et al. Lmms-eval: Re-
+     perception of the world at any resolution. arXiv preprint            ality check on the evaluation of large multimodal models. In
+     arXiv:2409.12191, 2024. 5                                            Findings of the Association for Computational Linguistics:
+[37] Xinjian Wu, Fanhu Zeng, Xiudong Wang, and Xinghao                    NAACL 2025, pages 881–916, 2025. 6
+     Chen. Ppt: Token pruning and pooling for efficient vision       [50] Tianchen Zhao, Tongcheng Fang, Haofeng Huang, Enshu
+     transformers. arXiv preprint arXiv:2310.01812, 2023. 1               Liu, Rui Wan, Widyadewi Soedarmadji, Shiyao Li, Zinan
+     Lin, Guohao Dai, Shengen Yan, et al. Vidit-q: Efficient
+     and accurate quantization of diffusion transformers for im-
+     age and video generation. arXiv preprint arXiv:2406.02540,
+     2024. 1
+[51] Xingyu Zheng, Haotong Qin, Yuye Li, Jiakai Wang, Jinyang
+     Guo, Michele Magno, and Xianglong Liu. First-order er-
+     ror matters: Accurate compensation for quantized large lan-
+     guage models. arXiv preprint arXiv:2507.11017, 2025. 2
+   Fine-Grained Post-Training Quantization for Large Vision Language Models
+                 with Quantization-Aware Integrated Gradients
+                                                       Supplementary Material
+A. Proof of Quantization-Aware Integrated                               Recognizing the definition of QIGi (x), we obtain the com-
+   Gradients Completeness                                               pleteness property:
+
+We denote the input as x = [x1 , . . . , xT ], where each token               T
+                                                                              X
+embedding xi ∈ Rd . Thus the full input lies in RT ×d . Us-                         QIGi (x) = G(x) − G(xq )
+ing the definition of QIG in Eq. 3, the attribution for the i-th              i=1
+                                                                                                                                  (14)
+token is defined as:                                                                             = f (x, w) − f (x, wq )
+                                                                                                                       
+                          Z 1
+                                ∂ (f (xα , w) − f (xα , wq ))                                     − f (xq , w) − f (xq , wq ) .
+                                                                                                                            
+ QIGi (x) = (xi − xqi )                                       dα, (8)
+                           0                ∂xi
+where xα = x + α(x − xq ) is the linear interpolation be-
+               q
+                                                                        Discussion. When the baseline satisfies G(xq ) = 0 (e.g.,
+tween the quantized input xq and the original input x.                  when f (xq , w) = f (xq , wq )), the completeness relation
+   To simplify the notation, we define the quantization-error           simplifies to:
+function as:
+                                                                                     T
+                G(x) = f (x, w) − f (x, wq ).
+                                                                                     X
+                                                                 (9)                       QIGi (x) = f (x, w) − f (x, wq ),      (15)
+                                                                                     i=1
+Under this definition, QIG becomes standard Integrated
+Gradients (IG) applied to G(·) with baseline xq :                       which mirrors the classical IG completeness property. In
+                                Z 1                                     practice, post-processing of QIG values (e.g., clipping or
+                              q      ∂G(xα )
+         QIGi (x) = (xi − xi )                dα. (10)                  interquartile-range filtering) may slightly break strict alge-
+                                 0     ∂xi                              braic completeness while improving numerical stability and
+                                                                        visualization quality.
+Completeness. Consider the interpolation path γ(α) =
+xα = xq +α(x−xq ). Since the path is linear, the derivative             B. More Implementation Details
+with respect to α can be written as:
+                                                                        QIG objective implementation. Let x ∈ RB×T ×H be
+                       ∂xα
+                           = x − xq .                           (11)    the pre-residual activation of the current block, and let xq
+                       ∂α                                               be its quantized version. The block outputs are denoted as
+Applying the chain rule to G(γ(α)) yields:                              yfp = f (x, w) and yq = f (x, wq ). We define the per-token
+             ∂                     ∂xα                                  quantization distortion error as:
+               G(xα ) = ∇x G(xα )⊤
+            ∂α                     ∂α                                                       H
+                                                                                      1 X
+                                         ⊤
+                          = ∇x G(xα ) (x − x )     q                     Eb,t (x) =       (yfp − yq )b,t,h ,            E(x) ∈ RB×T .
+                                                                (12)                  H
+                                                                                           h=1
+                             T
+                            X               ∂G(xα )
+                          =     (xi − xqi )         ,                      To obtain QIG attributions, we approximate the gradi-
+                            i=1
+                                             ∂xi                        ents of this quantization distortion loss Eb,t (x) using 32-
+                                                                        step integrated gradients [34]. Specifically, we integrate
+which shows that the weighted coordinate-wise gradients in
+                                                                        along the straight-line path from the baseline xq to the input
+QIG correspond to the directional derivative of G along the
+                                                                        x, defined as x(α) = xq + α(x − xq ) for α ∈ [0, 1]. Cru-
+interpolation path.
+                                                                        cially, this computation is performed directly on the differ-
+    Integrating both sides from α = 0 to 1, and using
+                                                                        ence function ∥f (x)−fq (x)∥, without separately comput-
+G(γ(0)) = G(xq ) and G(γ(1)) = G(x), the fundamen-
+                                                                        ing or subtracting gradients from the full-precision and
+tal theorem of calculus gives:
+                                                                        quantized models individually. This follows the construc-
+                      Z 1
+                            ∂                                           tion described in Appendix A, where Eb,t (x) serves as the
+    G(x) − G(xq ) =           G(xα ) dα                                 scalar target function for attribution.
+                       0   ∂α
+                       T             Z 1               (13)
+                      X          q       ∂G(xα )                        Quantization Formats. We adopt uniform integer quan-
+                    =     (xi − xi )             dα.
+                      i=1             0   ∂xi                           tization for all experiments, and quantize both the weights
+W and the input activations X of each linear layer. For a           Method                    VizWiz     MMMU       ScienceQA
+given tensor T and bit-width b, we denote its quantized in-
+teger representation by Q(T ) ∈ Zb and the corresponding            No Clipping               54.32      41.37        93.28
+dequantized value by T̂ .                                           Top5 zero                 57.20      43.56        94.10
+   For weight-only quantization, we apply asymmetric,               Top5 average              57.25      44.78        94.18
+group-wise quantization to the weight matrix W . Each row
+                                                                    IQR Clipping (Ours)       59.10      45.00        94.25
+of W is partitioned into non-overlapping groups of size 128,
+and for each group g we compute a scale sg and zero-point
+                                                                 Table A1. Ablation on sensitivity stabilization strategies. Our
+zg from the group-wise minimum and maximum:
+                                                                 IQR Clipping achieves the best overall performance on LLaVA-
+                                                                 OneVision-7B under W4A8 quantization.
+                    max(Wg ) − min(Wg )
+               sg =                     ,                (16)
+                          2b − 1                                             PPL↓    PIQA ↑     ARC-e↑     ARC-c ↑     MMLU ↑
+                                     
+                             min(Wg )                              GPTQ      6.24     75.46      67.00      40.10       30.05
+               zg = round −             .                (17)
+                                sg                                 + Ours    6.19     75.95      67.17      39.85       32.01
+
+  The integer weights are then obtained as:                      Table A2. Comparison of GPTQ and Our Fine-Grained Quantiza-
+                                                               tion on LLaMA-2-7B (3bit).
+  Q(Wg ) = clip round Wg /sg + zg , 0, 2b − 1 , (18)
+                                
+
+                                                                tokens already leads to clear performance differences, un-
+and the dequantized weights are Ŵg = sg Q(Wg ) − zg .           derscoring the necessity of fine-grained, token-level impor-
+We primarily use b ∈ {3, 4}, which we denote as W 3 and          tance estimation. Among all variants, our IQR-based ap-
+W 4.                                                             proach achieves the best results across VizWiz, MMMU,
+   For weight–activation quantization, we use symmetric          and ScienceQA, demonstrating that the observed gains orig-
+quantization for both weights and activations. Given a ten-      inate not merely from simple top-value replacement, but
+sor T and bit-width b, we define:                                from a distribution-aware clipping mechanism that more ef-
+                                                                 fectively stabilizes the sensitivity distribution.
+                        max(|T |)
+                      sT =         ,                             Extension to Large Language Models (LLMs). To ver-
+                         2b−1 − 1                         (19)
+                                                                 ify that our method’s effectiveness stems from accurately
+     Q(T ) = clip round(T /sT ), −2b−1 , 2b−1 − 1 ,
+                                                 
+                                                                 measuring token-level sensitivity rather than serving as a
+and T̂ = sT Q(T ). In this setting we write W xAy to in-         simple modality-related replacement, we further extend our
+dicate x-bit weight and y-bit activation quantization, e.g.,     approach to LLMs. Tab. A2 reports results with quan-
+W 4A8 for 4-bit weights and 8-bit activations. Unless oth-       tized LLaMA-2 on several standard language understanding
+erwise stated, the group size for weight quantization is fixed   benchmarks, including perplexity (PPL), PIQA for physi-
+to 128.                                                          cal commonsense reasoning, ARC-e/ARC-c for scientific
+                                                                 question answering, and MMLU for multi-domain knowl-
+                                                                 edge understanding. As shown in Tab. A2, our fine-grained
+C. More Experimental Results
+                                                                 quantization method not only performs strongly on LVLMs
+Effectiveness of IQR-Based Clipping. To more compre-             but also achieves notable improvements when applied to
+hensively evaluate the robustness benefits introduced by our     LLMs. Specifically, by leveraging QIG to model token-
+IQR-based clipping strategy, we conduct an ablation study        level sensitivity, we attain superior quantization perfor-
+comparing four sensitivity stabilization variants: (1) No        mance across different modalities and model types. This ca-
+Clipping, which directly uses raw token-level sensitivities;     pability to capture fine-grained token sensitivity makes our
+(2) Top-5 Zero, which suppresses the five largest sensitivity    method highly versatile, enabling consistent performance
+values by setting them to zero; (3) Top-5 Average, which         gains across various large-scale pre-trained models, includ-
+replaces the five largest sensitivities with the global mean     ing both multimodal and unimodal settings.
+computed over all token sensitivities; and (4) our full IQR      Robustness with OCR-Specific Calibration. To address
+Clipping method, which attenuates extreme values using           concerns regarding the method’s adaptability to domain-
+statistically grounded interquartile-range thresholds.           specific challenges, we evaluate our approach using an
+   As shown in Tab. A1, all clipping strategies improve          OCR-focused calibration set derived from InfoVQA data.
+performance relative to the raw-sensitivity baseline, high-      Tab. A3 reports the performance on Qwen2-VL-7B un-
+lighting the importance of controlling outlier sensitivities.    der W4A8 quantization across three OCR-intensive bench-
+Notably, modifying the importance allocation of only five        marks: DocVQA, ChartQA, and OCRBench. As shown in
+ Bitwidth   Calib. Size   Method   DocVQA   ChartQA   OCRBench   Avg.
+                          MBQ       84.48    77.28      70.60    77.45
+               128
+                          Ours      88.60    77.52      76.80    80.97
+  W4A8
+                          MBQ       84.87    76.68      71.50    77.68
+               256
+                          Ours      89.13    77.04      77.00    81.06
+
+
+Table A3. Results on Qwen2-VL-7B using OCR-specific calibration data.
+Our method shows significant robustness improvements over MBQ in text-
+rich scenarios.
+
+
+
+the table, our method consistently outperforms the MBQ
+baseline across all calibration sizes (128 and 256 samples).
+Specifically, with only 128 calibration samples, our ap-
+proach achieves an average improvement of 3.52% over
+MBQ, with notable gains of +4.12% on DocVQA and
++6.20% on OCRBench. Even as the calibration size in-
+creases to 256, our method maintains a significant lead (avg.
++3.38%). These results demonstrate that our token-level
+sensitivity modeling effectively captures critical features
+for text-rich visual understanding, ensuring robustness even
+when calibration data is limited or domain-specific.
+
+D. Visualizations
+In this section, we provide extended visualizations to fur-
+ther analyze the conversational outputs of vision–language
+models under different quantization schemes. The compar-
+ative results, visually shown in Figs. A1–A4, indicate that
+our proposed fine-grained quantization strategy enables the
+quantized model’s responses to better align with the cal-
+ibration data, effectively reducing degradation in reason-
+ing quality, visual detail retention, and linguistic coher-
+ence, thereby more clearly demonstrating its advantages
+over modality-based baseline methods.
+            Example 1 LLava onevision-7B W3A16
+
+            Question：Which classic film does this iconic scene on the
+            ship's bow come from?
+
+
+
+
+            FP16 Response: Titanic
+
+            MBQ Response: Film
+
+            Ours Response: Titanic
+
+Figure A1. The baseline fails to identify the film and produces an incomplete answer, whereas our fine-grained quantization successfully
+preserves the correct semantic prediction and matches the full-precision model.
+          Example 2 LLava onevision-7B W4A8
+
+           Question：Is the motorcycle currently stationary or moving?
+           Give exactly two visual cues from the image to justify your choice
+
+
+
+
+           FP16 Response: The lack of blur suggests that the motorcycle is
+           stationary.
+
+           MBQ Response: Motorcycle
+            ### Does not answer the question or give visual cues
+
+           Ours Response: Motorcycle is stationary\nThe motorcycle's kickstand is
+           down, indicating that it is parked and not moving. Additionally, the rider's foot
+           is resting on the ground next to the motorcycle, which suggests that they are
+           stationary rather than riding away or preparing to ride.
+
+Figure A2. The baseline fails to answer the question and provides no reasoning, whereas our fine-grained quantization preserves both
+correctness and detailed visual justification, closely matching the full-precision model.
+             Example 3 Internvl2-8B W4A8
+
+               Question：Describe the image in detail.
+
+
+
+
+           FP16 Response: The image depicts a scene in a natural or zoo setting, featuring two
+           giraffes. The giraffes are standing on a grassy area with a backdrop of lush green trees and
+           foliage. The giraffe in the foreground is standing on a log, reaching up to a tree branch with
+           its long neck to feed on the leaves. The second giraffe is positioned slightly behind and to the
+           left, also feeding on the tree. Both giraffes have characteristic long necks, spotted coats, and
+           are standing on all four legs. The environment appears to be a serene and natural habitat,
+           possibly a zoo or a wildlife reserve, designed to mimic the giraffes' natural environment.
+
+           MBQ Response: animal species, including giraffes. The image captures a moment of
+           natural beauty and wildlife, showcasing the grace and elegance of these majestic animals.
+            ### Missing detail
+
+           Ours Response: The image depicts a scene in what appears to be a naturalistic enclosure,
+           likely a zoo or wildlife sanctuary. The primary focus is on two giraffes, which are tall, slender,
+           and have long necks. The giraffes are standing on a grassy area, with one of them standing on
+           a fallen tree branch, which is a common behavior for these animals as they use their height to
+           reach higher foliage for food.\n\nThe giraffes are surrounded by a lush, green environment.
+           There are several trees with dense foliage, providing a natural and shaded habitat. The trees
+           have broad leaves, which are typical of deciduous forests. The ground is covered in grass, and
+           there are fallen branches and logs, contributing to the naturalistic setting.\n\nIn the background,
+           the image shows more trees and greenery, suggesting that the enclosure is quite expansive.
+           The lighting in the image is natural, indicating that the photo was likely taken during the day.
+           The overall ambiance is serene and peaceful, emphasizing the natural behavior and habitat of
+           the giraffes.\n\nThe giraffes are the central subjects, and their interaction with the environment,
+           such as standing on the fallen tree branch, highlights their adaptability and natural foraging
+           habits. The image captures a moment of their daily routine, showcasing their grace and
+           elegance.
+
+
+Figure A3. The baseline provides only a minimal and overly generic description, missing most visual details, whereas our fine-grained
+quantization preserves rich scene understanding and produces a comprehensive description close to the full-precision model.
+          Example 4 Internvl2-8B W3A16
+
+           Question：Describe the image in detail.
+
+
+
+
+          FP16 Response: The image depicts a serene harbor scene with several traditional fishing
+          boats docked along the shore. The boats are painted in vibrant colors, primarily blue and red,
+          with some featuring intricate designs. The boats are equipped with tall masts and rigging,
+          indicating they are likely used for sailing. The water is calm, reflecting the boats and the
+          partly cloudy sky above. The horizon is visible in the distance, with a gentle gradient from the
+          blue of the sky to the green of the land. The overall atmosphere is peaceful and picturesque,
+          capturing a moment of tranquility in a coastal setting
+          MBQ Response: and rustic charm, capturing a quiet moment in the life of a small fishing
+          community. The careful arrangement of the boats and the harmonious blend of colors and
+          natural elements create a visually pleasing and inviting scene.
+          ### Missing detail
+          Ours Response: The image depicts a serene and picturesque harbor scene. The focal
+          point is a cluster of small, colorful boats, likely fishing boats, moored side by side on a wooden
+          dock. The boats are adorned with vibrant blue and red stripes, adding a splash of color to the
+          tranquil waters. The boats are equipped with tall, slender masts, and their sails are neatly
+          furled and tied, suggesting they are not currently in use.\n\nThe water in the harbor is calm,
+          reflecting the clear blue sky and the fluffy, white clouds that dot the horizon. The sky is mostly
+          clear, with only a few scattered clouds, contributing to the overall peaceful and inviting
+          atmosphere. The horizon line is visible in the distance, where the calm sea meets the
+          sky.\n\nTo the left of the image, there are a few more wooden posts or mooring poles, some of
+          which are partially submerged in the water. These posts are likely used to secure the boats to
+          the dock. The dock itself appears to be made of wood, blending harmoniously with the natural
+          surroundings.\n\nThe image captures a moment of quiet repose, with the boats gently rocking
+          in the gentle ripples of the water. The scene is devoid of any human activity, emphasizing the
+          stillness and beauty of the harbor. The overall composition of the image, with its balanced use
+          of color and light, creates a visually pleasing and idyllic coastal setting.
+
+
+
+Figure A4. The baseline produces an incomplete and overly generic description that misses key scene elements, whereas our fine-grained
+quantization preserves detailed coastal features and provides a rich interpretation closely aligned with the full-precision model.
+

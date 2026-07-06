@@ -104,3 +104,42 @@
 - **promoted_to_insight**: 3（L1→L2：verifier→agent-facing、skill-as-object 两个新 pattern 因 ≥3 独立来源即时晋升为 provisional insight；外加既有 workflow pattern 晋升）
 - **validated_insights**: 1（L2→L3：真实长程工作流远未饱和——5 个独立 benchmark 跨日期一致，既有 pattern 直接升 validated，confidence medium）
 - **queued_for_review**: 0（暂无 confidence>0.8 的 validated insight 触发 DomainMaps 晋升）
+
+### [2026-06-26] agenda-evolve
+
+- **trigger**: autoresearch round 2——daily-papers 当日消化 9 篇 GUI/agent/safety 论文，其证据未反映到方向 evidence
+- **insights_reviewed**: 0（insights.md 自 6/25 无新 validated 条目；本轮证据来自当日 paper notes 而非 insights）
+- **directions_added**: 0
+- **directions_updated**: 3（RL-based GUI Agent Training: +MobileForge/GUIAgentExploration；Agent-Facing Environment Runtime: +OpenRath/AgentMemorySystem；Personal CUA Safety: +PrivacyAlign/OverPrivilegedTools，confidence 0.35→0.4）
+- **directions_paused**: 0
+- **directions_abandoned**: 0
+- **reasoning**: 当日 9 篇中 6 篇直接落入 3 个 active direction。最有价值的是 OverPrivilegedTools 的 negative result——safety-alignment 训练几乎不迁移到 least-privilege（Qwen OPUR 50.4%→60.7%），与 PrivacyAlign 缺 runtime baseline 互补，双双支撑 Personal CUA Safety 方向"runtime intervention 优于训练/prompt"的核心 framing，故 confidence 0.35→0.4 并把"三路对照（training/prompt/runtime）"写入 next_action。AgentMemorySystem 的"全文本/DB workload、无 GUI visual memory"反向印证 Agent-Facing Runtime 在 CUA 场景的 memory 空白。未新增方向/insight（无 experiment、无新 validated insight）。
+
+### [2026-06-26] agenda-evolve (supervisor-triggered)
+
+- **trigger**: Supervisor 回复 6/25 Discussion Topic 的 3 个战略问题
+- **insights_reviewed**: 0
+- **directions_added**: 0
+- **directions_updated**: 2（Agent-Facing Environment Runtime → 标记 primary；GUI Grounding Robustness → 标记 secondary high）
+- **directions_paused**: 1（Personal CUA Safety & Contextual Integrity：Supervisor 决定不在 Mission scope 内，移入 Paused，证据保留）
+- **directions_abandoned**: 0
+- **reasoning**: Supervisor 明确 (1) primary=Agent-Facing Environment Runtime（不与 GUI Grounding 合并，但 grounding 可观测角度并入 AFE affordance）；(2) Personal CUA Safety 不在当前 Mission scope 内 → 按协议 Pause（scope 决定而非 hypothesis 证伪，故 Paused 而非 Abandoned，可经 Mission 调整恢复）；(3) 确认 Self-Improving 继续暂停。6/25 Discussion Topic 标记 resolved。Active Directions 现为 3 个（AFE-Runtime primary、GUI Grounding secondary、RL Training）。
+
+### [2026-07-03] memory-distill
+
+- **period**: 2026-06-26 ~ 2026-07-03
+- **logs_processed**: 5（2026-06-26, 06-29, 06-30, 07-01, 07-03）
+- **new_patterns**: 2（read-only evidence sub-agent 模块原语；runtime state 一等对象化）
+- **promoted_to_insight**: 4（L1 → L2：counterfactual 诊断 pattern 第 3 数据点晋升；small specialized GUI grounding 达 3 论文晋升；两条新 pattern 同批达阈值即晋升）
+- **validated_insights**: 1（L2 → L3："Verifier/环境 oracle 角色迁移" 获 Dockerless[SWE 域 training supervision] + PolicyGuard[dialogue 域 runtime affordance] 两个新域复现，provisional → validated）
+- **queued_for_review**: 0（"真实长程工作流未饱和" 追加 OSWorld2 20.6% 证据但 confidence 维持 medium，未达 L3 → L4 门槛）
+
+### [2026-07-03] agenda-evolve
+
+- **trigger**: memory-distill 产出新 validated insight（"Verifier/环境 oracle 角色迁移" L2→L3）及 4 条新 provisional insight，agenda 未反映
+- **insights_reviewed**: 2（"Verifier 角色迁移" validated 今日；"真实长程工作流未饱和" validated 6/25 获 OSWorld2 新证据）
+- **directions_added**: 0
+- **directions_updated**: 2（Agent-Facing Environment Runtime: +PolicyGuard/Dockerless 证据 + 2 条新 insight，confidence 0.4→0.45；GUI Grounding Robustness: +DecodableNotGrounded 证据，next_action 的 Action Collapse Rate 备选路径升级为三 regime + 五 ablation protocol，confidence 0.45→0.5）
+- **directions_paused**: 0
+- **directions_abandoned**: 0
+- **reasoning**: primary 方向的核心假设由三部分组成（observe/verify affordance + 因果收益），本轮 "Verifier 角色迁移" 升 validated 确立了 verify 组件的跨域可行性（SWE + dialogue 两个新域），"runtime state 一等对象化"（5 篇论文收敛）确立了 observe 组件的接口工程形态——两者都不能替代自有实验对因果收益的验证，故 confidence 仅小幅上调。GUI Grounding 的 evidence-dependence 诊断角度获得独立方法论支撑（DecodableNotGrounded 的 arbiter 协议可直接迁移），使无训练备选路径的可行性显著上升。未新增方向：validated/developing ideas 均已被现有 direction 覆盖。

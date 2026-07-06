@@ -1,0 +1,1023 @@
+                                                 VIRAL: Visual Sim-to-Real at Scale for Humanoid Loco-Manipulation
+
+                                                               Tairan He1,2* Zi Wang1* Haoru Xue1,3* Qingwei Ben1,4*
+                                                      Zhengyi Luo1 Wenli Xiao1,2 Ye Yuan1 Xingye Da1 Fernando Castañeda1
+                                                     Shankar Sastry3 Changliu Liu2 Guanya Shi2 Linxi “Jim” Fan1† Yuke Zhu1†
+                                                          1              2           3                  4             *                        †
+                                                              NVIDIA         CMU         UC Berkeley        CUHK          Equal Contribution       Project Leads
+                                                                              https://viral-humanoid.github.io
+
+
+
+
+arXiv:2511.15200v2 [cs.RO] 27 Nov 2025
+                                         Figure 1. Center: Unitree G1 humanoid performing loco-manipulation, walking between tables to place and pick objects for 54 loops with
+                                         our RGB-based sim-to-real policy. Surrounding: diverse simulated scenes used for training. Website: https://viral-humanoid.github.io
+
+                                                                   Abstract                                     sim alignment of the dexterous hands and cameras. De-
+                                                                                                                ployed on a Unitree G1 humanoid, the resulting RGB-based
+                                         A key barrier to the real-world deployment of humanoid                 policy performs continuous loco-manipulation for up to 54
+                                         robots is the lack of autonomous loco-manipulation skills.             cycles, generalizing to diverse spatial and appearance vari-
+                                         We introduce VIRAL, a visual sim-to-real framework that                ations without any real-world fine-tuning, and approach-
+                                         learns humanoid loco-manipulation entirely in simulation               ing expert-level teleoperation performance. Extensive abla-
+                                         and deploys it zero-shot to real hardware. VIRAL follows               tions dissect the key design choices required to make RGB-
+                                         a teacher-student design: a privileged RL teacher, operat-             based humanoid loco-manipulation work in practice.
+                                         ing on full state, learns long-horizon loco-manipulation us-
+                                                                                                                1. Introduction
+                                         ing a delta action space and reference state initialization. A
+                                         vision-based student policy is then distilled from the teacher         Humanoid robots are often framed as the natural embod-
+                                         via large-scale simulation with tiled rendering, trained with          iment of general-purpose physical intelligence: machines
+                                         a mixture of online DAgger and behavior cloning. We find               that could ultimately take on a large fraction of physi-
+                                         that compute scale is critical: scaling simulation to tens of          cal work for society. Yet, despite rapid progress in hard-
+                                         GPUs (up to 64) makes both teacher and student training                ware and control, current humanoids have delivered limited
+                                         reliable, while low-compute regimes often fail. To bridge              real, sustained productivity outside of carefully engineered
+                                         the sim-to-real gap, VIRAL combines large-scale visual do-             demos [21]. A core missing piece is autonomous loco-
+                                         main randomization over lighting, materials, camera pa-                manipulation—tight coordination of locomotion and ma-
+                                         rameters, image quality, and sensor delays—with real-to-               nipulation under onboard perception—over long horizons
+
+
+                                                                                                            1
+                                                        PD Controller (200Hz)                           WBC Action
+                                                                                                                           wbc
+      Simulation               Privileged Proprioception                                                               a
+
+                                                                    Privileged            Teacher Action
+                                                                  Teacher Policy
+                               Privileged Exteroception                                             teacher   Phase 1
+                                                                         teacher   50Hz             a         Reinforcement
+                                                                                                              Learning           WBC
+                                                                                          DAgger & BC
+      Rendering              Sim-to-Real Proprioception                                                       Phase 2            Policy
+                                                                                                              Supervised
+                                                                   Sim-to-Real            Student Action      Learning
+                                                                  Student Policy
+                                      RGB Image                                                     student                        wbc
+                                                                         student   50Hz             a                               50Hz
+
+
+
+Figure 2. VIRAL teacher-student pipeline. Phase 1: In simulation, a privileged RL teacher policy πteacher receives full-state proprioception
+and exteroception of the task information and outputs WBC commands. Phase 2: A vision-based student policy πstudent observes only RGB
+images and sim-to-real proprioception and is trained to imitate the teacher policy via DAgger and behavior cloning.
+
+and across diverse environments to accomplish useful tasks.                  Visual sim-to-real for robotics is not a new idea [2, 3,
+Most existing humanoid systems either focus on blind loco-                17, 25, 30, 33, 42, 62, 65, 75, 76, 83], but we revisit it in the
+motion [28, 39, 43, 84], static tabletop manipulation without             context of humanoid loco-manipulation and push the sys-
+mobility [41, 45, 77], or rely heavily on human teleopera-                tem to modern scales in simulation fidelity, GPU compute,
+tion [6, 26, 44, 78, 79, 82] or non-onboard sensors [72, 80],             and humanoid hardware. Our goal is not to propose yet an-
+and they rarely demonstrate autonomous loco-manipulation                  other novel RL or sim-to-real algorithm, but to provide a
+with onboard sensors in the real world [15, 65, 74].                      technical recipe on the full stack required to make RGB-
+                                                                          based humanoid loco-manipulation work in practice: what
+   Recently, there has been an exciting push to replicate the
+                                                                          designs matter, where they fail, and how they interact.
+large language model recipe [1] in robotics, by collecting
+large-scale real-world datasets and training “robotic foun-                   To enable efficient sim-to-real training, we adopt a
+dation models” from real-world teleoperation data [5, 7, 29,              teacher-student framework as shown in Figure 2. We first
+32, 50, 64, 81]. While it remains unclear whether this path               train an RL teacher policy in simulation with full access
+alone will suffice for general manipulation, it is clear that             to privileged state, operating on top of a pretrained whole-
+mobile manipulation will encounter substantially more vari-               body control (WBC) policy [6]. We then distill this teacher
+ation than fixed tabletop setups and will therefore demand                into a vision-based student policy that observes only RGB
+far more data [19, 34, 73]. When the mobile platform is a                 images and proprioception accessible on the real robot. The
+humanoid, the cost per data point increases even further due              student is trained with large-scale visual distillation using a
+to hardware complexity, higher degrees of freedom, safety                 mixture of online DAgger [56] and behavior cloning. We
+constraints, and the engineering overhead of the teleopera-               find that scaling up GPU compute for simulation training is
+tion stack [16]. In other words, if we treat humanoid mobile              essential for reliable learning of loco-manipulation skills.
+manipulation as “just another data problem,” the required                    To facilitate visual sim-to-real transfer, on the simula-
+scale may be prohibitively expensive in practice.                         tion side, we scale up visual randomization variations, in-
+   Simulation offers an alternative path. Modern GPU-                     cluding scene assets, lighting, materials, and camera pa-
+accelerated, photorealistic simulators can generate orders of             rameters, with high-fidelity tiled rendering; on the hard-
+magnitude more data at low marginal cost compared with                    ware side, we align the simulator and real hardware to best
+human teleoperation [4, 46, 48]. Sim-to-real has become                   match each other, including system identification (SysID)
+the de facto approach for legged locomotion [57, 63], where               on high-gear-ratio dexterous hands and the alignment of
+policies trained in simulation routinely transfer to hard-                cameras. Together, these technical elements yield an
+ware [13, 27, 38]. In contrast, manipulation is still largely             end-to-end RGB-based student policy that transfers zero-
+dominated by imitation learning from real-world data, with                shot to the real humanoid robot and executes continuous
+sim-to-real successes typically restricted to tabletop settings           loco-manipulation—walking, placing, grasping, and object
+and narrow tasks [2, 10, 24, 41, 62]. Moreover, sim-to-real               transport—over long horizons.
+locomotion and manipulation are usually studied in isola-                    In real-world experiments, VIRAL shows not only the
+tion: locomotion work often ignores manipulation, and ma-                 robustness of the high success rate that is near the human
+nipulation work typically assumes a fixed base. In this pa-               expert teleoperation performance, but also generalization to
+per, we aim to answer: Can visual sim-to-real enable useful               various spatial and scene variations. In simulation experi-
+humanoid loco-manipulation with onboard perception?                       ments, scaling studies, and ablations reveal which key com-
+
+
+                                                                     2
+ponents of the VIRAL framework are most critical for the                   observation oprivt    = [oprop-priv
+                                                                                                       t       , oexte-priv
+                                                                                                                  t           ] includes privileged
+full stack to work in practice. Overall, our results suggest               proprioception and exteroception. Proprioception consists
+that large-scale visual sim-to-real provides a practical path              of oprop-priv
+                                                                                t        = [vt , ω t , gt , at−1 , q t , q̇ t , ftfinger ] where vt , ω t
+toward autonomous humanoid loco-manipulation.                              are base linear and angular velocities, gt is base projected
+                                                                           gravity, at−1 is last action, q t , q̇ t are joint positions and
+2. Key Elements of VIRAL                                                   velocities, ftfinger are fingertip forces. As for privileged ex-
+Framework Overview. To achieve efficient visual simula-                    teroception, we have oexte-priv
+                                                                                                      t        = [et , T t , O t ] where et is the
+tion training, the VIRAL controller is trained via teacher-                current stage, T t is the placement and lift target, O t is the
+student privileged learning [9] as shown in Figure 2. We                   relative transforms of objects and tables to the robot. All
+first train a privileged RL teacher policy with full access                observation terms are specified in Section 7.1. The teacher
+to the privileged state-based inputs and run the simulation                is trained with PPO [59] with a custom implementation of
+without the compute burden of visual rendering on two 8-                   TRL [68] to train across GPUs in a distributed manner.
+GPU L40S nodes (16 GPUs in total). During this stage, we                   Teacher Element #1: Reward Design. To design rewards
+carefully design stage-based rewards and initialize environ-               for humanoid loco-manipulation, we segment the task into a
+ments from demonstrations to boost RL training. Instead                    sequence of walking, placing, grasping, and turning. There-
+of training low-level motor skills from scratch, we integrate              fore, we define four key rewards:
+the pre-trained WBC policy [6] and make the command for                    1. Walking toward the objects: rwalk = exp(−4 (∥probot −
+WBC the action space for the teacher policy. Details of                        pGraspObj ∥ − 0.45)2 );
+teacher training are provided in Section 2.1.                              2. Placing objects when near tray: rplace = −∥fPlaceObj ∥ ∗
+    After the teacher discovers strong behavior under priv-                    1(∥pPlaceObj − ptray ∥ < 0.3) where fPlaceObj is the force
+ileged information, we distill it into a student policy that                   between robot finger and the object to be placed;
+only receives the observations available on the real robot                 3. Grasping objects: rgrasp-z = min(hGraspObj − htable , 0.15)
+(i.e., proprioception and RGB images). Visual distillation                     and rgrasp-goal = exp(−10||pGraspObj − pgoal ||2 );
+is performed using large-scale simulation on eight 8-GPU                   4. Turning: rturn = −|yrobot − ydesired | where y is the base
+L40S nodes (64 GPUs in total) with tiled rendering in Isaac                    yaw heading angle.
+Lab [48]. The student is trained by a combination of online                Full reward definitions are provided in Section 7.2.
+DAgger [56] and behavior cloning to predict the teacher’s
+                                                                           Teacher Element #2: Delta Action Space. Rather than
+action given only access to proprioception and RGB image.
+                                                                           outputting absolute joint targets—as is common in legged
+More details of student training are provided in Section 2.2.
+                                                                           RL locomotion [57]—we adopt a delta action space. The
+    To facilitate sim-to-real transfer of the RGB-based stu-
+                                                                           policy outputs increments that are accumulated into the
+dent policy, we randomize simulation assets, materials,
+                                                                           WBC command. In practice, this delta representation
+dome lighting, image effects, camera extrinsics, and sen-
+                                                                           significantly accelerates and stabilizes RL training. An
+sor delays during student training. We also perform real-to-
+                                                                           ablation of this choice is shown in Figure 9.
+sim alignment through system identification (SysID) of the
+Unitree 3-fingered dexterous hand and calibration of camera                Teacher Element #3: WBC command as API. To reduce
+extrinsics. Finally, we deploy the student policy on the real              reward engineering burden and enable reliable real-world
+robot without any fine-tuning. Using onboard sensor obser-                 deployment, the teacher in VIRAL produces high-level
+vations, the student executes continuous loco-manipulation                 WBC commands rather than learning low-level motor skills
+behaviors—including walking, placing, grasping, and ob-                    from scratch. We use HOMIE [6] as the underlying WBC
+ject transport—on the Unitree G1 humanoid. Details of                      controller, which provides stable lower-body locomotion
+sim-to-real transfer are provided in Section 2.3.                          and diverse upper-body poses. The command space of
+                                                                           HOMIE involves velocity and height tracking commands
+2.1. Key Elements of Teacher Training                                      for locomotion and upper-body joint commands. We ex-
+Teacher Formulation. We formulate the teacher as a                         tend this command interface by incorporating finger ac-
+goal-conditioned RL policy.               At time step t, the              tions, yielding the full action space for VIRAL. Note that
+teacher πteacher (at |opriv
+                       t    ) outputs    a  high-level command             VIRAL framework does not have designs overfitting to spe-
+for the low-level WBC policy given privileged obser-                       cific WBC policy, and can be extended to other humanoid
+vation. Specifically, the teacher policy outputs at =                      WBC controllers [44, 78]. With a stable and robust WBC
+(∆vt , ∆ω yaw        arm
+            t , ∆qt , ∆qt
+                              finger
+                                     ) as the command for the              policy as an API layer, the action space of VIRAL policy is
+WBC policy [6], where ∆vt , ∆ω yaw      t   are delta linear (x, y)        limited to a safe and reliable region of humanoid motions,
+and angular (yaw) velocity commands and ∆q arm                finger       improving deployability.
+                                                      t , ∆q t
+are delta joint targets for arm and finger motors. These com-              Teacher Element #4: Reference State Initialization.
+mands are passed to the WBC policy [6]. The privileged                     Learning long-horizon walking-placing-grasping-turning
+
+
+                                                                       3
+       Figure 3. Visual randomization on image, lighting, material, and camera-extrinsics randomization for sim-to-real robustness.
+
+                                                                         induced observation distributions:
+
+ Reference State Initialization                                               ρo ≜ α ρoπteacher + (1 − α) ρoπstudent ,
+                                                                                              h                                           2
+                                                                                                                                            i
+Figure 4. Frames of reference state initialization for teacher RL.        Ldistill = Eot ∼ρo πteacher (oteacher
+                                                                                                         t       ) − πstudent (ostudent
+                                                                                                                                t       ) 2 ,
+
+                                                                         where ρoπteacher and ρoπstudent denote the observation distribu-
+skills for high-DoF humanoids with RL typically demands                  tions induced by the teacher and student rollouts, and α de-
+heavy reward engineering still often yields suboptimal or                notes the ratio. The distinction between DAgger and BC
+poor sim-to-real transfer. To mitigate this, we collect 200              lies solely in the source of observations: teacher rollouts
+teleoperated simulation demonstrations and use them as                   provide clean, near-optimal demonstrations that rapidly im-
+a state-initialization buffer for RL (Figure 4). At every                print strong priors on the student, while student rollouts ex-
+episode reset, we sample a demonstration snapshot and ini-               pose the learner to states outside the teacher’s ideal distribu-
+tialize the scene—robot, objects, and tables—accordingly,                tion, which is critical for improving error-correction robust-
+exposing the policy to diverse rewarding states long                     ness and preventing compounding error during deployment.
+before it is capable of reaching them from scratch. This                 This mixed-policy rollout combines the fast initialization of
+reference-biased exploration greatly reduces reliance on                 BC with the state-coverage benefits of DAgger, producing a
+brittle reward tuning and improves sim-to-real transfer,                 more resilient vision-based controller. Ablation of the mix-
+as human-provided grasping and placement poses offer                     ture coefficient α is provided in Figure 11.
+strong priors. Similar ideas have appeared in humanoid
+                                                                         Student Element #2: Network Backbone. For the stu-
+control [52, 60] and manipulation [41, 49]. We find
+                                                                         dent’s vision backbone, we adopt a state-of-the-art image
+this reset strategy to be essential for training humanoid
+                                                                         encoder [61] to extract high-quality RGB features, which
+loco-manipulation, as shown in the ablation in Figure 9.
+                                                                         are fused with proprioceptive to the policy head. The re-
+                                                                         sulting student observation ostudent therefore integrates both
+                                                                         visual embeddings and the proprioception available on real
+2.2. Key Elements of Student Training                                    hardware, enabling the policy to reason over rich visual cues
+                                                                         while maintaining grounded low-level awareness. We also
+Student Element #1: DAgger&BC Mixture. We train the                      evaluate choices for the student policy head, including a
+RGB-based student policy by distilling from the privileged               single-step MLP and a history-aware architecture that in-
+teacher through a hybrid of online DAgger [56] and behav-                corporates temporal context. Ablations of the vision back-
+ior cloning (BC). Both procedures share the same MSE ob-                 bone and history architecture are shown in Figure 10 and
+jective, computed over a mixture of teacher- and student-                Figure 12, respectively.
+
+
+                                                                     4
+Student Element #3: Distributed Simulation Learning
+System. Large-scale visual simulation is substantially more
+expensive than rendering-free physics, typically operating
+at least an order of magnitude slower in terms of simulation
+throughput. To scale up visual simulation training through-
+put, we implement a customized version of TRL [68] with
+support of Accelerate [22] for efficient scaling across mul-
+tiple GPUs and compute nodes. This implementation pre-
+serves the simplicity of single-GPU training while enabling
+near-linear scaling to large clusters for high-throughput vi-
+sual sim-to-real learning. We identify scaling up GPUs for
+both teacher and student training as critical in our ablation                        Figure 7. Real-world performance comparison: VIRAL
+studies in Figure 14 and Figure 15.                                                  matches expert-level reliability, outperforms non-experts, and op-
+                                                                                     erates faster than the expert teleoperator.
+2.3. Key Elements of Sim-to-Real Transfer
+                                                                                     ure 3) to ensure that the student remains robust to hardware-
+Sim-to-Real Element #1: SysID for Dexterous Hand.                                    induced viewpoint differences.
+While modern humanoids increasingly use low–gear ra-
+                                                                                     Sim-to-Real Element #3: Visual and Simulation Ran-
+tio motors—reducing the need for motor-level SysID—the
+                                                                                     domization. To enhance robustness and improve sim-to-
+Unitree G1’s 3-fingered dexterous hand employs high gear
+                                                                                     real transfer, we apply extensive visual and physical ran-
+ratios, resulting in a substantial sim-to-real mismatch. To
+                                                                                     domization during training (Figure 3). We randomize im-
+address this, we define a real-world grasp–release prim-
+                                                                                     age quality (brightness, contrast, hue, saturation, Gaussian
+itive and replay the identical action sequence in simula-
+                                                                                     noise, and blur), camera extrinsics to account for small pose
+tion. We then perform SysID over finger armature, stiffness,
+                                                                                     shifts, and camera latency to model transmission delays. We
+and damping parameters to align simulated joint trajectories
+                                                                                     additionally vary global illumination using dome-light en-
+with real measurements. As shown in Figure 5, SysID sig-
+                                                                                     vironments and randomize material and color properties of
+nificantly improves the correspondence between simulated
+                                                                                     floors, tables, objects, and robot components. These per-
+and real joint positions.
+                                                                                     turbations significantly improve the policy’s transferability
+            Before                                After                              by preventing overfitting to any specific simulated appear-
+            Finger                                Finger
+            SysID                                 SysID                              ance or lighting condition. Ablation of this randomization
+                                                                                     is provided in Figure 13.
+Joint Pos
+
+                     Sim Joint Pos         Real Joint Pos     Target Joint Pos
+                                                                                     3. Real-World Results of VIRAL
+Figure 5. System identification of the dexterous hand. Real–sim                      In this section, we present real-world humanoid loco-
+overlays (top) and joint position trajectories (bottom) before and                   manipulation results achieved by VIRAL. The following
+after SysID, showing markedly improved alignment.                                    section (Section 4) analyzes the contribution of each design
+                                 Sim FOV                    Sim FOV
+                                                                                     choice. Our experiments deploy a 29-DoF Unitree G1 hu-
+     Real FOV
+                                 (Before Alignment)         (After Alignment)        manoid equipped with 7-DoF three-finger dexterous hands.
+                                                                                     Perception is provided by an Intel RealSense D435i, and all
+                                                                                     policy inference is performed on a desktop workstation with
+Figure 6. Real-to-sim camera extrinsics alignment. Real view
+                                                                                     an Intel i9-14900K CPU and an NVIDIA RTX 4090 GPU.
+versus simulated views before and after alignment.                                   3.1. Robustness
+Sim-to-Real Element #2: FOV Alignment and Random-                                    We evaluate the robustness of the learned student policy
+ization. We match the simulator’s camera intrinsics (focal                           on a continuous loco-manipulation task in which the hu-
+length, focus distance, and sensor apertures) to the man-                            manoid repeatedly walks between two tables, places an ob-
+ufacturer’s specifications. However, the camera extrinsics                           ject, grasps a new object, and turns around. Across 59 con-
+of Unitree G1 robots vary across units due to mechanical                             secutive real-world trials, VIRAL succeeds in 54, demon-
+tolerances and can even drift over time on the same robot.                           strating strong reliability under extended deployment.
+To better align simulated and real visual observations, we                              We also compare VIRAL with two human teleopera-
+perform a lightweight real-to-sim extrinsics calibration by                          tors: an expert with over 1000 hours of G1 teleopera-
+visually matching rendered and real images (Figure 6). We                            tion experience and a non-expert teleoperator with approx-
+further apply extrinsics randomization during training (Fig-                         imately one hour of experience. All conditions use the
+
+
+                                                                                 5
+Figure 8. Real-world generalization of VIRAL RGB-based policy under variations in tray and object position, robot start pose, table
+height and type, tablecloth color, lighting, and object category. Videos are provided in https://viral-humanoid.github.io.
+
+same HOMIE policy, yielding a near-apple-to-apple com-                plateaus with a success rate below 10%, whereas the full
+parison. As shown in Figure 7, the expert attains a 100%              VIRAL teacher with RSI reaches nearly 95% success. RSI
+success rate with a 21.4 s cycle time, slightly higher than           improves exploration by resetting episodes to diverse inter-
+the 20.2 s cycle time of VIRAL. Meanwhile, the non-expert             mediate states along the task trajectory, so the policy can
+reaches only 73% success with significantly slower execu-             practice all stages of the task from the outset rather than
+tion. These results show that although expert-level success           discovering subgoals sequentially.
+remains challenging, VIRAL achieves near–expert success
+performance while being faster than the expert, and it sub-
+stantially outperforms non-experts in both reliability and ef-
+ficiency—highlighting its potential to reduce human work-
+load in assisted teleoperation settings.
+
+3.2. Generalization
+                                                                      Figure 9. Ablations of teacher policy training. Training rewards
+We assess real-world generalization by systematically vary-           (left) and success rates (right) for the full method (RSI + delta ac-
+ing the environment along multiple factors, including tray            tion), without demonstration resets, and without delta action space,
+start position, robot start pose, table height, lighting, table       showing that both components are critical for final success.
+cloth, table type and color, and object category (Figure 8).
+Across these variations, VIRAL consistently completes the             4.2. Delta versus Absolute Action Space
+task without additional tuning, indicating strong robustness.
+                                                                      We compare delta and absolute joint action spaces for the
+We attribute this behavior to the domain randomization used
+                                                                      teacher policy. Unlike much of the legged locomotion RL
+during simulation training and the robustness of RL, which
+                                                                      literature, which commonly uses absolute joint targets, we
+exposes the policy to diverse visual and spatial conditions.
+                                                                      find that a delta action space is crucial for humanoid loco-
+Videos are provided in https://viral-humanoid.github.io.
+                                                                      manipulation: as shown in Figure 9, only the delta-action
+                                                                      teacher reliably solves the task, while the absolute-action
+4. Experiments                                                        variant fails to reach high success.
+In this section, we evaluate the contribution of each design
+component of VIRAL, corresponding to the key elements                 4.3. Vision Backbone
+introduced in Section 2.                                              Figure 10 reports the student’s training loss and success
+                                                                      rate. We see that state-of-the-art vision backbones (DI-
+4.1. Reference State Initialization for RL                            NOv3 [61]) yield stronger visual representations and greater
+Figure 9 compares training curves with and without ref-               capacity, enabling faster convergence and higher task suc-
+erence state initialization (RSI) [52] from teleoperated              cess—i.e., the policy learns the target behaviors more reli-
+demonstrations. Without RSI, the teacher policy quickly               ably with better visual features.
+
+
+                                                                  6
+                                                                          M, w/o-D, w/o-E) or using no randomization at all. Suc-
+                                                                          cess rates are randomization
+                                                                                         normalized by the model trained with all ran-
+                                                                          domizations (set to 1.0) and averaged over 200 episodes.
+                                                                          Two trends emerge: (i) turn-
+                                                                          ing off all randomization
+                                                                          causes a large drop in per-
+    Figure 10. Ablation of vision backbone for student policy.            formance (down to 0.649, a
+                                                                          35.1% decrease), and (ii) re-
+4.4. DAgger versus BC Visual Distillation                                 moving any single compo-
+We ablate the DAgger-BC mixture by varying the rollout ra-                nent also degrades perfor-
+tio α, defined as the fraction of environments that follow the            mance, indicating that the
+teacher policy during data collection (α = 0 corresponds to               randomizations are comple-
+pure DAgger on student rollouts, α = 1 to pure BC). As                    mentary and together form         Figure 13. Ablation of vi-
+shown in Figure 11, BC (α = 1) yields fast loss reduc-                    a crucial pipeline for robust     sual randomization.
+tion but produces a brittle policy that fails to correct its own          sim-to-real transfer.
+mistakes and performs poorly in Isaac-to-MuJoCo [48, 67]
+and real-world evaluations. Introducing student rollouts
+                                                                          4.7. Scaling Compute for Teacher Training
+(α = 0.5) slows optimization slightly but substantially im-               Figure 14 highlights the impact of scaling GPU resources
+proves deployment success rate, so we adopt α = 0.5 as our                from 1 to 16 during teacher training. Increasing the number
+   Teacher rollout ratio
+default DAgger-BC ratio.                                                  of GPUs substantially accelerates learning: larger batches
+                                                                          of parallel environments broaden state-space coverage per
+                                                                          unit wall time, enabling the policy to discover rewarding be-
+                                                                          haviors far more quickly. Early training even shows better-
+                                                                          than-linear speedup—for example, reaching a modest suc-
+                                                                          cess rate of ∼ 0.2 with 4 GPUs takes well under half the time
+                                                                          required with 2 GPUs—reflecting richer on-policy experi-
+                                                                          ence and more diverse rollouts. Beyond speed, scaling has
+  Figure 11. Ablation of ratio of DAgger/BC of student policy.            a pronounced effect on asymptotic performance. With in-
+                                                                          sufficient compute (1–2 GPUs), the teacher plateaus far be-
+4.5. History Architecture                                                 low the desired performance range and never reaches high
+                                                                          success rates. In contrast, using 8–16 GPUs consistently
+Figure 12 compares a single-step baseline, a feed-forward
+                                                                          drives the policy above 90% success, revealing that large-
+history model, and an LSTM under different history
+                                                                          scale simulation is not only beneficial but often necessary
+lengths.
+Ablation    History-aware models consistently outperform the
+         history                                                          for learning long-horizon humanoid loco-manipulation.
+single-step baseline, and longer temporal windows provide
+additional gains when resources allow.
+
+
+
+
+                                                                          Figure 14. Scaling compute for teacher training. Rewards (left)
+                                                                          and success rates (right) for 1–16 GPUs. More GPUs yield faster
+ Figure 12. Ablation of the history architecture of student policy.       convergence and better asymptotic performance.
+
+4.6. Visual Randomization                                                 4.8. Scaling Compute for Student Training
+Figure 13 presents an ablation of our visual domain ran-                  We observe a clear scaling trend for the student policy as
+domization. We focus on three dominant components: ma-                    well. Figure 15 plots distillation (DAgger) loss and down-
+terial randomization for table/floor/robot (M), dome-light                stream success rate as we increase the number of GPUs
+randomization (D), and camera-extrinsics randomization                    from 1 to 64. Larger-scale training consistently acceler-
+(E), while other factors (image quality, object color, cam-               ates convergence: the same loss threshold is reached dra-
+era delay) provide smaller gains. All policies are evaluated              matically sooner, and the success curve rises much more
+in IsaacSim [48] with all randomizations enabled; training                steeply. Beyond speed, scaling also improves training sta-
+variants differ by removing one component at a time (w/o-                 bility: policies trained with more GPUs exhibit smoother
+
+
+                                                                      7
+loss curves and less variance in success rate, especially dur-            foot placement but offering limited semantic understand-
+ing the early stages when the student is most sensitive to dis-           ing. Some works [8, 12, 71] combine RGB vision and
+tribution shift. Interestingly, higher-GPU runs also achieve              language instructions with sim-to-real locomotion policies
+slightly higher final success, suggesting that large-scale ex-            for semantic navigation, but rely on high-latency vision-
+perience collection yields richer and more diverse state cov-             language-action (VLA) models. VIRAL instead distills
+erage, which in turn improves robustness. Overall, these                  compact, RGB-driven visuomotor policies trained in ran-
+results indicate that substantial computing is not merely a               domized simulation to support real-time, goal-conditioned
+convenience but a practical requirement for reliable visual               locomotion without sacrificing sim-to-real scalability.
+loco-manipulation distillation.
+                                                                          Sim-to-Real for Manipulation Visual sim-to-real has
+                                                                          been a key driver of progress in manipulation. A central
+                                                                          tool is domain randomization: by varying rendering prop-
+                                                                          erties in simulation, policies trained on RGB can transfer
+                                                                          to the real world [53, 58, 66]. This strategy enabled end-
+                                                                          to-end RL for challenging skills—e.g., OpenAI’s Dactyl re-
+                                                                          oriented objects with a five-finger hand using massive ran-
+Figure 15. Scaling compute for student policy training. Distil-           domization and curriculum learning [2, 3], and later works
+lation loss (left) and success rate (right) when training with 1–64       scaled to tasks like Rubik’s Cube solving and high-speed
+GPUs. Larger GPU counts provide significantly faster conver-
+                                                                          rotation [2, 24]. Early attempts that relied on high-fidelity
+gence, smoother optimization dynamics, and higher final perfor-
+                                                                          RGB/depth/point-cloud simulation still struggled with the
+mance, highlighting the importance of large-scale parallel simula-
+tion for vision-based loco-manipulation.                                  reality gap [2, 3, 25, 30, 33, 75, 76]. Recent methods
+                                                                          improve robustness and scalability via a teacher–student
+4.9. Object generalization                                                paradigm: a privileged-state teacher is trained first, then a
+                                                                          student is distilled from RGB with randomization [17, 42,
+We study object-level generalization on the grasping sub-
+                                                                          62]. However, prior work largely targets tabletop settings.
+task under two training regimes: (i) single-object training
+                                                                          We extend this paradigm to humanoid loco-manipulation.
+on a cylinder only and (ii) multi-object training on ten dis-
+tinct objects. At test time, we evaluate on the same ten ob-
+jects and report normalized success rates. As shown in Fig-               Sim-to-Real for Loco-Manipulation Loco-manipulation
+ure 16, training with multiple objects yields substantially               requires a humanoid robot to move through an environ-
+better generalization—the multi-object policy attains higher              ment while simultaneously interacting with objects. It poses
+success    on every category than the cylinder-only baseline.
+   Object generalization
+                                                                          unique challenges for sim-to-real learning. Recent work ex-
+                                                                          plores sim-to-real learning for low-level loco-manipulation
+                                                                          control, using either modular architectures that decouple leg
+                                                                          and arm [6, 14, 42] or end-to-end policies that coordinate
+                                                                          full-body motion [23, 26, 51]. On top of these controllers,
+                                                                          some systems achieve task-level loco-manipulation via im-
+                                                                          itation learning or vision–language–action models [23, 54,
+                                                                          70], but these approaches require large real-world datasets
+                                                                          and often lack robustness. VIRAL bridges both layers by
+                                                                          training an RGB-driven, end-to-end policy entirely in sim-
+                                                                          ulation, enabling zero-shot deployment for humanoid goal-
+  Figure 16. Ablation of object generalization of teacher policy.
+                                                                          conditioned loco-manipulation without real-world demon-
+5. Related Work                                                           strations or large models.
+
+Sim-to-Real for Locomotion Sim-to-real techniques                         6. Limitations and Discussions
+have enabled blind locomotion policies trained in simu-
+lation to be deployed zero-shot on real legged robots [6,                 While sim-to-real has demonstrated remarkable success in
+11, 18, 20, 31, 35–38, 40, 63]. These proprioceptive poli-                isolated capabilities—robust locomotion, geometric per-
+cies are robust and agile but lack environmental aware-                   ception, and rigid-body manipulation—scaling these meth-
+ness, making them insufficient for navigation in cluttered                ods to general-purpose loco-manipulation (“locomote any-
+or goal-directed settings. To compensate, some works in-                  where, perceive anything, manipulate everything”) exposes
+corporate depth image or LiDAR-based elevation map to                     four critical coverage gaps that current paradigms have yet
+model terrain geometry [13, 43, 47, 55, 69, 84], improving                to bridge.
+
+
+                                                                      8
+Physics Coverage:                                                      trast, imitation learning moves the burden to data collection.
+The Physical Diversity Gap Modern simulators theoret-                  As it stands, a few days of high-quality teleoperation data
+ically possess the capability to model complex dynamics,               can often outperform months of sim-to-real engineering for
+including fluid-structure interactions and deformable bod-             specific tasks, primarily because the “reward” is implicitly
+ies. The fundamental bottleneck is not the lack of simu-               provided by the human demonstrator, bypassing the speci-
+lation features, but the scalability of engineering effort re-         fication problem entirely.
+quired to ground these features in reality. We can, with
+sufficient effort, engineer specific environments to simulate          Hardware Coverage:
+scooping rice, grasping noodles with tongs, cutting garlic,            The Hardware-Simulation Gap Finally, a distinct gap
+hand-crafting sushi, or feeding beans into a coffee machine.           remains between the idealized actuation in simulation and
+However, each of these scenarios requires bespoke tuning               the reality of current humanoid hardware. While quasi-
+of material properties and boundary conditions to align with           direct drive (QDD) actuators for locomotion are relatively
+the real world. The challenge lies in scaling this effort to the       well-modeled, dexterous manipulation hardware often suf-
+open-ended diversity of daily life: modeling the damping of            fers from unmodeled friction, backlash, thermal throttling,
+every cardboard box, the stiffness of every garment, the fric-         and sensor noise. Simulation policies that rely on precise
+tion of specific oil stains, or the granular mechanics of food         finger positioning or force feedback often fail to transfer to
+items. The barrier is not that we cannot simulate these in-            hardware that lacks the requisite reliability and precision,
+teractions, but that the engineering cost to accurately instan-        limiting the complexity of tasks that can be genuinely at-
+tiate them for the long tail of real-world physics arguably            tempted in the real world.
+exceeds the complexity of collecting real-world data itself.
+                                                                       Outlook These four gaps suggest that while sim-to-real
+Task Coverage:                                                         will retain a critical role in robotics—particularly for
+The Long-Tail of Task Generation Even if physics                       safe, stable evaluation and solving skills with bounded
+could be perfectly simulated, the diversity of tasks remains           state-spaces—scaling it to solve general-purpose loco-
+an unresolved challenge. Constructing a simulation envi-               manipulation is likely out of reach for the near future. The
+ronment for a single task (e.g., dishwashing) requires mod-            field has successfully identified the sweet spot for sim-to-
+eling not just object geometries, but their functional af-             real in locomotion: where aggressive randomization of lim-
+fordances, varied states (dirty vs. clean), and interaction            ited parameters (terrain, mass) and carefully-designed re-
+logic. Scaling this to the thousands of distinct chores in             ward functions produce robust policies that generalize well.
+a household environment presents a massive content gen-                However, the equivalent sweet spot for manipulation re-
+eration bottleneck. Furthermore, simulation is limited by              mains undiscovered, as the complexity of contact physics
+human imagination; we cannot simulate “unknown un-                     and semantic diversity in manipulation vastly exceeds that
+knowns”—edge cases and task variants that only emerge                  of locomotion tasks.
+during real-world deployment (e.g., adapting to a pet’s in-                We believe the path forward involves redefining the role
+terference or accommodating a human user with mobility                 of simulation within a broader data ecosystem. Rather
+constraints). Current asset taxonomies and generative pro-             than forcing simulation to generate the entire distribution
+cedural pipelines fail to capture this functional breadth.             of the real world, the next frontier lies in integrating sim-
+                                                                       to-real with the rapidly maturing stacks of real-world imita-
+                                                                       tion learning and foundation models. Discovering this syn-
+Reward and Policy Coverage:
+                                                                       ergy—where simulation complements rather than replaces
+The Reward Engineering Bottleneck Defining “RL-
+                                                                       real-world learning—is the most exciting direction for the
+friendly” reward functions that are both dense enough to
+                                                                       future of general-purpose loco-manipulation.
+guide exploration and sparse enough to prevent specifi-
+cation gaming is a delicate art that does not scale. In                Acknowledgement
+practice, we observe a tension between under-exploration
+(where dense, shaped rewards bias the policy toward lo-                We thank Jeremy Chimienti, Tri Cao, Jazmin Sanchez, Is-
+cal optima or simulator exploits) and over-exploration                 abel Zuluaga, Jesse Yang, Caleb Geballe, Haotian Lin,
+(where sparse rewards fail to bootstrap learning in high-              Lingyun Xu, Huanyu Li, Chaoyi Pan, Chaitanya Chawla,
+dimensional spaces). For a single task, tuning these re-               Jason Liu, Tony Tao, Ritvik Singh, Ankur Handa, Arthur
+wards to find the “Goldilocks” regime is feasible. How-                Allshire, Guanzhi Wang, Yinzhen Xu, Runyu Ding, Xi-
+ever, manually designing robust reward functions for thou-             aowei Jiang, Yuqi Xie, Jimmy Wu, Haoyu Xiong, Avnish
+sands of distinct tasks is intractable. This highlights a cru-         Narayan, Kaushil Kundalia, Qi Wang, Scott Reed, Ziang
+cial trade-off: while sim-to-real offers scalable data gen-            Cao, Fengyuan Hu, Sirui Chen, Chenran Li, and Tingwu
+eration, it demands high upfront engineering effort. In con-           Wang for their help and support during this project.
+
+                                                                   9
+References                                                               [13] Xuxin Cheng, Kexin Shi, Ananye Agarwal, and Deepak
+                                                                              Pathak. Extreme parkour with legged robots. arXiv preprint
+ [1] Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ah-                    arXiv:2309.14341, 2023. 2, 8
+     mad, Ilge Akkaya, Florencia Leoni Aleman, Diogo Almeida,
+                                                                         [14] Xuxin Cheng, Yandong Ji, Junming Chen, Ruihan Yang, Ge
+     Janko Altenschmidt, Sam Altman, Shyamal Anadkat, et al.
+                                                                              Yang, and Xiaolong Wang. Expressive whole-body con-
+     Gpt-4 technical report. arXiv preprint arXiv:2303.08774,
+                                                                              trol for humanoid robots. arXiv preprint arXiv:2402.16796,
+     2023. 2
+                                                                              2024. 8
+ [2] Ilge Akkaya, Marcin Andrychowicz, Maciek Chociej, Ma-
+                                                                         [15] Jeremy Dao, Helei Duan, and Alan Fern. Sim-to-real learn-
+     teusz Litwin, Bob McGrew, Arthur Petron, Alex Paino,
+                                                                              ing for humanoid box loco-manipulation. In 2024 IEEE In-
+     Matthias Plappert, Glenn Powell, Raphael Ribas, et al.
+                                                                              ternational Conference on Robotics and Automation (ICRA),
+     Solving rubik’s cube with a robot hand. arXiv preprint
+                                                                              pages 16930–16936. IEEE, 2024. 2
+     arXiv:1910.07113, 2019. 2, 8
+                                                                         [16] Kourosh Darvish, Luigi Penco, Joao Ramos, Rafael Cis-
+ [3] OpenAI: Marcin Andrychowicz, Bowen Baker, Maciek
+                                                                              neros, Jerry Pratt, Eiichi Yoshida, Serena Ivaldi, and Daniele
+     Chociej, Rafal Jozefowicz, Bob McGrew, Jakub Pachocki,
+                                                                              Pucci. Teleoperation of humanoid robots: A survey. IEEE
+     Arthur Petron, Matthias Plappert, Glenn Powell, Alex Ray,
+                                                                              Transactions on Robotics, 39(3):1706–1727, 2023. 2
+     et al. Learning dexterous in-hand manipulation. The Inter-
+                                                                         [17] Shengliang Deng, Mi Yan, Songlin Wei, Haixin Ma, Yuxin
+     national Journal of Robotics Research, 39(1):3–20, 2020. 2,
+                                                                              Yang, Jiayi Chen, Zhiqi Zhang, Taoyu Yang, Xuheng Zhang,
+     8
+                                                                              Wenhao Zhang, et al. Graspvla: a grasping foundation model
+ [4] Genesis Authors. Genesis: A universal and generative                     pre-trained on billion-scale synthetic action data. arXiv
+     physics engine for robotics and beyond. URL https://github.              preprint arXiv:2505.03233, 2025. 2, 8
+     com/Genesis-Embodied-AI/Genesis, 2024. 2
+                                                                         [18] Helei Duan, Ashish Malik, Mohitvishnu S Gadde, Jeremy
+ [5] Jose Barreiros, Andrew Beaulieu, Aditya Bhat, Rick Cory,                 Dao, Alan Fern, and Jonathan Hurst. Learning dynamic
+     Eric Cousineau, Hongkai Dai, Ching-Hsin Fang, Kunimatsu                  bipedal walking across stepping stones. In 2022 IEEE/RSJ
+     Hashimoto, Muhammad Zubair Irshad, Masha Itkina, et al.                  International Conference on Intelligent Robots and Systems
+     A careful examination of large behavior models for multitask             (IROS), pages 6746–6752. IEEE, 2022. 8
+     dexterous manipulation. arXiv preprint arXiv:2507.05331,
+                                                                         [19] Zipeng Fu, Tony Z Zhao, and Chelsea Finn. Mobile aloha:
+     2025. 2
+                                                                              Learning bimanual mobile manipulation with low-cost
+ [6] Qingwei Ben, Feiyu Jia, Jia Zeng, Junting Dong, Dahua                    whole-body teleoperation. arXiv preprint arXiv:2401.02117,
+     Lin, and Jiangmiao Pang.         Homie: Humanoid loco-                   2024. 2
+     manipulation with isomorphic exoskeleton cockpit. arXiv
+                                                                         [20] Xinyang Gu, Yen-Jen Wang, Xiang Zhu, Chengming Shi,
+     preprint arXiv:2502.13013, 2025. 2, 3, 8
+                                                                              Yanjiang Guo, Yichen Liu, and Jianyu Chen. Advanc-
+ [7] Johan Bjorck, Fernando Castañeda, Nikita Cherniadev,                    ing humanoid locomotion: Mastering challenging terrains
+     Xingye Da, Runyu Ding, Linxi Fan, Yu Fang, Dieter Fox,                   with denoising world model learning.           arXiv preprint
+     Fengyuan Hu, Spencer Huang, et al. Gr00t n1: An open                     arXiv:2408.14472, 2024. 8
+     foundation model for generalist humanoid robots. arXiv
+                                                                         [21] Zhaoyuan Gu, Junheng Li, Wenlan Shen, Wenhao Yu,
+     preprint arXiv:2503.14734, 2025. 2
+                                                                              Zhaoming Xie, Stephen McCrory, Xianyi Cheng, Abdulaziz
+ [8] Wenzhe Cai, Jiaqi Peng, Yuqiang Yang, Yujian Zhang, Meng                 Shamsah, Robert Griffin, C Karen Liu, et al. Humanoid
+     Wei, Hanqing Wang, Yilun Chen, Tai Wang, and Jiangmiao                   locomotion and manipulation: Current progress and chal-
+     Pang. Navdp: Learning sim-to-real navigation diffusion pol-              lenges in control, planning, and learning. arXiv preprint
+     icy with privileged information guidance. arXiv preprint                 arXiv:2501.02116, 2025. 1
+     arXiv:2505.08712, 2025. 8                                           [22] Sylvain Gugger, Lysandre Debut, Thomas Wolf, Philipp
+ [9] Dian Chen, Brady Zhou, Vladlen Koltun, and Philipp                       Schmid, Zachary Mueller, Sourab Mangrulkar, Marc Sun,
+     Krähenbühl. Learning by cheating. In Conference on robot               and Benjamin Bossan. Accelerate: Training and inference
+     learning, pages 66–75. PMLR, 2020. 3                                     at scale made simple, efficient and adaptable. https:
+[10] Yuanpei Chen, Chen Wang, Yaodong Yang, and C Karen                       //github.com/huggingface/accelerate, 2022.
+     Liu. Object-centric dexterous manipulation from human mo-                5
+     tion data. arXiv preprint arXiv:2411.04005, 2024. 2                 [23] Huy Ha, Yihuai Gao, Zipeng Fu, Jie Tan, and Shuran Song.
+[11] Zixuan Chen, Xialin He, Yen-Jen Wang, Qiayuan Liao, Yan-                 Umi on legs: Making manipulation policies mobile with
+     jie Ze, Zhongyu Li, S Shankar Sastry, Jiajun Wu, Koushil                 manipulation-centric whole-body controllers. arXiv preprint
+     Sreenath, Saurabh Gupta, et al. Learning smooth humanoid                 arXiv:2407.10353, 2024. 8
+     locomotion through lipschitz-constrained policies. arXiv            [24] Ankur Handa, Arthur Allshire, Viktor Makoviychuk, Aleksei
+     preprint arXiv:2410.11825, 2024. 8                                       Petrenko, Ritvik Singh, Jingzhou Liu, Denys Makoviichuk,
+[12] An-Chieh Cheng, Yandong Ji, Zhaojing Yang, Zaitian                       Karl Van Wyk, Alexander Zhurkevich, Balakumar Sundar-
+     Gongye, Xueyan Zou, Jan Kautz, Erdem Bıyık, Hongxu                       alingam, et al. Dextreme: Transfer of agile in-hand ma-
+     Yin, Sifei Liu, and Xiaolong Wang. Navila: Legged robot                  nipulation from simulation to reality. In 2023 IEEE Inter-
+     vision-language-action model for navigation. arXiv preprint              national Conference on Robotics and Automation (ICRA),
+     arXiv:2412.04453, 2024. 8                                                pages 5977–5984. IEEE, 2023. 2, 8
+
+
+                                                                    10
+[25] Nicklas Hansen and Xiaolong Wang. Generalization in re-                  trol of bipedal robots. In 2021 IEEE International Confer-
+     inforcement learning by soft data augmentation. In 2021                  ence on Robotics and Automation (ICRA), pages 2811–2817.
+     IEEE International Conference on Robotics and Automation                 IEEE, 2021.
+     (ICRA), pages 13611–13617. IEEE, 2021. 2, 8                         [38] Zhongyu Li, Xue Bin Peng, Pieter Abbeel, Sergey Levine,
+[26] Tairan He, Zhengyi Luo, Xialin He, Wenli Xiao, Chong                     Glen Berseth, and Koushil Sreenath. Reinforcement learning
+     Zhang, Weinan Zhang, Kris Kitani, Changliu Liu, and                      for versatile, dynamic, and robust bipedal locomotion con-
+     Guanya Shi. Omnih2o: Universal and dexterous human-                      trol. The International Journal of Robotics Research, 44(5):
+     to-humanoid whole-body teleoperation and learning. arXiv                 840–888, 2025. 2, 8
+     preprint arXiv:2406.08858, 2024. 2, 8                               [39] Qiayuan Liao, Takara E Truong, Xiaoyu Huang, Guy Tevet,
+[27] Tairan He, Chong Zhang, Wenli Xiao, Guanqi He,                           Koushil Sreenath, and C Karen Liu. Beyondmimic: From
+     Changliu Liu, and Guanya Shi. Agile but safe: Learning                   motion tracking to versatile humanoid control via guided dif-
+     collision-free high-speed legged locomotion. arXiv preprint              fusion. arXiv preprint arXiv:2508.08241, 2025. 2
+     arXiv:2401.17583, 2024. 2                                           [40] Qiayuan Liao, Bike Zhang, Xuanyu Huang, Xiaoyu Huang,
+[28] Tairan He, Wenli Xiao, Toru Lin, Zhengyi Luo, Zhenjia                    Zhongyu Li, and Koushil Sreenath. Berkeley humanoid:
+     Xu, Zhenyu Jiang, Jan Kautz, Changliu Liu, Guanya Shi,                   A research platform for learning-based control. In 2025
+     Xiaolong Wang, et al. Hover: Versatile neural whole-                     IEEE International Conference on Robotics and Automation
+     body controller for humanoid robots. In 2025 IEEE Inter-                 (ICRA), pages 2897–2904. IEEE, 2025. 8
+     national Conference on Robotics and Automation (ICRA),              [41] Toru Lin, Kartik Sachdev, Linxi Fan, Jitendra Malik, and
+     pages 9989–9996. IEEE, 2025. 2                                           Yuke Zhu. Sim-to-real reinforcement learning for vision-
+[29] Yingdong Hu, Fanqi Lin, Pingyue Sheng, Chuan Wen, Ji-                    based dexterous manipulation on humanoids. arXiv preprint
+     acheng You, and Yang Gao. Data scaling laws in imi-                      arXiv:2502.20396, 2025. 2, 4
+     tation learning for robotic manipulation. arXiv preprint            [42] Minghuan Liu, Zixuan Chen, Xuxin Cheng, Yandong Ji, Ri-
+     arXiv:2410.18647, 2024. 2                                                Zhao Qiu, Ruihan Yang, and Xiaolong Wang. Visual whole-
+[30] Yangru Huang, Peixi Peng, Yifan Zhao, Guangyao Chen,                     body control for legged loco-manipulation. arXiv preprint
+     and Yonghong Tian. Spectrum random masking for gener-                    arXiv:2403.16967, 2024. 2, 8
+     alization in image-based reinforcement learning. Advances           [43] Junfeng Long, Junli Ren, Moji Shi, Zirui Wang, Tao Huang,
+     in Neural Information Processing Systems, 35:20393–20406,                Ping Luo, and Jiangmiao Pang. Learning humanoid loco-
+     2022. 2, 8                                                               motion with perceptive internal model. In 2025 IEEE In-
+[31] Jemin Hwangbo, Joonho Lee, Alexey Dosovitskiy, Dario                     ternational Conference on Robotics and Automation (ICRA),
+     Bellicoso, Vassilios Tsounis, Vladlen Koltun, and Marco                  pages 9997–10003. IEEE, 2025. 2, 8
+     Hutter. Learning agile and dynamic motor skills for legged          [44] Zhengyi Luo, Ye Yuan, Tingwu Wang, Chenran Li, Sirui
+     robots. Science Robotics, 4(26):eaau5872, 2019. 8                        Chen, Fernando Castañeda, Zi-Ang Cao, Jiefeng Li, David
+[32] Physical Intelligence, Kevin Black, Noah Brown, James                    Minor, Qingwei Ben, Xingye Da, Runyu Ding, Cyrus Hogg,
+     Darpinian, Karan Dhabalia, Danny Driess, Adnan Esmail,                   Lina Song, Edy Lim, Eugene Jeong, Tairan He, Haoru Xue,
+     Michael Equi, Chelsea Finn, Niccolo Fusai, et al. π0. 5:                 Wenli Xiao, Zi Wang, Simon Yuen, Jan Kautz, Yan Chang,
+     a vision-language-action model with open-world generaliza-               Umar Iqbal, Linxi Fan, and Yuke Zhu. Sonic: Supersizing
+     tion, 2025. URL https://arxiv. org/abs/2504.16054, 1(2):3.               motion tracking for natural humanoid whole-body control.
+     2                                                                        arXiv preprint arXiv:2511.07820, 2025. 2, 3
+[33] Yunfan Jiang, Chen Wang, Ruohan Zhang, Jiajun Wu, and               [45] Abhiram Maddukuri, Zhenyu Jiang, Lawrence Yunliang
+     Li Fei-Fei. Transic: Sim-to-real policy transfer by learning             Chen, Soroush Nasiriany, Yuqi Xie, Yu Fang, Wenqi Huang,
+     from online correction. arXiv preprint arXiv:2405.10315,                 Zu Wang, Zhenjia Xu, Nikita Chernyadev, et al. Sim-and-
+     2024. 2, 8                                                               real co-training: A simple recipe for vision-based robotic
+[34] Yunfan Jiang, Ruohan Zhang, Josiah Wong, Chen Wang,                      manipulation. arXiv preprint arXiv:2503.24361, 2025. 2
+     Yanjie Ze, Hang Yin, Cem Gokmen, Shuran Song, Jiajun                [46] Viktor Makoviychuk, Lukasz Wawrzyniak, Yunrong Guo,
+     Wu, and Li Fei-Fei. Behavior robot suite: Streamlining real-             Michelle Lu, Kier Storey, Miles Macklin, David Hoeller,
+     world whole-body manipulation for everyday household ac-                 Nikita Rudin, Arthur Allshire, Ankur Handa, et al. Isaac
+     tivities. arXiv preprint arXiv:2503.05652, 2025. 2                       gym: High performance gpu-based physics simulation for
+[35] Ashish Kumar, Zipeng Fu, Deepak Pathak, and Jitendra Ma-                 robot learning. arXiv preprint arXiv:2108.10470, 2021. 2
+     lik. Rma: Rapid motor adaptation for legged robots. arXiv           [47] Takahiro Miki, Joonho Lee, Jemin Hwangbo, Lorenz Well-
+     preprint arXiv:2107.04034, 2021. 8                                       hausen, Vladlen Koltun, and Marco Hutter. Learning robust
+[36] Joonho Lee, Jemin Hwangbo, Lorenz Wellhausen, Vladlen                    perceptive locomotion for quadrupedal robots in the wild.
+     Koltun, and Marco Hutter. Learning quadrupedal locomotion                Science robotics, 7(62):eabk2822, 2022. 8
+     over challenging terrain. Science robotics, 5(47):eabc5986,         [48] Mayank Mittal, Pascal Roth, James Tigue, Antoine Richard,
+     2020.                                                                    Octi Zhang, Peter Du, Antonio Serrano-Muñoz, Xinjie Yao,
+[37] Zhongyu Li, Xuxin Cheng, Xue Bin Peng, Pieter Abbeel,                    René Zurbrügg, Nikita Rudin, et al. Isaac lab: A gpu-
+     Sergey Levine, Glen Berseth, and Koushil Sreenath. Rein-                 accelerated simulation framework for multi-modal robot
+     forcement learning for robust parameterized locomotion con-              learning. arXiv preprint arXiv:2511.04831, 2025. 2, 3, 7
+
+
+                                                                    11
+[49] Ashvin Nair, Bob McGrew, Marcin Andrychowicz, Woj-                     [61] Oriane Siméoni, Huy V Vo, Maximilian Seitzer, Federico
+     ciech Zaremba, and Pieter Abbeel. Overcoming exploration                    Baldassarre, Maxime Oquab, Cijo Jose, Vasil Khalidov,
+     in reinforcement learning with demonstrations. In 2018                      Marc Szafraniec, Seungeun Yi, Michaël Ramamonjisoa,
+     IEEE international conference on robotics and automation                    et al. Dinov3. arXiv preprint arXiv:2508.10104, 2025. 4,
+     (ICRA), pages 6292–6299. IEEE, 2018. 4                                      6
+[50] Abby O’Neill, Abdul Rehman, Abhiram Maddukuri, Ab-                     [62] Ritvik Singh, Arthur Allshire, Ankur Handa, Nathan Ratliff,
+     hishek Gupta, Abhishek Padalkar, Abraham Lee, Acorn Poo-                    and Karl Van Wyk. Dextrah-rgb: Visuomotor policies
+     ley, Agrim Gupta, Ajay Mandlekar, Ajinkya Jain, et al. Open                 to grasp anything with dexterous hands. arXiv preprint
+     x-embodiment: Robotic learning datasets and rt-x models:                    arXiv:2412.01791, 2024. 2, 8
+     Open x-embodiment collaboration 0. In 2024 IEEE Inter-                 [63] Jie Tan, Tingnan Zhang, Erwin Coumans, Atil Iscen,
+     national Conference on Robotics and Automation (ICRA),                      Yunfei Bai, Danijar Hafner, Steven Bohez, and Vincent
+     pages 6892–6903. IEEE, 2024. 2                                              Vanhoucke. Sim-to-real: Learning agile locomotion for
+[51] Guoping Pan, Qingwei Ben, Zhecheng Yuan, Guangqi Jiang,                     quadruped robots. arXiv preprint arXiv:1804.10332, 2018.
+     Yandong Ji, Shoujie Li, Jiangmiao Pang, Houde Liu, and                      2, 8
+     Huazhe Xu. Roboduet: Learning a cooperative policy for                 [64] Generalist AI Team. Gen-0: Embodied foundation mod-
+     whole-body legged loco-manipulation. IEEE Robotics and                      els that scale with physical interaction. Generalist AI Blog,
+     Automation Letters, 2025. 8                                                 2025. https://generalistai.com/blog/preview-uqlxvb-bb.html.
+[52] Xue Bin Peng, Pieter Abbeel, Sergey Levine, and Michiel                     2
+     Van de Panne. Deepmimic: Example-guided deep reinforce-                [65] Dhruva Tirumala, Markus Wulfmeier, Ben Moran, Sandy
+     ment learning of physics-based character skills. ACM Trans-                 Huang, Jan Humplik, Guy Lever, Tuomas Haarnoja, Leonard
+     actions On Graphics (TOG), 37(4):1–14, 2018. 4, 6                           Hasenclever, Arunkumar Byravan, Nathan Batchelor, et al.
+[53] Xue Bin Peng, Marcin Andrychowicz, Wojciech Zaremba,                        Learning robot soccer from egocentric vision with deep rein-
+     and Pieter Abbeel. Sim-to-real transfer of robotic control                  forcement learning. arXiv preprint arXiv:2405.02425, 2024.
+     with dynamics randomization. In 2018 IEEE international                     2
+     conference on robotics and automation (ICRA), pages 3803–              [66] Josh Tobin, Rachel Fong, Alex Ray, Jonas Schneider, Woj-
+     3810. IEEE, 2018. 8                                                         ciech Zaremba, and Pieter Abbeel. Domain randomization
+                                                                                 for transferring deep neural networks from simulation to the
+[54] Ri-Zhao Qiu, Yuchen Song, Xuanbin Peng, Sai Aneesh
+                                                                                 real world. In 2017 IEEE/RSJ international conference on
+     Suryadevara, Ge Yang, Minghuan Liu, Mazeyu Ji, Chengzhe
+                                                                                 intelligent robots and systems (IROS), pages 23–30. IEEE,
+     Jia, Ruihan Yang, Xueyan Zou, et al. Wildlma: Long hori-
+                                                                                 2017. 8
+     zon loco-manipulation in the wild. In 2025 IEEE Inter-
+                                                                            [67] Emanuel Todorov, Tom Erez, and Yuval Tassa. Mujoco: A
+     national Conference on Robotics and Automation (ICRA),
+                                                                                 physics engine for model-based control. In 2012 IEEE/RSJ
+     pages 10011–10019. IEEE, 2025. 8
+                                                                                 international conference on intelligent robots and systems,
+[55] Junli Ren, Tao Huang, Huayi Wang, Zirui Wang, Qing-
+                                                                                 pages 5026–5033. IEEE, 2012. 7
+     wei Ben, Junfeng Long, Yanchao Yang, Jiangmiao Pang,
+                                                                            [68] Leandro von Werra, Younes Belkada, Lewis Tunstall, Ed-
+     and Ping Luo. Vb-com: Learning vision-blind composite
+                                                                                 ward Beeching, Tristan Thrush, Nathan Lambert, Shengyi
+     humanoid locomotion against deficient perception. arXiv
+                                                                                 Huang, Kashif Rasul, and Quentin Gallouédec. Trl: Trans-
+     preprint arXiv:2502.14814, 2025. 8
+                                                                                 former reinforcement learning. https://github.com/
+[56] Stéphane Ross, Geoffrey Gordon, and Drew Bagnell. A re-                    huggingface/trl, 2020. 3, 5
+     duction of imitation learning and structured prediction to no-         [69] Huayi Wang, Zirui Wang, Junli Ren, Qingwei Ben, Tao
+     regret online learning. In Proceedings of the fourteenth inter-             Huang, Weinan Zhang, and Jiangmiao Pang. Beamdojo:
+     national conference on artificial intelligence and statistics,              Learning agile humanoid locomotion on sparse footholds.
+     pages 627–635. JMLR Workshop and Conference Proceed-                        arXiv preprint arXiv:2502.10363, 2025. 8
+     ings, 2011. 2, 3, 4, 1
+                                                                            [70] Kaijun Wang, Liqin Lu, Mingyu Liu, Jianuo Jiang, Zeju
+[57] Nikita Rudin, David Hoeller, Philipp Reist, and Marco Hut-                  Li, Bolin Zhang, Wancai Zheng, Xinyi Yu, Hao Chen,
+     ter. Learning to walk in minutes using massively parallel                   and Chunhua Shen. Odyssey: Open-world quadrupeds ex-
+     deep reinforcement learning. In Conference on robot learn-                  ploration and manipulation for long-horizon tasks. arXiv
+     ing, pages 91–100. PMLR, 2022. 2, 3                                         preprint arXiv:2508.08240, 2025. 8
+[58] Fereshteh Sadeghi and Sergey Levine. Cad2rl: Real single-              [71] Meng Wei, Chenyang Wan, Xiqian Yu, Tai Wang, Yuqiang
+     image flight without a single real image. arXiv preprint                    Yang, Xiaohan Mao, Chenming Zhu, Wenzhe Cai, Hanqing
+     arXiv:1611.04201, 2016. 8                                                   Wang, Yilun Chen, et al. Streamvln: Streaming vision-and-
+[59] John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Rad-                   language navigation via slowfast context modeling. arXiv
+     ford, and Oleg Klimov. Proximal policy optimization algo-                   preprint arXiv:2507.05240, 2025. 8
+     rithms. arXiv preprint arXiv:1707.06347, 2017. 3, 1                    [72] Haoyang Weng, Yitang Li, Nikhil Sobanbabu, Zihan Wang,
+[60] Dana Sharon and Michiel van de Panne. Synthesis of con-                     Zhengyi Luo, Tairan He, Deva Ramanan, and Guanya Shi.
+     trollers for stylized planar bipedal walking. In Proceedings                Hdmi: Learning interactive humanoid whole-body control
+     of the 2005 IEEE International Conference on Robotics and                   from human videos. arXiv preprint arXiv:2509.16757, 2025.
+     Automation, pages 2387–2392. IEEE, 2005. 4                                  2
+
+
+                                                                       12
+[73] Haoyu Xiong, Russell Mendonca, Kenneth Shaw, and
+     Deepak Pathak. Adaptive mobile manipulation for ar-
+     ticulated objects in the open world.         arXiv preprint
+     arXiv:2401.14403, 2024. 2
+[74] Shaofeng Yin, Yanjie Ze, Hong-Xing Yu, C Karen Liu,
+     and Jiajun Wu. Visualmimic: Visual humanoid loco-
+     manipulation via motion tracking and generation. arXiv
+     preprint arXiv:2509.20322, 2025. 2
+[75] Zhecheng Yuan, Tianming Wei, Shuiqi Cheng, Gu Zhang,
+     Yuanpei Chen, and Huazhe Xu. Learning to manipulate any-
+     where: A visual generalizable framework for reinforcement
+     learning. arXiv preprint arXiv:2407.15815, 2024. 2, 8
+[76] Yanjie Ze, Nicklas Hansen, Yinbo Chen, Mohit Jain, and
+     Xiaolong Wang. Visual reinforcement learning with self-
+     supervised 3d representations. IEEE Robotics and Automa-
+     tion Letters, 8(5):2890–2897, 2023. 2, 8
+[77] Yanjie Ze, Zixuan Chen, Wenhao Wang, Tianyi Chen, Xi-
+     alin He, Ying Yuan, Xue Bin Peng, and Jiajun Wu. Gener-
+     alizable humanoid manipulation with 3d diffusion policies.
+     arXiv preprint arXiv:2410.10803, 2024. 2
+[78] Yanjie Ze, Siheng Zhao, Weizhuo Wang, Angjoo Kanazawa,
+     Rocky Duan, Pieter Abbeel, Guanya Shi, Jiajun Wu, and
+     C Karen Liu. Twist2: Scalable, portable, and holis-
+     tic humanoid data collection system.         arXiv preprint
+     arXiv:2511.02832, 2025. 2, 3
+[79] Yuanhang Zhang, Yifu Yuan, Prajwal Gurunath, Tairan
+     He, Shayegan Omidshafiei, Ali-akbar Agha-mohammadi,
+     Marcell Vazquez-Chanlatte, Liam Pedersen, and Guanya
+     Shi. Falcon: Learning force-adaptive humanoid loco-
+     manipulation. arXiv preprint arXiv:2505.06776, 2025. 2
+[80] Siheng Zhao, Yanjie Ze, Yue Wang, C Karen Liu, Pieter
+     Abbeel, Guanya Shi, and Rocky Duan.              Resmimic:
+     From general motion tracking to humanoid whole-body
+     loco-manipulation via residual learning. arXiv preprint
+     arXiv:2510.05070, 2025. 2
+[81] Tony Z Zhao, Jonathan Tompson, Danny Driess, Pete Flo-
+     rence, Kamyar Ghasemipour, Chelsea Finn, and Ayzaan
+     Wahid. Aloha unleashed: A simple recipe for robot dexterity.
+     arXiv preprint arXiv:2410.13126, 2024. 2
+[82] Peiyuan Zhi, Peiyang Li, Jianqin Yin, Baoxiong Jia,
+     and Siyuan Huang. Learning unified force and posi-
+     tion control for legged loco-manipulation. arXiv preprint
+     arXiv:2505.20829, 2025. 2
+[83] Yuke Zhu, Ziyu Wang, Josh Merel, Andrei Rusu, Tom Erez,
+     Serkan Cabi, Saran Tunyasuvunakool, János Kramár, Raia
+     Hadsell, Nando de Freitas, et al. Reinforcement and imita-
+     tion learning for diverse visuomotor skills. arXiv preprint
+     arXiv:1802.09564, 2018. 2
+[84] Ziwen Zhuang, Shenzhe Yao, and Hang Zhao. Humanoid
+     parkour learning. arXiv preprint arXiv:2406.10759, 2024. 2,
+     8
+
+
+
+
+                                                                    13
+        VIRAL: Visual Sim-to-Real at Scale for Humanoid Loco-Manipulation
+                                                  Supplementary Material
+7. Training Details                                                7.2. Reward Details
+7.1. Observation Details                                           A single place–pickup cycle is decomposed into five stages:
+                                                                   (1) walking toward the object; (2) moving the arm and hand
+Table 1 summarizes the observation terms and their corre-          to a pre-place pose; (3) placing the object; (4) grasping and
+sponding dimensions.                                               lifting the next object; and (5) turning. Repeating this se-
+                                                                   quence produces a long-horizon loco-manipulation loop. At
+       State term                           Dimensions             each step, the total reward is a stage-weighted sum
+       Base linear velocity                        3                                4
+       Base angular velocity                       3
+                                                                                          wi 1[st = i]rt ,
+                                                                                                      (i)
+                                                                                    X
+                                                                             rt =                            wi > 0,
+       Projected gravity                           3
+                                                                                    i=0
+       Actions                                    31
+       Stage                                       5               and stage transitions are governed by stage-specific ad-
+       Delta actions                              11               vancement and completion criteria. Table 3 instantiates r(s)
+       DoF position                               43
+                                                                   with stage-dependent shaping terms for teacher policy.
+       DoF velocity                               43
+       Placement position                          2               7.3. Hyperparameters Details
+       Table–pelvis transform                      9
+       Finger-tip forces for hold object          12               Table 4 lists the PD gains used for the Unitree G1 robot
+       Hold object transform                       9               equipped with 3-finger dexterous hands.
+       Hold object–hand transform                  9                   Table 5 lists the hyperparamters for teacher policy
+       Target pre-place position                   3               trained by PPO [59].
+       Finger-tip forces for grasp object         12                   Table 6 lists the hyperparameters for student policy
+       Grasp object transform                      9               trained by the mixture of DAgger [56] and Behavior
+       Grasp object–hand transform                 9               Cloning.
+       Target lift position                        3
+       HOMIE commands                              7               7.4. Domain Randomization
+       Single-step total dim                      226              Table 7 summarizes all randomizations used during policy
+                                                                   training, including image quality, dome lighting, materials,
+        Table 1. Observation dimensions for teacher.               table properties, and camera extrinsics.
+
+   Table 2 lists the observation terms and their correspond-
+ing dimensions. In addition to these state observations, we
+feed an RGB image of size 108 × 192 into the vision en-
+coder. The resulting 128-dimensional visual feature is con-
+catenated with the state observations and then passed to the
+policy head.
+
+          State term                    Dimensions
+          Base angular velocity               3
+          Projected gravity                   3
+          Actions                            31
+          DoF position (w/o fingers)         29
+          DoF velocity (w/o fingers)         29
+          Delta actions                      11
+          HOMIE commands                      7
+          Single-step total dim             113
+
+        Table 2. Observation dimensions for student.
+
+
+
+
+                                                               1
+Term                                                   Expression                                                                  Weight Stage(s)
+Termination / generic penalties
+Termination                                            1{termination}                                                             −2000.0   0–4
+Delta action rate                                      ∥∆at ∥22                                                                     −0.01   0–4
+DoF velocity                                           ∥q̇∥22                                                                        −0.5   0–4
+DoF acceleration                                       ∥q̈∥22                                                                 −3.0 × 10−6   0–4
+Torque limits                                          ∥τ ∥22                                                                      −0.001   0–4
+Output smoothness                                      ∥πt − πt−1 ∥22                                                                −9.0   0–4
+Finger primitive limits                                 clip(ufinger , [l, u]) − ufinger                                            −20.0   0–4
+Fast right-arm velocity                                ∥q̇right arm ∥22                                                             −80.0   0–4
+Finger qvel, when contacting ground with single-foot   ∥q̇finger ∥2 1single-foot                                                  −3000.0   1–3
+Arm qvel, when contacting ground with single-foot      ∥q̇right arm ∥2 1single-foot                                               −1300.0   1–3
+Heading / command shaping
+                                                                                   2
+Heading toward object                                   (ψGraspObj − ψrobot )/π                                                 −10000.0     0
+Object in view                                         1[y            >y
+                                                       P right hand cmdGraspObj 
+                                                                                   − 0.1] + 1[yleft hand < yGraspObj + 0.1]        −1.0      0
+Large linear vx command                                    max 0, |vx | − 0.5                                                     −20.0     0–4
+                                                           max 0, |vycmd | − 0.5
+                                                       P                            
+Large linear vy command                                                                                                           −20.0     0–4
+                                                                        cmd
+                                                       P                            
+Large angular ω command                                    max 0, |ω | − 0.5                                                      −20.0     0–4
+                                                       P                             
+Large upper-body actions                                   max 0, |uupper | − 2π                                                  −20.0     0–4
+Zero linear vx , linear vy , angular ω cmd             |vxcmd | + |vycmd | + |ω cmd |                                             −12.0     1–3
+Zero linear vx , linear vy cmd                         |vxcmd | + |vycmd |                                                         −4.0      4
+Task / object-centric rewards
+Robot-Object distance                                  exp(−4 (∥probot − pGraspObj ∥ − 0.45)2 )                                      2.0   0–4
+Upper-body actions (pose)                              ∥qright arm ∥22                                                             −1.0     0
+                                                       exp −4 (ufinger − uclose )2
+                                                                                       
+Keep hand closed                                                                                                                     9.0 0–1, 3–4
+Place objects when near tray                           −∥fPlaceObj ∥ ∗ 1(∥pPlaceObj − ptray ∥ < 0.3)                                10.0   0–1
+                                                                                         
+Holding object                                         exp −4∥pPlaceObj − phand ∥2                                                   1.0   0–4
+                                                                             (k)               
+Hand–object distance                                   exp −10 maxk ∥pfinger − pGraspObj ∥2                                         20.0   3–4
+Grasp based on obj–finger dir                          − d̂⊤ d̂                                                                      5.0   3–4
+                                                       P thumb index
+Grasp force                                                ∥fGraspObj-hand ∥                                                         1.0   3–4
+Lift goal distance                                     exp(−10||pGraspObj − pgoal ||2 )                                             10.0   3–4
+Lift z                                                 min(hGraspObj − htable , 0.15)                                              200.0   3–4
+Turn around                                            −|yrobot − ydesired |                                                        15.0    4
+                                                       exp −4∥qright arm − q∗Place ∥2
+                                                                                          
+Right-arm qpos tracking (hold)                                                                                                       5.0   0–2
+                                                       exp −4∥qright arm − q∗Grasp ∥2
+                                                                                           
+Right-arm qpos tracking (front)                                                                                                     25.0   3–4
+                                                                                       
+Finger qvel during right-arm qvel                      exp −6∥q̇arm ∥2 ∥q̇finger ∥2                                                 15.0   1–4
+Object–table contact move                              ∥vGraspObj,xy ∥ 1table-contact                                            −1000.0   1–4
+Object relative move (hand–obj vz )                      z
+                                                       |vGraspObj      z |1
+                                                                   − vhand                                                       −3000.0   1–3
+                                                                              in-grasp
+Object lean during pick                                |ϕGraspObj | + |θGraspObj |                                                −500.0   0–3
+Object non–z velocity during pick                      ∥vGraspObj,xy ∥2                                                           −500.0   0–3
+
+                 Table 3. Reward components, expressions, weights, and the stages (0–4) where each term is applied.
+
+
+
+
+                                                                           2
+      Joint             Kp [N·m/rad]      Kd [N·m·s/rad]
+      hip yaw                 150               2.0
+      hip roll                150               2.0
+      hip pitch               150               2.0
+      knee                    200               4.0
+      ankle pitch              40               2.0
+      ankle roll               40               2.0
+      waist yaw               250               5.0
+      waist roll              250               5.0
+      waist pitch             250               5.0
+      shoulder pitch          100               5.0
+      shoulder roll           100               5.0
+      shoulder yaw            40                2.0
+      elbow                    40               2.0
+      wrist roll               20               2.0
+      wrist pitch              20               2.0
+      wrist yaw                20               2.0
+      hand index              0.5               0.1
+      hand middle             0.5               0.1
+      hand thumb 1            0.5               0.1
+      hand thumb 2            0.5               0.1
+      hand thumb 0            2.0               0.1
+
+Table 4. Joint-space PD gains (Kp , Kd ) used in the low-level
+controller.
+
+
+
+
+   Hyperparameters                         Values
+   Number of environments       32768 (2048*8GPUs*2Nodes)
+   Discount factor (γ)                     0.998
+   Learning rate                          0.00002
+   Entropy coefficient                      0.01
+   Value loss coefficient                     1
+   Init noise std (RL)                       0.5
+   MLP size                            [512, 256, 128]
+
+          Table 5. Hyperparameters for teacher policy.
+
+
+
+
+  Hyperparameters                            Values
+  Number of environments            65535 (1024*8GPUs*8Nodes)
+  Number of steps per environment                1
+  Learning rate                               0.0002
+
+          Table 6. Hyperparameters for student policy.
+
+
+
+
+                                                                 3
+     Table 7. Comprehensive domain randomization parameters during training
+
+Parameter                      Probability               Distribution
+Image Augmentation
+Brightness                        0.25                  ∼ U(0.7, 2)
+Contrast                          0.25                  ∼ U(0.5, 1.5)
+Hue                                0.5                 ∼ U(−0.1, 0.1)
+Saturation                        0.25                  ∼ U(0.5, 2)
+Gaussian Noise Std                0.25                 ∼ U(0.0, 0.15)
+Gaussian Blur Kernel Size         0.25                   ∼ U(3, 5)
+Gaussian Blur Sigma               0.25                  ∼ U(0.1, 1.5)
+Lighting
+Dome Light Intensity               1.0                 ∼ U(800, 2000)
+Dome Light Yaw Rotation            1.0                   ∼ U(−π, π)
+Dome Light Texture Map             1.0                ∼ U(texture maps)
+                                             (Indoor, Clear, Cloudy, Night, Studio)
+Material Randomization
+Robot Material - Roughness         1.0                  ∼ U(0.0, 0.8)
+Robot Material - Metallic          1.0                  ∼ U(0.0, 0.8)
+Robot Material - Specular          1.0                  ∼ U(0.0, 0.8)
+Floor Material Texture             1.0                ∼ U(texture maps)
+                                              (Wood, Carpet, Masonry, Metals,
+                                             Natural, Plastics, Stone, Wall Board)
+Table Material Texture             1.0                ∼ U(texture maps)
+                                                            (Wood)
+Object Material Texture            1.0                ∼ U(texture maps)
+                                                     (All Base Materials)
+Table Physical Properties
+Table Height (m)                   1.0                ∼ U(0.65, 0.6775)
+Table Depth (m)                    1.0                 ∼ U(0.7, 0.75)
+Table Width (m)                    1.0                  ∼ U(1.4, 1.6)
+Table Thickness (m)                1.0                ∼ U(0.035, 0.04)
+Camera Extrinsics
+Position Noise - X (m)             1.0                ∼ U(−0.02, 0.02)
+Position Noise - Y (m)             1.0                ∼ U(−0.05, 0.05)
+Position Noise - Z (m)             1.0                ∼ U(−0.02, 0.02)
+Rotation Noise - Roll (rad)        1.0                ∼ U(−0.05, 0.05)
+Rotation Noise - Pitch (rad)       1.0                 ∼ U(−0.1, 0.1)
+Rotation Noise - Yaw (rad)         1.0                ∼ U(−0.05, 0.05)
+
+
+
+
+                                         4
+

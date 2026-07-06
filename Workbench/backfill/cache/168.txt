@@ -1,0 +1,1200 @@
+                                                 TimeViper: A Hybrid Mamba-Transformer Vision-Language Model for
+                                                                Efficient Long Video Understanding
+
+                                             Boshen Xu1∗‡             Zihan Xiao1∗ Jiaze Li2 Jianzhong Ju2 Zhenbo Luo2 Jian Luan2                                         Qin Jin1†
+                                                                 1
+                                                                     AIM3 Lab, Renmin University of China 2 MiLM Plus, Xiaomi Inc.
+                                                                              Project Page: https://xuboshen.github.io/TimeViper/
+
+                                           Efficient Backbone                    Native Hybrid Architecture for Video Understanding                         Competitive Performance
+
+
+
+
+arXiv:2511.16595v2 [cs.CV] 26 Nov 2025
+                                                                            Develop                            Interpret                      Compress
+
+                                                                                                                           Obs: severe
+                                                                                                                           vision tokens        MLP
+                                                                               MLP
+                                                                                                                           redundancy
+                                                                                                                                                Attn
+                                                                               Attn               long video                                   TransV
+                                                                                                Q: What happens?           Obs: vision-to-
+                                                                             Mamba                                                             Mamba
+                                                                                                A…B...C…D…                 text information
+                                                                                                A: The video…              aggregation
+                                                                                             vision token                    text token
+
+
+                                         Figure 1. We present TimeViper, a hybrid Mamba-Transformer vision-language model for efficient long video understanding. We reveal
+                                         the severe vision token redundancy and a vision-to-text information aggregation phenomenon in hybrid models. To this end, we introduce
+                                         TransV, the first token-transfer module that compresses vision tokens into text tokens inside the LLM, enabling the model to process over
+                                         10,000 frames. Benefitting from the Mamba layers’ O(n) computation and O(1) cache cost, TimeViper generates 40.1% more tokens per
+                                         second than Qwen3 [97] when processing 32k input tokens (approximately 2k frames at 16 tokens per frame) and producing 1k output
+                                         tokens with batch size 32. TimeViper delivers performance competitive with Transformer-based MLLMs on public benchmarks, including
+                                         multi-choice QA on VideoMME [29] (vs. Video-XL [73]), temporal video grounding on Charades [74] (vs. VTimeLLM [36]), video
+                                         detailed captioning on VDC [14] (vs. AuroraCap [14]), and hour-long video understanding on LVBench [85] (vs. Gemini-1.5-Pro [80]).
+
+
+                                                                      Abstract                                             extending frame numbers. We further analyze attention be-
+                                                                                                                           haviors of both Mamba and Transformer layers, offering
+                                         We introduce TimeViper, a hybrid vision-language model                            new insights into hybrid model interpretability. This work
+                                         designed to tackle challenges of long video understand-                           represents an initial step towards developing, interpreting,
+                                         ing. Processing long videos demands both an efficient                             and compressing hybrid Mamba-Transformer architectures.
+                                         model architecture and an effective mechanism for han-
+                                         dling extended temporal contexts. To this end, TimeViper
+                                         adopts a hybrid Mamba-Transformer backbone that com-
+                                         bines the efficiency of state-space models with the expres-                       1. Introduction
+                                         sivity of attention mechanisms. Through this hybrid de-                           Understanding long videos is an essential yet long-standing
+                                         sign, we reveal the vision-to-text information aggregation                        challenge in computer vision, holding great potential for
+                                         phenomenon, where information progressively flows from                            applications across video platforms [79, 94], household
+                                         vision tokens to text tokens across increasing LLM depth,                         scenarios [32, 66, 98], and embodied agents [10, 109].
+                                         resulting in severe vision token redundancy. Motivated by                         Recent advances in multimodal large language models
+                                         this observation, we propose TransV, a token information                          (MLLMs) [21] have made general long video understand-
+                                         transfer module that transfers and compresses vision tokens                       ing increasingly feasible. Nevertheless, existing models still
+                                         into instruction tokens while maintaining multimodal un-                          struggle to achieve a balance between effectiveness and ef-
+                                         derstanding capabilities. This design enables TimeViper to                        ficiency when dealing with extended video contexts. We ar-
+                                         process hour-long videos exceeding 10,000 frames. Exten-                          gue that building a truly capable long-video understanding
+                                         sive experiments across multiple benchmarks demonstrate                           model requires addressing two key challenges: constructing
+                                         that TimeViper competes with state-of-the-art models while                        an efficient MLLM backbone, and handling redundancy in
+                                             † Corresponding author; ‡ Project lead; ∗ Equal contribution.                 long-context processing.
+                                         spac∗ This work was done during their internship at Xiaomi.                           Most prior works [50, 73] adopt Transformer-based
+
+
+                                                                                                                     1
+LLMs as the backbone, owing to their strong reason-                 eliminating redundancy. Extensive experiments demon-
+ing and language understanding capabilities. However,               strate that TimeViper achieves promising performance to
+the quadratic computational complexity of attention makes           Transformer-based MLLMs across long video understand-
+them inherently inefficient for long-context modeling. To           ing benchmarks, including multi-choice video QA, tempo-
+improve efficiency, recent efforts have explored linearized         ral video grounding, and detailed video captioning.
+architectures such as Mamba [23, 33], which replace atten-              Our main contributions are summarized as follows:
+tion with state-space models for linear-time inference. De-         • We introduce TimeViper, a hybrid Mamba-Transformer
+spite their efficiency advantages, these models often depend           vision-language model for efficient long video under-
+heavily on distillation from Transformer-based models [52,             standing, featuring internal LLM token compression that
+53] or suffer from limited performance on complex multi-               enables processing over 10,000 frames.
+modal tasks [86, 115]. Encouragingly, a new generation of           • We discover the phenomenon of vision-to-text aggrega-
+hybrid Mamba-Transformer LLMs [9, 25, 44, 45, 68, 122]                 tion and vision token redundancy in hybrid architectures,
+have recently emerged, combining the efficiency of state-              and propose TransV, a mechanism that eliminates visual
+space models with the expressivity of attention. Inspired by           redundancy through explicit token information transfer.
+these developments, we explore a hybrid architecture tai-           • Extensive experiments demonstrate that TimeViper
+lored for long video understanding that inherits the comple-           achieves comparable performance to Transformer-based
+mentary strengths of both model families.                              MLLMs while accelerating inference speed.
+   Another major bottleneck arises from the redundancy
+in long video sequences. For example, a one-hour video              2. Related Works
+sampled at 1 frame per second, with each frame encoded              MLLM for long video understanding. Long video under-
+into 768 vision tokens [107], produces approximately 2.7            standing [29, 43, 60, 87, 104, 108] has long been a chal-
+million tokens, exceeding even the million-token context            lenging problem in computer vision. Towards this goal,
+limit of Gemini [21]. Thus, reducing contextual length              MLLMs emerge as a promising approach, but they strug-
+is crucial for scalable long-video modeling. Most prior             gle to process long videos while comprehending content.
+works [20, 39, 51, 58, 72, 93] address this issue by per-           Existing methods aim to balance computational efficiency
+forming vision token compression and merging at the pro-            and performance, typically categorized into subsampling
+jection layer before feeding the tokens into the LLM, lever-        or compression strategies. Subsampling strategies [28, 31,
+aging redundancy within ViT representations [11]. How-              35, 63, 100, 101] shorten video length by using language
+ever, for long videos, the LLM itself remains the primary           queries to retrieve the most relevant video segments. For
+computational bottleneck of an MLLM, as it processes the            instance, VideoAgent [87] iteratively selects frames and
+compressed sequences through billions of parameters. Re-            generates captions for them using vision-language models,
+cent works have attempted to alleviate this by internal token       which are then provided to an LLM to answer the ques-
+dropping [18, 76, 92, 112] or compression [70, 73] within           tion. Meanwhile, compression strategies condense redun-
+the LLM, typically guided by attention scores to identify re-       dant video embeddings into more compact representations.
+dundant vision tokens. Yet, developing such strategies for          Most works [20, 22, 39–41, 47, 51, 58, 69, 72, 93, 99, 120]
+hybrid architectures remains largely unexplored and chal-           merge visual features before feeding them into the LLM.
+lenging, where the mechanism for storing token information          For instance, LLaMA-VID [51] employs a dual-token strat-
+could differ fundamentally from Transformers.                       egy that compresses each frame into two tokens. However,
+    In this work, we propose TimeViper, an efficient hybrid         these methods fail to resolve the computational bottleneck
+MLLM designed for long video understanding. Through                 of LLM. To further improve efficiency, another line of work
+information exchange analysis within the LLM, we iden-              drops [18, 50, 92] or compresses [3, 70, 73, 102, 112] to-
+tify a vision-to-text information aggregation phenomenon.           kens within LLMs. For example, PDrop [92] progressively
+As layer depth increases, information from vision to-               prunes vision tokens across LLM layers. Although effi-
+kens progressively converges into text tokens, across both          cient, dropping tokens based on attention scores [5, 121]
+instruction-centric tasks (e.g., video QA) and vision-centric       can cause irreversible information loss. While token drop-
+tasks (e.g.,video captioning). At deeper layers, even re-           ping is convenient and can be applied in a training-free
+moving all vision tokens causes no performance degrada-             manner, token compression avoids information loss. VoCo-
+tion, suggesting severe token redundancy within the model.          LLaMA [102] and Video-XL [73] suggest compressing vi-
+Motivated by this observation, we introduce TransV, a               sion tokens into new special tokens. Nevertheless, as ex-
+token compression mechanism within the LLM. TransV                  isting methods rely heavily on Transformers, the token
+progressively shortens the context length by transferring           compression approaches in hybrid MLLM remain unex-
+partial vision tokens into instruction tokens via gated             plored. In this work, we pioneer this direction by introduc-
+cross-attention, preserving critical visual information while       ing TimeViper, a hybrid MLLM with a token information
+
+                                                                2
+   Response: A person in a modern kitchen is holding a
+                                                             Remained vision token 𝑋1        Dropped vision token TDrop(𝑋1 )   Instruction token 𝑋1
+   large, flat piece of pinkish salt…
+                                                                                                  Deeper Layer
+           Hybrid Large Language Model
+                         MLP Layer                                 Attention-Guided Query-Aware Token Dropping                               Gated
+                     Attention Layer                                                                                                       CrossAttn
+
+
+                          TransV                                                                                                        attention
+                                                                                        attention distribution
+                     Mamba-2 Layer
+                                                                                                  Shallow layer
+
+          Projector w/ ToMe                                                     Uniform Token Dropping                                       Gated
+                   ViT                     Instructions:                                                                                   CrossAttn
+                                           Describe the
+                                          video in detail.
+
+
+Figure 2. Illustration of TimeViper, our proposed hybrid MLLM for long video understanding. The model consists of a ViT visual encoder,
+a projector with token merging, and a hybrid Mamba-Transformer LLM equipped with TransV. The token merging [11] compresses each
+frame into 16 vision tokens. Inside the LLM, TransV transfers information from redundant vision tokens to instruction tokens to reduce the
+number of vision tokens. Specifically, TransV uniformly drops vision tokens in shallow layers and removes low-attention vision tokens in
+deeper layers. The compression module is implemented through a Gated Cross-Attention mechanism [3] with adaptive learnable weights.
+Note that TransV is illustrated before the attention layer for clarity, though it may be applied before any layer in practice.
+
+transfer module within LLM named TransV to compress vi-                     compression module, TransV, for long video understanding.
+sion tokens into instruction tokens.                                        Our method is built upon two key ideas: 1) hybrid MLLM
+State-space model for visual perception. Transform-                         construction, which integrate the efficiency of state-space
+ers’ attention with quadratic computational cost remains                    models with the expressivity of attention mechanisms, and
+a fundamental bottleneck for efficiency. Linearized ar-                     2) performing LLM token compression through vision-to-
+chitectures [33, 64] have evolved again in NLP commu-                       text information transfer. We first introduce the hybrid
+nity, aiming to reduce complexity to linear time and elim-                  model structure in Section 3.1. Next, in Section 3.2, we
+inate the need for KV-cache during inference. Some                          analyze the token information exchange between vision and
+recent efforts are pushing LLMs with linearized mod-                        text tokens and present our compression module TransV. Fi-
+ules or Mamba-Transformer hybrid architectures, such as                     nally, we describe the training strategy in Section 3.3.
+Nemotron-Nano [9], Samba [68], and Hymba [25]. In-
+spired by these works, researchers have begun to explore                    3.1. Model Architecture
+linearized architectures for computer vision tasks like im-
+                                                                            Our model follows the standard multimodal design [54] and
+age [27, 103, 118], video [48], and 3D [56] understanding.
+                                                                            consists of three components: a visual encoder (ViT) [107],
+The rise of linearized LLM has also inspired efficient mul-
+                                                                            a projector, and a hybrid Mamba-Transformer LLM [9].
+timodal models [53, 67, 70, 86, 93, 115]. However, since
+                                                                            The LLM backbone includes 27 Mamba-2 [23] layers, 4
+images and short clips involve relatively limited sequence
+                                                                            self-attention layers, and 25 MLP layers. Following prior
+lengths, the advantage from linearized architectures is still
+                                                                            work [50, 120], we apply token merging (ToMe) [11] in the
+a controversial problem [103]. In contrast, long video un-
+                                                                            projection layer to reduce intra-frame redundancy. Given
+derstanding naturally demands models capable of process-
+                                                                            a long video with a corresponding textual instruction, the
+ing extremely long contexts, posing far stricter efficiency
+                                                                            ViT encodes video frames, and the projector with ToMe
+requirements. Recently, AuroraLong [93] combines a ViT
+                                                                            produces a sequence of compressed vision tokens X0 ∈
+with RWKV6 [65] and employs token merging in a pro-
+                                                                            RT0 ×D , while the instruction is tokenized into text instruc-
+jector to compress vision tokens. In this work, TimeViper
+                                                                            tion tokens X1 ∈ RT1 ×D , where typically T0 ≫ T1 , and
+is the first hybrid MLLM that performs token compression
+                                                                            D is the hidden dimension. The LLM processes the con-
+within the hybrid LLM, achieving promising performance
+                                                                            catenated multimodal input X = [X0 , X1 ] ∈ RT ×D of se-
+among 7B-sized MLLMs while maintaining high efficiency.
+                                                                            quence length T and generates response tokens Y .
+3. Method                                                                       The hybrid backbone integrates Mamba-2 and self-
+                                                                            attention layers, each contributing complementary capa-
+We propose TimeViper, a hybrid Mamba-Transformer                            bilities: the Mamba-2 layer is mainly responsible for se-
+vision-language model equipped with an internal LLM                         quence position modeling, encoding historical sequence in-
+
+
+                                                                        3
+                                                                             (MCQ) on VideoMME [29] and temporal video grounding
+                                                                             (TVG) on Charades [74], and vision-centric tasks such as
+                                                                             video detailed captioning (VDC) on VDC [14]. We employ
+                                                                             standard evaluation metrics for each task, i.e., accuracy for
+                                                                             VQA, mIoU for TVG, and LLM-judged scores for VDC.
+                                                                             Vision-to-text information aggregation phenomenon. To
+                                                                             understand the pattern of information flow within the hy-
+                                                                             brid model, we investigate the mechanism of information
+                                                                             exchange among vision, instruction, and response tokens
+Figure 3. Comparison of information blocking to illustrate                   in attention layers during autoregressive generation, follow-
+the vision-to-text information aggregation phenomenon in hybrid              ing the methodology of [42]. We apply attention masks L
+MLLMs. For instruction-centric tasks (e.g., multi-choice video               and set the corresponding matrix values to 0 to block in-
+QA), information is first aggregated from vision tokens to instruc-          formation exchange among different types of tokens. For
+tion tokens, which are then used for response generation. In con-            clarity, we illustrate our two information-blocking con-
+trast, for vision-centric tasks (e.g., detailed video captioning), vi-
+                                                                             figurations, i.e., vision-to-instruction (V2I) and vision-to-
+sion tokens directly contribute to response generation.
+                                                                             response (V2R), by assuming that X0 , X1 , and Y each con-
+                                                                             tain only a single token at the l-th layer:
+formation into a fixed-size implicit hidden memory through
+forgetting and memorization mechanisms, while the self-                      • block the information from vision to instruction tokens:
+                                                                                                                
+attention layer preserves the entire history of the sequence                                            1 0 0 
+                                                                                l+1 l+1 l+1 
+                                                                                                    = 0 1 0 · X0l , X1l , Y:tl (3)
+                                                                                                                                  
+and performs retrieval and querying based on the impor-                         X0 , X1 , Y:t
+tance of the tokens.                                                                                    1 1 1
+Mamba-2 Layer. A Mamba-2 layer is built around a core
+state-space model (SSM) block, which recurrently main-                       • block the information from vision to response tokens:
+                                                                                                                
+tains a compact hidden state summarizing past information.                                              1 0 0 
+Let xt denote the input at step t, and ht ∈ RN ×D the hidden
+                                                                                l+1 l+1 l+1 
+                                                                                                    = 1 1 0 · X0l , X1l , Y:tl (4)
+                                                                                                                                 
+                                                                                X0 , X1 , Y:t
+memory. The SSM update is defined as:                                                                   0 1 1
+                     ht = At ht−1 + Bt xt                                        As shown in Figure 3, we observe a consistent vision-to-
+                                                                  (1)        text aggregation phenomenon: in instruction-centric tasks,
+                      yt = CtT ht
+                                                                             visual information is progressively absorbed into instruc-
+where At , Bt , and Ct are discretized SSM parameters [23].                  tion tokens until deeper layers, whereas in vision-centric
+This mechanism encodes temporal dependencies via learn-                      tasks, vision tokens directly contribute to response gener-
+able decay and gating dynamics, enabling efficient informa-                  ation. Blocking V2I drastically degrades performance in
+tion propagation over long sequences.                                        early layers for MCQ and TVG, but has negligible impact
+Self-Attention Layer. In contrast, the self-attention layer                  in later layers, confirming that instruction tokens eventually
+directly models token interactions:                                          internalize visual cues. Conversely, in VDC, blocking V2R
+                                                                             causes a sharp drop in shallow layers, highlighting the dom-
+                                QK T
+                y = SoftMax(L ⊙ √ ) · V                           (2)        inant role of vision tokens in direct response generation.
+                                 D                                           Vision token redundancy in hybrid MLLM. While many
+where [Q, K, V ] = [WQ , WK , WV ]X, and WQ , WK , WV                        previous studies have shown vision token redundancy in
+are learnable parameters. L is the causal attention mask.                    Transformers [11, 18, 92], it remains unclear how such vi-
+    By integrating these two mechanisms, the hybrid LLM                      sual redundancy manifests in hybrid models. To investigate
+retains the contextual expressivity of attention while bene-                 this, we drop vision tokens at different layers to observe per-
+fiting from the efficiency of SSMs.                                          formance changes on benchmarks. Specifically, we use two
+                                                                             vision token dropping strategies: uniform dropping (uni)
+3.2. Token Information Transfer                                              and attention-guided dropping (attn), which keeps the top-
+To analyze information dynamics within hybrid MLLMs,                         k vision tokens most attended by the last instruction token
+given the lack of hybrid MLLMs, we first train a hybrid                      XT1 . Let p denote the token dropping rate, Td = pT0 be the
+model on open-source datasets for subsequent experiments                     number of tokens to be dropped. We define the dropping
+and analyses. To ensure the generalizability of our experi-                  operator TD(·) as:
+ments on downstream tasks, we conduct the following anal-                                   (
+yses on high-quality and widely used benchmarks, includ-                                        Uniform(X, Td )                  uni
+                                                                                TD(X) =                                                 (5)
+ing instruction-centric tasks such as multi-choice video QA                                     Topk(X, −Attn(XT1 , X), Td )     attn
+
+                                                                         4
+                                                                         3.3. Training Procedure
+                                                                         To effectively adapt TimeViper for long video understand-
+                                                                         ing, we divide the training process into two stages and
+                                                                         train the model using fully open-source data: (1) Image-
+                                                                         text alignment stage: We first pretrain the projector to
+                                                                         align the ViT and LLM modalities using 3M high-quality
+                                                                         image–text pairs sampled from CC12M [15] and Pixel-
+                                                                         Prose [75]. Token compression is disabled during this stage.
+                                                                         (2) Visual instruction tuning: We then fine-tune the pro-
+Figure 4. Illustration of token redundancy. We compare perfor-           jector and LLM, including the compression modules, on
+mance under different vision-token dropping rates p using uni-           approximately 4.8M multimodal instruction pairs, consist-
+form dropping and attention-guided dropping strategies. In the hy-       ing of 1.8M video instruction data [8, 13, 17, 50, 71, 76,
+brid MLLM, vision token redundancy increases progressively with          113] primarily sourced from LLaVA-Video, 2.8M single-
+layer depth, allowing more aggressive token removal in deeper            image instruction data [46] from LLaVA-OneVision, and
+layers with minimal performance loss.                                    diverse downstream task-specific datasets including 26K
+                                                                         dense video captioning samples [12, 37, 78, 105, 117] and
+where Uniform(X, k) uniformly drops k tokens from X ∈                    250K temporal video grounding samples [2, 6, 34, 57, 61,
+RN , TopK(X, S, k) discards k tokens with the highest                    62, 69, 88, 89, 95, 106]. This stage adapts TimeViper for
+scores in X according to S ∈ RN , and Attn(·, ·) computes                instruction-following and video understanding while learn-
+the attention scores using the first argument as the query               ing effective internal compression through TransV.
+and the second as the key. Results in Figure 4 show that re-
+dundancy increases with depth. For MCQ and VDC, tokens                   4. Experiments
+can be uniformly dropped at all layers, but attention-guided
+                                                                         We first describe the experimental setups in Section 4.1, fol-
+dropping is reliable only in deeper layers. In TVG, exces-
+                                                                         lowed by the ablation studies in Section 4.2 and main results
+sive token dropping before the first attention layer, i.e., the
+                                                                         in Section 4.3. Finally, in Section 4.4, we provide a qualita-
+14-th layer, harms performance, but the drop ratio can in-
+                                                                         tive analysis illustrating how hybrid models and Transform-
+crease in later layers. Vision tokens are critical in shallow
+                                                                         ers interpret visual content through attention visualizations.
+layers but become nearly 100% redundant in deep layers
+across our testbeds. For all tasks, even discarding all vi-              4.1. Experimental Setup
+sion tokens in deep layers, the model can still achieve high
+performance by relying solely on the instruction tokens,                 Downstream benchmarks. We evaluate TimeViper across
+which is surprisingly similar to observations from previous              a diverse suite of video understanding benchmarks: (1)
+Transformer-based image MLLMs [18, 111, 114].                            VideoMME [29]: A comprehensive video QA benchmark
+Token information transfer via TransV. Motivated by                      covering multiple domains. It includes 2.7K QA samples
+these findings that information implicitly transfers from vi-            over videos ranging from 11 seconds to 1 hour. We eval-
+sion to text tokens and vision token redundancy is severe                uate models without textual subtitles. (2) LVBench [85]:
+for all tasks, we propose TransV, a lightweight in-LLM                   A benchmark on hour-long video understanding across six
+compression module that explicitly transfers visual infor-               dimensions, comprising 2094 multiple-choice QA samples.
+mation into instruction tokens, reducing redundant compu-                (3) MLVU [116]: Designed for minute-level video under-
+tation while preserving task performance. At the l-th layer,             standing, with 2174 QA samples spanning diverse domains.
+the token information transfer from vision to instruction to-            We evaluate the average performance of multiple-choice
+kens is formulated as:                                                   tasks (M-Avg), where videos have an average duration of
+                                                                         653 seconds. (4) LongVideoBench [90]: Targets long-form
+                                                                         referring reasoning that requires retrieval-based QA, with
+               X̃1l = CrossAttnl (X1l , TDl (X0l ))
+                                                              (6)        videos averaging 473 seconds. (5) MVBench [49]: A short-
+            X1l+1 = X1l + tanh(αl )(X̃1l )                               term video QA benchmark emphasizing temporal reason-
+                                                                         ing, containing 4K QA pairs over 20 task categories. (6)
+where the CrossAttn(·, ·) computes the attention with the                Charades [74]: A temporal video grounding benchmark
+first term as the query and the second as both the key and               containing 6672 minute-level indoor activity videos paired
+value. αl is a learnable scalar controlling the degree of in-            with natural language queries. (7) VDC [14]: An efficient
+formation aggregation, and its value is normalized to the                and high-fidelity video captioning benchmark evaluated via
+range [−1, 1] via tanh(·). αl is initialized to zero to ensure           query-conditioned scoring using LLaMA3-8B [26]. It con-
+instruction understanding.                                               sists of 1027 videos and we evaluate on the “detailed” split.
+
+                                                                     5
+Table 1. Ablation of TransV choices. The “uni 7 0.5-attn 39 0.9”
+denotes applying uniform TranV at the 7th layer with a dropping
+rate of p = 50% and attention-guided TransV at the 39th layer
+with p = 90%. “TDuni” denotes uniform token dropping.
+
+       Method                  max frame   VideoMME   VDC    Charades
+   1   none                       5k         58.8     39.8     40.5
+   2   TDuni 7 0.5                8k         57.3     39.0     26.1
+   3   uni 7 0.5                  8k         56.7     38.9     38.1
+   4   uni 2 0.5                  9k         56.1     39.7     38.2
+   5   uni 7 0.9                 >10k        53.4     37.9     34.6
+   6   uni 7 0.5-uni 39 0.9      >10k        56.2     39.4     37.9
+   7   uni 7 0.5-attn 39 0.9     >10k        56.6     39.1     37.9
+
+
+                                                                            Figure 6. Comparison of prefilling time. TransV incurs no addi-
+                                                                            tional latency at low frame inputs (e.g., 64 frames) while signifi-
+                                                                            cantly reducing prefilling time at high frame inputs. For instance,
+                                                                            at 4,096 frames, TransV reduces prefilling time by 15.7% com-
+                                                                            pared to the ToMe baseline.
+
+
+                                                                            attn 39 0.9” represents applying uniform TransV in
+                                                                            the 7th layer with a ratio of 50% and attention-guided
+                                                                            TransV in the 39th layer with ratio of 90%.
+                                                                            Impact of compression components on GPU memory
+                                                                            consumption. We apply ToMe in the projector and
+                                                                            TransV in the LLM. Benefiting from the hybrid Mamba-
+                                                                            Transformer backbone, both memory usage and prefill-
+Figure 5. Comparison of GPU memory usage during inference.                  ing time generally grow approximately linearly with input
+While ToMe extends the context window to about 5K frames,                   length. Figure 5 reports memory usage as the number of
+TransV efficiently scales beyond 10K frames.
+                                                                            frames increases. The vanilla model runs “Out of Mem-
+                                                                            ory” error at merely 128 frames. TimeViper applying ToMe
+Implementation details. Our data are organized in the or-                   in the projector alleviates the initial token burden, extend-
+der of system prompt tokens, video tokens, and instruction                  ing the limit to approximately 5K frames. TimeViper with
+token as the LLM inputs. For all training and evaluation                    TransV further enables better scalability: at 4,096 frames,
+processes, videos are sampled at 1 frame per second. Dur-                   it reduces memory consumption by 54.8% compared to
+ing training, videos longer than 256 frames are uniformly                   TimeViper, and can handle 10K+ frames with ample mar-
+sampled to 256 frames; during evaluation, we use at most                    gin. This highlights the complementary roles of token com-
+the first 256 frames. Each input frame is resized to 384×384                pression in the projector and within the LLM.
+and initially encoded into 768 vision tokens. After being                   Impact of compression components on prefilling time.
+projected with ToMe, each frame is compressed into 16 to-                   As shown in Figure 6,the vanilla model already incurs 4.5s
+kens [50, 120]. We apply TransV at the 7th shallow LLM                      latency at 64 frames. TimeViper drastically reduces this to
+layer with token dropping rate p = 50%, and the 39th                        0.4s, and TransV further decreases prefilling time, with the
+deep LLM layer where TransV is applied using an attention-                  effect becoming more pronounced as the number of frames
+guided strategy with p = 90%. Introducing TransV adds                       increases. Notably, at 4,096 frames, TransV reduces prefill-
+approximately 100M parameters to the model. To acceler-                     ing time by 15.7% compared to TimeViper.
+ate training, we implement training with data packing [16]                  TransV placement in shallow layers. As shown in Ta-
+that supports training with varied sequence length caused by                ble 1, the TimeViper baseline can process approximately
+TransV. Across all training stages, the model uses a learning               5K input frames. By comparing rows 1, 2, and 3, we ob-
+rate of 1e-5, AdamW optimizer with weight decay of 0.01,                    serve that introducing token dropping or token compression
+warmup rate of 0.03, and cosine annealing scheduler. For                    enables the model to handle over 8K frames. Comparing
+TransV modules, we adopt a higher learning rate of 5e-5.                    rows 2 and 3, using TransV effectively mitigates the Cha-
+                                                                            rades performance drop, from 26.1 to 38.1, indicating that
+4.2. Ablation Study
+                                                                            it successfully facilitates token transfer. Comparing rows 3
+For representation simplicity, each TransV is denoted                       and 4, compressing at the 7th layer does not necessarily out-
+as “type layer ratio-...”, for example, “uni 7 0.5-                         perform compression at the 2nd layer on the VDC or TVG
+
+
+                                                                        6
+Table 2. Comparison with state-of-the-art models. Our work differs from previous studies both the choice of LLM backbone and the
+design of token compression strategy, while achieving competitive performance across benchmarks. Most existing methods fine-tune the
+ViT (indicated with *), whereas we do not due to computational constraints. Additionally, while the concurrent work Nanov2-VL [24] is
+trained on 46.7M samples, we uses only 7.8M, making Nanov2-VL a reasonable upper bound for hybrid models.
+
+                                                                          MVBench      LongVideoBench   MLVU    VideoMME         LVBench   Charades-STA   VDC
+ Model                                 LLM             >10K frame input
+                                                                           avg.acc             val      M-Avg   overall   long   avg.acc      mIoU        avg.acc
+                                                                          Proprietary Models
+ GPT-4V [1]                               -                   -             43.7               59.1     49.2     59.9     53.5     -            -           -
+ GPT-4o [38]                              -                   -             64.6               66.7     64.6     71.9     65.3    30.8         35.7         -
+ Gemini-1.5-Pro [80]                      -                   -             60.5               64.0      -       75.0     67.4    33.1          -          43.1
+                                                                   Transformer-based Video MLLMs
+ LLaMA-VID [51]                  Vicuna-1.5-7B [82]           ✗             41.9                -       33.2     25.9      -      23.9          -          25.6
+ LongVA [110]                      Qwen2-7B [81]              ✗              -                  -       56.3     52.6     46.2     -            -          27.9
+ LongVU [72]                       Qwen2-7B [81]              ✗             66.9                -       65.4     60.6     59.5     -            -           -
+ VILA1.5-7B [30]                   Qwen2-7B [81]              ✗             56.8                -       56.8     58.8      -       -            -           -
+ LLaVA-OneVision* [46]             Qwen2-7B [81]              ✗             56.7               56.3     64.7     58.2      -       -           13.5        41.2
+ LLaVA-Video* [113]                Qwen2-7B [81]              ✗             58.6               58.2     70.8     63.3      -       -            -           -
+ Qwen2-7B-VL* [84]                 Qwen2-7B [81]              ✗             67.0                -        -       63.3      -       -            -          41.6
+ Qwen2.5-VL* [7]                  Qwen2.5-7B [96]             ✗             69.6               56.0     70.2     65.1      -      45.3         43.6         -
+ LongVILA* [19]                    Qwen2-7B [81]              ✗             67.1               57.1      -       60.1     47.0     -            -           -
+ Kangaroo* [55]                   LLaMA3-8B [26]              ✗             61.0               54.8     61.0     56.0     46.7    39.4          -           -
+ Video-XL* [73]                    Qwen2-7B [81]              ✗             55.3               50.7     64.9     55.5      -       -            -           -
+ Vamba* [70]                     Qwen2-VL-7B [81]             ✗             60.4               55.9     65.9     57.8      -       -            -           -
+ VideoChat-Flash* [50]             Qwen2-7B [81]              ✓             73.2               64.2     74.5     64.0     53.6    47.2         48.4         -
+ VTimeLLM [73]                   Vicuna-1.5-13B [82]          ✗              -                  -        -        -        -       -           34.6         -
+ AuroraCap* [73]                 Vicuna-1.5-7B [82]           ✗              -                  -        -        -        -       -            -          39.0
+ Qwen2.5-7B (ours)                Qwen2.5-7B [96]             ✗             57.6               55.4     64.9     56.6     48.7    36.6         40.8        42.0
+                                                                   Linearized/Hybrid Video MLLMs
+ LongLLaVA* [86]                  Jamba-52B [44]              ✗             64.6               53.5      -       53.8     46.4     -            -           -
+ AuroraLong* [93]                 RWKV6-2B [65]               ✓             53.2                -       52.7      -        -       -            -          42.5
+ Nanov2-VL* (upper bound) [24]    Nanov2-12B [9]              ✗              -                 63.6     73.6     66.0      -       -            -           -
+ TimeViper (ours)                  Nanov2-9B [9]              ✗             57.2               54.1     65.6     58.8     48.8    35.5         40.5        39.7
+ TimeViper (ours w/ TransV)        Nanov2-9B [9]              ✓             56.2               52.0     63.1     56.9     48.2    35.6         37.9        39.1
+
+
+
+
+Figure 7. Comparison of performance as the number of input frames increases on long-video understanding benchmarks. We train our
+models with 256 frames as inputs, and sample 1 frame per second during evaluation. The x-axis here denotes the maximum number of
+frames. If a video exceeds this length, we take only the first max frames for inference.
+
+benchmarks. For example, compression at the 7th layer out-                             uate a higher compression rate of p = 90% at the 7th layer
+performs the 2nd layer by 0.6 points on MCQ, but performs                              in Table 1. Larger compression rate allows the model to
+0.8 points worse on VDC.                                                               process more frames, but it comes with a significant per-
+TransV placement in deep layers. From rows 6 and 7                                     formance drop. Comparing rows 4 and 5, after increas-
+in Table 1, attention-guided TransV yields higher MCQ per-                             ing compression rate from 50% to 90%, the accuracy on
+formance of 56.6 than uniform TransV’s 56.2, with minor                                VideoMME decreases from 56.7 to 53.4.
+differences on VDC and Charades. Moreover, transferring                                Impact of different LLM backbones under identical
+token information in deeper layers significantly increases                             training recipe. To isolate the effect of model architecture
+the model’s long-context capacity: comparing rows 1 and                                from scaling up, we train a Transformer-based baseline us-
+3, the model handles tens of thousands of frames with only                             ing Qwen2.5 following exactly the same training recipe as
+a 0.1 drop on VideoMME.                                                                our hybrid model. As shown in Table 2, Qwen2.5 performs
+Compression rate for TransV in shallow layers. We eval-                                on par with TimeViper when trained on our dataset, suggest-
+
+
+                                                                                   7
+Figure 8. Illustration of attention score matrices in Nanov2 [9] and Qwen2.5 [96] at shallow and deep layers. White lines divide the input
+sequence into four distinct segments: system prompt, vision tokens, user instruction, and the generated response.
+
+ing that purely Transformer-based architectures do not of-              65.64 to 69.00, and LVBench increases from 35.53 to 37.0.
+fer a clear advantage under comparable training conditions.
+Notably, the concurrent work Nanov2-VL, which adopts a                  4.4. Qualitative Analysis
+standard MLLM architecture but is trained on 46.7M sam-                 To better understand how hybrid MLLMs differ from
+ples, substantially larger than our 7.8M, achieves state-of-            Transformer-based MLLMs in processing multimodal in-
+the-art performance. This indicates that hybrid MLLMs can               puts, we first formalize the definitions of attention scores
+benefit significantly from scaling.                                     used in both Mamba-2 and self-attention layers and then
+4.3. Main Results                                                       analyze attention behaviors across layers. For Mamba lay-
+                                                                        ers, we follow [4] to define the attention pattern, while for
+TimeViper achieves competitive performance with cur-                    Transformer layers, we use the attention weights.
+rent models across video understanding benchmarks.                      Definition of attention score. For self-attention (Equa-
+For MCQ tasks, as shown in Table 2, despite not fine-                   tion (2)), the attention score Mj,i ∈ R from xj to xi is:
+tuning ViT, TimeViper with TransV achieves an average
+accuracy of 56.2 on VideoMME, +0.7 points higher than                                            T             i
+                                                                                             Qi K≤i           X
+Video-XL (55.5), which compresses tokens into new ones                          yi = Softmax( √     ) · V≤i =     Mi,j Vj              (7)
+                                                                                                D             j=1
+within Qwen2. For VDC task, TimeViper achieves strong
+performance with an accuracy of 39.7, excqeeding the task-
+                                                                        For the SSM block, we rewrite Equation (1) to express its at-
+specific model Auroracap by +0.7 points. For TVG task,
+                                                                        tention pattern as the weighted sum from inputs [x1 , . . . , xi ]
+TimeViper establishes a surprisingly strong baseline with an
+                                                                        to the output yi :
+mIoU of 40.5 on Charades, significantly outperforming the
+task-specific model VTimeLLM-13B with an mIoU of 34.6.                                 i
+                                                                                       X             i
+                                                                                                     Y                 i
+                                                                                                                       X
+                                                                                                                              ′
+This is particularly notable because TimeViper uses only                        yi =         CiT (       Ak )Bj xj =         Mi,j xj   (8)
+SigLIP positional embedding for vision tokens and relies on                            j=1       k=j+1                 j=1
+the implicit temporal modeling of Mamba layers. Yet the
+                                                                                   ′
+model learns robust temporal alignments between videos                  Here, |Mi,j  | ∈ R+ serves as the “attention score” [4, 119]
+and language query, matching or exceeding prior models                  from xj to xi within the SSM block. Although both the
+such as Qwen2.5-VL-7B that explicitly employ MRoPE for                  self-attention and Mamba mechanisms employ a multi-head
+fine-grained timestamp modeling. These results collectively             design [23, 83] along the hidden dimension, we omit this
+demonstrate that hybrid Mamba-Transformer architectures                 detail in the equations for simplicity.
+are highly competitive for long video understanding.                    Diverse and specialized attention patterns in Mamba
+Effect of increasing the number of inference frames.                    layers. Figure 8 visualizes the attention score matrices
+Since the model is trained with 256 frames, we evalu-                   of Nano (hybrid) and Qwen (Transformer) from shallow to
+ate test-time scalability by varying the number of input                deep layers. Mamba layers exhibit diverse attention pat-
+frames. As shown in Figure 7, TimeViper scales robustly                 terns, ranging from sparsity, locality to globality, suggesting
+with longer contexts across four long video understand-                 that different layers and heads specialize in modeling dif-
+ing benchmarks. For example, when increasing the in-                    ferent types of dependencies. For example, Layer 0, Head
+put frames from 256 to 512 frames, MLVU improves from                   8 of Mamba layer (ML0) exhibits sparsity, where only a
+
+
+                                                                    8
+  Video Input
+
+
+
+
+                                                           MCQ                                                                                            TVG
+            Extrapolating from the video, what does the                             When did the protagonist show
+            brand OSMO in the video sell?                                           a damascus knife?                      203.0 to 223.0 seconds
+            A. Kobe beef.
+            B. Salt.                                                                                                                                   Pred
+            C. Molasses.                                                                207s                                                    222s     GT
+            D. Black truffle.
+
+                          06:35
+                                                B. Salt.
+
+
+
+
+                                      VDC            Describe the sequence of events in the video depicted by these frames in a detailed manner.
+
+
+                The video opens with a person in a modern kitchen, transitioning to a close-up of their hands holding a large, flat piece of pinkish salt...
+                A small hamster is seen in the person's hand, followed by a view of a wooden surface with various packaged meats and seasonings.
+                The person carefully handles a piece of raw salmon, ..., and then a white, round food item, possibly scallops, is shown. A close-up of
+                several strips of raw bacon on a baking tray is shown, ... The person then holds a piece of raw meat, possibly beef, in a black vacuum-
+                sealed package, showing its marbling and texture. The scene transitions to a wooden surface with various jars and containers labeled
+                'OSMO' and a small piece of pinkish salt... A close-up of the person's hands holding a knife with intricate designs engraved on the
+                blade is shown, followed by ... The person then places a seasoned piece of raw meat, possibly beef, onto the salt crust, pressing it
+                down gently to ensure it is well-coated. The person uses tongs to lift the seasoned piece of meat, revealing its seared and juicy texture.
+
+                                                                                                                                                                1
+Figure 9. Qualitative results of TimeViper on three long video understanding tasks. (1) MCQ: The model demonstrates reasoning capability
+by correctly answering a multi-choice question about the video’s content. (2) TVG: It accurately localizes the temporal boundaries for a
+specific event, reaching an IoU of 0.75. (3) VDC: The model generates a detailed description that showcases its fine-grained comprehension.
+Green text highlights accurate detailed descriptions. Some output in the middle is omitted for brevity.
+
+few tokens receive dominant attention from the following                              instruction and response tokens.
+tokens, revealing Mamba’s capability to selectively high-                             Qualitative results. Figure 9 illustrates qualitative exam-
+light salient tokens. In contrast, ML20 exhibits globality,                           ples from MCQ, TVG, and VDC tasks. TimeViper accu-
+where all tokens attend uniformly to preceding tokens, re-                            rately answers complex multi-choice video questions, local-
+flecting its effective integration of prior information. ML52                         izes temporal boundaries with an IoU of 0.75, and produces
+displays locality, focusing primarily on neighboring tokens.                          rich, fine-grained video descriptions.
+This diversity highlights the complementary strengths of
+state-space modeling within hybrid architectures.                                     5. Conclusion
+Attention sink in self-attention layer of hybrid MLLM.
+                                                                                      This work takes an initial step toward understanding
+The “attention sink” [77, 91] is clearly observed in the self-
+                                                                                      and compressing hybrid vision-language models for long
+attention layers of Nano, as shown in Figure 8, where the
+                                                                                      videos. We introduce TimeViper, a Mamba-Transformer
+majority of attention scores are concentrated on the initial
+                                                                                      hybrid model equipped with TransV, an internal LLM token
+few tokens. This behavior aligns with observations in tra-
+                                                                                      transfer module that compresses vision information into text
+ditional Transformer models, as exemplified by Qwen’s at-
+                                                                                      tokens. We reveal that visual information gradually shifts
+tention maps such as AL24 and AL27.
+                                                                                      into text tokens as depth of hybrid LLM layer increases,
+Decrease of attention to vision tokens across layers.
+                                                                                      resulting in substantial redundancy among vision tokens in
+Comparing the second row with the first row in Figure 8,
+                                                                                      deep layers. TimeViper can efficiently process hour-long
+we observe a clear downward trend in attention scores as-
+                                                                                      videos while maintaining strong multimodal understand-
+signed to vision tokens as the layers deepen. This phe-
+                                                                                      ing. TimeViper achieves promising performance for long
+nomenon is consistent with our broader findings: as the
+                                                                                      video understanding across multi-choice video QA, tempo-
+model processes more layers, visual information becomes
+                                                                                      ral video grounding, and detailed video captioning.
+increasingly redundant and is subsequently deprioritized by
+
+
+                                                                                9
+Appendix
+A. Limitations
+First, our current performance still falls short of the SOTA
+models due to limited training data and insufficient model
+training. Second, while TransV enables processing over
+10,000 frames, the model has not been trained on videos
+of such duration.
+
+B. Experimental Setups
+Implementation details. When training attention-based
+dropping in multi-turn dialogue scenarios, the attention dis-        Figure 10. Comparison of average attention scores across all lay-
+tribution is computed using the last token of the final in-          ers in Nanov2 and Qwen2.5. The visualization shows both atten-
+                                                                     tion and Mamba layers for Nano, and attention layers for Qwen.
+struction as the query. For temporal video grounding data,
+                                                                     For Mamba layers, we normalize each row of the attention scores
+we incorporate a time-aware prompt [50]: “The video lasts            using the L1 norm so that all values fall within the range [0, 1].
+for {} seconds, and {} frames are uniformly sampled from
+it.” During training, we randomly sample one instruction
+from a pool of 15 manually constructed task prompts, such            bound timestamps. Consequently, our TVG training data
+as: “From the video, locate the portion that aligns with             remains 250K.
+the textual query , and output the start and end timestamps
+in seconds. The output format of the predicted timestamp             C. Main Results
+should be like: ’start to end’ seconds. A specific example is        TransV can be also applied to Qwen2.5. Qwen can also
+: 12.0 to 20.0 seconds”. We do not use a system prompt,              use TransV to handle ultra-long sequences, as shown in Ta-
+but we retain the BOS token to act as an attention sink [91].        ble 4. We observe that on LVBench, this even brings a +0.4
+Training data summary. Our training pipeline adopts a                improvement. However, the performance drop on VDC is
+two-stage strategy. We summarize the training data in Ta-            more severe for Qwen than for Nano. For example, Qwen
+ble 3. Specifically, in the first image-text alignment stage,        drops from 42.0 to 40.7 (a decrease of 1.3 points), whereas
+we utilize 3 million images randomly sampled from the                Nano drops from 39.7 to 39.1 (a decrease of 0.6 points).
+CC12M dataset [15], paired with captions sourced from
+PixelProse [75]. In the second video instruction tun-
+                                                                     D. Qualitative Results
+ing stage, we assemble a composite dataset to enhance
+MLLM’s video understanding and timestamp prediction ca-              We define average attention scores used in both Mamba-2
+pabilities, comprising: (1) 1.3M samples from LLaVA-                 and self-attention layers to analyze attentions received by
+Video [113]; (2) 253K data from Kinetics400 [13] and We-             different types of tokens.
+bVid [8] that are recaptioned with GPT-4o or Gemini by               Average attention score computation. We adopt the
+ShareGemini [71] and ShareGPT-4 [17]; (3) 100K samples               category-level attention score definition from LLaVA-
+from ET-Instruct [57]; (4) 112K samples from VideoGPT-               Mini [111]. Tokens are grouped into instruction, vision,
+Plus [59]; (5) 11K samples from LongVid [50] and                     and response categories: Tins , Tvis , and Tres . Let aij de-
+MovieChat [76]; (6) 26K dense video captioning (DVC)                 note the attention score from token ti to token tj , aver-
+samples aggregated from ActivityNet [12], COIN [78],                 aged over all attention heads. For two token categories
+HiREST [105], ViTT [37], and YouCook2 [117]; and (7)                 A, B ∈ {Tins , Tvis , Tres }, we define their category-level at-
+250K temporal video grounding (TVG) samples [89] from                tention score as:
+YT-Temporal [95], DiDeMo [6], QuerYD [62], Intern-                                                  P       P
+Vid [88], and HowTo100M [61]. We obtain grounding data                                                ti ∈A    tj ∈B aij
+                                                                          Attn(A → B) = n                                 o .     (9)
+with annotations from VTG-IT [34], TimeIT [69], Time-                                                      P
+                                                                                                 ti ∈ A      tj ∈B aij > 0
+Pro [106], HTStep [2], and LongVid [50]. This data col-
+lection process yields 339K temporal grounding samples.
+To ensure data quality, we apply a simple cleaning pro-              The denominator counts the number of tokens in A that at-
+tocol to the TVG data. Specifically, we filter out coarse-           tend to any token in B with non-zero weight, ensuring that
+grained samples where the ground truth duration exceeds              tokens masked by the causal attention mask are excluded.
+30 seconds or spans more than one-third of the total video           In Figure 10, we analyze the overall attention scores from
+length. We also discard invalid entries containing out-of-           the entire sequence T = Tins ∪ Tvis ∪ Tres to a target category
+
+
+                                                                10
+                               Table 3. Data recipe. Overview of the datasets used in our two-stage training pipeline.
+
+ Stage 1: Projector Alignment
+ Image caption data (3M)                     CC12M (3M) [15] with PixelProse captions [75]
+ Stage 2: Video Instruction-Tuning
+ Image instruction data (2.8M)               LLaVA-OneVision (2.8M) [46];
+                                             LLaVA-Video (1.3M) [113]; Kinetics400 & WebVid (253K) [8, 13] (recaptioned via ShareGem-
+ Video instruction data (1.8M)               ini [71] & ShareGPT-4 [17]); VideoGPT-Plus (112K) [59]; ET-Instruct (100K) [57]; LongVid [50]
+                                             & MovieChat (11K) [76]
+ Dense video captioning (26K)                ActivityNet [12], COIN [78], HiREST [105], ViTT [37], YouCook2 [117]
+                                             YT-Temporal [95], DiDeMo [6], QuerYD [62], InternVid [88], HowTo100M [61] (Annotated by
+ Temporal video grounding (250K)
+                                             VTG-IT [34], TimeIT [69], TimePro [106], HTStep [2], LongVid [50])
+
+                                           Table 4. Performance of applying TransV to Qwen2.5 and Nano.
+
+                                                                     MVBench         LongVideoBench   MLVU    VideoMME         LVBench   Charades-STA   VDC
+ Model                               LLM          >10K frame input
+                                                                      avg.acc             val         M-Avg   overall   long   avg.acc      mIoU        avg.acc
+ Qwen2.5-7B (ours)              Qwen2.5-7B [96]          ✗             57.6               55.4        64.9     56.6     48.7    36.6         40.8        42.0
+ Qwen2.5-7B (ours w/ TransV)    Qwen2.5-7B [96]          ✓             55.7               53.7        63.3     55.7     47.4    37.0         38.7        40.7
+ TimeViper (ours)                Nanov2-9B [9]           ✗             57.2               54.1        65.6     58.8     48.8    35.5         40.5        39.7
+ TimeViper (ours w/ TransV)      Nanov2-9B [9]           ✓             56.2               52.0        63.1     56.9     48.2    35.6         37.9        39.1
+
+
+
+
+B. To ensure equal contribution from each category, we                                a biology lecture. The correct answer relies on aggregating
+compute the arithmetic mean of the scores:                                            information across the entire video duration. In this case,
+                                                                                      a model must accurately align the textual concepts (e.g.,
+                                    1                                                 structure, photosynthesis) with their corresponding tempo-
+              Attn(T → B) =           Attn(Tins → B)
+                                    3                                                 ral segments (00:52, 07:37, etc.), As shown in the visual
+                                     +Attn(Tvis → B)                  (10)
+                                                                                      evidence, TimeViper w/ TransV correctly deduces the se-
+                                                                                      quence (c)-(d)-(e)-(a)-(b), demonstrating its capability in
+                                                    
+                                     +Attn(Tres → B) .
+                                                                                      modeling global temporal dependencies and understanding
+Hybrid MLLMs preserve stronger attention to vision to-                                narrative structure.
+kens. To quantify model behavior, we compute the aver-                                Qualitative results on Charades. For temporal video
+age attention received by instruction, vision, and response                           grounding results shown in Figure 11b, we observe that in-
+tokens across all layers. As shown in Figure 10, Qwen                                 corporating the compression module yields only minimal
+rapidly down-weights vision tokens after the early layers,                            changes. Both the original and compressed models cor-
+instead favoring instruction and response tokens. In con-                             rectly interpret timestamps and successfully localize video
+trast, Nano maintains noticeably higher attention to vision                           segments that correspond to the natural language query.
+tokens throughout the network. These findings suggest that                            Qualitative results on VDC. Figure 11a presents the qual-
+the hybrid model is more effective at attending to visual in-                         itative comparison for the video detailed captioning task.
+formation than the Transformer-based architecture.                                    In the generated captions, green text denotes accurate vi-
+Qualitative results on VideoMME. Figure 11c provides                                  sual details, while red text indicates hallucinations or fac-
+qualitative examples illustrating the effectiveness of TransV                         tual errors. In the first example showing a person paint-
+on the MCQ task. In the first case (top row), the query                               ing (top row), the baseline model suffers from severe ob-
+requires retrieving fine-grained visual information, specif-                          ject hallucination, fabricating elements such as a “sponge”
+ically, the defending layers about the Berlin Wall. The                               which are absent in the video. Surprisingly, TimeViper
+compressed model, TimeViper w/ TransV, successfully at-                               w/ TransV generates more faithful description, accurately
+tends to the critical frame at 03:36, which clearly depicts the                       recognizing specific objects like “paintbrushes”. This sug-
+structure of the wall, enabling it to select the correct answer.                      gests that compression may help reduce hallucination by fil-
+This example highlights TransV’s capability to identify and                           tering out irrelevant or misleading visual information. In
+attend to key visual cues within long videos. In the sec-                             the second example (bottom row), the compression module
+ond case (bottom row), the query requires long-term tem-                              TransV largely retains the original model behavior where
+poral reasoning to infer the chronological order of topics in                         there are both correct and incorrect captions.
+
+
+                                                                                11
+Video Input
+
+
+
+
+w/o TransV                                                                                                                                                 w/ TransV
+
+               A person is sitting on the floor, painting a large canvas with        A person is sitting on the floor in front of a canvas. They
+               blue and white paint. They are using a variety of brushes             are holding a paintbrush in their right hand and are using
+               and tools, including a palette knife and a sponge. The                it to paint on the canvas. The canvas is blue and white,
+               person is wearing a black shirt and jeans. They are sitting in        and the person is using a variety of colors, including blue,
+               front of a computer monitor, which is displaying a video of           white, and red. The person is wearing a black shirt and
+               the painting process. The person is using their right hand to         jeans. There are several other paintbrushes and paint
+               paint and their left hand to hold the canvas. They are                tubes on the table in front of the person. The person is
+               moving the brush in a circular motion, creating a swirling            painting a picture of a blue sky with white clouds. They are
+               effect. The person is also using their fingers to blend the           using a variety of brushstrokes to create the clouds. The
+               paint. The person is focused on their work and is creating a          person is also using a palette knife to mix the paint. The
+               beautiful piece of art.                                               person is taking their time and is carefully painting the
+                                                                                     picture. They are enjoying the process of creating art.
+
+
+                                                          (a) Qualitative results on VDC.
+
+Video Input                                                                      Video Input
+
+
+
+
+                                               22.5s              29.4s     GT                                     14.6s                        21.2s              GT
+IoU = 0.69                                                                Pred    IoU = 0.60                                                                     Pred
+IoU = 0.59                                                                Pred    IoU = 0.76                                                                     Pred
+
+
+             When does the query “person sitting on bed” happen?                               When does the query “the person was putting the bag
+                                                                                               into the cabinet” happen?
+
+                             w/o TransV                            w/ TransV                                     w/o TransV                               w/ TransV
+
+    20.0 to 30.0 seconds                   25.0 to 30.0 seconds                        15.0 to 25.0 seconds                    15.0 to 20.0 seconds
+
+
+                                                        (b) Qualitative results on Charades.
+                                                                                                                                                                        5
+
+Video Input
+
+
+
+
+                                                                                                                           w/o TransV                   w/ TransV
+
+              How many defending layers were there in the barrier in the east of the Berlin wall                  B. 3.                         B. 3.
+              accoridng to the video?
+              A. 4.    B. 3.     C. 2. D. 5.                                                                                     03:36
+                                                                                                                                                                        3
+
+
+
+Video Input
+
+
+
+
+                                                                                                             w/o TransV                                 w/ TransV
+              What is the order for introducing content in the video?
+              (a) The excretion process of plants.                                   B. (c)(d)(e)(a)(b).                       B. (c)(d)(e)(a)(b).
+              (b) Plant adaptability.
+              (c) The structure of a plant.
+              (d) The special way of eating of plants.                              00:52            05:13             07:37            10:53            15:29
+              (e) Photosynthesis.
+              A. (a)(d)(e)(c)(b). B. (c)(d)(e)(a)(b).
+              C. (d)(c)(b)(a)(e). D. (c)(e)(d)(b)(a).
+
+
+                                                       (c) Qualitative results on VideoMME.                                                                             2
+
+
+                                          Figure 11. Qualitative results on three benchmarks.
+
+                                                                             12
+References                                                            Lachy Groom, Karol Hausman, Brian Ichter, et al.
+                                                                      π0 : A vision-language-action flow model for gen-
+ [1] Josh Achiam, Steven Adler, Sandhini Agarwal,                     eral robot control. arXiv preprint arXiv:2410.24164,
+     Lama Ahmad, Ilge Akkaya, Florencia Leoni Ale-                    2024. 1
+     man, Diogo Almeida, Janko Altenschmidt, Sam Alt-
+                                                                 [11] Daniel Bolya, Cheng-Yang Fu, Xiaoliang Dai,
+     man, Shyamal Anadkat, et al. Gpt-4 technical report.
+                                                                      Peizhao Zhang, Christoph Feichtenhofer, and Judy
+     arXiv preprint arXiv:2303.08774, 2023. 7
+                                                                      Hoffman. Token merging: Your vit but faster. In
+ [2] Triantafyllos Afouras, Effrosyni Mavroudi, Tushar                The Eleventh International Conference on Learning
+     Nagarajan, Huiyu Wang, and Lorenzo Torresani.                    Representations, 2023. 2, 3, 4
+     Ht-step: Aligning instructional articles with how-to
+                                                                 [12] Fabian Caba Heilbron, Victor Escorcia, Bernard
+     videos. Advances in Neural Information Processing
+                                                                      Ghanem, and Juan Carlos Niebles. Activitynet: A
+     Systems, 36:50310–50326, 2023. 5, 10, 11
+                                                                      large-scale video benchmark for human activity un-
+ [3] Jean-Baptiste Alayrac, Jeff Donahue, Pauline Luc,                derstanding. In Proceedings of the ieee conference
+     Antoine Miech, Iain Barr, Yana Hasson, Karel                     on computer vision and pattern recognition, pages
+     Lenc, Arthur Mensch, Katherine Millican, Malcolm                 961–970, 2015. 5, 10, 11
+     Reynolds, et al. Flamingo: a visual language model          [13] Joao Carreira and Andrew Zisserman. Quo vadis,
+     for few-shot learning. Advances in neural informa-               action recognition? a new model and the kinet-
+     tion processing systems, 35:23716–23736, 2022. 2,                ics dataset. In proceedings of the IEEE Conference
+     3                                                                on Computer Vision and Pattern Recognition, pages
+ [4] Ameen Ali Ali, Itamar Zimerman, and Lior Wolf.                   6299–6308, 2017. 5, 10, 11
+     The hidden attention of mamba models. In Proceed-           [14] Wenhao Chai, Enxin Song, Yilun Du, Chenlin
+     ings of the 63rd Annual Meeting of the Association               Meng, Vashisht Madhavan, Omer Bar-Tal, Jenq-
+     for Computational Linguistics (Volume 1: Long Pa-                Neng Hwang, Saining Xie, and Christopher D Man-
+     pers), pages 1516–1534, Vienna, Austria, 2025. As-               ning. Auroracap: Efficient, performant video de-
+     sociation for Computational Linguistics. 8                       tailed captioning and a new benchmark. In The Thir-
+ [5] Saeed Ranjbar Alvar, Gursimran Singh, Mohammad                   teenth International Conference on Learning Repre-
+     Akbari, and Yong Zhang. Divprune: Diversity-based                sentations, 2025. 1, 4, 5
+     visual token pruning for large multimodal models.           [15] Soravit Changpinyo, Piyush Sharma, Nan Ding, and
+     In Proceedings of the Computer Vision and Pattern                Radu Soricut. Conceptual 12m: Pushing web-scale
+     Recognition Conference, pages 9392–9401, 2025. 2                 image-text pre-training to recognize long-tail visual
+ [6] Lisa Anne Hendricks, Oliver Wang, Eli Shechtman,                 concepts. In Proceedings of the IEEE/CVF con-
+     Josef Sivic, Trevor Darrell, and Bryan Russell. Lo-              ference on computer vision and pattern recognition,
+     calizing moments in video with natural language. In              pages 3558–3568, 2021. 5, 10, 11
+     Proceedings of the IEEE international conference on         [16] Guo Chen, Zhiqi Li, Shihao Wang, Jindong Jiang,
+     computer vision, pages 5803–5812, 2017. 5, 10, 11                Yicheng Liu, Lidong Lu, De-An Huang, Wonmin
+ [7] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang,                 Byeon, Matthieu Le, Max Ehrlich, Tong Lu, Limin
+     Wenbin Ge, Sibo Song, Kai Dang, Peng Wang, Shijie                Wang, Bryan Catanzaro, Jan Kautz, Andrew Tao,
+     Wang, Jun Tang, et al. Qwen2. 5-vl technical report.             Zhiding Yu, and Guilin Liu. Eagle 2.5: Boost-
+     arXiv preprint arXiv:2502.13923, 2025. 7                         ing long-context post-training for frontier vision-
+ [8] Max Bain, Arsha Nagrani, Gül Varol, and Andrew                  language models, 2025. 6
+     Zisserman. Frozen in time: A joint video and image          [17] Lin Chen, Xilin Wei, Jinsong Li, Xiaoyi Dong, Pan
+     encoder for end-to-end retrieval. In Proceedings of              Zhang, Yuhang Zang, Zehui Chen, Haodong Duan,
+     the IEEE/CVF international conference on computer                Zhenyu Tang, Li Yuan, et al. Sharegpt4video: Im-
+     vision, pages 1728–1738, 2021. 5, 10, 11                         proving video understanding and generation with
+ [9] Aarti Basant, Abhijit Khairnar, Abhijit Paithankar,              better captions. Advances in Neural Information Pro-
+     Abhinav Khattar, Adithya Renduchintala, Aditya                   cessing Systems, 37:19472–19495, 2024. 5, 10, 11
+     Malte, Akhiad Bercovich, Akshay Hazare, Ale-                [18] Liang Chen, Haozhe Zhao, Tianyu Liu, Shuai Bai,
+     jandra Rico, Aleksander Ficek, et al.         Nvidia             Junyang Lin, Chang Zhou, and Baobao Chang. An
+     nemotron nano 2: An accurate and efficient hybrid                image is worth 1/2 tokens after layer 2: Plug-and-
+     mamba-transformer reasoning model. arXiv preprint                play inference acceleration for large vision-language
+     arXiv:2508.14444, 2025. 2, 3, 7, 8, 11                           models. In European Conference on Computer Vi-
+[10] Kevin Black, Noah Brown, Danny Driess, Adnan Es-                 sion, pages 19–35. Springer, 2024. 2, 4, 5
+     mail, Michael Equi, Chelsea Finn, Niccolo Fusai,            [19] Yukang Chen, Fuzhao Xue, Dacheng Li, Qinghao
+
+
+                                                            13
+     Hu, Ligeng Zhu, Xiuyu Li, Yunhao Fang, Haotian                     Rectifying magnitude neglect in linear attention. In
+     Tang, Shang Yang, Zhijian Liu, Ethan He, Hongxu                    ICCV, 2025. 3
+     Yin, Pavlo Molchanov, Jan Kautz, Jim Fan, Yuke                [28] Yue Fan, Xiaojian Ma, Rujie Wu, Yuntao Du, Jiaqi
+     Zhu, Yao Lu, and Song Han. Longvila: Scaling long-                 Li, Zhi Gao, and Qing Li. Videoagent: A memory-
+     context visual language models for long videos. In                 augmented multimodal agent for video understand-
+     International Conference on Representation Learn-                  ing. In European Conference on Computer Vision,
+     ing, pages 18227–18246, 2025. 7                                    pages 75–92. Springer, 2024. 2
+[20] Zhe Chen, Jiannan Wu, Wenhai Wang, Weijie Su,                 [29] Chaoyou Fu, Yuhan Dai, Yongdong Luo, Lei Li,
+     Guo Chen, Sen Xing, Muyan Zhong, Qinglong                          Shuhuai Ren, Renrui Zhang, Zihan Wang, Chenyu
+     Zhang, Xizhou Zhu, Lewei Lu, et al. Internvl: Scal-                Zhou, Yunhang Shen, Mengdan Zhang, et al.
+     ing up vision foundation models and aligning for                   Video-mme: The first-ever comprehensive evalua-
+     generic visual-linguistic tasks. In Proceedings of the             tion benchmark of multi-modal llms in video analy-
+     IEEE/CVF Conference on Computer Vision and Pat-                    sis. In Proceedings of the Computer Vision and Pat-
+     tern Recognition, pages 24185–24198, 2024. 2                       tern Recognition Conference, pages 24108–24118,
+[21] Gheorghe Comanici, Eric Bieber, Mike Schaek-                       2025. 1, 2, 4, 5
+     ermann, Ice Pasupat, Noveen Sachdeva, Inderjit                [30] Chaoyou Fu, Haojia Lin, Xiong Wang, YiFan Zhang,
+     Dhillon, Marcel Blistein, Ori Ram, Dan Zhang, Evan                 Yunhang Shen, Xiaoyu Liu, Haoyu Cao, Zuwei
+     Rosen, et al. Gemini 2.5: Pushing the frontier                     Long, Heting Gao, Ke Li, Long MA, Xiawu Zheng,
+     with advanced reasoning, multimodality, long con-                  Rongrong Ji, Xing Sun, Caifeng Shan, and Ran He.
+     text, and next generation agentic capabilities. arXiv              VITA-1.5: Towards GPT-4o level real-time vision
+     preprint arXiv:2507.06261, 2025. 1, 2                              and speech interaction. In The Thirty-ninth Annual
+[22] Wenliang Dai, Junnan Li, Dongxu Li, Anthony                        Conference on Neural Information Processing Sys-
+     Tiong, Junqi Zhao, Weisheng Wang, Boyang Li, Pas-                  tems, 2025. 7
+     cale N Fung, and Steven Hoi. Instructblip: To-                [31] Gabriele Goletto, Tushar Nagarajan, Giuseppe
+     wards general-purpose vision-language models with                  Averta, and Dima Damen. Amego: Active memory
+     instruction tuning. Advances in neural information                 from long egocentric videos. In European Confer-
+     processing systems, 36:49250–49267, 2023. 2                        ence on Computer Vision, pages 92–110. Springer,
+                                                                        2024. 2
+[23] Tri Dao and Albert Gu. Transformers are ssms:
+                                                                   [32] Kristen Grauman, Andrew Westbury, Eugene Byrne,
+     generalized models and efficient algorithms through
+                                                                        Zachary Chavis, Antonino Furnari, Rohit Girdhar,
+     structured state space duality. In Proceedings of the
+                                                                        Jackson Hamburger, Hao Jiang, Miao Liu, Xingyu
+     41st International Conference on Machine Learning.
+                                                                        Liu, et al. Ego4d: Around the world in 3,000 hours
+     JMLR.org, 2024. 2, 3, 4, 8
+                                                                        of egocentric video. In Proceedings of the IEEE/CVF
+[24] Amala Sanjay Deshmukh, Kateryna Chumachenko,                       conference on computer vision and pattern recogni-
+     Tuomas Rintamaki, Matthieu Le, Tyler Poon, Da-                     tion, pages 18995–19012, 2022. 1
+     nial Mohseni Taheri, Ilia Karmanov, Guilin Liu,               [33] Albert Gu and Tri Dao. Mamba: Linear-time se-
+     Jarno Seppanen, Guo Chen, et al. Nvidia nemotron                   quence modeling with selective state spaces. In First
+     nano v2 vl. arXiv preprint arXiv:2511.03929, 2025.                 Conference on Language Modeling, 2024. 2, 3
+     7
+                                                                   [34] Yongxin Guo, Jingyu Liu, Mingda Li, Dingxin
+[25] Xin Dong, Yonggan Fu, Shizhe Diao, Wonmin                          Cheng, Xiaoying Tang, Dianbo Sui, Qingbin Liu, Xi
+     Byeon, ZIJIA CHEN, Ameya Sunil Mahabalesh-                         Chen, and Kevin Zhao. Vtg-llm: Integrating times-
+     warkar, Shih-Yang Liu, Matthijs Van keirsbilck,                    tamp knowledge into video llms for enhanced video
+     Min-Hung Chen, Yoshi Suhara, Yingyan Celine Lin,                   temporal grounding. In Proceedings of the AAAI
+     Jan Kautz, and Pavlo Molchanov. Hymba: A hybrid-                   Conference on Artificial Intelligence, pages 3302–
+     head architecture for small language models. In                    3310, 2025. 5, 10, 11
+     The Thirteenth International Conference on Learn-             [35] Wei Han, Hui Chen, Min-Yen Kan, and Soujanya
+     ing Representations, 2025. 2, 3                                    Poria. Self-adaptive sampling for accurate video
+[26] Abhimanyu Dubey, Abhinav Jauhri, Abhinav                           question answering on image text models. In Find-
+     Pandey, Abhishek Kadian, Ahmad Al-Dahle, Aiesha                    ings of the Association for Computational Linguis-
+     Letman, Akhil Mathur, Alan Schelten, Amy Yang,                     tics: NAACL 2024, pages 2522–2534, 2024. 2
+     Angela Fan, et al. The llama 3 herd of models. arXiv          [36] Bin Huang, Xin Wang, Hong Chen, Zihan Song, and
+     e-prints, pages arXiv–2407, 2024. 5, 7                             Wenwu Zhu. Vtimellm: Empower llm to grasp video
+[27] Qihang Fan, Huaibo Huang, Yuang Ai, and Ran He.                    moments. In Proceedings of the IEEE/CVF Confer-
+
+
+                                                              14
+     ence on Computer Vision and Pattern Recognition,                 ing foundation models with lightning attention. arXiv
+     pages 14271–14280, 2024. 1                                       preprint arXiv:2501.08313, 2025. 2
+[37] Gabriel Huang, Bo Pang, Zhenhai Zhu, Clara Rivera,          [46] Bo Li, Yuanhan Zhang, Dong Guo, Renrui Zhang,
+     and Radu Soricut. Multimodal pretraining for dense               Feng Li, Hao Zhang, Kaichen Zhang, Peiyuan
+     video captioning. In Proceedings of the 1st Confer-              Zhang, Yanwei Li, Ziwei Liu, and Chunyuan Li.
+     ence of the Asia-Pacific Chapter of the Association              Llava-onevision: Easy visual task transfer. Trans-
+     for Computational Linguistics and the 10th Interna-              actions on Machine Learning Research, 2024. 5, 7,
+     tional Joint Conference on Natural Language Pro-                 11
+     cessing, pages 470–490, Suzhou, China, 2020. Asso-          [47] Jiaze Li, Yaya Shi, Zongyang Ma, Haoran Xu, Yan-
+     ciation for Computational Linguistics. 5, 10, 11                 dong.bai Yandong.bai, Huihui Xiao, Ruiwen Kang,
+[38] Aaron Hurst, Adam Lerer, Adam P Goucher, Adam                    Fan Yang, Tingting Gao, and Di Zhang. iMOVE
+     Perelman, Aditya Ramesh, Aidan Clark, AJ Os-                     : Instance-motion-aware video understanding. In
+     trow, Akila Welihinda, Alan Hayes, Alec Rad-                     Findings of the Association for Computational Lin-
+     ford, et al. Gpt-4o system card. arXiv preprint                  guistics: ACL 2025, pages 23959–23975, Vienna,
+     arXiv:2410.21276, 2024. 7                                        Austria, 2025. Association for Computational Lin-
+[39] Md Mohaiminul Islam, Tushar Nagarajan, Huiyu                     guistics. 2
+     Wang, Gedas Bertasius, and Lorenzo Torresani.               [48] Kunchang Li, Xinhao Li, Yi Wang, Yinan He, Yali
+     Bimba: Selective-scan compression for long-range                 Wang, Limin Wang, and Yu Qiao. Videomamba:
+     video question answering. In Proceedings of the                  State space model for efficient video understanding.
+     Computer Vision and Pattern Recognition Confer-                  In European conference on computer vision, pages
+     ence, pages 29096–29107, 2025. 2                                 237–255. Springer, 2024. 3
+[40] Jindong Jiang, Xiuyu Li, Zhijian Liu, Muyang Li,
+                                                                 [49] Kunchang Li, Yali Wang, Yinan He, Yizhuo Li, Yi
+     Guo Chen, Zhiqi Li, De-An Huang, Guilin Liu, Zhid-
+                                                                      Wang, Yi Liu, Zun Wang, Jilan Xu, Guo Chen, Ping
+     ing Yu, Kurt Keutzer, et al. Storm: Token-efficient
+                                                                      Luo, et al. Mvbench: A comprehensive multi-modal
+     long video understanding for multimodal llms. In
+                                                                      video understanding benchmark. In Proceedings of
+     Proceedings of the IEEE/CVF International Confer-
+                                                                      the IEEE/CVF Conference on Computer Vision and
+     ence on Computer Vision, pages 5830–5841, 2025.
+                                                                      Pattern Recognition, pages 22195–22206, 2024. 5
+[41] Peng Jin, Ryuichi Takanobu, Wancai Zhang, Xi-
+                                                                 [50] Xinhao Li, Yi Wang, Jiashuo Yu, Xiangyu Zeng,
+     aochun Cao, and Li Yuan. Chat-univi: Unified visual
+                                                                      Yuhan Zhu, Haian Huang, Jianfei Gao, Kunchang
+     representation empowers large language models with
+                                                                      Li, Yinan He, Chenting Wang, et al. Videochat-
+     image and video understanding. In Proceedings of
+                                                                      flash: Hierarchical compression for long-context
+     the IEEE/CVF Conference on Computer Vision and
+                                                                      video modeling. arXiv preprint arXiv:2501.00574,
+     Pattern Recognition, pages 13700–13710, 2024. 2
+                                                                      2024. 1, 2, 3, 5, 6, 7, 10, 11
+[42] Omri Kaduri, Shai Bagon, and Tali Dekel. What’s
+     in the image? a deep-dive into the vision of vision         [51] Yanwei Li, Chengyao Wang, and Jiaya Jia. Llama-
+     language models. In Proceedings of the Computer                  vid: An image is worth 2 tokens in large language
+     Vision and Pattern Recognition Conference, pages                 models. In European Conference on Computer Vi-
+     14549–14558, 2025. 4                                             sion. Springer, 2024. 2, 7
+[43] Kumara Kahatapitiya, Kanchana Ranasinghe, Jong-             [52] Yingyue Li, Bencheng Liao, Wenyu Liu, and Xing-
+     woo Park, and Michael S Ryoo. Language repository                gang Wang. Matvlm: Hybrid mamba-transformer for
+     for long video understanding. In Findings of the As-             efficient vision-language modeling. In Proceedings
+     sociation for Computational Linguistics: ACL 2025,               of the IEEE/CVF International Conference on Com-
+     pages 5627–5646, Vienna, Austria, 2025. Associa-                 puter Vision, pages 20878–20888, 2025. 2
+     tion for Computational Linguistics. 2                       [53] Bencheng Liao, Hongyuan Tao, Qian Zhang, Tian-
+[44] Barak Lenz, Opher Lieber, Alan Arazi, Amir                       heng Cheng, Yingyue Li, Haoran Yin, Wenyu Liu,
+     Bergman, Avshalom Manevich, Barak Peleg, Ben                     and Xinggang Wang. Multimodal mamba: Decoder-
+     Aviram, Chen Almagor, Clara Fridman, Dan Padnos,                 only multimodal state space model via quadratic to
+     et al. Jamba: Hybrid transformer-mamba language                  linear distillation. arXiv preprint arXiv:2502.13145,
+     models. In The Thirteenth International Conference               2025. 2, 3
+     on Learning Representations, 2025. 2, 7                     [54] Haotian Liu, Chunyuan Li, Qingyang Wu, and
+[45] Aonian Li, Bangwei Gong, Bo Yang, Boji Shan,                     Yong Jae Lee. Visual instruction tuning. Advances
+     Chang Liu, Cheng Zhu, Chunhao Zhang, Congchao                    in neural information processing systems, 36:34892–
+     Guo, Da Chen, Dong Li, et al. Minimax-01: Scal-                  34916, 2023. 3
+
+
+                                                            15
+[55] Jiajun Liu, Yibing Wang, Hanghang Ma, Xiaoping                   ceedings of the IEEE/CVF International Conference
+     Wu, Xiaoqi Ma, xiaoming Wei, Jianbin Jiao, En-                   on Computer Vision, pages 272–283, 2023. 2
+     hua Wu, and Jie Hu. Kangaroo: A powerful video-             [64] Bo Peng, Eric Alcaide, Quentin Anthony, Alon Al-
+     language model supporting long-context video input.              balak, Samuel Arcadinho, Stella Biderman, Huanqi
+     arXiv preprint arXiv:2408.15542, 2024. 7                         Cao, Xin Cheng, Michael Chung, Matteo Grella,
+[56] Yunze Liu and Li Yi. Map: Unleashing hybrid                      et al. Rwkv: Reinventing rnns for the transformer
+     mamba-transformer vision backbone’s potential with               era. arXiv preprint arXiv:2305.13048, 2023. 3
+     masked autoregressive pretraining. In Proceedings of        [65] Bo Peng, Daniel Goldstein, Quentin Anthony, Alon
+     the Computer Vision and Pattern Recognition Con-                 Albalak, Eric Alcaide, Stella Biderman, Eugene
+     ference, pages 9676–9685, 2025. 3                                Cheah, Xingjian Du, Teddy Ferdinan, Haowen Hou,
+[57] Ye Liu, Zongyang Ma, Zhongang Qi, Yang Wu,                       et al. Eagle and finch: Rwkv with matrix-valued
+     Chang Wen Chen, and Ying Shan. E.t. bench: To-                   states and dynamic recurrence.        arXiv preprint
+     wards open-ended event-level video-language under-               arXiv:2404.05892, 2024. 3, 7
+     standing. In Neural Information Processing Systems          [66] Toby Perrett, Ahmad Darkhalil, Saptarshi Sinha,
+     (NeurIPS), 2024. 5, 10, 11                                       Omar Emara, Sam Pollard, Kranti Kumar Parida,
+[58] Zhijian Liu, Ligeng Zhu, Baifeng Shi, Zhuoyang                   Kaiting Liu, Prajwal Gatti, Siddhant Bansal, Kevin
+     Zhang, Yuming Lou, Shang Yang, Haocheng Xi,                      Flanagan, et al. Hd-epic: A highly-detailed egocen-
+     Shiyi Cao, Yuxian Gu, Dacheng Li, Xiuyu Li, Yun-                 tric video dataset. In Proceedings of the Computer
+     hao Fang, Yukang Chen, Cheng-Yu Hsieh, De-                       Vision and Pattern Recognition Conference, pages
+     An Huang, An-Chieh Cheng, Vishwesh Nath, Jinyi                   23901–23913, 2025. 1
+     Hu, Sifei Liu, Ranjay Krishna, Daguang Xu, Xiao-            [67] Yanyuan Qiao, Zheng Yu, Longteng Guo, Si-
+     long Wang, Pavlo Molchanov, Jan Kautz, Hongxu                    han Chen, Zijia Zhao, Mingzhen Sun, Qi Wu,
+     Yin, Song Han, and Yao Lu. Nvila: Efficient                      and Jing Liu. Vl-mamba: Exploring state space
+     frontier visual language models. arXiv preprint                  models for multimodal learning. arXiv preprint
+     arXiv:2412.04468, 2024. 2                                        arXiv:2403.13600, 2024. 3
+                                                                 [68] Liliang Ren, Yang Liu, Yadong Lu, yelong shen,
+[59] Muhammad Maaz, Hanoona Rasheed, Salman Khan,
+                                                                      Chen Liang, and Weizhu Chen. Samba: Simple hy-
+     and Fahad Shahbaz Khan. Videogpt+: Integrating
+                                                                      brid state space models for efficient unlimited con-
+     image and video encoders for enhanced video under-
+                                                                      text language modeling. In International Conference
+     standing. arxiv, 2024. 10, 11
+                                                                      on Representation Learning, pages 53551–53575,
+[60] Karttikeya Mangalam, Raiymbek Akshulakov, and                    2025. 2, 3
+     Jitendra Malik. Egoschema: A diagnostic bench-              [69] Shuhuai Ren, Linli Yao, Shicheng Li, Xu Sun, and
+     mark for very long-form video language understand-               Lu Hou. Timechat: A time-sensitive multimodal
+     ing. Advances in Neural Information Processing Sys-              large language model for long video understand-
+     tems, 36:46212–46244, 2023. 2                                    ing. In Proceedings of the IEEE/CVF Conference
+[61] Antoine Miech, Dimitri Zhukov, Jean-Baptiste                     on Computer Vision and Pattern Recognition, pages
+     Alayrac, Makarand Tapaswi, Ivan Laptev, and Josef                14313–14323, 2024. 2, 5, 10, 11
+     Sivic. Howto100m: Learning a text-video embed-              [70] Weiming Ren, Wentao Ma, Huan Yang, Cong Wei,
+     ding by watching hundred million narrated video                  Ge Zhang, and Wenhu Chen. Vamba: Understanding
+     clips. In Proceedings of the IEEE/CVF international              hour-long videos with hybrid mamba-transformers.
+     conference on computer vision, pages 2630–2640,                  In Proceedings of the IEEE/CVF International Con-
+     2019. 5, 10, 11                                                  ference on Computer Vision (ICCV), pages 21197–
+[62] Andreea-Maria Oncescu, Joao F Henriques, Yang                    21208, 2025. 2, 3, 7
+     Liu, Andrew Zisserman, and Samuel Albanie.                  [71] Share. Sharegemini: Scaling up video caption data
+     Queryd: A video dataset with high-quality text and               for multimodal large language models, 2024. 5, 10,
+     audio narrations. In ICASSP 2021-2021 IEEE Inter-                11
+     national Conference on Acoustics, Speech and Sig-           [72] Xiaoqian Shen, Yunyang Xiong, Changsheng Zhao,
+     nal Processing (ICASSP), pages 2265–2269. IEEE,                  Lemeng Wu, Jun Chen, Chenchen Zhu, Zechun Liu,
+     2021. 5, 10, 11                                                  Fanyi Xiao, Balakrishnan Varadarajan, Florian Bor-
+[63] Junting Pan, Ziyi Lin, Yuying Ge, Xiatian Zhu, Ren-              des, Zhuang Liu, Hu Xu, Hyunwoo J. Kim, Bilge
+     rui Zhang, Yi Wang, Yu Qiao, and Hongsheng Li.                   Soran, Raghuraman Krishnamoorthi, Mohamed El-
+     Retrieving-to-answer: Zero-shot video question an-               hoseiny, and Vikas Chandra. LongVU: Spatiotem-
+     swering with frozen large language models. In Pro-               poral adaptive compression for long video-language
+
+
+                                                            16
+     understanding. In Forty-second International Con-            [82] Hugo Touvron, Louis Martin, Kevin Stone, Peter
+     ference on Machine Learning, 2025. 2, 7                           Albert, Amjad Almahairi, Yasmine Babaei, Nikolay
+[73] Yan Shu, Zheng Liu, Peitian Zhang, Minghao Qin,                   Bashlykov, Soumya Batra, Prajjwal Bhargava, Shruti
+     Junjie Zhou, Zhengyang Liang, Tiejun Huang, and                   Bhosale, et al. Llama 2: Open foundation and fine-
+     Bo Zhao. Video-xl: Extra-long vision language                     tuned chat models. arXiv preprint arXiv:2307.09288,
+     model for hour-scale video understanding. In Pro-                 2023. 7
+     ceedings of the Computer Vision and Pattern Recog-           [83] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob
+     nition Conference, pages 26160–26169, 2025. 1, 2,                 Uszkoreit, Llion Jones, Aidan N Gomez, Łukasz
+     7                                                                 Kaiser, and Illia Polosukhin. Attention is all you
+[74] Gunnar A Sigurdsson, Abhinav Gupta, Cordelia                      need. Advances in neural information processing
+     Schmid, Ali Farhadi, and Karteek Alahari. Charades-               systems, 30, 2017. 8
+     ego: A large-scale dataset of paired third and first         [84] Peng Wang, Shuai Bai, Sinan Tan, Shijie Wang, Zhi-
+     person videos. arXiv preprint arXiv:1804.09626,                   hao Fan, Jinze Bai, Keqin Chen, Xuejing Liu, Jialin
+     2018. 1, 4, 5                                                     Wang, Wenbin Ge, et al. Qwen2-vl: Enhancing
+[75] Vasu Singla, Kaiyu Yue, Sukriti Paul, Reza                        vision-language model’s perception of the world at
+     Shirkavand, Mayuka Jayawardhana, Alireza Ganj-                    any resolution. arXiv preprint arXiv:2409.12191,
+     danesh, Heng Huang, Abhinav Bhatele, Gowthami                     2024. 7
+     Somepalli, and Tom Goldstein. From pixels to prose:          [85] Weihan Wang, Zehai He, Wenyi Hong, Yean Cheng,
+     A large dataset of dense image captions. arXiv                    Xiaohan Zhang, Ji Qi, Ming Ding, Xiaotao Gu,
+     preprint arXiv:2406.10328, 2024. 5, 10, 11                        Shiyu Huang, Bin Xu, et al. Lvbench: An extreme
+[76] Enxin Song, Wenhao Chai, Guanhong Wang,                           long video understanding benchmark. In Proceed-
+     Yucheng Zhang, Haoyang Zhou, Feiyang Wu,                          ings of the IEEE/CVF International Conference on
+     Haozhe Chi, Xun Guo, Tian Ye, Yanting Zhang, et al.               Computer Vision, pages 22958–22967, 2025. 1, 5
+     Moviechat: From dense token to sparse memory for             [86] Xidong Wang, Dingjie Song, Shunian Chen, Chen
+     long video understanding. In Proceedings of the                   Zhang, and Benyou Wang. Longllava: Scaling multi-
+     IEEE/CVF Conference on Computer Vision and Pat-                   modal llms to 1000 images efficiently via hybrid ar-
+     tern Recognition, pages 18221–18232, 2024. 2, 5,                  chitecture. arXiv preprint arXiv:2409.02889, 2024.
+     10, 11                                                            2, 3, 7
+[77] Mingjie Sun, Xinlei Chen, J Zico Kolter, and Zhuang          [87] Xiaohan Wang, Yuhui Zhang, Orr Zohar, and Serena
+     Liu. Massive activations in large language models. In             Yeung-Levy. Videoagent: Long-form video under-
+     First Conference on Language Modeling, 2024. 9                    standing with large language model as agent. In Eu-
+[78] Yansong Tang, Dajun Ding, Yongming Rao, Yu                        ropean Conference on Computer Vision, pages 58–
+     Zheng, Danyang Zhang, Lili Zhao, Jiwen Lu, and Jie                76. Springer, 2024. 2
+     Zhou. Coin: A large-scale dataset for comprehen-             [88] Yi Wang, Yinan He, Yizhuo Li, Kunchang Li, Ji-
+     sive instructional video analysis. In Proceedings of              ashuo Yu, Xin Ma, Xinhao Li, Guo Chen, Xinyuan
+     the IEEE/CVF Conference on Computer Vision and                    Chen, Yaohui Wang, Ping Luo, Ziwei Liu, Yali
+     Pattern Recognition, pages 1207–1216, 2019. 5, 10,                Wang, Limin Wang, and Yu Qiao. Internvid: A
+     11                                                                large-scale video-text dataset for multimodal under-
+[79] Makarand Tapaswi, Yukun Zhu, Rainer Stiefelhagen,                 standing and generation. In The Twelfth International
+     Antonio Torralba, Raquel Urtasun, and Sanja Fidler.               Conference on Learning Representations, 2024. 5,
+     Movieqa: Understanding stories in movies through                  10, 11
+     question-answering. In Proceedings of the IEEE con-          [89] Ye Wang, Ziheng Wang, Boshen Xu, Yang Du, Ke-
+     ference on computer vision and pattern recognition,               jun Lin, Zihan Xiao, Zihao Yue, Jianzhong Ju, Liang
+     pages 4631–4640, 2016. 1                                          Zhang, Dingyi Yang, Xiangnan Fang, Zewen He,
+[80] Gemini Team, Petko Georgiev, Ving Ian Lei, Ryan                   Zhenbo Luo, Wenxuan Wang, Junqi Lin, Jian Luan,
+     Burnell, Libin Bai, Anmol Gulati, Garrett Tanzer,                 and Qin Jin. Time-r1: Post-training large vision lan-
+     Damien Vincent, Zhufeng Pan, Shibo Wang, et al.                   guage model for temporal video grounding. In The
+     Gemini 1.5: Unlocking multimodal understanding                    Thirty-ninth Annual Conference on Neural Informa-
+     across millions of tokens of context. arXiv preprint              tion Processing Systems, 2025. 5, 10
+     arXiv:2403.05530, 2024. 1, 7                                 [90] Haoning Wu, Dongxu Li, Bei Chen, and Junnan
+[81] Qwen Team et al. Qwen2 technical report. arXiv                    Li.     Longvideobench: A benchmark for long-
+     preprint arXiv:2407.10671, 2(3), 2024. 7                          context interleaved video-language understanding.
+
+
+                                                             17
+     Advances in Neural Information Processing Systems,               ceedings of the Computer Vision and Pattern Recog-
+     37:28828–28857, 2024. 5                                          nition Conference, pages 28885–28900, 2025. 1
+[91] Guangxuan Xiao, Yuandong Tian, Beidi Chen, Song             [99] Senqiao Yang, Yukang Chen, Zhuotao Tian,
+     Han, and Mike Lewis. Efficient streaming language                Chengyao Wang, Jingyao Li, Bei Yu, and Jiaya Jia.
+     models with attention sinks. In The Twelfth Inter-               Visionzip: Longer is better but not necessary in vi-
+     national Conference on Learning Representations,                 sion language models. In Proceedings of the Com-
+     2024. 9, 10                                                      puter Vision and Pattern Recognition Conference,
+[92] Long Xing, Qidong Huang, Xiaoyi Dong, Jiajie Lu,                 pages 19792–19802, 2025. 2
+     Pan Zhang, Yuhang Zang, Yuhang Cao, Conghui He,            [100] Linli Yao, Haoning Wu, Kun Ouyang, Yuanxing
+     Jiaqi Wang, Feng Wu, et al. Pyramiddrop: Accel-                  Zhang, Caiming Xiong, Bei Chen, Xu Sun, and Jun-
+     erating your large vision-language models via pyra-              nan Li. Generative frame sampler for long video un-
+     mid visual redundancy reduction. In Proceedings of               derstanding. In Findings of the Association for Com-
+     the Computer Vision and Pattern Recognition Con-                 putational Linguistics: ACL 2025, pages 17900–
+     ference, 2025. 2, 4                                              17917, Vienna, Austria, 2025. Association for Com-
+                                                                      putational Linguistics. 2
+[93] Weili Xu, Enxin Song, Wenhao Chai, Xuexiang Wen,
+     Tian Ye, and Gaoang Wang. Bringing rnns back to            [101] Jinhui Ye, Zihan Wang, Haosen Sun, Keshigeyan
+     efficient open-ended video understanding. In Pro-                Chandrasegaran, Zane Durante, Cristobal Eyza-
+     ceedings of the IEEE/CVF International Conference                guirre, Yonatan Bisk, Juan Carlos Niebles, Ehsan
+     on Computer Vision, pages 23453–23465, 2025. 2,                  Adeli, Li Fei-Fei, et al. Re-thinking temporal search
+     3, 7                                                             for long-form video understanding. In Proceed-
+                                                                      ings of the Computer Vision and Pattern Recognition
+[94] Antoine Yang, Arsha Nagrani, Ivan Laptev, Josef                  Conference, pages 8579–8591, 2025. 2
+     Sivic, and Cordelia Schmid. Vidchapters-7m: Video
+                                                                [102] Xubing Ye, Yukang Gan, Xiaoke Huang, Yixiao Ge,
+     chapters at scale. Advances in Neural Information
+                                                                      and Yansong Tang. Voco-llama: Towards vision
+     Processing Systems, 36:49428–49444, 2023. 1
+                                                                      compression with large language models. In Pro-
+[95] Antoine Yang, Arsha Nagrani, Paul Hongsuck Seo,                  ceedings of the Computer Vision and Pattern Recog-
+     Antoine Miech, Jordi Pont-Tuset, Ivan Laptev, Josef              nition Conference, pages 29836–29846, 2025. 2
+     Sivic, and Cordelia Schmid. Vid2seq: Large-scale           [103] Weihao Yu and Xinchao Wang. Mambaout: Do we
+     pretraining of a visual language model for dense                 really need mamba for vision? In Proceedings of
+     video captioning. In Proceedings of the IEEE/CVF                 the Computer Vision and Pattern Recognition Con-
+     conference on computer vision and pattern recogni-               ference, pages 4484–4496, 2025. 3
+     tion, pages 10714–10726, 2023. 5, 10, 11                   [104] Zihao Yue, Qi Zhang, Anwen Hu, Liang Zhang, Zi-
+[96] An Yang, Baosong Yang, Beichen Zhang, Binyuan                    heng Wang, and Qin Jin. Movie101: A new movie
+     Hui, Bo Zheng, Bowen Yu, Chengyuan Li, Dayi-                     understanding benchmark. In Proceedings of the
+     heng Liu, Fei Huang, Haoran Wei, Huan Lin, Jian                  61st Annual Meeting of the Association for Compu-
+     Yang, Jianhong Tu, Jianwei Zhang, Jianxin Yang,                  tational Linguistics (Volume 1: Long Papers), pages
+     Jiaxi Yang, Jingren Zhou, Junyang Lin, Kai Dang,                 4669–4684, Toronto, Canada, 2023. Association for
+     Keming Lu, Keqin Bao, Kexin Yang, Le Yu, Mei Li,                 Computational Linguistics. 2
+     Mingfeng Xue, Pei Zhang, Qin Zhu, Rui Men, Runji           [105] Abhay Zala, Jaemin Cho, Satwik Kottur, Xilun
+     Lin, Tianhao Li, Tingyu Xia, Xingzhang Ren, Xu-                  Chen, Barlas Oguz, Yashar Mehdad, and Mohit
+     ancheng Ren, Yang Fan, Yang Su, Yichang Zhang,                   Bansal. Hierarchical video-moment retrieval and
+     Yu Wan, Yuqiong Liu, Zeyu Cui, Zhenru Zhang, and                 step-captioning. In Proceedings of the IEEE/CVF
+     Zihan Qiu. Qwen2.5 technical report. arXiv preprint              Conference on Computer Vision and Pattern Recog-
+     arXiv:2412.15115, 2024. 7, 8, 11                                 nition, pages 23056–23065, 2023. 5, 10, 11
+[97] An Yang, Anfeng Li, Baosong Yang, Beichen Zhang,           [106] Xiangyu Zeng, Kunchang Li, Chenting Wang, Xin-
+     Binyuan Hui, Bo Zheng, Bowen Yu, Chang Gao,                      hao Li, Tianxiang Jiang, Ziang Yan, Songze Li, Yan-
+     Chengen Huang, Chenxu Lv, et al. Qwen3 techni-                   song Shi, Zhengrong Yue, Yi Wang, Yali Wang,
+     cal report. arXiv preprint arXiv:2505.09388, 2025.               Yu Qiao, and Limin Wang. Timesuite: Improving
+     1                                                                MLLMs for long video understanding via grounded
+[98] Jingkang Yang, Shuai Liu, Hongming Guo, Yuhao                    tuning. In The Thirteenth International Conference
+     Dong, Xiamengwei Zhang, Sicheng Zhang, Pengyun                   on Learning Representations, 2025. 5, 10, 11
+     Wang, Zitang Zhou, Binzhu Xie, Ziyue Wang, et al.          [107] Xiaohua Zhai, Basil Mustafa, Alexander Kolesnikov,
+     Egolife: Towards egocentric life assistant. In Pro-              and Lucas Beyer. Sigmoid loss for language im-
+
+                                                           18
+      age pre-training. In Proceedings of the IEEE/CVF                   In Proceedings of the Computer Vision and Pattern
+      international conference on computer vision, pages                 Recognition Conference, pages 13691–13701, 2025.
+      11975–11986, 2023. 2, 3                                            5
+[108] Ce Zhang, Taixi Lu, Md Mohaiminul Islam, Ziyang              [117] Luowei Zhou, Chenliang Xu, and Jason Corso. To-
+      Wang, Shoubin Yu, Mohit Bansal, and Gedas Berta-                   wards automatic learning of procedures from web in-
+      sius. A simple LLM framework for long-range                        structional videos. In Proceedings of the AAAI con-
+      video question-answering. In Proceedings of the                    ference on artificial intelligence, 2018. 5, 10, 11
+      2024 Conference on Empirical Methods in Natural              [118] Lianghui Zhu, Bencheng Liao, Qian Zhang, Xin-
+      Language Processing, pages 21715–21737, Miami,                     long Wang, Wenyu Liu, and Xinggang Wang. Vision
+      Florida, USA, 2024. Association for Computational                  mamba: Efficient visual representation learning with
+      Linguistics. 2                                                     bidirectional state space model. In Forty-first Inter-
+[109] Jiazhao Zhang, Kunyu Wang, Shaoan Wang, Ming-                      national Conference on Machine Learning, 2024. 3
+      han Li, Haoran Liu, Songlin Wei, Zhongyuan Wang,             [119] Itamar Zimerman, Ameen Ali, and Lior Wolf. Ex-
+      Zhizheng Zhang, and He Wang. Uni-navid: A video-                   plaining modern gated-linear rnns via a unified im-
+      based vision-language-action model for unifying em-                plicit attention formulation. In ICLR, 2025. 8
+      bodied navigation tasks. Robotics: Science and Sys-          [120] Orr Zohar, Xiaohan Wang, Yann Dubois, Nikhil
+      tems, 2025. 1                                                      Mehta, Tong Xiao, Philippe Hansen-Estruch,
+[110] Peiyuan Zhang, Kaichen Zhang, Bo Li, Guangtao                      Licheng Yu, Xiaofang Wang, Felix Juefei-Xu, Ning
+      Zeng, Jingkang Yang, Yuanhan Zhang, Ziyue Wang,                    Zhang, et al. Apollo: An exploration of video
+      Haoran Tan, Chunyuan Li, and Ziwei Liu. Long con-                  understanding in large multimodal models.            In
+      text transfer from language to vision. arXiv preprint              Proceedings of the Computer Vision and Pattern
+      arXiv:2406.16852, 2024. 7                                          Recognition Conference, pages 18891–18901, 2025.
+[111] Shaolei Zhang, Qingkai Fang, Zhe Yang, and Yang                    2, 3, 6
+      Feng. LLaVA-mini: Efficient image and video                  [121] Xin Zou, Di Lu, Yizhou Wang, Yibo Yan, Yuanhuiyi
+      large multimodal models with one vision token. In                  Lyu, Xu Zheng, Linfeng Zhang, and Xuming Hu.
+      The Thirteenth International Conference on Learn-                  Don’t just chase” highlighted tokens” in mllms: Re-
+      ing Representations, 2025. 5, 10                                   visiting visual holistic context retention. Advances in
+[112] Yuan Zhang, Chun-Kai Fan, Junpeng Ma, Wenzhao                      Neural Information Processing Systems, 2025. 2
+      Zheng, Tao Huang, Kuan Cheng, Denis Gudovskiy,               [122] Jingwei Zuo, Maksim Velikanov, Ilyas Chahed,
+      Tomoyuki Okuno, Yohei Nakata, Kurt Keutzer, et al.                 Younes Belkada, Dhia Eddine Rhayem, Guillaume
+      Sparsevlm: Visual token sparsification for efficient               Kunsch, Hakim Hacid, Hamza Yous, Brahim Farhat,
+      vision-language model inference. In International                  Ibrahim Khadraoui, et al. Falcon-h1: A family of
+      Conference on Machine Learning, 2025. 2                            hybrid-head language models redefining efficiency
+[113] Yuanhan Zhang, Jinming Wu, Wei Li, Bo Li, Zejun                    and performance. arXiv preprint arXiv:2507.22448,
+      MA, Ziwei Liu, and Chunyuan Li. LLaVA-video:                       2025. 2
+      Video instruction tuning with synthetic data. Trans-
+      actions on Machine Learning Research, 2025. 5, 7,
+      10, 11
+[114] Zhi Zhang, Srishti Yadav, Fengze Han, and Ekate-
+      rina Shutova. Cross-modal information flow in mul-
+      timodal large language models. In Proceedings of
+      the Computer Vision and Pattern Recognition Con-
+      ference, pages 19781–19791, 2025. 5
+[115] Han Zhao, Min Zhang, Wei Zhao, Pengxiang Ding,
+      Siteng Huang, and Donglin Wang. Cobra: Extending
+      mamba to multi-modal large language model for effi-
+      cient inference. In Proceedings of the AAAI Confer-
+      ence on Artificial Intelligence, pages 10421–10429,
+      2025. 2, 3
+[116] Junjie Zhou, Yan Shu, Bo Zhao, Boya Wu,
+      Zhengyang Liang, Shitao Xiao, Minghao Qin, Xi
+      Yang, Yongping Xiong, Bo Zhang, et al. Mlvu:
+      Benchmarking multi-task long video understanding.
+
+
+                                                              19
+

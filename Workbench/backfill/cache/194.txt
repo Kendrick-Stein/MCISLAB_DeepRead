@@ -1,0 +1,676 @@
+                    This CVPR paper is the Open AccessToken-wise
+                                                         version, provided by the Computer Vision Foundation.
+                                                         Channel importance estimation       Top-k important channel       Partitioning into token-dependent     Shared and routed
+                                 Except for this watermark, it  is calibration
+                                                             from   identicaldatato the accepted    version;
+                                                                                              identification per token     and token-independent Channels              low-rank a
+                           the final published version of the proceedings        is available onLanguage
+                                                                       Vision token                IEEE Xplore.
+                                                                                                             token     Hadamard product        Important channel              Low
+
+
+
+
+  Quant Experts: Token-aware Adaptive Error Reconstruction with Mixture of
+          Experts for Large Vision-Language Models Quantization
+
+      Chenwei Jia* Baoting Li* Xuchong Zhang† Mingzhuo Wei Bochen Lin Hongbin Sun
+              State Key Laboratory of Human-Machine Hybrid Augmented Intelligence
+                           Institute of Artificial Intelligence and Robotics
+                                      Xi’an Jiaotong University
+                                                         jiacw@stu.xjtu.edu.cn
+
+
+
+                                                                                                                               Fixed scaling
+                           Abstract
+                                                                                     Modality-aware
+Post-Training Quantization (PTQ) has emerged as an ef-                               Token-aware
+fective technique for alleviating the substantial computa-                                                  e.g. SmoothQuant (Channel-wise static quantization)
+tional and memory overheads of Vision-Language Models
+                                                                                                                      Different modalities
+(VLMs) by compressing both weights and activations with-
+out retraining the full model. Existing PTQ methods pri-                             Modality-aware
+
+marily rely on static identification and global compensa-                            Token-aware
+tion of sensitive or outlier channels, yet they often overlook                                                    e.g. MBQ (Modality-aware quantization)
+the distributional differences of these important channels
+                                                                                                                              Different tokens
+across inputs, leading to unsatisfactory quantization. In
+                                                                                     Modality-aware
+this work, we observe that the distributions and occurrence
+frequencies of important channels vary significantly both                            Token-aware
+across modalities and among tokens, even within the same                                                    Quant Experts (Token-aware adaptive quantization)
+modality. Accordingly, we propose Quant Experts (QE),
+                                                                                Figure 1. Illustration of Different Quantization Granularities. D
+a token-aware adaptive error compensation with mixture-                         is the calibration data, and Wq is the quantized weight matrix.
+of-experts for VLMs quantization. QE divides the impor-                         SmoothQuant [44] employs channel-wise with fixed scaling co-
+tant channels into token-independent and token-dependent                        efficients to achieve global quantization. MBQ [23] presents
+groups. For the former, a shared expert is designed for most                    a modality-aware strategy that focuses on sensitivities in input
+tokens to compensate for global quantization error using a                      modalities. In contrast, we propose a token-aware adaptive quan-
+low-rank adapter. For the latter, routed experts including                      tization that considers both global and local error reconstruction.
+multiple routed low-rank adapters are elaborated to com-
+pensate for local quantization error related to specific to-
+kens. Extensive experiments demonstrate that QE consis-                         sion and acceleration while preserving accuracy. Among
+tently enhances task accuracy across various quantization                       existing approaches, Post-Training Quantization (PTQ) is
+settings and model scales, ranging from 2B to 70B param-                        widely adopted for its efficiency and compatibility without
+eters, while maintaining performance comparable to full-                        retraining the full model. However, low-bit quantization
+precision models.                                                               inevitably introduces numerical perturbations that degrade
+                                                                                performance, a problem that is especially pronounced in
+                                                                                multimodal scenarios [13].
+1. Introduction                                                                     Recent studies on large-scale model quantization reveal
+                                                                                significant variation in channel value distributions and sen-
+Model quantization has become a key technique for reduc-                        sitivities, where a small set of outlier or highly sensitive
+ing the computational and memory costs of large-scale mul-                      channels plays a key role in preserving model expressive-
+timodal models [19]. By mapping weights and activations                         ness and accuracy. To mitigate quantization errors aris-
+to low-bit representations, it achieves substantial compres-                    ing from these important channels, numerous methods have
+  * Equal contribution.                                                         been proposed from different perspectives, including chan-
+  † Corresponding author: zhangxc0329@xjtu.edu.cn.                              nel smoothing, mixed-precision strategy, Hessian-based op-
+                                                                                               Output
+
+
+
+
+                                                                         24716                                                                   …
+                                                                                             Quantized
+                                                                                              Weight
+                                                                                                                                       Router        …
+timization, and low-rank reconstruction approaches. For in-      fixedly employs the shared expert to compensate for global
+stance, SmoothQuant [44] and AWQ [24] alleviate quan-            quantization errors and dynamically selects the most suit-
+tization errors by balancing activation and weight ranges        able routed expert according to the input tokens, thereby
+via channel-wise scaling, with fixed coefficients for each       achieving adaptive compensation for local errors. Extensive
+channel estimated from the calibration dataset. SpQR [9]         experiments under various quantization settings demon-
+statically identifies highly sensitive channels and allocates    strate that QE effectively mitigates errors caused by dy-
+higher precision to them, effectively reducing quantization      namic channel importance and substantially restores model
+errors. OBQ [11] and GPTQ [12] estimate a static Hes-            performance under low-bit quantization. This work makes
+sian matrix from inputs and perform channel- or block-wise       the following contributions:
+quantization based on the computed sensitivity. LQER [48]        • We observe that the distributions and occurrence fre-
+and ASER [50] leverage singular value decomposition                 quencies of important channels vary significantly both
+(SVD) to explicitly reconstruct quantization errors through         across modalities and among tokens, even within the
+a global low-rank adapter [16], i.e. all important channels         same modality.
+are handled uniformly by a single adapter. Currently, in         • We propose QE, a token-aware adaptive error compen-
+multimodal scenarios, MBQ [23] reveals substantial dif-             sation with MoE for VLMs quantization. It employs a
+ferences in channel sensitivities across modalities and in-         fixed shared expert to compensate global quantization er-
+troduces a modality-aware channel scaling strategy to im-           rors while dynamically selecting routed experts to correct
+prove the adaptability of channel-smoothing methods. Al-            token-dependent local errors.
+though these methods reduce quantization errors effectively,     • Extensive experiments across various quantization set-
+the fixed channel-importance estimation and global error            tings and multimodal benchmarks demonstrate that QE
+compensation neglect the modeling of local feature vari-            effectively mitigates low-bit performance degradation,
+ations, failing to adequately account for the dynamic re-           achieving up to a 5.09% accuracy improvement under the
+lationships among important channel, error compensation,            challenging W4A6 quantization for the 72B model.
+input modalities, and even tokens.
+   In this paper, we conduct a systematic analysis of large      2. Observation and Motivation
+Vision-Language Models (VLMs) and observe that chan-             2.1. Observation One: The Positions of Important
+nel importance exhibits strong dynamics, varying signif-               Channels Vary Across Tokens
+icantly across modalities and tokens. In particular, only
+a small subset of important channels appears consistently        As illustrated in Fig. 2, we visualize the value distributions
+among most tokens, while the majority exhibit strong             of several tokens along with the positions of their corre-
+input-dependent fluctuations, with their importance differ-      sponding important channels computed by Eqs. (1) and (2).
+ing across modalities and tokens. To further minimize quan-                        w := Meanrow (|Wf |),                   (1)
+tization errors, the dynamic nature of channel importance
+                                                                                   Ct = Top -k(|xt | ⊙ w) ,                (2)
+necessitates quantization methods that not only compensate
+for errors in globally activated important channels but also     where Wf ∈ Rdout ×din is the weight matrix, din is the num-
+adaptively mitigate those arising in input-dependent ones.       ber of input channels, dout is the number of output channels,
+   Accordingly, we propose Quant Experts (QE), a token-          Meanrow computes the mean of absolute values along row,
+aware adaptive error reconstruction framework with the           w is a din -dimensional vector, xt is the t-th token, and Ct
+Mixture-of-Experts (MoE) [15, 36] for VLMs quantization,         denotes its top-k important channels.
+which considers both global and local variations in chan-            It is evident that, under the same layer weight, the po-
+nel importance across different tokens. QE first estimates       sitions of important channels vary not only across different
+the occurrence frequency of important channels from cali-        modalities but also among tokens within the same modality.
+bration data and then divides them into token-independent        In the case of across modalities, the intrinsic differences in
+and token-dependent channels. We then employ two types           value distributions lead to cross-modal shifts in the posi-
+of experts, the shared expert and the routed experts, to         tions of important channels. More importantly, even within
+model these two kinds of channel groups respectively.            the same modality, variations in token semantics and con-
+The shared expert employs a low-rank adapter to recon-           textual information cause significant changes in activation
+struct global quantization errors that predominantly orig-       distributions, resulting in dynamic migrations of important
+inate from token-independent important channels. Mean-           channels. These findings indicate that the positions of im-
+while, token-dependent channels are clustered into multiple      portant channels are not static but dynamically adapt to both
+sub-groups according to their co-occurrence relationships,       inter- and intra-modality variations.
+and each sub-group is assigned a routed expert equipped              This observation reveals a key limitation of those glob-
+with a routed low-rank adapter. During inference, QE             ally calibrated and compensated methods [9, 24, 50], just
+
+
+
+                                                            24717
+                                                                             Figure 3. Visualization of a Transformer block in Qwen2VL-2B,
+Figure 2. Visualization of a Transformer block in Qwen2VL-2B,                illustrating important channel behavior. The top panel shows ac-
+illustrating token value distributions (top) and the positions of im-        tivation frequencies, while the bottom depicts average activation
+portant channels (bottom). In the top panel, brightness reflects             values. Red crosses mark important channel positions identified
+token magnitude, while in the bottom panel, highlighted positions            by the static global method on the calibration dataset.
+denote important channels.
+                                                                             tization error compensation that fails to properly address
+identifying some fixed outliers and employing unified com-                   these two types inevitably results in performance degrada-
+pensation, which fails to capture token-wise variations in                   tion: insufficient compensation for token-independent im-
+channel importance.                                                          portant channels weakens the model’s overall representa-
+                                                                             tional capacity, while neglecting token-dependent important
+2.2. Observation Two: Uneven Frequency Distri-
+                                                                             ones compromises token-level semantic fidelity. Therefore,
+     bution of Important Channels
+                                                                             an effective quantization framework should adopt differen-
+To gain deeper insight, we compute the occurrence fre-                       tiated protection and compensation strategies across tokens
+quency of each important channel using Eq. (3) and sort                      to ensure both stability and adaptability in performance.
+them in descending order of frequency.
+                                 mc                                          3. Method
+                  fc = k × Pdin        ,            (3)
+                                i=0 mi                                       As illustrated in Fig. 4, QE first estimates the distribu-
+where mc denotes the number of times channel c is identi-                    tion frequency of important channels from the calibration
+fied as important, and fc represents the proportion of tokens                data D and partitions them into token-independent and
+for which channel c is recognized as an important channel                    token-dependent channels. It then employs the shared ex-
+among all tokens.                                                            pert (SE) and the routed experts (REs), to handle these
+    As shown in Fig. 3, there is a small subset of important                 distinct channel groups, each implemented as a low-rank
+channels that occur across most tokens, while the major-                     adapter. The shared expert focuses on global quantization
+ity are activated only for specific tokens. Meanwhile, those                 error that is mainly caused by token-independent channels.
+important channels with smaller frequency values may still                   Whereas token-dependent channels are clustered through
+exhibit larger outlier magnitudes, making their contribution                 co-occurrence analysis into multiple subgroups, and each
+to quantization error compensation equally non-negligible.                   is handled by a routed expert that specializes in local er-
+Based on this observation, we define the channels, which                     ror compensation. During inference, a lightweight router
+consistently appear across diverse input tokens and play                     dynamically selects the optimal routed expert for adaptive
+a key role in compensating global quantization errors, as                    error compensation.
+token-independent important channels. Conversely, chan-
+                                                                             3.1. Calibration and Error Reconstruction
+nels whose activation depends on specific tokens are re-
+garded as token-dependent important channels, which re-                      In this subsection, we illustrate how to minimize quanti-
+veal distinctive token properties of different tokens and the                zation error from token-aware adaptive optimization and
+local nature of quantization errors.                                         establish the mapping between important channels and
+    This observation suggests that important channels in                     the mixture-of-experts. Let Wfl denote the full-precision
+VLMs comprise both global and local components. Quan-                        weight of the l-th layer, and Wql = Q(Wfl ) its quantized
+
+
+
+                                                                        24718
+                  Tokens from                  w             Top-k importance                  Important channel frequency
+                                                                                                       Token-independent
+                                                                                                           Channels                            r/2        Shared Expert
+
+
+
+
+Channel-wise
+                                                                                                               Token-dependent
+                                                                                                                  Channels
+
+
+                                                                                                                                               r/2        Routed Experts
+
+                                                                                                                                                           Nr
+               Token-wise
+                Channel importance estimation            Top-k important channel          Partitioning into token-dependent          Shared and routed experts with
+                    from calibration data                 identification per token        and token-independent Channels                   low-rank adaptor
+
+                            Vision token                     Language token          Hadamard product            Important channel               Low-rank adapter
+
+Figure 4. The framework of Quant Experts (QE). The token-independent channels are model by a shared expert, while token-dependent
+channels are captured by multiple routed experts. A lightweight low-rank adapter is implemented for each expert.
+
+
+counterpart. As typical, the quantization error is defined as                                   Algorithm 1: Channel Dependence Partitioning
+El = Wfl − Wql . Building on the analysis in Sec. 2, we
+                                                                                                    Input : Layer weight {Wfl }L
+                                                                                                                               l=1 ; calibration data
+further formulate quantization objective optimization as:
+                                                                                                            D; the number of important channels k; the
+                     arg min ∥(El − (ẼlS + ẼlR (xl )))xl ∥F ,                  (4)                        number of routed experts Nr .
+                         Ẽl        |      {z         }                                             Output: Token-independent channels {Csl };
+                                                   Ẽl
+                                                                                                            token-dependent channels {Crl }.
+where xl denotes the input tokens of the l-th layer, ẼlS                                      1    for sample d ∈ D do
+represents the token-independent error approximation, and                                       2       Inference d and store input activations in X
+ElR (xl ) denotes the error approximation dependent on xl .
+                                                                                               3  for l ← 1 to L do
+   Our approach leverages two complementary low-rank
+                                                                                                4     Initialize T l ← ∅
+adapters to reconstruct the quantization error:
+                                                                                                5     Compute wl from Wfl according to Eq. (1)
+                                                         ∗       ∗
+                           Ẽl = LlSA LlSB + Ll,i Ll,i ,                         (5)            6     for token xlt in Xl do
+                                 | {z } | RA{z RB}                                              7          Alt ← Top -k(|xlt | · wl ) // indices
+                                      ẼlS           ElR (xl )
+                                                                                                8          T l ← T l ⊎ Alt
+                            i∗ = arg min Rl |xl | i ,
+                                                 
+                                                                                 (6)                      l
+                                           i                                                    9       (Cunsorted , f l ) ← unique(I l )
+                                                                                               10       π ← argsort(f l , descending)
+where LlSA and LlSB form the shared expert that mod-
+                                                                                               11       Reorder C l ← Cunsorted
+                                                                                                                            l
+                                                                                                                                 [π]
+els token-independent error approximation, while Ll,i  RA and
+                                                                                               12       Token-independent channels Csl ← C[1:k]
+                                                                                                                                            l
+Ll,i
+  RB    denote  the routed experts adaptively  modeling token-
+dependent error approximation. Rl is a lightweight router                                      13       Token-dependent channels Crl ← C[k+1:(N
+                                                                                                                                          l
+                                                                                                                                                r +1)k]
+
+that predicts a score for each routed expert, and selects an                                14      return {Csl }L       l L
+                                                                                                                 l=1 , {Cr }l=1
+expert with the minimal score. In this way, QE integrates
+global token-independent and local token-dependent com-
+pensation within a unified mixture-of-experts framework.
+                                                                                            3.2. SE for Token-Independent Channels
+     We quantify the distribution of channel importance using
+activation X ∈ RT ×din collected from the calibration data                                  We introduce the shared expert to reconstruct the quanti-
+D. For the t-th input token xlt in layer l, we compute the per-                             zation error that primarily arises from token-independent
+token important channels Alt as Eq. (2). Then we aggregate                                  channels. As in prior work [12, 24, 40], the performance
+all Alt over D to form a multiset T l , and compute the oc-                                 degradation and quantization error stem mainly from these
+currence frequency f l of each important channel according                                  outlier channels, underscoring the need to mitigate their im-
+to Eq. (3). These channels are sorted by f and partitioned                                  pact on both weight and activation quantization.
+into two disjoint important channel sets: the first k channels                                 Building upon the above motivation, the shared expert is
+Csl , referred to as token-independent channels, and the sub-                               designed following [50] to focus on the token-independent
+sequent (Nr k) channels Crl , referred to as token-dependent                                channels Csl . Specifically, to alleviate weight quantization
+channels. To sum up, the pseudo-code of the dependence                                      errors and suppress the interference of their outlier mag-
+partitioning process is detailed in Algorithm 1.                                            nitudes on other channels, token-independent channels are
+
+
+
+                                                                                       24719
+                                                                              Output
+ Algorithm 2: Building Routed Experts
+     Input : Per-layer data {Xl , Ol , ElS , Crl}L
+                                                 l=1 ; the
+             number of routed experts Nr ; rank r.                                                                        …
+     Output: REs {(Ll,i      l,i
+                      RA , LRB )} and Router {R }.
+                                                       l                    Quantized
+                                                                             Weight
+ 1 for l ← 1 to L do                                                                                             Router       …
+ 2     Initialize router parameter Rl ∈ Rdin ×Nr
+ 3     Compute xl ← Meanrow (|Xl |)                                            Input
+
+ 4     Sl ← NPMI Similarity(Ol )                                               Shared Expert         Routed Experts       ADD
+ 5     N l ← Normed Laplacian(Sl )
+                                                                  Figure 5. Illustration of the Inference Computation Process of QE.
+ 6     Ul ← Eigenvectors(N l )
+ 7     Cluster Γl ← KMeans(Ul[:,2:Nr +1] , Nr )
+ 8     for cluster labels γ ∈ Γl do                               eling its corresponding channel cluster. During inference,
+ 9          Initialize weight ω ← 1 ∈ Rdin                        a lightweight router estimates the final error of each expert
+10          Compute ω ← (xlγ /min(xlγ )) ⊙ xl                     and activates the one predicted to yield the lowest error.
+                                p                                     Specifically, we construct the co-occurrence matrix fol-
+11          Normalize ω ← ω/ min(ω) max(ω)
+                                                                  lowing Eq. (7) to capture the token-level correlation patterns
+12          Perform SVD: U ΣV ⊤ = ElS diag(ω)
+                                                                  among token-dependent channels from all tokens Xl .
+13          Ll,i
+              RA ← Ur Σr                                                 l
+                                                                            = 1 ci ∈ Crl ∩ Alt , Ol ∈ {0, 1}T ×(Nr k) ,
+                                                                                              
+            Ll,i        ⊤ −1                                           Ot,i                                                  (7)
+14            RB ← Vr S       diag(1/ω)
+15          R[:,i] ← Meanrow (|ElS − Ll,i
+              l                             l,i
+                                       RA LRB |)                 where Ol denotes the co-occurrence matrix over T tokens in
+                                                                 l-th layer, and the indicator function 1(·) returns 1 if the i-th
+16   return {(Ll,i   l,i  L,Nr        l L
+               RA , LRB )}l=1,i=1 , {R }l=1                      channel ci is important for the t-th token, and 0 otherwise.
+                                                                     Next, we employ spectral clustering [34, 37] to par-
+                                                                 tition the token-dependent important channels based on
+                                                                 their most likely co-occurrence patterns. Firstly, the co-
+exempted from direct quantization and reconstructed by a
+                                                                 occurrence matrix Ol is transformed into a similarity matrix
+low-rank adapter {(LlSA , LlSB )}L
+                                 l using whitening SVD.
+                                                                 Sl ∈ R(Nr k)×(Nr k) by using the normalized pointwise mu-
+To mitigate token-wise activation quantization errors, the
+                                                                 tual information (NPMI) [2, 21], which quantifies the asso-
+shared expert employs channel-wise scaling, which reduces
+                                                                 ciation strength between co-occurring channels as follows:
+activation magnitudes while proportionally amplifying the
+corresponding weights. Through the initial reconstruction                                      T
+                                                                                               X
+                                                                                                     l
+for El performed by the shared expert, QE achieves precise                      p(i) = T1           Ot,i ,                         (8)
+recovery of token-independent channels, while the remain-                                       t
+ing error ElS = El − LlSA LlSB is subsequently refined by                                      T
+                                                                                               X
+                                                                                                   l    l
+the routed experts associated with token-dependent chan-                     p(i, j) = T1        (Ot,i Ot,j ),                     (9)
+nels. The algorithm for the shared expert is detailed in the                                    t
+                                                                                             p(i,j) 
+supplementary Sec. 7.1.                                                         Si,j = (log p(i)p(j) ) − log p(i, j),             (10)
+                                                                 where i, j represent the channel indices, and Si,j represents
+3.3. REs for Token-Dependent Channels
+                                                                 the NPMI value between channels i and j. A higher NPMI
+In this subsection, we focus on the quantization error com-      value indicates a stronger likelihood that these channels will
+pensation for token-dependent important channels. Ideally,       occur as important channels within a single token.
+one would tailor an individual compensation strategy to             For the similarity matrix Sl , we perform eigen decom-
+each token, but the virtually unbounded value combinations       position on its normalized Laplacian N l and take the next
+make such token-specific designs computationally infeasi-        Nr eigenvectors Ul = [u2 ,. . . ,uNr +1 ] as spectral embed-
+ble. Therefore, it becomes essential to design a constrained     dings. K-Means then partitions Crl into Nr clusters of token-
+yet effective compensation strategy that approximates the        dependent channels using spectral embeddings Ul . For
+optimal solution. We observe that token-dependent chan-          each cluster, we apply a weighting vector ω on ElS to en-
+nels exhibit correlated occurrence patterns across differ-       hance the reconstruction accuracy for its token-dependent
+ent tokens. Based on this insight, we empirically com-           channels γ. Next, we perform SVD to reconstruct each
+pute their co-occurrence statistics and cluster channels with    weighted ElS and truncate the rank to r. The Nr low-
+strong mutual association. We then employ routed experts,        rank adapters together constitute the routed experts. Fi-
+each employed with a low-rank adapter dedicated to mod-          nally, we use the absolute mean of the remaining error
+
+
+
+                                                             24720
+El,i      l    l,i   l,i
+  R = ES −LRA LRB for i-th routed expert as the param-           ShareGPT4V [5], randomly sampling 128 image-caption
+                   l
+eters of router Ri , which estimates the error of any input      pairs as the calibration set. In both LQER and QE, the total
+token under i-th routed expert. The above procedure is de-       SVD rank r is set to 64. Since QE employs both shared and
+tailed in Algorithm 2. The inference process is illustrated      routed experts, the total rank of 64 is split into 64
+                                                                                                                    2 for each
+in Fig. 5, where the shared expert provides stable global        type, ensuring that the overall rank matches LQER. The k
+compensation and the router adaptively activates the opti-       is fixed to 32, and the Nr is set to 8. For refinement, we
+mal routed expert for dynamic local compensation.                set epochs for 16 with 100 iterations per epoch using the
+    To further alleviate the performance degradation intro-      AdamW [28] optimizer (learning rate 1 × 10−4 , no weight
+duced by post-training quantization, we design an optional       decay) and a cosine annealing schedule [27]. The refine-
+lightweight refinement strategy. Specifically, only routed       ment coefficients are τ = 0.5, α = 1.0, and β = 0.05.
+experts (LlRA , LlRB ) and the router Rl are trainable, while    Smaller models are evaluated on 4× RTX 4090 24G GPUs,
+all other parameters remain frozen. Moreover, this refine-       and the 72B model is on 4× A800 80G GPUs.
+ment is performed layer-wise without end-to-end training of
+all parameters. The refinement is detailed and formulated in        4.2. Main Results
+the supplementary material Sec. 7.2.                                Smaller VLMs are generally more sensitive to quantization,
+                                                                    making them more challenging benchmarks [22, 23]. We
+4. Experiments                                                      report results on Qwen2VL-2B and InternVL2-8B in Tab. 1
+                                                                    and Tab. 2, and on the larger 72B model in Tab. 3.
+4.1. Experimental Setup                                             Weight-Activation Quantization. QE consistently sur-
+Models. We conduct comprehensive PTQ experiments                    passes both the modality-aware baseline MBQ [23] and
+on several representative open-source VLMs, covering the            the static low-rank method LQER [48]. In the challeng-
+Qwen2VL [43] series (2B, 7B, 72B) and the InternVL2 [8]             ing W4A6 setting, it improves Qwen2VL-2B accuracy by
+series (2B, 8B). All model weights are obtained from the            4.01% over MBQ, with only a 4.23% drop from full pre-
+official repositories.                                              cision, and gains 3.13% on InternVL2-2B. At W4A8, the
+Baselines. We perform systematic comparisons with pop-              performance gap to full precision narrows to within 2%,
+ular open-source PTQ methods. For weight-activation                 demonstrating strong robustness. On the larger Qwen2VL-
+quantization, QE is evaluated under W4A6 and W4A8                   72B, QE achieves a remarkable average accuracy improve-
+settings against round-to-nearest (RTN), channel-scaling            ment of 5.09% under the W4A6 quantization setting, nearly
+SmoothQuant (SQ) [44], modality-balanced MBQ [23],                  matching full-precision performance.
+and low-rank reconstruction LQER [48]. Activations and              Weight-Only Quantization. QE again outperforms MBQ
+weights are quantized using per-token and per-output-               and LQER across all models. MBQ’s distribution reshap-
+channel symmetric schemes, respectively. For weight-                ing offers limited benefit over AWQ due to capacity limits,
+only quantization, we adopt AWQ [24] as the channel-                while LQER’s static compensation yields only minor recov-
+scaling baseline under the W3A16 configuration, apply-              ery. These results highlight the necessity of dynamic com-
+ing group-wise asymmetric quantization with 128 group               pensation to handle modality- and token-level distribution
+size. Throughout, “WxAy” denotes weight and activation              shifts that static methods cannot capture.
+bitwidths of x and y, while #W and #A represent their                  Additional results on Qwen2VL-7B and InternVL2-2B
+bitwidths respectively.                                             (Supplementary Tab. 9 and Tab. 10) show consistent gains,
+Evaluation Metrics. To comprehensively assess the per-              further confirming the generalizability of our method across
+formance of our method, we experiment across diverse                diverse vision-language models.
+multimodal tasks. Text recognition and understanding are
+tested on OCRBench [25] and TextVQA [38]; document                  4.3. Ablation Studies
+and infographic comprehension on DocVQA [32] and In-                Effect of Each Component. Our method integrates a
+foVQA [33]; chart reasoning on ChartQA [31]; and general            shared expert (SE) and routed experts (REs). Main re-
+visual perception on VizWiz-VQA [14]. ScienceQA [29]                sults show that their combination yields notable gains across
+and MMMU [46] evaluate scientific and general reasoning,            quantization settings. To further verify each expert type,
+while MMStar [6] and MuirBench [42] assess overall multi-           we conduct ablation studies in Tab. 4. Results show that
+modal and multi-image understanding. AI2D [18] measures             removing either expert consistently degrades performance.
+diagram comprehension, ensuring coverage across all major           The random routing experiment demonstrates that the pro-
+aspects of multimodal reasoning. We evaluate on the open            posed routing method can adaptively select the suitable
+source evaluation framework LMMs-Eval [49].                         routed expert to recover model accuracy. Similarly, the ran-
+Experimental Details.       We follow MBQ [23] and                  dom clustering experiment confirms that the proposed co-
+use the enhanced COCO Caption dataset [7] from                      occurrence-based clustering substantially enhances quanti-
+
+
+
+                                                            24721
+ Method             #W   #A       MMMU      OCRBench     ScienceQA   TextVQA    VizWiz   AI2D     ChartQA   DocVQA     InfoVQA     MMStar   MuriBench    Avg. (↑)
+ Qwen2VL-2B         16      16     39.89      74.90        76.96      77.72      65.73   70.01      72.04     87.28      58.49      43.46     26.19       62.97
+ RTN                4       6      34.00      59.80        64.70      67.58      55.62   59.26      56.08     75.78      45.12      40.67     31.19       53.62
+ SQ (ICML’23)       4       6      30.44      59.60        65.25      65.88      53.90   59.16      40.44     70.73      39.36      38.20     30.00       50.27
+ LQER (ICML’24)     4       6      33.00      65.80        68.32      69.37      55.91   62.56      62.68     81.02      48.92      37.82     29.77       55.92
+ MBQ (CVPR’25)      4       6      34.44      61.10        67.08      69.45      57.19   60.91      60.08     76.24      43.13      42.61     29.77       54.73
+ QE                 4       6      33.78      68.20        71.84      73.18      59.62   65.45      64.60     82.75      51.84      42.04     32.88       58.74
+ RTN                4       8      35.00      65.20        70.85      72.46      56.96   65.45      65.24     80.10      49.03      40.75     34.23       57.75
+ SQ (ICML’23)       4       8      32.11      65.80        68.02      68.61      57.43   61.95      44.08     75.07      42.06      38.93     29.58       53.06
+ LQER (ICML’24)     4       8      35.67      69.80        71.99      73.08      56.81   67.55      66.68     83.68      52.73      39.88     31.50       59.03
+ MBQ (CVPR’25)      4       8      34.33      62.30        70.85      72.36      58.32   65.19      62.32     78.19      47.93      42.57     32.62       57.00
+ QE                 4       8      37.33      72.10        74.67      75.34      61.59   68.36      69.28     84.46      53.97      41.29     34.12       61.14
+ RTN                3       16     32.44      65.80        67.63      70.43      55.81   61.59      62.80     78.36      46.32      35.24     38.54       55.91
+ AWQ (MLSys’24)     3       16     33.22      63.40        68.32      70.60      56.88   61.72      62.08     78.70      45.02      36.48     35.62       55.64
+ LQER (ICML’24)     3       16     34.56      67.50        69.86      70.04      58.68   62.76      65.36     81.19      47.54      36.35     38.58       57.49
+ MBQ (CVPR’25)      3       16     33.44      63.90        69.16      70.75      52.59   63.28      63.56     79.27      45.87      34.66     34.50       55.54
+ QE                 3       16     33.89      70.10        72.09      74.46      60.15   64.96      68.52     82.97      51.31      39.66     34.12       59.29
+
+                                                  Table 1. Main results on the model of Qwen2VL-2B.
+
+ Method             #W   #A       MMMU      OCRBench     ScienceQA   TextVQA    VizWiz   AI2D     ChartQA   DocVQA     InfoVQA     MMStar   MuriBench    Avg. (↑)
+ InternVL2-8B       16      16     48.00      76.90        97.12      76.91      60.61   82.09      82.60     89.97      66.92      59.36     36.12       70.60
+ RTN                4       6      37.00      69.20        93.16      69.96      55.34   73.77      74.16     83.81      55.82      50.03     30.12       62.94
+ SQ (ICML’23)       4       6      40.44      69.50        94.84      69.83      50.91   75.13      74.92     84.28      56.77      49.59     32.00       63.47
+ LQER (ICML’24)     4       6      40.22      72.20        94.74      71.83      58.03   76.49      77.88     85.80      60.47      49.69     30.85       65.29
+ MBQ (CVPR’25)      4       6      43.67      71.00        95.49      70.26      52.90   77.59      75.64     84.21      58.09      53.89     32.27       65.00
+ QE                 4       6      44.89      74.30        96.23      74.77      59.00   79.40      80.48     87.77      63.12      55.27     34.15       68.13
+ RTN                4       8      43.33      72.80        95.93      73.11      56.96   79.40      79.36     86.55      61.47      55.23     35.38       67.23
+ SQ (ICML’23)       4       8      42.22      72.20        95.54      72.58      51.68   77.04      77.48     85.48      59.07      51.98     32.58       65.26
+ LQER (ICML’24)     4       8      44.44      75.10        96.68      75.06      57.49   80.99      80.44     88.11      63.85      54.77     33.15       68.19
+ MBQ (CVPR’25)      4       8      44.44      73.50        96.78      72.00      56.67   79.21      77.72     86.42      61.48      55.32     32.77       66.94
+ QE                 4       8      45.56      75.60        96.73      76.08      59.77   81.06      81.60     88.31      64.83      56.09     34.31       69.09
+ RTN                3       16     44.22      74.20        96.18      74.64      55.99   80.47      79.32     87.96      62.61      55.37     32.88       67.62
+ AWQ (MLSys’24)     3       16     45.67      74.60        96.33      74.97      59.18   80.47      80.08     88.01      63.55      54.55     34.85       68.39
+ LQER (ICML’24)     3       16     45.33      74.90        96.38      74.77      57.12   80.60      80.04     88.10      63.61      55.65     32.73       68.11
+ MBQ (CVPR’25)      3       16     46.11      75.20        96.18      74.97      58.43   79.70      79.72     88.00      63.16      54.96     35.00       68.31
+ QE                 3       16     45.78      75.90        96.28      75.50      59.46   80.99      80.76     88.79      64.35      57.14     33.38       68.94
+
+                                                  Table 2. Main results on the model of InternVL2-8B.
+
+ Setting   Method   MMMU         OCRBench    ScienceQA    TextVQA    VizWiz               Setting     Component                  MMMU (↑)    ScienceQA (↑)
+  FP16     -        61.44          78.70       91.22        82.26    76.27                 FP16       -                            39.89         76.95
+           RTN      51.33          59.10       85.52        72.12    64.29                            routed experts (REs)         34.56         68.72
+           SQ       53.33          61.20       86.96        74.42    63.45
+                                                                                                      shared expert (SE)           35.22         69.61
+ W4A6      LQER     52.33          59.60       86.71        73.84    66.64
+                                                                                          W4A6        SE + random routing          35.89         70.00
+           MBQ      52.67          69.70       86.32        76.08    67.99
+                                                                                                      SE + random clustering       35.33         69.71
+           QE       58.11          76.60       90.33        79.27    73.91                            QE (SE+REs)                  36.89         70.85
+           RTN      57.11          66.50       90.08        75.96    71.14                            routed experts (REs)         36.00         71.94
+           SQ       56.44          65.10       90.03        76.37    66.70
+                                                                                                      shared expert (SE)           36.78         73.13
+ W4A8      LQER     57.44          70.60       91.32        78.15    74.28
+           MBQ      58.33          73.90       89.24        79.19    72.24                W4A8        SE + random routing          37.89         73.67
+                                                                                                      SE + random clustering       37.22         73.82
+           QE       58.89          78.30       91.47        81.47    75.83                            QE (SE+REs)                  38.00         74.37
+Table 3. Main results of Qwen2VL-72B model (higher is better).                            Table 4. Ablation study results on Qwen2VL-2B model.
+
+
+zation performance. Furthermore, we visualize the clus-                              Qwen2VL W4A6 quantization. As observed on both 2B
+tering results in Fig. 6 according to Sec. 3.3. The clus-                            and 7B models, applying refinement consistently leads to
+tered similarity matrix and t-SNE [30] projection indicate                           notable accuracy improvements across multiple tasks com-
+that our method effectively identifies and partitions these                          pared to the non-refinement counterparts.
+co-occurring clusters.                                                               Effect of the Number of Routed Experts. We analyze in
+Effect of Refinement. Tab. 5 presents the ablation results                           Tab. 6 the impact of the number of routed experts on model
+of the proposed refinement for routed experts under the                              accuracy. Here, Nr denotes the number of routed experts.
+
+
+
+                                                                               24722
+Figure 6. Illustration of the Co-Occurrence-Based Clustering in a Transformer Block of Qwen2VL-2B. (a) Similarity matrix Sl showing
+mutual co-occurrence among token-dependent channels, with brightness indicating similarity. (b) Channels with strong co-occurrence are
+grouped into the same cluster. (c) t-SNE [30] projection demonstrates that the clustering effectively captures their co-occurrence relations.
+
+
+    Model    Ref.     MMMU     OCRBench    ScienceQA   TextVQA    VizWiz                    Complexity      Origin           QE
+                 ✗     33.78     68.20       71.84      73.18       59.62
+     2B                                                                                     Computation       sd2       2
+                                                                                                                     sd + sd(2r + Nr )
+                 ✓     36.89     69.60       70.85      73.30       60.58
+                 ✗     45.44     73.00       79.87      71.63       64.18                   Memory             d2     d2 + rd(1 + Nr )
+     7B
+                 ✓     44.00     74.60       80.61      77.58       65.11
+                                                                                    Table 7. Complexity analysis of the linear layer in QE method.
+Table 5. Ablation study of Refinement on Routed Experts. “✓”
+indicates applied refinement; “✗” indicates none.
+                                                                                Qwen2VL-7B weight shapes under various quantization
+                                                                                settings. As shown in Tab. 8, QE achieves 3.5×-4.5× accel-
+It can be observed that as Nr increases, the model perfor-                      eration, highlighting its strong potential for hardware-level
+mance gradually improves; however, a larger Nr also im-                         efficiency gains.
+plies higher memory overhead for routed experts.
+                                                                                            Shape (IC × OC)     W4A6    W4A8      W3A16
+            Nr       OCRBench    TextVQA      VizWiz     Avg. (↑)
+                                                                                             3584 × 3584        3.56×   3.50×     4.10×
+             2         68.40       73.14       59.70      67.08
+                                                                                             3584 × 18944       3.60×   3.59×     4.50×
+             4         68.50       73.13       60.41      67.35
+                                                                                            18944 × 3584        3.84×   3.77×     4.50×
+             8         69.60       73.30       60.58      67.83
+            16         69.90       73.52       60.75      68.06
+                                                                                 Table 8. NPU speedup ratios of QE for Qwen2VL-7B linear layers
+Table 6. Impact of the number of routed experts on the perfor-                   compared with the fp16 model, measured during the prefill stage
+mance of Qwen2VL-2B under the W4A6 quantization setting.                         with a sequence length of s=128. “IC” and “OC” denote the input
+                                                                                 and output channel dimensions, respectively.
+
+4.4. Overheads Analysis and Kernel Performance
+                                                                                 5. Conclusion
+The low-rank adapter introduces additional computation
+and memory overhead from the lightweight auxiliary matri-                        In this work, we reveal a key observation that the dis-
+ces L·A and L·B . Let s denote the sequence length, d hid-                       tributions and occurrence frequencies of important chan-
+den size, r(≪ d) the rank, and Nr (≪ d) the routed experts                       nels vary significantly both across modalities and among
+count. The complexity analysis of a single layer is provided                     tokens, even within the same modality. Building on this
+in Tab. 7, with computation quantified in terms of floating-                     insight, we propose Quant Experts (QE), a token-aware
+point operations (FLOPs) and memory overhead evaluated                           adaptive error compensation for VLMs quantization, that
+by the total number of parameters. Notably, QE incurs only                       dynamically adapts to such variations. Specifically, QE
+minimal additional computational and memory costs com-                           employs a shared expert to robustly reconstruct token-
+pared to the original linear, yet enables the quantized model                    independent channels and routed experts to adaptively com-
+to recover accuracy comparable to full precision.                                pensate token-dependent ones, with each expert imple-
+    To assess hardware efficiency, we develop an analyti-                        mented as a low-rank adapter. Comprehensive evaluations
+cal performance model following the FlightLLM [47] ac-                           on diverse VLMs show that QE consistently outperforms
+celerator architecture. Prefill-stage kernel speedups of lin-                    globally static PTQ baselines across different quantization
+ear layers are measured with sequence length 128 using                           configurations.
+
+
+
+                                                                            24723
+Acknowledgments                                                        [12] Elias Frantar, Saleh Ashkboos, Torsten Hoefler, and Dan
+                                                                            Alistarh. OPTQ: Accurate quantization for generative pre-
+This work was supported by the New Generation                               trained transformers. In International Conference on Learn-
+Artificial Intelligence-National Science and Technology                     ing Representations, 2023. 2, 4, 1
+Major Project (Grant No. 2025ZD0122404), the Na-                       [13] Zhuocheng Gong, Jiahao Liu, Jingang Wang, Xunliang Cai,
+tional Natural Science Foundation of China (Grant                           Dongyan Zhao, and Rui Yan. What makes quantization for
+No. 92464302), the China Postdoctoral Science Foundation                    large language model hard? an empirical study from the lens
+(Grant No. 2025M770535), and the Sanqin Talent Special                      of perturbation. In AAAI, pages 18082–18089, 2024. 1
+Support Plan (Grant No. 2024STZZK09).                                  [14] Danna Gurari, Qing Li, Abigale J Stangl, Anhong Guo, Chi
+                                                                            Lin, Kristen Grauman, Jiebo Luo, and Jeffrey P Bigham.
+References                                                                  Vizwiz grand challenge: Answering visual questions from
+                                                                            blind people. In CVPR, pages 3608–3617, 2018. 6
+ [1] Saleh Ashkboos, Amirkeivan Mohtashami, Maximilian L               [15] Ethan He, Abhinav Khattar, Ryan Prenger, Vijay Kor-
+     Croci, Bo Li, Pashmina Cameron, Martin Jaggi, Dan Alis-                thikanti, Zijie Yan, Tong Liu, Shiqing Fan, Ashwath Aithal,
+     tarh, Torsten Hoefler, and James Hensman. QuaRot: Outlier-             Mohammad Shoeybi, and Bryan Catanzaro. Upcycling large
+     free 4-bit inference in rotated llms. In NeurIPS, pages                language models into mixture of experts. arXiv preprint,
+     100213–100240, 2024. 1                                                 2024. 2
+ [2] Gerlof Bouma. Normalized (pointwise) mutual information           [16] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-
+     in collocation extraction. In Proceedings of GSCL, pages               Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen.
+     31–40, 2009. 5                                                         LoRA: Low-rank adaptation of large language models. In In-
+ [3] Adrian Bulat, Yassine Ouali, and Georgios Tzimiropoulos.               ternational Conference on Learning Representations, 2022.
+     QBB: Quantization with binary bases for llms. In NeurIPS,              2
+     pages 3209–3228, 2024. 1                                          [17] Wenjing Ke, Zhe Li, Dong Li, Lu Tian, and Emad Barsoum.
+ [4] Jerry Chee, Yaohui Cai, Volodymyr Kuleshov, and Christo-               DL-QAT: Weight-decomposed low-rank quantization-aware
+     pher De Sa. QuIP: 2-bit quantization of large language mod-            training for large language models. In Conference on Empir-
+     els with guarantees. In NeurIPS, 2023. 1                               ical Methods in Natural Language Processing, pages 113–
+ [5] Lin Chen, Jinsong Li, Xiaoyi Dong, Pan Zhang, Conghui                  119, 2024. 1
+     He, Jiaqi Wang, Feng Zhao, and Dahua Lin. Sharegpt4v:             [18] Aniruddha Kembhavi, Mike Salvato, Eric Kolve, Minjoon
+     Improving large multi-modal models with better captions. In            Seo, Hannaneh Hajishirzi, and Ali Farhadi. A diagram is
+     ECCV, pages 370–387, 2024. 6                                           worth a dozen images. In ECCV, 2016. 6
+ [6] Lin Chen, Jinsong Li, Xiaoyi Dong, Pan Zhang, Yuhang              [19] Gun Il Kim, Sunga Hwang, and Beakcheol Jang. Efficient
+     Zang, Zehui Chen, Haodong Duan, Jiaqi Wang, Yu Qiao,                   compressing and tuning methods for large language models:
+     Dahua Lin, and Feng Zhao. Are we on the right way for                  A systematic literature review. ACM Computing Surveys, 57
+     evaluating large vision-language models? In NeurIPS, 2024.             (10):1–39, 2025. 1
+     6                                                                 [20] Junhan Kim, Chungman Lee, Eulrang Cho, Kyungphil Park,
+ [7] Xinlei Chen, Hao Fang, Tsung-Yi Lin, Ramakrishna Vedan-                Ho young Kim, Joonyoung Kim, and Yongkweon Jeon. To-
+     tam, Saurabh Gupta, Piotr Dollár, and C Lawrence Zitnick.             wards next-level post-training quantization of hyper-scale
+     Microsoft coco captions: Data collection and evaluation                transformers. In NeurIPS, 2024. 1
+     server. arXiv preprint arXiv:1504.00325, 2015. 6                  [21] Omer Levy and Yoav Goldberg. Linguistic regularities in
+ [8] Zhe Chen, Jiannan Wu, Wenhai Wang, Weijie Su, Guo Chen,                sparse and explicit word representations. In Conference on
+     Sen Xing, Muyan Zhong, Qinglong Zhang, Xizhou Zhu,                     Computational Natural Language Learning, pages 171–180,
+     Lewei Lu, et al. Internvl: Scaling up vision foundation mod-           2014. 5
+     els and aligning for generic visual-linguistic tasks. In CVPR,    [22] Shiyao Li, Xuefei Ning, Luning Wang, Tengxuan Liu, Xi-
+     pages 24185–24198, 2024. 6                                             angsheng Shi, Shengen Yan, Guohao Dai, Huazhong Yang,
+ [9] Tim Dettmers, Ruslan A. Svirschevski, Vage Egiazarian,                 and Yu Wang. Evaluating quantized large language models.
+     Denis Kuznedelev, Elias Frantar, Saleh Ashkboos, Alexan-               arXiv preprint arXiv:2402.18158, 2024. 6
+     der Borzunov, Torsten Hoefler, and Dan Alistarh. SpQR:            [23] Shiyao Li, Yingchun Hu, Xuefei Ning, Xihui Liu, Ke Hong,
+     A sparse-quantized representation for near-lossless LLM                Xiaotao Jia, Xiuhong Li, Yaqi Yan, Pei Ran, Guohao Dai,
+     weight compression. In International Conference on Learn-              et al. MBQ: Modality-balanced quantization for large vision-
+     ing Representations, 2024. 2, 1                                        language models. In CVPR, pages 4167–4177, 2025. 1, 2,
+[10] Steven K. Esser, Jeffrey L. McKinstry, Deepika Bablani,                6
+     Rathinakumar Appuswamy, and Dharmendra S. Modha.                  [24] Ji Lin, Jiaming Tang, Haotian Tang, Shang Yang, Wei-Ming
+     Learned step size quantization. In International Conference            Chen, Wei-Chen Wang, Guangxuan Xiao, Xingyu Dang,
+     on Learning Representations, 2020. 1                                   Chuang Gan, and Song Han. AWQ: Activation-aware weight
+[11] Elias Frantar, Sidak Pal Singh, and Dan Alistarh. Optimal              quantization for on-device llm compression and accelera-
+     Brain Compression: a framework for accurate post-training              tion. Proceedings of machine learning and systems, 6:87–
+     quantization and pruning. In NeurIPS, 2022. 2, 1                       100, 2024. 2, 4, 6, 1
+
+
+
+
+                                                                  24724
+[25] Yuliang Liu, Zhang Li, Mingxin Huang, Biao Yang, Wenwen              for LLMs using post-training quantization. In Findings of
+     Yu, Chunyuan Li, Xu-Cheng Yin, Cheng-Lin Liu, Lianwen                the Association for Computational Linguistics: ACL 2025,
+     Jin, and Xiang Bai. OCRBench: on the hidden mystery of               pages 8782–8795. Association for Computational Linguis-
+     ocr in large multimodal models. In Science China Informa-            tics, 2025. 1
+     tion Sciences, page 220102, 2024. 6                             [40] Hanlin Tang, Yifu Sun, Decheng Wu, Kai Liu, Jianchen Zhu,
+[26] Zechun Liu, Barlas Oguz, Changsheng Zhao, Ernie Chang,               and Zhanhui Kang. EasyQuant: An efficient data-free quan-
+     Pierre Stock, Yashar Mehdad, Yangyang Shi, Raghuraman                tization algorithm for LLMs. In Empirical Methods in Natu-
+     Krishnamoorthi, and Vikas Chandra. LLM-QAT: Data-free                ral Language Processing, pages 9119–9128, 2023. 4
+     quantization aware training for large language models. In       [41] Albert Tseng, Jerry Chee, Qingyao Sun, Volodymyr
+     Findings of the Association for Computational Linguistics,           Kuleshov, and Christopher De Sa. QuIP#: Even better llm
+     pages 467–484, 2024. 1                                               quantization with hadamard incoherence and lattice code-
+[27] Ilya Loshchilov and Frank Hutter. SGDR: Stochastic gradi-            books. In International Conference on Machine Learning,
+     ent descent with warm restarts. In International Conference          2024. 1
+     on Learning Representations, 2017. 6                            [42] Fei Wang, Xingyu Fu, James Y. Huang, Zekun Li, Qin Liu,
+[28] Ilya Loshchilov and Frank Hutter. Decoupled weight de-               Xiaogeng Liu, Mingyu Derek Ma, Nan Xu, Wenxuan Zhou,
+     cay regularization. In International Conference on Learning          Kai Zhang, Tianyi Lorena Yan, Wenjie Jacky Mo, Hsiang-
+     Representations, 2019. 6                                             Hui Liu, Pan Lu, Chunyuan Li, Chaowei Xiao, Kai-Wei
+[29] Pan Lu, Swaroop Mishra, Tanglin Xia, Liang Qiu, Kai-Wei              Chang, Dan Roth, Sheng Zhang, Hoifung Poon, and et al.
+     Chang, Song-Chun Zhu, Oyvind Tafjord, Peter Clark, and               Muirbench: A comprehensive benchmark for robust multi-
+     Ashwin Kalyan. Learn to explain: Multimodal reasoning via            image understanding. In ICLR, 2025. 6
+     thought chains for science question answering. In NeurIPS,      [43] Peng Wang, Shuai Bai, Sinan Tan, Shijie Wang, Zhihao Fan,
+     pages 2507–2521, 2022. 6                                             Jinze Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin
+[30] Laurens van der Maaten and Geoffrey Hinton. Visualizing              Ge, et al. Qwen2-vl: Enhancing vision-language model’s
+     data using t-sne. Journal of machine learning research, 9            perception of the world at any resolution. arXiv preprint,
+     (Nov):2579–2605, 2008. 7, 8                                          2024. 6
+[31] Ahmed Masry, Do Xuan Long, Jia Qing Tan, Shafiq Joty,           [44] Guangxuan Xiao, Ji Lin, Mickael Seznec, Hao Wu, Julien
+     and Enamul Hoque. ChartQA: A benchmark for question                  Demouth, and Song Han. SmoothQuant: Accurate and effi-
+     answering about charts with visual and logical reasoning. In         cient post-training quantization for large language models.
+     Association for Computational Linguistics, 2022. 6                   In International Conference on Machine Learning, pages
+[32] Minesh Mathew, Dimosthenis Karatzas, and CV Jawahar.                 38087–38099, 2023. 1, 2, 6
+     Docvqa: A dataset for vqa on document images. In Proceed-       [45] Zhewei Yao, Xiaoxia Wu, Cheng Li, Stephen Youn, and Yux-
+     ings of the IEEE/CVF winter conference on applications of            iong He. Exploring post-training quantization in llms from
+     computer vision, pages 2200–2209, 2021. 6                            comprehensive study to low rank compensation. In AAAI,
+[33] Minesh Mathew, Viraj Bagal, Rubèn Tito, Dimosthenis                 2024. 1
+     Karatzas, Ernest Valveny, and CV Jawahar. Infographicvqa.       [46] Xiang Yue, Yuansheng Ni, Kai Zhang, Tianyu Zheng, Ruoqi
+     In Proceedings of the IEEE/CVF Winter Conference on Ap-              Liu, Ge Zhang, Samuel Stevens, Dongfu Jiang, Weiming
+     plications of Computer Vision, pages 1697–1706, 2022. 6              Ren, Yuxuan Sun, et al. MMMU: A massive multi-discipline
+[34] Andrew Ng, Michael Jordan, and Yair Weiss. On spectral               multimodal understanding and reasoning benchmark for ex-
+     clustering: Analysis and an algorithm. In NeurIPS, 2001. 5           pert agi. In CVPR, pages 9556–9567, 2024. 6
+[35] Wenqi Shao, Mengzhao Chen, Zhaoyang Zhang, Peng Xu,             [47] Shulin Zeng, Jun Liu, Guohao Dai, Xinhao Yang, Tianyu
+     Lirui Zhao, Zhiqian Li, Kaipeng Zhang, Peng Gao, Yu Qiao,            Fu, Hongyi Wang, Wenheng Ma, Hanbo Sun, Shiyao Li,
+     and Ping Luo. OmniQuant: Omnidirectionally calibrated                Zixiao Huang, et al. Flightllm: Efficient large language
+     quantization for large language models. In International             model inference with a complete mapping flow on fpgas.
+     Conference on Learning Representations, 2024. 1                      In ACM/SIGDA International Symposium on Field Pro-
+[36] Noam Shazeer, *Azalia Mirhoseini, *Krzysztof Maziarz,                grammable Gate Arrays, pages 223–234, 2024. 8
+     Andy Davis, Quoc Le, Geoffrey Hinton, and Jeff Dean.            [48] Cheng Zhang, Jianyi Cheng, George A. Constantinides, and
+     Outrageously large neural networks: The sparsely-gated               Yiren Zhao. LQER: low-rank quantization error recon-
+     mixture-of-experts layer. In International Conference on             struction for llms. In International Conference on Machine
+     Learning Representations, 2017. 2                                    Learning, 2024. 2, 6, 1
+[37] Jianbo Shi and J. Malik. Normalized cuts and image seg-         [49] Kaichen Zhang, Bo Li, Peiyuan Zhang, Fanyi Pu,
+     mentation. IEEE TPAMI, 22(8):888–905, 2000. 5                        Joshua Adrian Cahyono, Kairui Hu, Shuai Liu, Yuanhan
+[38] Amanpreet Singh, Vivek Natarajan, Meet Shah, Yu Jiang,               Zhang, Jingkang Yang, Chunyuan Li, and Ziwei Liu. LMMs-
+     Xinlei Chen, Dhruv Batra, Devi Parikh, and Marcus                    eval: Reality check on the evaluation of large multimodal
+     Rohrbach. Towards vqa models that can read. In CVPR,                 models. In Association for Computational Linguistics, pages
+     pages 8317–8326, 2019. 6                                             881–916, 2025. 6
+[39] Siqing Song, Chuang Wang, Rui-Qi Wang, Yi Yang, and             [50] Weibo Zhao, Yubin Shi, Xinyu Lyu, Wanchen Sui, Shen Li,
+     Xu-Yao Zhang. Achieving binary weight and activation                 and Yong Li. ASER: activation smoothing and error recon-
+
+
+
+
+                                                                24725
+     struction for large language model quantization. In AAAI,
+     2025. 2, 4, 1
+[51] Yilong Zhao, Chien-Yu Lin, Kan Zhu, Zihao Ye, Lequn
+     Chen, Size Zheng, Luis Ceze, Arvind Krishnamurthy, Tianqi
+     Chen, and Baris Kasikci. Atom: Low-bit quantization for
+     efficient and accurate llm serving. In Machine Learning and
+     Systems, 2024. 1
+
+
+
+
+                                                               24726
+

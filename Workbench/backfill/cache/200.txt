@@ -1,0 +1,619 @@
+                    This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                 Except for this watermark, it is identical to the accepted version;
+                           the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+     Beyond Sequential Tools: A Unified VLM Agent System for Photographic
+               Post-Processing via Dynamic Multi-Expert Fusion
+
+ Honglin Xiong1 * Chenjie Zhu2 * Jianbiao Ding3 Zixuan Ni3 Wei Li4 Zhenpeng Mi3† Qian Wang1†
+                            1
+                              ShanghaiTech University 2 Southeast University
+         3
+           Hithink RoyalFlush Information Network Co.,Ltd. 4 Zhejiang University of Technology
+                            {xionghl, qianwang}@shanghaitech.edu.cn, chenjiezhu@seu.edu.cn,
+               {dingjianbiao, mizhenpeng}@myhexin.com, zixuan2i@zju.edu.cn, liwei@zjut.edu.cn
+
+
+
+                            Abstract                              generalized “all-in-one” restoration models. While special-
+                                                                  ized models for tasks like deblurring [19, 31, 42] or de-
+Real-world image restoration is challenged by complex,            raining [13, 30, 41] perform well in their narrow domains,
+coupled degradations. Existing ”all-in-one” models often          they are ill-equipped for mixed degradations. Conversely,
+lack generalization, while agentic systems suffer from in-        all-in-one models [11, 16, 24, 27, 46], while broader, of-
+efficient sequential tool invocation. We propose a VLM-           ten struggle to generalize to the unpredictable, intertwined
+guided one-shot framework for universal photographic              artifacts seen in the real world, partly due to their reliance
+post-processing. Our system employs a Vision-Language             on limited synthetic training data. Seeking to address this
+Model (VLM) as an orchestrator to perform nuanced in-             generalization gap, a recent paradigm utilizes large lan-
+tent understanding and degradation analysis, dynamically          guage models as agents to coordinate multiple restoration
+allocating weights to a suite of specialized expert LoRA          tools [48, 49]. However, these agent-based methods suffer
+modules. To ensure superior composability, these experts          from critical flaws. Beyond significant latency from time-
+adapt only Key (K) and Value (V) matrices and are simul-          consuming planning, they fundamentally rely on “sequen-
+taneously merged into a pretrained diffusion backbone for         tially” invoking a collection of disjointed, isolated models.
+synergistic, single-pass restoration. Furthermore, we intro-      This strategy is ultimately inadequate for tackling coupled,
+duce a lightweight branch trained via Direct Preference Op-       synergistic corruptions, as it treats the task as a series of in-
+timization (DPO) to ensure perceptually optimal weight al-        dependent sub-problems and can lead to the accumulation
+location. Our method achieves state-of-the-art performance        of errors and artifacts.
+across diverse synthetic and real-world datasets. Crucially,
+it demonstrates remarkable zero-shot generalization on au-            These shortcomings motivate a fundamental shift away
+thentic real-world data without additional fine-tuning.           from the sequential pipeline towards a more holistic and in-
+                                                                  tegrated system. A truly universal system must replace the
+                                                                  combinatorial search of isolated tools with a single, collabo-
+1. Introduction                                                   rative execution step. Furthermore, this step must be adap-
+                                                                  tive, modulating its behavior based on the specific issues
+Digital images in real-world scenarios are frequently             present, rather than applying a one-size-fits-all fix. This re-
+marred by a complex, tangled web of coupled artifacts—for         quires a “brain” capable of not only interpreting ambigu-
+instance, a noisy, motion-blurred photograph taken in a           ous user intent (e.g., “make the image clearer”) but also
+hazy environment. This intricate interplay of corruptions         performing a comprehensive image diagnostic—identifying
+makes universal photographic post-processing a formidable         both the type and severity of all degradations, from global
+challenge. Treating each issue independently often fails          haze to localized motion blur. Furthermore, the restoration
+or even exacerbates other problems, a complexity that has         tools, acting as the system’s “hands”, should not be iso-
+spurred the development of various deep learning-based ap-        lated. They must work in synergy with the “brain” and be
+proaches.                                                         able to accept its instructions. Critically, these “hands” must
+   The trajectory of this field has evolved from special-         possess both strong generalization to handle diverse inputs,
+ized expert models, which are inherently siloed, to more          and at the same time, be able to flexibly use different “pen”
+  * Equal contribution                                            to handle different vertical tasks. These “pens” should not
+  † Corresponding authors                                         be completely isolated, but rather should be easily compos-
+
+
+
+                                                            41521
+able. Furthermore, this framework is inherently extensible,            VLM’s analysis with human perceptual preferences, we
+allowing new expert “pens” to be trained and integrated at             introduce a lightweight allocation branch trained on the
+minimal cost.                                                          VLM’s features using DPO. This allows us to achieve
+    To realize this vision, we propose a novel vision-                 highly accurate, human-aligned weight allocation with
+language agent system that perfectly instantiates this                 high data efficiency.
+“brain-hands-pen” architecture. Our framework is orches-
+trated by a powerful VLM that acts as the system’s “brain”.
+The execution is handled by a pretrained diffusion back-
+bone, which serves as the powerful and general-purpose
+                                                                     2. Related Work
+“hands”. The specialized expert Low-Rank Adaptations
+(LoRAs) function [14] as a set of versatile and composable           Image Restoration The evolution of image restoration (IR)
+“pens”. The VLM performs the sophisticated user intent               has been driven by a quest for greater generality and ca-
+understanding and in-depth image diagnostics required to             pability. Early efforts in the deep learning era focused on
+generate a structured restoration plan. This plan, however,          specialized models, developing highly optimized architec-
+does not define a sequential pipeline. Instead, it consists of       tures for distinct tasks. This paradigm produced founda-
+(1) a descriptive prompt optimized for the diffusion model,          tional methods for image denoising, such as DnCNN [44],
+and (2) a set of precise, adaptive weights for a suite of co-        and later, more powerful transformer-based architectures
+operative expert modules. The execution is handled by a              like Restormer [43]. Similar specialization occurred in im-
+pretrained diffusion backbone augmented by these expert              age deblurring, with notable advances from efficient net-
+LoRAs. To achieve the crucial Collaborative Expert Exe-              works like MIMO-UNet [9] to NAFNet [8]. While these
+cution, our system abandons the sequential pipeline. The             expert models achieve high performance, their utility is con-
+expert LoRAs are simultaneously fused into the backbone              fined to their specific, isolated domains. To overcome this
+via a weighted sum to execute a tailored, one-shot restora-          narrow specialization, the “all-in-one” restoration paradigm
+tion. This dynamic fusion paradigm enables a synergistic,            emerged. These methods aim to build a single, unified
+context-aware restoration in a single, efficient forward pass.       model capable of handling multiple degradation types. Ap-
+To ensure this fusion is stable, the experts are trained by          proaches in this area vary, from general U-shaped trans-
+adapting only the Key (K) and Value (V) matrices, enhanc-            formers like Uformer [35] and HINet [7], to prompt-guided
+ing their composability. To achieve Adaptive and Cali-               systems that select restoration paths based on textual in-
+brated Execution, we introduce a lightweight allocation              structions, such as InstructIR [11] and AutoDIR [16]. De-
+branch trained on the VLM’s features using Direct Prefer-            spite their versatility, these monolithic models often strug-
+ence Optimization (DPO) from human feedback, ensuring                gle with generalization to complex, unseen combinations of
+the dynamically assigned weights are perceptually optimal.           real-world degradations and can face challenges in balanc-
+Our key contributions are:                                           ing conflicting restoration goals.
+• A Unified Agent with Cooperative Multi-Expert Fu-                      Agentic System Most recently, the rise of LLMs and
+  sion: We propose a novel agentic system that replaces              VLMs as intelligent agents has introduced a new paradigm
+  the paradigm of sequential, conflicting tools with a coop-         for complex problem-solving. Frameworks like Visual
+  erative multi-expert fusion. A VLM master agent handles            ChatGPT [37] demonstrated how a model can invoke var-
+  analysis and decision-making, orchestrating a pretrained           ious external visual tools to complete a task. This concept
+  diffusion backbone that is dynamically augmented by fus-           was adapted to image restoration, creating “agentic IR” sys-
+  ing multiple specialized expert LoRAs. This architecture           tems like AgenticIR [48], MAIR [15], RestoreAgent [6],
+  unifies disparate post-processing tasks within a single, co-       and 4KAgent [49]. These systems use a central agent to
+  herent framework, leverages the backbone’s semantic un-            parse a request and plan a sequence of operations, applying
+  derstanding to ensure experts work cohesively, and offers          a chain of specialized models. This sequential tool invoca-
+  remarkable extensibility for new tasks with minimal train-         tion, however, presents a fundamental flaw. Artifacts, noise,
+  ing cost.                                                          and unrealistic textures from one model are amplified by
+• Dynamic Weight Fusion: Leveraging the linear additiv-              the next, leading to catastrophic degradation. Concurrently,
+  ity of LoRA, we merge multiple experts simultaneously              HybridAgent [22] employs a discrete routing strategy to di-
+  in a single step. The master agent dynamically assigns             rect images to specific models, yet its hard routing mecha-
+  weights to each expert based on the diagnosed sever-               nism fails to capture the continuous nature of degradation
+  ity of the corresponding degradation, enabling a highly            severity. Our work directly confronts this bottleneck and
+  tailored restoration while drastically reducing processing         propose a new agentic paradigm that abandons the sequen-
+  time compared to iterative agent methods.                          tial pipeline in favor of a dynamic, collaborative fusion of
+• DPO-Optimized Weight Allocation: To align the                      experts, into a single, unified forward pass.
+
+
+
+                                                             41522
+                  Step 1: Analysis and Planning                                                     Step 2: Dynamic Expert Assembly
+     User_Prompt:
+                                     VLM Agent                                      Weight Assgin                                   Single-Task LoRA Expert Zoo
+    “This photo is
+    blurry, make it
+    clearer”                                                                          Lora_derain:
+                             VIsion Encoder                     RLHF                       0.3                                                        ...
+    System_Prompt:                                                                    Lora_dehaze:
+    “You serve as the                                                                      0.7
+    master controller                        ...                                            ...
+    for a *Universal                                                                  Lora_deblur:
+                               Visual Tokens
+    Photographic Post-                                                                     0.0
+    Processing
+                                                                Adapter
+    System*...”             Language Decoder
+                                                                                                                       ...                 Merged LoRA
+
+             LQ            Downstream Instructions                                                                                                    Result
+
+                                                                         Text                                                        𝐾𝑉
+
+                                                                                                     DiT-Block          DiT-Block
+                              Enhancing Prompt
+
+                                                                                        DiT-Block
+                                                                                                                 ...                 𝑄∗
+                           “Remove rain streaks and
+                                                                       Embedding
+                           mitigate haze to enhance
+                           overall clarity and visibility...”
+
+                                                                                   Diffusion Transformer
+                                                     Step 3: Single-Pass Execution
+
+Figure 1. The pipeline of our method. First, the VLM agent analyzes the input image and prompt, selecting expert LoRAs and assigning
+weights via an RLHF-tuned adapter. Second, the LoRAs are dynamically merged into the diffusion model by updating only its K and V
+matrices. Finally, the adapted model performs the restoration using the image and an enhanced prompt.
+
+
+3. Method                                                                          3: Single-Pass Execution. Finally, this dynamically as-
+                                                                                   sembled, bespoke model is conditioned on the refined text
+3.1. Overview of the System Pipeline                                               prompt and the original degraded image. It then executes
+As illustrated in Figure 1, our system’s workflow instan-                          the tailored restoration in a single, efficient forward pass,
+tiates our “brain-hands-pen” architecture through an effi-                         producing a high-quality, enhanced image that synergisti-
+cient, three-step process: Step 1: Analysis and Planning.                          cally addresses all diagnosed issues.
+The process begins when a user provides a degraded image
+                                                                                   3.2. Analysis and Weight Allocation
+and an optional text prompt. These inputs are processed
+by the VLM Orchestrator Agent Qwen2.5-VL-72B [3] (the                              The core of our system’s intelligence lies in the VLM Or-
+“brain”). The agent performs a comprehensive analysis                              chestrator Agent, which executes the critical “Analysis and
+of user intent and image artifacts to generate a structured                        Planning” stage. It is responsible for bridging high-level
+restoration plan”. This plan consists of two key compo-                            user goals with low-level model operations by generating a
+nents: (a) a semantically-rich text prompt optimized for the                       precise restoration plan. This process begins when the agent
+diffusion backbone, and (b) a dictionary of specialized ex-                        holistically analyzes the user’s inputs: the degraded im-
+pert LoRA modules (the “pens”), each assigned a precise                            age and an often-ambiguous text prompt (such as “make it
+weight w ∈ [0.0, 1.0] corresponding to the diagnosed sever-                        clearer”). The VLM leverages both text and image content
+ity of a specific degradation. Step 2: Dynamic Expert As-                          to infer the underlying intent while simultaneously conduct-
+sembly. This plan immediately triggers the dynamic LoRA                            ing a comprehensive visual examination. This diagnostic
+fusion mechanism. The system programmatically assem-                               identifies a spectrum of degradations—distinguishing be-
+bles a temporary, specialized model by additively merg-                            tween global issues like digital noise and localized artifacts
+ing the specified expert LoRAs, scaled by their assigned                           such as motion blur—and assesses their severity. Based
+weights, into the frozen weights of the pretrained diffusion                       on this complete analysis, the agent formulates a structured
+restoration backbone Flux-Kontext [4] (the “hands”). Step                          plan. This plan consists of two key components: (1) a re-
+
+
+
+                                                                        41523
+fined, descriptive text prompt optimized for the diffusion           Prior to DPO, we first pre-train this branch using the col-
+model, which translates the user’s intent into an actionable         lected pseudo-labels (the VLM’s initial heuristic assess-
+instruction; and (2) the set of expert LoRAs required to ad-         ments) with a standard cross-entropy loss. This pre-trained
+dress the diagnosed issues, each assigned a precise weight           model serves as the frozen reference πref and the initializa-
+corresponding to its severity.                                       tion for our policy πθ .Finally, the policy πθ is trained using
+    However, translating this qualitative assessment into op-        the preference triplets (x, yw , yl ) via the DPO loss. The ob-
+timal numerical weights is a non-trivial challenge. While            jective is to adjust πθ to increase the probability of the win-
+frontier VLMs (e.g., GPT-4o [1], Gemini 2.5-Pro [10]) ac-            ning bins yw and decrease that of the losing bins yl , relative
+cessed via API might handle this, such a path raises con-            to the reference policy πref . The loss is defined as:
+cerns about cost and reproducibility. We thus investigate an                                   πθ(yw |x)          πθ (yl |x) 
+                                                                                                                                   
+alternative centered on smaller, open-source VLMs (such                L = −E log σ β log                      − log
+                                                                                                  πref (yw |x)       πref (yl |x)
+as the Qwen-VL series). As these models struggle to quan-
+tify precise weights via prompting alone, we introduce a              where β is a temperature, σ is the logistic function, and
+lightweight weight allocation branch. Instead of fine-tuning          π(y|x) is the categorical probability of selecting bin set y.
+the entire VLM, we attach this small MLP network to its               This efficient, preference-based approach directly optimizes
+frozen features and train it with Direct Preference Optimiza-         the agent’s allocation strategy for human perception, signif-
+tion (DPO) [29] to directly align the agent’s decisions with          icantly enhancing the final visual quality.
+human perceptual preferences.
+                                                                      3.3. Dynamic LoRA Fusion for Multi-Expert Exe-
+    The DPO-based alignment is implemented by training
+                                                                            cution
+the branch on a specialized preference dataset. To build this,
+we construct a new corpus specifically for various compos-            The execution core of our system is not a monolithic model
+ite degradations. The data generation process is as follows:          but a flexible assembly of the pretrained Flux-Kontext dif-
+for each degraded image, we first extract its high-level vi-          fusion model and a set of lightweight, specialized “expert”
+sion feature embedding x from the frozen VLM’s vision en-             LoRAs. Each expert is trained on a dedicated sub-dataset
+coder. Concurrently, the VLM is prompted to generate a set            to master a specific restoration skill, such as denoising or
+of candidate LoRA weight combinations. This set includes:             deblurring.
+(1) the VLM’s initial heuristic assessment, which serves as              Crucially, we adopt a targeted fine-tuning strategy: for
+a pseudo-label for pre-training, and (2) four other diverse           each expert LoRA, we update only the Key (K) and Value
+weight variations .We use the diffusion backbone to gener-            (V) projection matrices within the self-attention mecha-
+ate restored images for all these candidate weight sets. All          nisms, while keeping the Query (Q) matrices frozen. By
+generated images are then presented to human annotators,              preserving the original Query matrices, we retain the back-
+who provide pairwise preferences. This process yields a fi-           bone’s powerful, pretrained attention patterns. This forces
+nal preference dataset of triplets (x, yw , yl ), where x is the      each LoRA to focus on learning the new “content” (the
+shared vision feature, yw is the winning set of weights, and          restoration skill) rather than altering the model’s underlying
+yl is the losing set.                                                 attention structure. This leads to more stable, predictable,
+    To make this optimization tractable, we transform the             and composable experts that are less prone to task conflict
+continuous task into a discrete classification problem. The           or catastrophic interference when combined.
+continuous weight space w ∈ [0.0, 1.0] for each LoRA is                  The ability to linearly combine these modules stems
+discretized into K finite bins (e.g., {0.0, 0.1, . . . , 1.0}, K =    from the principle of Low-Rank Adaptation. Each expert
+10). The policy network’s goal is to select the optimal bin           LoRA learns a low-rank update ∆W , which can be seen as
+for each expert LoRA.The allocation branch πθ (the MLP)               a “task vector.” Previous work has already validated the ef-
+is modeled as a classifier. Given input x, it outputs logits          fectiveness of linearly combining multiple LoRAs [47]. We
+for each expert LoRA over the K discrete bins. A weight               adopt this direct and time-efficient merging approach. To
+vector y is thus a combination of chosen bins. The policy             address an image with multiple degradations, we construct
+πθ (y|x) is the probability of selecting bin combination y            a composite update by taking a weighted sum of the expert
+given x. Assuming independence, the log-probability is the            task vectors, applied specifically to the K and V matrices.
+sum of log-probabilities for each bin:                                For their original weight matrices W0,M , the adapted matri-
+                                                                             ′
+                                                                      ces WM    are calculated as:
+                                N
+                                X                                                         N
+               log πθ (y|x) =         log πθ (y i |x)                     ′
+                                                                                          X
+                                                                         WM = W0,M +            wi · ∆Wi,M ,   where M ∈ {K, V }
+                                i=1
+                                                                                          i=1
+
+where N is the number of experts and πθ (y i |x) is the                  where wi is the scalar weight assigned by the VLM orches-
+softmax probability for the i-th expert’s chosen bin y i .               trator to the i-th expert LoRA.
+
+
+
+                                                                 41524
+                                                              LowLight
+
+
+
+
+                                                             NightRain
+
+
+
+
+                                                             Rain + Haze
+
+
+
+
+                                                          Lowlight + Haze
+
+
+
+
+                                                  Lowlight + Blur + JPEG artifact
+
+
+
+
+         LQ                 DA-CLIP                AutoDIR                 InstuctIR            Ours               Reference
+
+Figure 2. Qualitative comparisons with SOTA methods on the Real-1000 dataset [23]. All methods are evaluated in a zero-shot setting.
+For better visualization, we only select the top 3 competing methods.
+
+
+    This paradigm of training expert LoRAs on small,                 4. Experiments
+single-task datasets and dynamically fusing them into a pre-
+trained backbone is immensely powerful. It allows our                4.1. Experimental Settings
+agent to not only dynamically assemble a bespoke, high-              4.1.1. Evaluation Datasets and Metrics
+performance restoration model on-the-fly—perfectly tai-              We evaluate our model’s generalization capabilities on two
+lored to the unique degradations of any given image, but             challenging mixed-degradation benchmarks.
+also to execute this tailored restoration in a single, efficient        Real-World Dataset:        We use the Real-1000
+forward pass, synergistically addressing all issues at once          dataset [23], partitioned into three groups: Group 1
+and avoiding the error accumulation of sequential pipelines.         (single degradations: Blur, Haze, Rain, Raindrop, Low-
+
+
+
+                                                               41525
+Table 1. Quantitative comparisons with state-of-the-art methods on the Real-1000 dataset [23]. We report results on Group 1 (single
+degradations), Group 2 (two degradations), and Group 3 (three degradations). All methods are evaluated in a zero-shot setting. The top
+two performances of each metric are marked in bold and underline respectively.
+
+ Dataset     Method               PSNR ↑     SSIM ↑     LPIPS ↓     DISTS ↓     NIQE ↓      MANIQA ↑       CLIPIQA ↑      MUSIQ ↑
+             DA-CLIP [24]          19.62      0.6930     0.3049      0.1974      4.500        0.2870         0.3509         55.75
+             InstructIR [11]       21.72      0.7796     0.2374      0.1447      4.734        0.2922         0.3572         55.89
+             AutoDIR [16]          20.72      0.7157     0.3704      0.2102      6.158        0.2395         0.3040         43.56
+             DiffUIR [46]          19.31      0.6515     0.3379      0.2195      4.880        0.2758         0.3393         51.27
+ Group 1
+             Flux-Kontext [4]      17.69      0.5618     0.4275      0.1707      4.972        0.2863         0.3758         48.92
+             Qwen-Image [38]       16.82      0.5947     0.3589      0.1938      5.175        0.3252         0.3912         57.70
+             AgenticIR [48]        18.68      0.6625     0.2937      0.1620      4.850        0.2977         0.3599         55.34
+             Our Method            22.90      0.7718     0.1711      0.1380      4.375        0.3295         0.4098         60.67
+             DA-CLIP [24]          17.85      0.6680     0.3786      0.2414      5.442        0.2871         0.3673         52.47
+             InstructIR [11]       18.09      0.6488     0.3970      0.2636      5.104        0.2610         0.3504         50.36
+             AutoDIR [16]          18.79      0.5931     0.5182      0.2750      7.025        0.2102         0.2545         40.38
+             DiffUIR [46]          14.16      0.4546     0.4534      0.3159      6.154        0.2645         0.3631         46.46
+ Group 2
+             Flux-Kontext [4]      16.92      0.5144     0.4114      0.2098      5.058        0.2934         0.4448         54.16
+             Qwen-Image [38]       14.25      0.4553     0.4938      0.3373      6.504        0.3077         0.4129         52.69
+             AgenticIR [48]        15.37      0.4850     0.5010      0.3200      6.850        0.2400         0.2950         42.10
+             Our Method            21.10      0.7175     0.2528      0.1579      4.812        0.2997         0.4569         55.84
+             DA-CLIP [24]          15.04      0.7082     0.2940      0.1953      5.834        0.2303         0.2377         43.75
+             InstructIR [11]       16.36      0.7250     0.2799      0.1606      5.474        0.2157         0.2318         42.52
+             AutoDIR [16]          18.06      0.7122     0.3245      0.1785      6.654        0.2145         0.2378         42.64
+             DiffUIR [46]           9.05      0.4345     0.3949      0.2822      6.461        0.2554         0.2736         40.09
+ Group 3
+             Flux-Kontext [4]      12.51      0.5542     0.3000      0.2263      5.848        0.2737         0.3352         51.27
+             Qwen-Image [38]       10.12      0.4834     0.3167      0.3422      6.353        0.3367         0.3795         49.74
+             AgenticIR [48]        14.80      0.5230     0.3500      0.2500      6.150        0.2400         0.2600         45.00
+             Our Method            19.25      0.7310     0.2650      0.1550      5.120        0.3450         0.3880         52.30
+
+
+light), Group 2 (coupled degradations: Rain+Haze,                      cially, each LoRA expert is trained to address only a single,
+Low-light+Haze, Low-light+Rain, Low-light+Blur), and                   specific degradation, trained exclusively on its correspond-
+Group 3 (complex degradations: Low-light+Blur+Noise,                   ing task-specific dataset (Table 2) for 10,000 to 40,000
+Low-light+Blur+JPEG artifact, Low-light+Noise+JPEG                     steps, depending on dataset size. Notably, these specific
+artifact).                                                             datasets were carefully selected to align with the training
+    Synthetic Dataset: We use the MiO100 dataset [48], fo-             data used by key baselines, ensuring a fair and controlled
+cusing on its most complex Group C (3-type degradations)               comparison. Second, we train the weight allocation branch.
+for high-complexity analysis.
+    Metrics: We employ a comprehensive suite of met-                    Table 2. Overview of training datasets used for LoRA experts.
+rics. Full-reference (FR) metrics—PSNR, SSIM [34],
+                                                                        Task                 Dataset           Samples    Data Type
+LPIPS [45], and DISTS [12]—are used to measure fi-
+                                                                        Image Denoising      Flickr2K [32]     2,650      Synthetic
+delity. As FR metrics can be unreliable for tasks with
+                                                                        JPEG Artifact        Flickr2K [32]     2,650      Synthetic
+multiple plausible solutions (e.g., low-light enhancement),             Image Deraining      Rain100H [40]     1,800      Synthetic
+we supplement them with powerful no-reference (NR) met-                 Raindrop Removal     Custom [28]       861        Mixed
+rics—NIQE [25], MUSIQ [17], MANIQA [39], and CLIP-                      Image Dehazing       RESIDE [20]       2,553      Synthetic
+IQA [33]—to assess perceptual quality. All metrics were                 Image Deblurring     GoPro [26]        2,103      Real
+calculated via the PyIQA toolbox [5].                                   Low-Light Enhance    LOL(v1) [36]      689        Mixed
+                                                                        Super-Resolution     DIV2K [2]         800        Synthetic
+4.1.2. Training Strategy
+Our training process has two stages: training the LoRA ex-            To create the preference dataset, we sample 500 images
+perts and the DPO-based weight allocation branch.                     from the training sets of the real and synthetic datasets.
+   First, to address a wide range of image restoration chal-          For each sampled image, we construct a data pair following
+lenges, we train a pool of specialized LoRA experts. Cru-             the methodology detailed in Section 3.2. The DPO branch
+
+
+
+                                                               41526
+is then trained on this curated preference dataset for 2,000                 generalization gap of all-in-one models and the error accu-
+steps, learning to predict the optimal weights for the restora-              mulation of agentic systems. This is confirmed in our quan-
+tion process.                                                                titative results. As shown in Table 1, our method achieves
+                                                                             new state-of-the-art results on the challenging, real-world
+Table 3. Quantitative comparison of multiple-degradation image               Real-1000 dataset, surpassing all competitors across both
+restoration tasks on the Group C of MiO100 dataset. The top two              full-reference and no-reference metrics in all three degra-
+performances of each metric are marked in bold and underline                 dation groups. Furthermore, as illustrated in Figure 2,
+respectively.                                                                our method faithfully restores many challenging real-world
+                                                                             scenes where other SOTA methods fail. We also demon-
+ Method            PSNR    SSIM     LPIPS    MANIQA   CLIPIQA   MUSIQ
+                                                                             strate highly competitive results on the synthetic MiO100
+ AirNet [21]       17.95   0.5145   0.5782   0.1854    0.3113   30.12
+ PromptIR [27]     18.51   0.5166   0.5756   0.1906    0.3104   29.71        benchmark (Table 3).
+ MiOIR [18]        15.63   0.4896   0.5376   0.1717    0.2891   37.95
+ DA-CLIP [24]      18.53   0.5320   0.5335   0.1916    0.3476   33.87
+ InstructIR [11]   17.09   0.5135   0.5582   0.1732    0.2537   33.69        Table 4. Ablation study on the effectiveness of agent compo-
+ AutoDIR [16]      18.61   0.5443   0.5019   0.2045    0.2939   37.86        nents. We incrementally add modules: A: Baseline generation
+ AgenticIR [48]    18.82   0.5474   0.4493   0.2698    0.3948   48.68        backbone (FLUX). A+B: Adds the VLM Agent for prompt en-
+ MAIR[15]          19.42   0.5544   0.4142   0.2798    0.4239   51.36
+ 4K Agent[49]      19.77   0.5629   0.4271   0.3545    0.5233   55.56
+                                                                             hancing. A+B+C: Adds the expert LoRA module.
+ Our Method        19.85   0.5765   0.3392   0.3298    0.4742   58.78
+                                                                                Method        PSNR         SSIM        LPIPS    MANIQA        CLIPIQA         MUSIQ
+                                                                                Input          17.35      0.5848       0.4087     0.2628          0.3353      45.59
+                                                                                A              17.69      0.5618       0.4275     0.2863          0.3758      48.92
+4.2. Comparisons with SOTA Models                                               A+B            19.37      0.6426       0.2967     0.2847          0.3714      51.35
+                                                                                A+B+C          22.90      0.7718       0.1711     0.3295          0.4098      60.67
+Our comprehensive experiments on real-world and syn-
+thetic datasets reveal critical flaws in existing restoration
+paradigms and highlight the superiority of our system.
+   1. All-in-One Models Lack Generalization. We ob-                          4.3. Effectiveness of the System Component
+serve that existing monolithic “all-in-one” models suffer
+                                                                             We used the Real-1000 Group 1 (single degradation) dataset
+from insufficient generalization, especially on complex, un-
+                                                                             to validate the VLM-based prompt enhancement and the ex-
+seen real-world data. This is evident in Figure 2: despite
+                                                                             pert LoRA module. Subsequently, we used Group 2 (cou-
+most of these models being trained on deraining tasks, none
+                                                                             pled degradations) to demonstrate the superiority of our dy-
+of them successfully remove rain in the challenging “night
+                                                                             namic weight allocation.
+rain” scene. In contrast, our method, by leveraging special-
+ized experts, produces an ideal result.                                         The results of the first experiment are shown in Ta-
+   2. Generalist Foundation Models Struggle with Spe-                        ble 4. We compare three configurations: (A) The baseline
+cialized Tasks. Furthermore, we find that even power-                        FLUX-Kontext model with simple prompts (e.g., “Low-
+ful general-purpose foundation models, such as the FLUX-                     light enhancement”); (A+B) The baseline augmented with
+Kontext backbone and Qwen-Image [38], exhibit significant                    the VLM agent providing enhanced prompts (e.g., “En-
+limitations in specialized vertical tasks. Despite their strong              hance the brightness, exposure, and detail throughout the
+generalization, their capabilities on challenging domains,                   entire image to improve visibility and legibility of the text
+such as low-light enhancement, are often constrained. This                   and symbols on the signs and bins.”); and (A+B+C) Our
+is consistent with our ablation study (shown in Figure 4                     full single-task system, adding the specialized expert LoRA
+and Table 4), which reveals that the baseline backbone (our                  module. As shown in Table 4, The backbone alone (A)
+“hands”) struggles significantly without the aid of a special-               struggles significantly with the low-light task. The en-
+ized expert LoRA (our “pens”).                                               hanced prompt (A+B) offers some improvement, but the re-
+                                                                             sult remains constrained by the backbone’s limited vertical
+   3. Sequential Agents Suffer from Catastrophic Fail-
+                                                                             capability. Only by integrating the specialized expert LoRA
+ures. Current agentic systems, which rely on sequential tool
+                                                                             (A+B+C) does the system acquire the necessary knowledge
+invocation, exhibit severe failure modes when tackling cou-
+                                                                             to achieve an ideal restoration.
+pled degradations. We found that this sequential process-
+ing inevitably causes error accumulation, leading to severe                  Table 5. Ablation study on the impact of two strategies: (1) DPO-
+image degradation. As shown in Figure 3, we categorize                       optimized dynamic weights and (2) K-V-only LoRA adaptation.
+these failures into four distinct phenomena: “Cumulative
+Artifacts,” “Noise Amplification,” “Unrealistic Smoothing,”                     Method                         PSNR     SSIM    LPIPS    MANIQA     CLIPIQA    MUSIQ
+and “Content Hallucination.”                                                    Fixed Weights (K-V only)       19.56   0.6722   0.2901   0.2940      0.4457    53.29
+                                                                                Full LoRA (QKV) + DPO          20.45   0.6981   0.2677   0.2952      0.4491    54.15
+   4. Our Method Achieves SOTA Performance. By a                                Heuristic (πref ) (K-V only)   20.12   0.6850   0.2785   0.2965      0.4510    54.72
+                                                                                Ours (K-V only + DPO)          21.10   0.7175   0.2528   0.2997      0.4596    55.84
+cooperative, single-step fusion, our method avoids both the
+
+
+
+                                                                        41527
+                      (a) Cumulative Artifacts                                                  (b) Noise Amplification
+
+
+
+
+                     (c) Unrealistic Smoothing                                                 (d) Content Hallucination
+
+
+
+
+            LQ                4K Agent                        Ours                   LQ                4K Agent               Ours
+
+Figure 3. Qualitative comparison with the SOTA agentic system , illustrating the failures of sequential tool invocation. (a) For an input
+with motion blur and JPEG artifacts, the sequential agent aggravates the blocky artifacts. (b) For an input with defocus blur and noise, the
+sequential agent catastrophically amplifies the noise . (c) An example of Unrealistic Smoothing. (d) A failure of Content Hallucination,
+where the agent generates plausible but non-existent birds. Our system avoids these issues and produces faithful restorations.
+
+
+                               LowLight
+                                                                               uses LoRAs trained on all self-attention matrices (Q, K, V)
+                                                                               with DPO-optimized weights; Heuristic (πref ) (K-V only),
+                                                                               which uses K-V only LoRAs but with weights from the
+                                                                               pre-trained, non-aligned allocation branch (πref ); and Ours
+                                                                               (K-V only + DPO), which represents our full, proposed
+                              Motion Blur                                      method.The results provide two critical insights. Compar-
+                                                                               ing “Ours” to the “Heuristic” baseline demonstrates the sig-
+                                                                               nificant gains from DPO-based alignment. Similarly, com-
+                                                                               paring “Ours” to the “Full LoRA” method validates the ef-
+                                                                               fectiveness of our K-V-only adaptation strategy.
+                                Rain
+                                                                               5. Conclusion
+                                                                               In this paper, we proposed a novel VLM-guided one-
+                                                                               shot system that redefines the approach to universal
+                                                                               photographic post-processing. Our framework, orches-
+                                                                               trated by a VLM agent, cooperatively fuses multiple
+       LQ              Flux       Flux + Ehanced Prompt   Full Framework       specialized LoRA experts into a diffusion backbone.
+                                                                               This single-step, context-aware fusion paradigm directly
+Figure 4. Qualitative ablation study on the effectiveness of agent             addresses the core limitations of prior work, namely
+components. This figure illustrates the effect of progressively in-            the error accumulation of iterative agents and the poor
+tegrating each component on a vertical single-restoration task.                generalization of all-in-one models. Our comprehensive
+                                                                               experiments demonstrate state-of-the-art performance,
+                                                                               particularly in challenging zero-shot, real-world scenarios
+   We then validate our complete agent-based fusion strat-                     where other methods fail. Future work could explore
+egy on the Group 2 dataset, which features coupled degra-                      expanding the library of expert “pens”, investigating the
+                                                                               VLM’s role in local, region-based expert fusion, scaling
+dations. As shown in Table 5, we conduct a comprehensive
+                                                                               the human preference dataset to improve robustness on
+ablation to isolate the contributions of our DPO-optimized                     out-of-distribution degradation combinations, and con-
+weight allocation and the K-V-only LoRA adaptation strat-                      ducting comprehensive user studies to further validate
+egy. We compare four distinct methods: Fixed Weights                           perceptual quality. We believe this agentic, modular,
+(K-V only), which merges the LoRAs using fixed, uniform                        and extensible framework represents a significant step
+weights as a baseline; Full LoRA (QKV) + DPO, which                            towards truly universal and intelligent image restoration.
+
+
+
+                                                                           41528
+                                                                     [12] Keyan Ding, Kede Ma, Shiqi Wang, and Eero P Simon-
+                                                                          celli. Image quality assessment: Unifying structure and tex-
+References                                                                ture similarity. IEEE transactions on pattern analysis and
+                                                                          machine intelligence, 44(5):2567–2581, 2020. 6
+ [1] Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ah-           [13] Xueyang Fu, Jiabin Huang, Xinghao Ding, Yinghao Liao,
+     mad, Ilge Akkaya, Florencia Leoni Aleman, Diogo Almeida,             and John Paisley. Clearing the skies: A deep network archi-
+     Janko Altenschmidt, Sam Altman, Shyamal Anadkat, et al.              tecture for single-image rain removal. IEEE Transactions on
+     Gpt-4 technical report. arXiv preprint arXiv:2303.08774,             Image Processing, 26(6):2944–2956, 2017. 1
+     2023. 4                                                         [14] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-
+ [2] Eirikur Agustsson and Radu Timofte. Ntire 2017 challenge             Zhu, Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen, et al.
+     on single image super-resolution: Dataset and study. In              Lora: Low-rank adaptation of large language models. ICLR,
+     Proceedings of the IEEE conference on computer vision and            1(2):3, 2022. 2
+     pattern recognition workshops, pages 126–135, 2017. 6           [15] Xu Jiang, Gehui Li, Bin Chen, and Jian Zhang. Multi-agent
+ [3] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin              image restoration. arXiv preprint arXiv:2503.09403, 2025.
+     Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun                 2, 7
+     Tang, et al. Qwen2. 5-vl technical report. arXiv preprint       [16] Yitong Jiang, Zhaoyang Zhang, Tianfan Xue, and Jinwei Gu.
+     arXiv:2502.13923, 2025. 3                                            Autodir: Automatic all-in-one image restoration with latent
+ [4] Stephen Batifol, Andreas Blattmann, Frederic Boesel, Sak-            diffusion. In European Conference on Computer Vision,
+     sham Consul, Cyril Diagne, Tim Dockhorn, Jack English,               pages 340–359. Springer, 2024. 1, 2, 6, 7
+     Zion English, Patrick Esser, Sumith Kulal, et al. Flux. 1       [17] Junjie Ke, Qifei Wang, Yilin Wang, Peyman Milanfar, and
+     kontext: Flow matching for in-context image generation and           Feng Yang. Musiq: Multi-scale image quality transformer.
+     editing in latent space. arXiv e-prints, pages arXiv–2506,           In Proceedings of the IEEE/CVF international conference on
+     2025. 3, 6                                                           computer vision, pages 5148–5157, 2021. 6
+ [5] Chaofeng Chen and Jiadi Mo. IQA-PyTorch: Pytorch                [18] Xiangtao Kong, Chao Dong, and Lei Zhang. Towards ef-
+     toolbox for image quality assessment. [Online]. Avail-               fective multiple-in-one image restoration: A sequential and
+     able: https : / / github . com / chaofengc / IQA -                   prompt learning strategy. arXiv preprint arXiv:2401.03379,
+     PyTorch, 2022. 6                                                     2024. 7
+ [6] Haoyu Chen, Wenbo Li, Jinjin Gu, Jingjing Ren, Sixi-            [19] Orest Kupyn, Volodymyr Budzan, Mykola Mykhailych,
+     ang Chen, Tian Ye, Renjing Pei, Kaiwen Zhou, Fenglong                Dmytro Mishkin, and Jiřı́ Matas. Deblurgan: Blind mo-
+     Song, and Lei Zhu. Restoreagent: Autonomous image                    tion deblurring using conditional adversarial networks. In
+     restoration agent via multimodal large language models.              Proceedings of the IEEE conference on computer vision and
+     Advances in Neural Information Processing Systems, 37:               pattern recognition, pages 8183–8192, 2018. 1
+     110643–110666, 2024. 2                                          [20] Boyi Li, Wenqi Ren, Dengpan Fu, Dacheng Tao, Dan Feng,
+ [7] Liangyu Chen, Xin Lu, Jie Zhang, Xiaojie Chu, and Cheng-             Wenjun Zeng, and Zhangyang Wang. Benchmarking single-
+     peng Chen. Hinet: Half instance normalization network                image dehazing and beyond. IEEE transactions on image
+     for image restoration. In Proceedings of the IEEE/CVF                processing, 28(1):492–505, 2018. 6
+     conference on computer vision and pattern recognition,          [21] Boyun Li, Xiao Liu, Peng Hu, Zhongqin Wu, Jiancheng Lv,
+     pages 182–192, 2021. 2                                               and Xi Peng. All-in-one image restoration for unknown
+ [8] Liangyu Chen, Xiaojie Chu, Xiangyu Zhang, and Jian                   corruption. In Proceedings of the IEEE/CVF conference
+     Sun. Simple baselines for image restoration. In European             on computer vision and pattern recognition, pages 17452–
+     conference on computer vision, pages 17–33. Springer,                17462, 2022. 7
+     2022. 2                                                         [22] Bingchen Li, Xin Li, Yiting Lu, and Zhibo Chen.
+ [9] Sung-Jin Cho, Seo-Won Ji, Jun-Pyo Hong, Seung-Won Jung,              Hybrid agents for image restoration.         arXiv preprint
+     and Sung-Jea Ko. Rethinking coarse-to-fine approach in               arXiv:2503.10120, 2025. 2
+     single image deblurring. In Proceedings of the IEEE/CVF         [23] Hao Li, Xiang Chen, Jiangxin Dong, Jinhui Tang, and Jin-
+     international conference on computer vision, pages 4641–             shan Pan. Foundir: Unleashing million-scale training data
+     4650, 2021. 2                                                        to advance foundation models for image restoration. CoRR,
+[10] Gheorghe Comanici, Eric Bieber, Mike Schaekermann, Ice               2024. 5, 6
+     Pasupat, Noveen Sachdeva, Inderjit Dhillon, Marcel Blis-        [24] Ziwei Luo, Fredrik K Gustafsson, Zheng Zhao, Jens Sjölund,
+     tein, Ori Ram, Dan Zhang, Evan Rosen, et al. Gemini 2.5:             and Thomas B Schön. Controlling vision-language models
+     Pushing the frontier with advanced reasoning, multimodality,         for multi-task image restoration. In ICLR, 2024. 1, 6, 7
+     long context, and next generation agentic capabilities. arXiv   [25] Anish Mittal, Rajiv Soundararajan, and Alan C Bovik. Mak-
+     preprint arXiv:2507.06261, 2025. 4                                   ing a “completely blind” image quality analyzer. IEEE
+[11] Marcos V Conde, Gregor Geigle, and Radu Timofte. Instruc-            Signal processing letters, 20(3):209–212, 2012. 6
+     tir: High-quality image restoration following human instruc-    [26] Seungjun Nah, Tae Hyun Kim, and Kyoung Mu Lee. Deep
+     tions. In European Conference on Computer Vision, pages              multi-scale convolutional neural network for dynamic scene
+     1–21. Springer, 2024. 1, 2, 6, 7                                     deblurring. In Proceedings of the IEEE conference on
+
+
+
+
+                                                                 41529
+     computer vision and pattern recognition, pages 3883–3891,             conference on computer vision and pattern recognition,
+     2017. 6                                                               pages 1191–1200, 2022. 6
+[27] V Potlapalli, S Zamir, S Khan, and F Khan. Promptir:             [40] Wenhan Yang, Robby T Tan, Jiashi Feng, Jiaying Liu, Zong-
+     Prompting for all-in-one blind image restoration. arxiv 2023.         ming Guo, and Shuicheng Yan. Deep joint rain detec-
+     arXiv preprint arXiv:2306.13090, 6. 1, 7                              tion and removal from a single image. In Proceedings
+[28] Rui Qian, Robby T Tan, Wenhan Yang, Jiajun Su, and Ji-                of the IEEE conference on computer vision and pattern
+     aying Liu. Attentive generative adversarial network for               recognition, pages 1357–1366, 2017. 6
+     raindrop removal from a single image. In Proceedings             [41] Wenhan Yang, Robby T Tan, Jiashi Feng, Zongming Guo,
+     of the IEEE conference on computer vision and pattern                 Shuicheng Yan, and Jiaying Liu. Joint rain detection and
+     recognition, pages 2482–2491, 2018. 6                                 removal from a single image with contextualized deep net-
+[29] Rafael Rafailov, Archit Sharma, Eric Mitchell, Christo-               works. IEEE transactions on pattern analysis and machine
+     pher D Manning, Stefano Ermon, and Chelsea Finn. Direct               intelligence, 42(6):1377–1393, 2019. 1
+     preference optimization: Your language model is secretly a       [42] Syed Waqas Zamir, Aditya Arora, Salman Khan, Mu-
+     reward model. Advances in neural information processing               nawar Hayat, Fahad Shahbaz Khan, Ming-Hsuan Yang,
+     systems, 36:53728–53741, 2023. 4                                      and Ling Shao. Multi-stage progressive image restoration.
+[30] Dongwei Ren, Wangmeng Zuo, Qinghua Hu, Pengfei Zhu,                   In Proceedings of the IEEE/CVF conference on computer
+     and Deyu Meng. Progressive image deraining networks: A                vision and pattern recognition, pages 14821–14831, 2021. 1
+     better and simpler baseline. In Proceedings of the IEEE/CVF      [43] Syed Waqas Zamir, Aditya Arora, Salman Khan, Mu-
+     conference on computer vision and pattern recognition,                nawar Hayat, Fahad Shahbaz Khan, and Ming-Hsuan Yang.
+     pages 3937–3946, 2019. 1                                              Restormer: Efficient transformer for high-resolution image
+[31] Xin Tao, Hongyun Gao, Xiaoyong Shen, Jue Wang, and Ji-                restoration. In Proceedings of the IEEE/CVF conference on
+     aya Jia. Scale-recurrent network for deep image deblurring.           computer vision and pattern recognition, pages 5728–5739,
+     In Proceedings of the IEEE conference on computer vision              2022. 2
+     and pattern recognition, pages 8174–8182, 2018. 1                [44] Kai Zhang, Wangmeng Zuo, Yunjin Chen, Deyu Meng, and
+[32] Radu Timofte, Eirikur Agustsson, Luc Van Gool, Ming-                  Lei Zhang. Beyond a gaussian denoiser: Residual learning of
+     Hsuan Yang, and Lei Zhang. Ntire 2017 challenge on single             deep cnn for image denoising. IEEE transactions on image
+     image super-resolution: Methods and results. In Proceedings           processing, 26(7):3142–3155, 2017. 2
+     of the IEEE conference on computer vision and pattern            [45] Richard Zhang, Phillip Isola, Alexei A Efros, Eli Shecht-
+     recognition workshops, pages 114–125, 2017. 6                         man, and Oliver Wang. The unreasonable effectiveness
+[33] Jianyi Wang, Kelvin CK Chan, and Chen Change Loy.                     of deep features as a perceptual metric. In Proceedings
+     Exploring clip for assessing the look and feel of im-                 of the IEEE conference on computer vision and pattern
+     ages. In Proceedings of the AAAI conference on artificial             recognition, pages 586–595, 2018. 6
+     intelligence, pages 2555–2563, 2023. 6                           [46] Dian Zheng, Xiao-Ming Wu, Shuzhou Yang, Jian Zhang,
+[34] Zhou Wang, Alan C Bovik, Hamid R Sheikh, and Eero P Si-               Jian-Fang Hu, and Wei-Shi Zheng. Selective hourglass
+     moncelli. Image quality assessment: from error visibility to          mapping for universal image restoration based on diffu-
+     structural similarity. IEEE transactions on image processing,         sion model. In Proceedings of the IEEE/CVF conference
+     13(4):600–612, 2004. 6                                                on computer vision and pattern recognition, pages 25445–
+[35] Zhendong Wang, Xiaodong Cun, Jianmin Bao, Wengang                     25455, 2024. 1, 6
+     Zhou, Jianzhuang Liu, and Houqiang Li. Uformer: A general        [47] Ming Zhong, Yelong Shen, Shuohang Wang, Yadong Lu,
+     u-shaped transformer for image restoration. In Proceedings            Yizhu Jiao, Siru Ouyang, Donghan Yu, Jiawei Han, and
+     of the IEEE/CVF conference on computer vision and pattern             Weizhu Chen. Multi-lora composition for image generation.
+     recognition, pages 17683–17693, 2022. 2                               arXiv preprint arXiv:2402.16843, 2024. 4
+[36] Chen Wei, Wenjing Wang, Wenhan Yang, and Jiaying                 [48] Kaiwen Zhu, Jinjin Gu, Zhiyuan You, Yu Qiao, and Chao
+     Liu. Deep retinex decomposition for low-light enhancement.            Dong. An intelligent agentic system for complex image
+     arXiv preprint arXiv:1808.04560, 2018. 6                              restoration problems. arXiv preprint arXiv:2410.17809,
+[37] Chenfei Wu, Shengming Yin, Weizhen Qi, Xiaodong Wang,                 2024. 1, 2, 6, 7
+     Zecheng Tang, and Nan Duan. Visual chatgpt: Talking,             [49] Yushen Zuo, Qi Zheng, Mingyang Wu, Xinrui Jiang, Renjie
+     drawing and editing with visual foundation models. arXiv              Li, Jian Wang, Yide Zhang, Gengchen Mai, Lihong V Wang,
+     preprint arXiv:2303.04671, 2023. 2                                    James Zou, et al. 4kagent: agentic any image to 4k super-
+[38] Chenfei Wu, Jiahao Li, Jingren Zhou, Junyang Lin, Kaiyuan             resolution. arXiv preprint arXiv:2507.07105, 2025. 1, 2, 7
+     Gao, Kun Yan, Sheng-ming Yin, Shuai Bai, Xiao Xu, Yilei
+     Chen, et al. Qwen-image technical report. arXiv preprint
+     arXiv:2508.02324, 2025. 6, 7
+[39] Sidi Yang, Tianhe Wu, Shuwei Shi, Shanshan Lao, Yuan
+     Gong, Mingdeng Cao, Jiahao Wang, and Yujiu Yang.
+     Maniqa: Multi-dimension attention network for no-reference
+     image quality assessment. In Proceedings of the IEEE/CVF
+
+
+
+
+                                                                 41530
+

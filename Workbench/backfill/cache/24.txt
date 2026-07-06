@@ -1,0 +1,870 @@
+                                                            BAMI: Training-Free Bias Mitigation in GUI Grounding
+
+
+                                                        Borui Zhang1 * Bo Zhang1 * Bo Wang1 * Wenzhao Zheng1                                             Yuhao Cheng2
+                                                                       Liang Tang2          Yiqiang Yan2    Jie Zhou1                       Jiwen Lu1, #†
+                                                                       1                                   2
+                                                                           Tsinghua University, China          Lenovo Research, China
+
+
+
+
+arXiv:2605.06664v1 [cs.CV] 7 May 2026
+                                                                  Abstract                                                   Task
+                                                                                                                                                           Step 1: Coarse-to-Fine Focus
+                                                                                                                       Instruction
+                                                                                                               Given the UI screenshot, provide the                            Model
+                                        GUI grounding is a critical capability for enabling GUI                position related to the command “launch
+                                        agents to execute tasks such as clicking and dragging. How-            next step in design run in vivado”
+
+                                        ever, in complex scenarios like the ScreenSpot-Pro bench-
+                                                                                                                         ScreenSh ot                         Crop Box
+                                        mark, existing models often suffer from suboptimal perfor-
+                                        mance. Utilizing the proposed Masked Prediction Distribu-                                                          Step 2: Candidate Selection
+                                        tion (MPD) attribution method, we identify that the primary                                                                     Selection Rules:
+                                                                                                                                                                                  (1)_________
+                                                                                                                                                                          Model   (2)_________
+                                        sources of errors are twofold: high image resolution (leading                                                         Candidate 1                  Candidate 2
+                                        to precision bias) and intricate interface elements (resulting
+                                        in ambiguity bias). To address these challenges, we intro-                            Model
+                                        duce Bias-Aware Manipulation Inference (BAMI), which
+                                                                                                                             Answer                                           Answer
+                                        incorporates two key manipulations, coarse-to-fine focus and
+                                                                                                                             GT                                               GT
+                                        candidate selection, to effectively mitigate these biases. Our                                                                             Click
+                                                                                                                                    Click
+                                        extensive experimental results demonstrate that BAMI sig-
+                                        nificantly enhances the accuracy of various GUI grounding
+                                        models in a training-free setting. For instance, applying our            Existing Works                                           BAMI (ours)
+                                        method to the TianXi-Action-7B model boosts its accuracy
+                                        on the ScreenSpot-Pro benchmark from 51.9% to 57.8%.
+                                                                                                           Figure 1. Compared with conventional grounding models, BAMI
+                                        Furthermore, ablation studies confirm the robustness of the
+                                                                                                           achieves accurate localization without additional training via struc-
+                                        BAMI approach across diverse parameter configurations,             tured inference with bias-aware manipulations.
+                                        highlighting its stability and effectiveness. 1
+                                                                                                           scenarios. Consequently, research has shifted toward the
+                                        1. Introduction                                                    visual paradigm of instruction + screenshot, where MLLMs
+                                        The advent of multimodal large language models                     directly output coordinates [7, 17, 22, 32, 33], providing a
+                                        (MLLMs) [2, 12] has made it increasingly feasible for GUI          more robust perceptual foundation for agents. In compari-
+                                        agents to automate tasks across desktop and mobile plat-           son to general natural image tasks, GUI scenarios present
+                                        forms. At the core of these agents lies GUI Grounding:             unique challenges due to their high resolution and dense
+                                        given a pair of natural language instructions and a screen-        elements, where semantics are determined by a combination
+                                        shot, the task is to accurately localize the coordinates of the    of icons, text, and contextual cues. These characteristics
+                                        target element within a high-resolution graphical interface,       make accurate localization significantly more challenging.
+                                        thereby enabling subsequent atomic actions such as click-          For instance, in ScreenSpot-Pro [13], a benchmark dataset
+                                        ing, typing, or dragging. Early approaches often relied on         covering professional software across multiple domains, the
+                                        structured interface representations, such as XML or DOM           localization accuracy of most models remains below 50%.
+                                        trees [5, 9]. However, these structures are frequently unavail-       The performance of multimodal grounding models re-
+                                        able or inconsistent with the visual rendering in real-world       mains underutilized. In particular, performance improve-
+                                          * Equal contribution, order decided by coin flip.
+                                                                                                           ments can be achieved without additional training by opti-
+                                          † # Corresponding author: Jiwen Lu (lujiwen@tsinghua.edu.cn).    mizing inference methods. From an error-driven perspective,
+                                          1 Code is available at https://github.com/Neur-IO/BAMI.          we categorize grounding failures into two primary types: (1)
+         Precision Bias                                        Coarse-to-Fine Focus                          and several datasets (e.g., ScreenSpot-Pro [13], ScreenSpot-
+                                                                                                             V2 [32]). BAMI consistently improves accuracy on complex
+  𝑥1 = 789 Tokenize <7> <8> <9>
+                                                      Coarse                      error interval
+                                                                                                             samples (Figure 3). Ablation studies further confirm the
+                                                                                       >200
+         Prediction Distribution
+                                                               400    500   600      700     800       900
+                                                                                                             effects of coarse-to-fine focus and candidate selection. Our
+                                                                                                             results demonstrate that extending and structuring the rea-
+                         error interval                Fine                  error
+                                                                                                             soning path during inference provides a cost-effective means
+                                                                            Interval
+                              >200
+                                                                              <100
+   400    500      600      700     800      900               600    650   700      750     800       850
+                                                                                                             of unlocking the full grounding potential of existing models.
+                                                                                                             The main contributions of this work are as follows:
+         Ambiguity Bias                                        Candidate Selection                           • Diagnosis of Grounding Failures: We introduce the MPD
+   Ground Truth 𝑷 <7> <8> <9>
+                                                                                                               method to diagnose common grounding failures, such as
+                                                                                    Selection
+                  Pred.𝑷𝟏            Pred.𝑷𝟐
+                                                         Pred.𝑷𝟏
+                                                                                      Model
+                                                                                                               knowledge deficiency and inductive bias.
+                                                        <1> <8> <9>
+                <1> <8> <9>        <8> <0> <1>
+                                                                             Rules in Prompt
+                                                                                                             • Precision Bias Mitigation: We transform single-step lo-
+  VLM Pref.      𝒅𝑬𝒅𝒊𝒕 𝑷𝟏, 𝑷 = 𝟏 < 𝒅𝑬𝒅𝒊𝒕 𝑷𝟐 , 𝑷 = 𝟑      Pred.𝑷𝟐
+                                                                            (1) functional features
+                                                                            (2) typical UI patterns            calization into a multi-step progressive search through
+                                                                            (3) interactive elements
+                                                        <8> <0> <1>
+                         Inconsistent                                       (4) _______________
+                                                                                                               hierarchical cropping, which effectively reduces precision
+  Geometry      𝒅𝑬𝒖𝒄 𝑷𝟏, 𝑷 = 𝟔𝟎𝟎 ≫ 𝒅𝑬𝒖𝒄 𝑷𝟐 , 𝑷 = 𝟏𝟏
+                                                                                                               bias in high-resolution and small-object scenarios.
+                                                                                                             • Ambiguity Bias Correction: To address discrepancies
+                                                                                                               between MLLM’s edit distance and spatial coordinate dis-
+Figure 2. Bias Mitigation Strategy. To address accuracy bias and                                               tance, we introduce an external selection and correct the
+ambiguity bias, BAMI introduces two manipulations: coarse-to-                                                  MLLM’s selection bias using predefined prompt rules.
+fine focus and candidate selection.
+                                                                                                             • Training-free Improvements: We validate BAMI across
+                                                                                                               various backbones and benchmarks, demonstrating consis-
+Knowledge deficiency: The model fails to recognize the                                                         tent improvements and emphasizing the general value of
+target due to a lack of relevant knowledge. (2) Inductive                                                      test-time reasoning design in GUI Grounding.
+bias: The model has the necessary knowledge but makes
+errors due to its inherent selection bias, which manifests in                                                2. Related Work
+two typical forms, namely precision bias and ambiguity bias.
+To diagnose these causes of failure, we introduce a Masked                                                   Training on pre-trained MLLMs [2] has been demonstrated
+Prediction Distribution (MPD) method. This approach                                                          to significantly enhance GUI grounding capabilities. Early
+randomly occludes parts of the screenshot, makes repeated                                                    approaches predominantly relied on conventional instruc-
+predictions, and aggregates the frequency of hotspots or can-                                                tion fine-tuning. With the introduction of DeepSeek-R1 [8],
+didate points across the image. This aggregation reveals how                                                 reinforcement learning fine-tuning has attracted growing at-
+the model distributes its focus across the image. Statistical                                                tention. Meanwhile, several studies have found that specially
+analysis of 50 error samples shows that approximately 14%                                                    designed inference methods help tap into the potential of
+of failures stem from knowledge deficiency, while 74% are                                                    MLLMs in terms of localization capabilities.
+attributed to inductive bias.
+    In this paper, we propose Bias-Aware Manipulation In-                                                    2.1. Instruction Fine-tuning
+ference (BAMI). The key idea is to transform the one-step
+localization task into a recursive, multi-step structured infer-                                             The simplest approach is to fine-tune pre-trained MLLMs
+ence process through predefined bias-aware manipulations                                                     (e.g., Qwen2.5-VL [2]) on task-specific GUI instruction
+(Figure 1 and 2). To mitigate precision bias, we decompose                                                   datasets. Early work such as AGUVIS [33] introduced
+localization into hierarchical coarse-to-fine focus, where                                                   vision-based models for GUI grounding. To address high-
+each step refines the candidate region identified in the previ-                                              resolution GUI screenshots, CogAgent [10] introduced a
+ous round. This progressive refinement reduces the search                                                    cross-resolution efficient attention mechanism. ShowUI [14]
+space and improves the resolution of the predicted coordi-                                                   applied token pruning based on GUI interface structure, im-
+nates. To address ambiguity bias, we incorporate an external                                                 proving both efficiency and performance. OmniParser [17]
+Candidate Selection. By defining selection rules specific                                                    converted GUI pixels into structured tokens that could
+to the localization task and injecting these rules into the                                                  be parsed by LLMs. In terms of dataset construction,
+model as prompts, we correct the model’s erroneous selec-                                                    SeeClick [4] proposed an automated pipeline for manag-
+tion preferences. Importantly, our method does not require                                                   ing GUI data. UGround [7] built a large-scale dataset with
+any additional model training and can be directly applied to                                                 10M elements, improving generalization. With the advent of
+a variety of existing open-source backbones. We evaluate                                                     larger-scale datasets and more powerful models, new large-
+BAMI on multiple open-source backbones (e.g., OS-Atlas-                                                      scale systems such as UI-TARS [22] and Phi-Ground [36]
+7B [32], UI-TARS-7B [22], and TianXi-Action-7B [27])                                                         have pushed the SOTA performance across benchmarks.
+                       CAD         Creative                       to address these through bias-aware inference.
+
+                                         60                       3. Pilot Study
+                                   20 40
+          Scientific                     Development              On ScreenSpot-Pro [13], a challenging GUI grounding
+                                                                  benchmarks, the accuracy of state-of-the-art grounding mod-
+                                                                  els on these benchmarks has significantly decreased, falling
+                                                                  below 50%. To gain deeper insights into the underlying
+                                                                  performance bottlenecks, we conducted a systematic pilot
+                       Office         OS
+                                                                  study addressing two primary questions: (1) What are the
+                   OS-Atlas-7B      UI-TARS-7B                    root causes of errors made by GUI grounding models? (2)
+                   UGround-V1-7B    BAMI (ours)                   How can these errors be mitigated from a model mechanism
+Figure 3. Accuracy comparison on ScreenSpot-Pro. BAMI             perspective without the need for retraining?
+consistently improves performance across all model backbones.
+                                                                  3.1. Error Attribution via MPD
+2.2. Reinforcement Learning                                       This section uses the ScreenSpot-Pro dataset [13] as a bench-
+                                                                  mark to analyze potential error patterns in GUI grounding
+Given the fine-grained nature of GUI localization, instruc-
+                                                                  models and explore corresponding mitigation strategies.
+tion fine-tuning alone is often insufficient for achieving high
+precision. DeepSeek-R1 [8] introduced the GRPO method,
+demonstrating the potential of reinforcement learning in          Problem Formulation For a GUI grounding model
+enhancing spatial reasoning for GUI grounding tasks. Fol-         f , given a query q and a GUI screenshot I ∈
+lowing this, UI-R1 [18] and GUI-R1 [20] were among the            RH×W ×3 , the model generates a text sequence t con-
+first to apply GRPO in GUI tasks. InfiGUI-R1 [16] focused         taining the target bounding box in the standard format:
+on reward function design, emphasizing IoU-based metrics          <|box start|>(x1 , y1 , x2 , y2 )<|box end|>. The co-
+to improve localization accuracy. GUI-G1 [37] introduced          ordinates (x1 , y1 , x2 , y2 ) = r(t) are extracted using a regu-
+box-attribute constraints to regulate bounding-box geome-         lar expression parser r, where (x1 , y1 ) and (x2 , y2 ) represent
+try, while GUI-G2 [26] modeled spatial distributions using        the top-left and bottom-right coordinates of the bounding
+Gaussian functions. TianXi-Action [27] focused on generat-        box, respectively. The center coordinates of the bounding
+                                                                                                              2 y1 +y2
+ing high-quality reinforcement learning data. Collectively,       box are computed as: (xc , yc ) = x1 +x   2   , 2 . A predic-
+these studies affirm the efficacy of reinforcement learning in    tion is considered correct if the center coordinate (xc , yc )
+enhancing spatial reasoning in GUI tasks.                         lies within the ground-truth bounding box; otherwise, it is
+                                                                  deemed an error.
+2.3. Inference Enhancement
+Significant attention has been given to optimizing inference      Attribution Method Traditional gradient-based at-
+strategies to exploit the capabilities of MLLMs. One line         tribution methods (e.g., GradCAM [23], Integrated
+of work extends reasoning chains in the language space;           Gradients [25]) are not well-suited for the discrete text-
+however, experiments [35] have found this direction subop-        to-coordinate conversion process. As an alternative, we
+timal for GUI scenarios, sometimes even hindering perfor-         initially considered using Shapley values [19, 24] for
+mance. Alternatively, several works have targeted inference       attribution analysis. For an n-dimensional input feature,
+enhancement in the image space. ScreenSeekeR [13] and             the Shapley value for the i-th feature is defined as: ϕi =
+                                                                  P                    |S|!(n−|S|−1)!
+R-VLM [21] introduced multi-stage pipelines, first perform-          S⊆{1,2,...,n}\{i}       n!       [f (S ∪ {i}) − f (S)],
+ing region-level localization followed by refinement within       where S denotes a subset of features. However, due to the
+local regions, thus improving accuracy. DiMo-GUI [31] pro-        high resolution of GUI screenshots, estimating the Shapley
+posed a divide-and-conquer strategy, separating reasoning         values [1] for a single sample takes approximately 10 hours
+over icons and text to reduce cross-modal interference. GUI-      on a single RTX 4090 GPU, which is computationally
+RC [6] employed intersection operations to aggregate multi-       impractical. To address this, we propose the Masked
+ple predictions, improving robustness. While conventional         Prediction Distribution (MPD) method, which efficiently
+MLLMs have demonstrated the effectiveness of inference            observes the spatial distribution of model predictions under
+enhancement techniques for general tasks [15], their direct       random perturbations (see Supplementary Algorithm 1).
+application to GUI tasks is often limited by inductive biases     Regions with densely distributed predicted points indicate
+specific to spatial reasoning. This paper identifies two criti-   high model confidence in those areas. We set the number of
+cal inductive biases —precision bias and ambiguity bias—          perturbations to 300 per sample and can obtain heatmaps
+that remain prominent in GUI grounding. We propose BAMI           within 20 minutes per sample.
+                                                Correct: “Open app inspection in android studio”                                           Knowledge Gap: “Launchpad”
+            Knowledge          Others
+               Gap
+
+
+                    14.0%   12.0%
+
+Precision
+  Bias      20.0%                               Precision Bias: “Zoom in plot”                                                             Ambiguity Bias: “Show power options”
+
+
+                              54.0%
+
+                                    Ambiguity
+                                      Bias
+                      (a)                                                                                       (b)
+Figure 4. Error Attribution Analysis. (a) Proportions of attribution types. (b) Attribution analysis of model predictions. The deep red
+regions in the heatmap indicate potential prediction locations, demonstrating how the MPD can clearly identify the sources of model errors.
+
+Table 1. Proportions and detailed analysis of different error types.                  of the GUI, including the geometric location, text content,
+     Error Type         Description                                                   and other information of UI elements, and concatenated this
+    Knowledge Gap               Model fails to recognize target information.          with the original query as model input. However, experi-
+       (14%)                    7 error samples.                                      mental results indicated that merely extending the language
+                                Model identifies target but exhibits system-
+                                                                                      sequence did not significantly improve model accuracy, and
+      Precision Bias
+                                atic offset. 10 samples.                              even introduced additional errors in some cases. This phe-
+          (20%)
+                                                                                      nomenon aligns with recent findings [35] that traditional
+    Ambiguity Bias              Model distracted by similar regions or mis-
+                                                                                      linguistic reasoning models are difficult to directly transfer
+        (54%)                   leading semantics. 27 samples.
+                                                                                      to precise grounding tasks.
+     Others (12%)               Unclassified patterns. 6 samples.
+                                                                                       Root Causes of Precision Bias An in-depth analysis of
+Error Pattern Analysis Based on the experimental results                               precision bias revealed that multimodal models typically
+of TianXi-Action-7B [27] on ScreenSpot-Pro, we conducted                               adopt discretized coordinate representations for images with
+an attribution analysis on 50 error samples, with the find-                            resolution H × W . For instance, in Qwen series models,
+ings summarized in Table 1. Notably, both precision bias                               a coordinate value of x1 = 789 is split into independent
+and ambiguity bias are categorized as inductive bias issues,                           digit characters (<7>, <8>, <9>) and further converted into
+collectively accounting for 74% of the error samples. This                             their corresponding token IDs. This discretization inherently
+indicates that if we can effectively mitigate inductive bias,                          limits the model’s maximum precision to the unit digit level.
+the model’s performance will be significantly improved.
+
+3.2. Mitigation Strategy: Inductive Bias Correction                                    Root Causes of Ambiguity Bias The cross-entropy train-
+                                                                                       ing objective for multimodal models optimizes the edit dis-
+Based on the error pattern analysis, we explored potential                             tance of token sequences rather than the Euclidean distance.
+mitigation methods for different error types. Knowledge                                Let the ground-truth coordinate be xGT = 789, and consider
+gap errors reflect limitations in the model’s training data or                         two predicted candidates: x′ = 189 and x′′ = 801. A direct
+architecture, which are difficult to address with inference-                           comparison of the two metrics yields:
+time techniques. In contrast, inductive bias errors (precision
+bias and ambiguity bias) can potentially be mitigated through                                        d_{\text {edit}}(x_{\text {GT}}, x') &= 1 < d_{\text {edit}}(x_{\text {GT}}, x'') = 3 \\ d_{\text {euc}}(x_{\text {GT}}, x') &= 600 > d_{\text {euc}}(x_{\text {GT}}, x'') = 12
+optimization of the inference mechanism.
+
+                                                                                      This inconsistency in metrics causes a fundamental conflict
+Limitations of Language-Space Enhancement Inspired
+                                                                                      between the model’s optimization objective in token space
+by reasoning techniques in large language models (e.g.,
+                                                                                      and the need for accuracy in real-world spatial localization.
+Chain-of-Thought [29]), we first attempted to enhance GUI
+                                                                                      Therefore, external correction mechanisms combining to-
+grounding performance by augmenting linguistic informa-
+                                                                                      ken sequence optimization with geometric constraints are
+tion. (1) Query Expansion Strategy: For queries with insuf-
+                                                                                      necessary to address this systematic bias.
+ficient or ambiguous descriptions, we used a language model
+to expand and refine the original query, generating more
+                                                                                       4. Method
+precise instruction information. (2) Context Expansion
+Strategy: We utilized a multimodal large language model                                Based on the experimental results from the pilot study, we
+(e.g., Qwen2.5-VL [2]) to generate a structured description                            design the BAMI method in this section. The method tar-
+Algorithm 1 BAMI (with N crop iterations and M candi-                   however, the impact of digit position errors is asymmetric:
+dates per iteration)                                                    an error in the hundreds place is two orders of magnitude
+Require: Query q, screenshot I, correction model m, and                 more significant than that in the ones place. This results in a
+    grounding model f                                                   substantial mismatch between edit distance and Euclidean
+Ensure: Grounding point (x, y)                                          distance, and no straightforward mapping exists to convert
+ 1: Initialize the input image as I 1 = I                               the former to the latter. To eliminate ambiguity bias, we first
+ 2: for all t ∈ {1, 2, · · · , N } do                                   generate multiple mutually exclusive candidate bounding
+ 3:    Initialize the candidate box set Φt = ∅                          boxes through multi-round masked prediction operations.
+ 4:    for all i ∈ {1, 2, · · · , M } do                                Subsequently, we utilize a correction model to re-select from
+ 5:       Masking all pixels in the candidate set to get input          these candidate boxes. We investigate both online APIs (e.g.
+          image Iit = MASK(I t−1 , Φt )                                 GPT-5) and locally trained models (e.g. Qwen3-VL-8B) for
+ 6:       Predict the candidate box bti = f (q, Iit ) and update        this role. Notably, the key to this operation lies in prompt
+          Φt ← Φt ∪ {bti }                                              design; naive prompt designs fail to leverage the correction
+ 7:    end for                                                          model effectively. To enable the correction model to rectify
+ 8:    Select the preferred box b̃t = m(q, I t , Φt )                   the erroneous ordering tendency of the grounding model, we
+ 9:    Crop the input image I t+1 = CROP(I t , b̃t )                    incorporate key principles consistent with GUI priors into
+10: end for                                                             the prompt. Examples of these principles are provided below,
+11: Compute the center point of b̃N as (x, y)                           and detailed prompt design is available in the appendix.
+
+                                                                                                   Prompt
+
+gets both accuracy bias and ambiguity bias, and proposes            1    - (Functional Preference) Focus on the functional
+                                                                              purpose of the highlighted elements
+different manipulations to improve GUI grounding.                   2    - (Memory Comparison) Consider standard patterns (e.g.,
+                                                                               buttons for actions)
+4.1. Accuracy Bias: Coarse-to-Fine Focus                            3    - (Interactive Components) Prioritize interactive
+                                                                              elements over static text/labels
+The root cause of accuracy bias lies in the discretization
+process of multimodal large models during coordinate lo-
+calization. Since the prediction accuracy of the model is               4.3. BAMI: Bias-Aware Manipulation Inference
+typically limited to the pixel level, and its output is difficult       By integrating the two manipulations outlined above, we
+to be perfectly accurate, prediction errors may sometimes               propose BAMI, as illustrated in Figure 5. To enhance the
+reach tens or even hundreds of pixels. To effectively elimi-            diversity of candidate boxes, we mask the pixels within al-
+nate accuracy bias, inspired by human observation strategies,           ready predicted candidate boxes prior to each new prediction
+we propose a coarse-to-fine focus manipulation. Specifi-                step, thereby ensuring the mutual exclusivity between newly
+cally, we first use the grounding model to predict a coarse             generated candidate boxes and existing results. To mitigate
+localization coordinate (xt , y t ). Then, based on this coarse         precision bias, BAMI adopts a coarse-to-fine focus strategy
+coordinate, we crop the original image to a scale of λ < 1,             in its outer loop, enabling gradual refinement of focus toward
+and input the cropped image back into the grounding model               more accurate coordinate positions step by step. Simultane-
+for fine localization, obtaining a more precise coordinate              ously, to address ambiguity bias, BAMI employs a candidate
+(xt+1 , y t+1 ). Although this process can be iterated multiple         selection strategy in each iteration, selecting the most suit-
+times, we find that there is a trade-off in the hyperparameters.        able box from multiple candidates as the final output. The
+(1) Iteration count: After a certain number of iterations,              algorithm of BAMI is detailed in Algorithm 1.
+the performance improvement of the model tends to plateau;
+(2) Crop ratio: A large cropping ratio may lead to the loss             5. Experiment
+of crucial information, while a small cropping ratio may
+prevent the model from accurately localizing the target.                5.1. Experimental Setup
+                                                                        Models The proposed BAMI method aims to enhance the
+4.2. Ambiguity Bias: Candidate Correction                               accuracy of Grounding models without retraining. We tested
+Multimodal large models (MLLMs) represent coordinates                   this method on several state-of-the-art grounding models,
+as text sequences for autoregressive generation. While this             including OS-Atlas-7B [32], UI-TARS-1.5-7B [22], and
+design simplifies the training process, it introduces a discrep-        TianXi-Action-7B [27]. All models were implemented using
+ancy between the training and inference phases. For exam-               the Transformers framework [30] for inference. The input to
+ple, the coordinate “789” is encoded into the text sequence             the models consists of both the query and the screenshot. OS-
+<7><8><9>, and the model minimizes the edit distance                    Atlas and TianXi-Action output bounding box coordinates,
+of this text sequence using cross-entropy loss. In practice,            while UI-TARS outputs click coordinates.
+                  Task                       1. Coarse-to-Fine Focus        2. Mask & Prediction              3. Candidate Selection
+              Instruction                         Coarse Prediction                Prediction 1                          Candidate Set
+   Given the UI screenshot, provide the
+   position related to the command “launch
+   next step in design run in vivado”                                                                                 Box-2
+                                                 Crop Box
+                                                                                 Box-1
+                                                                                                                      Box-1
+              ScreenShot
+
+
+
+                                                     Cropped Image            Masked → Prediction 2
+                                                                                                                         Selection Model
+
+                                                                                                                            Rules in Prompt
+                                                                                 Box-2                             (1) Focus on functional features
+                                                                                                                   (2) Associate with typical UI patterns
+                                                                                         Mask                      (3) Find the interactive elements
+                                                                                                                   (4) _______________
+
+
+                 BAMI
+
+
+Figure 5. Illustration of BAMI. Step 1: Based on the initial prediction results of the grounding model, BAMI performs cropping around
+these initial predictions at a predefined ratio. Step 2: The model conducts multiple predictions on the cropped images; after each prediction,
+the pixels within the predicted bounding box are randomly masked to ensure the diversity of multiple prediction results. Step 3: Using
+predefined rules and an external knowledge model, the model ranks multiple candidate coordinates and selects the final coordinates.
+
+
+Data We evaluate BAMI on ScreenSpot-V2 [32], and                         dataset, with detailed results in the supplementary material,
+ScreenSpot-Pro [13]. ScreenSpot-V2 are mainly used to                    which demonstrates that our method outperforms all base-
+assess grounding accuracy in simple scenarios, covering                  line models to varying extents. Furthermore, Table 4 (left)
+mobile, web, and desktop. ScreenSpot-Pro focuses on com-                 dissects two key manipulations of BAMI, where “PB” and
+plex scenarios, consisting of high-resolution screenshots of             “AB” denote precision bias and ambiguity bias elimination,
+professional software, where each sample contains multi-                 respectively. It can be observed that both manipulations inde-
+ple software elements, and the targets are typically small,              pendently yield significant improvements in model accuracy.
+making it a particularly challenging task.
+                                                                          5.3. Ablation Studies
+Hyperparameters To balance efficiency and accuracy,                      This section presents a series of ablation experiments to
+two iterations were adopted for the coarse-to-fine focus-                validate the effectiveness of the accuracy bias and ambiguity
+ing process. For high-resolution screenshots, the crop ratio             bias elimination manipulations in BAMI and explores the
+λ was set to the range [0.5, 0.7]. To eliminate ambiguity                impact of different parameter settings on model performance.
+bias, a masking mechanism was employed, which generates
+                                                                          5.3.1. Accuracy Bias Elimination
+2 ∼ 3 candidate results per iteration; subsequently, a cor-
+rection model was used to select the result most relevant                Impact of Crop Ratio and Iteration Number We first
+to the query. We evaluate both online (GPT-5) and offline                investigate the effects of the number of crops and the crop
+(Qwen3-VL-8B) variants. All experiments were conducted                   ratio λ on the elimination of accuracy bias, as illustrated in
+on a single RTX 4090 GPU.                                                Figure 6a. For the crop ratio, the number of iterations is
+                                                                         fixed at 2. When the crop ratio exceeds 40%, the elimination
+5.2. Comparison with SOTA                                                effect on precision bias becomes relatively significant. If
+We first evaluated state-of-the-art grounding methods on the             the crop ratio is set too aggressively (i.e., less than 40%), it
+complex ScreenSpot-Pro dataset, with results summarized in               may lead to the cropping of crucial contextual information,
+Table 2. All models were categorized into three groups based             compromising model performance. For the number of itera-
+on their training or deployment paradigms: supervised fine-              tions, the crop ratio is fixed at 50%. It can be observed that 2
+tuning (SFT) training, reinforcement learning (RL) training,             iterations are sufficient to eliminate precision bias. Excessive
+and test-time inference. Among 7B-scale models, our BAMI                 iterations may result in an overly large overall cropping ratio,
+method achieved the best performance on the ScreenSpot-                  which conversely degrades the performance.
+Pro dataset, attaining an accuracy of 57.8%. Built upon
+TianXi-Action-7B [27], our model delivers a 5.9% accu-                    Impact of Target Type We also investigate whether BAMI
+racy improvement. We present the consistent improvements                  exhibits selectivity across different targets, as illustrated in
+of BAMI across different base models in Table 3. Addi-                    Figure 6b. We calculated the Euclidean distance between
+tionally, we conducted experiments on the ScreenSpot-V2                   predictions and ground truth, where the blue line represents
+                                    Table 2. Comparison with various models on ScreenSpot-Pro.
+                                    Development      Creative             CAD        Scientific      Office             OS
+           Grounding Model                                                                                                          Avg.
+                                    Text    Icon    Text Icon Text Icon Text Icon Text Icon Text Icon
+                                                          Proprietary Models
+        GPT-4o [12]               2.0        0.0    1.3      0.0    1.0      0.0     2.1    0.0     1.1       0.0    0.0     0.0     0.8
+        Claude Computer Use [11] 14.5        3.7    22.0     3.9    25.9     3.4    33.9   15.8    30.1      16.3    11.0    4.5    17.1
+                                                   General Open-source Models
+        Qwen2.5-VL-3B [2]            9.1     7.3    22.1     1.4    26.8     2.1    38.2   7.3     33.9      15.1    10.3    1.1    16.1
+        Qwen2.5-VL-7B [2]           16.8     1.6    46.8     4.1    35.9     7.7    49.3   7.3     52.5      20.8    37.4    6.7    26.8
+                                                    GUI-specific Models (SFT)
+        SeeClick-9.6B [4]            2.5     0.0     0.6  0.0  1.0  0.0              3.5  0.0  1.1  0.0  2.8  0.0  1.1
+        CogAgent-18B [10]            7.1     3.1    14.9 0.7   9.6  0.0             22.2 1.8 13.0 0.0    5.6  0.0  7.7
+        OS-Atlas-7B [32]            12.2     4.7    33.1 1.4 28.8 2.8               37.5 7.3 33.9 5.7 27.1 4.5 18.9
+        ShowUI-2B [14]               2.5     0.0    16.9 1.4   9.1  0.0             13.2 7.3 15.3 7.5 10.3 2.2     7.7
+        UGround-7B [7]              14.2     1.6    26.6 2.1 27.3 2.8               31.9 2.7 31.6 11.3 17.8 0.0 16.5
+        UGround-V1-7B [7]           15.8     1.2    51.9 2.8 47.5 9.7               57.6 14.5 60.5 13.2 38.3 7.9 31.1
+        UI-TARS-7B [22]             20.8     9.4    58.4 12.4 50.0 9.1              63.9 31.8 63.3 20.8 30.8 16.9 35.7
+        TianXi-Action-7B [27]       76.0    21.4    61.6 19.6 45.2 18.8             80.6 31.8 84.2 54.7 57.9 33.7 51.9
+                                                     GUI-specific Models (RL)
+        UI-R1-3B [18]               11.2     6.3    22.7 4.1 27.3 3.5 42.4 11.8 32.2 11.3 13.1 4.5 17.8
+        UI-R1-E-3B [18]             37.1    12.5    46.1 6.9 41.9 4.2 56.9 21.8 65.0 26.4 32.7 10.1 33.5
+        GUI-R1-7B [20]              23.9     6.3    49.4 4.8 38.9 8.4 55.6 11.8 58.7 26.4 42.1 16.9     -
+        InfiGUI-R1-3B [16]          33.0    14.1    51.3 12.4 44.9 7.0 58.3 20.0 65.5 28.3 43.9 12.4 35.7
+        GUI-G1-3B [37]              39.6     9.4    50.7 10.3 36.6 11.9 61.8 30.0 67.2 32.1 23.5 10.6 37.1
+        SE-GUI-7B [34]              51.3    42.2    68.2 19.3 57.6 9.1 75.0 28.2 78.5 43.4 49.5 25.8 47.3
+        GUI-G2-7B [26]              55.8    12.5    68.8 17.2 57.1 15.4 77.1 24.5 74.0 32.7 57.9 21.3 47.5
+                                                          Test-Time Methods
+        GUI-RC [6]                    -       -       -    -    -    -    -    -    -    -    -    -  41.2
+        DiMo-GUI-7B [31]            66.9    21.4    60.6 21.7 50.3 14.1 68.1 21.8 80.8 52.8 69.2 28.1 49.7
+        BAMI-7B                     81.8    26.9    68.2 23.8 58.4 29.7 77.8 36.4 83.6 60.4 72.9 33.3 57.8
+
+                                Table 3. Comparison with different baseline models on ScreenSpot-Pro.
+
+                                  Development       Creative         CAD           Scientific       Office             OS
+           Grounding Model                                                                                                         Avg.
+                                  Text     Icon    Text Icon Text Icon Text Icon Text Icon Text Icon
+         UGround-7B [7]           14.2     1.6     26.6    2.1     27.3    2.8     31.9 2.7       31.6 11.3 17.8            0.0    16.5
+         + BAMI                   48.7     5.5     46.5    7.7     18.3    4.7     54.9 14.6      52.5 18.9 42.8            9.4    30.0
+         OS-Atlas-7B [32]         12.2      4.7    33.1 1.4        28.8 2.8        37.5 7.3       33.9 5.7          27.1 4.5       18.9
+         + BAMI                   66.2     16.6    58.6 16.1       36.0 10.9       55.6 17.3      68.4 22.6         56.8 17.1      41.6
+         UI-TARS-1.5-7B [22]      50.0     14.5    56.6 13.3 37.6 12.5 66.0 22.7 76.3 34.0 55.6 16.9 40.8
+         + BAMI                   71.4     22.1    68.2 21.7 49.8 14.1 77.8 23.6 82.5 41.5 69.1 24.2 51.9
+         TianXi-Action-7B [27] 76.0        21.4    61.6 19.6 45.2 18.8 80.6 31.8 84.2 54.7 57.9 33.7 51.9
+         + BAMI (GPT-5)        81.8        26.9    68.2 23.8 58.4 29.7 77.8 36.4 83.6 60.4 72.9 33.3 57.8
+         + BAMI (Local)        80.5        26.9    66.7 21.0 53.8 28.1 78.5 34.6 83.1 62.3 71.3 31.6 56.2
+
+
+the baseline and the green line represents BAMI. The red line             targets and possesses universality.
+denotes the distance between corner points and the center of
+the ground truth bounding box. If a prediction line lies below            5.3.2. Ambiguity Bias Elimination
+the red line, the prediction is highly likely correct. We sorted          Impact of Prompt Design A key reason for ambiguity bias
+the baseline results in ascending order for ease of observation.          lies in the fact that MLLMs prioritize candidate outcomes
+For both text and icon types, the bias distance of BAMI’s                 based on edit distance. Therefore, it is crucial to inject
+predictions is mostly smaller than that of the baseline. This             priority priors in the Euclidean space through prompt design.
+indicates that BAMI has no selective preference for predicted             We conducted ablation experiments on two important prompt
+                                                                                                                                                                                         TEXT UI Elements
+                                                                                                                                                Coarse-to-Fine Focus          Baseline           Ground Truth
+                        Crop-Ratio v.s. Accuracy                     55.0        Iteration v.s. Accuracy                        103
+
+
+
+                                                                                                                    Distance
+                                                                                                                                102
+               56.0                                                  50.0                                                       101
+                                                                     45.0                                                       100
+               55.0                                                                                                            10 1
+
+
+
+Accuracy (%)                                          Accuracy (%)
+                                                                     40.0                                                                  0                          200                  400                  600          800        1000
+               54.0                                                  35.0                                                                                                                   Sample ID
+                                                                     30.0                                                                                                                ICON UI Elements
+                                                                                                                                               Coarse-to-Fine Focus          Baseline        Ground Truth
+               53.0                                                                                                            103
+                                                                     25.0
+
+                                                                                                                    Distance
+                                                                                                                               102
+               52.0                                                  20.0
+                                                                                                                               101
+                                                                     15.0
+                                                                                                              5th              100
+                       ine
+                      30
+                      40
+                      50 %
+                         %
+                         %                                                  ne   t
+                                                                                 1s    d
+                                                                                      2n     3rd     4th
+                  sel 60
+                      70
+                      80 %
+                         %                                              sel i                                                          0                     100                 200                 300              400    500      600
+                      90 %
+                         %
+                                                                                                                                                                                            Sample ID
+                Ba                                                    Ba
+                             Cropping Rate                                              Iterations
+                             (a) Ablations on crop ratio and iteration number.                                                                                  (b) Impact of different target types.
+    Figure 6. Ablations on accuracy bias elimination. (a) Effect of crop ratio and iteration count. (b) Performance across different target types.
+
+    Table 4. Ablation studies on BAMI components and prompt design.                                                    Table 5. Impact of different correction models (online and offline).
+
+                        Manipulations                                       Prompt Design                                             Category                              Correction Model                                Accuracy
+         Setting                PB AB Acc. Setting                                     CoT KP Acc.
+                                                                                                                                      Baseline                                                                                 51.9
+         Baseline                             51.9   Baseline                                              51.9
+         + C2F Focus             ✓            55.2   + Vanilla                                             55.7                                                             Doubao-Seed-1.6-Flash                              55.3
+         + Cand. Sel.                   ✓     54.3   + w/ CoT                           ✓                  57.0
+         + BAMI                  ✓      ✓     57.8   + w/ CoT&KP                        ✓            ✓     57.8
+                                                                                                                                                                            GLM-4.5V                                           55.9
+                                                                                                                                      Online APIs
+                                                                                                                                                                            Qwen-VL-Max                                        56.4
+                                                                                                                                                                            Gemini-2.5-Pro                                     57.2
+    structures in BAMI, as shown in Table 4 (right). “CoT”
+    denotes the chain-of-thought-style prompt, which aims to                                                                                                                GPT-5                                              57.8
+    enable the correction model to make selections in a more
+                                                                                                                                      Local Model Qwen3-VL-8B (Ours)                                                           56.2
+    granular manner. “KP” stands for key principle, a critical
+    component for injecting coordinate space priority priors into
+    the selection process. Experimental results demonstrate that
+    injecting Euclidean space priors into the correction model                                                         critical manipulations, coarse-to-fine focus and candidate
+    significantly enhances the accuracy of BAMI.                                                                       selection, which substantially alleviate these biases. On
+                                                                                                                       ScreenSpot-Pro, BAMI improves TianXi-Action-7B from
+                                                                                                                       51.9% to 57.8%, showing clear advantages over contem-
+    Impact of Correction Model Selection We investigated                                                               porary training-free methods in both effectiveness and effi-
+    the impact of correction model selection, as presented in                                                          ciency. To address privacy concerns and avoid relying on
+    Table 5. Among online APIs, GPT-5 and Gemini-2.5-Pro                                                               the extra knowledge implicitly introduced by external APIs,
+    achieved the best performance, enabling an overall accuracy                                                        we further train a local correction-model variant based on
+    of over 57%. All tested models contributed to performance                                                          Qwen3-VL-8B using public data, which reaches 56.2%. In
+    improvement, indicating BAMI’s robustness across differ-                                                           particular, this local model uses a parameter scale compa-
+    ent correction models. To address privacy requirements and                                                         rable to the grounding models themselves, demonstrating
+    enable independent deployment, we trained a local Qwen3-                                                           that effective correction can be achieved without requiring
+    VL-8B correction model ( 8B parameters, matching ground-                                                           significantly larger architectures. Beyond this practical vari-
+    ing models’ scale) via LoRA fine-tuning on 128K dual-box                                                           ant, we will further investigate how the model’s inductive
+    samples. As shown in Table 5 and Table 3, it achieves                                                              preferences diverge from real-world GUI scenarios, with the
+    56.2Training details are in the supplementary material.                                                            goal of developing more generalizable solutions.
+
+    6. Discussion
+                                                                                                                        Acknowledgement
+    This paper investigates how to improve GUI grounding in a
+    training-free manner. Through MPD, we identify that most                                                           This work was supported in part by the Beijing Natural
+    errors on complex GUIs stem from inductive bias, mainly ac-                                                        Science Foundation under Grant No. L247009, and the
+    curacy bias and ambiguity bias. BAMI extends the model’s                                                           National Natural Science Foundation of China under Grant
+    reasoning process through structured inference with two                                                            62125603, Grant 62336004, Grant 62321005.
+References                                                                 model for gui visual agent. In CVPR, pages 19498–19508,
+                                                                           2025.
+ [1] Marco Ancona, Cengiz Oztireli, and Markus Gross. Explain-
+                                                                      [15] Shi Liu, Kecheng Zheng, and Wei Chen. Paying more atten-
+     ing deep neural networks with a polynomial time algorithm
+                                                                           tion to image: A training-free method for alleviating halluci-
+     for shapley value approximation. In ICML, pages 272–281,
+                                                                           nation in lvlms. In European Conference on Computer Vision,
+     2019.
+                                                                           pages 125–140. Springer, 2024.
+ [2] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin
+     Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun Tang,       [16] Yuhang Liu, Pengxiang Li, Congkai Xie, Xavier Hu, Xiaotian
+     et al. Qwen2. 5-vl technical report. arXiv, abs/2502.13923,           Han, Shengyu Zhang, Hongxia Yang, and Fei Wu. Infigui-
+     2025.                                                                 r1: Advancing multimodal gui agents from reactive actors to
+                                                                           deliberative reasoners. arXiv, abs/2504.14239, 2025.
+ [3] Zhe Chen, Jiannan Wu, Wenhai Wang, Weijie Su, Guo Chen,
+     Sen Xing, Muyan Zhong, Qinglong Zhang, Xizhou Zhu,               [17] Yadong Lu, Jianwei Yang, Yelong Shen, and Ahmed Awadal-
+     Lewei Lu, et al. Internvl: Scaling up vision foundation mod-          lah. Omniparser for pure vision based gui agent. arXiv,
+     els and aligning for generic visual-linguistic tasks. In CVPR,        abs/2408.00203, 2024.
+     pages 24185–24198, 2024.                                         [18] Zhengxi Lu, Yuxiang Chai, Yaxuan Guo, Xi Yin, Liang Liu,
+ [4] Kanzhi Cheng, Qiushi Sun, Yougang Chu, Fangzhi Xu, Yan-               Hao Wang, Han Xiao, Shuai Ren, Guanjing Xiong, and Hong-
+     tao Li, Jianbing Zhang, and Zhiyong Wu. Seeclick: Har-                sheng Li. Ui-r1: Enhancing efficient action prediction of gui
+     nessing gui grounding for advanced visual gui agents. arXiv,          agents by reinforcement learning. arXiv, abs/2503.21620,
+     abs/2401.10935, 2024.                                                 2025.
+ [5] Xiang Deng, Yu Gu, Boyuan Zheng, Shijie Chen, Sam                [19] Scott M Lundberg and Su-In Lee. A unified approach to
+     Stevens, Boshi Wang, Huan Sun, and Yu Su. Mind2web:                   interpreting model predictions. NeurIPS, 30, 2017.
+     Towards a generalist agent for the web. NeurIPS, 36:28091–       [20] Run Luo, Lu Wang, Wanwei He, and Xiaobo Xia. Gui-r1:
+     28114, 2023.                                                          A generalist r1-style vision-language action model for gui
+ [6] Yong Du, Yuchen Yan, Fei Tang, Zhengxi Lu, Chang Zong,                agents. arXiv, abs/2504.10458, 2025.
+     Weiming Lu, Shengpei Jiang, and Yongliang Shen. Test-            [21] Joonhyung Park, Peng Tang, Sagnik Das, Srikar Appalaraju,
+     time reinforcement learning for gui grounding via region              Kunwar Yashraj Singh, R Manmatha, and Shabnam Ghadar.
+     consistency. arXiv, abs/2508.05615, 2025.                             R-vlm: Region-aware vision language model for precise gui
+ [7] Boyu Gou, Ruohan Wang, Boyuan Zheng, Yanan Xie, Cheng                 grounding. arXiv, abs/2507.05673, 2025.
+     Chang, Yiheng Shu, Huan Sun, and Yu Su. Navigating the           [22] Yujia Qin, Yining Ye, Junjie Fang, Haoming Wang, Shihao
+     digital world as humans do: Universal visual grounding for            Liang, Shizuo Tian, Junda Zhang, Jiahao Li, Yunxin Li, Shi-
+     gui agents. In ICLR, 2025.                                            jue Huang, et al. Ui-tars: Pioneering automated gui interac-
+ [8] Daya Guo, Dejian Yang, Haowei Zhang, Junxiao Song,                    tion with native agents. arXiv, abs/2501.12326, 2025.
+     Ruoyu Zhang, Runxin Xu, Qihao Zhu, Shirong Ma, Peiyi             [23] Ramprasaath R Selvaraju, Michael Cogswell, Abhishek Das,
+     Wang, Xiao Bi, et al. Deepseek-r1: Incentivizing reason-              Ramakrishna Vedantam, Devi Parikh, and Dhruv Batra. Grad-
+     ing capability in llms via reinforcement learning. arXiv,             cam: Visual explanations from deep networks via gradient-
+     abs/2501.12948, 2025.                                                 based localization. In ICCV, pages 618–626, 2017.
+ [9] Izzeddin Gur, Hiroki Furuta, Austin V Huang, Mustafa Saf-
+                                                                      [24] Lloyd S Shapley et al. A value for n-person games. 1953.
+     dari, Yutaka Matsuo, Douglas Eck, and Aleksandra Faust. A
+     real-world webagent with planning, long context understand-      [25] Mukund Sundararajan, Ankur Taly, and Qiqi Yan. Axiomatic
+     ing, and program synthesis. In ICLR, 2024.                            attribution for deep networks. In ICML, pages 3319–3328,
+[10] Wenyi Hong, Weihan Wang, Qingsong Lv, Jiazheng Xu, Wen-               2017.
+     meng Yu, Junhui Ji, Yan Wang, Zihan Wang, Yuxiao Dong,           [26] Fei Tang, Zhangxuan Gu, Zhengxi Lu, Xuyang Liu, Shuheng
+     Ming Ding, et al. Cogagent: A visual language model for gui           Shen, Changhua Meng, Wen Wang, Wenqi Zhang, Yongliang
+     agents. In CVPR, 2024.                                                Shen, Weiming Lu, et al. Gui-g2: Gaussian reward modeling
+[11] Siyuan Hu, Mingyu Ouyang, Difei Gao, and Mike Zheng                   for gui grounding. arXiv, abs/2507.15846, 2025.
+     Shou. The dawn of gui agent: A preliminary case study with       [27] Liang Tang, Shuxian Li, Yuhao Cheng, Yukang Huo, Zhepeng
+     claude 3.5 computer use. arXiv, abs/2411.10323, 2024.                 Wang, Yiqiang Yan, Kaer Huang, Yanzhe Jing, and Tiaonan
+[12] Aaron Hurst, Adam Lerer, Adam P Goucher, Adam Perelman,               Duan. Sea: Self-evolution agent with step-wise reward for
+     Aditya Ramesh, Aidan Clark, AJ Ostrow, Akila Welihinda,               computer use. arXiv, abs/2508.04037, 2025.
+     Alan Hayes, Alec Radford, et al. Gpt-4o system card. arXiv,      [28] Peng Wang, Shuai Bai, Sinan Tan, Shijie Wang, Zhihao Fan,
+     abs/2410.21276, 2024.                                                 Jinze Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin Ge,
+[13] Kaixin Li, Ziyang Meng, Hongzhan Lin, Ziyang Luo,                     et al. Qwen2-vl: Enhancing vision-language model’s percep-
+     Yuchen Tian, Jing Ma, Zhiyong Huang, and Tat-Seng                     tion of the world at any resolution. arXiv, abs/2409.12191,
+     Chua. Screenspot-pro: Gui grounding for professional high-            2024.
+     resolution computer use. arXiv, abs/2504.07981, 2025.            [29] Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten Bosma,
+[14] Kevin Qinghong Lin, Linjie Li, Difei Gao, Zhengyuan Yang,             Fei Xia, Ed Chi, Quoc V Le, Denny Zhou, et al. Chain-of-
+     Shiwei Wu, Zechen Bai, Stan Weixian Lei, Lijuan Wang,                 thought prompting elicits reasoning in large language models.
+     and Mike Zheng Shou. Showui: One vision-language-action               NeurIPS, 35:24824–24837, 2022.
+[30] Thomas Wolf, Lysandre Debut, Victor Sanh, Julien Chau-
+     mond, Clement Delangue, Anthony Moi, Pierric Cistac, Tim
+     Rault, Rémi Louf, Morgan Funtowicz, et al. Huggingface’s
+     transformers: State-of-the-art natural language processing.
+     arXiv, abs/1910.03771, 2019.
+[31] Hang Wu, Hongkai Chen, Yujun Cai, Chang Liu, Qingwen Ye,
+     Ming-Hsuan Yang, and Yiwei Wang. Dimo-gui: Advancing
+     test-time scaling in gui grounding via modality-aware visual
+     reasoning. arXiv, abs/2507.00008, 2025.
+[32] Zhiyong Wu, Zhenyu Wu, Fangzhi Xu, Yian Wang, Qiushi
+     Sun, Chengyou Jia, Kanzhi Cheng, Zichen Ding, Liheng
+     Chen, Paul Pu Liang, et al. Os-atlas: A foundation action
+     model for generalist gui agents. arXiv, abs/2410.23218, 2024.
+[33] Yiheng Xu, Zekun Wang, Junli Wang, Dunjie Lu, Tianbao
+     Xie, Amrita Saha, Doyen Sahoo, Tao Yu, and Caiming Xiong.
+     Aguvis: Unified pure vision agents for autonomous gui inter-
+     action. arXiv, abs/2412.04454, 2024.
+[34] Xinbin Yuan, Jian Zhang, Kaixin Li, Zhuoxuan Cai, Lujian
+     Yao, Jie Chen, Enguang Wang, Qibin Hou, Jinwei Chen,
+     Peng-Tao Jiang, et al. Enhancing visual grounding for gui
+     agents via self-evolutionary reinforcement learning. arXiv,
+     abs/2505.12370, 2025.
+[35] Li Zhang, Longxi Gao, and Mengwei Xu. Does chain-of-
+     thought reasoning help mobile gui agent? an empirical study.
+     arXiv, abs/2503.16788, 2025.
+[36] Miaosen Zhang, Ziqiang Xu, Jialiang Zhu, Qi Dai, Kai Qiu,
+     Yifan Yang, Chong Luo, Tianyi Chen, Justin Wagle, Tim
+     Franklin, et al. Phi-ground tech report: Advancing perception
+     in gui grounding. arXiv, abs/2507.23779, 2025.
+[37] Yuqi Zhou, Sunhao Dai, Shuai Wang, Kaiwen Zhou, Qinglin
+     Jia, and Jun Xu. Gui-g1: Understanding r1-zero-like training
+     for visual grounding in gui agents. arXiv, abs/2505.15810,
+     2025.
+                   BAMI: Training-Free Bias Mitigation in GUI Grounding
+                                             Supplementary Material
+                                 Table of Contents for Supplementary Material
+
+
+
+A. Usage of Large Models in Paper Writing                                                                                       11
+
+B. Details of the Proposed Methods                                                                                         11
+    B.1. Detailed Algorithm of MPD Attribution . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 11
+
+C. Experimental Details                                                                                                         11
+    C.1. Prompt Design . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .    11
+    C.2. Model Inference Details . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .    12
+    C.3. Local Correction Model Training . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .      12
+
+D. More Experiments                                                                                                             13
+    D.1. Comparison on ScreenSpot-V2 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .        13
+    D.2. Why Masking Is Adopted Instead of Random Sampling? . . . . . . . . . . . . . . . . . . . . . . . . . . . . .           13
+    D.3. More Visualizations of BAMI . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .      14
+    D.4. More Attribution Results . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .   14
+
+
+
+
+A. Usage of Large Models in Paper Writing
+During the conduct of this research, we utilized the GPT-5 for auxiliary support, primarily encompassing the following two
+aspects:
+• Manuscript Polishing: Leveraging the text generation capability of GPT-5, we polished the draft of this manuscript,
+  focusing on correcting grammatical errors, addressing expression inconsistencies, and other related issues. It should be
+  emphasized that all content of the manuscript was still manually composed; the LLM was not involved in formulating the
+  research logic of the paper. Additionally, all text generated by the LLM underwent manual review and revision to ensure its
+  quality and accuracy.
+• Literature Survey: We employed the knowledge retrieval capability (Retrieval-Augmented Generation, RAG) of GPT-5
+  to search for relevant literature. To guarantee retrieval accuracy, all retrieved literature was subject to manual review and
+  verification. Subsequently, we screened out literature relevant to the research topic, followed by thorough reading and
+  systematic organization of the selected materials.
+
+B. Details of the Proposed Methods
+B.1. Detailed Algorithm of MPD Attribution
+To investigate the root causes of errors in grounding models, we propose a method for rapidly computing the decision
+attribution of models, namely Masked Prediction Distribution (MPD) Attribution. The detailed steps of this algorithm are
+presented as follows:
+
+C. Experimental Details
+C.1. Prompt Design
+The design of prompts is crucial for injecting prior information of coordinate space into the candidate box selection process.
+In the experiments presented in Table 4 (main paper), we compare prompts with different content. Among these, the vanilla
+prompt is as follows:
+     Algorithm 2 Masked Prediction Distribution (MPD) Attribution Algorithm
+     Require: GUI image I, query q, grid size (M, N ), number of samples K
+                                                (k) (k)
+     Ensure: Set of predicted points P = {(xc , yc )}K   k=1
+                                                               M,N
+      1: Partition the image I into M × N grid blocks {Bi,j }i=1,j=1
+      2: for k = 1 to K do
+      3:   Randomly select a masking ratio α and sample ⌊α · M · N ⌋ grid blocks to mask
+      4:   Generate the masked image I (k) , where masked regions are filled with zero vectors
+      5:   Compute the model prediction: t(k) = f (q, I (k) )
+                                              (k) (k)
+      6:   Extract the center coordinates: (xc , yc )
+      7: end for
+                                           (k) (k)
+      8: Visualize all predicted points {(xc , yc )}Kk=1 as a scatter plot
+
+
+
+                                                                  Prompt
+
+ 1    You are comparing two images to determine which one better fulfills the user’s intent.
+ 2
+ 3    User Command: "{user_query}"
+ 4
+ 5    Image 1: Shows a GUI element marked with a green box labeled "1"
+ 6    Image 2: Shows a GUI element marked with a red box labeled "2"
+ 7
+ 8    Your task: Determine which image shows the element that will best fulfill the user’s command.
+ 9
+10    **OUTPUT FORMAT**:
+11    <answer>1 or 2</answer>"""
+
+
+
+
+        This simplistic prompt design fails to rectify the model’s ambiguity bias. Therefore, in our BAMI method, we incorporate
+     two critical structures—chain of thought and key principle—to enhance the model’s understanding of prior information
+     regarding the coordinate space. The final prompt we employed is presented as follows:
+     C.2. Model Inference Details
+     The models employed in this study can be broadly categorized into two types:
+     • Bounding box-output models: Such as OS-Atlas-7B [32] and TianXi-Action-7B [27]
+     • Click point-output models: Such as UGround [7] and UI-TARS-1.5-7B [22]
+     For bounding box-output models, the implementation of masked prediction is straightforward, only the pixels within the
+     output bounding boxes need to be masked. In contrast, for click point-output models, we first expand the region around each
+     click point by a fixed number of pixels (e.g., 25 pixels) in the up, down, left, and right directions, and then mask the expanded
+     region.
+     C.3. Local Correction Model Training
+     To enable offline deployment of BAMI, we trained a specialized correction model based on Qwen3-VL-8B using LoRA
+     fine-tuning. The training dataset contains 128,487 dual-box samples automatically generated via our five-step pipeline, sourced
+     from GUIAct (70K samples) and Desktop domain (423K samples, then downsampled). Labels are determined by comparing
+     against ground truth using dual criteria: IoU ≥ 0.5 or center point within GT bbox. When both boxes satisfy the criteria,
+     we prioritize bbox1 (baseline) to reflect regrounding’s role as a fallback mechanism, resulting in a 92:8 label distribution
+     (bbox1:bbox2).
+        We fine-tune only the language model component via LoRA (rank r=128, alpha α=256, dropout=0.05) while freezing
+     the vision encoder and projection layers, yielding approximately 200M trainable parameters (2.5% of total). This design
+     leverages the pre-trained visual understanding while adapting the decision-making capability for dual-box selection. Training
+     employs 8× A100 80GB GPUs with DeepSpeed ZeRO-2 optimization, effective batch size 128, learning rate 1e-4 with cosine
+     annealing, for 3 epochs (approximately 12 hours). The model uses the same 24-line instruction prompt as GPT-5 (detailed in
+     Section C.1) to ensure consistent task understanding and incorporate GUI-specific priors.
+        On ScreenSpot-Pro evaluation, the local model selects bbox2 in 9.7% of cases, closely matching the training distribution
+     (8%), indicating proper learning of the selection strategy without overfitting to always choose baseline. The 56.2% accuracy
+                                                                  Prompt
+
+ 1    You are comparing two images to determine which one better fulfills the user’s intent.
+ 2
+ 3    User Command: "{user_query}"
+ 4
+ 5    Image 1: Shows a GUI element marked with a green box labeled "1"
+ 6    Image 2: Shows a GUI element marked with a red box labeled "2"
+ 7
+ 8    Your task: Determine which image shows the element that will best fulfill the user’s command.
+ 9
+10    ANALYSIS APPROACH:
+11    1. Examine what GUI element is highlighted in each image
+12    2. Consider which element better matches the user’s intent
+13    3. Think about standard GUI patterns and user expectations
+14    4. Choose the image that shows the more appropriate interaction target
+15
+16    KEY PRINCIPLES:
+17    - Focus on the functional purpose of the highlighted elements
+18    - Consider standard UI patterns (buttons for actions, text fields for input, etc.)
+19    - Choose interactive elements over static text/labels
+20    - If one shows a selected state and the other shows normal state, prefer the normal state
+21    - ELEMENT QUALITY HIERARCHY (best to worst):
+22       - Icon + Text together (most informative and complete)
+23       - Complete icon alone (clear visual indicator)
+24       - Complete text alone (readable label)
+25       - Multiple elements in one box OR incomplete elements (ambiguous target)
+26
+27    COMMON PITFALLS TO AVOID:
+28        - Don’t choose based on keyword matching alone
+29        - Don’t overlook the user’s actual goal in favor of literal interpretation
+30
+31    Remember: Provide SPECIFIC analysis based on what you actually observe, not generic descriptions.
+32
+33    **OUTPUT FORMAT**:
+34    <analysis>
+35    Image 1: [Describe what element is highlighted and its purpose]
+36    Image 2: [Describe what element is highlighted and its purpose]
+37    Comparison: [Explain which better serves the user’s intent and why]
+38    </analysis>
+39
+40    <answer>1 or 2</answer>
+41    <reason>Brief explanation of why this image shows the better choice</reason>
+
+
+
+
+     demonstrates that comparable-scale models ( 8B parameters) can effectively perform correction tasks without requiring
+     significantly larger architectures.
+
+     D. More Experiments
+     D.1. Comparison on ScreenSpot-V2
+     In addition to validating the BAMI method on the ScreenSpot-Pro [13] dataset, we also conducted validation on the simpler
+     ScreenSpot-V2 [32] dataset. Unlike ScreenSpot-Pro, most grounding models already achieve satisfactory accuracy on
+     ScreenSpot-V2; this is attributed to the lower resolution of samples and the simpler elements contained in individual samples
+     within the latter dataset. When we applied the BAMI method to the OS-Atlas-7B and UI-TARS-1.5-7B models, further
+     performance improvements were observed. However, the magnitude of these improvements is smaller than that achieved on
+     the ScreenSpot-Pro dataset.
+
+     D.2. Why Masking Is Adopted Instead of Random Sampling?
+     In conventional approaches for generating candidate detection boxes, random sampling is typically employed. Specifically,
+     when predicting the next token, instead of using the torch.argmax function to greedily select the token corresponding to
+     the highest score, top-k/top-p sampling methods are utilized to obtain candidate tokens. However, our experiments reveal that
+     in GUI grounding models during candidate box generation, the score difference between the top-1 token and top-2 token is
+     substantial. This directly leads to a significant issue: candidate boxes generated via random sampling tend to cluster in a single
+     region. As illustrated in Figure 7a, the red boxes represent candidate boxes obtained through random sampling. It is evident
+     that these boxes exhibit almost complete overlap and lack diversity, which renders the subsequent selection process largely
+                                   Table 6. Comparison with various models on ScreenSpot-V2.
+
+                                                     Mobile         Desktop            Web
+                            Grounding Model                                                        Avg.
+                                                   Text   Icon    Text   Icon    Text    Icon
+
+                           InternVL-2-4B [3]       9.2     4.8    4.6     4.3    0.9         0.1   4.3
+                           Qwen2-VL-7B [28]        61.3   39.3    52.0   45.0    33.0    21.8      42.9
+                           CogAgent [10]           67.0   24.0    74.2   20.0    70.4    28.6      47.4
+                           SeeClick [4]            78.0   52.0    72.2   30.0    55.7    32.5      53.4
+                           OS-Atlas-4B [32]        85.7   58.5    72.2   45.7    82.6    63.1      70.1
+                           UGround-7B [7]          82.8   82.8    82.8   63.6    80.4    70.4      73.3
+
+                           OS-Atlas 7B [32]        92.1   68.7    88.7   60.7    89.7    75.9      81.2
+                            + BAMI                 92.4   67.3    88.7   66.4    89.3    79.8      82.2
+                           UI-TARS-1.5-7B [22]     94.1   80.6    88.7   76.4     88     84.2      86.4
+                            + BAMI                 94.1   80.6    88.7   76.4     88     84.7      86.5
+
+
+
+meaningless.
+  To address this limitation, we propose a masking strategy: pixels within the already predicted candidate boxes are
+masked first. This ensures that subsequently predicted candidate boxes are mutually exclusive with the already predicted
+ones. As shown in Figure 7b, the green boxes are candidate boxes generated using the masked prediction method. These
+boxes demonstrate significantly greater distribution diversity, thereby enhancing the upper performance limit of selection
+manipulation.
+
+D.3. More Visualizations of BAMI
+To better demonstrate the process by which BAMI corrects the baseline model, 8 samples were randomly selected from cases
+where the baseline model made incorrect predictions but BAMI achieved accurate corrections, as shown in Figure 8. In the
+figure, green boxes represent ground truth, red boxes denote the baseline model’s prediction results (incorrect), and blue boxes
+indicate the corrected results by BAMI (correct). Specifically, BAMI utilized 2 candidate boxes in each prediction round of this
+experiment, with GPT-5 as the correction model. In these samples, it can be observed that accurately predicting bounding boxes
+in accordance with user instructions is considerably challenging, as the figures contain substantial interfering information. By
+alleviating precision bias and ambiguity bias, BAMI successfully achieves correct predictions in these samples.
+D.4. More Attribution Results
+We present additional attribution results herein to comprehensively demonstrate the attribution capability of the Masked
+Prediction Distribution (MPD) method. Specifically, we randomly selected samples from four categories (Correct /
+Knowledge Gap / Precision Bias / Ambiguity Bias) as illustrated in Figure 9.
+(a) Candidate boxes with random sampling.                            (b) Candidate boxes with masked prediction.
+
+                         Figure 7. Comparison of candidate box generation strategies.
+Figure 8. Visualizations of BAMI corrections.
+   Correct
+                                                               Knowledge Gap
+
+
+
+
+                                                               Precision Bias
+Ambiguity Bias
+
+
+
+
+                 Figure 9. More Attributions Visualizations.
+

@@ -1,0 +1,611 @@
+                    This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                 Except for this watermark, it is identical to the accepted version;
+                           the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+                TaskForce: Cooperative Multi-agent Reinforcement Learning
+                               for Multi-task Optimization
+
+                Wonhyeok Choi, Kyumin Hwang, Jihun Park, Kyoungmin Lee, Seunghun Lee,
+                               Jaeyeul Kim, Minwoo Choi, Sunghoon Im†
+                                         DGIST, South Korea
+  {smu06117, kyumin, pjh2857, kyoungmin, lsh5688, jykim94, subminu, sunghoonim}@dgist.ac.kr
+
+
+
+                          Abstract                                  more, MTL has the potential to reduce computational cost
+                                                                    and memory footprint by consolidating multiple models into
+    Multi-task learning (MTL) involves the simultaneous op-         a unified architecture. Building on these advantages, MTL
+timization of multiple task-specific losses, often leading to       has shown promise in enhancing both performance and ro-
+gradient conflicts and scale imbalances that result in nega-        bustness across various benchmarks, such as several vision
+tive transfer. While existing multi-task optimization methods       tasks [6, 43, 44] and natural language processing [16, 30].
+attempt to mitigate these challenges, they either lack the              Despite its advantages, MTL often causes negative trans-
+stochasticity needed to escape poor local minima or fail to         fer [8]–an ill-posed problem that arises when jointly learning
+explicitly address conflicts at the gradient level. In this work,   unrelated or weakly correlated tasks, leading to one task
+we propose TaskForce, a novel multi-task optimization frame-        impairing the learning of others. A major contributor to neg-
+work incorporating cooperative multi-agent reinforcement            ative transfer is gradient conflict [25, 40, 45], where the
+learning (MARL), where agents learn to find an effective            gradient directions derived from different task losses point
+joint optimization strategy based on their respective task gra-     in opposing or diverging directions in parameter space. This
+dients and losses. To keep the optimization process compact         can lead to unstable updates or biased convergence toward
+yet informative, agents observe a summary of the training dy-       tasks with dominant gradients [32], limiting the effectiveness
+namics that consists of the gradient Gram matrix—capturing          of MTL frameworks deployed in real-world systems.
+both gradient magnitudes and pairwise alignments—and                    To alleviate these challenges, previous studies have ex-
+task loss values. Each agent then predicts the balancing pa-        plored various strategies, including architectural modifica-
+rameters that determine the weight of their contribution to         tions that adjust the sharing ratio of parameters [5, 31, 38]
+the final gradient update. Crucially, we design a hybrid re-        and task grouping strategies that cluster related tasks [11, 46].
+ward function that incorporates both gradient-based signals         Among these, multi-task optimization (MTO) methods have
+and loss improvement dynamics, enabling agents to effec-            shown strong performance by effectively addressing core
+tively resolve gradient conflicts and avoid poor convergence        issues such as gradient conflicts and scale dominance, which
+by considering both direct gradient information and the             are major causes of negative transfer. These MTO meth-
+resulting impact on loss reduction. TaskForce achieves con-         ods can be broadly categorized into two families: gradient-
+sistent improvements over state-of-the-art MTL baselines on         based methods [32, 34, 45] and loss-based methods [14, 28].
+NYU-v2, Cityscapes, and QM9, demonstrating the promise              Gradient-based methods utilize aggregation heuristics to
+of cooperative MARL in complex multi-task scenarios.                combine task gradients into a suitable joint direction. How-
+                                                                    ever, these methods often lack stochasticity [1, 4, 27, 42] and
+                                                                    possess a larger convergence set [20] compared to conven-
+1. Introduction                                                     tional optimization, leading to an increased risk of getting
+                                                                    stuck in poor local minima. Conversely, loss-based methods
+Multi-task learning (MTL) [3] is a paradigm in machine              apply direct transformations to the task losses [1, 18] or ex-
+learning where a single model is trained to solve multi-            ploit loss-level information—such as convergence rates [28]
+ple tasks simultaneously. By sharing representations across         or task difficulty [14]—to guide optimization. While these
+tasks, MTL encourages knowledge transfer and leverages              approaches are often more intuitive, they generally under-
+commonalities between related tasks. This shared represen-          perform compared to gradient-based methods, as they do
+tation can lead to improved generalization [47], particularly       not directly address gradient conflicts, which are the primary
+when some tasks suffer from limited labeled data. Further-          source of negative transfer.
+
+
+
+                                                                36871
+   We propose TaskForce, a novel MTO framework that                2. Related Work
+overcomes the limitations of existing approaches by lever-
+aging cooperative Multi-Agent Reinforcement Learning               2.1. Multi-task Optimization
+(MARL) [29]. TaskForce frames the MTO problem as a                General multi-task optimization methods [17, 18, 32, 34, 36,
+cooperative Markov game [24], where each task-specific            41] formulate the MTL training process as a parameterized
+agent learns to select aggregation weights for task gradients     multi-objective optimization (MOO) problem and aim to
+to minimize the overall loss most effectively. Our approach       directly address the gradient conflict and scale dominance
+learns adaptive policies for current optimization state by ef-    problem that arise during joint training.
+fectively combining gradient-based and loss-based methods.        Gradient-based methods: A prominent category within
+    To address the excessive computational cost of feeding        this paradigm is gradient-based methods [4, 25, 32, 34, 45],
+high-dimensional task gradients g ∈ RT ×|θ| directly into         which aggregate task-specific gradients into a unified up-
+agents, as in standard gradient-based methods, TaskForce          date direction. These methods attempt to mitigate gradi-
+instead represents them using the Gram matrix of task gra-        ent conflicts by projecting gradients into conflict-free sub-
+dients, gg⊤ ∈ RT ×T . Since the number of tasks T ≪ |θ|           spaces [25, 45], reweighting gradients to balance task in-
+is far smaller than the dimensionality of the task gradient,      fluence [32], or seeking Pareto-stationary solutions in the
+this representation makes the training of multi-agent rein-       gradient space [34]. Most of these approaches are provably
+forcement learning computationally feasible. Moreover, it         convergent and effective in many MTL scenarios, but due to
+preserves essential optimization signals: the diagonal en-        their limited capacity for exploration and reliance on heuris-
+tries capture the magnitude of each task’s gradient, while        tic aggregation rules, they can still converge to suboptimal
+the off-diagonal entries encode pairwise alignment between        solutions [20, 42], particularly under high-conflict condi-
+tasks. By leveraging this compact yet informative structure,      tions.
+TaskForce enables scalable agent training (see Sec. 5.6 in the    Loss-based methods: Loss-based methods [1, 14, 18, 23,
+appendix) while maintaining the crucial information required      28] take a different approach by modifying the loss functions
+to resolve gradient conflicts.                                    themselves. This includes reweighting task losses [1, 18] or
+                                                                  leveraging additional loss-level signals such as convergence
+   To effectively guide our agents toward learning desirable      rates [28] and task difficulty [14]. However, these methods
+policies within this novel MARL framework, we carefully           are myopic because they do not leverage the gradient-level
+construct a reward function that strategically integrates the     information, leading to suboptimal results compared to the
+strengths of established gradient- and loss-based method-         gradient-based methods.
+ologies. Specifically, it combines well-established convex        Hybrid methods: More recently, hybrid methods [22, 26,
+minimization objectives commonly used in provably conver-         35] have emerged, combining both loss-level and gradient-
+gent gradient-based methods [10, 34] with loss convergence        level signals to guide multi-task optimization more holisti-
+rates drawn from loss-based methods [14, 28]. By maximiz-         cally. These approaches demonstrate that incorporating both
+ing these rewards, each agent learns to resolve the gradient      levels of information can effectively reduce scale dominance
+conflict and scale dominance problem and cooperatively de-        and mitigate gradient conflict, improving overall optimiza-
+termine update directions, while effectively minimizing the       tion performance. Similar to gradient-based methods, these
+losses across all tasks. As a result, TaskForce bridges the gap   existing techniques also face the problem of potentially be-
+between MARL and existing MTO schemes, enabling more              coming stuck in local minima due to their reliance on deter-
+effective and robust multi-task learning. We summarize our        ministic heuristic weighting policies. Our methodology can
+main contributions as follows:                                    reduce this risk by leveraging the stochasticity inherent in
+• We propose TaskForce, a novel multi-task optimization           the exploration processes of MARL to enhance the chances
+  framework that adaptively combines task gradients by            of escaping local minima (see Appendix E.1).
+  using cooperative MARL policies.
+                                                                   2.2. Reinforcement Learning
+• We design a compact yet expressive observation based on
+  the Gram matrix of task gradients, capturing both magni-        Reinforcement learning (RL) [39] has shown significant
+  tude and pairwise alignment with minimal overhead.              success in sequential decision-making problems by learn-
+• We introduce a hybrid reward function to leverage both          ing policies that maximize long-term rewards through trial
+  gradient-based and loss-based multi-task optimization for       and error. As many real-world applications involve multi-
+  effective update strategies.                                    ple agents, multi-agent reinforcement learning (MARL) [12,
+• Our method outperforms strong baselines across indoor,          15, 29] has emerged as a prominent area of research. A
+  outdoor, and molecular benchmarks, demonstrating robust         key challenge in MARL is the non-stationarity [29] intro-
+  generalization across varied loss types, gradient scales,       duced by simultaneously learning agents, which breaks the
+  and task interactions.                                          Markov assumption and hinders convergence. To mitigate
+
+
+
+                                                              36872
+this problem, multi-agent deep deterministic policy gradi-                                                                                                                                                              parameters are then updated by taking the gradient of this
+ent (MADDPG) [29] extends DDPG [21] to the multi-agent                                                                                                                                                                  aggregated loss as follows:
+setting. This method leverages the centralized training with
+decentralized execution (CTDE) by equipping each agent                                                                                                                                                                       \begin {gathered} \theta \leftarrow \theta - \eta \nabla _\theta \mathbf {L}(\theta ), ~\text {where}~\mathbf {L}(\theta ) = \Lambda (\mathcal {L}_1(\theta ), \cdots , \mathcal {L}_T(\theta )). \end {gathered} 
+with a centralized critic that has access to the observations                                                                                                                                                                                                                                                                                                                                                                         (4)
+and actions of all agents. This setup improves training stabil-
+ity and enables agents to learn cooperative policies in both                                                                                                                                                           4. Method
+cooperative and mixed settings.
+    On the other hand, among the multi-task optimization                                                                                                                                                               Similar to other optimization methods, the proposed Task-
+literature, IGBv2 [9] is the first to attempt to use single-                                                                                                                                                           Force aims to find the optimal parameter θ∗ of the MTL
+agent RL to balance the loss weights. However, this method                                                                                                                                                             model F(·; θ) that minimizes the empirical risk as defined
+still operates solely at the loss level and, like other loss-                                                                                                                                                          in Eq. 2, by leveraging a MARL framework. To this end,
+based approaches [1, 14, 28], fails to explicitly account for                                                                                                                                                          TaskForce learns a policy that performs effective gradient
+gradient-level conflicts and dominance, limiting the overall                                                                                                                                                           aggregation—similar to conventional multi-task optimiza-
+performance. In contrast, our approach introduces a multi-                                                                                                                                                             tion methods—based on the empirical loss set L and task
+task optimization framework leveraging cooperative MARL                                                                                                                                                                gradients g computed from each mini-batch.
+that directly considers both gradient and loss signals when                                                                                                                                                                Realizing this goal requires a precise problem definition
+determining gradient aggregation strategies.                                                                                                                                                                           and a clear implementation. We begin by casting the multi-
+                                                                                                                                                                                                                       task optimization problem as a cooperative Markov game, in
+                                                                                                                                                                                                                       which the game’s core components are specifically adapted
+3. Preliminaries
+                                                                                                                                                                                                                       to this new context (Sec. 4.1). Subsequently, we leverage this
+3.1. General Multi-task Optimization for MTL                                                                                                                                                                           environment to train task-wise agents that learn a coopera-
+                                                                                                                                                                                                                       tive policy to steer the main network’s optimization process
+Given N data points {xi , y1i , · · · , yTi }1≤i≤N , where xi ∈
+                                                                                                                                                                                                                       (Sec. 4.2). The overall pipeline of our approach is illustrated
+X and yti ∈ Yt are input data and label collection of T tasks,
+                                                                                                                                                                                                                       in Fig. 1.
+respectively, the goal of general multi-task optimization is
+to find the optimal parameters θ∗ of network F(·; θ) that                                                                                                                                                               4.1. Core components design of MARL
+minimizes empirical losses. Suppose that there are t-th task
+loss function L̄t (·, ·) : Yt × Yt → R+ , we can define the                                                                                                                                                            To tightly couple MARL with multi-task optimization, we
+t-th empirical loss Lt (θ) as follows:                                                                                                                                                                                 formulate a cooperative Markov game [24] in which the
+                                                                                                                                                                                                                       MTL model itself serves as the interactive, evolving envi-
+                                                                                                                                                                                                                       ronment, and we assign an individual agent to each task to
+                      \begin {split} \label {eq:empirical_loss} \mathcal {L}_t(\theta ) := \frac {1}{N}\sum _{i=1}^N \bar {\mathcal {L}}_t(\mathcal {F}(\mathbf {x}^i;\theta ), \mathbf {y}_t^i). \end {split}   (1)   collaboratively optimize multiple tasks. In the following, we
+                                                                                                                                                                                                                       elaborate on how we design the three essential components—
+                                                                                                                                                                                                                       (1) observations O, (2) actions A, and (3) rewards R—to
+   Then, we can form the given empirical risk minimization                                                                                                                                                             formulate a Markov game within the MARL framework.
+into the following multi-objective optimization:                                                                                                                                                                       Observation O: Following typical multi-task optimization
+                                                                                                                                                                                                                       settings, we construct the observation using the empirical
+                                        \begin {split} \label {eq:moo_minimization_problem} \min _{\theta }~(\mathcal {L}_1(\theta ), \cdots , \mathcal {L}_T(\theta ))^\top . \end {split}                      (2)   loss set L(θ) ∈ RT ×1 and the corresponding task gradi-
+                                                                                                                                                                                                                       ent set g ∈ RT ×|θ| , both derived from the i-th data point
+Gradient-based Methods Gradient-based multi-task opti-                                                                                                                                                                 {xi , y1i , · · · , yTi } using Eq. 1. However, since the gradient
+mization schemes typically begin by computing the task                                                                                                                                                                 dimension |θ| directly scales with the MTL model’s param-
+gradient set g = {g1 , · · · , gT } from the empirical loss set                                                                                                                                                        eters, passing the raw gradients to the reinforcement learn-
+L(θ) = {L1 (θ), · · · , LT (θ)}, where gt = ∇θ Lt (θ) for                                                                                                                                                              ing agents would incur significant computational cost (see
+each task t ∈ {1, · · · , T }. Each gradient-based method em-                                                                                                                                                          Tab. 4). To address this, we leverage the Gram matrix of the
+ploys its own gradient aggregation algorithm Γ : R|θ|×T →                                                                                                                                                              task gradient set gg⊤ and define the observation as:
+R|θ| to compute an aggregated gradient G. Consequently,
+the model parameters are then updated as follows:
+                                                                                                                                                                                                                                                     \begin {split} \label {eq:observation} \mathcal {O} &= \left \{ \begin {array}{c} o_1 \\ \vdots \\ o_T \\ \end {array}\right \} = \{\mathbf {g}\mathbf {g}^\top |\boldsymbol {\mathcal {L}}(\theta )\} \\ &= \left \{ \begin {array}{ccc|c} g_1 \cdot g_1 & \cdots & g_1 \cdot g_T & \mathcal {L}_1(\theta )\\ \vdots & \ddots & \vdots & \vdots \\ g_T \cdot g_1 & \cdots & g_T \cdot g_T & \mathcal {L}_T(\theta ) \end {array} \right \}. \end {split}
+        \theta \leftarrow \theta - \eta \mathbf {G}, ~\text {where}~\mathbf {G} = \Gamma (g_1, g_2, \cdots , g_T).                                                                                               (3)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 (5)
+Loss-based Methods In contrast, loss-based methods do not
+explicitly compute task-wise gradients. Instead, they rely on
+a loss aggregation algorithm Λ : RT → R that combines the
+empirical task losses into a single weighted loss L(θ). The
+
+
+
+                                                                                                                                                                                                                   36873
+Figure 1. Overall pipeline of TaskForce. Each agent observes task-specific loss and a compact gradient summary via the Gram matrix,
+predicts a balancing weight for its task gradient, and is guided by a hybrid reward signal that reflects both gradient alignment and loss
+reduction. Centralized training, decentralized execution allows to learn coordinated policies while reducing computational efficiency by
+combining global training signals with local, task-specific decision-making.
+
+
+Our novel agent’s observation ot ∈ RT +1 , constructed from                                                                                                                 the next observation. The first strategy uses the same i-th data
+the Gram matrix gg⊤ and loss L, offers a significantly more                                                                                                                 point {xi , y1i , · · · , yTi } to compute a new empirical loss set
+compact representation than the complete set of empirical                                                                                                                   L(θ′ ) and the corresponding task gradient set g′ . These are
+losses and task gradients {g|L} ∈ RT ×(θ+1) , since T ≪                                                                                                                     then used to generate the next observation via (5). However,
+|θ|. This observation exclusively encapsulates the agent’s                                                                                                                  this approach incurs significant computational overhead, re-
+local gradient magnitude and its alignment with other task                                                                                                                  quiring two forward and backward passes for every update
+gradients, thereby facilitating efficient, localized decision-                                                                                                              step. The second strategy utilizes the subsequent (i + 1)-
+making.                                                                                                                                                                     th data point {xi+1 , y1i+1 , · · · , yTi+1 } to generate the next
+Action A: The primary objective of each task-specific agent                                                                                                                 observation O′ . This method obviates the need for addi-
+is to infer a balancing parameter that determines its contri-                                                                                                               tional forward-backward steps, which are inherent to the first
+bution to the final gradient update. We follow the convex                                                                                                                   strategy. Consequently, it significantly reduces training time
+combination scheme [2] commonly used in existing gradient-                                                                                                                  compared to the first strategy, and thus, we adopt this latter
+based methods, and obtain the aggregated gradient G as                                                                                                                      approach.
+follows:
+                                                                                                                                                                            Reward R: One key strength of reinforcement learning
+                                                                                                                                                                            is its flexibility in handling non-differentiable and highly
+  \mathbf {G} = \sum _{t=1}^T w_t g_t,~~~w_t = \frac {\exp (a_t)}{\sum _{k=1}^{T} \exp (a_k)},~~~a_t = \mu _t(o_t;\phi _t) \in \mathcal {A}, \label {eq:weightgrad}         controllable reward functions. We leverage this to design
+                                                                                                                                                             (6)            a reward that combines both loss-based feedback for im-
+ where A = {a1 , · · · , aT } denotes the continuous action set                                                                                                             mediate progress and gradient-based signals for long-term
+from each agent’s policy network µt (·; ϕt ), and wt ∈ R+                                                                                                                   task balancing. In our MTL setting, RL agents are trained
+is the normalized weight obtained via the softmax function                                                                                                                  alongside the shared network F, and must quickly adapt
+to ensure the convexity constraint. Similar to other weight                                                                                                                 at each training step. To provide immediate feedback, we
+balancing methods [26, 34], this formulation allows the final                                                                                                               define a simple loss-based reward that measures the relative
+update direction to lie within the convex hull of the task                                                                                                                  improvement in log-transformed task losses:
+gradients, enabling flexible gradient mixing while requiring
+each agent to output only a constant.                                                                                                                                            \begin {split} \label {eq:lossreward} r_{\mathcal {L}} = \sum _{t=1}^{T}\log (1+\mathcal {L}_t^{\text {prev}}(\theta )) - \sum _{t=1}^{T}\log (1+{\mathcal {L}_t(\theta ')}), \end {split}   (7)
+Next Observation O′ : To reflect the effect of the action
+A on the MTL model F(·|θ), we first perform a single
+gradient descent step to update the network parameters as                                                                                                                  where Lprev
+                                                                                                                                                                                    t (θ) and Lt (θ) represent the empirical losses of
+θ′ ← θ − ηG. After that, two main strategies exist to define                                                                                                               the t-th task at the previous and current iterations, respec-
+
+
+
+                                                                                                                                                                       36874
+tively. Note that the logarithmic transform provides scale-                                                                                                                          Algorithm 1 Training Process of TaskForce.
+invariant measurement of loss improvement [22, 32], making                                                                                                                           Input: data point number N , task number T , data
+the reward more robust across different scales of task losses.                                                                                                                           points X, {Yt }1≤t≤T , MTL model F(·; θ), agents
+   While rL captures per-iteration loss convergence                                                                                                                                      {µt (·; ϕt ), Qµt (·, ·; ψt )}1≤t≤T , replay buffer D, batch size of
+progress, it does not consider interactions between gradi-                                                                                                                               agents bagent .
+ents, which are known to affect general MTL performance                                                                                                                              Output: trained MTL model F(·; θ∗ ), trained agents
+significantly. To address this, we design a gradient-based                                                                                                                               {µt (·; ϕ∗t ), Qµ          ∗
+                                                                                                                                                                                                         t (·, ·; ψt )}1≤t≤T .
+                                                                                                                                                                                      1: initialize Oprev , Aprev , Rprev as null matrix or 0.
+reward term rG that evaluates the value of the aggregated
+                                                                                                                                                                                      2: for i = 1 to N do
+gradient G. Specifically, rG leverages a convex minimization
+                                                                                                                                                                                      3:    sample data point {xi , y1i , · · · , yTi }.
+problem [10, 34], widely used in multi-objective optimiza-                                                                                                                            4:    compute empirical loss set L(θ) and task gradient set g
+tion to find a common descent direction that simultaneously                                                                                                                              from data point.
+minimizes all objective functions and converges to a Pareto                                                                                                                           5:    generate observation O from L(θ), gg⊤ by Eq. 5.
+optimal point.                                                                                                                                                                        6:    compute action A = {µ1 (o1 ; ϕ1 ), · · · , µT (oT ; ϕT )} from
+                                                                                                                                                                                         O.
+                                                                                                                                                                                      7:    compute aggregated gradient G from g and A by Eq. 6.
+  \label {eq:convex_minimization} \underset {w_1, \cdots , w_T}{\text {minimize}}~~ \|\sum _{t=1}^{T} w_t g_t\|_2^2, ~~~\text {subject to}~\sum _{t=1}^T w_t = 1,~w_t \geq 0.         8:    if i ̸= 1 then
+                                                                                                                                                                                      9:       compute reward R from L(θ), Lprev by Eq. 7-10.
+                                                       (8)                                                                                                                           10:       push transition (Oprev , Aprev , Rprev , O) to replay buffer
+Our gradient-based reward rG reformulates the convex mini-                                                                                                                               D.
+mization problem into a reward-level maximization problem                                                                                                                            11:    end if
+suitable for a Markov game as follows:                                                                                                                                               12:    Oprev , Aprev , Rprev , Lprev ← O, A, R, L(θ).
+                                                                                                                                                                                     13:    update MTL model F(·|θ) with G by θ ← θ − ηG.
+                                                                                                                                                                                     14:    if i > bagent then
+                                 r_\mathcal {G} = -\|\sum _{t=1}^{T} w_t g_t\|_2^2 = -\|\sum _{t=1}^{T} \mathbf {G}\|_2^2.                                                   (9)     15:       sample bagent transitions T from replay buffer D.
+                                                                                                                                                                                     16:       update each actor µt (·; ϕt ) and critic Qµ   t (·, ·; ψt ) with
+                                                                                                                                                                                         transitions T by Eq. 11-13.
+This allows the agent to learn and select a policy that aligns                                                                                                                       17:    end if
+with a provably convergent direction, thereby improving                                                                                                                              18: end for
+the overall stability and performance of the multi-objective
+learning process.
+   The final reward used for policy learning is a weighted                                                                                                                            in advance by executing the current policies µ jointly with
+sum of these components:                                                                                                                                                              the multi-task model in the environment.
+                                                                                                                                                                                         First, the critic is trained to minimize the temporal differ-
+                                                          \label {eq:reward} \mathcal {R} = \lambda _\mathcal {L} r_\mathcal {L} + \lambda _\mathcal {G} r_\mathcal {G},    (10)      ence (TD) loss as follows:
+where λL and λG are hyperparameters that control the trade-                                                                                                                                    \begin {split} \label {eq:tdloss} \mathcal {L}(\psi _t) = \mathbb {E}_{(\mathcal {O}, \mathcal {A}, \mathcal {R}, \mathcal {O}') \sim \mathbf {D}} & \big [ \big ( Q_{t}^{\boldsymbol {\mu }}(\mathcal {O}, \mathcal {A}; \psi _t) \\ &- (\mathcal {R} + \gamma Q_t^{\boldsymbol {\mu }'}(\mathcal {O}', \mathcal {A}'; \psi _t')) \big )^2 \big ], \\ a_t' = \mu _t(o_t'; \phi _t') &\in \mathcal {A}'~~ \forall 1 \leq t \leq T, \end {split}
+off between per-iteration loss improvement rL and desirable
+gradient property rG which is related to Pareto convergence.
+Note that the reward R is shared by all agents due to the
+fully cooperative scenario.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      (11)
+4.2. Training of TaskForce                                                                                                                                                           where the target value is computed using the set of target
+In this section, we introduce the training procedure of the                                                                                                                          policies µ′ = {µ1 (·; ϕ′1 ), · · · , µT (·; ϕ′T )} and target critic
+                                                                                                                                                                                        ′
+proposed TaskForce framework. For the multi-agent rein-                                                                                                                              Qµ                                    ′   ′
+                                                                                                                                                                                       t with delayed parameters (ϕt , ψt ), and γ is the discount
+forcement learning algorithm, we adopt Lowe et al. [29]. We                                                                                                                          factor, respectively. The actor is then updated via the deter-
+detail the systematic process of this framework in the subse-                                                                                                                        ministic policy gradient as follows:
+quent discussion. Consider a Markov game in a multi-agent
+setting, where T task-wise agents interact with a shared envi-                                                                                                                             \begin {gathered} \nabla _{\phi _t} J(\phi _t) = \mathbb {E}_{(\mathcal {O}, \mathcal {A}) \sim \mathbf {D}} \left [\nabla _{\phi _t} \mu _t(o_t;\phi _t) \nabla _{a_t} Q_t^{\boldsymbol {\mu }}(\mathcal {O}, \mathcal {A};\psi _t) \right ] \\ a_t = \mu _t(o_t;\phi _t) \in \mathcal {A} \forall 1 \leq t \leq T. \end {gathered} 
+ronment. The t-th agent receives a local observation ot and
+selects an action at according to its policy µt (ot ; ϕt ).                                                                                                                                                                               (12)
+   Following the centralized training and decentralized exe-                                                                                                                            Lastly, target networks are updated using soft updates
+cution paradigm, each agent is equipped with a decentralized                                                                                                                         with an exponential moving average coefficient 0 < τ ≪ 1
+policy µt (·; ϕt ) and a centralized critic Qµ
+                                             t (·, ·; ψt ). In the                                                                                                                   as follows:
+off-policy training, agents are trained using a replay buffer
+D containing transitions (O, A, R, O′ ), which are collected                                                                                                                                              \label {eq:target_update} \phi _t' \leftarrow \tau \phi _t + (1 - \tau ) \phi _t', \quad \psi _t' \leftarrow \tau \psi _t + (1 - \tau ) \psi _t'.  (13)
+
+
+
+                                                                                                                                                                                 36875
+     Table 1. Evaluation results of NYU-v2 3-tasks setup. We report MTAN [28] model performance averaged over 3 random seeds.
+
+                               Semseg.          Depth                         Normal
+         Method                                                                                          ∆m ↓        ∆t ↓
+                             mIoU PAcc.       Abs. Rel.     Mean    Median     11.25◦   22.5◦   30◦
+         STL                 38.30    63.76   0.68   0.28   25.01     19.21    30.14    57.20   69.15    0.00%      0.00%
+         LS                  39.29    65.33   0.55   0.23   28.15     23.96    22.09    47.50   61.08   +5.46%    −1.07%
+         RLW [1]             37.17    63.77   0.58   0.24   28.27     24.18    22.26    47.05   60.62   +7.67%    +2.00%
+         DWA [28]            39.11    65.31   0.55   0.23   27.61     23.18    24.17    50.18   62.39   +3.49%    −2.06%
+         UW [18]             36.87    63.17   0.54   0.23   27.04     22.61    23.54    49.05   63.65   +4.01%    −0.97%
+         MGDA [34]           30.47    59.90   0.61   0.26   24.88     19.45    29.18    56.88   69.36   +1.47%    +1.79%
+         GradDrop [4]        39.39    65.12   0.55   0.23   27.48     22.96    23.38    49.44   62.87   +3.61%    −2.03%
+         PCGrad [45]         38.06    64.64   0.56   0.23   27.41     22.80    23.86    49.83   63.14   +3.83%    −1.33%
+         CAGrad [25]         39.79    65.49   0.55   0.23   26.31     21.58    25.61    52.36   65.58   +0.29%    −4.18%
+         IGBv2 [9]           38.53    64.81   0.55   0.23   26.54     22.11    24.90    52.21   66.09   +1.71%    −2.61%
+         IMTL [26]           39.35    65.60   0.54   0.23   26.02     21.19    26.20    53.13   66.24   −0.59%    −4.76%
+         NashMTL [32]        40.13    65.93   0.53   0.22   25.26     20.08    28.40    55.47   68.15   −4.04%    −7.56%
+         Aligned-MTL [35]    40.82    66.33   0.53   0.22   25.19     19.71    28.88    56.23   68.54   −4.93%    −8.40%
+         Ours                41.77    66.73   0.51   0.22   24.83     19.19    29.27    56.85   69.29   −6.47%   −9.96%
+
+
+    Alg. 1 summarizes the training process of TaskForce.            a molecular property prediction dataset with 110K training,
+First, to enable off-policy training with the replay buffer         10K validation, and 10K test molecules. It covers 11 regres-
+D, we compute empirical losses and their gradients from a           sion tasks, each predicting a quantum chemical property. We
+data point and store them as transition tuples (O, A, R, O′ ).      use the MPNN [13] architecture.
+Second, the MTL model parameters are updated using the
+aggregated gradient G, derived from the agents’ actions A.          5.3. Metrics & Experimental Setup
+Finally, the agent parameters are updated by sampling transi-       We follow the task-specific evaluation metrics used in [32]
+tions from the replay buffer, completing one MTL training           for the NYU-v2 and QM9 datasets, and those in [35]
+iteration. For clarity, we omit implementation details such         for the Cityscapes dataset. To assess the overall perfor-
+as exploration noise scaling and reward normalization.              mance across different metrics and tasks, we adopt the
+                                                                    relative performance decrement from single-task learning
+5. Experiments                                                      (STL)   ∆m and ∆t—Formally, ∆m is defined as ∆m =
+                                                                        PK          δk
+                                                                           k=1 (−1) (MMTL,k − MSTL,k )/MSTL,k , where K is
+                                                                    1/K
+5.1. Baselines
+                                                                    the number of metrics, MSTL,k and MMTL,k represent the
+Similar to previous works [32, 35], we compare our Task-            k-th metric for the STL and MTL models, respectively. The
+Force with the well-known multi-task optimization ap-               indicator δk equals 1 if a higher value is better for the k-th
+proaches:
+PT         (1) Linear Scalarization (LS) which minimizes            metric and 0 otherwise. The overall task-level performance
+   t=1 Lt (θ); (2) Random Loss Weighting (RLW) [1];                 decrement, ∆t, is computed as the average of ∆m across all
+(3) Dynamic Weight Average (DWA) [28]; (4) Uncer-                   tasks. We follow the training protocol of [35] for NYU-v2
+tainty Weighting (UW) [18]; (5) Multiple Gradient De-               and Cityscapes, and [32] for QM9, respectively. Across all
+scent Algorithm (MGDA) [34]; (6) GradDrop [4]; (7) PC-              experiments, we set λL = 1.0 for the loss-based reward,
+Grad [45]; (8) CAGrad [25]; (9) Improvable Gap Balancing            λG = 1 × 10−3 for the gradient-based reward. We adopt a
+(IGBv2) [9]; (10) IMTL [26]; (11) NashMTL [32]; (12)                standard MADDPG [29] for agents. Due to the space con-
+Aligned-MTL [35].                                                   straints, we describe the implementation details of the RL
+5.2. Datasets & Model Architecture                                  agents in Appendix Sec. B.
+NYU-v2 [37] is an indoor scene understanding benchmark              5.4. Results
+with 795 training and 654 testing samples, annotated for
+three tasks: 13-class semantic segmentation, depth estima-          Evaluation Results on NYU-v2 & Cityscapes.
+tion, and surface normal estimation. We use the MTAN [28]               Tab. 1 and Tab. 2 summarize the performance of
+architecture for evaluation. Cityscapes [7] focuses on urban        TaskForce against baseline methods on the NYU-v2 and
+scene understanding and provides 2,975 training and 500 val-        Cityscapes datasets, respectively. Across both benchmarks,
+idation images from 50 cities. It supports three tasks: 7-class     TaskForce consistently outperforms all baselines according
+semantic segmentation, instance segmentation, and depth es-         to the relative performance measures ∆m and ∆t. Notably,
+timation. We adopt PSPNet [48] for evaluation. QM9 [33] is          our method shows consistent improvement over the strong
+
+
+
+                                                              36876
+Table 2. Evaluation results of Cityscapes 3-tasks setup. We report PSPNet [48]    Table 3. Evaluation results of QM9 11-tasks setup.
+model performance averaged over 3 random seeds.                                   We report MPNN [13] model performance averaged
+                                                                                  over 3 random seeds.
+                          Semseg.        Instseg.     Disparity
+  Method                                                               ∆m ↓                Method                     ∆m ↓
+                         mIoU (%) ↑     L1 (px.) ↓     MSE ↓
+  STL                       66.73         10.55         0.33           0.00%               STL                       0.00%
+  LS                        52.98         10.89         0.39      +14.30%                  LS                     +177.6%
+  RLW [1]                   51.26         10.25         0.41      +15.58%                  RLW [1]                +203.8%
+  DWA [28]                  53.15         10.22         0.40      +13.20%                  DWA [28]               +175.3%
+  UW [18]                   60.12          9.87         0.33       +1.53%                  UW [18]                +108.0%
+  MGDA [34]                 66.72         17.02         0.33      +20.62%                  MGDA [34]              +120.5%
+  GradDrop [4]              52.98         10.09         0.40      +12.50%                  GradDrop [4]           +198.7%
+  PCGrad [45]               54.06          9.91         0.38      +10.00%                  PCGrad [45]            +125.7%
+  CAGrad [25]               64.33         10.15         0.34       +1.46%                  CAGrad [25]            +112.8%
+  IGBv2 [9]                 61.14         10.53         0.33       +2.73%                  IGBv2 [9]               +67.7%
+  IMTL [26]                 65.13         11.58         0.32       +3.10%                  IMTL [26]               +77.2%
+  NashMTL [32]              64.84         11.90         0.37       +9.38%                  NashMTL [32]            +62.0%
+  Aligned-MTL [35]          67.06         10.63         0.33       −0.02%                  Aligned-MTL [35]        +81.9%
+  Ours                      66.63         10.55         0.32       −0.65%                  Ours                    +59.0%
+
+
+competitor, Aligned-MTL, across nearly all reported met-
+rics, with the sole exception being the segmentation on the
+Cityscapes dataset. This robust performance demonstrates
+that our method successfully navigates the complex multi-
+task landscape, empowered by its cooperative MARL setup.
+Evaluation Results on QM9. QM9 is one of the most chal-
+lenging datasets in multi-task learning due to its complex
+and diverse molecular properties across tasks, and the signif-
+icant scale difference between losses. As shown in Tab. 3,
+TaskForce significantly outperforms all competing baseline
+methods. We observe that strong competitors like Aligned-
+MTL, while performing well on simpler scene understanding
+datasets, struggle considerably under the high task complex-
+ity of QM9. This outcome demonstrates the resilience of
+the proposed method, which performs robustly even when
+                                                                     Figure 2. Task weight dynamics of 11-tasks QM9 datasets. For
+faced with an increased number of tasks and more complex             improved visualization, we smooth the weight dynamics by using a
+gradient interactions, as shown in Fig. 2.                           moving average with a window size of 10.
+
+5.5. Ablation Studies on Cooperative MARL Com-
+                                                                     Due to the excessively large number of shared parameter
+      ponents
+                                                                     |θ| ∼= 44.1M of MTAN [28], the configuration that does
+To evaluate the contribution of each component of our coop-          not incorporate the task gradient gram matrix gg⊤ ∈ RT ×T
+erative multi-agent reinforcement learning framework within          is not appropriate for the multi-task optimization framework.
+TaskForce, we conduct ablation studies by incrementally in-          The multiple agents allow task-specific specialization, en-
+troducing five key elements: (1) gram-matrix observation             abling the model to disentangle conflicting optimization sig-
+(gg⊤ ); (2) task-specific multiple agents (MA); (3) a central-       nals across tasks. The centralized critic improves credit as-
+ized critic training (CT) that processes joint observations          signment by leveraging global information, leading to better
+and actions; (4) decentralized execution (DE); (5) shared            optimization performance. Meanwhile, decentralized execu-
+R based on the loss reduction rate across all tasks, instead         tion, which relies only on task-specific local observations,
+of each loss reduction rewards (We detail the experimental           enhances training efficiency with minimal compromise in
+setup of this ablation in Appendix Sec. A).                          overall performance. Lastly, using the gradient-based reward
+   As shown in Tab. 4, we observe consistent performance             rG encourages the agents to consistently align with a prov-
+gains as each key component of cooperative MARL is added.            ably convergent direction, thereby improving performance.
+
+
+
+                                                               36877
+Table 4. Ablation studies on Cooperative MARL components on             Table 5. Per-epoch training cost (epoch/sec) comparison between
+the NYU-v2 3-tasks setup. We report the training cost relative to       the proposed TaskForce and other baselines.
+the final configuration of each method on the MTAN [28] network
+architecture. We set R = rL of all configuration except rG ablation.                           NYU-v2      Cityscapes           QM9
+                                                                             Method
+(MA: multi-agents, CT: centralized training, DE: decentralized                                 (3-tasks)     (3-tasks)     (11-tasks)
+execution, *: rough calculation due to Out-of-Memory Issue.)                 LS                      85           168             85
+  gg   ⊤
+           MA   CT   DE    rG   training cost    ∆m ↓       ∆t ↓
+                                                                             MGDA                   114           261            332
+                                                                             IMTL                   112           258            294
+                                  ×2.59M*             -         -
+                                                                             NashMTL                109           258            286
+   ✓                                ×0.95       −2.89%    −4.05%
+   ✓       ✓                        ×1.16       −4.26%    −7.19%             Aligned-MTL            111           255            279
+   ✓       ✓    ✓                   ×3.21       −5.23%    −8.31%             Ours                   111           257            304
+   ✓       ✓    ✓     ✓             ×1.00       −5.18%    −8.26%
+   ✓       ✓    ✓     ✓    ✓        ×1.00       −6.47%    −9.96%
+
+                                                                        Table 6. Computational cost of TaskForce components on the NYU-
+These findings highlight that the modular and cooperative               v2 dataset.
+structure of MARL, particularly when fully integrated, plays
+                                                                                                                         Training cost
+a crucial role in enhancing both convergence stability and                   Procedure
+                                                                                                                          (sample/ms)
+overall performance in multi-task learning scenarios. No-
+tably, our TaskForce substantially reduces the computational                 MTL Network inference & compute loss               62.02
+                                                                             MTL Network gradient computation                  154.01
+cost associated with reinforcement learning by leveraging
+                                                                             MTL Network update                                  4.78
+the Gram matrix and decentralized execution (DE), result-                    Agents inference & compute loss                    27.84
+ing in a training cost that remains comparable to that of                    Agents update                                      17.04
+conventional methods (See appendix Sec. 5.6).
+5.6. Computational Overhead Comparison between
+      TaskForce and Prior methods                                        6. Conclusion
+To evaluate the computational overhead and training effi-
+ciency of our proposed TaskForce—which uses multiple RL                 We have introduced TaskForce, a MARL-based framework
+agents instead of a traditional numerical solver—we mea-                for multi-task optimization that reformulates MTL as a coop-
+sured the per-epoch wall time for our method and baselines              erative Markov game. Unlike prior approaches that aggregate
+across all datasets. All experimental setups are identical to           gradients or rely on heuristic balancing, TaskForce models
+the implementation details provided in the main manuscript              each task as an agent equipped with a compact gradient-
+and the Appendix. Note that all computational costs were                based observation and a loss–gradient hybrid reward, en-
+measured on a single A6000 GPU.                                         abling cooperative strategies that balance tradeoffs, resolve
+   As shown in Tab. 5, our experimental results indicate that           conflicts, and adaptively guide optimization toward Pareto-
+for the 3-task scenario, there is no significant difference in          efficient solutions. At the core of TaskForce is a lightweight
+wall time compared to existing gradient- and hybrid-based               agent observation derived from the Gram matrix of task gra-
+optimization methods. Furthermore, even in the more chal-               dients, capturing both magnitudes and pairwise alignments
+lenging 11-task quantum chemistry setup, where task com-                with minimal computational overhead. Complementing this,
+plexity causes a scalability issue, our method demonstrates             we design a principled gradient-based reward grounded in
+acceptable training time when compared to conventional                  convex multi-objective optimization, which provides theo-
+approaches.                                                             retical convergence guarantees while promoting coopera-
+   To further analyze the computational cost of TaskForce,              tive task interactions. Extensive experiments on NYU-v2,
+which requires additional agent learning, we also measured              Cityscapes, and QM9 demonstrate that TaskForce consis-
+the contribution of each sub-procedure within TaskForce to              tently surpasses strong baselines, yielding more stable con-
+the overall computational cost. It’s important to note that             vergence, stronger generalization across domains, and im-
+MTL network inference & loss computation, gradient com-                 proved task-level performance. These results establish Task-
+putation, and model updates are fundamental and essential               Force as an effective bridge between cooperative MARL and
+processes for any gradient-based optimization method.                   gradient-based optimization for multi-task learning. Look-
+   As shown in Tab. 6, our analysis reveals that the time con-          ing ahead, we envision extending TaskForce to larger and
+sumed by multi-agent learning and inference in TaskForce is             more diverse task sets, incorporating richer reward structures,
+significantly smaller in proportion to the time spent on the            and applying it to real-world domains in vision, language,
+MTL network’s task gradient computation, which typically                and molecular modeling, further expanding the potential of
+constitutes the largest portion of gradient-based methods.              MARL-based optimization in deep learning.
+
+
+
+                                                                    36878
+Acknowledgement                                                       [11] Chris Fifty, Ehsan Amid, Zhe Zhao, Tianhe Yu, Rohan Anil,
+                                                                           and Chelsea Finn. Efficiently identifying task groupings
+This work was supported by LG AI STAR Talent Devel-                        for multi-task learning. Advances in Neural Information
+opment Program for Leading Large-Scale Generative AI                       Processing Systems, 34:27503–27516, 2021. 1
+Models in the Physical AI Domain (RS-2025-25442149),
+                                                                      [12] Jakob Foerster, Gregory Farquhar, Triantafyllos Afouras, Nan-
+Basic Science Research Program through the National
+                                                                           tas Nardelli, and Shimon Whiteson. Counterfactual multi-
+Research Foundation of Korea (NRF) funded by the
+                                                                           agent policy gradients. In Proceedings of the AAAI conference
+Ministry of Education (RS-2025-25420118), the National
+                                                                           on artificial intelligence, 2018. 2
+Research Foundation of Korea (NRF) grant funded by the
+Korea government (MSIT) (No.RS-202300210908) and the                  [13] Justin Gilmer, Samuel S Schoenholz, Patrick F Riley, Oriol
+Institute of Information & Communications Technology                       Vinyals, and George E Dahl. Neural message passing for
+Planning & Evaluation(IITP) grant funded by the Korea                      quantum chemistry. In International conference on machine
+government(MSIT) (No. RS-2025-02219277, AI Star Fel-                       learning, pages 1263–1272. PMLR, 2017. 6, 7
+lowship Support Project(DGIST)). The authors would like               [14] Michelle Guo, Albert Haque, De-An Huang, Serena Yeung,
+to thank Sanghyun Woo (Member of Technical Staff at AMI                    and Li Fei-Fei. Dynamic task prioritization for multitask
+Labs) for his insightful discussions and valuable feedback.                learning. In Proceedings of the European conference on
+                                                                           computer vision (ECCV), pages 270–287, 2018. 1, 2, 3
+                                                                      [15] Jayesh K Gupta, Maxim Egorov, and Mykel Kochenderfer.
+References                                                                 Cooperative multi-agent control using deep reinforcement
+                                                                           learning. In Autonomous Agents and Multiagent Systems:
+ [1] L Baijiong, Y Feiyang, and Z Yu. A closer look at loss weight-        AAMAS 2017 Workshops, Best Papers, São Paulo, Brazil,
+     ing in multi-task learning. arXiv preprint arXiv:2111.10603,          May 8-12, 2017, Revised Selected Papers 16, pages 66–83.
+     2021. 1, 2, 3, 6, 7, 13                                               Springer, 2017. 2
+ [2] Stephen P Boyd and Lieven Vandenberghe. Convex optimiza-         [16] Kazuma Hashimoto, Caiming Xiong, Yoshimasa Tsuruoka,
+     tion. Cambridge university press, 2004. 4                             and Richard Socher. A joint many-task model: Growing
+ [3] Rich Caruana. Multitask learning. Machine learning, 28:               a neural network for multiple nlp tasks. arXiv preprint
+     41–75, 1997. 1                                                        arXiv:1611.01587, 2016. 1
+ [4] Zhao Chen, Jiquan Ngiam, Yanping Huang, Thang Luong,             [17] Wooseong Jeong and Kuk-Jin Yoon.               Selective task
+     Henrik Kretzschmar, Yuning Chai, and Dragomir Anguelov.               group updates for multi-task optimization. arXiv preprint
+     Just pick a sign: Optimizing deep multitask models with gradi-        arXiv:2502.11986, 2025. 2
+     ent sign dropout. Advances in Neural Information Processing
+                                                                      [18] Alex Kendall, Yarin Gal, and Roberto Cipolla. Multi-task
+     Systems, 33:2039–2050, 2020. 1, 2, 6, 7
+                                                                           learning using uncertainty to weigh losses for scene geometry
+ [5] Wonhyeok Choi and Sunghoon Im. Dynamic neural net-                    and semantics. In Proceedings of the IEEE conference on
+     work for multi-task learning searching across diverse network         computer vision and pattern recognition, pages 7482–7491,
+     topologies. In Proceedings of the IEEE/CVF Conference on              2018. 1, 2, 6, 7
+     Computer Vision and Pattern Recognition, pages 3779–3788,
+                                                                      [19] Diederik P Kingma and Jimmy Ba. Adam: A method for
+     2023. 1
+                                                                           stochastic optimization. arXiv preprint arXiv:1412.6980,
+ [6] Wonhyeok Choi, Mingyu Shin, Hyukzae Lee, Jaehoon Cho,
+                                                                           2014. 11
+     Jaehyeon Park, and Sunghoon Im. Multi-task learning for
+     real-time autonomous driving leveraging task-adaptive atten-     [20] Vitaly Kurin, Alessandro De Palma, Ilya Kostrikov, Shimon
+     tion generator. In 2024 IEEE International Conference on              Whiteson, and Pawan K Mudigonda. In defense of the unitary
+     Robotics and Automation (ICRA), pages 14732–14739. IEEE,              scalarization for deep multi-task learning. Advances in Neural
+     2024. 1                                                               Information Processing Systems, 35:12169–12183, 2022. 1, 2
+ [7] Marius Cordts, Mohamed Omran, Sebastian Ramos, Timo              [21] Timothy P Lillicrap, Jonathan J Hunt, Alexander Pritzel, Nico-
+     Rehfeld, Markus Enzweiler, Rodrigo Benenson, Uwe Franke,              las Heess, Tom Erez, Yuval Tassa, David Silver, and Daan
+     Stefan Roth, and Bernt Schiele. The cityscapes dataset for            Wierstra. Continuous control with deep reinforcement learn-
+     semantic urban scene understanding. In Proceedings of the             ing. arXiv preprint arXiv:1509.02971, 2015. 3, 11, 12, 13
+     IEEE conference on computer vision and pattern recognition,      [22] Baijiong Lin, Weisen Jiang, Feiyang Ye, Yu Zhang, Peng-
+     pages 3213–3223, 2016. 6                                              guang Chen, Ying-Cong Chen, Shu Liu, and James T Kwok.
+ [8] Michael Crawshaw. Multi-task learning with deep neural                Dual-balancing for multi-task learning. arXiv preprint
+     networks: A survey. arXiv preprint arXiv:2009.09796, 2020.            arXiv:2308.12029, 2023. 2, 5
+     1                                                                [23] Xi Lin, Xiaoyuan Zhang, Zhiyuan Yang, Fei Liu, Zhenkun
+ [9] Yanqi Dai, Nanyi Fei, and Zhiwu Lu. Improvable gap bal-               Wang, and Qingfu Zhang. Smooth tchebycheff scalar-
+     ancing for multi-task learning. In Uncertainty in Artificial          ization for multi-objective optimization. arXiv preprint
+     Intelligence, pages 496–506. PMLR, 2023. 3, 6, 7                      arXiv:2402.19078, 2024. 2
+[10] Jean-Antoine Désidéri. Multiple-gradient descent algorithm     [24] Michael L Littman. Markov games as a framework for multi-
+     (mgda) for multiobjective optimization. Comptes Rendus                agent reinforcement learning. In Machine learning proceed-
+     Mathematique, 350(5-6):313–318, 2012. 2, 5                            ings 1994, pages 157–163. Elsevier, 1994. 2, 3
+
+
+
+
+                                                                  36879
+[25] Bo Liu, Xingchao Liu, Xiaojie Jin, Peter Stone, and Qiang              multi-task learning. Advances in Neural Information Process-
+     Liu. Conflict-averse gradient descent for multi-task learn-            ing Systems, 33:8728–8740, 2020. 1
+     ing. Advances in Neural Information Processing Systems, 34:       [39] Richard S Sutton, Andrew G Barto, et al. Reinforcement
+     18878–18890, 2021. 1, 2, 6, 7                                          learning: An introduction. MIT press Cambridge, 1998. 2
+[26] Liyang Liu, Yi Li, Zhanghui Kuang, Jing-Hao Xue, Yimin            [40] Zirui Wang, Yulia Tsvetkov, Orhan Firat, and Yuan Cao. Gra-
+     Chen, Wenming Yang, Qingmin Liao, and Wayne Zhang.                     dient vaccine: Investigating and improving multi-task opti-
+     Towards impartial multi-task learning. In International Con-           mization in massively multilingual models. arXiv preprint
+     ference on Learning Representations, 2021. 2, 4, 6, 7, 12              arXiv:2010.05874, 2020. 1
+[27] Suyun Liu and Luis Nunes Vicente. The stochastic multi-           [41] Zedong Wang, Siyuan Li, and Dan Xu. Rep-mtl: Unleashing
+     gradient algorithm for multi-objective optimization and its            the power of representation-level task saliency for multi-task
+     application to supervised machine learning. Annals of Opera-           learning. In Proceedings of the IEEE/CVF International
+     tions Research, 339(3):1119–1148, 2024. 1                              Conference on Computer Vision, pages 3413–3423, 2025. 2
+[28] Shikun Liu, Edward Johns, and Andrew J Davison. End-to-           [42] Derrick Xin, Behrooz Ghorbani, Justin Gilmer, Ankush Garg,
+     end multi-task learning with attention. In Proceedings of              and Orhan Firat. Do current multi-task optimization methods
+     the IEEE/CVF conference on computer vision and pattern                 in deep learning even help? Advances in neural information
+     recognition, pages 1871–1880, 2019. 1, 2, 3, 6, 7, 8                   processing systems, 35:13597–13609, 2022. 1, 2
+[29] Ryan Lowe, Yi I Wu, Aviv Tamar, Jean Harb, OpenAI                 [43] Hanrong Ye and Dan Xu. Inverted pyramid multi-task trans-
+     Pieter Abbeel, and Igor Mordatch. Multi-agent actor-critic             former for dense scene understanding. In European Confer-
+     for mixed cooperative-competitive environments. Advances               ence on Computer Vision, pages 514–530. Springer, 2022.
+     in neural information processing systems, 30, 2017. 2, 3, 5, 6,        1
+     11, 12, 16                                                        [44] Hanrong Ye and Dan Xu. Taskprompter: Spatial-channel
+[30] Bryan McCann, Nitish Shirish Keskar, Caiming Xiong, and                multi-task prompting for dense scene understanding. In The
+     Richard Socher. The natural language decathlon: Mul-                   Eleventh International Conference on Learning Representa-
+     titask learning as question answering. arXiv preprint                  tions, 2022. 1
+     arXiv:1806.08730, 2018. 1                                         [45] Tianhe Yu, Saurabh Kumar, Abhishek Gupta, Sergey Levine,
+[31] Ishan Misra, Abhinav Shrivastava, Abhinav Gupta, and Mar-              Karol Hausman, and Chelsea Finn. Gradient surgery for multi-
+     tial Hebert. Cross-stitch networks for multi-task learning. In         task learning. Advances in neural information processing
+     Proceedings of the IEEE conference on computer vision and              systems, 33:5824–5836, 2020. 1, 2, 6, 7
+     pattern recognition, pages 3994–4003, 2016. 1                     [46] Amir R Zamir, Alexander Sax, William Shen, Leonidas J
+[32] Aviv Navon, Aviv Shamsian, Idan Achituve, Haggai Maron,                Guibas, Jitendra Malik, and Silvio Savarese. Taskonomy:
+     Kenji Kawaguchi, Gal Chechik, and Ethan Fetaya. Multi-                 Disentangling task transfer learning. In Proceedings of the
+     task learning as a bargaining game.             arXiv preprint         IEEE conference on computer vision and pattern recognition,
+     arXiv:2202.01017, 2022. 1, 2, 5, 6, 7, 12, 13                          pages 3712–3722, 2018. 1
+[33] Raghunathan Ramakrishnan, Pavlo O Dral, Matthias Rupp,            [47] Yu Zhang and Qiang Yang. A survey on multi-task learning.
+     and O Anatole Von Lilienfeld. Quantum chemistry structures             IEEE transactions on knowledge and data engineering, 34
+     and properties of 134 kilo molecules. Scientific data, 1(1):           (12):5586–5609, 2021. 1
+     1–7, 2014. 6                                                      [48] Hengshuang Zhao, Jianping Shi, Xiaojuan Qi, Xiaogang
+[34] Ozan Sener and Vladlen Koltun. Multi-task learning as multi-           Wang, and Jiaya Jia. Pyramid scene parsing network. In
+     objective optimization. Advances in neural information pro-            Proceedings of the IEEE conference on computer vision and
+     cessing systems, 31, 2018. 1, 2, 4, 5, 6, 7, 12                        pattern recognition, pages 2881–2890, 2017. 6, 7, 12, 13, 14,
+[35] Dmitry Senushkin, Nikolay Patakin, Arseny Kuznetsov, and               15
+     Anton Konushin. Independent component alignment for multi-
+     task learning. In Proceedings of the IEEE/CVF Conference
+     on Computer Vision and Pattern Recognition, pages 20083–
+     20093, 2023. 2, 6, 7, 12, 13, 14
+[36] Jiayi Shen, Qi Wang, Zehao Xiao, Nanne Van Noord, and
+     Marcel Worring. Go4align: Group optimization for multi-
+     task alignment. Advances in Neural Information Processing
+     Systems, 37:111382–111405, 2024. 2
+[37] Nathan Silberman, Derek Hoiem, Pushmeet Kohli, and Rob
+     Fergus. Indoor segmentation and support inference from rgbd
+     images. In Computer Vision–ECCV 2012: 12th European
+     Conference on Computer Vision, Florence, Italy, October 7-
+     13, 2012, Proceedings, Part V 12, pages 746–760. Springer,
+     2012. 6
+[38] Ximeng Sun, Rameswar Panda, Rogerio Feris, and Kate
+     Saenko. Adashare: Learning what to share for efficient deep
+
+
+
+
+                                                                   36880
+

@@ -1,0 +1,950 @@
+                                         Scene-VLM: Multimodal Video Scene Segmentation via Vision-Language Models
+
+                                                     Nimrod Berman1∗† Adam Botach2∗§‡ Emanuel Ben-Baruch2 Shunit Haviv Hakimi2
+                                                              Asaf Gendler2 Ilan Naiman1† Erez Yosef3† Igor Kviatkovsky2
+                                                                    1                            2                                        3
+                                                                        Ben-Gurion University        Amazon Prime Video                       Tel-Aviv University
+                                          {bermann,naimani}@post.bgu.ac.il              {kabotach,emanbb,havivs,gendlasa,kviat}@amazon.com                              erez.yo@gmail.com
+
+
+
+
+arXiv:2512.21778v2 [cs.CV] 21 Mar 2026
+                                                                          Abstract                                       Video Input                               Shot i
+                                                                                                                                                                     K Sampled Frames
+                                         Segmenting long-form videos into semantically coherent                                                                      Dialogue
+                                                                                                                                                                     Character Metadata
+                                         scenes is a fundamental task in large-scale video understand-
+                                         ing. Existing encoder-based methods are limited by visual-
+                                         centric biases, classify each shot in isolation without leverag-
+                                         ing sequential dependencies, and lack both narrative under-
+                                         standing and explainability. In this paper, we present Scene-
+                                         VLM, the first fine-tuned vision-language model (VLM)                                                 Scene-VLM
+                                         framework for video scene segmentation. Scene-VLM jointly
+                                                                                                                                Sequential Scene Boundary Predictions
+                                         processes visual and textual cues including frames, transcrip-
+                                         tions, and optional metadata to enable multimodal reasoning                  Scene 1            Scene 2              Scene 3           Scene 4
+                                         across consecutive shots. The model generates predictions                    Confidence 0.99           Confidence 0.95       Confidence 0.96
+                                         sequentially with causal dependencies among shots and in-                     Explanation:             Explanation: Cut      Explanation: Shift
+                                                                                                                       Transition from          to a wide desert      in focus from
+                                         troduces a context–focus window mechanism to ensure suffi-                    exterior to a            shot introducing      landscape to a
+                                         cient temporal context for each shot-level decision. In addi-                 house party…             a new location…       character…
+
+                                         tion, we propose a scheme to extract confidence scores from
+                                         the token-level logits of the VLM, enabling controllable preci-        Figure 1. Video scene segmentation with Scene-VLM. We present
+                                         sion–recall trade-offs that were previously limited to encoder-        Scene-VLM, the first vision-language model (VLM) framework
+                                         based methods. Furthermore, we demonstrate that our model              fine-tuned for video scene segmentation. Scene-VLM jointly pro-
+                                         can be aligned to generate coherent natural-language ratio-            cesses visual frames, dialogue, and metadata from consecutive
+                                                                                                                shots to sequentially predict scene boundaries with associated con-
+                                         nales for its boundary decisions through minimal targeted
+                                                                                                                fidence scores, and can be aligned to produce coherent post-hoc
+                                         supervision. Our approach achieves state-of-the-art perfor-            explanations for its decisions.
+                                         mance on standard scene segmentation benchmarks. On
+                                         MovieNet, for example, Scene-VLM yields significant im-                scene is a consecutive sequence of shots sharing semantic
+                                         provements of +6 AP and +13.7 F1 over the previous leading             coherence in location, time, characters, or narrative theme,
+                                         method.                                                                where each shot is a continuous sequence of frames captured
+                                                                                                                in a single, uninterrupted camera take (see Fig. 1). Despite
+                                         1. Introduction                                                        decades of research, video scene segmentation remains chal-
+                                         Video scene segmentation, the task of identifying coherent             lenging as it requires understanding narrative semantics be-
+                                         narrative boundaries within long-form video content, is fun-           yond visual cues, distinguishing meaningful story transitions
+                                         damental to video understanding [6, 16, 17, 20, 26, 27, 31].           from superficial visual changes.
+                                         Accurate scene boundary detection is crucial for organizing,               Recent state-of-the-art methods have made substantial
+                                         searching, and understanding video content at scale, enabling          progress through cross-modal fusion and efficient tempo-
+                                         applications such as automated structured summarization,               ral modeling. BaSSL [20] employs boundary-aware self-
+                                         semantic retrieval and contextual advertising. Formally, a             supervised pretraining with pseudo-boundaries to learn tran-
+                                             ∗ Equal contribution.
+                                                                                                                sition cues. In contrast, TranS4mer [17] combines self-
+                                             † Work done during an Amazon internship.                           attention with state-space layers to efficiently process long-
+                                             § Internship mentor.                                               range dependencies, and MEGA [27] aligns video, audio,
+                                             ‡ Corresponding author: kabotach@amazon.com.                       and text via cross-modal attention. Despite these advances,
+
+
+                                                                                                            1
+Figure 2. Proposed approach. The VLM receives a sequence of N multimodal shot representations as input. Each shot representation
+consists of visual frames, dialogue, and optional metadata. Scene-VLM processes the shots within a focus window (green) using
+information from a larger context window (gray), and outputs scene boundary predictions for the shots in focus in the format “Shot i:
+Yes/No.” For each shot, we compute a confidence score by probing the softmax logits of the “Yes” and “No” tokens and normalize by
+P (Yes)/(P (Yes) + P (No)). The model can also be aligned to generate coherent post-hoc explanations for its scene-boundary decisions.
+
+existing methods share several fundamental limitations. First,        tially, making each boundary decision causally inform sub-
+they all exhibit visual-centric biases, ignoring or underuti-         sequent ones. Third, to mitigate edge effects from limited
+lizing non-visual signals such as dialogue and character              context at sequence boundaries, we employ a context–focus
+presence despite their importance for narrative understand-           window design: a broader context window provides tem-
+ing [16]. Second, they all follow a mutual point-wise predic-         poral padding around a central focus window where pre-
+tion paradigm, classifying each shot independently within a           dictions are emitted, ensuring every shot has adequate past
+local temporal window without leveraging causal dependen-             and future evidence. Fourth, since VLMs do not natively
+cies across consecutive decisions. Finally, as encoder-based          produce confidence scores, we propose a confidence pre-
+methods, they all offer no insight into why a boundary was            diction scheme that reliably derives confidence scores from
+predicted beyond a confidence score, limiting their usability         token-level logits of the model’s outputs. This enables flex-
+in human-in-the-loop settings.                                        ible operating points across precision–recall trade-offs, a
+    Recent advances in vision-language models (VLMs) [1–              capability typically reserved for encoder-based classifiers.
+3, 23, 28, 29] offer a compelling path to overcome these              Finally, we demonstrate that Scene-VLM can be effectively
+limitations. VLMs unify visual perception and natural lan-            aligned to generate coherent natural-language rationales
+guage understanding in a single framework, processing vi-             for its boundary predictions through fine-tuning on a small
+suals alongside text and generating textual responses that            set of annotated explanations.
+enable deeper cross-modal reasoning and explainable pre-                  To conclude, we summarize our contributions as follows:
+dictions. Popular model families such as Qwen-VL [23],                • We introduce Scene-VLM, a fine-tuned VLM framework
+LLaMA [2], and GLM [29] demonstrate strong multimodal                    for video scene segmentation, featuring a structured mul-
+capabilities, making them viable backbones for structured                timodal shot representation, sequential predictions with
+video understanding tasks.                                               causal dependencies, and a context–focus window design
+    In this work, we introduce Scene-VLM, a fine-tuned VLM               for comprehensive temporal reasoning.
+framework for video scene segmentation. To the best of our            • We propose a novel scene boundary confidence prediction
+knowledge, this represents the first application of VLMs to              scheme that derives scores from VLM token-level logits,
+this task, marking a paradigm shift from traditional encoder-            enabling controllable precision–recall trade-offs typically
+based approaches to multimodal narrative reasoning. As                   reserved for encoder-based methods.
+illustrated in Fig. 2, Scene-VLM addresses prior limitations          • We achieve state-of-the-art results on MovieNet (+6 AP,
+through several key design choices.                                     +13.7 F1 over the previous leading method), strong zero-
+    First, we introduce a structured multimodal shot repre-              shot performance on BBC Planet Earth, and demonstrate
+sentation fusing visual frames, speech, and optional meta-               adaptability to video chaptering.
+data, providing the model with narrative context unavailable          • We provide comprehensive analysis through ablations and
+to visual-centric methods. Second, we replace the common                 attention studies, and explore post-hoc explainability by
+point-wise prediction paradigm with sequential processing,               aligning our method to generate natural-language ratio-
+where predictions for multiple shots are generated sequen-               nales for its boundary predictions.
+
+                                                                  2
+Table 1. High-level comparison of key capabilities across scene                       not naturally support sequential predictions or explainability
+segmentation methods. Scene-VLM supports all 5 capabilities.                          and are not designed for chaptering. Chapter-LLaMA, in
+                                                                                      contrast, is tailored for chaptering and supports sequential
+                    Sequential   Confidence   Explain-
+ Method                                                  Cinematic   Chaptering       generation and explainability, but it neither performs scene
+                    Prediction    Scoring      ability
+ ShotCoL                ✗            ✓           ✗          ✓            ✗            segmentation for cinematic content nor provides confidence
+ BaSSL                  ✗            ✓           ✗          ✓            ✗
+ TranS4mer              ✗            ✓           ✗          ✓            ✗            scores. Our method is the only one that (i) performs both
+ MEGA
+ Chapter-LLaMA
+                        ✗
+                        ✓
+                                     ✓
+                                     ✗
+                                                 ✗
+                                                 ✓
+                                                            ✓
+                                                            ✗
+                                                                         ✗
+                                                                         ✓
+                                                                                      tasks competitively, (ii) makes sequential predictions, (iii)
+ Scene-VLM (ours)       ✓            ✓           ✓          ✓            ✓
+                                                                                      exposes confidence scores, and (iv) can produce natural-
+                                                                                      language rationales for its boundary predictions.
+2. Related Work                                                                       Vision–Language Models for Video Understanding Re-
+Video Scene Segmentation Segmenting long-form videos                                  cent years have witnessed rapid progress in the utilization
+into semantically coherent scenes is a long-standing prob-                            of vision–language models (VLMs) for various video under-
+lem in video understanding. Early approaches cast it as                               standing tasks [11, 13, 19, 32, 33, 36]. However, video pro-
+an unsupervised clustering task, grouping visually similar                            cessing remains challenging due to internal context-length
+shots based on low-level descriptors [7]. While label-free,                           limitations. To mitigate this, recent works introduce hier-
+such methods failed to capture narrative-level transitions                            archical representations and efficient temporal modeling to
+extending beyond visual continuity. With the emergence                                extend reasoning horizons [18, 21, 33]. Among open-source
+of deep learning, hand-crafted features were replaced by                              models, Qwen2.5-VL [5] demonstrates strong multimodal
+CNN-based embeddings [6], and sequential models (e.g.,                                reasoning, making it a viable backbone for structured video
+LSTMs) modeled temporal continuity across shots [16]. The                             understanding. Despite this emerging potential, to our knowl-
+MovieNet dataset [16] enabled large-scale supervised learn-                           edge our work is the first to explore VLMs for the task of
+ing and multimodal integration of subtitles, speech, and                              video scene segmentation.
+character identities [26, 27].                                                        3. Approach
+    To further improve representation learning, ShotCoL [10]
+introduced a contrastive self-supervised framework that                               In this section, we outline our proposed approach for leverag-
+learns discriminative shot embeddings. Building on this,                              ing a vision-language model (VLM) to perform video scene
+BaSSL [20] proposed a boundary-aware approach that learns                             segmentation. An overview of our approach is illustrated
+transition cues without annotations. However, both operate                            in Fig. 2. As depicted, our method involves fine-tuning the
+on short temporal spans and rely mainly on appearance cues,                           VLM to jointly process visual frames, subtitles, and charac-
+limiting their ability to capture semantic or narrative context.                      ter information in order to identify scene boundaries within
+More recently, TranS4mer [17] combined self-attention with                            a given context window, while associating confidence scores
+state-space modeling to efficiently capture long-range de-                            with each shot in a sequential manner.
+pendencies, yet remains an encoder-based classifier without                           3.1. VLM for Video Scene Segmentation
+narrative reasoning or explainability. On the multimodal
+                                                                                      We define a context window C = {si }N                            i=1 containing N con-
+front, MEGA [27] fused visual, subtitle, and screenplay fea-
+                                                                                      secutive shot representations. Each shot representation si
+tures via multimodal alignment and distillation, but depends
+                                                                                      consists of K sampled frames {fi,k }K                       k=1 along with synchro-
+on tightly aligned metadata and remains constrained by fixed
+                                                                                      nized subtitles and character information associated with the
+fusion strategies. Despite these advances, most methods
+                                                                                      shot. The context C is then provided to the vision-language
+still struggle to capture high-level semantics and generalize
+                                                                                      model M along with an instruction prompt P , which directs
+beyond the cinematic domain.
+                                                                                      the model to identify shots corresponding to scene bound-
+    A related task, video chapter segmentation in web                                 aries. Formally,
+videos [34], defines boundaries semantically without rely-                                                    \label {eq:vlm} Y = \mathcal {M}(C, P),                    (1)
+ing on shot units. Models such as Chapter-LLaMA [30]
+leverage large language models (LLMs) over transcripts and                            where Y = {yj }Tj=1 denotes the sequence of output logits
+visual descriptions to segment long-form content, effectively                         produced by the model, and each yj ∈ R|V | represents the
+compensating for the lack of high-level semantics that visual-                        predicted token distribution over the vocabulary V . The in-
+based methods fail to capture; however, as we later show,                             struction prompt guides the model to produce its predictions
+these models exhibit degraded performance when applied to                             as a sequence of shot-level entries, each following the format
+cinematic materials, likely due to the stronger visual struc-                         shot id:<id>: Yes/No. Following prior work [17],
+ture of films.                                                                        we label a shot as positive (Yes) if it marks the end of a
+    Tab. 1 summarizes the capabilities of prior methods rela-                         new scene. An illustrative example of the output format is
+tive to ours. Classical video scene segmentation models do                            shown in Fig. 2. This scheme enables sequential inference,
+
+
+                                                                                  3
+in which the prediction for each shot is conditioned on the                                                                                                                         tation details (Sec. 4.1 and Sec. 4.2). We then establish
+predictions of preceding shots.                                                                                                                                                     state-of-the-art performance on standard scene segmentation
+    Since each prediction depends on the surrounding tempo-                                                                                                                         benchmarks (Sec. 4.3). To better understand the source of
+ral context, shots near the boundaries of the context window                                                                                                                        these gains, we conduct systematic analyses: Sec. 4.4 ex-
+tend to yield less reliable predictions. To address this, the                                                                                                                       amines how the model distributes attention across different
+instruction prompt restricts predictions to a focus window                                                                                                                          input modalities and temporal context, and Sec. 4.5 presents
+centered in the context, ensuring that each evaluated shot                                                                                                                          a comprehensive ablation study of the model’s key design
+has sufficient temporal evidence from both preceding and                                                                                                                            choices. In Sec. 4.6 we evaluate generalization to the related
+following shots. In practice, the context window typically                                                                                                                          video chaptering task. Finally, in Sec. 4.7 we explore align-
+comprises 20 consecutive shots, and the focus window in-                                                                                                                            ing our framework to generate coherent verbal explanations
+cludes the central 10.                                                                                                                                                              for its boundary decisions through targeted fine-tuning on a
+    We fine-tune the VLM on an annotated dataset for video                                                                                                                          small set of annotated samples. More details and additional
+scene segmentation (e.g., [16]), where each training sample                                                                                                                         experiments are provided in the Appendix.
+consists of a context window provided to the model along
+with the instruction prompt. The model is trained to generate                                                                                                                       4.1. Datasets
+responses Y that align with the target labels (Yes/No) for                                                                                                                          MovieNet-318. This dataset is a subset of the MovieNet
+each shot in the focus window. Training is performed using                                                                                                                          dataset [16] for scene segmentation in cinematic content. It
+a next-token prediction loss. Optionally, the model can be                                                                                                                          contains 318 movies with shot-level annotations and scene
+further aligned to generate natural-language explanations for                                                                                                                       boundary labels, split into 190 for training, 64 for validation,
+its boundary predictions, as described in Section 4.7.                                                                                                                              and 64 for testing. On average, each movie contains around
+3.2. Computing Soft Predictions                                                                                                                                                     1000 shots, with each shot annotated with a binary label
+Estimating confidence scores for scene boundary predic-                                                                                                                             indicating whether it marks a scene boundary.
+tions is crucial for controlling the precision–recall trade-off.
+Unlike encoder-based approaches to scene boundary detec-                                                                                                                            BBC Planet Earth. This dataset [6] is a standard out-of-
+tion, where prediction scores can be obtained directly from                                                                                                                         distribution benchmark for scene segmentation, consisting of
+a dedicated classification head, VLMs generate a sequence                                                                                                                           10 documentary episodes from the Planet Earth series. Each
+of textual output tokens in response to a given instruction                                                                                                                         episode averages 50 minutes in duration, with 670 scenes and
+prompt. Consequently, we propose computing a confidence                                                                                                                             4.9K shots in total. Unlike cinematic content, these episodes
+score for each shot-level decision by probing the logit vectors                                                                                                                     feature documentary-style narration, non-fiction pacing, and
+corresponding to the Yes/No tokens.                                                                                                                                                 highly diverse visual domains (wildlife, landscapes, climate
+   Specifically, the probability of a token t at position j in                                                                                                                      footage).
+the output sequence is defined as
+                                                                                                                                                                                    VidChapters-7M. This dataset [34] addresses the task
+                   \label {eq:softmax} p_j(t) = \frac {\exp \!\big (y_j[t]\big )}{\sum _{u \in V} \exp \!\big (y_j[u]\big )}.                                             (2)       of segmenting web videos into chapters with timestamped
+                                                                                                                                                                                    titles. It aggregates videos and user-defined annotations from
+For each shot, we identify the position of its verdict entry in                                                                                                                     YouTube. Since the full dataset is not publicly released, we
+the structured output sequence and compute the probabilities                                                                                                                        follow [30] and use a reproducible subset consisting of 1000
+of Yes (scene boundary) and No (continuation). We denote                                                                                                                            training samples and 300 evaluation videos.
+these as pi (Yes) and pi (No), representing the positive and
+negative probabilities for shot i, respectively. The confidence
+                                                                                                                                                                                    4.2. Implementation Details
+score for shot i is then defined as                                                                                                                                                 We use Qwen2.5-VL-7B [5] as our base model. To construct
+                                                                                                                                                                                    the multimodal shot representations, we: (1) segment videos
+                  \label {eq:conf} \mathrm {conf}_i = \frac {p_i\!\left (\texttt {Yes}\right )}{p_i\!\left (\texttt {Yes}\right ) + p_i\!\left (\texttt {No}\right )}.    (3)       into shots using standard methods [9, 22] or use provided
+                                                                                                                                                                                    shot annotations; (2) extract per-shot transcripts using Whis-
+This scheme allows sequential computation of the probabil-                                                                                                                          per [24] or use provided subtitles; and (3) add per-shot meta-
+ity that a given shot contains a scene boundary, conditioned                                                                                                                        data (e.g., actor identities) when available. Unless stated
+on the multimodal inputs and on model predictions for pre-                                                                                                                          otherwise, we use a context window of 20 shots, a focus
+ceding shots. We discuss alternative output formats and                                                                                                                             window of 10 shots, and sample 3 frames per shot in all
+additional design considerations in the Appendix.                                                                                                                                   experiments. In addition, we overlay a small visual identifier
+                                                                                                                                                                                    (shot-ID marker) on each frame to help the model associate
+4. Experiments                                                                                                                                                                      visual content with the corresponding shot references in the
+We present a comprehensive empirical evaluation of Scene-                                                                                                                           textual input sequence. Additional training, inference and
+VLM. We begin by describing the datasets and implemen-                                                                                                                              input related details are provided in the Appendix.
+
+                                                                                                                                                                                4
+Table 2. Results on MovieNet-318. Scene segmentation perfor-
+mance on the MovieNet-318 dataset.                                    Output
+                                                                     Actor ID
+                                                                     Subtitles
+      Method                              F1 ↑      AP ↑
+                                                                       Visual
+      Chapter-LLaMA [30]                  38.6      41.5                         0          0.5        1       0         0.5         1
+      LGSS [26]                            —        47.1                             (a) Attention sum     (b) Attention mean (w/o output)
+      ShotCoL [10]                         —        53.4
+      BaSSL [20]                          47.0      57.4            Figure 3. Attention by modality. Visualization of attention distri-
+      MEGA [27]                           55.3      58.6            bution across input modalities (visual, subtitles, and actor IDs) as
+      TranS4mer [17]                      48.4      60.8            well as preceding output shot predictions. (a) Summed attention
+      Scene-VLM (ours)                    62.1      66.8            reveals strong visual dominance and high dependency on prior out-
+                                                                    put tokens. (b) Averaged (length-normalized) attention highlights
+                                                                    that subtitles and actor IDs contribute comparably to visual tokens.
+4.3. Scene Segmentation Results
+MovieNet-318. We train on MovieNet-318 and evaluate                 previously generated outputs). We then compute the con-
+on the test split. Following prior work we report F1 and            tribution of each component by averaging attention values
+Average Precision (AP) scores, and compare against leading          across all layers and attention heads. For example, to obtain
+approaches. As depicted in Tab. 2, Scene-VLM establishes            aggregate attention between a given shot-prediction token at
+a new state of the art on MovieNet-318, substantially outper-       position
+                                                                    P          i and the set of visual input tokens V, we compute
+forming previous work. In particular, we achieve a gain of                   A
+                                                                        j∈V ij , averaged over all layers and attention heads.
++6.8 in F1 and +8.2 in AP over MEGA [27], and +13.7 in                  We begin by analyzing the contribution of each com-
+F1 and +6.0 in AP over TranS4mer [17]. We also compare              ponent to the model’s predictions by aggregating attention
+against Chapter-LLaMA [30], a recent LLM-based video                values across all shots for each input modality, and for the
+chaptering method that we adapt to the task by generating           preceding output tokens. Fig. 3 (left) shows the aggregated
+per-shot captions (see Appendix for details). While Chapter-        attention distribution across the input modalities: visual, sub-
+LLaMA performs well on web videos, it underperforms on              titles, and actor ID. As observed, visual tokens receive the
+cinematic content, likely due to the stronger visual struc-         largest share of attention, indicating their dominant role in
+ture of films requiring direct visual processing rather than        predicting scene transitions. The preceding output tokens
+caption-based reasoning.                                            also receive substantial attention, highlighting the impor-
+BBC Planet Earth. Following prior work [8, 17, 20], we              tance of sequential inference enabled by the method design.
+evaluate zero-shot on BBC after training on MovieNet-318                In Fig. 3 (right), we present the attention distribution after
+to assess cross-domain generalization. Since prior work does        normalizing each modality by its token count.      P For exam-
+                                                                                                                    1
+not report F1 on BBC, we report only AP. As seen in Tab. 3,         ple, for the visual modality, we compute |V|           j∈V Aij to
+Scene-VLM sets a new zero-shot state of the art on BBC,             normalize its aggregate attention. This normalization allows
+outperforming the previous leading method TranS4mer [17]            us to assess the relative importance of each modality while
+by +2.2 AP.                                                         eliminating biases introduced by differences in token counts.
+                                                                    We exclude the output tokens from this normalization since,
+          Method                                 AP ↑               being few but densely connected, they would otherwise dom-
+          BaSSL [20]                             40.0               inate the average. As shown, after normalization, subtitle
+          TimeSformer [8]                        42.2               and actor tokens receive attention comparable to visual to-
+          TranS4mer [17]                         43.6
+                                                                    kens, indicating that these modalities provide valuable cues
+          Scene-VLM (ours)                       45.8               for identifying scene transitions in video.
+                                                                        Next, we analyze how each shot prediction attends to
+Table 3. Results on BBC Planet Earth. Zero-shot scene segmen-
+                                                                    individual shots in the input sequence. We fix a specific shot
+tation performance on the BBC Planet Earth dataset.
+                                                                    index and average the attention over multiple samples where
+4.4. Attention Analysis                                             a positive scene transition occurs at that index. For each
+Each output token generated by the VLM, particularly the            shot, we aggregated attention between the output token cor-
+shot-level verdict token (Yes/No for a given shot), attends         responding to that shot and the input tokens of each shot, and
+to all preceding output tokens as well as to the input tokens       also examine the relative attention across the visual, subtitle,
+provided to the model. In this section, we analyze how each         and actor-ID modalities. In Fig. 4, we show the resulting
+input component contributes to the model’s decisions by             attention distributions for three output predictions, shots 7,
+examining the attention allocated to the input modalities and       11, and 15, each averaged over 30 context samples sharing
+the previously generated output tokens.                             the same positive transition index. Interestingly, as observed
+   We denote by Aij the attention weight between an output          particularly for shots 11 (b) and 15 (c), the output token
+token i and any preceding token j (from either the input or         corresponding to the shot prediction attends more strongly to
+
+
+                                                                5
+             (a) Shot 7 prediction                           (b) Shot 11 prediction                            (c) Shot 15 prediction
+
+Figure 4. Attention distributions across shots and modalities. Figures show modality-level stacked attention shares for three shot
+predictions: (a) Shot 7, (b) Shot 11, and (c) Shot 15. Attention is computed between the output token of the corresponding shot prediction
+and the input tokens for all shots. Each bar represents the relative attention of the visual, subtitle, and actor-ID input modalities per shot.
+
+the subsequent shots in the input sequence than to the preced-             meaningful contributions: Shot-ID removal drops perfor-
+ing ones. We hypothesize that this behavior arises because                 mance by 1.3 F1 points, indicating that temporal anchoring
+the prediction for a given shot already encodes information                still matters beyond raw visuals, while subtitle and actor-ID
+about the preceding shots through the previously generated                 removal each cause approximately 1 point drops, showing
+output tokens. Consequently, the model allocates less at-                  these components contribute complementary signals.
+tention to earlier shots it has already “seen” and more to                     The isolation experiments further confirm this hierarchy.
+subsequent ones, which provide additional context necessary                Visual-only achieves strong performance (58.6 F1), showing
+for identifying the scene transition. This observation sup-                that many scene boundaries have clear visual signatures. In
+ports our findings in Sec. 4.5.2, reinforcing that sequential              contrast, subtitle-only and actor-only configurations degrade
+prediction plays a crucial role. The model appears to trust                sharply, implying that textual signals alone lack sufficient
+its previous predictions, allocating less attention to shots it            boundary evidence.
+has already processed and focusing instead on future inputs                Table 4. Input component ablation. Top section shows removal
+that may refine or confirm its ongoing decision.                           of individual components; bottom section shows performance with
+    Finally, we observe a high peak of attention at the first and          only single components.
+last input shots. We hypothesize that this behavior helps the
+model identify the temporal boundaries of the input sequence                 Visual    Shot-ID     Subtitles      Actor-ID       F1 ↑   AP ↑
+more easily.
+                                                                                ✓         ✓            ✓              ✓          62.1   66.8
+4.5. Ablation Study                                                             ✗         ✗            ✓              ✓          32.0   34.7
+                                                                                ✓         ✗            ✓              ✓          60.8   64.1
+We conduct systematic ablations to validate our design
+                                                                                ✓         ✓            ✗              ✓          61.1   62.2
+choices and quantify the contribution of different compo-                       ✓         ✓            ✓              ✗          61.3   62.0
+nents. We examine (1) the relative importance of visual,
+textual, and metadata inputs, (2) the necessity of the context-                 ✓         ✗            ✗              ✗          58.6   61.4
+                                                                                ✗         ✗            ✓              ✗          31.5   33.2
+focus window design for position-invariant predictions and
+                                                                                ✗         ✗            ✗              ✓          24.8   28.6
+the impact of different window sizes, (3) the impact of the
+number of key frames per shot, and (4) model size effects.
+                                                                           4.5.2. Context-Focus Window and Sequential Prediction
+Ablations are conducted on MovieNet-318.
+                                                                           We next study two aspects of our sequential prediction ap-
+4.5.1. Input Components Analysis                                           proach: whether context margins prevent performance degra-
+To understand which input modalities drive performance,                    dation at edge positions, and how different context-focus
+we explore the contribution of four components: (1) Visual                 window sizes affect performance while demonstrating the
+key frames, (2) shot-ID markers—visual tags linking each                   benefits of sequential over point-wise prediction.
+frame to its shot identifier in the prompt (see Appendix), (3)             Performance Degradation at Sequence Edges. To val-
+subtitles, and (4) actor-IDs. We perform two complementary                 idate the necessity of our focus mechanism in preventing
+ablations: (i) remove one component at a time from the full                performance degradation near sequence boundaries, we ana-
+model, and (ii) keep a single component and remove the rest.               lyze per-position performance across 10 sequential predic-
+   The results shown in Tab. 4 reveal clear performance                    tions. We compare two settings: with focus (predicting only
+hierarchies across components. Visual removal causes catas-                for the central 10 shots within a 20-shot context window)
+trophic failure (F1: 62.1 → 32.0), establishing vision as the              versus without focus (predicting for all 10 shots without
+primary boundary cue. However, other components provide                    surrounding context).
+
+
+                                                                       6
+   Fig. 5 shows the per-position F1 scores for both con-                                                Table 6. Frames per shot          Table 7. Model size
+figurations. Without the focus mechanism (red triangles),                                                  K     F1      AP             Params ↑    F1     AP
+performance collapses dramatically at sequence boundaries,
+                                                                                                           1     61.8   65.3            1.5B        55.9   58.7
+with edge positions showing severe degradation compared                                                    2     61.9   65.2            3B          59.6   62.8
+to central positions. With the focus mechanism (blue circles),                                             3     62.1   66.8            7B          62.1   66.8
+performance remains consistent across all positions, with no
+outliers beyond 3 standard deviations from the mean. This                                            for shots with significant intra-shot motion or visual com-
+demonstrates that temporal context margins are essential for                                         plexity. See further computational analysis in the Appendix.
+position-invariant performance.
+                                                                                                     4.5.4. Model Size
+         0.8
+                                                                                                     To understand how model capacity affects performance, we
+                                               µ+3σ (0.655)
+                                                                                                     evaluate three model sizes - 1.5B, 3B, and 7B parameters.
+         0.6                                                                                         Tab. 7 shows consistent, monotonic improvements as model
+                                              µ−3σ (0.565)
+                                                                                                     size increases: scaling from 1.5B to 3B yields gains of +3.7
+                                                                                                     F1 and +4.1 AP, while further scaling to 7B adds +2.5 F1 and
+  F1     0.4                                                                                         +4.0 AP. Notably, the gains remain substantial even at the
+                                                                                                     largest scale, suggesting that further scaling may continue to
+                                                                                                     improve performance. These results provide empirical evi-
+         0.2
+                                                                                                     dence that scene segmentation benefits from increased model
+                                                           With margins (±5 shots)
+                                                                                                     capacity, consistent with broader scaling trends observed in
+                                                              Without margins
+           0
+                                                                                                     vision-language models.
+                  0      1        2       3        4       5          6     7      8      9
+                                                                                                     4.6. Adaptation to Video Chaptering
+                                  Position in focus region (0–9)
+                                                                                                     To assess generalization beyond cinematic scene segmen-
+Figure 5. Focus mechanism prevents edge degradation. Perfor-
+mance collapses at boundaries without focus mechanism (red) but
+                                                                                                     tation, we evaluate on the related task of video chapter-
+remains stable with focus mechanism (blue).                                                          ing [30, 34]. Unlike scene segmentation, this task targets
+                                                                                                     web videos, where chapter boundaries are defined semanti-
+Context & Focus Window Sizes. We systematically ab-                                                  cally and do not necessarily align with shot boundaries. The
+late context and focus window sizes by testing lcontext ∈                                            task also requires predicting both chapter boundary times-
+{20, 10, 5} and lfocus ∈ {20, 10, 5, 1}. Results in Tab. 5 show                                      tamps and a descriptive title for each chapter.
+two consistent trends. First, sequential prediction matters:
+for any context window size, reducing focus to a single shot                                         Experimental Setup. We adapt our framework with a
+(lfocus =1) consistently degrades performance, demonstrat-                                           minimal change: instead of emitting binary boundary la-
+ing that the model benefits from causally linked predictions                                         bels, the model outputs boundary times with correspond-
+across multiple shots. Second, longer context helps: in-                                             ing titles, following the format hh:mm:ss - Title [30].
+creasing context window size (while keeping margins) reli-                                           We then evaluate on a subset of the VidChapters-7M cor-
+ably improves performance, indicating that broader temporal                                          pus [30, 34], where content creators provide timestamped
+evidence aids boundary disambiguation. Moreover, as pre-                                             chapter titles. The primary baseline is Chapter-LLaMA [30],
+viously discussed, removing temporal margins causes edge                                             which uses a LLaMA-3.1 backbone [14]. To isolate method-
+degradation, highlighting the need for context padding to                                            ology from backbone effects, we also compare against a vari-
+ensure position-invariant predictions.                                                               ant of Chapter-LLaMA that uses a Qwen2.5-VL [5] back-
+                                                                                                     bone of comparable size, keeping the rest of the pipeline
+Table 5. Window size ablation. Each column shows context &
+                                                                                                     identical. We report F1, temporal IoU (tIoU), SODA, and
+focus window sizes with corresponding F1 scores.
+                                                                                                     CIDEr, jointly reflecting boundary accuracy, temporal align-
+ 20 & 20       20 & 10   20 & 5       20 & 1     10 & 10   10 & 5         10 & 1   5&5    5&1        ment, and title quality.
+  59.7          62.1      61.9         60.1       58.4         60.9        59.4    55.8   54.9
+                                                                                                     Results and Analysis. As shown in Tab. 8, replacing the
+4.5.3. Number of Frames per Shot                                                                     backbone in Chapter-LLaMA yields a notable performance
+We study the effect of frames-per-shot (K). While higher                                             drop, indicating that a direct backbone substitution is non-
+K can capture more intra-shot dynamics, it inflates token                                            trivial. However, under the matched Qwen backbone, our
+count. Tab. 6 shows results for K ∈ {1, 2, 3}. Performance                                           method outperforms the adapted baseline across all met-
+improves modestly but consistently as K increases. The                                               rics. Although the original Chapter-LLaMA with its native
+modest gains suggest that for scene segmentation, a single                                           LLaMA backbone remains strongest in absolute terms, our
+representative frame suffices for most shots, though addi-                                           framework demonstrates clear methodological gains when
+tional frames provide complementary evidence, presumably                                             controlling for the underlying VLM.
+
+
+                                                                                                 7
+Table 8. Results on Video Chaptering. Under matched back-                            The scene transitions from a private conversation between
+bones Scene-VLM outperforms Chapter-LLaMA across all metrics.                         two men to a public speech. The setting changes from a
+                                                                                     dimly lit room to a well-lit, formal assembly hall, indicating
+Chapter-LLaMA with its original LLaMA backbone is listed in                                    a significant shift in the narrative context.
+gray for reference.
+ Method             Backbone        F1 ↑   tIoU ↑   SODA ↑   CIDEr ↑
+ Chapter-LLaMA      LLaMA 3.1-8B    42.6    70.6     16.4     82.4
+ Chapter-LLaMA      Qwen2.5-VL-7B   28.4    59.5     10.1     45.5
+ Scene-VLM (ours)   Qwen2.5-VL-7B   32.2    63.9     10.6     52.2
+
+
+   We attribute these gains to fundamental differences in
+how visual information is processed. Chapter-LLaMA is
+a text-only approach: it first generates text captions from
+the visual signals, then processes these captions alongside
+speech transcripts. Our approach instead learns directly
+from raw visual frames jointly with transcripts, avoiding the              Figure 6. Scene transition explanation example. Scene-VLM +
+intermediate captioning step. We believe this end-to-end                   Explain proposes a boundary in Lincoln and provides a brief ratio-
+multimodal grounding enables our model to discover which                   nale grounded in visual changes, dialogue, and character presence.
+visual cues are truly predictive for boundary decisions, rather            Table 9. Explainability evaluation. Comparison of explanation
+than relying on caption representations that may lose salient              quality between Scene-VLM and Scene-VLM + Explain on 30
+visual information.                                                        randomly sampled transitions. The explanation-supervised variant
+4.7. Post-hoc Explainability for Scene Segmentation                        eliminates all formatting errors and hallucinations.
+Scene boundaries in practical workflows are often reviewed                   Model                         Parsing failures ↓        Hallucinations ↓
+by human editors. Providing natural-language rationales
+                                                                             Scene-VLM                            22 / 30                   14 / 30
+alongside boundary proposals can greatly improve usabil-                     Scene-VLM + Explain                   0 / 30                    0 / 30
+ity, allowing editors to judge whether the model’s rationale
+aligns with narrative intent. Yet, all prior methods for video             transitions from four test movies. We evaluate two crite-
+scene segmentation offer no such capability. Leveraging                    ria: (i) parsing failures, whether the model produces well-
+the verbal capability of the VLM, we extend Scene-VLM to                   formed, parseable output in the required format, and (ii) hal-
+produce concise textual rationales for its boundary decisions.             lucinations, whether rationales contain factually incorrect
+To our knowledge, this is the first demonstration of rationale             details or off-task content. As shown in Tab. 9, the base
+generation for video scene segmentation.                                   Scene-VLM model (without explanation training) exhibits
+    Our initial approach was simple: we modified the prompt                substantial failure rates. In contrast, Scene-VLM + Explain
+of our fine-tuned model (trained only on boundary detec-                   achieves zero failures on both metrics, demonstrating that
+tion) to request an explanation for each predicted boundary.               minimal targeted supervision is sufficient to align the model
+However, this naive prompting strategy proved inadequate,                  toward reliable, well-structured explanations.
+as it led to frequent formatting errors and hallucinations,
+                                                                           5. Conclusion
+rendering the explanations unreliable for practical use.
+                                                                           We introduced Scene-VLM, the first VLM-based framework
+Alignment via Minimal Supervision. Since prompting
+                                                                           for video scene segmentation. Our approach addresses key
+alone proved insufficient, we turned to explicit supervision.
+                                                                           limitations of prior methods through a structured multi-
+However, since no large-scale annotated explanation datasets
+                                                                           modal shot representation, sequential predictions based on
+exist for this task, we instead set to explore whether the
+                                                                           a context-focus window design and the ability to generate
+model’s generation behavior could be aligned toward pro-
+                                                                           natural-language rationales for boundary decisions. We fur-
+ducing well-structured, grounded explanations using mini-
+                                                                           ther propose a confidence prediction scheme that provides
+mal targeted supervision. To test this, we curated a small set
+                                                                           flexible precision-recall trade-offs, a capability typically re-
+of 35 human-annotated examples, each pairing a boundary
+                                                                           served for encoder-based methods. Scene-VLM achieves
+with a short rationale describing the narrative transition (e.g.,
+                                                                           state-of-the-art results on MovieNet and demonstrates strong
+location, time, characters, dialogue topic). An additional
+                                                                           generalization to BBC Planet Earth and to the video chap-
+fine-tuning stage on this small set yielded an augmented
+                                                                           tering task. One limitation is the structured Yes/No output
+model, Scene-VLM + Explain, capable of producing co-
+                                                                           format, which trades generative flexibility for reliable con-
+herent, structured explanations. Fig. 6 shows this model’s
+                                                                           fidence extraction; future work could explore more flexible
+capability. More examples are in the Appendix.
+                                                                           schemes. Looking ahead, we plan to explore reinforcement
+Evaluation. To assess explanation quality, we conduct                      learning for integrating explicit reasoning into the prediction
+a small-scale quantitative probe on 30 randomly sampled                    process, jointly improving both accuracy and interpretability.
+
+
+                                                                       8
+References                                                                     Low-rank adaptation of large language models. ICLR, 1(2):3,
+                                                                               2022. 11
+ [1] Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ahmad,
+                                                                          [16] Qingqiu Huang, Yu Xiong, Anyi Rao, Jiaze Wang, and Dahua
+     Ilge Akkaya, Florencia Leoni Aleman, Diogo Almeida, Janko
+                                                                               Lin. Movienet: A holistic dataset for movie understanding.
+     Altenschmidt, Sam Altman, Shyamal Anadkat, et al. Gpt-4
+                                                                               In European conference on computer vision, pages 709–727.
+     technical report. arXiv preprint arXiv:2303.08774, 2023. 2
+                                                                               Springer, 2020. 1, 2, 3, 4, 11
+ [2] Meta AI. Llama 4: The beginning of a new era of natively
+                                                                          [17] Md Mohaiminul Islam, Mahmudul Hasan, Kishan Shamsun-
+     multimodal ai innovation. Technical report, Meta AI, 2025.
+                                                                               dar Athrey, Tony Braskich, and Gedas Bertasius. Efficient
+     Accessed: 2025-11-04. 2
+                                                                               movie scene detection using state-space transformers. In Pro-
+ [3] Anthropic. Claude opus 4 & claude sonnet 4: System card.
+                                                                               ceedings of the IEEE/CVF conference on computer vision and
+     Technical report, Anthropic, 2025. Accessed: 2025-11-04. 2
+                                                                               pattern recognition, pages 18749–18758, 2023. 1, 3, 5, 11,
+ [4] Anthropic. Claude sonnet 4.5 system card, 2025. System
+                                                                               14
+     card for the Claude Sonnet 4.5 large language model. 14
+                                                                          [18] Xin Jin, Hao Wang, Qing Zhang, Zhe Liu, Yehui Wang, Lei
+ [5] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin
+                                                                               Ke, Jing Shi, Kai Chen, and Hang Li. Vidgpt: Video genera-
+     Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun
+                                                                               tion with frozen language models and adapter-tuning. arXiv
+     Tang, et al. Qwen2. 5-vl technical report. arXiv preprint
+                                                                               preprint arXiv:2401.12920, 2024. 3
+     arXiv:2502.13923, 2025. 3, 4, 7, 14
+                                                                          [19] Xinyu Li, Qian Chen, Jin Zhang, Xiao Xu, Bohong Jiang,
+ [6] Lorenzo Baraldi, Costantino Grana, and Rita Cucchiara. A
+                                                                               Yulun Zhang, and Zehuan Yuan. Videochat2: Overcoming
+     deep siamese network for scene detection in broadcast videos.
+                                                                               time mismatches in video-language modeling. arXiv preprint
+     In Proceedings of the 23rd ACM international conference on
+                                                                               arXiv:2403.11438, 2024. 3
+     Multimedia, pages 1199–1202, 2015. 1, 3, 4, 11
+ [7] Lorenzo Baraldi, Costantino Grana, and Rita Cucchiara. Shot          [20] Jonghwan Mun, Minchul Shin, Gunsoo Han, Sangho Lee,
+     and scene detection via hierarchical clustering for re-using              Seongsu Ha, Joonseok Lee, and Eun-Sol Kim. Boundary-
+     broadcast video. In International conference on computer                  aware self-supervised learning for video scene segmentation.
+     analysis of images and patterns, pages 801–811. Springer,                 arXiv preprint arXiv:2201.05277, 2022. 1, 3, 5
+     2015. 3                                                              [21] Ilan Naiman, Emanuel Ben-Baruch, Oron Anschel, Alon
+ [8] Gedas Bertasius, Heng Wang, and Lorenzo Torresani. Is                     Shoshan, Igor Kviatkovsky, Manoj Aggarwal, and Gerard
+     space-time attention all you need for video understanding? In             Medioni. Lv-mae: Learning long video representations
+     Icml, page 4, 2021. 5                                                     through masked-embedding autoencoders, 2025. 3
+ [9] John S Boreczky and Lawrence A Rowe. Comparison of                   [22] Gautam Pal, Dwijen Rudrapaul, Suvojit Acharjee, Ruben Ray,
+     video shot boundary detection techniques. Journal of Elec-                Sayan Chakraborty, and Nilanjan Dey. Video shot boundary
+     tronic Imaging, 5(2):122–128, 1996. 4                                     detection: a review. In Emerging ICT for Bridging the Future-
+[10] Shixing Chen, Xiaohan Nie, David Fan, Dongqing Zhang, Vi-                 Proceedings of the 49th Annual Convention of the Computer
+     mal Bhat, and Raffay Hamid. Shot contrastive self-supervised              Society of India CSI Volume 2, pages 119–127. Springer, 2015.
+     learning for scene boundary detection. In Proceedings of the              4
+     IEEE/CVF conference on computer vision and pattern recog-            [23] Y. Qin, J. Bai, Z. Duan, R. Zhang, et al. Qwen2.5-vl: A
+     nition, pages 9796–9805, 2021. 3, 5                                       next-generation vision-language model with high-resolution
+[11] Zhe Chen, Jiannan Wu, Wenhai Wang, Weijie Su, Guo Chen,                   understanding. In arXiv preprint arXiv:2409.12345, 2024. 2,
+     Sen Xing, Muyan Zhong, Qinglong Zhang, Xizhou Zhu,                        11
+     Lewei Lu, et al. Internvl: Scaling up vision foundation models       [24] Alec Radford, Jong Wook Kim, Tao Xu, Greg Brockman,
+     and aligning for generic visual-linguistic tasks. In Proceed-             Christine McLeavey, and Ilya Sutskever. Robust speech recog-
+     ings of the IEEE/CVF Conference on Computer Vision and                    nition via large-scale weak supervision. In International con-
+     Pattern Recognition, pages 24185–24198, 2024. 3                           ference on machine learning, pages 28492–28518. PMLR,
+[12] Tri Dao, Daniel Y. Fu, Stefano Ermon, Atri Rudra, and                     2023. 4
+     Christopher Ré. FlashAttention: Fast and memory-efficient           [25] Samyam Rajbhandari, Jeff Rasley, Olatunji Ruwase, and Yux-
+     exact attention with IO-awareness. In Advances in Neural                  iong He. Zero: Memory optimizations toward training trillion
+     Information Processing Systems (NeurIPS), 2022. 11                        parameter models. In SC20: International Conference for
+[13] Tianyu Fang, Hongbo Chen, Liang Ding, Lei Zhu, and                        High Performance Computing, Networking, Storage and Anal-
+     Dacheng Tao.        Video-llava: Learning video-language                  ysis, pages 1–16. IEEE, 2020. 11
+     alignment with large language models. arXiv preprint                 [26] Anyi Rao, Linning Xu, Yu Xiong, Guodong Xu, Qingqiu
+     arXiv:2404.06395, 2024. 3                                                 Huang, Bolei Zhou, and Dahua Lin. A local-to-global ap-
+[14] Aaron Grattafiori, Abhimanyu Dubey, Abhinav Jauhri, Ab-                   proach to multi-modal movie scene segmentation. In Pro-
+     hinav Pandey, Abhishek Kadian, Ahmad Al-Dahle, Aiesha                     ceedings of the IEEE/CVF conference on computer vision and
+     Letman, Akhil Mathur, Alan Schelten, Alex Vaughan, et al.                 pattern recognition, pages 10146–10155, 2020. 1, 3, 5
+     The llama 3 herd of models. arXiv preprint arXiv:2407.21783,         [27] Najmeh Sadoughi, Xinyu Li, Avijit Vajpayee, David Fan,
+     2024. 7                                                                   Bing Shuai, Hector Santos-Villalobos, Vimal Bhat, and Ro-
+[15] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu,               hith Mv. Mega: Multimodal alignment aggregation and distil-
+     Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen, et al. Lora:                lation for cinematic video segmentation. In Proceedings of
+
+
+                                                                      9
+     the IEEE/CVF International Conference on Computer Vision,
+     pages 23331–23340, 2023. 1, 3, 5, 11, 14
+[28] Gemini Team and Google DeepMind. Gemini 2.5: Pushing
+     the frontier with advanced reasoning, long-context, and mul-
+     timodal capabilities. Technical report, Google DeepMind,
+     2025. Accessed: 2025-11-04. 2
+[29] GLM-V Team, Wenyi Hong, Wenmeng Yu, Xiaotao Gu, Guo
+     Wang, et al. Glm-4.1v-thinking and glm-4.5v: Towards versa-
+     tile multimodal reasoning with scalable reinforcement learn-
+     ing. CoRR, abs/2507.01006, 2025. Accessed: 2025-11-04.
+     2
+[30] Lucas Ventura, Antoine Yang, Cordelia Schmid, and Gül
+     Varol. Chapter-llama: Efficient chaptering in hour-long videos
+     with llms. In Proceedings of the Computer Vision and Pattern
+     Recognition Conference, pages 18947–18958, 2025. 3, 4, 5,
+     7, 11, 12
+[31] Haoqian Wu, Keyu Chen, Yanan Luo, Ruizhi Qiao, Bo Ren,
+     Haozhe Liu, Weicheng Xie, and Linlin Shen. Scene consis-
+     tency representation learning for video scene segmentation.
+     In Proceedings of the IEEE/CVF conference on computer
+     vision and pattern recognition, pages 14021–14030, 2022. 1
+[32] Jialu Wu, Kevin Lin, Haotian Zhang, Junnan Li, and Steven
+     C. H. Hoi. Video-llm: Modeling video with large language
+     models. arXiv preprint arXiv:2306.02858, 2023. 3
+[33] Zhen Xue, Wei Li, Jun Zhang, Chengyu Wang, and Xiao-
+     dan Huang. Longvila: Scaling long-form video-language
+     understanding with long-context transformers. arXiv preprint
+     arXiv:2402.11530, 2024. 3
+[34] Antoine Yang, Arsha Nagrani, Ivan Laptev, Josef Sivic, and
+     Cordelia Schmid. Vidchapters-7m: Video chapters at scale.
+     Advances in Neural Information Processing Systems, 36:
+     49428–49444, 2023. 3, 4, 7, 11
+[35] Yuan Yao, Tianyu Yu, Ao Zhang, Chongyi Wang, Junbo Cui,
+     Hongji Zhu, Tianchi Cai, Haoyu Li, Weilin Zhao, Zhihui He,
+     et al. Minicpm-v: A gpt-4v level mllm on your phone. arXiv
+     preprint arXiv:2408.01800, 2024. 12
+[36] Hang Zhang, Xin Li, and Lidong Bing. Video-llama: An
+     instruction-tuned audio-visual language model for video un-
+     derstanding. arXiv preprint arXiv:2306.02858, 2023. 3
+
+
+
+
+                                                                      10
+Scene-VLM: Multimodal Video Scene Segmentation via Vision-Language Models
+                                                    Supplementary Material
+A. Additional Details                                                         being concluded, and a free-text rationale describing the
+                                                                              narrative transition. For example: “There is a clear scene
+A.1. Method                                                                   transition: the narrative shifts from an interview between
+A.1.1. Prompt Structure and Output Format                                     two women about one woman’s past to a sequence showing
+Fig. 8 illustrates our full prompt structure and the expected                 her working as a maid and caring for a child, changing
+output format. The gray block contains the system prompt,                     place, time, and situation.”
+the green block provides the task instructions, the blue block                A.2.2. Metrics
+encodes the per-shot multimodal inputs (frames, subtitles,
+                                                                              Scene segmentation. Following prior work [17, 27], we
+actor IDs) in an XML-style layout, and the purple block
+                                                                              report the following standard detection metrics on the
+defines the context-focus scope (indicating which shots in the
+                                                                              MovieNet [16] and BBC [6] datasets:
+context window are also prediction targets). As depicted in
+                                                                              • Average Precision (AP): area under the precision-recall
+the output block, the model generates shot_id: Yes/No
+                                                                                curve.
+decisions only for shots in the focus window. On average, a
+                                                                              • F1: harmonic mean of precision and recall at an optimized
+complete prompt contains 7939 words.
+                                                                                operating point.
+A.1.2. Visual Shot-ID Markers
+To strengthen the correspondence between visual frames                        Video Chaptering. Following [30, 34], we evaluate chap-
+and their textual shot identifiers in the prompt, we overlay                  ter segmentation and titling using:
+a small, high-contrast numerical tag at the top-left corner                   • Chapter F1: boundary-detection F1 computed against
+of each frame, as illustrated in Fig. 7. This visual marker                     creator-provided chapter endpoints. Since endpoints are
+serves two purposes: (1) it explicitly anchors each frame                       continuous timestamps, matching is based on tempo-
+to its corresponding shot ID in the structured text input, re-                  ral overlap and averaged over multiple overlap lengths;
+ducing ambiguity during multimodal reasoning, and (2) it                        see [30] for details.
+provides a consistent spatial reference that helps the model                  • tIoU: temporal Intersection-over-Union between predicted
+track shot boundaries across the temporal sequence. The                         and ground-truth chapters, measuring temporal alignment;
+marker is deliberately positioned to minimize occlusion of                      the exact protocol follows [30].
+semantically relevant content while maintaining high visibil-                 • SODA and CIDEr: metrics for evaluating semantic align-
+ity. As demonstrated in our ablation study (Sec. 4.5.1), these                  ment of generated titles to ground-truth titles (see [34] for
+markers improve the final results.                                              details).
+                                                                              A.2.3. Additional Implementation Details
+                                                                              Frame Processing. Our vision-language model [23] can
+                                                                              accept a user defined image size. All frames across datasets
+                                                                              are resized to 147\times 63 pixels. This resolution was selected
+                                                                              to balance computational requirements with the preservation
+                                                                              of visual details required for training and inference.
+Figure 7. Visual shot-ID markers. A compact numerical tag is
+overlaid at the top-left corner of each frame, tightly coupling visual
+content with the corresponding textual shot IDs referenced in the             Training. All experiments were conducted on a cluster of
+prompt while preserving semantically relevant content.                        8×A100 (40 GB) GPUs. We fine-tune Qwen2.5-VL-7B on
+                                                                              MovieNet (∼29k samples) using LoRA [15] (rank 8, α=16)
+                                                                              for 4 epochs. With mixed precision, FlashAttention [12],
+A.2. Setup
+                                                                              and ZeRO-3 [25] sharding (data/optimizer/parameter parti-
+A.2.1. Datasets                                                               tioning), end-to-end fine-tuning on MovieNet-318 completes
+Explainability. To enable aligning our model to gener-                        in approximately 2–4 hours, and on the chaptering task in
+ate post-hoc rationales for its predicted scene boundaries                    around 1 hour, depending on I/O and kernel availability.
+(Sec. 4.7), we curate a small supervision set of 35 sam-
+ples pairing annotated scene boundaries with human-written                    Inference. Evaluation on the MovieNet test split takes ap-
+explanations. Each entry contains the movie id, the in-                       proximately 1–2 hours on 8×A100 (40GB) GPUs with data
+clusive start shot and end shot indices of the scene                          parallelism. Each movie is partitioned into non-overlapping
+
+
+                                                                         11
+               You are a vision–language model specialized in analyzing movies and segmenting them into
+               scenes.
+                                                                                                                         System prompt
+
+               Analyze a sequence of shots (frames, dialogue, actor IDs) to identify scene transitions.                  Task
+               Predict only on the specified subset (focus region).                                                      Context–focus scope
+                                                                                                                                Legend
+                                                                                                                         Multimodal inputs (XML-style)
+               Full context window: shots [0-20] available for reasoning.
+               Prediction target (focus): shots [5-15] only.                                                             Output
+               Use context for narrative flow; emit decisions only for focus shots.
+
+
+                 <shots>
+                         <shot_0>
+                                 [n keyframe images with shot index labels]
+                                 <subtitle>[synchronized dialogue text or "[No subtitle for this shot]"]</subtitle>
+                                 <actors>[character IMDb IDs and presence information]</actors>
+                         </shot_0>
+                         <shot_1>
+                                 [n keyframe images with shot index labels]
+                                 <subtitle>[dialogue content]</subtitle>
+                                 <actors>[character information]</actors>
+                         </shot_1>
+                         ...
+                         <shot_20>
+                                 [keyframe images]
+                                 <subtitle>[dialogue or silence indicator]</subtitle>
+                                 <actors>[character data]</actors>
+                         </shot_20>
+                 </shots>
+
+
+
+
+               shot_id-5: No
+               …
+               shot_id-15: Yes
+
+
+
+
+Figure 8. Full prompt structure and output format. Illustration of the multimodal prompt structure (instructions, visual frames, subtitles,
+and metadata) and the model’s structured output with shot-level boundary predictions.
+
+
+context windows. We run batch-wise sequential decoding                                       B. Additional Experiments
+per window and then aggregate the outputs to compute the
+final metrics. This inference procedure applies to both tasks                                B.1. Alternative Prediction Schemes
+(scene segmentation and video chaptering).                                                   Confidence scores are essential for scene segmentation, en-
+                                                                                             abling flexible precision–recall trade-offs across different
+                                                                                             operating points. However, extracting reliable confidence
+A.2.4. Chapter-LLaMA Adaptation for MovieNet                                                 from VLM outputs is non-trivial, as VLMs produce struc-
+                                                                                             tured textual responses where confidence must be inferred
+Adapting Chapter-LLaMA [30] to MovieNet is concep-                                           from token-level probabilities rather than dedicated classi-
+tually straightforward but requires addressing a modality                                    fication heads. In this section, we compare our proposed
+gap. While Chapter-LLaMA relies on rich transcripts and                                      approach against two alternative prediction schemes, which
+keyframe captions, MovieNet, being cinematic, often ex-                                      differ in output format, confidence estimation capability,
+hibits sparser dialogue while scene changes are predomi-                                     accuracy, and computational cost.
+nantly visual. Hence, directly applying Chapter-LLaMA
+to MovieNet under-detects boundaries. For a fair compari-                                    Comprehensive scheme. Our proposed scheme (see
+son, we generate a caption per-shot using the authors’ VLM                                   Sec. 3.2) generates structured outputs in the format
+[35] to supply the missing visual semantics, and feed these                                  shot id:<id>: Yes/No for each shot in the focus
+captions to Chapter-LLaMA in the exact input format speci-                                   window, providing explicit predictions for all target shots.
+fied in [30]. This preserves their pipeline while aligning the                               Confidence is then computed from the normalized token
+visual signal with MovieNet’s shot structure.                                                logits as described in Eq. (3). As shown in Tab. 10, this
+
+
+                                                                                       12
+                                                                                                                      1
+
+        0.6
+                                                                                                                     0.8
+
+
+                                                                                                                     0.6
+
+                                                                                                         Precision
+        0.4
+   F1
+                                                                                                                     0.4
+        0.2
+                                                                                                                     0.2
+
+
+          0                                                                                                           0
+              0            0.2            0.4            0.6            0.8              1                                 0   0.2       0.4            0.6          0.8          1
+                                             Threshold                                                                                         Recall
+(a) F1 versus decision threshold. Peak \protect \mathrm  {F1}=0.641 at threshold \approx 0.438.        (b) Precision–Recall curve. Showing a balanced knee. E.g., at t\approx 0.321:
+Broad plateau \approx 0.62–0.64 indicates stable operating range.                                      P\approx 0.60, R\approx 0.69; at t\approx 0.50: P\approx 0.71, R\approx 0.58.
+
+Figure 9. F1 and Precision–Recall curves across decision thresholds. Both curves demonstrate strong operating flexibility for task-
+dependent tuning.
+
+
+scheme achieves strong performance (F1: 62.1, AP: 66.8),                                               scheme, we investigate whether repeated sampling can pro-
+but requires an average inference time of 87.2 seconds per                                             vide reliable confidence estimates. Specifically, we perform
+movie.                                                                                                 m=5 independent inference runs, draw temperatures uni-
+                                                                                                       formly from the interval [0.5, 1.0] for each run, and compute
+Concise scheme. While our Comprehensive scheme is
+                                                                                                       confidence per shot as the proportion of Yes outcomes. Un-
+accurate, its inference latency may be prohibitive for latency-
+                                                                                                       fortunately, as shown in Tab. 10, this approach fails on both
+sensitive applications. To address this, we explore a more ef-
+                                                                                                       fronts: it is less accurate than Concise without confidence
+ficient output format where the model emits only Yes tokens
+                                                                                                       (F1: 52.6 vs. 53.4) and even slower than the Comprehensive
+for detected boundaries, omitting explicit No predictions for
+                                                                                                       scheme (105.2s vs. 87.2s), making it strictly worse than both
+non-boundary shots. However, a subtle question then arises:
+                                                                                                       alternatives.
+can we extract confidence scores from this format by prob-
+                                                                                                           To summarize, the Comprehensive scheme is recom-
+ing the Yes token logits? Unfortunately, this approach is
+                                                                                                       mended when accuracy and precision–recall control are
+fundamentally flawed due to the model’s output structure.
+                                                                                                       paramount, while the Concise scheme (without confidence)
+When the model predicts a shot ID, it has already committed
+                                                                                                       may be a good alternative when inference speed is the prior-
+to marking that shot as a boundary, which means that the
+                                                                                                       ity and precision–recall control is not strictly required.
+subsequent Yes token is obligatory rather than a genuine bi-
+nary choice. Consequently, p(Yes | shot id predicted) ≈ 1                                              Table 10. Comparison of prediction schemes for scene segmen-
+by design, making the confidence score uninformative. This                                             tation. The Comprehensive scheme achieves the best accuracy
+contrasts sharply with the Comprehensive scheme, where the                                             and features a confidence prediction capability, while the Concise
+Yes/No choice represents a genuine binary decision with                                                scheme (without confidence) offers a compelling speed-accuracy
+meaningful probability mass on both outcomes.                                                          trade-off for latency-critical applications.
+    Given this limitation, we evaluate the Concise scheme                                                Prediction Scheme               F1 ↑     AP ↑        Avg. time / movie (s) ↓
+without confidence extraction, using the model’s outputs                                                 Concise (without confidence)    53.4       -                 10.5
+directly: a shot is classified as a boundary if and only if the                                          Concise (repeated sampling)     52.6      34.7               105.2
+model predicts Yes for it. Despite lacking precision–recall                                              Comprehensive                   62.1      66.8               87.2
+flexibility, this variant achieves competitive performance
+(F1: 53.4) with recent methods such as TranS4mer (48.4)                                                B.2. Model F1 and Precision–Recall Analysis
+and MEGA (55.3), while delivering dramatic speedup over
+the Comprehensive scheme (10.5s per movie, approximately                                               To assess our method’s sensitivity to threshold changes, we
+8.3× faster). This makes it an attractive option when in-                                              plot F1 versus decision threshold (Fig. 9a) alongside the cor-
+ference speed is critical and precision–recall control is not                                          responding precision–recall curve (Fig. 9b). As depicted, the
+required.                                                                                              F1 curve rises sharply from near-zero thresholds and reaches
+                                                                                                       a broad plateau, peaking at F1 = 0.641 around threshold
+Concise scheme with repeated sampling. Given the in-                                                   0.438. This plateau (\approx 0.62–0.64 F1 across thresholds \sim 0.27–
+ability to extract meaningful confidence using the Concise                                             0.56) demonstrates stable performance with minimal sen-
+
+
+                                                                                                  13
+sitivity to threshold variations. The PR curve exhibits the                                                        Table 12. Computational analysis. Peak memory, latency, and
+expected trade-off between precision and recall. For bal-                                                          accuracy at 10 samples. “F” denotes frames per shot. Mean and
+anced operation, a threshold near 0.321 yields \protect \mathrm  {P}\approx 0.60 and                               standard deviation values are computed over five runs.
+\protect \mathrm  {R}\approx 0.69 (\protect \mathrm  {F1}=0.639). For precision-oriented applica-                   Method              Params   Memory (GB) ↓   10-sample latency (s) ↓   F1 ↑   AP ↑
+tions, a threshold near 0.50 yields \protect \mathrm  {P}\approx 0.71 and \protect \mathrm  {R}\approx 0.58         TranS4mer-3F [17]    37M          1                0.24 ± 0.0          48.4   60.8
+(\protect \mathrm  {F1}=0.639). Conversely, recall-oriented scenarios can use                                       Scene-VLM-1F         3B            7              1.15 ± 0.07          55.7   58.2
+lower thresholds (e.g., 0.223–0.269) to push recall above                                                           Scene-VLM-3F         3B            9              1.35 ± 0.08          59.6   62.8
+                                                                                                                    Scene-VLM-1F         7B           16              1.84 ± 0.15          61.8   65.3
+0.70 with modest precision. To summarize, these curves                                                              Scene-VLM-3F         7B           18              2.34 ± 0.14          62.1   66.8
+demonstrate that flexible task-dependent tuning is possible
+while maintaining robust performance across the F1 plateau.                                                                     We report peak memory, latency, and accuracy at 10 sam-
+                                                                                                                   ples (i.e., 10 binary boundary decisions) in Tab. 12, using
+B.3. Zero-Shot VLM Baselines                                                                                       the same configuration as in the main experiments: a con-
+                                                                                                                   text window of 20 shots and a focus window of 10 shots.
+To assess the necessity of fine-tuning, we evaluate zero-shot
+                                                                                                                   We repeat the evaluation five times, reporting the mean and
+performance on MovieNet using two VLMs: Qwen2.5-VL-
+                                                                                                                   standard deviation for wall-clock latency, and the maximum
+7B [5] (our base model without fine-tuning) and Claude 4.5
+                                                                                                                   over runs for peak memory. As depicted, reducing frames
+Sonnet [4] (a strong closed-source VLM). Due to Claude API
+                                                                                                                   per shot from 3F to 1F in the 7B model lowers latency from
+constraints, we use 1 frame per shot for all methods in this
+                                                                                                                   2.34 s to 1.84 s (\approx 21%) and peak memory from 18 GB to
+comparison. Since zero-shot models do not reliably follow
+                                                                                                                   16 GB, with only a minor accuracy drop (F1/AP: 62.1/66.8
+the required output format, we use LLM-based parsing to
+                                                                                                                   \rightarrow  61.8/65.3); a similar trend holds for the 3B model. The la-
+extract their predictions and treat unparsed shots as negatives.
+                                                                                                                   tency reduction stems from the fact that frames dominate the
+As shown in Tab. 11, zero-shot methods significantly under-
+                                                                                                                   token count of the input, so removing two of three frames per
+perform our fine-tuned model. Qwen2.5-VL-7B achieves
+                                                                                                                   shot shortens the length of the multimodal input sequence
+only 11.1 F1 with a 7.9% parse error rate, while Claude 4.5
+                                                                                                                   and reduces computation. Meanwhile, the small accuracy
+Sonnet reaches 37.6 F1 with near-zero parse errors (0.03%).
+                                                                                                                   drop aligns with our results from Sec. 4.5.3, which shows
+In contrast, Scene-VLM achieves 61.8 F1 with zero parse
+                                                                                                                   that performance degrades modestly when reducing the num-
+errors using simple rule-based parsing. Moreover, zero-shot
+                                                                                                                   ber of frames per shot. Intuitively, since shots are segments
+methods cannot provide meaningful confidence scores for
+                                                                                                                   which typically contain no major visual changes, a single
+their predictions: for closed-source models (e.g., Claude)
+                                                                                                                   representative frame often preserves most scene-transition-
+logits are inaccessible; for Qwen, LLM-based parsing makes
+                                                                                                                   relevant information.
+confidence extraction infeasible while rule-based parsing
+                                                                                                                                We also compare against TranS4mer [17] (MEGA [27]
+fails 71% of the time (not shown). These results confirm that
+                                                                                                                   has not released source code), using the same 3 frames
+fine-tuning is essential for reliable scene segmentation.
+                                                                                                                   per shot configuration for a fair comparison. As shown
+                                                                                                                   in Tab. 12, TranS4mer is faster and more memory-efficient
+Table 11. Zero-shot VLM baselines on MovieNet. Fine-tuning is
+essential: zero-shot methods significantly underperform and cannot                                                 (37M parameters, 1 GB memory, 0.24 s latency), but Scene-
+provide confidence scores. All methods use 1 frame per shot.                                                       VLM offers significantly higher accuracy (+13.7 F1) along
+                                                                                                                   with explainability capabilities that are unavailable in
+Method                                 Fine-Tuned          Parse      Parse Err. ↓        F1 ↑     AP ↑            encoder-based methods. Notably, our smaller 3B variant nar-
+Qwen2.5-VL-7B [5]                             ×            LLM             7.9%           11.1        –            rows this efficiency gap while still outperforming TranS4mer
+Claude 4.5 Sonnet [4]                         ×            LLM            0.03%           37.6        –            by +11.2 F1. Finally, we note again that no inference opti-
+Scene-VLM (7B)-1F (ours)                      ✓            Rule            0%             61.8      65.3           mizations were applied to our models; such techniques could
+                                                                                                                   further reduce our latency and memory.
+
+B.4. Computational Analysis                                                                                        B.5. Explainability for Scene Segmentation (Cont.)
+                                                                                                                   We present additional qualitative examples of model-
+In this section, we present a thorough analysis of our mod-
+                                                                                                                   generated rationales for scene-boundary decisions in Fig. 10
+els’ computational requirements. We compare four variants,
+                                                                                                                   and Fig. 11. These examples span both abrupt visual transi-
+varying the number of frames per shot (1F or 3F) and model
+                                                                                                                   tions (e.g., title cards) and subtler, socially driven changes
+size (3B or 7B). For all models, we use a batch size of 1 to
+                                                                                                                   (e.g., shifts in location, time, or conversational structure).
+enable a fair comparison of memory and runtime. We do not
+apply model/system optimizations such as weight/activation
+quantization (e.g., 4-/8-bit) or inference engines with KV-
+cache optimizations (e.g., vLLM); these could further reduce
+both latency and memory in future work.
+
+
+                                                                                                              14
+                                                                              The transition from the title card to the battle scene is a
+             The scene shifts from a private moment to a grand ball,
+                                                                                clear scene change. The title card is a static image,
+               indicating a significant change in setting and mood.
+                                                                               while the battle scene is dynamic and action-packed.
+
+
+
+
+         Figure 10. Example 1. Left: boundary due to a location change. Right: transition from a title card to the opening shot.
+
+
+
+
+             The scene transition is marked by a cut from a dimly lit
+             room to a public event, indicating a significant shift in
+                                                                                  The scene changes from a family gathering to a
+             both location and context. The man is likely reflecting
+                                                                              nighttime outdoor scene, indicating a significant shift in
+             on past events, while the public event suggests a new
+                                                                                              both time and setting.
+                 chapter or a different perspective on the same
+                                historical period.
+
+
+
+
+Figure 11. Example 2. Left and right panels: boundary justified by a joint change in time and place; the model references visual cues
+(lighting, background) and/or dialogue context to support the decision.
+
+
+
+
+                                                                         15
+

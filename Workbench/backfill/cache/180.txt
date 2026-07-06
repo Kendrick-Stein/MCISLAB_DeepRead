@@ -1,0 +1,691 @@
+                                                        BOLT: Boost Large Vision-Language Model Without Training
+                                                                   for Long-form Video Understanding
+
+                                                                 Shuming Liu     Chen Zhao*       Tianqi Xu     Bernard Ghanem
+                                                                  King Abdullah University of Science and Technology (KAUST)
+
+
+
+
+arXiv:2503.21483v1 [cs.CV] 27 Mar 2025
+                                                                     Abstract
+
+                                         Large video-language models (VLMs) have demonstrated
+                                         promising progress in various video understanding tasks.
+                                                                                                            Question: What is the man holding in his right hand when he turns on the faucet?
+                                         However, their effectiveness in long-form video analysis is
+                                                                                                            Testing with Uniform Sampling: plate
+                                         constrained by limited context windows. Traditional ap-
+                                                                                                                                                                                         20 minutes
+                                         proaches, such as uniform frame sampling, often inevitably                                                                                        video
+                                         allocate resources to irrelevant content, diminishing their        Testing with Query-guided Frame Sampling: knife
+                                         effectiveness in real-world scenarios. In this paper, we                                                                                        20 minutes
+                                                                                                                                                                                           video
+                                         introduce BOLT, a method to BOost Large VLMs with-
+                                                                                                                   GT segments                 Distracting backgrounds (e.g., turn off the faucet)
+                                         out additional Training through a comprehensive study of
+                                         frame selection strategies. First, to enable a more realis-        Figure 1. Given a long video, conventional VLMs adopt uniform
+                                         tic evaluation of VLMs in long-form video understanding,           sampling during inference, which may divert VLM’s focus due to
+                                         we propose a multi-source retrieval evaluation setting. Our        the distracting backgrounds. In contrast, our query-guided frame
+                                                                                                            sampling can identify and prioritize question-relevant frames,
+                                         findings reveal that uniform sampling performs poorly in
+                                                                                                            boosting the VLM’s performance without requiring fine-tuning.
+                                         noisy contexts, underscoring the importance of selecting
+                                         the right frames. Second, we explore several frame selec-          frame, meaning that without reduction, an hour-long video
+                                         tion strategies based on query-frame similarity and ana-           at 30 FPS would require 20 million tokens. Given the lim-
+                                         lyze their effectiveness at inference time. Our results show       ited context length of the underlying language models and
+                                         that inverse transform sampling yields the most signifi-           computational constraints [28, 39], video token reduction
+                                         cant performance improvement, increasing accuracy on the           has become essential for enabling large VLMs to efficiently
+                                         Video-MME benchmark from 53.8% to 56.1% and MLVU                   handle video understanding tasks.
+                                         benchmark from 58.9% to 63.4%. Our code is available at                To reduce video tokens, previous works have primarily
+                                         https://github.com/sming256/BOLT.                                  explored strategies from two perspectives. The first is spa-
+                                                                                                            tial compression, which reduces the number of tokens per
+                                                                                                            frame, as employed by methods such as MovieChat [30]
+                                         1. Introduction                                                    and SlowFast-LLaVA [36]. This paper focuses on the sec-
+                                         Recently, large Video-Language Models (VLMs) have                  ond perspective, temporal selection, which involves se-
+                                         emerged as powerful tools for video understanding [11,             lecting a subset of frames from raw videos. Most prior
+                                         17, 18, 20, 21, 27, 41]. These models leverage the syn-            works have relied on uniform frame sampling, in which a
+                                         ergy between visual and linguistic modalities through large        fixed number of frames are evenly selected from the video
+                                         language models, enabling them to capture complex re-              [1, 14, 38]. Although simple and efficient, this approach of-
+                                         lationships and contextual cues over time. They have               ten fails in complex real-world scenarios because it assumes
+                                         demonstrated remarkable advancements in tasks such as              that all frames contribute equally to content understanding,
+                                         video captioning [4, 33, 37] and video question answer-            which may hold true for short, query-trimmed videos but
+                                         ing [12, 21, 23]. However, large VLMs face significant             not for long, unedited ones. For example, instructional or
+                                         challenges in processing long videos containing thousands          surveillance videos usually contain lengthy segments irrel-
+                                         of frames due to the sheer volume of video tokens. For             evant to the given query. Sampling frames from these seg-
+                                         instance, LLaVA-OneVision [13] utilizes 196 tokens per             ments not only consumes the token budget but may also
+                                                                                                            distract the VLM from pertinent information, thereby im-
+                                           * Corresponding author.                                          pairing its performance [14, 29].
+
+
+                                                                                                        1
+    Some recent methods, such as Goldfish [2], LongVU                 2. Related Works
+[28], and Frame-Voyager [39], have started to explore adap-
+tive temporal selection strategies by using visual-text sim-          2.1. Large Vision-Language Models for Video
+ilarity to identify relevant frames. However, these meth-             Transformer-based large language models (LLMs) have
+ods require additional training on existing VLMs, demand-             revolutionized natural language processing [8, 24]. Re-
+ing substantial computational resources and extensive fine-           searchers have extended LLMs to handle multiple modal-
+tuning data. For instance, Frame-Voyager [39] requires 32             ities by incorporating multimodal inputs, typically visual
+H100 GPUs for training. This raises a crucial question: Can           content such as images and videos [13, 47] to make large
+we boost the performance of existing large VLMs without               vision-language models (VLMs). These models leverage
+additional training by designing better temporal selection            large-scale pre-training on extensive data to learn rich repre-
+methods? This paper provides an affirmative answer to this            sentations that capture intricate relationships between visual
+question through two key explorations: how selecting the              and textual modalities. Building upon these, large VLMs
+right frames matters and how to select the frames right.              have significantly advanced various video understanding
+    First, we investigate the importance of selecting the right       tasks such as video captioning [4, 33, 37], video question
+frames for long-form video understanding using two newly              answering [12, 21, 23], and temporal reasoning [25, 34].
+designed evaluation setups. (1) We utilize the MultiHop-              Recent surveys [16, 31] comprehensively review the ar-
+EgoQA dataset [5], which provides question-related seg-               chitectures, training strategies, and applications of VLMs
+ments, to examine the performance of large VLMs with and              in video understanding, highlighting both their capabilities
+without access to ground-truth video segments. (2) To fur-            and the challenges they address.
+ther study the impact of frame selection in real-world sce-               Despite these successes, large VLMs encounter signifi-
+narios containing diverse background clips in longer videos,          cant challenges when processing videos due to the substan-
+we propose a multi-source retrieval evaluation setting by             tial amount of video frames, the limited context length of
+extending the videos via internal retrieval in the existing           language models [32], and the “lost in the middle” prob-
+dataset. The results show that selecting irrelevant frames,           lem [19]. These constraints necessitate efficient frame se-
+i.e., query-unrelated ones, significantly degrades the perfor-        lection strategies to identify and retain essential information
+mance on VQA tasks — a common issue encountered with                  from videos without overwhelming the model. Thus, devel-
+uniform sampling.                                                     oping effective frame selection methods is critical to further
+                                                                      enhance VLM performance in video understanding tasks.
+   Then, we explore how to select the frames right by in-
+troducing several query-aware frame selection approaches,             2.2. Video Token Reduction in Large VLMs
+including top-K selection, watershed grouping, and inverse
+transform sampling. All these approaches are applied only             Reducing video tokens is essential for making large VLMs
+at test time, without any retraining of the VLMs. We                  computationally feasible. The most common and straight-
+find that inverse transform sampling consistently improves            forward approach is uniform frame sampling, which selects
+VLM performance, particularly in the multi-source retrieval           frames without considering their individual importance to
+evaluation scenario. Using this frame selection strategy, we          the task. Unfortunately, this method may omit crucial
+can BOost the performance of existing Large VLMs with-                frames needed for understanding complex or long videos,
+out additional Training. We thus name our method BOLT.                thereby limiting reasoning performance. Several strategies
+                                                                      have been proposed in the literature to make token reduction
+   Our main contributions can be summarized as:                       more adaptive and task-specific.
+
+• We demonstrate that selecting the right frames signif-              Token Merging. One approach is to merge information
+  icantly impacts large VLMs’ test-time performance for               within or across frames to form a compact yet comprehen-
+  long-form video understanding. We validate this through             sive representation. MovieChat [30] implements short-term
+  experiments on the MultiHop-EgoQA dataset [5], and by               and long-term memory mechanisms to integrate and com-
+  introducing multi-source retrieval evaluation setup, which          press frames from a long video, ensuring minimal infor-
+  better reflects real-world video understanding challenges.          mation loss. LLaMA-VID [15] encodes each frame into
+• We explore various training-free frame selection strate-            separate context and content tokens, whereas LongVU [28]
+  gies and propose leveraging inverse transform sampling              leverages cross-modal queries and inter-frame dependen-
+  to select query-relevant frames to improve VQA perfor-              cies to reduce redundancy while preserving visual details.
+  mance without requiring model retraining.                           However, token merging approaches risk oversimplifying
+• Our method achieves consistent improvements on five                 fine-grained information, potentially preventing the model
+  benchmarks, e.g., from 53.8% to 56.1% on the Video-                 from capturing subtle differences between frames.
+  MME [9], and from 58.9% to 63.4% on MLVU [46].                      Query-Based Frame Sampling. To overcome limitations
+
+                                                                  2
+associated with uniform sampling, recent similarity-based                                   Table 1. Demonstration of the importance of selecting the right
+methods select frames based on their relevance to specific                                  frames (i.e., GT segments) on MultiHop-EgoQA dataset. All
+queries or tasks. Goldfish [2] addresses video QA by seg-                                   models use 8 frames as input. We report the average sentence
+                                                                                            similarity as the evaluation metric.
+menting long videos into shorter clips and retrieving rel-
+evant clips using cosine similarity between query embed-                                     Frame Selection      LLaVA-NeXT-Video-7B InternVL2-8B
+dings and captions. Other approaches learn optimal frame
+                                                                                             Uniform                                    61.7              71.8
+selection strategies through additional training. For in-
+                                                                                             GT segments                         62.8 (+1.1)       72.5 (+0.7)
+stance, Frame-Voyager [39] learns informative frame com-
+                                                                                             w.o. GT segments                    59.2 (-2.5)       69.1 (-2.7)
+binations by training on a dataset that ranks frames based
+on prediction losses from a VLM [3]. Although potentially
+more effective, such learnable sampling methods require                                     4. BOLT
+additional training and substantial computational resources,                                In this section, we first perform an empirical analysis to val-
+limiting their practicality.                                                                idate the importance of frame selection. This analysis incor-
+   Unlike the above-mentioned methods, in this work, we                                     porates annotated ground-truth segments from untrimmed
+propose a training-free frame selection strategy to enhance                                 videos and a challenging multi-source retrieval condition.
+the performance of existing large VLMs at inference time.                                   Subsequently, we compare four different frame selection
+                                                                                            strategies, finding that inverse transform sampling can ef-
+3. Revisiting Large VLMs                                                                    fectively prioritize question-relevant frames.
+Consider a video V with T frames {f1 , f2 , . . . , fT } and an
+                                                                                            4.1. Impact of Ground Truth Segments
+associated query Q (system prompts omitted for brevity).
+The VQA task aims to generate an answer A that accu-                                        In VQA tasks, particularly those involving long-form video
+rately addresses the query based on the content of V . The                                  understanding, many queries pertain to specific temporal
+response format depends on the query type, encompassing                                     segments within hour-long untrimmed videos. We hypothe-
+both open-ended and multiple-choice answers.                                                size that effectively retrieving query-relevant segments sig-
+   State-of-the-art VLMs typically address this task using                                  nificantly reduces the complexity of reasoning for VLMs.
+the following pipeline: First, due to computational con-                                    To validate this hypothesis, we leverage existing VQA
+straints and the video’s high frame rate, a subset of N                                     benchmarks that provide temporal interval annotations.
+frames {f1′ , f2′ , . . . , fN
+                             ′
+                               } is selected, where N ≪ T . In                                  Specifically, we utilize MultiHop-EgoQA [5], a recently
+common implementations, N is often set to 16 or 32 frames.                                  introduced long-form egocentric benchmark. This dataset
+Next, each selected frame fi′ is processed through a vision                                 provides temporal annotations of relevant intervals for each
+encoder Ev to obtain visual embeddings: vi = Ev (fi′ ),                                     video-question pair, such as {(ts1 , te1 ), (ts2 , te2 ), . . .}. To
+where vi ∈ RM ×C . Here, C denotes the embedding dimen-                                     examine the significance of frame selection, we conduct ex-
+sion, and M represents the number of tokens per frame.                                      periments under three conditions: (1) Uniform sampling
+   Following visual encoding, a projection module maps vi-                                  (baseline): Frames are uniformly sampled from the entire
+sual embeddings vi into the language embedding space, en-                                   video. (2) Ground-truth segment-only sampling: Frames
+suring dimensional compatibility with textual tokens. For                                   are uniformly sampled only from question-relevant ground-
+simplicity, we omit the projector from subsequent notation.                                 truth segments. (3) Complement-set sampling: Frames are
+The visual embeddings are concatenated with the question’s                                  uniformly sampled only from segments outside the ground-
+textual embeddings Et (Q), forming an input sequence pro-                                   truth intervals. The results are summarized in Table 1.
+cessed by an LLM to generate the answer auto-regressively:                                      We evaluate pretrained models InternVL2-8B [6] and
+                                                                                            LLaVA-NeXT-Video-7B [44] using 8 sampled frames, re-
+             A = \text {LLM}([v_1; v_2; \ldots ; v_N; E_t(Q)]).                   (1)       porting average sentence similarity as the evaluation met-
+   Note that the context-length limitation L of the above                                   ric (higher is better). Experimental results show that, com-
+language model, eg., 16K, constrains the total number of                                    pared with uniform sampling, excluding irrelevant context
+tokens, including visual and textual embeddings:                                            enables VLMs to better focus on informative visual features
+                                                                                            for question answering. Conversely, when only irrelevant
+                  \sum _{i=1}^N \text {len}(v_i) + \text {len}(E_t(Q)) \leq L.              frames are provided, the generated predictions exhibit lower
+                                                                                  (2)       similarity to ground-truth answers.
+                                                                                            4.2. Multi-Source Retrieval Evaluation
+   Unlike image understanding tasks that process a sin-
+gle frame, this constraint makes frame selection crucial                                    The above preliminary analysis demonstrates the signifi-
+for effective video understanding, as the model must select                                 cance of frame selection in VQA tasks by directly evaluat-
+frames judiciously within the limited context window.                                       ing the models’ capability on ground-truth segments. How-
+
+
+                                                                                        3
+                                     Query
+                                                                                                                                  similarity
+                                                                                                                                    score
+
+                  Frame Selection
+                                                                 (b) Top-K Selection
+
+
+                                                                                                                                 cumulative
+            Pretrained VLM                                                                                                       distribution
+                                                                                                                                   function
+
+                                 Answer
+   (a) Training-Free Frame Selection Framework               (c) Watershed Grouping                  (d) Inverse Transform Sampling
+Figure 2. (a) Proposed training-free frame selection framework. Without exhaustive fine-tuning of VLMs, their performance can be
+improved by selecting query-related frames. (b) Top-K selection often yields redundant frames with limited diversity. (c) Watershed
+grouping may overlook broader temporal context. (d) Inverse transform sampling can prioritize relevant frames while preserving selec-
+tion diversity, achieving stronger performance on benchmarks, particularly for videos with noisy backgrounds.
+
+Table 2. Multi-source retrieval evaluation on Video-MME. K                  footage. Furthermore, it imposes more rigorous reasoning
+is set to 4 in this experiment. Using the ‘right’ frames (GT seg-           demands on VLMs, providing a more comprehensive as-
+ments) significantly outperforms uniformly sampling frames.                 sessment of their capabilities. We implement this evaluation
+     Frame Selection Strategy        LLaVA-OneVision-7B                     framework on the Video-MME dataset, and the preliminary
+                                                                            results are presented in Table 2.
+     GT segments (16 frames)                            56.85                  The experimental results reveal several critical insights.
+     Uniform (64 frames)                         52.11 (-4.74)              Most notably, uniform sampling exhibits substantial per-
+     Uniform (16 frames)                         47.78 (-9.07)              formance degradation under proposed evaluation frame-
+     Blind test                                         40.85               work, indicating its fundamental inadequacy in handling
+                                                                            long video content containing substantial query-irrelevant
+ever, extending this analysis to general VQA benchmarks,                    segments. Despite increasing the input frame count to 64
+such as Video-MME [9], is constrained by the absence of                     frames, accuracy still exhibits a significant decline from
+temporal segment annotations. To overcome this limitation                   56.85% to 52.11%. With a fixed frame count of 16 frames,
+and assess frame selection efficacy under more challenging                  performance further deteriorates to 47.78%, representing a
+conditions, we introduce a novel multi-source retrieval eval-               notable 9.07% reduction compared to the baseline. This re-
+uation setting.                                                             sult is even close to the blind test result, in which no visual
+                                                                            information is provided. These findings underscore the im-
+   The proposed multi-source retrieval evaluation employs
+                                                                            portance of intelligent frame selection strategies for VQA
+a systematic construction procedure. First, K distinct
+                                                                            tasks, particularly when processing long video sequences.
+videos are sampled from the benchmark and concatenated
+along their temporal dimension, with brief black-frame                      4.3. Selecting the Frames Right
+transitions inserted between adjacent videos. During video
+selection, we ensure that the sampled videos have similar                   Based on the above analysis, we emphasize that it is es-
+durations yet differ significantly in their visual content, such            sential for VLMs to select frames relevant to the query.
+as different categories or domains. This concatenation gen-                 Next, we discuss how to select those frames effectively,
+erates a pseudo-long-form video that effectively simulates                  and introduce several frame selection strategies designed
+real-world continuous video content. Next, we randomly                      to improve the identification and prioritization of question-
+select a question Q from the associated question sets of                    relevant frames without requiring model fine-tuning.
+these videos and evaluate the model’s response accuracy us-                 Uniform Sampling. We first revisit conventional uniform
+ing the concatenated video, deviating from the conventional                 sampling, which selects frames at fixed intervals: fi′ =
+trimmed-video evaluation paradigm.                                          f⌊i×T /N ⌋ , where i ∈ {1, . . . , N }. Although uniform sam-
+   Our proposed evaluation framework offers distinct ad-                    pling is computationally efficient, it neglects the query con-
+vantages over standard evaluation protocols. Primarily, it                  text by implicitly assuming a uniform distribution of infor-
+better approximates real-world scenarios in which mod-                      mation throughout the video. Since uniform sampling re-
+els must identify relevant content within extended video                    mains widely used during both training and testing in cur-
+sequences, such as lengthy instructional or surveillance                    rent state-of-the-art VLMs, we adopt this as our baseline.
+
+
+                                                                        4
+Top-K Selection. To identify query-relevant frames, an in-                                                          Inverse Transform Sampling. Analysis of top-K sampling
+tuitive approach is to leverage text-video similarity and se-                                                       and watershed grouping methods reveals two critical re-
+lect frames with high similarity scores. A commonly used                                                            quirements: the selection of query-relevant frames and the
+method is top-K sampling, which operates as follows:                                                                preservation of frame diversity. Additionally, contextual in-
+    First, the question  Q  and each frame  f_i  are encoded into                                                   formation surrounding query-relevant segments should be
+embeddings using a pretrained contrastive lightweight mul-                                                          retained. To meet these requirements without additional
+timodal network, such as CLIP [26] or SigLIP [40]. The                                                              model fine-tuning, we propose an adaptive frame selection
+similarity between the visual embedding of a frame  E_v(f_i)                                                        method based on inverse transform sampling (ITS).
+and the textual embedding of the question  E_t(Q)  can then                                                            ITS is a probabilistic sampling technique that generates
+be computed, typically using cosine similarity:                                                                     samples from a specified probability distribution. When ap-
+                                                                                                                    plied to video understanding, ITS leverages frame-query
+                          s(f_i) = \cos (E_t(Q), E_v(f_i)).                                               (3)
+                                                                                                                    similarity scores to construct a query-guided probability
+    Next, we select the top  K  frames with the highest simi-                                                       distribution over frames, where the probability of selecting
+larity scores. These query-relevant frames are retained and                                                         a frame  f_i  is proportional to its similarity score  s_i  . Specif-
+subsequently processed by the VLM. Formally, the selec-                                                             ically, we first normalize the similarity scores  s_i  across the
+tion process is defined as:                                                                                         entire video sequence to the range [0, 1] and refine the nor-
+                                                                                                                    malized score as follows:
+         \mathcal {F}_{\text {top-}K} = \{ f_i \mid s(f_i) \in \text {Top-}K(\{ s(f_j) \}_{j=1}^N) \}.    (4)
+    Although effective for direct visual matching, top-K                                                                                  s^r_i = \left (\frac {s_i - \min (s)}{\max (s) - \min (s)}\right )^\alpha , \label {eg:alpha}    (5)
+sampling exhibits notable limitations. As shown in Fig-
+ure 2(b), when applied to long video sequences, top-K sam-                                                          where \alpha  controls the sharpness of the distribution. Smaller
+pling often yields redundant frames with high visual sim-                                                           values of \alpha  produce a more uniform distribution, increasing
+ilarity, potentially missing diverse contextual information                                                         frame diversity, while larger values yield a sharper distribu-
+crucial for complex queries. Moreover, this strategy may                                                            tion, emphasizing query-relevant frames.
+inadequately address temporal dependencies and causal re-                                                               Next, we construct the cumulative distribution function,
+lationships, which require analyzing scene transitions and                                                           F(i) , based on the refined scores:
+broader contextual continuity.
+Watershed Grouping. The watershed algorithm, origi-                                                                                                          F(i) = \frac {\sum _{j=1}^{i}s^r_j}{\sum _{j=1}^{N}s^r_j}.                    (6)
+nally developed for image segmentation [10], can be effec-
+tively adapted for temporal clustering in video understand-                                                            Finally, we sample  N  frames using uniform sampling
+ing tasks. This approach conceptualizes similarity scores as                                                        over the inverse transform of this cumulative distribution
+a topographical landscape, where local extrema define dis-                                                          function:
+tinct temporal segments.
+                                                                                                                              f'_i = f_{\arg \min _k\{F(k)\geq i/N\}}, \quad i \in \{1, \ldots , N\},                                      (7)
+    Formally, given the frame-query similarity scores s(fi ),
+we first apply a smoothing operation, such as sliding-                                                              where  f'_i  represents the  i -th sampled frame.
+window average pooling, to mitigate outliers and obtain re-                                                            By employing the above inverse transform sampling,
+fined scores: sri = smooth(s(fi )). Subsequently, the water-                                                        frames with higher relevance to the query have an increased
+shed algorithm computes the mean similarity score across                                                            probability of being sampled, while frames with lower rel-
+the temporal sequence: s = mean{sr1 , sr2 , . . . , srT }. This                                                     evance retain a non-zero probability. This ensures an effec-
+mean score s serves as a threshold for segmenting frames                                                            tive balance between capturing essential query-related vi-
+into distinct peak and valley regions, based on whether                                                             sual content and preserving sufficient contextual and tem-
+sri > s. Finally, we select representative frames exclusively                                                       poral diversity. Additionally, by controlling the distribution
+from the top K highest-scoring peak regions.                                                                        sharpness through the parameter \alpha , ITS provides flexible
+    The watershed-based approach is particularly effective                                                          adjustment of the relevance-diversity trade-off. Empirically,
+for long videos, where traditional top-K sampling tends to                                                          we find that setting \alpha  between 2.5 and 3.5 yields satisfac-
+yield redundant frames. By clustering temporally adjacent                                                           tory improvements.
+frames, this method facilitates the extraction of a more di-                                                           Importantly, ITS requires no additional training and can
+verse subset of frames. Nevertheless, due to its grouping                                                           be seamlessly integrated into existing VLMs during infer-
+mechanism, this strategy can overlook important temporal                                                            ence. Our experimental results demonstrate that ITS consis-
+context and still retain temporal redundancy, as illustrated                                                        tently outperforms alternative approaches, achieving a 2.3%
+in Figure 2(c). This limitation poses challenges, especially                                                        improvement over uniform sampling on the Video-MME
+when addressing queries involving causal or explanatory                                                             benchmark and a 4.5% improvement on the MLVU bench-
+reasoning (e.g., why or how).                                                                                       mark.
+
+
+                                                                                                                5
+Table 3. Comparison of our proposed BOLT with state-of-the-art models on standard benchmarks. Inverse transform sampling is
+used. Our training-free approach BOLT enables off-the-shelf VLM LLaVA-OneVision to focus on query-related frames, thereby boosting
+the VQA performance in various settings. It also outperforms other large VLMs in the literature with comparable model scales.
+
+                                  LLM Training   Video-MME (w.o. sub.)               EgoSchema LongVideo
+Model                                                                                                    MLVU NextQA
+                                  Size  Free   Overall Short Medium Long             Full Subset Bench
+Video-LLaVA [17]                    7B       ✗       39.9    45.3    38.0    36.2     -       -        39.1          47.3      -
+VideoChat2 [14]                     7B       ✗       39.5    48.3    37.0    33.2    54.4    63.6      39.3          44.5      -
+ShareGPT4Video [4]                  8B       ✗       39.9    48.3    36.3    35.0     -       -        41.8          46.4      -
+Chat-UniVi-V1.5 [11]                7B       ✗       40.6    45.7    40.3    35.8     -       -         -             -        -
+VideoLLaMA2 [7]                     7B       ✗       47.9    56.0    45.4    42.1     -      53.1       -             -        -
+Frame-Voyager [39]                  8B       ✗       57.5    67.3    56.3    48.9     -       -         -            65.6     73.9
+LongVU [28]                         7B       ✗       60.9    64.7    58.2    59.5     -       -         -            65.4      -
+LLaVA-OneVision8 frame [13]         7B               53.8    63.6    52.0    45.7    59.17   62.0      54.2          58.9     77.4
+LLaVA-OneVision8 frame +BOLT        7B       ✓       56.1    66.8    54.2    47.3    59.23   62.2      55.6          63.4     77.4
+LLaVA-OneVision16 frame [13]        7B               56.9    68.3    54.0    48.2    59.49   61.4      55.7          61.2     78.1
+LLaVA-OneVision16 frame +BOLT       7B       ✓       57.8    69.2    56.8    47.3    59.86   61.8      57.0          65.8     78.3
+LLaVA-OneVision32 frame [13]        7B               58.5    70.3    56.6    48.8    60.36   62.2      56.4          63.2     79.4
+LLaVA-OneVision32 frame +BOLT       7B       ✓       59.9    70.1    60.0    49.6    60.66   64.0      59.6          66.8     79.5
+
+
+
+5. Experiments                                                      Table 4. Our training-free approach BOLT boosts various
+                                                                    VLMs. Inverse transform sampling is used on the Video-MME
+5.1. Experimental Settings                                          benchmark. All models use 8 frames.
+Datasets. We evaluate our approach on five widely used                              LLM With    Video-MME (w.o. sub.)
+VQA benchmarks: Video-MME [9], EgoSchema [22],                      Model
+                                                                                    Size BOLT Overall Short Medium Long
+LongVideoBench [32], MLVU [46], and NextQA [35].
+                                                                                             ✗      37.6      42.7     37.1   33.0
+Among them, the NextQA and EgoSchema datasets con-                  Video-LLaVA      7B
+                                                                                             ✓      39.3      45.7     38.0   34.1
+tain short videos averaging less than 2 minutes in length,
+focusing primarily on short-form question answering. In                                      ✗      48.5      56.7     46.6   42.3
+                                                                    LongVA           7B
+                                                                                             ✓      51.6      59.8     51.0   43.9
+contrast, Video-MME, MLVU, and LongVideoBench in-
+clude longer videos, ranging from a few minutes to around                                    ✗      52.6      62.4     51.1   44.2
+                                                                    InternVL2        8B
+two hours, thus evaluating models’ capabilities in long-                                     ✓      53.3      65.6     50.4   43.9
+form video understanding. Notably, Video-MME consists                                        ✗      56.0      67.8     53.6   46.7
+of 900 videos with 2,700 questions and categorizes videos           LLaVA-Video      7B
+                                                                                             ✓      58.6      70.4     55.7   49.9
+into short, medium, and long subsets, which we specifically
+leverage in our ablation studies. Importantly, we evaluate
+Video-MME without subtitles.                                        on these datasets, surpassing prior methods such as Vide-
+Implementation Details. For computational efficiency,               oLLaMA2 [7] and thus establishing a robust baseline.
+we sample video frames at 1 FPS. To compute the sim-                Our training-free, query-guided inverse transform sampling
+ilarity between video frames and textual queries, we use            (ITS) method further enhances the performance of LLaVA-
+the pretrained CLIP-L/14 model [26] to extract visual and           OneVision. Specifically, on Video-MME, accuracy im-
+textual embeddings. The hyperparameter \alpha  is set to 2.5        proves from 53.8% to 56.1% using 8 frames, and on MLVU,
+for EgoSchema, LongVideoBench, NextQA, and to 3 for                 it increases from 58.9% to 63.4% with 8 frames. On Nex-
+Video-MME and MLVU. We utilize the LMMs-Eval li-                    tQA, our performance remains comparable to the base-
+brary [42] to measure accuracy for multiple-choice tasks.           line, likely due to the brevity of the videos. Notably,
+All experiments are conducted on two A100 GPUs. Addi-               our method continues to yield improvements even with
+tional details can be found in the supplementary material.          32 frames, demonstrating significant gains on long-video
+                                                                    benchmarks, such as a 3.2% increase on LongVideoBench
+5.2. Benchmark Results
+                                                                    and a 3.6% increase on MLVU. These results highlight the
+Comparison with State-of-the-Art Methods on Stan-                   importance of selecting the right frames at inference time
+dard Benchmarks. Table 3 presents the comparison of                 to fully unleash the potential of existing VLMs, and our
+our approach against state-of-the-art methods. Recently,            proposed inverse transform sampling consistently surpasses
+LLaVA-OneVision [13] has achieved strong performance                uniform sampling by a substantial margin.
+
+
+                                                                6
+Table 5. Our BOLT boosts existing VLMs under multi-source              Table 6. Comparison of different training-free frame selection
+retrieval evaluation. Inverse transform sampling is used. LLaVA-       strategies on Video-MME dataset. LLaVA-OneVision-7B is uti-
+OneVision-7B is utilized and the K is set to 4.                        lized with 16 frames.
+
+                                     Video-MME (w.o. sub.)              Frame Selection       Query     Standard        Retrieval-Based
+Model
+                                  Overall Short Medium Long             Blind Test             ✗                      40.85
+                  64 frame
+LLaVA-OneVision                    52.1    61.8    50.8   43.8          Uniform                ✗         56.85              47.78
+LLaVA-OneVision64 frame +BOLT      54.9    66.1    54.2   44.4          Uniform + Shuffle      ✗      56.25 (-0.60)      46.93 (-0.85)
+                                                                        Random                 ✗      55.15 (-1.70)      46.05 (-1.73)
+LLaVA-OneVision16 frame            47.8    55.8    45.6   42.0
+LLaVA-OneVision16 frame +BOLT      53.4    65.1    51.1   43.3          Top-K                  ✓      57.10 (+0.25)      48.45 (+0.67)
+                                                                        Watershed              ✓      57.23 (+0.38)      49.15 (+1.37)
+Results on Off-the-Shelf VLMs. As shown in Table 4, we                  ITS                    ✓      57.78 (+0.93)      53.37 (+5.59)
+extend the proposed approach to additional video VLMs,
+including Video-LLaVA [17], LongVA [43], InternVL2 [6],                Table 7. Comparison of different visual-text similarity mea-
+and LLaVA-Video [45], and evaluate its effectiveness on the            sures on Video-MME dataset. LLaVA-OneVision-7B is utilized
+Video-MME benchmark. The results clearly demonstrate                   with 16 frames. The baseline is uniform sampling.
+that our training-free approach, BOLT, consistently boosts
+                                                                        Baseline     Caption       SigLIP   CLIP        CLIP + SigLIP
+the performance of off-the-shelf VLMs, achieving approx-
+imately 1% to 3% accuracy improvements. For instance,                   56.85         55.47        57.00    57.78             57.83
+the performance of LLaVA-Video notably increases from
+56.0% to 58.6% with only 8 frames, verifying the strong                Comparison with Alternative Frame Selection Tech-
+generalization capability of inverse transform sampling.               niques. Table 6 compares our proposed method with alter-
+Results on Proposed Multi-Source Retrieval Evaluation                  native training-free frame selection strategies. As a baseline
+Setting. We further evaluate our method under the retrieval-           setup, we exclude visual input entirely, relying solely on the
+based evaluation setting on Video-MME, as described in                 question text (Blind Test). Surprisingly, even without visual
+Section 4.2. This evaluation assesses the model’s ability to           data, the model achieves 41% accuracy on Video-MME, in-
+retrieve query-relevant information from noisy video con-              dicating that VLMs heavily utilize general knowledge to
+tent. As shown in Tables 3 and 5, LLaVA-OneVision’s                    answer multiple-choice questions. When visual input is in-
+performance significantly decreases from 56.9% to 47.8%                cluded, uniform and random sampling strategies yield sim-
+when using 16 frames, demonstrating that irrelevant back-              ilar performance, around 56% in standard evaluation and
+ground frames substantially hinder comprehension. Even                 47% in multi-source retrieval evaluation, suggesting limited
+increasing the frame count to 64 frames (equivalent to 16              effectiveness of traditional, query-agnostic frame selection
+frames per candidate video) yields only partial recovery               approaches on datasets such as Video-MME, which does
+(52.1% vs. 47.8%), confirming that background noise leads              not require complex temporal reasoning.
+to considerable distraction in pretrained VLMs.                            However, incorporating query-visual similarity through
+   Applying our proposed frame selection strategy consis-              strategies such as top-K sampling, watershed grouping, and
+tently improves VLM accuracy. With 16 frames, perfor-                  inverse transform sampling consistently improves perfor-
+mance on Video-MME increases from 47.8% to 53.4%, rep-                 mance over uniform sampling. Among these methods, ITS
+resenting a substantial 5.6% gain. Furthermore, results indi-          provides robust gains across both standard and retrieval-
+cate that BOLT effectively enhances accuracy across short,             based evaluations, achieving the best overall performance.
+medium, and long videos. These findings highlight both the             Remarkably, in the retrieval-based evaluation, ITS signifi-
+importance of selecting query-relevant frames and main-                cantly boosts accuracy from 47.78% to 53.35%, highlight-
+taining frame diversity to maximize model performance.                 ing the importance of selecting both query-relevant frames,
+                                                                       and underscoring the effectiveness of our proposed method.
+5.3. Ablations and Analysis
+                                                                       Comparison of Visual-Text Similarity Measures. Since
+To further validate the effectiveness of our training-free ap-         our approach leverages similarity between image and query
+proach, we conduct ablation studies and analyses from four             embeddings for frame selection, we compare various image
+perspectives: (1) comparisons with alternative frame se-               representation methods, including image captions and pre-
+lection techniques, (2) comparison of visual-text similarity           trained vision-language encoders, as shown in Table 7. We
+measures, (3) analysis on the hyperparameter α, and (4)                initially caption each frame using LLaVA-OneVision and
+analysis with respect to video length. Additional experi-              compute frame selection based on the similarity between
+mental results and efficiency analysis are provided in the             queries and generated captions. However, this caption-
+supplementary material.                                                based approach underperforms due to noisy captions and in-
+
+
+                                                                   7
+Table 8. Analysis on the sharpness hyperparameter α in ITS.
+LLaVA-OneVision-7B is utilized with 16 frames.
+
+  α             Video-MME       MLVU        LongVideoBench
+  Uniform         56.90           61.24           55.72
+  2               58.37           65.08           58.04
+  2.5             57.51           65.24           57.00
+  3               57.78           65.76           57.67
+  3.5             57.74           65.11           58.41
+
+Table 9. Impact of video number K in multi-source retrieval
+evaluation. If K = 1, the evaluation degrades to standard VQA
+setting. When K is larger, the background noise is also larger.                                 004-1.png
+      Video Number K        1         2       4           8                                     006-2.png
+      Uniform             56.85     51.81    47.78   44.82
+      Watershed           57.23     53.70    48.67   45.89
+      ITS                 57.78     54.93    53.37   49.04
+
+accurate similarity scores. In contrast, directly using image                                                                               (b)
+encoders achieves consistent improvements over the uni-
+form sampling baseline, with CLIP outperforming SigLIP.
+Furthermore, averaging the similarity scores from CLIP and
+SigLIP yields the best overall performance.
+Analysis on the Sharpness Hyperparameter α. As de-
+scribed in Eq. 5, the hyperparameter α controls the sharp-            Figure 3. Visualization of frame selection results using inverse
+ness of the similarity distribution. Table 8 investigates the         transform sampling. The blue curve represents the similarity
+impact of different α values. When α is set between 2 and             scores across the entire video sequence, and the red lines indicate
+3.5, the VQA performance consistently surpasses uniform               the selected frames.
+sampling across all three datasets by a large margin. More-
+over, performance variation within this range is minor, indi-         6. Conclusion
+cating that ITS is less sensitive to the exact value of α.            In this paper, we introduced BOLT, a training-free method
+Impact of Background Noise Level. To examine the effect               designed to enhance large VLMs for long-form video un-
+of background noise on model performance, we conduct                  derstanding. We explored various temporal frame selec-
+an analysis using multi-source retrieval evaluation setting,          tion techniques, focusing particularly on inverse transform
+where target videos are concatenated with randomly se-                sampling, to efficiently prioritize query-relevant frames,
+lected background videos, simulating long and noisy video             significantly improving visual question-answering perfor-
+environments. Table 9 shows that introducing background               mance. Our evaluations demonstrate that BOLT effectively
+videos degrades accuracy (frame budget 16), with uniform              addresses the limitations of conventional uniform sampling,
+sampling being particularly susceptible to the increased              providing a scalable solution to extend the capabilities of
+noise. Although ITS also experiences a performance drop,              existing VLMs without requiring additional fine-tuning.
+it consistently outperforms uniform sampling. These results           Limitations. Although BOLT significantly improves long-
+emphasize the effectiveness of query-guided frame selec-              form video understanding, its effectiveness relies on accu-
+tion in mitigating the adverse impacts of noisy contexts.             rate query-frame similarity measures, which may not al-
+                                                                      ways reflect true relevance on tasks that require reasoning.
+5.4. Visualization                                                    Future work could explore more robust similarity metrics
+To further illustrate the frame selection results of inverse          that better adapt to varied video content and query contexts,
+transform sampling, we provide two examples from the                  including under multi-round VQA scenarios.
+Video-MME in Figure 3. As shown in the figure, ITS can                Acknowledgments. This work is supported by the KAUST
+effectively sample query-relevant frames with high similar-           Center of Excellence for Generative AI under award num-
+ity scores. At the same time, ITS also includes certain local         ber 5940. The computational resources are provided by
+peaks as contextual information, ensuring frame diversity             IBEX, which is managed by the Supercomputing Core Lab-
+and providing the VLMs with crucial context for reasoning.            oratory at KAUST.
+
+
+                                                                  8
+References                                                                [14] KunChang Li, Yinan He, Yi Wang, Yizhuo Li, Wenhai
+                                                                               Wang, Ping Luo, Yali Wang, Limin Wang, and Yu Qiao.
+ [1] Kirolos Ataallah, Xiaoqian Shen, Eslam Abdelrahman, Es-                   Videochat: Chat-centric video understanding. arXiv preprint
+     sam Sleiman, Deyao Zhu, Jian Ding, and Mohamed El-                        arXiv:2305.06355, 2023. 1, 6
+     hoseiny. Minigpt4-video: Advancing multimodal llms for               [15] Yanwei Li, Chengyao Wang, and Jiaya Jia. Llama-vid: An
+     video understanding with interleaved visual-textual tokens.               image is worth 2 tokens in large language models, 2023. 2
+     arXiv preprint arXiv:2404.03413, 2024. 1
+                                                                          [16] Zijing Liang, Yanjie Xu, Yifan Hong, Penghui Shang, Qi
+ [2] Kirolos Ataallah, Xiaoqian Shen, Eslam Abdelrahman, Es-                   Wang, Qiang Fu, and Ke Liu. A survey of multimodel large
+     sam Sleiman, Mingchen Zhuge, Jian Ding, Deyao Zhu,                        language models. In Proceedings of the 3rd International
+     Jürgen Schmidhuber, and Mohamed Elhoseiny. Goldfish:                     Conference on Computer, Artificial Intelligence and Control
+     Vision-language understanding of arbitrarily long videos. In              Engineering, pages 405–409, 2024. 2
+     ECCV, pages 251–267. Springer, 2024. 2, 3                            [17] Bin Lin, Yang Ye, Bin Zhu, Jiaxi Cui, Munan Ning, Peng
+ [3] Guo Chen, Yin-Dong Zheng, Jiahao Wang, Jilan Xu, Yifei                    Jin, and Li Yuan. Video-llava: Learning united visual rep-
+     Huang, Junting Pan, Yi Wang, Yali Wang, Yu Qiao, Tong                     resentation by alignment before projection. arXiv preprint
+     Lu, et al. Videollm: Modeling video sequence with large                   arXiv:2311.10122, 2023. 1, 6, 7
+     language models. arXiv preprint arXiv:2305.13292, 2023. 3            [18] Kevin Lin, Faisal Ahmed, Linjie Li, Chung-Ching Lin,
+ [4] Lin Chen, Xilin Wei, Jinsong Li, Xiaoyi Dong, Pan Zhang,                  Ehsan Azarnasab, Zhengyuan Yang, Jianfeng Wang, Lin
+     Yuhang Zang, Zehui Chen, Haodong Duan, Zhenyu Tang, Li                    Liang, Zicheng Liu, Yumao Lu, et al. Mm-vid: Advanc-
+     Yuan, et al. Sharegpt4video: Improving video understand-                  ing video understanding with gpt-4v (ision). arXiv preprint
+     ing and generation with better captions. In NeurIPS, pages                arXiv:2310.19773, 2023. 1
+     19472–19495, 2024. 1, 2, 6                                           [19] Nelson F. Liu, Kevin Lin, John Hewitt, Ashwin Paranjape,
+ [5] Qirui Chen, Shangzhe Di, and Weidi Xie. Grounded multi-                   Michele Bevilacqua, Fabio Petroni, and Percy Liang. Lost in
+     hop videoqa in long-form egocentric videos. arXiv preprint                the middle: How language models use long contexts, 2023.
+     arXiv:2408.14469, 2024. 2, 3                                              2
+ [6] Zhe Chen, Jiannan Wu, Wenhai Wang, Weijie Su, Guo Chen,              [20] Shuming Liu, Chen-Lin Zhang, Chen Zhao, and Bernard
+     Sen Xing, Muyan Zhong, Qinglong Zhang, Xizhou Zhu,                        Ghanem. End-to-end temporal action detection with 1b pa-
+     Lewei Lu, et al. Internvl: Scaling up vision foundation mod-              rameters across 1000 frames. In CVPR, pages 18591–18601,
+     els and aligning for generic visual-linguistic tasks. In CVPR,            2024. 1
+     pages 24185–24198, 2024. 3, 7                                        [21] Muhammad Maaz, Hanoona Rasheed, Salman Khan, and Fa-
+ [7] Zesen Cheng, Sicong Leng, Hang Zhang, Yifei Xin, Xin Li,                  had Shahbaz Khan. Video-chatgpt: Towards detailed video
+     Guanzheng Chen, Yongxin Zhu, Wenqi Zhang, Ziyang Luo,                     understanding via large vision and language models. arXiv
+     Deli Zhao, and Lidong Bing. VideoLLaMA 2: Advanc-                         preprint arXiv:2306.05424, 2023. 1, 2
+     ing Spatial-Temporal Modeling and Audio Understanding in             [22] Karttikeya Mangalam, Raiymbek Akshulakov, and Jitendra
+     Video-LLMs, 2024. 6                                                       Malik. Egoschema: A diagnostic benchmark for very long-
+                                                                               form video language understanding. Advances in Neural In-
+ [8] Abhimanyu Dubey, Abhinav Jauhri, Abhinav Pandey, Ab-
+                                                                               formation Processing Systems, 36:46212–46244, 2023. 6
+     hishek Kadian, Ahmad Al-Dahle, Aiesha Letman, Akhil
+     Mathur, Alan Schelten, et al. The llama 3 herd of models,            [23] Juhong Min, Shyamal Buch, Arsha Nagrani, Minsu Cho, and
+     2024. 2                                                                   Cordelia Schmid. Morevqa: Exploring modular reasoning
+                                                                               models for video question answering. In 2024 IEEE/CVF
+ [9] Chaoyou Fu, Yuhan Dai, Yondong Luo, Lei Li, Shuhuai Ren,
+                                                                               Conference on Computer Vision and Pattern Recognition
+     Renrui Zhang, Zihan Wang, Chenyu Zhou, Yunhang Shen,
+                                                                               (CVPR), pages 13235–13245, 2024. 1, 2
+     Mengdan Zhang, et al. Video-mme: The first-ever compre-
+                                                                          [24] OpenAI, Josh Achiam, Steven Adler, Sandhini Agarwal,
+     hensive evaluation benchmark of multi-modal llms in video
+                                                                               Lama Ahmad, et al. Gpt-4 technical report, 2024. 2
+     analysis. arXiv preprint arXiv:2405.21075, 2024. 2, 4, 6
+                                                                          [25] Long Qian, Juncheng Li, Yu Wu, Yaobo Ye, Hao Fei, Tat-
+[10] Robert M Haralick, Stanley R Sternberg, and Xinhua                        Seng Chua, Yueting Zhuang, and Siliang Tang. Momen-
+     Zhuang. Image analysis using mathematical morphology. In                  tor: Advancing video large language model with fine-grained
+     TPAMI, pages 532–550. IEEE, 1987. 5                                       temporal reasoning, 2024. 2
+[11] Peng Jin, Ryuichi Takanobu, Wancai Zhang, Xiaochun Cao,              [26] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+     and Li Yuan. Chat-univi: Unified visual representation em-                Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+     powers large language models with image and video under-                  Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning
+     standing. In CVPR, pages 13700–13710, 2024. 1, 6                          transferable visual models from natural language supervi-
+[12] Wonkyun Kim, Changin Choi, Wonseok Lee, and Wonjong                       sion. In International conference on machine learning, pages
+     Rhee. An image grid can be worth a video: Zero-shot video                 8748–8763. PMLR, 2021. 5, 6
+     question answering using a vlm. IEEE Access, 2024. 1, 2              [27] Shuhuai Ren, Linli Yao, Shicheng Li, Xu Sun, and Lu
+[13] Bo Li, Yuanhan Zhang, Dong Guo, Renrui Zhang, Feng Li,                    Hou. Timechat: A time-sensitive multimodal large lan-
+     Hao Zhang, Kaichen Zhang, Peiyuan Zhang, Yanwei Li, Zi-                   guage model for long video understanding. In Proceedings
+     wei Liu, and Chunyuan Li. Llava-onevision: Easy visual task               of the IEEE/CVF Conference on Computer Vision and Pat-
+     transfer, 2024. 1, 2, 6                                                   tern Recognition, pages 14313–14323, 2024. 1
+
+
+                                                                      9
+[28] Xiaoqian Shen, Yunyang Xiong, Changsheng Zhao, Lemeng               [39] Sicheng Yu, Chengkai Jin, Huanyu Wang, Zhenghao Chen,
+     Wu, Jun Chen, Chenchen Zhu, Zechun Liu, Fanyi Xiao, Bal-                 Sheng Jin, Zhongrong Zuo, Xiaolei Xu, Zhenbang Sun,
+     akrishnan Varadarajan, Florian Bordes, Zhuang Liu, Hu Xu,                Bingni Zhang, Jiawei Wu, Hao Zhang, and Qianru Sun.
+     Hyunwoo J. Kim, Bilge Soran, Raghuraman Krishnamoor-                     Frame-voyager: Learning to query frames for video large
+     thi, Mohamed Elhoseiny, and Vikas Chandra. Longvu: Spa-                  language models, 2024. 1, 2, 3, 6
+     tiotemporal adaptive compression for long video-language            [40] Xiaohua Zhai, Basil Mustafa, Alexander Kolesnikov, and
+     understanding, 2024. 1, 2, 6                                             Lucas Beyer. Sigmoid loss for language image pre-training.
+[29] Yan Shu, Peitian Zhang, Zheng Liu, Minghao Qin, Junjie                   In Proceedings of the IEEE/CVF International Conference
+     Zhou, Tiejun Huang, and Bo Zhao. Video-XL: Extra-Long                    on Computer Vision, pages 11975–11986, 2023. 5
+     Vision Language Model for Hour-Scale Video Understand-              [41] Ce Zhang, Taixi Lu, Md Mohaiminul Islam, Ziyang Wang,
+     ing, 2024. 1                                                             Shoubin Yu, Mohit Bansal, and Gedas Bertasius. A sim-
+[30] Enxin Song, Wenhao Chai, Guanhong Wang, Yucheng                          ple llm framework for long-range video question-answering.
+     Zhang, Haoyang Zhou, Feiyang Wu, Haozhe Chi, Xun Guo,                    arXiv preprint arXiv:2312.17235, 2023. 1
+     Tian Ye, Yanting Zhang, Yan Lu, Jenq-Neng Hwang, and                [42] Kaichen Zhang, Bo Li, Peiyuan Zhang, Fanyi Pu,
+     Gaoang Wang. Moviechat: From dense token to sparse                       Joshua Adrian Cahyono, Kairui Hu, Shuai Liu, Yuanhan
+     memory for long video understanding. In 2024 IEEE/CVF                    Zhang, Jingkang Yang, Chunyuan Li, and Ziwei Liu. Lmms-
+     Conference on Computer Vision and Pattern Recognition                    eval: Reality check on the evaluation of large multimodal
+     (CVPR), pages 18221–18232, Seattle, WA, USA, 2024.                       models, 2024. 6
+     IEEE. 1, 2                                                          [43] Peiyuan Zhang, Kaichen Zhang, Bo Li, Guangtao Zeng,
+[31] Yunlong Tang, Jing Bi, Siting Xu, Luchuan Song, Susan                    Jingkang Yang, Yuanhan Zhang, Ziyue Wang, Haoran Tan,
+     Liang, Teng Wang, Daoan Zhang, Jie An, Jingyang Lin,                     Chunyuan Li, and Ziwei Liu. Long context transfer from
+     Rongyi Zhu, Ali Vosoughi, Chao Huang, Zeliang Zhang,                     language to vision. arXiv preprint arXiv:2406.16852, 2024.
+     Pinxin Liu, Mingqian Feng, Feng Zheng, Jianguo Zhang,                    7
+     Ping Luo, Jiebo Luo, and Chenliang Xu. Video understand-            [44] Yuanhan Zhang, Bo Li, haotian Liu, Yong jae Lee, Liangke
+     ing with large language models: A survey, 2024. 2                        Gui, Di Fu, Jiashi Feng, Ziwei Liu, and Chunyuan Li. Llava-
+[32] Haoning Wu, Dongxu Li, Bei Chen, and Junnan Li.                          next: A strong zero-shot video understanding model, 2024.
+     Longvideobench: A benchmark for long-context interleaved                 3
+     video-language understanding. NeurIPS, 37:28828–28857,              [45] Yuanhan Zhang, Jinming Wu, Wei Li, Bo Li, Zejun Ma, Zi-
+     2024. 2, 6                                                               wei Liu, and Chunyuan Li. Video instruction tuning with
+[33] Hao Wu, Huabin Liu, Yu Qiao, and Xiao Sun. Dibs: En-                     synthetic data. arXiv preprint arXiv:2410.02713, 2024. 7
+     hancing dense video captioning with unlabeled videos via            [46] Junjie Zhou, Yan Shu, Bo Zhao, Boya Wu, Shitao Xiao, Xi
+     pseudo boundary enrichment and online refinement. In                     Yang, Yongping Xiong, Bo Zhang, Tiejun Huang, and Zheng
+     2024 IEEE/CVF Conference on Computer Vision and Pat-                     Liu. Mlvu: A comprehensive benchmark for multi-task
+     tern Recognition (CVPR), pages 18699–18708, 2024. 1, 2                   long video understanding. arXiv preprint arXiv:2406.04264,
+[34] Yongliang Wu, Bozheng Li, Jiawang Cao, Wenbo Zhu, Yi                     2024. 2, 6
+     Lu, Weiheng Chi, Chuyun Xie, Haolin Zheng, Ziyue Su, Jay            [47] Deyao Zhu, Jun Chen, Xiaoqian Shen, Xiang Li, and Mo-
+     Wu, and Xu Yang. Zero-shot long-form video understanding                 hamed Elhoseiny. Minigpt-4: Enhancing vision-language
+     through screenplay, 2024. 2                                              understanding with advanced large language models, 2023.
+[35] Junbin Xiao, Xindi Shang, Angela Yao, and Tat-Seng Chua.                 2
+     Next-qa: Next phase of question-answering to explaining
+     temporal actions. In Proceedings of the IEEE/CVF Confer-
+     ence on Computer Vision and Pattern Recognition (CVPR),
+     pages 9777–9786, 2021. 6
+[36] Mingze Xu, Mingfei Gao, Zhe Gan, Hong-You Chen,
+     Zhengfeng Lai, Haiming Gang, Kai Kang, and Afshin De-
+     hghan. SlowFast-LLaVA: A Strong Training-Free Baseline
+     for Video Large Language Models, 2024. 1
+[37] Antoine Yang, Arsha Nagrani, Paul Hongsuck Seo, An-
+     toine Miech, Jordi Pont-Tuset, Ivan Laptev, Josef Sivic, and
+     Cordelia Schmid. Vid2seq: Large-scale pretraining of a vi-
+     sual language model for dense video captioning, 2023. 1,
+     2
+[38] Jiabo Ye, Haiyang Xu, Haowei Liu, Anwen Hu, Ming
+     Yan, Qi Qian, Ji Zhang, Fei Huang, and Jingren Zhou.
+     mplug-owl3: Towards long image-sequence understanding
+     in multi-modal large language models. arXiv preprint
+     arXiv:2408.04840, 2024. 1
+
+
+                                                                    10
+               BOLT: Boost Large Vision-Language Model Without Training
+                          for Long-form Video Understanding
+                                                 Supplementary Material
+   In this appendix, we provide additional experimental re-             Table 11. Inference time analysis. The inference time is evalu-
+sults and further analyses. Specifically, we present results            ated by one A100 GPU. We utilize the LLaVA-OneVision-7B with
+on Video-MME with subtitles in Section A. Then, we dis-                 an input of 16 frames. CLIP-L/14 is used to extract visual features.
+cuss inference costs in Section B. In the end, we provide
+additional visualization examples in Section C.                                Step                              Time     Increase
+                                                                               VLM inference                     1.32 s
+A. Additional Results on Video-MME                                             CLIP visual feature               1.21 s
+In the main paper, we presented benchmark results of vari-                     Inverse Transform Sampling       0.003 s
+ous VLMs on the Video-MME dataset without subtitles. To                        Total                             2.53 s     +90.9%
+further validate the effectiveness of the proposed method,
+we incorporate subtitles into the VLMs’ text input. As
+shown in Table 10, our method consistently improves over-                  Additionally, our inference pipeline relies solely on basic
+all performance across different frame budgets. Particu-                CLIP for visual-text matching. While incorporating auxil-
+larly, with only 8 input frames, BOLT increases the accu-               iary alignment models or external tools, such as object de-
+racy from 58.7% to 61.0%. The performance across short,                 tectors or OCR models, could further improve VQA per-
+medium, and long videos also improves, demonstrating the                formance, it would inevitably increase computational over-
+effectiveness and robustness of our approach in leveraging              head. Our frame selection method is orthogonal to such ap-
+both visual and textual information.                                    proaches, as it focuses on selecting query-relevant frames to
+                                                                        improve the effectiveness of downstream VLM inference.
+Table 10. Benchmark results on Video-MME dataset with sub-
+titles. Our proposed inverse transform sampling can consistently
+enhance the overall performance under different frame budgets.          C. Additional Qualitative Results
+                                                                        We provide additional visualizations of inverse transform
+Model                     BOLT Overall Short Medium Long                sampling in Figure 5. The blue curve represents the simi-
+                            ✗      58.7   70.8     56.1    49.4         larity scores across the entire video sequence, while the red
+LLaVA-OneVision8 frame
+                            ✓      61.0   71.7     58.4    52.9         lines indicate the selected frames.
+                            ✗      60.3   72.7     57.1    51.1             As shown in the figure, the proposed method effectively
+LLaVA-OneVision16 frame                                                 selects frames with high visual-query similarity. In addi-
+                            ✓      61.7   74.0     59.3    51.8
+                                                                        tion, it preserves certain background elements, helping to
+                            ✗      61.9   75.7     58.4    51.6
+LLaVA-OneVision32 frame
+                            ✓      62.7   75.1     61.4    51.4
+
+
+
+B. Analysis of Inference Cost
+We also evaluate the inference cost of our training-free ap-
+proach. Our method consists of three main steps: CLIP-
+based frame feature encoding, inverse transform sampling,                                          004-1.png
+and VLM inference. In terms of memory usage, our ap-                                               006-2.png
+proach requires nearly the same GPU memory as the base-
+line method that uses uniform sampling. In terms of infer-
+ence time, as shown in Table 11, the total inference time
+per sample increases by approximately 90%, primarily due
+to the CLIP feature encoding step. In contrast, the inverse
+transform sampling itself is highly efficient. Although our
+method introduces some additional inference time, it re-                Figure 4. When visual-query similarity scores remain similar
+mains acceptable considering that no training or fine-tuning            across the video, inverse transform sampling simplifies to uni-
+is required.                                                            form sampling.
+
+
+                                                                   11
+                        004-1.png
+                        006-2.png
+
+
+
+
+          Figure 5. Additional visualization results.
+
+
+maintain important contextual information required for ac-
+curate video understanding.
+   In Figure 4, we present an example where the visual-
+query similarity scores remain relatively similar through-
+out the video. In such cases, the cumulative distribution
+function becomes approximately linear, causing the final se-
+lected frames to approximate uniform sampling. This indi-
+cates that most clips in the video may contribute equally to
+answering the question.
+
+
+
+
+                                                               12
+

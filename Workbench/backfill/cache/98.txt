@@ -1,0 +1,703 @@
+                                         GeoPredict: Leveraging Predictive Kinematics and 3D Gaussian Geometry for
+                                                                 Precise VLA Manipulation
+
+                                         Jingjing Qian1             Boyao Han2 Chen Shi1 Lei Xiao1 Long Yang1 Shaoshuai Shi3                                  Li Jiang1†
+                                                                           1
+                                                                             The Chinese University of Hong Kong, Shenzhen
+                                                                        2
+                                                                          Hunan University 3 Voyager Research, Didi Chuxing
+                                                                        https://jingjingqian75.github.io/GeoPredict-Page/
+
+
+
+
+arXiv:2512.16811v2 [cs.CV] 7 Apr 2026
+                                                                    Abstract                                   To move beyond purely reactive policies, recent work
+                                                                                                            has begun to incorporate predictive structure into visuomo-
+                                        Vision–Language–Action (VLA) models achieve strong gen-             tor models [17, 23, 30]. Some approaches learn latent dy-
+                                        eralization in robotic manipulation but remain largely re-          namics or temporal abstractions to better capture how states
+                                        active and 2D-centric, making them unreliable in tasks              evolve over time [7, 8, 24, 50], while others predict fu-
+                                        that require precise 3D reasoning. We propose GeoPre-               ture observations such as RGB frames, depths, or point-
+                                        dict, a geometry-aware VLA framework that augments a                based representations [6, 11, 12, 17, 36, 49]. Although
+                                        continuous-action policy with predictive kinematic and ge-          these methods provide useful temporal signals, they often
+                                        ometric priors. GeoPredict introduces a trajectory-level            remain view-independent and do not strictly enforce multi-
+                                        module that encodes motion history and predicts multi-step          view or 3D geometric consistency, making it hard to reason
+                                        3D keypoint trajectories of robot arms, and a predictive 3D         about object poses, clearances, and end-effector motion in
+                                        Gaussian geometry module that forecasts workspace ge-               workspace coordinates. Moreover, tightly coupling high-
+                                        ometry with track-guided refinement along future keypoint           capacity predictive modules with large VLA backbones can
+                                        trajectories. These predictive modules serve exclusively as         introduce non-negligible computational overhead if com-
+                                        training-time supervision through depth-based rendering,            plex 3D prediction is required during inference time.
+                                        while inference requires only lightweight additional query             For robotic manipulation, we argue that two predic-
+                                        tokens without invoking any 3D decoding. Experiments on             tive capabilities are particularly valuable. First, the policy
+                                        RoboCasa Human-50, LIBERO, and real-world manipula-                 should exploit predictive kinematic priors that summarize
+                                        tion tasks show that GeoPredict consistently outperforms            how the robot is likely to move over the next few steps,
+                                        strong VLA baselines, especially in geometry-intensive and          rather than relying solely on instantaneous joint states. Sec-
+                                        spatially demanding scenarios.                                      ond, it should reason about predictive 3D Gaussian geome-
+                                                                                                            try through an explicit, differentiable representation aligned
+                                                                                                            with the robot’s workspace and amenable to supervision
+                                        1. Introduction                                                     from depth and multi-view cues. Crucially, these predictive
+                                                                                                            signals must seamlessly integrate with VLA architectures
+                                        Vision–Language–Action (VLA) models have recently                   and keep inference-time overhead modest enough to enable
+                                        emerged as a powerful paradigm for robotic manipula-                practical deployment for real-time robotic control.
+                                        tion, leveraging large pre-trained Vision–Language Models
+                                                                                                               In this paper, we introduce GeoPredict, a geometry-
+                                        (VLMs) to map rich visual observations and language in-
+                                                                                                            aware VLA framework augmented with predictive priors
+                                        structions directly to actions [4, 22, 51, 54]. By inheriting
+                                                                                                            for robotic manipulation. GeoPredict is built on top of a
+                                        semantic and visual priors from internet-scale data, these
+                                                                                                            strong continuous-action VLA policy [3], and augments the
+                                        models generalize well across tasks and settings. However,
+                                                                                                            policy with two complementary predictive modules.
+                                        they operate primarily in 2D image space, mapping the cur-
+                                        rent observation reactively and lacking explicit 3D spatial            First, at the kinematic level, we introduce a trajectory-
+                                        modeling [53]. This 2D-centric, myopic formulation lim-             level prediction module that tracks key robot joints and end-
+                                        its performance in tasks requiring precise 3D reasoning and         effector points and encodes their motion history into com-
+                                        physically consistent long-horizon control.                         pact tokens via a Track Encoder. A set of learnable future
+                                                                                                            track queries then predicts multi-step 3D keypoint trajec-
+                                          † Corresponding Author.                                           tories, providing explicit, differentiable kinematic priors.
+
+
+                                                                                                        1
+These predicted trajectories not only regularize the trans-          2.2. Future Prediction for Robotic Manipulation
+former’s internal dynamics, but also serve as guidance for
+                                                                     Recent works explore future prediction to enhance robotic
+where high-fidelity 3D scene modeling is most needed.
+                                                                     policies [6, 13–15, 31, 48]. Some directly forecast future
+    Second, at the geometric level, we introduce a pre-              observations like RGB images [17, 42], depths [49], or
+dictive 3D Gaussian geometry module that forecasts how               pointmaps [27], while approaches like Seer [40] condition
+workspace geometry evolves over time. A coarse 3D spa-               inverse dynamics on these forecasted visual states. How-
+tial query grid is decoded into Gaussian primitives repre-           ever, these methods face two key limitations. First, popu-
+senting the scene at future timesteps. To focus geometric            lar approaches like SuSiE [2] or UniPi [10] often rely on
+capacity where precision matters most, a track-guided re-            a single prediction step, which struggles to capture com-
+finement mechanism increases Gaussian density along the              plex physical dynamics and introduces time-consuming de-
+predicted future keypoint trajectories of the joints, yielding       noising that reduces control frequency. Second, these 2D-
+higher resolution around anticipated motion and interaction          centric methods [42] struggle with multi-view consistency
+regions. The resulting 3DGS representation is supervised             and lack the explicit 3D geometry crucial for accurate ma-
+through future depth-map rendering, providing a geometry-            nipulation. To address this gap, we introduce GeoPredict, a
+focused training signal without requiring color modeling.            geometry-aware predictive model that forecasts scene evo-
+    Both predictive modules are integrated via a block-wise          lution over a full horizon of H steps in explicit 3D space,
+causal attention hierarchy and are used only during training;        learning a spatially coherent and predictive 3D representa-
+inference behaves exactly like the base VLA policy.                  tion to condition action generations.
+    In summary, our main contributions are threefold: (1)
+We introduce GeoPredict, a geometry-aware VLA frame-                 2.3. 3D Scene Representation
+work that injects future-aware kinematic and geometric pri-
+                                                                     3D scene representation is a fundamental problem in com-
+ors into a continuous-action VLA policy, enhancing reason-
+                                                                     puter vision, traditionally relying on explicit structures like
+ing about long-horizon 3D dynamics. (2) We propose two
+                                                                     meshes [28], voxels [43] and point clouds [35]. Recent re-
+complementary predictive modules: a trajectory-level kine-
+                                                                     search has shifted to neural representations that learn con-
+matic predictor forecasting multi-step robot keypoint mo-
+                                                                     tinuous models of scene geometry and appearance. Pio-
+tion, and a predictive 3D Gaussian geometry module with
+                                                                     neered by Neural Radiance Fields (NeRF) [32], these im-
+track-guided refinement that allocates geometric capacity to
+                                                                     plicit models often require subsequent acceleration [16, 33,
+task-relevant interaction regions. (3) We show that GeoPre-
+                                                                     45] due to costly training and rendering. More recently, 3D
+dict delivers consistent and substantial improvements over
+                                                                     Gaussian Splatting (3DGS) [18, 38, 41, 46] has emerged as
+strong VLA baselines on RoboCasa Human-50, LIBERO,
+                                                                     a highly effective explicit alternative. 3DGS models scenes
+and real-world manipulation tasks, particularly those requir-
+                                                                     as a collection of 3D Gaussians with learned attributes,
+ing precise spatial reasoning and geometric robustness.
+                                                                     leveraging differentiable rasterization for high-fidelity and
+                                                                     remarkably efficient rendering. While recent works like
+2. Related Work                                                      GWM [30] apply 3DGS to robotic world modeling, di-
+2.1. Vision-Language-Action Models                                   rectly forecasting these massive Gaussian attributes remains
+                                                                     computationally demanding. To circumvent this burden,
+Vision-Language-Action (VLA) models have emerged as                  we leverage 3DGS as a predictive scene geometry mod-
+powerful robotic policies [4, 20, 22, 44, 51, 52]. Pio-              ule solely during training, aiming to endow the VLA policy
+neering methods like OpenVLA [20] rely on discrete au-               with intrinsic, foresight-driven spatial reasoning ability.
+toregressive tokenization, limiting inference frequency and
+struggling with continuous, multi-modal action distribu-             3. Methodology
+tions [53]. While subsequent architectures like π0 [3] uti-
+lize conditional flow matching [25] to generate continuous           We propose GeoPredict, a geometry-aware VLA frame-
+actions, they remain predominantly 2D-centric and reac-              work that equips continuous-control policies with predictive
+tive [3, 5, 17, 52], lacking the robust 3D geometric under-          kinematic and geometric priors. GeoPredict jointly learns
+standing required for complex manipulation. Furthermore,             future robot keypoint trajectories and future scene geometry
+although SpatialVLA [37] and BridgeVLA [21] integrate                through a 3DGS representation, and conditions the under-
+explicit 3D information and auxiliary tasks, they still lack a       lying VLA on these predictions. Notably, these predictive
+predictive understanding of 3D scene dynamics. To address            modules are used only during training, while the action gen-
+this gap, our GeoPredict introduces a geometry-aware pre-            eration process remains similar to a standard VLA policy.
+dictive model that directly forecasts 3D scene evolution us-            First, we describe the problem setup and the base VLA
+ing 3D Gaussian Splatting [18], equipping the VLA model              model (Sec. 3.1). We then introduce our trajectory encoding
+with predictive geometric priors.                                    and future motion prediction module (Sec. 3.2), followed
+
+                                                                 2
+  Instruction 𝑳: pick the corn from                             Text          …                                                                      …
+  the counter and place it in the sink                        Encoder                                                                                                                                    𝑷𝒐𝒊𝒏𝒕!&#$
+
+
+
+
+                                                                                          LLM Transformer
+                                                                                                                                                                                                                                                                                                                                                     Coarse
+  Observation 𝑰!                                                                                                                                                                                                                                                                                                                                     Voxel
+                                                               Vision         …                                                                      …
+                                                              Encoder
+                                                                                                                                                                                                                                                                                                                                                     Refined
+                                                                                                                                                                                                                                                                                                                                                      Voxel
+   History                                                     Track          …                                                                      …                                                                                Future Tracks
+   Tracks                                                     Encoder
+                                                                                                                                                                                                                      Time PE
+       𝑷𝒐𝒊𝒏𝒕!"#$                                                              …                                                                      …
+       𝑷𝒐𝒊𝒏𝒕!"%
+
+
+
+                                                                              …                                                                       …                                                            Voxel
+                                                                                                                                                                                                                  Decoder
+                                                      3D Spatial Query                  Iterative                                                                                                                                                                                  3D Future Voxel Gaussians
+         𝑥!   𝑥"   𝑥#        𝑥$%#   𝑥$%"                                                Denoising
+         𝑦!   𝑦"   𝑦#   ……   𝑦$%#   𝑦$%"
+                                                                                                                                                                                                        Future Depths
+         𝑧!   𝑧"   𝑧#        𝑧$%#   𝑧$%"
+
+                                                               …                         Action
+                                                                                                                                                                                                                                                           …                                                     …                                       Render
+              Cross-Attention                           𝑡+1        𝑡 + 50     …          Expert                                                      …
+                                                      Gaussian Noise                                                                                                                                                          𝑡+1                                                  𝑡 + 25                                                   𝑡 + 50
+
+
+       History Track Query      History Track Token      Future Track Query       Text Token                                   Image Token                                                                      Spatial Query                                                                    State Token                                         Action Noise
+
+
+
+Figure 1. Overview of GeoPredict. Given an instruction, multi-view images and motion history encoded by the Track Encoder, a central
+LLM Transformer learns two main tasks. First, it predicts multi-timestep 3D keypoint trajectories using learnable Future Track Query.
+Second, it forecasts future workspace geometry as a predictive 3D Gaussian by processing a 3D Spatial Query through a Voxel Decoder.
+A track-guided refinement mechanism leverages the predicted future tracks to allocate geometric capacity to task-relevant interaction
+regions. Our policy then generates the final action via an Action Expert. Crucially, these predictive modules serve exclusively as training-
+time supervision and are not invoked during inference, thus preserving efficiency.
+
+by the predictive 3D Gaussian geometry and its refinement                               the action expert then generates At by integrating a learned
+mechanism (Sec. 3.3). Finally, we present the attention de-                             vector field from noise in a small, fixed number of steps.
+sign, training objective and inference process (Sec. 3.4).
+                                                                                        3.2. Trajectory-Level Kinematic Prediction
+3.1. Preliminary                                                                        GeoPredict models robot motion at the trajectory level. This
+Problem Definition. The VLA paradigm [3, 20] aims to                                    provides both a compact summary of past kinematics and an
+learn a policy π that maps a language instruction L, the cur-                           explicit prediction of future trajectories, serving as a kine-
+rent multi-view image observation It , and the robot’s pro-                             matic prior for action generation and as guidance for spatial
+prioceptive state Qt to a continuous action chunk At =                                  refinement in the following 3D Gaussian geometry module.
+[at , at+1 , . . . , at+H−1 ], where we set H = 50. Each ac-                            Track Encoder. The Track Encoder compresses the mo-
+tion at ∈ R7 is a 7-DoF end-effector command at =                                       tion history of all robot keypoints into compact tokens for
+{∆x, ∆θ, g}, where ∆x ∈ R3 and ∆θ ∈ R3 denote trans-                                    the transformer. This historical context provides a strong
+lational and rotational offsets (e.g., in axis–angle or Euler                           kinematic prior: because joint motion exhibits inertia and
+representation), and g ∈ R is the gripper’s open-close state.                           action generation fundamentally involves forecasting future
+    While VLAs generate actions reactively from the current                             trajectories, encoding past dynamics enables the model to
+observation, many manipulation tasks require anticipating                               make more physically consistent motion predictions.
+how both the robot and the surrounding scene will evolve                                    As illustrated in Figure 1, we track K 3D keypoints
+over time. Thus, GeoPredict augments the policy by condi-                               (joints and end-effector points). For each keypoint k ∈
+tioning not only on past observations but also on internally                            {1, . . . , K}, we collect its 3D coordinates from time 0 to
+predicted future robot motion and future scene geometry.                                t−1 into a trajectory T k ∈ R(t−1)×3 . A shared learnable
+    Base VLA model. We adopt π0 [3] as the VLA base                                     history query Qhist performs cross-attention over the em-
+model. It comprises a VLM (PaliGemma [1] with a SigLIP                                  bedded trajectory to produce a single history track token:
+vision encoder) and a robotics-specific action expert that                                   \begin {aligned} \mathbf {Z}_k^{\text {hist}} = \text {CrossAttn}\big (&\text {query}=\mathbf {Q}^{\text {hist}},\; \text {key}=\text {MLP}(\bm {\mathcal {T}}_k),\\ &\text {value}=\text {MLP}(\bm {\mathcal {T}}_k)\big ). \end {aligned} 
+generates continuous actions via conditional flow match-                                                                                                                                                                                                                                                                                                            (1)
+ing [25]. Text, image, and proprioceptive tokens are pro-
+jected into a shared space and processed by the transformer;                            These K history tokens encode inertia, joint limits, and mo-
+
+
+                                                                                   3
+tion regularities, and are appended to the transformer input.                                                                                                                                                  query is obtained by
+Future Track Query. To explicitly capture future motion,
+we introduce K learnable future track queries {qfut       K                                                                                                                                                                          \mathbf {Q}^{\text {spatial}}[i,j,k] = \mathbf {Q}^{\text {init}}[i,j,k] + \mathbf {PE}^{\text {spatial}}[i, j,k].                                                                                                                      (4)
+                                                       k }k=1 .
+These queries are processed together with the instruction                                                                                                                                                      All spatial queries are flattened into a sequence of Nx Ny Nz
+L, current images It , and history tokens {Zhist
+                                               k }, producing                                                                                                                                                  tokens and provided to the transformer together with the
+future track embeddings efutk  that summarize   the latent pre-                                                                                                                                                instruction, current observations and history track tokens.
+dicted trajectory of each keypoint.
+                                                                                                                                                                                                               Voxel Decoder. After multi-layer attention, we obtain spa-
+   We decode each efut k into an explicit spatio-temporal tra-                                                                                                                                                 tial embeddings Espatial ∈ R(Nx Ny Nz )×C that summarize
+jectory by using a shared MLP to predict H+1 timesteps,
+                                                                                                                                                                                                               the workspace representation at time t. To model future ge-
+one for the current time t and H for future steps
+                                                                                                                                                                                                               ometry, we reuse the temporal positional encoding PEtime
+{t+1, . . . , t+H}. A 1D sinusoidal temporal encoding
+                                                                                                                                                                                                               from Eq. (2) and construct temporally shifted embeddings
+PEtime ∈ R(H+1)×C is then adopted as follows:
+                                                                                                                                                                                                                                                \mathbf {E}^{\text {spatial}}_{t+\tau } = \mathbf {E}^{\text {spatial}} + \mathbf {PE}^{\text {time}}[\tau ], \quad \tau =0,\ldots ,H.                                                                                       (5)
+   \label {eq:track} \hat {\mathbf {p}}_{k,t+\tau } = \text {MLP}\big (\mathbf {e}_k^{\text {fut}} + \mathbf {PE}^{\text {time}}[\tau ]\big ), \qquad \tau = 0,\ldots ,H.  (2)
+                                                                                                                                                                                                               Each Espatial
+                                                                                                                                                                                                                       t+τ is reshaped into a grid of size Nx × Ny × Nz
+  The predicted trajectories are supervised using a Mean                                                                                                                                                       and passed through a 3D voxel decoder composed of trans-
+Squared Error loss over all keypoints and timesteps as                                                                                                                                                         posed convolutions and upsampling layers, which restores
+                                                                                                                                                                                                               the original voxel resolution (H/v)×(W/v)×(D/v). This
+                                                                                                                                                                                                               yields a dense voxel feature volume
+        \label {eq:track_loss} \mathcal {L}_{\text {track}} = \frac {1}{K(H+1)} \sum _{k=1}^{K}\sum _{\tau =0}^{H} \|\hat {\mathbf {p}}_{k,t+\tau } - \mathbf {p}^{\text {gt}}_{k,t+\tau }\|_2^2.    (3)
+                                                                                                                                                                                                                                                                                              \mathbf {F}^{\text {voxel}} \in \mathbb {R}^{(H/v) \times (W/v) \times (D/v) \times C'},                                                                                       (6)
+This encourages the shared transformer backbone to learn                                                                                                                                                       where C ′ is the feature dimension of the voxel feature grid.
+predictive, dynamically consistent motion representations                                                                                                                                                          A final 3D convolution maps each voxel feature
+and provides explicit future trajectories that will be used for                                                                                                                                                Fvoxel [i, j, k] to a set of NG Gaussian primitives. Following
+predictive 3D Gaussian refinement.                                                                                                                                                                             the 3DGS formulation [18], each primitive g = {µ, α, Σ}
+                                                                                                                                                                                                               has a 3D center µ ∈ R3 , an opacity α ∈ R, and a covariance
+3.3. Predictive 3D Gaussian Geometry                                                                                                                                                                           matrix Σ ∈ R3×3 . Because our focus is on geometry rather
+We now introduce a predictive 3D Gaussian geometry                                                                                                                                                             than appearance, we omit color coefficients. The union of
+module that estimates the future geometry of the robot                                                                                                                                                         Gaussians over all voxels forms the initial 3D scene repre-
+workspace. By anticipating how the scene will evolve, this                                                                                                                                                     sentation Ginitt+τ .
+module provides the policy with stronger spatial reasoning                                                                                                                                                     Track-based Gaussian Refinement. While a coarse global
+abilities, which is essential for manipulation tasks that re-                                                                                                                                                  representation is often sufficient for capturing the overall
+ply on forecasting future object configurations. The module                                                                                                                                                    workspace, accurate manipulation requires high-fidelity ge-
+comprises four components: a 3D spatial query for encod-                                                                                                                                                       ometry near regions of interaction, particularly around the
+ing the robot workspace, a voxel decoder that produces 3D                                                                                                                                                      end-effector, joints, and task-relevant objects. We therefore
+Gaussian Splatting (3DGS) primitives, a track-guided re-                                                                                                                                                       refine the Gaussian representation adaptively using the pre-
+finement mechanism for increasing fidelity near interaction                                                                                                                                                    dicted future keypoint trajectories from Sec. 3.2.
+regions, and a depth-rendering objective for supervision.                                                                                                                                                          At timestep t+τ , given the initial Gaussian set Ginit
+                                                                                                                                                                                                                                                                      t+τ and
+3D Spatial Query. To represent the workspace efficiently,                                                                                                                                                      the predicted keypoint positions Pt+τ = {p̂k,t+τ }K    k=1 , we
+we define a 3D volume of dimensions H × W × D meters                                                                                                                                                           define a binary refinement mask for each voxel V[i, j, k]:
+and discretize it into voxels of size v, yielding a grid resolu-
+tion of (H/v) × (W/v) × (D/v). For token efficiency, this                                                                                                                                                         \small \mathbf {M}^{\text {refine}}[i,j,k]= \begin {cases} 1, & \text {if } \exists \, \mathbf {p}\in \mathbf {P}_{t+\tau } ~~\text {s.t.}~~ \mathbf {p}\in \bm {\mathcal {V}}[i,j,k], \\ 0, & \text {otherwise}. \end {cases}                             (7)
+high-resolution grid is downsampled by a factor of 4 along
+each axis, producing a coarse grid of size Nx × Ny × Nz ,                                                                                                                                                         For each voxel with Mrefine [i, j, k] = 1, a shared MLP
+where Nx = H/(4v), Ny = W/(4v), and Nz = D/(4v).                                                                                                                                                                                                       ′
+                                                                                                                                                                                                               maps Fvoxel [i, j, k] to an additional NG finer-grained Gaus-
+    Each coarse voxel is assigned a learnable C-dimensional                                                                                                                                                                         ′
+                                                                                                                                                                                                               sian primitives (NG > NG ), yielding a refined set Grefine
+                                                                                                                                                                                                                                                                        t+τ .
+embedding, forming the initial spatial query tensor Qinit ∈                                                                                                                                                    The complete Gaussian representation for timestep t + τ is
+RNx ×Ny ×Nz ×C . To incorporate geometric structure and
+reduce learning difficulty, we add a 3D sinusoidal po-                                                                                                                                                                                                                                                                           \mathbf {G}^{\text {total}}_{t+\tau } = \mathbf {G}^{\text {init}}_{t+\tau } \cup \mathbf {G}^{\text {refine}}_{t+\tau }. \vspace {-3pt}    (8)
+sitional encoding PEspatial ∈ RNx ×Ny ×Nz ×C , con-                                                                                                                                                               This track-guided refinement concentrates modeling ca-
+structed by concatenating independent 1D sinusoidal en-                                                                                                                                                        pacity near predicted interaction regions, improving geo-
+codings along the x, y, and z axes:         PEspatial [i, j, k] =                                                                                                                                              metric accuracy along the robot’s anticipated motion path
+            x          y         z
+                                     
+Concat PE [i], PE [j], PE [k] . Hence, the final spatial                                                                                                                                                       without requiring a globally high-resolution scene model.
+
+
+                                                                                                                                                                                                           4
+Future Depth Rendering. To supervise the predictive                                                                                                                                                                                                                                                                                                                                                                                                                          3D Token                                                                                                             State Token
+3DGS model, we render depth maps from Gtotal  t+τ at all H+1                                                                                                                                                                                                                                                                                                                                                                                                                                     …
+timesteps using differentiable alpha compositing, following
+the rendering formulation of 3D Gaussian Splatting [18].
+For a given camera and timestep t+τ , we consider a pixel
+ray r and collect all Gaussians whose projected ellipses in-                                                                                                                                                                                                                                                                                                                                                                   2D Token                                                                             3D Query                                                                                                         Action Noise
+
+tersect the ray into a set N , sorted in front-to-back order.                                                                                                                                                                                                                                                                                                                                                                      …                      …                                       …                                     …                                  …                                       …                                 …
+For the i-th Gaussian, let di denote the depth of its center
+µi and αi its opacity. The accumulated transmittance is
+
+                                                                                                                                        T_i \;=\; \prod _{j=1}^{i-1} (1 - \alpha _j), \vspace {-5pt}                                                                                                                                                                                                               (9)       Figure 2. Block-wise Causal Attention Mechanism. For simplic-
+                                                                                                                                                                                                                                                                                                                                                                                                                             ity, the detailed attention pathways from the 3D Token and State
+                                                                                                                                                                                                                                                                                                                                                                                                                             Token blocks to other blocks are not fully drawn.
+representing the probability that the ray passes through all
+primitives in front of the i-th one. The rendered depth for
+                                                                                                                                                                                                                                                                                                                                                                                                                             forms predictive 3D representations (future trajectories and
+ray r is then
+                     \vspace {-5pt} \hat {\mathbf {D}}(\mathbf {r}) \;=\; \sum _{i\in \mathcal {N}} T_i\,\alpha _i\, d_i.  (10)                                                                                                                                                                                                                                                                                              spatial fields), integrates current proprioception, and gen-
+                                                                                                                                                                                                                                                                                                                                                                                                                             erates an action via the action-noise block. The predictive
+Since we focus on geometry prediction, colors are omitted.                                                                                                                                                                                                                                                                                                                                                                   modules thus occupy an intermediate stage, shaping control
+   To restrict supervision to regions relevant for manipula-                                                                                                                                                                                                                                                                                                                                                                 by injecting structured motion and geometry priors into the
+tion, we apply a spatial mask over the robot’s operational                                                                                                                                                                                                                                                                                                                                                                   transformer.
+workspace. For each ray r, we back-project the depth value                                                                                                                                                                                                                                                                                                                                                                   Training Objective. We train the model end-to-end using
+to obtain a 3D point p3d (r). If this point lies within the                                                                                                                                                                                                                                                                                                                                                                  a weighted sum of three loss terms:
+predefined workspace, we set Mspatial (r) = 1; otherwise,
+Mspatial (r) = 0. The depth loss is formulated as a masked                                                                                                                                                                                                                                                                                                                                                                                  \mathcal {L}_{\text {total}} = \lambda _{1}\mathcal {L}_{\text {action}} + \lambda _{2}\mathcal {L}_{\text {track}} + \lambda _{3}\mathcal {L}_{\text {depth}}, \label {eq:total_loss} \vspace {-5pt}        (12)
+L1 loss over all cameras and timesteps:
+                                                                                                                                                                                                                                                                                                                                                                                                                             where Laction is the continuous conditional flow-matching
+                                                                                                                                                                                                                                                                                                                                                                                                                             loss from π0 , Ltrack is the trajectory prediction loss defined
+               \vspace {-5pt} \label {eq:depth_loss} \begin {split} \mathcal {L}_{\text {depth}} &= \frac {1}{\sum \mathbf {M}^{\text {spatial}}} \sum _{\tau =0}^{H} \sum _{c=1}^{N_{cam}} \sum _{\mathbf {r} \in \text {pixels}}\\ &\mathbf {M}^{\text {spatial}}(\mathbf {r})\, \big | \hat {\mathbf {D}}_{c,t+\tau }(\mathbf {r}) - \mathbf {D}^{\text {gt}}_{c,t+\tau }(\mathbf {r}) \big |. \end {split}               in Eq. 3, and Ldepth is the masked depth-rendering loss from
+                                                                                                                                                                                                                                                                                                                                                                                                                  (11)
+                                                                                                                                                                                                                                                                                                                                                                                                                             Eq. 11. The coefficients λ1 , λ2 , and λ3 balance supervision
+                                                                                                                                                                                                                                                                                                                                                                                                                             from action, kinematic, and geometric signals.
+This loss encourages the predicted 3D Gaussian represen-                                                                                                                                                                                                                                                                                                                                                                     Inference. At inference time, all context tokens including
+tation to accurately capture the evolution of workspace ge-                                                                                                                                                                                                                                                                                                                                                                  text, images, history track tokens and 3D queries are pro-
+ometry in regions relevant to downstream manipulation.                                                                                                                                                                                                                                                                                                                                                                       cessed by the transformer in a single forward pass, which
+                                                                                                                                                                                                                                                                                                                                                                                                                             computes and caches attention Key–Value pairs for subse-
+3.4. Training and Inference                                                                                                                                                                                                                                                                                                                                                                                                  quent use. The action expert then performs its iterative de-
+We now introduce how the kinematic and geometric predic-                                                                                                                                                                                                                                                                                                                                                                     noising process for a steps to generate the action chunk At ,
+tion modules are integrated into the transformer via a block-                                                                                                                                                                                                                                                                                                                                                                reusing the cached Key–Value states and invoking only its
+wise causal attention mechanism, and how the full system                                                                                                                                                                                                                                                                                                                                                                     lightweight action-specific layers.
+is jointly trained and deployed efficiently.                                                                                                                                                                                                                                                                                                                                                                                    Importantly, the predictive 3D Gaussian geometry mod-
+Block-wise Causal Attention Mechanism. We adopt a                                                                                                                                                                                                                                                                                                                                                                            ules (e.g., the voxel decoder and depth-rendering mod-
+block-wise causal attention structure adapted from π0 as                                                                                                                                                                                                                                                                                                                                                                     ule) are not executed during inference. They serve purely
+shown in Figure 2, in which the full token sequence is par-                                                                                                                                                                                                                                                                                                                                                                  as training-time supervision signals that shape the trans-
+titioned into five conceptually ordered groups: (1) 2D To-                                                                                                                                                                                                                                                                                                                                                                   former’s internal representations with geometric and phys-
+ken (text and image tokens), (2) 3D Token (history track                                                                                                                                                                                                                                                                                                                                                                     ical structure, while the action-generation pathway remains
+tokens), (3) 3D Query tokens (future track queries and spa-                                                                                                                                                                                                                                                                                                                                                                  unchanged and efficient during deployment.
+tial queries), (4) State Token (proprioceptive token) and (5)
+Action Noise tokens (used by flow matching). Attention is                                                                                                                                                                                                                                                                                                                                                                    4. Experiments
+fully bidirectional within each block, enabling rich intra-
+block interactions, while cross-block attention is strictly                                                                                                                                                                                                                                                                                                                                                                  We first introduce our experimental setup (Sec. 4.1), fol-
+causal: tokens in a given block may attend only to tokens                                                                                                                                                                                                                                                                                                                                                                    lowed by a benchmarking against state-of-the-art baselines
+within the same block or to those in preceding blocks.                                                                                                                                                                                                                                                                                                                                                                       (Sec. 4.2). We then dissect the contribution of our pro-
+    This organization imposes a perceptual-to-predictive-to-                                                                                                                                                                                                                                                                                                                                                                 posed modules through detailed ablation studies (Sec. 4.3)
+control hierarchy. The transformer fuses 2D language and                                                                                                                                                                                                                                                                                                                                                                     and qualitative analysis (Sec. 4.4). Finally, we assess the
+multi-view observations, incorporates 3D kinematic history,                                                                                                                                                                                                                                                                                                                                                                  model’s performance in real-world scenarios (Sec. 4.5).
+
+
+                                                                                                                                                                                                                                                                                                                                                                                                                         5
+4.1. Experimental Setup
+Simulation Benchmarks. We evaluate our method on two
+widely recognized robotic manipulation benchmarks.
+• RoboCasa [34]: This benchmark features 24 complex
+   long-horizon everyday tasks in kitchen environments.
+   We adopt the challenging Human-50 few-shot setting,
+   where policies are trained using only 50 human demon-
+   strations per task. To rigorously assess generalization
+   capabilities, we follow the standard protocol by evaluat-
+   ing our model over 50 trials per task across five distinct
+   scenes. This evaluation is conducted exclusively on un-
+   seen object instances, and includes scenes with unseen
+   styles that were never encountered during training.
+• LIBERO [26]: This benchmark is designed to evalu-                    Spatial Generalization:       Geometry Generalization:       Visual Robustness:
+   ate knowledge transfer and policy generalization across             Place the green cube into a   Place the green cube with      Place the yellow cube into
+                                                                       plate located at unseen       varying geometric sizes into   the plate under unseen
+   four distinct task suites: LIBERO-Spatial, LIBERO-                  spatial positions.            the plate.                     backgrounds.
+
+   Object, LIBERO-Goal, and LIBERO-Long. We follow
+                                                                      Figure 3. Real-world Evaluation Suite. These settings aim to
+   the standard protocol for LIBERO, training policies on
+                                                                      evaluate the model’s spatial generalization, geometry generaliza-
+   50 human-teleoperated demonstrations for each task and             tion and robustness to distractors. Each column represents differ-
+   evaluating over 50 trials per task (500 trials per suite).         ent trials of the same task.
+Real-world Evaluation Suite. To evaluate GeoPredict’s ef-
+ficacy on real-world tasks requiring precise 3D reasoning,            is used for all tasks. Observations include two environ-
+we use an evaluation suite (Figure 3). This suite includes            ment and one wrist camera views. Depth supervision is ap-
+three task categories, using 50 expert trajectories per cate-         plied only to the two 224 × 224 environment cameras. For
+gory for training. Each policy is evaluated for 20 trials per         the trajectory-level prediction module (Sec. 3.2), we track
+category, where success is defined as successfully grasping           K = 8 keypoints (7 joints, 1 end-effector) for LIBERO [26]
+the target object and placing it in the correct position.             and RoboCasa [34], and K = 7 (6 joints, 1 end-effector)
+• Spatial Generalization: The robot is instructed to place            for the real-world setup. For the predictive 3DGS geometry
+   the green cube into a plate. We evaluate the policy with           module (Sec. 3.3), the workspace is 1.6m × 1.6m × 1.0m
+   the plate located at positions unseen during training, test-       with v = 0.04m voxels. Token and decoder feature dimen-
+   ing its ability to generalize to novel target locations.           sions are C = 2048 and C ′ = 256. We use NG = 4
+• Geometry Generalization: During the 20 evaluation tri-                                                             ′
+                                                                      initial primitives per voxel, and generate NG    = 64 addi-
+   als, the model must grasp four distinct object types: a            tional primitives for voxels selected by the track-guided re-
+   small cube, a medium cube, a large cube, and a rectan-             finement mechanism. All loss weights in Eq. (12) are 1.0.
+   gular prism. Critically, the test set includes cubes with          We train for 40,000 iterations using AdamW [29] (LR 2.5e-
+   dimensions not seen during training. Furthermore, the              5) on 8 NVIDIA H20 GPUs with a total batch size of 32.
+   rectangular prism is tested in its three unique stable ori-        The primary metric is Task Success Rate (%).
+   entations, requiring the policy to adapt its grasp approach
+   based on the perceived object geometry.                            4.2. Main Results
+• Visual Robustness: This task evaluates the policy’s re-             RoboCasa. Table 1 details the performance across the 24
+   silience to visual distractors. The robot must place the           RoboCasa sub-tasks. GeoPredict achieves an average suc-
+   yellow cube into the plate while novel and task-irrelevant         cess rate of 52.4%, significantly outperforming all base-
+   objects are introduced into the background of the scene,           lines. Notably, it improves upon the π0 baseline success
+   which were absent during training.                                 rate of 42.3% by a margin of 10.1%. This substantial
+Baselines. Our primary baseline is our VLA backbone,                  gain underscores the benefit of conditioning the policy on
+π0 [3], trained without our proposed predictive 3D mod-               predictive kinematic and geometric priors, especially in
+ules. This comparison directly isolates the contribution of           the Human-50 few-shot setting where generalization from
+our geometry-aware predictive method. We also compare                 limited data is critical [34]. Moreover, GeoPredict demon-
+against a range of state-of-the-art VLA and world-modeling            strates clear advantages over other future prediction meth-
+approaches, including BC-Transformer [34], GWM [30],                  ods such as GWM [30] at 39.2% and 2D policies like BC-
+OpenVLA [20], SpatialVLA [37] and UniVLA [5].                         Transformer [34] at 28.8%. Additional large-scale results
+Implementation Details. A predictive horizon of H = 50                on RoboCasa Generated-300 are in the Appendix.
+
+
+                                                                  6
+Table 1. RoboCasa Simulation Benchmark Results. Task success rates (%) across 24 sub-tasks and the Average Success Rate (%).
+∗
+  Denotes our fine-tuned experimental results. Bold indicates the best performing model. See Appendix for detailed sub-task definitions.
+
+                            PnP       PnP      PnP       PnP     PnP         PnP     PnP      PnP      CM      CM       CB
+ Method                                                                                                                         TSS
+                           CTC1      CTC2      CTS1     STC1     CTS2       STC2     CTM      MTC      SU      SV       PS
+ BC-Transformer [34]         6.0       2.0      2.0       8.0      2.0        6.0      2.0      2.0    0.0     22.0    48.0     54.0
+ GWM [30]                    4.0      18.0     20.0      22.0      2.0       18.0     14.0     20.0    16.0    36.0    76.0     72.0
+ π0∗ (Baseline) [3]         24.0      6.8      26.8      15.6     11.2       12.8      6.8      7.6    18.4    33.6    74.0     69.6
+ GeoPredict (Ours)          32.4      8.8      27.6      31.2     20.4       28.8     14.4     18.0    28.4    49.2    67.6     70.8
+ Average Success Rate       OSD       CSD      ODD      CDD       OD         CD      TNSF     TFSF     TNS     TFS     TNM      TFM
+          28.8              46.0      56.0     28.0      28.0     42.0       80.0     38.0     50.0    32.0     4.0    62.0     70.0
+          39.2              58.0      54.0     28.0      50.0     56.0       80.0     52.0     44.0    46.0    22.0    64.0     70.0
+          42.3              40.8      82.0     55.2      69.2     66.4       96.0     43.6     86.0    43.2     6.0    59.6     60.0
+          52.4              40.4      78.8     87.2      70.0     77.6       96.8     72.4     94.8    60.0    13.2    84.8     82.8
+
+Table 2. LIBERO Simulation Benchmark Results. Task success rates (%) across 4 evaluation suites and the Average Success Rate (%).
+∗
+  Denotes our reproduced experimental results. † Denotes no available standard deviation data. Bold indicates the best performing model,
+and underline indicates the runner-up model.
+
+         Method                    LIBERO-Spatial      LIBERO-Object          LIBERO-Goal      LIBERO-Long         Average
+         Diffusion Policy [9]         78.3 ± 1.1           92.5 ± 0.7           68.3 ± 1.2        50.5 ± 1.3      72.4 ± 0.7
+         TraceVLA [52]                84.6 ± 0.2           85.2 ± 0.4           75.1 ± 0.3        54.1 ± 1.0      74.8 ± 0.5
+         Octo [39]                    78.9 ± 1.0           85.7 ± 0.9           84.6 ± 0.9        51.1 ± 1.3      75.1 ± 0.6
+         OpenVLA [20]                 84.7 ± 0.9           88.4 ± 0.8           79.2 ± 1.0        53.7 ± 1.3      76.5 ± 0.6
+         SpatialVLA [37]              88.2 ± 0.5           89.9 ± 0.7           78.6 ± 0.6        55.5 ± 1.0      78.1 ± 0.7
+         WorldVLA† [6]                   87.6                 96.2                 83.4              60.0            81.8
+         4D-VLA [47]                  88.9 ± 0.5           95.2 ± 0.3           90.9 ± 0.4        79.1 ± 1.2      88.6 ± 0.3
+         DreamVLA† [49]                  97.5                 94.0                 89.5              89.5            92.6
+         π0† [3]                         96.8                 98.8                 95.8              85.2            94.2
+         OpenVLA-OFT† [19]               95.2                 94.2                 95.2              93.2            94.5
+         UniVLA† [5]                     96.5                 96.8                 95.6              92.0            95.2
+         π0∗ (Baseline) [3]           96.6 ± 0.6           97.2 ± 0.8           94.2 ± 0.7        87.6 ± 1.1      93.9 ± 0.4
+         GeoPredict (Ours)            98.0 ± 0.7           98.2 ± 0.7           95.7 ± 0.2        94.0 ± 1.0      96.5 ± 0.6
+
+LIBERO. In Table 2, we show results on the four LIBERO                   ule yields the most substantial gains. Supervising with
+suites [26]. GeoPredict achieves an average success rate of              Ldepth (using only initial Ginit ) elevates performance to
+96.5%, surpassing the current SOTA method UniVLA [5].                    49.4%. Jointly training with Ltrack and Ldepth but with-
+Furthermore, it significantly outperforms strong baselines               out the explicit track-guided refinement yields 50.5%. Crit-
+such as OpenVLA [20] which attains 76.5% by a margin                     ically, activating the full track-guided refinement mecha-
+of 20.0%. Our model demonstrates consistently high per-                  nism, which allocates geometric capacity along the pre-
+formance across all four suites, including Spatial (98.0%),              dicted future tracks, achieves the peak 52.4%. This final
+Object (98.2%), Goal (95.7%), and the challenging Long                   1.9% gain (50.5% → 52.4%) validates our hypothesis: us-
+(94.0%). This indicates that our method’s geometry-aware                 ing kinematic predictions to refine the 3DGS representation
+training is highly effective and generalizes robustly across             provides a superior geometric prior for the policy.
+diverse tasks and environments.                                          Ablation on Depth Rendering. Table 4 ablates our predic-
+                                                                         tive 3DGS method. Rendering with color (49.2%) offers no
+4.3. Ablation Study                                                      benefit over depth-only (49.4%), confirming geometric in-
+Component Ablation. Table 3 details our ablation, build-                 formation alone suffices. Increasing the global initial prim-
+ing the model from the ground up. Starting from the π0                   itives from NG = 4 to NG = 8 (51.4%) significantly in-
+baseline (42.3%), adding the history Track Encoder pro-                  creases training time (12.0 to 19.1 hours/epoch).
+vides a kinematic prior, improving performance to 44.8%.                    In contrast, our track-guided refinement strategy (NG =
+Adding the Future Track Query (Ltrack ) for explicit motion                   ′
+                                                                         4, NG  = 8) is more efficient, achieving 51.1% at only 15.5
+prediction further boosts the rate to 47.2%.                             hours/epoch. This highlights the efficiency of allocating ge-
+   The predictive 3D Gaussian Splatting geometry mod-                    ometric capacity to task-relevant interaction regions. Since
+
+
+                                                                   7
+Table 3. Ablation Study on RoboCasa Simulation Benchmark.
+
+
+
+                                                                                         Ground Truth
+Future Depth is rendered from initial global Gaussians (Ginit ),
+while Future Depth∗ utilizes the refined total Gaussians (Gtotal ).
+Results denote the Average Success Rate (%) across all sub-tasks.
+
+ History Track       ✘          ✔          ✔          ✘          ✔           ✔
+ Future Track        ✘          ✘          ✔          ✘          ✔           ✔
+ Future Depth        ✘          ✘          ✘          ✔          ✔           ✘
+ Future Depth∗       ✘          ✘          ✘          ✘          ✘           ✔
+
+                                                                                         Initial
+ Average SR         42.3       44.8       47.2       49.4       50.5        52.4
+
+                                                             ′
+Table 4. Ablation Study on Depth Rendering. NG and NG          de-
+note the number of Gaussian primitives per voxel for the initial
+and refined stages, respectively. Color indicates RGB image re-
+construction. Time / Epoch represents the training time per epoch
+
+                                                                                         Refined
+in hours, and Average SR is the Average Success Rate (%).
+
+     NG                    4          4          8          4          4
+       ′
+     NG                    ✘          ✘          ✘          8          64
+     Color                 ✔          ✘          ✘          ✘          ✘                                𝒕+𝟏           𝒕 + 𝟏𝟎            𝒕 + 𝟐𝟎
+     Time / Epoch        12.3       12.0       19.1       15.5       15.7              Figure 4. Qualitative Comparisons of Future Depth Rendering.
+     Average SR          49.2       49.4       51.4       51.1       52.4              Visualizations are shown for timesteps t + 1, t + 10, and t + 20.
+                                                                                       Red boxes highlight the improvements in fine-grained geometric
+Table 5. Real-World Experiment Results. Task success rates (%)                         details. Best viewed zoomed in.
+across three distinct settings: Spatial, Geometry, and Robustness.
+
+  Method                   Spatial         Geometry             Robustness             baseline scores of 60.0% and 35.0% and demonstrating su-
+                                                                                       perior spatial generalization and resilience to distractors. In
+  π0 (Baseline) [3]            60.0            50.0                  35.0
+                                                                                       the Geometry task, GeoPredict attains a 95.0% success rate
+  GeoPredict (Ours)            85.0            95.0                  90.0
+                                                                                       compared to 50.0% for the baseline. This 45.0% improve-
+                                                                                       ment on tasks involving object sizes absent from the training
+these regions are a small fraction of the volume, we can                               set strongly indicates that our predictive 3DGS module en-
+            ′                                      ′
+increase NG   with negligible overhead. Setting NG   = 64                              dows the policy with a generalizable understanding of 3D
+yields our peak 52.4% success rate at a near-identical 15.7                            geometry, enabling adaptive grasping capabilities that the
+                                            ′
+hours. Therefore, we adopt NG = 4 and NG       = 64 as our                             2D-centric π0 baseline lacks. Moreover, since our method
+final configuration.                                                                   explicitly encodes motion history via the Track Encoder,
+                                                                                       the Appendix provides a dedicated real-world experiment
+4.4. Qualitative Analysis
+                                                                                       to validate the effectiveness of this historical context.
+Figure 4 provides a qualitative visualization of our predic-
+tive 3DGS geometry module, which compares the predicted                                5. Conclusion
+future depths at various timesteps (t + 1, t + 10, t + 20).
+While the initial Gaussians (Ginit ) capture only the coarse                           We presented GeoPredict, a geometry-aware VLA frame-
+scene layout, the refined Gaussians (Gtotal ) exhibit signif-                          work enhancing continuous-action policies with predictive
+icantly sharper geometric details, particularly surrounding                            kinematic and geometric priors. By forecasting robot tra-
+the robotic arm. This visually confirms that our refinement                            jectories and workspace geometry via track-guided 3DGS,
+mechanism produces a more precise and geometrically-                                   GeoPredict introduces future-aware structure into the trans-
+faithful prediction of the future, which in turn provides a                            former while keeping inference lightweight. Extensive ex-
+superior conditional prior for the action expert.                                      periments show consistent superiority over strong baselines
+                                                                                       in tasks requiring precise 3D reasoning, geometric robust-
+4.5. Real-World Experiments                                                            ness and long-horizon physical consistency. While ac-
+We validate GeoPredict on a DISCOVER robotic arm to as-                                quiring multi-view RGB-D and camera extrinsics presents
+sess performance on tasks demanding explicit 3D reason-                                scaling challenges, the increasing availability of calibrated
+ing. As detailed in Table 5, GeoPredict significantly outper-                          depth in modern datasets and commodity hardware miti-
+forms the π0 [3] baseline across all tasks. Specifically, in                           gates these concerns. Ultimately, our training-time predic-
+the Spatial and Robustness tasks, our method achieves suc-                             tive supervision provides a promising direction for reliable,
+cess rates of 85.0% and 90.0% respectively, surpassing the                             geometry-aware, and grounded VLA controllers.
+
+
+                                                                                   8
+Acknowledgment                                                                fusion. The International Journal of Robotics Research, 44
+                                                                              (10-11):1684–1704, 2025. 7
+This work is supported by the Shenzhen Science and Tech-                 [10] Yilun Du, Sherry Yang, Bo Dai, Hanjun Dai, Ofir Nachum,
+nology Program (Grant No. ZDCY20250901113000001)                              Josh Tenenbaum, Dale Schuurmans, and Pieter Abbeel.
+and the 1+1+1 CUHK-CUHK(SZ)-GDSTC Joint Collabo-                              Learning universal policies via text-guided video genera-
+ration Fund (Grant No. 2025A0505000079). We gratefully                        tion. Advances in neural information processing systems,
+acknowledge DISCOVER Robotics for providing hardware                          36:9156–9172, 2023. 2
+support.                                                                 [11] Kristen Grauman, Andrew Westbury, Eugene Byrne,
+                                                                              Zachary Chavis, Antonino Furnari, Rohit Girdhar, Jackson
+                                                                              Hamburger, Hao Jiang, Miao Liu, Xingyu Liu, et al. Ego4d:
+References                                                                    Around the world in 3,000 hours of egocentric video. In
+ [1] Lucas Beyer, Andreas Steiner, André Susano Pinto, Alexan-               Proceedings of the IEEE/CVF conference on computer vi-
+     der Kolesnikov, Xiao Wang, Daniel Salz, Maxim Neumann,                   sion and pattern recognition, pages 18995–19012, 2022. 1
+     Ibrahim Alabdulmohsin, Michael Tschannen, Emanuele                  [12] Gunshi Gupta, Karmesh Yadav, Yarin Gal, Dhruv Batra,
+     Bugliarello, et al. Paligemma: A versatile 3b vlm for trans-             Zsolt Kira, Cong Lu, and Tim GJ Rudner. Pre-trained text-
+     fer. CoRR, 2024. 3                                                       to-image diffusion models are versatile representation learn-
+ [2] Kevin Black, Mitsuhiko Nakamoto, Pranav Atreya, Homer                    ers for control. Advances in Neural Information Processing
+     Walke, Chelsea Finn, Aviral Kumar, and Sergey Levine.                    Systems, 37:74182–74210, 2024. 1
+     Zero-shot robotic manipulation with pre-trained image-              [13] Danijar Hafner, Timothy P Lillicrap, Mohammad Norouzi,
+     editing diffusion models. In NeurIPS 2023 Workshop on                    and Jimmy Ba. Mastering atari with discrete world mod-
+     Goal-Conditioned Reinforcement Learning, 2023. 2                         els. In International Conference on Learning Representa-
+ [3] Kevin Black, Noah Brown, Danny Driess, Adnan Esmail,                     tions, 2020. 2
+     Michael Equi, Chelsea Finn, Niccolo Fusai, Lachy Groom,             [14] Danijar Hafner, Kuang-Huei Lee, Ian Fischer, and Pieter
+     Karol Hausman, Brian Ichter, Szymon Jakubczak, Tim                       Abbeel. Deep hierarchical planning from pixels. Advances
+     Jones, Liyiming Ke, Sergey Levine, Adrian Li-Bell, Mohith                in Neural Information Processing Systems, 35:26091–26104,
+     Mothukuri, Suraj Nair, Karl Pertsch, Lucy Xiaoyang Shi,                  2022.
+     James Tanner, Quan Vuong, Anna Walling, Haohuan Wang,               [15] Nicklas Hansen, Hao Su, and Xiaolong Wang. Td-mpc2:
+     and Ury Zhilinsky. π0: A vision-language-action flow model               Scalable, robust world models for continuous control. In
+     for general robot control. arXiv preprint arXiv.2410.24164,              NeurIPS 2023 Foundation Models for Decision Making
+     2024. 1, 2, 3, 6, 7, 8                                                   Workshop, 2023. 2
+                                                                         [16] Tao Hu, Shu Liu, Yilun Chen, Tiancheng Shen, and Jiaya
+ [4] Anthony Brohan, Noah Brown, Justice Carbajal, Yevgen
+                                                                              Jia. Efficientnerf efficient neural radiance fields. In Proceed-
+     Chebotar, Joseph Dabis, Chelsea Finn, Keerthana Gopalakr-
+                                                                              ings of the IEEE/CVF Conference on Computer Vision and
+     ishnan, Karol Hausman, Alex Herzog, Jasmine Hsu, et al.
+                                                                              Pattern Recognition, pages 12902–12911, 2022. 2
+     Rt-1: Robotics transformer for real-world control at scale.
+     arXiv preprint arXiv:2212.06817, 2022. 1, 2                         [17] Yucheng Hu, Yanjiang Guo, Pengchao Wang, Xiaoyu Chen,
+                                                                              Yen-Jen Wang, Jianke Zhang, Koushil Sreenath, Chaochao
+ [5] Qingwen Bu, Yanting Yang, Jisong Cai, Shenyuan Gao,
+                                                                              Lu, and Jianyu Chen. Video prediction policy: A gener-
+     Guanghui Ren, Maoqing Yao, Ping Luo, and Hongyang Li.
+                                                                              alist robot policy with predictive visual representations. In
+     Univla: Learning to act anywhere with task-centric latent ac-
+                                                                              Forty-second International Conference on Machine Learn-
+     tions. arXiv preprint arXiv:2505.06111, 2025. 2, 6, 7
+                                                                              ing, 2025. 1, 2
+ [6] Jun Cen, Chaohui Yu, Hangjie Yuan, Yuming Jiang, Siteng             [18] Bernhard Kerbl, Georgios Kopanas, Thomas Leimkuehler,
+     Huang, Jiayan Guo, Xin Li, Yibing Song, Hao Luo, Fan                     and George Drettakis. 3d gaussian splatting for real-time
+     Wang, et al. Worldvla: Towards autoregressive action world               radiance field rendering. ACM Transactions on Graphics
+     model. arXiv preprint arXiv:2506.21539, 2025. 1, 2, 7                    (TOG), 42(4):1–14, 2023. 2, 4, 5
+ [7] Xiaoyu Chen, Hangxing Wei, Pushi Zhang, Chuheng Zhang,              [19] Moo Jin Kim, Chelsea Finn, and Percy Liang. Fine-tuning
+     Kaixin Wang, Yanjiang Guo, Rushuai Yang, Yucen Wang,                     vision-language-action models: Optimizing speed and suc-
+     Xinquan Xiao, Li Zhao, et al. Villa-x: enhancing latent                  cess. arXiv preprint arXiv:2502.19645, 2025. 7
+     action modeling in vision-language-action models. arXiv             [20] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao,
+     preprint arXiv:2507.23682, 2025. 1                                       Ashwin Balakrishna, Suraj Nair, Rafael Rafailov, Ethan P
+ [8] Yi Chen, Yuying Ge, Weiliang Tang, Yizhuo Li, Yixiao Ge,                 Foster, Pannag R Sanketi, Quan Vuong, et al. Openvla: An
+     Mingyu Ding, Ying Shan, and Xihui Liu. Moto: Latent mo-                  open-source vision-language-action model. In Conference
+     tion token as the bridging language for learning robot ma-               on Robot Learning, pages 2679–2713. PMLR, 2025. 2, 3, 6,
+     nipulation from videos. In Proceedings of the IEEE/CVF                   7
+     International Conference on Computer Vision, pages 19752–           [21] Peiyan Li, Yixiang Chen, Hongtao Wu, Xiao Ma, Xiangnan
+     19763, 2025. 1                                                           Wu, Yan Huang, Liang Wang, Tao Kong, and Tieniu Tan.
+ [9] Cheng Chi, Zhenjia Xu, Siyuan Feng, Eric Cousineau, Yilun                Bridgevla: Input-output alignment for efficient 3d manipu-
+     Du, Benjamin Burchfiel, Russ Tedrake, and Shuran Song.                   lation learning with vision-language models. arXiv preprint
+     Diffusion policy: Visuomotor policy learning via action dif-             arXiv:2506.07961, 2025. 2
+
+
+                                                                     9
+[22] Qixiu Li, Yaobo Liang, Zeyu Wang, Lin Luo, Xi Chen,                   [36] Zezhong Qian, Xiaowei Chi, Yuming Li, Shizun Wang,
+     Mozheng Liao, Fangyun Wei, Yu Deng, Sicheng Xu,                            Zhiyuan Qin, Xiaozhu Ju, Sirui Han, and Shanghang Zhang.
+     Yizhong Zhang, et al. Cogact: A foundational vision-                       Wristworld: Generating wrist-views via 4d world models
+     language-action model for synergizing cognition and action                 for robotic manipulation. arXiv preprint arXiv:2510.07313,
+     in robotic manipulation. CoRR, 2024. 1, 2                                  2025. 1
+[23] Shuang Li, Yihuai Gao, Dorsa Sadigh, and Shuran                       [37] Delin Qu, Haoming Song, Qizhi Chen, Yuanqi Yao, Xinyi
+     Song.      Unified video action model.        arXiv preprint               Ye, Yan Ding, Zhigang Wang, JiaYuan Gu, Bin Zhao,
+     arXiv:2503.00200, 2025. 1                                                  Dong Wang, et al. Spatialvla: Exploring spatial represen-
+[24] Xinghang Li, Minghuan Liu, Hanbo Zhang, Cunjun Yu, Jie                     tations for visual-language-action model. arXiv preprint
+     Xu, Hongtao Wu, Chilam Cheang, Ya Jing, Weinan Zhang,                      arXiv:2501.15830, 2025. 2, 6, 7
+     Huaping Liu, et al. Vision-language foundation models as              [38] Xuanchi Ren, Yifan Lu, Hanxue Liang, Zhangjie Wu, Huan
+     effective robot imitators. In ICLR, 2024. 1                                Ling, Mike Chen, Sanja Fidler, Francis Williams, and Jiahui
+[25] Yaron Lipman, Ricky TQ Chen, Heli Ben-Hamu, Maximil-                       Huang. Scube: Instant large-scale scene reconstruction us-
+     ian Nickel, and Matt Le. Flow matching for generative mod-                 ing voxsplats. Advances in Neural Information Processing
+     eling. arXiv preprint arXiv:2210.02747, 2022. 2, 3                         Systems, 37:97670–97698, 2024. 2
+[26] Bo Liu, Yifeng Zhu, Chongkai Gao, Yihao Feng, Qiang Liu,              [39] Octo Model Team, Dibya Ghosh, Homer Walke, Karl
+     Yuke Zhu, and Peter Stone. Libero: Benchmarking knowl-                     Pertsch, Kevin Black, Oier Mees, Sudeep Dasari, Joey
+     edge transfer for lifelong robot learning. Advances in Neural              Hejna, Tobias Kreiman, Charles Xu, et al.              Octo:
+     Information Processing Systems, 36:44776–44791, 2023. 6,                   An open-source generalist robot policy. arXiv preprint
+     7                                                                          arXiv:2405.12213, 2024. 7
+[27] Zeyi Liu, Shuang Li, Eric Cousineau, Siyuan Feng, Ben-                [40] Yang Tian, Sizhe Yang, Jia Zeng, Ping Wang, Dahua Lin,
+     jamin Burchfiel, and Shuran Song. Geometry-aware 4d                        Hao Dong, and Jiangmiao Pang. Predictive inverse dynam-
+     video generation for robot manipulation. arXiv preprint                    ics models are scalable learners for robotic manipulation. In
+     arXiv:2507.01099, 2025. 2                                                  The Thirteenth International Conference on Learning Rep-
+[28] William E Lorensen and Harvey E Cline. Marching cubes:                     resentations, 2025. 2
+     A high resolution 3d surface construction algorithm. In Sem-          [41] Guanjun Wu, Taoran Yi, Jiemin Fang, Lingxi Xie, Xiaopeng
+     inal graphics: pioneering efforts that shaped the field, pages             Zhang, Wei Wei, Wenyu Liu, Qi Tian, and Xinggang Wang.
+     347–353. 1998. 2                                                           4d gaussian splatting for real-time dynamic scene rendering.
+[29] Ilya Loshchilov and Frank Hutter. Decoupled weight de-                     In Proceedings of the IEEE/CVF conference on computer vi-
+     cay regularization. In International Conference on Learning                sion and pattern recognition, pages 20310–20320, 2024. 2
+     Representations, 2017. 6                                              [42] Hongtao Wu, Ya Jing, Chilam Cheang, Guangzeng Chen,
+[30] Guanxing Lu, Baoxiong Jia, Puhao Li, Yixin Chen, Ziwei                     Jiafeng Xu, Xinghang Li, Minghuan Liu, Hang Li, and Tao
+     Wang, Yansong Tang, and Siyuan Huang. Gwm: Towards                         Kong. Unleashing large-scale video generative pre-training
+     scalable gaussian world models for robotic manipulation. In                for visual robot manipulation. In ICLR, 2024. 2
+     Proceedings of the IEEE/CVF International Conference on               [43] Zhirong Wu, Shuran Song, Aditya Khosla, Fisher Yu, Lin-
+     Computer Vision, pages 9263–9274, 2025. 1, 2, 6, 7                         guang Zhang, Xiaoou Tang, and Jianxiong Xiao. 3d
+[31] Vincent Micheli, Eloi Alonso, and François Fleuret. Trans-                shapenets: A deep representation for volumetric shapes. In
+     formers are sample-efficient world models. In Deep Rein-                   Proceedings of the IEEE conference on computer vision and
+     forcement Learning Workshop NeurIPS 2022, 2022. 2                          pattern recognition, pages 1912–1920, 2015. 2
+[32] Ben Mildenhall, Pratul P Srinivasan, Matthew Tancik,                  [44] Lei Xiao, Jifeng Li, Juntao Gao, Feiyang Ye, Yan Jin,
+     Jonathan T Barron, Ravi Ramamoorthi, and Ren Ng. Nerf:                     Jingjing Qian, Jing Zhang, Yong Wu, and Xiaoyuan Yu. Ava-
+     Representing scenes as neural radiance fields for view syn-                vla: Improving vision-language-action models with active
+     thesis. Communications of the ACM, 65(1):99–106, 2021.                     visual attention. arXiv preprint arXiv:2511.18960, 2025. 2
+     2                                                                     [45] Qiangeng Xu, Zexiang Xu, Julien Philip, Sai Bi, Zhixin
+[33] Thomas Müller, Alex Evans, Christoph Schied, and Alexan-                  Shu, Kalyan Sunkavalli, and Ulrich Neumann. Point-
+     der Keller. Instant neural graphics primitives with a mul-                 nerf: Point-based neural radiance fields. In Proceedings of
+     tiresolution hash encoding. ACM transactions on graphics                   the IEEE/CVF conference on computer vision and pattern
+     (TOG), 41(4):1–15, 2022. 2                                                 recognition, pages 5438–5448, 2022. 2
+[34] Soroush Nasiriany, Abhiram Maddukuri, Lance Zhang,                    [46] Yunzhi Yan, Haotong Lin, Chenxu Zhou, Weijie Wang,
+     Adeet Parikh, Aaron Lo, Abhishek Joshi, Ajay Man-                          Haiyang Sun, Kun Zhan, Xianpeng Lang, Xiaowei Zhou,
+     dlekar, and Yuke Zhu. Robocasa: Large-scale simula-                        and Sida Peng. Street gaussians: Modeling dynamic urban
+     tion of everyday tasks for generalist robots. arXiv preprint               scenes with gaussian splatting. In European Conference on
+     arXiv:2406.02523, 2024. 6, 7                                               Computer Vision, pages 156–173. Springer, 2024. 2
+[35] Charles R Qi, Hao Su, Kaichun Mo, and Leonidas J Guibas.              [47] Jiahui Zhang, Yurui Chen, Yueming Xu, Ze Huang, Yan-
+     Pointnet: Deep learning on point sets for 3d classification                peng Zhou, Yu-Jie Yuan, Xinyue Cai, Guowei Huang,
+     and segmentation. In Proceedings of the IEEE conference                    Xingyue Quan, Hang Xu, et al. 4d-vla: Spatiotemporal
+     on computer vision and pattern recognition, pages 652–660,                 vision-language-action pretraining with cross-scene calibra-
+     2017. 2                                                                    tion. arXiv preprint arXiv:2506.22242, 2025. 7
+
+
+                                                                      10
+[48] Weipu Zhang, Gang Wang, Jian Sun, Yetian Yuan, and Gao
+     Huang. Storm: Efficient stochastic transformer based world
+     models for reinforcement learning. Advances in Neural In-
+     formation Processing Systems, 36:27147–27166, 2023. 2
+[49] Wenyao Zhang, Hongsi Liu, Zekun Qi, Yunnan Wang, Xin-
+     Qiang Yu, Jiazhao Zhang, Runpei Dong, Jiawei He, He
+     Wang, Zhizheng Zhang, et al. Dreamvla: A vision-language-
+     action model dreamed with comprehensive world knowl-
+     edge. In The Thirty-ninth Annual Conference on Neural In-
+     formation Processing Systems, 2025. 1, 2, 7
+[50] Qingqing Zhao, Yao Lu, Moo Jin Kim, Zipeng Fu, Zhuoyang
+     Zhang, Yecheng Wu, Zhaoshuo Li, Qianli Ma, Song Han,
+     Chelsea Finn, et al. Cot-vla: Visual chain-of-thought rea-
+     soning for vision-language-action models. In Proceedings
+     of the Computer Vision and Pattern Recognition Conference,
+     pages 1702–1713, 2025. 1
+[51] Jinliang Zheng, Jianxiong Li, Dongxiu Liu, Yinan Zheng,
+     Zhihao Wang, Zhonghong Ou, Yu Liu, Jingjing Liu, Ya-
+     Qin Zhang, and Xianyuan Zhan. Universal actions for en-
+     hanced embodied foundation models. In Proceedings of the
+     Computer Vision and Pattern Recognition Conference, pages
+     22508–22519, 2025. 1, 2
+[52] Ruijie Zheng, Yongyuan Liang, Shuaiyi Huang, Jianfeng
+     Gao, Hal Daumé III, Andrey Kolobov, Furong Huang, and
+     Jianwei Yang. Tracevla: Visual trace prompting enhances
+     spatial-temporal awareness for generalist robotic policies.
+     arXiv preprint arXiv:2412.10345, 2024. 2, 7
+[53] Yifan Zhong, Fengshuo Bai, Shaofei Cai, Xuchuan Huang,
+     Zhang Chen, Xiaowei Zhang, Yuanfei Wang, Shaoyang Guo,
+     Tianrui Guan, Ka Nam Lui, et al. A survey on vision-
+     language-action models: An action tokenization perspective.
+     arXiv preprint arXiv:2507.01925, 2025. 1, 2
+[54] Brianna Zitkovich, Tianhe Yu, Sichun Xu, Peng Xu, Ted
+     Xiao, Fei Xia, Jialin Wu, Paul Wohlhart, Stefan Welker,
+     Ayzaan Wahid, et al. Rt-2: Vision-language-action models
+     transfer web knowledge to robotic control. In Conference on
+     Robot Learning, pages 2165–2183. PMLR, 2023. 1
+
+
+
+
+                                                                   11
+

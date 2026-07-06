@@ -1,0 +1,694 @@
+                       This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                    Except for this watermark, it is identical to the accepted version;
+                              the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+                   HATS: Hardness-Aware Trajectory Synthesis for GUI Agents
+
+                                                   1,3,†          2,†               1               1
+                              Rui Shao , Ruize Gao , Bin Xie , Yixing Li ,
+                                    4            4          1,3              1,∗
+                      Kaiwen Zhou , Shuai Wang , Weili Guan , Gongwei Chen
+   1                                            2
+     Harbin Institute of Technology, Shenzhen National University of Singapore, CNRS@CREATE
+                         3                              4
+                           Shenzhen Loop Area Institute Huawei Noah’s Ark Lab
+             shaorui@hit.edu.cn ruizegao@u.nus.edu chengongwei@hit.edu.cn
+                                                 https://github.com/JiuTian-VL/HATS
+
+
+
+                             Abstract
+
+Graphical user interface (GUI) agents powered by large
+vision–language models (VLMs) have shown remarkable po-
+tential in automating digital tasks, highlighting the need for
+high-quality trajectory data to support effective agent train-
+ing. Yet existing trajectory synthesis pipelines often yield
+agents that fail to generalize beyond simple interactions.
+We identify this limitation as stemming from the neglect of
+semantic-ambiguous actions—interactions whose meanings
+are context-dependent, sequentially dependent, or visually
+ambiguous. Such actions are crucial for real-world robust-
+ness but are under-represented and poorly processed in cur-
+rent datasets, leading to semantic misalignment between task
+instructions and execution. To address these issues, we pro-
+pose HATS, a Hardness-Aware Trajectory Synthesis frame-
+work designed to mitigate the impact of semantic ambiguity.
+We define hardness as the degree of semantic ambiguity as-
+sociated with an action and develop two complementary
+modules: (1) a hardness-driven exploration that guides data
+collection toward ambiguous yet informative interactions,
+and (2) an alignment-guided refinement that iteratively val-
+idates and repairs instruction–execution alignment. The
+two modules operate in a closed-loop manner—exploration
+supplies refinement with challenging trajectories, while re-            Figure 1. Overview of trajectory synthesis paradigms. Compared
+finement feedback updates the hardness signal to guide fu-              with (a) existing methods, (b) HATS integrates hardness-driven ex-
+ture exploration. Extensive experiments show that agents                ploration and alignment-guided refinement in a closed loop, produc-
+trained with HATS consistently outperform state-of-the-art              ing high-quality trajectories with rich semantic coverage and strong
+baselines across benchmark GUI environments.                            instruction–execution alignment. (c) Experiments show HATS out-
+                                                                        performs OS-G ENESIS by 100%↑ on A NDROIDW ORLD (22.60
+                                                                        vs. 11.30) and 215%↑ on W EBA RENA (20.60 vs. 6.53).
+1. Introduction
+Graphical User Interface (GUI) agents powered by large                  flows, from booking travel in mobile apps to configuring
+Vision–Language Models (VLMs) have emerged as a                         cloud services in browsers. A capable agent must perceive
+promising direction for automating complex digital work-                the screen, interpret a natural-language goal, decompose it
+                                                                        into a plan, and execute actions such as TAP, S CROLL, or
+   †                    ∗
+       Equal contribution Corresponding author                          T YPE. Training such autonomy requires instruction-aligned
+
+
+
+                                                                27471
+trajectories coupling task goals, step-level descriptions, and
+exact action–state pairs [77]. However, collecting such tra-
+jectories manually is prohibitively expensive, motivating
+recent efforts toward automated trajectory synthesis.
+Automating Trajectory Synthesis. To reduce human anno-
+tation, recent work automates trajectory generation. Early
+task-driven approaches begin with written goals and record
+agents or humans executing them [25, 27, 37], but still de-
+pend on costly goal specification and yield inconsistent
+traces [39, 44]. OS-G ENESIS [59] instead introduces re-             Figure 2. Illustrative cases of semantic-ambiguous actions. Such
+verse task synthesis, where the system explores applications         actions constitute critical bottlenecks for robust agent generaliza-
+via random UI actions and then synthesizes task instructions         tion but are rarely captured by existing synthesis pipelines.
+to describe observed outcomes, improving diversity by re-
+moving manual goal authoring.                                       states, while the Alignment-Guided Refinement module
+                                                                    (§3.2) performs multi-round replay and repair to ensure se-
+The Semantic-Ambiguity Gap. Despite these advantages,               mantic consistency before data admission. Both modules
+reverse task synthesis [59] still faces critical limitations. Ex-   operate under a unified Hardness-Driven Monte Carlo
+ploration based on uniform random walks or shallow breadth-         Tree Search (HD-MCTS) procedure, which orchestrates ex-
+first search causes over 70% of collected traces to collapse        ploration, refinement, and feedback propagation in a single
+into trivial semantic-intuitive actions (e.g., “open menu”,         control loop. Exploration supplies challenging trajectories
+“tap back”), which quickly saturate learning yet dominate           for validation, and refinement converts misalignment feed-
+storage and training budgets. Conversely, the resulting cor-        back into hardness signals that guide subsequent exploration.
+pora remain deficient in semantic-ambiguous actions—UI              This closed-loop design systematically enhances both the
+interactions whose functional meaning depends on subtle             diversity and fidelity of synthesized data, yielding more reli-
+visual or contextual cues and are easily confused or hidden.        able and generalizable GUI agents.
+    As illustrated in Fig. 2, these actions include (a) identical
+                                                                    Contributions. We summarize our contributions as follows:
+“plus” icons that trigger different functions depending on con-
+text, (b) operations that only succeed after prerequisite steps,      • I. We introduce HATS, a unified closed-loop trajectory
+and (c) visually similar elements leading to distinct outcomes.          synthesis framework that enhances the representation
+Such rare yet crucial actions represent the key bottlenecks              and handling of semantic-ambiguous actions.
+where agents fail to generalize: without adequate exposure,           • II. We design a hardness-driven exploration module that
+they plateau at superficial behaviors and cannot handle un-              prioritizes rare, high-value actions while reducing redun-
+seen workflows. Moreover, when these actions do appear,                  dancy from intuitive ones.
+their ambiguity often leads to instruction–execution mis-             • III. We propose an alignment-guided refinement mod-
+alignment: synthesized instructions may omit essential con-              ule that replaces one-shot synthesis with multi-round
+text or replay inconsistently, introducing noisy supervision             validation, ensuring instruction–execution alignment.
+that further degrades data quality. This issue is exacerbated       These contributions collectively establish a scalable, seman-
+by existing one-shot instruction generation methods [59],           tically grounded pipeline that enhances diversity and fidelity
+which lack semantic validation and thus produce corpora             in trajectory synthesis, advancing GUI agent training.
+that are both redundant and unreliable. The challenge is
+thus twofold: (i) how to focus exploration on high-value, se-        2. Related Works
+mantically ambiguous regions of the state space rather than
+                                                                    GUI Agents. Recent advances in large language and vision–
+collecting redundant, intuitive actions; and (ii) how to en-
+                                                                    language models (LLMs/VLMs) have accelerated progress
+sure alignment between synthesized instructions and actual
+                                                                    in agents that perceive, reason, and act within graphical user
+executions to prevent supervision noise. Existing one-shot
+                                                                    interfaces [11, 12, 65]. Earlier systems relied on prompt
+instruction generation lacks semantic validation, making the
+                                                                    programming or external tool execution [58, 64], while more
+resulting corpora both redundant and unreliable.
+                                                                    recent work fine-tunes multimodal backbones to better rec-
+Hardness-Aware Trajectory Synthesis (HATS). To ad-                  ognize UI states [5, 66] and execute atomic actions across
+dress these challenges, we propose HATS, a closed-loop              web, desktop, and mobile environments [23, 27, 60]. Al-
+trajectory synthesis framework explicitly targeting semantic-       though these agents demonstrate strong generality, their per-
+ambiguous actions through two cooperative modules (Fig. 1).         formance remains heavily constrained by the quality and
+The Hardness-Driven Exploration module (§3.1) steers                diversity of available trajectory data, especially when han-
+search toward semantically complex, under-represented               dling semantically complex interactions.
+
+
+
+                                                                27472
+Figure 3. Architecture of the HATS framework. The framework integrates a Hardness-Driven Exploration module (§3.1) and an
+Alignment-Guided Refinement module (§3.2) within a unified HD-MCTS loop. Exploration corresponds to the Selection, Expansion,
+and Simulation Phase I, while refinement handles Simulation Phase II and Backpropagation. Misalignment detected during refinement is
+converted into a hardness reward that guides subsequent exploration, forming a closed loop for progressively improving both diversity and
+semantic fidelity of synthesized trajectories.
+
+GUI Trajectory Synthesis. A major challenge in data con-               actions whose semantics depend on contextual, sequential,
+struction is obtaining large-scale, instruction-aligned trajec-        or visual cues; and (ii) even when such actions are captured,
+tories that reflect realistic interface behaviors [8, 48, 54, 78].     one-shot instruction generation often produces noisy or mis-
+Existing approaches follow two paradigms. TASK - DRIVEN                aligned descriptions that degrade supervision quality. Our
+demonstrations [27, 37] require manually authored goals                framework HATS addresses both issues by tightly coupling
+and human/model executions, but are expensive and often                targeted exploration with alignment-aware data verification.
+yield inconsistent traces [39, 44]. To improve scalability,
+OS-G ENESIS [59] adopts an exploration-driven strategy,                Method Overview. As illustrated in Fig. 3, HATS con-
+exploring UIs first and then synthesizing task instructions            sists of two interacting modules: a Hardness-Driven Ex-
+from observed outcomes. However, naive exploration over-               ploration module that actively seeks semantically ambigu-
+samples repetitive semantic-intuitive actions while under-             ous, high-value actions (§3.1), and an Alignment-Guided
+representing semantic-ambiguous actions whose functional               Refinement module that validates and repairs the result-
+meaning depends on contextual, sequential, or visual cues.             ing instruction–trajectory pairs before admitting them into
+Moreover, one-shot reverse synthesis frequently produces               the training corpus (§3.2). These two modules are fused
+underspecified instructions that fail to replay, leading to            through a customized Hardness-Driven Monte Carlo Tree
+instruction-execution misalignment. These limitations mo-              Search (HD-MCTS) procedure that forms the unified control
+tivate our hardness-aware, closed-loop framework, which                loop of our framework. Instead of treating exploration and
+targets ambiguous interactions during exploration and ver-             supervision cleanup as two separate offline stages, HATS
+ifies synthesized instructions through iterative alignment.            unifies them into a single iterative search process. Each
+Other contemporaneous efforts explore stochastic or intent-            HD-MCTS iteration (Appendix Alg. 1) performs four coor-
+aware multi-app exploration [33], which is largely orthogo-            dinated stages:
+nal to our focus on addressing semantic ambiguity through                • Selection: the agent traverses an action tree to balance
+hardness-aware sampling and alignment refinement.                          exploitation and exploration using a UCB policy;
+                                                                         • Expansion: the tree grows by executing previously un-
+3. Hardness-Aware Trajectory Synthesis                                     visited actions and adding corresponding nodes;
+                                                                         • Simulation: the agent rolls out a bounded-depth trajec-
+Existing automated pipelines struggle in two key ways: (i)                 tory, reverse-synthesizes a natural-language instruction,
+they rarely capture semantic-ambiguous actions, i.e., inter-               replays and iteratively refines that instruction until it
+
+
+
+                                                                 27473
+Figure 4. Comparison of exploration strategies. Uniform Ran-              Figure 5. Comparison of instruction synthesis methods. One-
+dom Exploration [59] often yields trivial and redundant actions,          Shot Instruction Generation [59] directly maps raw traces to
+whereas our Hardness-Driven Exploration replaces random walk-             text, often yielding vague or underspecified goals and inconsistent
+ing with a hardness-driven exploration policy that selectively targets    executions. In contrast, our Multi-Round Alignment-Guided
+under-represented yet semantically challenging actions.                   Refinement iteratively replays and verifies task instructions to
+                                                                          produce semantically faithful and executable Verified Trajectories.
+   becomes executable and semantically aligned;
+ • Backpropagation: an alignment-derived hardness re-                     Upper Confidence Bound (UCB) rule:
+   ward is propagated up the tree to bias future exploration
+   toward semantically challenging regions.
+                                                                                  \label {eq:ucb} a^\star (v) \;=\; \arg \max _{a\in \mathcal {A}(v)} Q(v,a) +\; C\,\sqrt {\tfrac {\ln (N(v)+1)}{N(v,a)+1}},    (1)
+Notations. Let E denote a GUI environment. At time
+t, the agent observes a state st (screenshot + optional
+                                                                         where C controls exploration pressure. Unlike classical
+UI tree), executes an action at ∈ A, and transitions
+                                                                         MCTS, Q(v, a) is updated via the hardness reward (Eq. 3),
+to st+1 = E(st , at ). The atomic action set is A =
+                                                                         which we formally define later in the closed-loop integration
+{TAP, T YPE, S CROLL, BACK, L ONG -P RESS, S WIPE}. A
+                                                                         stage. This reward serves as an innovative bridge between
+trajectory τ = (s0 , a0 , s1 , . . . , sT ) records a sequence of
+                                                                         exploration and semantic feedback—transforming alignment
+interactions. We represent E as an action tree, where each
+                                                                         hardness into a guiding signal that steers future search toward
+node v corresponds to a state s(v) and each edge (v, a)
+                                                                         more informative, ambiguous behaviors.
+maintains a value estimate Q(v, a) and visit count N (v, a),
+with N (v) = ∑a N (v, a). P denotes the current path (a                  II. Expansion. If the current node v is not fully expanded,
+sequence of (a, s) pairs) with rollout depth limit Tmax .                we select an unvisited action ae ∈ A(v), apply it to obtain
+                                                                         se = E(s(v), ae ), create a child node u with state s(u) = se ,
+3.1. Hardness-Driven Exploration Module                                  and append (ae , se ) to P. This grows the search frontier
+                                                                         along under-explored branches and increases coverage of
+We follow the interaction-driven discovery paradigm in-                  semantically diverse UI states.
+troduced by OS-G ENESIS [59], where the agent explores
+by performing UI actions rather than following pre-defined                III. Simulation Phase I: Rollout. After selection and expan-
+goals. As contrasted in Fig. 4, however, OS-G ENESIS per-                 sion, we perform a bounded-depth rollout from the current
+forms reverse task synthesis from randomly sampled traces,                node by executing valid UI actions until P reaches depth
+often yielding trivial and redundant actions. In contrast, our            Tmax :
+approach replaces random walking with a hardness-driven                                 \mathcal {P} \leftarrow \textsc {Rollout}(\mathcal {E}, v, s, \mathcal {P}, T_{\max }). 
+exploration policy that selectively targets under-represented            This process produces a concrete multi-step interaction trace,
+yet semantically challenging actions. This module corre-                 a candidate trajectory, which is then passed to the alignment-
+sponds to the Selection and Expansion phases, as well as                 guided refinement module for subsequent processing.
+Simulation Phase I in HD-MCTS.
+I. Selection on the Action Tree. Starting from the root node
+                                                                          3.2. Alignment-Guided Refinement Module
+v0 with the initial GUI state s0 , HD-MCTS traverses the                 This module corresponds to Simulation Phase II in HD-
+action tree by recursively selecting outgoing edges using an             MCTS (see Fig. 3). It receives noisy, partially meaningful
+
+
+
+                                                                     27474
+Table 1. AndroidWorld evaluation results across task categories. All values are success rates (%). DLS = Daily Life & Services; S&C
+= Social & Communication; S&U = System & Utility; P&W = Productivity & Work. The final column shows overall success rate.
+                                                                                                        Task Categories (%)
+ Base Model               Strategies                                                                                                                                                                               Overall SR (%)
+                                                                                         DLS          S&C                 S&U                                                      P&W
+
+ GPT-4o [20]              Zero-Shot [63]                                           42.86 N.A.       66.67 N.A.                          77.27 N.A.                              29.09 N.A.                               45.22 N.A.
+                          Zero-Shot [63]                                          0.00 -100.0%     0.00 -100.0%                        2.38 -94.2%                             0.00 -100.0%                             1.02 -95.8%
+                          Task-Driven [25]                                        3.49 -79.8%      0.00 -100.0%                       19.70 -51.8%                             3.70 -57.2%                              7.90 -65.1%
+ InternVL2-4B [4]         Task-Driven w. Self-Instruct [62]                       2.30 -86.7%       3.70 -90.4%                       21.21 -48.2%                             0.62 -92.8%                              6.09 -73.4%
+                          OS-Genesis [59]                                         7.14 -58.6%      11.11 -71.2%                       36.36 -11.1%                             3.64 -57.9%                              11.30 -50.0%
+                          HATS                                                     17.24 0.0%       38.46 0.0%                          40.91 0.0%                               8.64 0.0%                               22.60 0.0%
+                          Zero-Shot [63]                                          0.00 -100.0%     0.00 -100.0%                        3.13 -94.1%                             0.00 -100.0%                             1.04 -95.8%
+                          Task-Driven [25]                                         1.15 -92.9%     0.00 -100.0%                       12.12 -77.2%                             0.62 -95.4%                              3.48 -85.7%
+ InternVL2-8B [4]         Task-Driven w. Self-Instruct [62]                        5.95 -63.1%     0.00 -100.0%                       13.64 -74.3%                             3.09 -77.2%                              6.25 -72.4%
+                          OS-Genesis [59]                                         13.79 -14.3%     0.00 -100.0%                       47.62 -10.2%                             4.08 -70.0%                              14.81 -39.4%
+                          HATS                                                     16.09 0.0%       25.93 0.0%                          53.03 0.0%                              13.58 0.0%                               24.35 0.0%
+                          Zero-Shot [63]                                          0.00 -100.0%     0.00 -100.0%                        7.58 -85.3%                             0.00 -100.0%                             1.75 -92.6%
+                          Task-Driven [25]                                        8.33 -54.7%      3.70 -88.0%                        30.30 -41.2%                             2.47 -75.1%                              10.43 -57.2%
+ Qwen2-VL-7B [61]         Task-Driven w. Self-Instruct [62]                       6.90 -62.5%      7.41 -75.9%                        25.76 -50.0%                             0.62 -93.7%                              6.09 -74.9%
+                          OS-Genesis [59]                                         17.86 -3.0%      0.00 -100.0%                       31.82 -38.2%                             1.85 -81.3%                              11.50 -52.7%
+                          HATS                                                     18.39 0.0%       30.77 0.0%                          51.52 0.0%                               9.88 0.0%                               24.35 0.0%
+
+
+
+Exploration Sequences from the previous stage and trans-                                               sponds to the instruction. Discrepancies between A (ex-
+forms them into executable, instruction-aligned Verified                                               pected behavior) and B (observed outcome) indicate seman-
+Trajectory. Unlike the One-Shot Instruction Generation                                                 tic gaps in I, e.g., missing contextual cues or ambiguity.
+paradigm in OS-G ENESIS [59], which directly maps ran-                                                 IV. Similarity Verification. To quantitatively measure align-
+dom traces to text, our method employs a Multi-Round                                                   ment between the Reference and Execution Sequences, we
+Alignment-Guided Refinement process that iteratively re-                                               perform the similarity verification using the Action-Level
+plays, verifies, and corrects synthesized instructions until se-                                       Reconstruction Recall metric:
+mantic and functional consistency are both achieved (Fig. 5).
+Prompt-Based Implementation. All stages of refinement                                                       \label {eq:recall} R(A,B) =\frac {1}{|A_a|} \sum _{a\in A_a} \mathbf {1}\bigl [\exists b\in B_a:\,\mathrm {match}(a,b\mid s)\bigr ]. 
+that sub-trajectory selection, instruction synthesis, execution
+                                                                                                                                                                 (2)
+replay, similarity verification, and contextual correction are
+                                                                                                      Here, match(a, b ∣ s) determines whether executing b in
+                                                                                                                              1
+                                                   1
+implemented via prompt-driven VLM modules .                                                           state s is semantically equivalent to action a in its original
+I. Sub-Trajectory Selection. From the rolled-out Explo-                                               context. A lower R(A, B) implies that the instruction I
+ration Sequence P, we first extract a semantically coherent                                           lacks critical contextual cues, for instance, it may omit wid-
+segment:                                                                                              get identifiers, temporal dependencies, or navigation context.
+                  A \gets \textsc {SelectSubsequence}(\mathcal {P})\footnotemark [1],                 We later compare this recall metric with a precision-based
+                                                                                                      alternative in our metric analysis (§4).
+representing one meaningful user intent, such as “add a new
+clock”. This selected segment is referred to as the Reference                                          V. Iterative Refinement and Final Verification. If
+Sequence, serves as the behavioral ground truth for synthesis                                          R(A, B) < Rmin or execution fails, I is refined by injecting
+and verification.                                                                                      missing context and re-executed to obtain an updated Exe-
+                                                                                                                          1
+                                                                                                       cution Sequence. This replay–refine loop continues until
+II. Instruction Synthesis. We then generate a natural-                                                 alignment improves (R(A, B) ≥ Rmin ) or the refinement
+language description for the Reference Sequence via                                                    budget Fmax is reached. We set Rmin = 0.7 based on em-
+                I \gets \textsc {SynthesizeInstruction}(A)\footnotemark [1],                           pirical validation balancing stability and coverage. When I
+                                                                                                       yields stable, deterministic execution, the pair (I, B) is ac-
+yielding an initial hypothesized instruction. Unlike OS-
+                                                                                                       cepted as a Verified Trajectory. Otherwise, it is discarded,
+G ENESIS, which treats this output as final, we regard I as
+                                                                                                       and its misalignment contributes to the hardness reward
+provisional and subject to replay-driven verification.
+                                                                                                       for future exploration.
+III. Replay and Execution. We execute the synthesized                                                     Only verified trajectories that pass alignment verifica-
+instruction I from the start state of A to obtain an Execution                                         tion are admitted to the corpus, ensuring that synthesized
+Sequence:                                                                                              data are both reliable (free from misaligned supervision)
+                  B \gets \textsc {ExecuteInstruction}(I)\footnotemark [1].                            and informative (rich in semantic-ambiguous yet executable
+                                                                                                           1
+This sequence represents how the environment actually re-                                                      The prompt templates used at each stage are provided in Appendix C.
+
+
+
+
+                                                                                                 27475
+                            Table 2. WebArena evaluation results across website domains. All values are success rates (%).
+                                                                                                                                WebArena (Success Rate %)
+ Base Model                    Strategies
+                                                                                                   Gitlab                      Maps                   Reddit                                      Overall
+
+ GPT-4o [20]                   Zero-Shot [63]                                                    32.14 N.A.                  6.42 N.A.                         27.36 N.A.                        22.82 N.A.
+                               Zero-Shot [63]                                                   1.11 -95.1%                 0.00 -100.0%                      0.94 -94.8%                        0.76 -96.3%
+                               Task-Driven [25]                                                 9.52 -58.1%                 5.00 -75.2%                       0.00 -100.0%                       5.72 -72.2%
+ InternVL2-4B [4]              Task-Driven w. Self-Instruct [62]                                9.52 -58.1%                 7.50 -67.0%                       0.00 -100.0%                       6.41 -68.9%
+                               OS-Genesis [59]                                                  7.94 -65.1%                 7.50 -67.0%                       3.13 -82.6%                        6.53 -68.3%
+                               HATS                                                              22.73 0.0%                 20.19 0.0%                         17.92 0.0%                        20.60 0.0%
+                               Zero-Shot [63]                                                   1.37 -95.1%                  0.95 -96.2%                      0.97 -95.2%                        1.13 -95.5%
+                               Task-Driven [25]                                                 6.35 -77.2%                  2.50 -89.9%                      0.00 -100.0%                       3.58 -85.6%
+ InternVL2-8B [4]              Task-Driven w. Self-Instruct [62]                                7.94 -71.4%                 0.00 -100.0%                      6.25 -69.0%                        5.30 -78.7%
+                               OS-Genesis [59]                                                  6.35 -77.2%                 10.00 -59.6%                      9.34 -53.7%                        8.16 -67.2%
+                               HATS                                                              27.81 0.0%                 24.77 0.0%                         20.19 0.0%                        24.87 0.0%
+                               Zero-Shot [63]                                                   1.14 -95.4%                 0.98 -95.4%                       1.96 -91.4%                        1.32 -94.3%
+                               Task-Driven [25]                                                 6.35 -74.6%                 5.00 -76.3%                       6.25 -72.6%                        5.95 -74.4%
+ Qwen2-VL-7B [61]              Task-Driven w. Self-Instruct [62]                                4.84 -80.6%                 7.50 -64.5%                       3.13 -86.3%                        5.12 -78.0%
+                               OS-Genesis [59]                                                 15.87 -36.5%                 5.00 -76.4%                       15.63 -31.3%                      12.81 -44.9%
+                               HATS                                                              25.00 0.0%                 21.10 0.0%                         22.77 0.0%                        23.28 0.0%
+
+
+
+behaviors). The effectiveness of the refinement module is                                                         rectly links exploration to the weakest regions of instruc-
+analyzed in §4, where multi-round replay is shown to mono-                                                        tion–execution understanding. We additionally clip hardness
+tonically increase action-level recall and substantially im-                                                      into a stable range (e.g., [0, Hmax ]) to avoid extreme values.
+prove downstream task success. As visualized in Fig. 5,                                                           Within HD-MCTS, this reward replaces task-return signals
+iterative refinement transforms vague one-shot instructions                                                       and encourages revisiting trajectories that are hard to align
+into precise and executable task instructions, bridging the                                                       yet semantically valuable. We use the default configuration
+gap between textual goals and GUI-level actions.                                                                  (ϵ=0.01, α=1), and analyze parameter sensitivity in §4.
+3.3. Closed-Loop Integration                                                                                       II. Hardness Propagation. After refinement, each verified
+                                                                                                                   instruction–trajectory pair (I, B) yields a hardness value
+This stage corresponds to the Backpropagation phase of                                                             r(A, B). We backpropagate this reward along the tree-
+HD-MCTS, where the alignment scores of refined trajecto-                                                           policy path from the expansion node to the root:
+ries are converted into a unified hardness feedback signal that
+guides subsequent exploration. In contrast to conventional                                                              N(v,a) \!\leftarrow \! N(v,a)+1,\Q(v,a) \!\leftarrow \! Q(v,a)+\tfrac {r - Q(v,a)}{N(v,a)}.  (4)
+MCTS, which backpropagates environment-provided task
+                                                                                                                  Following standard MCTS, only nodes selected by the tree
+rewards, GUI trajectory synthesis exposes no such scalar
+                                                                                                                  policy receive credit. Since hardness characterizes the entire
+supervision. We therefore propagate an alignment-derived
+                                                                                                                  instruction–trajectory pair rather than any single action, the
+hardness reward that quantifies semantic difficulty and
+                                                                                                                  same scalar reward is propagated along the path. These
+serves as a task-adaptive surrogate objective.
+                                                                                                                  updates reshape the value estimates, biasing future UCB
+I. Motivation and Design of the Hardness Reward. The                                                              selection (Eq. 1) toward semantically challenging regions.
+core idea is to turn semantic misalignment, typically noisy
+                                                                                                                     In summary, the closed loop of HATS turns semantic am-
+supervision, into informative feedback that prioritizes am-
+                                                                                                                  biguity from a training liability into a useful learning signal.
+biguous or hard regions of the GUI state space. During
+                                                                                                                  Misalignment during replay generates the hardness reward,
+refinement, we compute the action-level reconstruction
+                                                                                                                  which in turn guides exploration toward richer and harder-
+recall R(A, B) (Eq. 2), which measures how well a syn-
+                                                                                                                  to-align interactions. Verified trajectories annotated with
+thesized instruction I reproduces its reference sequence A.
+                                                                                                                  hardness form a semantically grounded dataset for down-
+High recall indicates clear semantic grounding, whereas low
+                                                                                                                  stream SFT training. We follow the two-stage paradigm of
+recall reflects ambiguous visual cues, missing preconditions,
+                                                                                                                  OS-G ENESIS [59] for planning-level and action-level learn-
+or unstable language–interface mappings. Thus, R naturally
+                                                                                                                  ing, with hardness-aware weighting detailed in Appendix B.
+serves as an empirical estimate of task hardness.
+   Building on this insight, we define the hardness reward
+as an inverse function of R(A, B):                                                                                 4. Experiments
+         \label {eq:hardness} r(A,B) = (R(A,B)+\epsilon )^{-\alpha }, \quad \epsilon > 0,\ \alpha > 0.      (3)   We evaluate HATS on two representative GUI benchmarks:
+                                                                                                                  A NDROIDW ORLD [48] and W EBA RENA [78], which to-
+This formulation (i) yields a continuous, bounded score that                                                      gether span diverse mobile and web interaction patterns. On
+increases smoothly as alignment deteriorates, and (ii) di-                                                        A NDROIDW ORLD, all 116 tasks are grouped into four func-
+
+
+
+                                                                                                              27476
+Table 3. Parameter sensitivity of the hardness reward in Eq. 3.                        Table 4. Metric comparison of action-level alignment.
+                            Hyperparameters                                               Alignment Metric Definition in Eq. 2             Success Rate (%)
+   Hardness Metric                                     Success Rate (%)
+                             ϵ          α
+                                                                                         1
+                                                                                       ∣Aa ∣
+                                                                                             ∑a∈Aa 1[∃ b ∈ Ba ∶ match(a, b ∣ s)]                 50.8
+                            0.01         0.50             22.7 -55.3%
+                            0.01         1.00              50.8 0.0%                     1
+                                                                                       ∣Ba ∣
+                                                                                             ∑b∈Ba 1[∃ a ∈ Aa ∶ match(a, b ∣ s)]                 36.0
+                            0.01         2.00             39.2 -22.8%
+   (R(A, B) + ϵ)
+                 −α
+                            0.10         0.50             13.8 -72.8%
+                            0.10         1.00             40.0 -21.3%           of the three components of HATS: (i) the alignment-based
+                            0.10         2.00             37.9 -25.3%
+                                                                                hardness metric, (ii) hardness-driven exploration, and (iii)
+                                                                                alignment-guided refinement.
+tional categories, DLS, S&C, S&U, and P&W, defined by                           Analysis I. Hardness Metric Validation. We validate the
+their interaction intent (see caption of Table 1), with the                     hardness definition in Eq. 3 through two complementary
+full mapping provided in Appendix B.1. For W EBA RENA,                          analyses: parameter sensitivity and metric substitution.
+we evaluate three lightweight yet representative domains                          • Parameter sensitivity. We vary ϵ and α in Eq. 3 and
+(Gitlab, Maps, Reddit) to reduce computational cost.                                observe consistent trends (Table 3). Large ϵ flattens
+Implementation Details. Following [59], we use three                                hardness differences, while small or large α distort the
+VLM backbones (InternVL2-4B/8B [4] and Qwen2-VL-                                    reward landscape and reduce discriminative power. The
+7B [61]), with GPT-4o [20] for instruction synthesis and re-                        default configuration (ϵ=0.01, α=1) offers a balanced
+ward modeling. All methods are trained under the same SFT                           scaling that preserves sensitivity to semantic hardness
+setting with screenshots and a11ytree inputs. We compare                            while maintaining stable reward behavior.
+HATS against four representative data–synthesis paradigms:                        • Metric comparison. We substitute recall in Eq. 2 with
+Z ERO -S HOT (CoT + M3A) [48], TASK -D RIVEN G ENER -                               an action-level precision metric and derive an analogous
+ATION [25], S ELF -I NSTRUCT [62], and OS-G ENESIS [59].                            hardness mapping. As shown in Table 4, recall-based
+HATS uses the same 1K-trajectory synthesis budget as OS-                            hardness correlates substantially better with downstream
+G ENESIS; the additional synthesis cost is bounded and tun-                         performance: recall captures coverage of intended ac-
+able, with HD-MCTS controlled by the iteration budget and                           tions, which is the main failure mode in ambiguous GUI
+replay–refine capped by Fmax with early stopping. Full                              workflows; precision does not penalize missing steps.
+training and efficiency details are provided in Appendix B.
+                              2
+Overall Performance. Tables 1 and 2 show that HATS
+achieves the highest success rates across all backbones.
+Improvements are especially notable in categories where
+existing methods perform poorly. For example, on A N -
+DROIDW ORLD S&C, OS-G ENESIS reaches only 11.11% on
+InternVL2-4B and 0.00% on Qwen2-VL-7B, while HATS
+attains 38.46% and 30.77%. Similar gains appear on P&W
+(e.g., 1.85% vs. 9.88% on InternVL2-4B) and on W E -
+BA RENA domains such as Gitlab (7.94% vs. 22.73%). Dur-
+ing baseline reproduction, we also observed that adding
+S ELF -I NSTRUCT data sometimes degraded TASK -D RIVEN
+                                                                                    (a) Performance comparison on A NDROIDW ORLD with InternVL2-4B.
+performance due to instruction–execution misalignment and
+noisy supervision, further illustrating the sensitivity of GUI
+agents to data quality. Following [59], the GPT-4o–based
+M3A agent is reported only as a reference baseline. These
+representative cases highlight a consistent pattern: HATS
+substantially boosts performance precisely in interaction
+regimes that existing data-synthesis pipelines struggle with,
+leading to the highest overall success rates on both mobile
+and web environments.
+                              3                                                      (b) Distribution: Baseline [62]             (c) Distribution: Ours
+Component Analysis. We next analyze the effectiveness
+   2
+                                                                                Figure 6. Performance comparison & corpus composition. Top:
+     Baseline reproduction uses available resources including official check-   performance comparison on A NDROIDW ORLD using InternVL2-
+points, released data, and our own reimplementations (see Appendix B).
+   3                                                                            4B. Bottom: corpus composition by task category for the baseline
+     To save computation, we evaluate on a representative subset of A N -
+                                                                                (left) and HATS (right), where HATS increases exploration in
+DROIDW ORLD; see Appendix B.5.
+                                                                                categories that are empirically harder for existing methods (e.g.,
+                                                                                P&W), while reducing exploration in easier categories (e.g., S&U).
+
+
+                                                                            27477
+ (a) Anal. II: Action Type Distribution   (b) Anal. III: Refinement Effect
+
+Figure 7. Radar chart comparison. (a) Action-type distribution
+on W EBA RENA, showing distributional differences between the                     Figure 8. Semantic-ambiguity ratios at log scale. HATS vs.
+baseline and HATS. (b) Per-task view of multi-round refinement,                   OS-G ENESIS across ambiguity types Vis, Seq, and Ctx on A N -
+where the shaded area expands across rounds, indicating higher                    DROIDW ORLD (AW) and W EBA RENA (WA). Bars correspond
+action-level recall and better synthesized trajectories.                          to AW/WA-Ctx/Seq/Vis pairs. Trajectories may involve multiple
+                                                                                  ambiguity types, so categories are not mutually exclusive.
+Analysis II. Effectiveness of Hardness-Driven Explo-
+ration. We use two qualitative analyses to show that                                 • Overall effect. Table 5 shows that, refinement yields
+hardness-driven exploration indeed shifts sampling coverage                            substantial gains: the average action-level reconstruc-
+toward semantically valuable, ambiguity-rich regions.                                  tion recall R(A, B) (Eq. 2) increases from 0.26 to 0.40,
+  • Distributional coverage analyses. Fig. 6a reveals a                                accompanied by a corresponding improvement in down-
+    clear pattern across baselines: tasks in S&U exhibit uni-                          stream success rate (from 16.00% to 23.07%). This
+    formly high success rates, whereas P&W tasks show                                  indicates that iterative replay increasingly corrects mis-
+    consistently lower success, suggesting that P&W con-                               matches and strengthens overall instruction fidelity.
+    tains a larger fraction of semantically complex, multi-                          • Single-case insight. A per-task view in Fig. 7b, using
+    step workflows. Motivated by this observation, we com-                             seven representative tasks (Appendix D), exhibits the
+    pare category proportions in the synthesized trajectories                          same steadily improving trend: the radar area expands
+                                           4
+    (Fig. 6 (b-c). Relative to the baseline , HATS increases                           monotonically across rounds, showing that iterative cor-
+    the sampling weight of P&W from 31.2% to 46.6%,                                    rection progressively fills missing context, resolves se-
+    while reducing S&U from 30.8% to 18.9%. This redis-                                quential inconsistencies, and produces more executable
+    tribution aligns with the empirical hardness indicated in                          task instructions for individual behaviors.
+    Fig. 6a: harder categories receive more coverage, while                      Table 5. Ablation on multi-round refinement on AndroidWorld.
+    easier ones are deemphasized. A similar shift is observed
+                                                                                         Refinement Rounds          Ravg        Success Rate (%)
+    in the action-type distributions on W EBA RENA (Fig. 7a),
+    which likely contributes to its improved performance.                                    One-Shot             0.26 -35.0%      16.00 -30.6%
+                                                                                             Round 1              0.19 -52.5%      15.56 -32.6%
+  • Semantics-focused auditing. We further compare                                           Round 2              0.29 -27.5%      21.43 -7.1%
+    whether the final trajectories synthesized by HATS con-                                  Round 3               0.40 0.0%        23.07 0.0%
+
+    tain more semantic ambiguity than those produced by
+    OS-G ENESIS. Using a third-party LLM auditor (GPT-
+    4o) following our rubric in Appendix B.5, each trajectory                     5. Conclusion
+    is independently evaluated for three ambiguity types:                        We introduced HATS, a closed-loop framework that trans-
+    context dependency, sequential dependency, and visual                        forms instruction–execution feedback into a hardness sig-
+    ambiguity. As shown in Fig. 8, a consistently larger frac-                   nal to guide trajectory synthesis for GUI agents. Through
+    tion of HATS trajectories receive ambiguity labels across                    the integration of a hardness-driven exploration module
+    all three categories, indicating that hardness-driven ex-                    and an alignment-guided refinement module, the frame-
+    ploration uncovers interactions where language–action                        work jointly enhances the diversity of semantic-ambiguous
+    grounding is intrinsically challenging.                                      actions and the semantic consistency of generated data.
+Analysis III. Effectiveness of Alignment-Guided Refine-                          By promoting exploration toward challenging yet infor-
+ment. We evaluate how multi-round replay–refinement im-                          mative interactions and ensuring alignment at the instruc-
+proves instruction–execution alignment.                                          tion–trajectory level, HATS produces higher-quality, more
+                                                                                 learnable datasets that enable GUI agents to generalize more
+   4
+    OS-Genesis (10/2025) does not provide category-labeled training data;        robustly across real-world interfaces.
+we thus use TASK -D RIVEN W. S ELF -I NSTR . for category-level comparison.
+
+
+
+
+                                                                             27478
+6. Acknowledgement                                                    [9] Xiang Deng, Yu Gu, Boyuan Zheng, Shijie Chen, Samuel
+                                                                          Stevens, Boshi Wang, Huan Sun, and Yu Su. Mind2web:
+This research is supported by the National Research Foun-                 Towards a generalist agent for the web. In NeurIPS, 2023. 1
+dation, Singapore under its AI Singapore Programme                   [10] Alexandre Drouin, Maxime Gasse, Massimo Caccia, Issam H.
+(AISG Award No: AISG2-PhD-2023-08-042T-J), the Na-                        Laradji, Manuel Del Verme, Tom Marty, David Vazquez,
+tional Natural Science Foundation of China (Grant No.                     Nicolas Chapados, and Alexandre Lacoste. WorkArena: How
+62306090 and Grant No. U24A20328), the China Post-                        capable are web agents at solving common knowledge work
+doctoral Science Foundation (Grant No. 2024M764192),                      tasks? In ICML, 2024. 1
+the Natural Science Foundation of Guangdong Province                 [11] Zane Durante, Qiuyuan Huang, Naoki Wake, Ran Gong,
+of China (Grant No. 2024A1515010147), the Natural Sci-                    Jae Sung Park, Bidipta Sarkar, Rohan Taori, Yusuke Noda,
+                                                                          Demetri Terzopoulos, Yejin Choi, et al. Agent ai: Survey-
+ence Foundation of Shenzhen City of China (Grant No.
+                                                                          ing the horizons of multimodal interaction. arXiv preprint
+JCYJ20250604145700001), and the Beijing Natural Sci-                      arXiv:2401.03568, 2024. 2, 1
+ence Foundation (Grant No. L254018), and is part of the              [12] Tao Feng, Chuanyang Jin, Jingyu Liu, Kunlun Zhu, Haoqin
+programme DesCartes, which is supported by the National                   Tu, Zirui Cheng, Guanyu Lin, and Jiaxuan You. How far are
+Research Foundation, Prime Minister’s Office, Singapore un-               we from agi. CoRR, 2024. 2, 1
+der its Campus for Research Excellence and Technological             [13] Carlos Florensa, David Held, Xinyang Geng, and Pieter
+Enterprise (CREATE) programme.                                            Abbeel. Automatic goal generation for reinforcement learning
+                                                                          agents. In ICML, 2018. 1
+References                                                           [14] Ruize Gao, Feng Liu, Jingfeng Zhang, Bo Han, Tongliang
+                                                                          Liu, Gang Niu, and Masashi Sugiyama. Maximum mean
+ [1] Yoshua Bengio, Jérôme Louradour, Ronan Collobert, and                discrepancy test is aware of adversarial attacks. In ICML,
+     Jason Weston. Curriculum learning. In ICML, 2009. 1                  2021. 1
+ [2] Yuxiang Chai, Siyuan Huang, Yazhe Niu, Han Xiao, Liang          [15] Ruize Gao, Jiongxiao Wang, Kaiwen Zhou, Feng Liu,
+     Liu, Dingyu Zhang, Peng Gao, Shuai Ren, and Hongsheng                Binghui Xie, Gang Niu, Bo Han, and James Cheng. Fast and
+     Li. Amex: Android multi-annotation expo dataset for mobile           reliable evaluation of adversarial robustness with minimum-
+     gui agents. In ACL, 2024. 1                                          margin attack. In ICML, 2022. 1
+ [3] Wentong Chen, Junbo Cui, Jinyi Hu, Yujia Qin, Junjie Fang,      [16] Boyu Gou, Ruohan Wang, Boyuan Zheng, Yanan Xie, Cheng
+     Yue Zhao, Chongyi Wang, Jun Liu, Guirong Chen, Yupeng                Chang, Yiheng Shu, Huan Sun, and Yu Su. Navigating the
+     Huo, Yuan Yao, Yankai Lin, Zhiyuan Liu, and Maosong Sun.             digital world as humans do: Universal visual grounding for
+     Guicourse: From general vision language models to versatile          gui agents. In ICLR, 2025. 1
+     gui agents. In ACL, 2025. 1                                     [17] Alex Graves, Marc G Bellemare, Jacob Menick, Remi Munos,
+                                                                          and Koray Kavukcuoglu. Automated curriculum learning for
+ [4] Zhe Chen, Jiannan Wu, Wenhai Wang, Weijie Su, Guo Chen,
+                                                                          neural networks. In ICML, 2017. 1
+     Sen Xing, Muyan Zhong, Qinglong Zhang, Xizhou Zhu,
+                                                                     [18] Zhiting Hu and Tianmin Shu. Language models, agent mod-
+     Lewei Lu, Bin Li, Ping Luo, Tong Lu, Yu Qiao, and Jifeng
+                                                                          els, and world models: The law for machine reasoning and
+     Dai. Internvl: Scaling up vision foundation models and align-
+                                                                          planning. In NeurIPS, 2023. 1
+     ing for generic visual-linguistic tasks. In CVPR, 2024. 5, 6,
+     7, 3                                                            [19] Keke Huang, Ruize Gao, Bogdan Cautis, and Xiaokui Xiao.
+                                                                          Scalable continuous-time diffusion framework for network
+ [5] Kanzhi Cheng, Qiushi Sun, Yougang Chu, Fangzhi Xu, Li
+                                                                          inference and influence estimation. In WWW, 2024. 1
+     YanTao, Jianbing Zhang, and Zhiyong Wu. SeeClick: Har-
+                                                                     [20] Aaron Hurst, Adam Lerer, Adam P Goucher, Adam Perelman,
+     nessing GUI grounding for advanced visual GUI agents. In
+                                                                          Aditya Ramesh, Aidan Clark, AJ Ostrow, Akila Welihinda,
+     ACL, 2024. 2, 1
+                                                                          Alan Hayes, Alec Radford, et al. Gpt-4o system card. arXiv
+ [6] Kanzhi Cheng, Yantao Li, Fangzhi Xu, Jianbing Zhang,                 preprint arXiv:2410.21276, 2024. 5, 6, 7, 3
+     Hao Zhou, and Yang Liu. Vision-language models can self-        [21] Chengyou Jia, Minnan Luo, Zhuohang Dang, Qiushi Sun,
+     improve reasoning via reflection. In ACL, 2025. 1                    Fangzhi Xu, Junlin Hu, Tianbao Xie, and Zhiyong Wu.
+ [7] Thibault Le Sellier de Chezelles, Maxime Gasse, Alexandre            Agentstore: Scalable integration of heterogeneous agents as
+     Lacoste, Massimo Caccia, Alexandre Drouin, Léo Boisvert,             specialized generalist computer assistant. In ICLR, 2024. 1
+     Megh Thakkar, Tom Marty, Rim Assouel, Sahar Omidi               [22] Chuanyang Jin, Yutong Wu, Jing Cao, Jiannan Xiang, Yen-
+     Shayegan, Lawrence Keunho Jang, Xing Han Lù, Ori Yoran,              Ling Kuo, Zhiting Hu, Tomer Ullman, Antonio Torralba,
+     Dehan Kong, Frank F. Xu, Siva Reddy, Graham Neubig,                  Joshua B Tenenbaum, and Tianmin Shu. Mmtom-qa: Mul-
+     Quentin Cappart, Russ Salakhutdinov, and Nicolas Chapados.           timodal theory of mind question answering. In ACL, 2024.
+     The browsergym ecosystem for web agent research. In TMLR,            1
+     2025. 1                                                         [23] Raghav Kapoor, Yash Parag Butala, Melisa Russak, Jing Yu
+ [8] Biplab Deka, Zifeng Huang, Chad Franzen, Joshua Hib-                 Koh, Kiran Kamble, Waseem Alshikh, and Ruslan Salakhut-
+     schman, Daniel Afergan, Yang Li, Jeffrey Nichols, and Ran-           dinov. Omniact: A dataset and benchmark for enabling multi-
+     jitha Kumar. Rico: A mobile app dataset for building data-           modal generalist autonomous agents for desktop and web. In
+     driven design applications. In UIST, 2017. 3, 1                      ECCV, 2024. 2, 1
+
+
+
+
+                                                                 27479
+[24] M Kumar, Benjamin Packer, and Daphne Koller. Self-paced               Spatial-temporal graph diffusion policy with kinematic mod-
+     learning for latent variable models. In NeurIPS, 2010. 1              eling for bimanual robotic manipulation. In CVPR, pages
+[25] Hanyu Lai, Xiao Liu, Iat Long Iong, Shuntian Yao, Yux-                17394–17404, 2025. 1
+     uan Chen, Pengbo Shen, Hao Yu, Hanchen Zhang, Xiaohan            [39] Shikhar Murty, Christopher D Manning, Peter Shaw, Mandar
+     Zhang, Yuxiao Dong, and Jie Tang. Autowebglm: A large                 Joshi, and Kenton Lee. BAGEL: Bootstrapping agents by
+     language model-based web navigating agent. In KDD, 2024.              guiding exploration with language. In ICML, 2024. 2, 3
+     2, 5, 6, 7, 3                                                    [40] Shikhar Murty, Dzmitry Bahdanau, and Christopher D Man-
+[26] Hao Li, Qi Lv, Rui Shao, Xiang Deng, Yinchuan Li, Jianye              ning. Nnetscape navigator: Complex demonstrations for web
+     Hao, and Liqiang Nie. Star: Learning diverse robot skill              agents without a demonstrator. In ICLR, 2025. 1
+     abstractions through rotation-augmented vector quantization.     [41] Runliang Niu, Jindong Li, Shiqi Wang, Yali Fu, Xiyu Hu,
+     In ICML, 2025. 1                                                      Xueyuan Leng, He Kong, Yi Chang, and Qi Wang. Screena-
+[27] Wei Li, William E Bishop, Alice Li, Christopher Rawles,               gent: A vision language model-driven computer control agent.
+     Folawiyo Campbell-Ajala, Divya Tyamagundlu, and Oriana                In IJCAI, 2024. 1
+     Riva. On the effects of data scale on UI control agents. In      [42] Vardaan Pahuja, Yadong Lu, Corby Rosset, Boyu Gou,
+     NeurIPS, 2024. 2, 3, 1                                                Arindam Mitra, Spencer Whitehead, Yu Su, and Ahmed Has-
+[28] Wei Li, Renshan Zhang, Rui Shao, Jie He, and Liqiang Nie.             san. Explorer: Scaling exploration-driven web trajectory
+     Cogvla: Cognition-aligned vision-language-action model via            synthesis for multimodal web agents. In ACL Findings, 2025.
+     instruction-driven routing & sparsification. In NeurIPS, 2025.        1
+     1                                                                [43] Jiayi Pan, Yichi Zhang, Nicholas Tomlin, Yifei Zhou, Sergey
+[29] Wei Li, Jizhihui Liu, Yixing Li, Junwen Tong, Rui Shao,               Levine, and Alane Suhr. Autonomous evaluation and refine-
+     and Liqiang Nie. Consisvla-4d: Advancing spatiotemporal               ment of digital agents. In COLM, 2024. 1
+     consistency in efficient 3d-perception and 4d-reasoning for      [44] Ajay Patel, Markus Hofmarcher, Claudiu Leoveanu-Condrei,
+     robotic manipulation. In CVPR, 2026.                                  Marius-Constantin Dinu, Chris Callison-Burch, and Sepp
+[30] Wei Li, Renshan Zhang, Rui Shao, Zhijian Fang, Kaiwen                 Hochreiter. Large language models can self-improve at web
+     Zhou, Zhuotao Tian, and Liqiang Nie. Semanticvla: Semantic-           agent tasks. arXiv preprint arXiv:2405.20309, 2024. 2, 3
+     aligned sparsification and enhancement for efficient robotic     [45] Rémy Portelas, Cédric Colas, Lilian Weng, Katja Hofmann,
+     manipulation. In AAAI, 2026.                                          and Pierre-Yves Oudeyer. Automatic curriculum learning for
+[31] Zajing Li, Bing Hu, Rui Shao, Gongwei Chen, Dongmei                   deep rl: A short survey. In IJCAI, 2020. 1
+     Jiang, Pengwei Xie, Jianye Hao, and Liqiang Nie. Global          [46] Jeff Rasley, Samyam Rajbhandari, Olatunji Ruwase, and Yux-
+     prior meets local consistency: Dual-memory augmented                  iong He. Deepspeed: System optimizations enable training
+     vision-language-action model for efficient robotic manipula-          deep learning models with over 100 billion parameters. In
+     tion. In CVPR, 2026.                                                  KDD, 2020. 3
+[32] Zaijing Li, Bing Hu, Rui Shao, Gongwei Chen, Dongmei             [47] Christopher Rawles, Alice Li, Daniel Rodriguez, Oriana Riva,
+     Jiang, Pengwei Xie, Jianye Hao, and Liqiang Nie. Global               and Timothy P Lillicrap. Androidinthewild: A large-scale
+     prior meets local consistency: Dual-memory augmented                  dataset for android device control. In NeurIPS, 2023. 1
+     vision-language-action model for efficient robotic manipula-     [48] Christopher Rawles, Sarah Clinckemaillie, Yifan Chang,
+     tion. arXiv preprint arXiv:2602.20200, 2026. 1                        Jonathan Waltz, Gabrielle Lau, Marybeth Fair, Alice Li,
+[33] Musen Lin, Minghao Liu, Taoran Lu, Lichen Yuan, Yiwei                 William Bishop, Wei Li, Folawiyo Campbell-Ajala, et al.
+     Liu, Haonan Xu, Yu Miao, Yuhao Chao, and Zhaojian Li. Gui-            Androidworld: A dynamic benchmarking environment for
+     rewalk: Massive data generation for gui agent via stochas-            autonomous agents. In ICLR, 2025. 3, 6, 7, 1
+     tic exploration and intent-aware reasoning. arXiv preprint       [49] Rui Shao, Xiangyuan Lan, and Pong C Yuen. Deep con-
+     arXiv:2509.15738, 2025. 3                                             volutional dynamic texture learning with adaptive channel-
+[34] Evan Zheran Liu, Kelvin Guu, Panupong Pasupat, and Percy              discriminability for 3d mask face anti-spoofing. In IJCB,
+     Liang. Reinforcement learning on web interfaces using                 2017. 1
+     workflow-guided exploration. In ICLR, 2018. 1                    [50] Rui Shao, Xiangyuan Lan, Jiawei Li, and Pong C Yuen. Multi-
+[35] Ilya Loshchilov and Frank Hutter. Decoupled weight decay              adversarial discriminative deep domain generalization for face
+     regularization. In ICLR, 2019. 3                                      presentation attack detection. In CVPR, 2019. 1
+[36] Quanfeng Lu, Wenqi Shao, Zitao Liu, Fanqing Meng, Boxuan         [51] Rui Shao, Tianxing Wu, and Ziwei Liu. Detecting and ground-
+     Li, Botong Chen, Siyuan Huang, Kaipeng Zhang, Yu Qiao,                ing multi-modal media manipulation. In CVPR, 2023. 1
+     and Ping Luo. Gui odyssey: A comprehensive dataset for           [52] Rui Shao, Tianxing Wu, Jianlong Wu, Liqiang Nie, and Ziwei
+     cross-app gui navigation on mobile devices. In ICCV, 2025.            Liu. Detecting and grounding multi-modal media manipula-
+     1                                                                     tion and beyond. IEEE Transactions on Pattern Analysis and
+[37] Xing Han Lù, Zdeněk Kasner, and Siva Reddy. Weblinx:                 Machine Intelligence, 2024.
+     Real-world website navigation with multi-turn dialogue. In       [53] Rui Shao, Wei Li, Lingsen Zhang, Renshan Zhang, Zhiyang
+     ICML, 2024. 2, 3, 1                                                   Liu, Ran Chen, and Liqiang Nie. Large vlm-based vision-
+[38] Qi Lv, Hao Li, Xiang Deng, Rui Shao, Yinchuan Li, Jianye              language-action models for robotic manipulation: A survey.
+     Hao, Longxiang Gao, Michael Yu Wang, and Liqiang Nie.                 arXiv preprint arXiv:2508.13073, 2025. 1
+
+
+
+
+                                                                  27480
+[54] Tianlin Shi, Andrej Karpathy, Linxi Fan, Jonathan Hernandez,        open-ended tasks in real computer environments. In NeurIPS,
+     and Percy Liang. World of bits: An open-domain platform             2024. 1
+     for web-based agents. In ICML, 2017. 3, 1                      [68] Fangzhi Xu, Qiushi Sun, Kanzhi Cheng, Jun Liu, Yu Qiao,
+[55] Noah Shinn, Federico Cassano, Ashwin Gopinath, Karthik              and Zhiyong Wu. Interactive evolution: A neural-symbolic
+     Narasimhan, and Shunyu Yao. Reflexion: Language agents              self-training framework for large language models. In ACL,
+     with verbal reinforcement learning. In NeurIPS, 2024. 1             2025. 1
+[56] Abhinav Shrivastava, Abhinav Gupta, and Ross Girshick.         [69] Shunyu Yao, Howard Chen, John Yang, and Karthik
+     Training region-based object detectors with online hard ex-         Narasimhan. Webshop: Towards scalable real-world web
+     ample mining. In CVPR, 2016. 1                                      interaction with grounded language agents. In NeurIPS, 2022.
+[57] Qiushi Sun, Zhangyue Yin, Xiang Li, Zhiyong Wu, Xipeng              1
+     Qiu, and Lingpeng Kong. Corex: Pushing the boundaries          [70] Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran,
+     of complex reasoning through multi-model collaboration. In          Karthik R Narasimhan, and Yuan Cao. React: Synergizing
+     COLM, 2023. 1                                                       reasoning and acting in language models. In ICLR, 2023. 4
+[58] Qiushi Sun, Zhirui Chen, Fangzhi Xu, Kanzhi Cheng, Chang       [71] Aohan Zeng, Mingdao Liu, Rui Lu, Bowen Wang, Xiao Liu,
+     Ma, Zhangyue Yin, Jianing Wang, Chengcheng Han, Renyu               Yuxiao Dong, and Jie Tang. AgentTuning: Enabling gen-
+     Zhu, Shuai Yuan, et al. A survey of neural code intelli-            eralized agent abilities for LLMs. In ACL Findings, 2024.
+     gence: Paradigms, advances and beyond. arXiv preprint               1
+     arXiv:2403.14734, 2024. 2, 1                                   [72] Chi Zhang, Zhao Yang, Jiaxuan Liu, Yucheng Han, Xin Chen,
+[59] Qiushi Sun, Kanzhi Cheng, Zichen Ding, Chuanyang Jin,               Zebiao Huang, Bin Fu, and Gang Yu. Appagent: Multimodal
+     Yian Wang, Fangzhi Xu, Zhenyu Wu, Chengyou Jia, Liheng              agents as smartphone users. In CHI, 2025. 1
+     Chen, Zhoumianze Liu, et al. Os-genesis: Automating gui        [73] Jianguo Zhang, Tian Lan, Rithesh Murthy, Zhiwei Liu,
+     agent trajectory construction via reverse task synthesis. In        Weiran Yao, Ming Zhu, Juntao Tan, Thai Hoang, Zuxin Liu,
+     ACL, 2025. 2, 3, 4, 5, 6, 7, 1                                      Liangwei Yang, et al. Agentohana: Design unified data and
+[60] Junyang Wang, Haiyang Xu, Jiabo Ye, Ming Yan, Weizhou               training pipeline for effective agent learning. arXiv preprint
+     Shen, Ji Zhang, Fei Huang, and Jitao Sang. Mobile-agent:            arXiv:2402.15506, 2024. 1
+     Autonomous multi-modal mobile device agent with visual         [74] Jiwen Zhang, Jihao Wu, Yihua Teng, Minghui Liao, Nuo Xu,
+     perception. In ICLR Workshop on LLM Agents, 2024. 2, 1              Xiao Xiao, Zhongyu Wei, and Duyu Tang. Android in the zoo:
+[61] Peng Wang, Shuai Bai, Sinan Tan, Shijie Wang, Zhihao Fan,           Chain-of-action-thought for gui agents. In EMNLP Findings,
+     Jinze Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin             2024. 1
+     Ge, et al. Qwen2-vl: Enhancing vision-language model’s         [75] Boyuan Zheng, Boyu Gou, Jihyung Kil, Huan Sun, and Yu
+     perception of the world at any resolution. arXiv preprint           Su. GPT-4V(ision) is a generalist web agent, if grounded. In
+     arXiv:2409.12191, 2024. 5, 6, 7, 3                                  ICML, 2024. 1
+[62] Yizhong Wang, Yeganeh Kordi, Swaroop Mishra, Alisa Liu,        [76] Longtao Zheng, Zhiyuan Huang, Zhenghai Xue, Xinrun
+     Noah A. Smith, Daniel Khashabi, and Hannaneh Hajishirzi.            Wang, Bo An, and Shuicheng Yan. Agentstudio: A toolkit for
+     Self-instruct: Aligning language models with self-generated         building general virtual agents. In ICLR, 2024. 1
+     instructions. In ACL, 2023. 5, 6, 7, 3                         [77] Longtao Zheng, Rundong Wang, Xinrun Wang, and Bo An.
+[63] Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten Bosma,             Synapse: Trajectory-as-exemplar prompting with memory for
+     brian ichter, Fei Xia, Ed H. Chi, Quoc V Le, and Denny              computer control. In ICLR, 2024. 2
+     Zhou. Chain of thought prompting elicits reasoning in large    [78] Shuyan Zhou, Frank F. Xu, Hao Zhu, Xuhui Zhou, Robert Lo,
+     language models. In NeurIPS, 2022. 5, 6, 3                          Abishek Sridhar, Xianyi Cheng, Tianyue Ou, Yonatan Bisk,
+[64] Qingyun Wu, Gagan Bansal, Jieyu Zhang, Yiran Wu, Shaokun            Daniel Fried, Uri Alon, and Graham Neubig. Webarena: A
+     Zhang, Erkang Zhu, Beibin Li, Li Jiang, Xiaoyun Zhang, and          realistic web environment for building autonomous agents. In
+     Chi Wang. Autogen: Enabling next-gen llm applications via           ICLR, 2024. 3, 6, 1
+     multi-agent conversation framework. In COLM, 2023. 2, 1        [79] Xurui Zhou, Gongwei Chen, Yuquan Xie, Zajing Li, Kaiwen
+[65] Zhiyong Wu, Chengcheng Han, Zichen Ding, Zhenmin Weng,              Zhou, Shuai Wang, Shuo Yang, Zhuotao Tian, and Rui Shao.
+     Zhoumianze Liu, Shunyu Yao, Tao Yu, and Lingpeng Kong.              Hiconagent: History context-aware policy optimization for
+     OS-copilot: Towards generalist computer agents with self-           gui agents. In CVPR, 2026. 1
+     improvement. In ICLR, 2024. 2, 1                               [80] Yijie Zhu, Rui Shao, Ziyang Liu, Jie He, Jizhihui Liu, Jiuru
+[66] Zhiyong Wu, Zhenyu Wu, Fangzhi Xu, Yian Wang, Qiushi                Wang, and Zitong Yu. H-gar: A hierarchical interaction
+     Sun, Chengyou Jia, Kanzhi Cheng, Zichen Ding, Liheng                framework via goal-driven observation-action refinement for
+     Chen, Paul Pu Liang, et al. Os-atlas: A foundation action           robotic manipulation. In AAAI, 2026. 1
+     model for generalist gui agents. In ICLR, 2025. 2, 1
+[67] Tianbao Xie, Danyang Zhang, Jixuan Chen, Xiaochuan Li,
+     Siheng Zhao, Ruisheng Cao, Toh Jing Hua, Zhoujun Cheng,
+     Dongchan Shin, Fangyu Lei, Yitao Liu, Yiheng Xu, Shuyan
+     Zhou, Silvio Savarese, Caiming Xiong, Victor Zhong, and
+     Tao Yu. OSWorld: Benchmarking multimodal agents for
+
+
+
+
+                                                                27481
+

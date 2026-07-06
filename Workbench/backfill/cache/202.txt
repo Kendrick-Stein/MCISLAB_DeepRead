@@ -1,0 +1,761 @@
+                  This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                               Except for this watermark, it is identical to the accepted version;
+                         the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+       Dynamics-Aware Preference Optimization for Vision-Language Models
+
+                Jusheng Zhang1         Kaitong Cai1 Jing Yang1 Jian Wang2                      Keze Wang1
+                                       1
+                                         Sun Yat-sen University 2 Snap Inc.
+
+
+                        Abstract                                   Prominent finetuning methods, including supervised fine-
+                                                                   tuning (SFT) [27, 38] and direct preference optimization
+Preference-based finetuning of vision-language models              (DPO) [29], employ diverse loss geometries and super-
+(VLMs) is notoriously unstable, i.e., trivially wrong nega-        vision signals, necessitating a unified analytical frame-
+tives inject uninformative gradients that distort optimiza-        work to unravel their behavioral foundations, especially in
+tion and degrade calibration. This work revisits this is-          preference-based alignment aimed at prioritizing human-
+sue through the lens of learning dynamics and identi-              preferred outputs [31]. Preference-based finetuning is es-
+fies a core pathology, i.e., the squeezing effect, where           sential for aligning VLMs with human intent [6, 20, 28,
+easy negatives retain large, misaligned gradients despite          45, 52, 54, 56], yet it suffers from notorious instabil-
+negligible loss. To address this, we propose Cooling-              ity in practice. Alignment datasets often contain static
+Weighted Direct Preference Optimization (CW-DPO), a                or mis-specified negative examples (trivially incorrect or
+two-stage framework that smooths and then stabilizes the           off-distribution) that inject uninformative gradients [5, 14,
+alignment process. Stage 1 employs a constrained SFT               35, 46, 49]. These gradients disrupt optimization, de-
+phase with low-weight “gentle negatives” to regularize             grade calibration, and produce overconfident, peaky pos-
+overconfident distributions and flatten the loss landscape.        teriors. Off-policy methods exacerbate this by penalizing
+Stage 2 introduces a competence-aware cooling weight               unlikely responses, while even naive on-policy approaches
+that adaptively scales negative gradients according to the         struggle with gradient spikes from dominant “easy nega-
+model’s average per-token log-probability, suppressing un-         tives” [7, 14, 50]. This points to a common flaw: align-
+informative updates while emphasizing hard, on-policy con-         ment is often treated as a static optimization task, ignor-
+trasts. This dynamics-aware weighting effectively mit-             ing the dynamic evolution of the model’s learning trajec-
+igates the squeezing effect and enables smoother con-              tory [8, 14, 31].
+vergence. Extensive and comprehensive results on the
+mainstream benchmarks, i.e., COCO, Flickr30k, NoCaps,                 In this work, we adopt a learning-dynamics perspective,
+MMMU, and MMBench1.1, our CW-DPO achieves state-                   reframing alignment to explicitly model and harness how
+of-the-art performance, e.g., +3.4 CIDEr over PPO and              the model’s beliefs evolve during finetuning [32]. We in-
++2.4% absolute accuracy on MMMU, while improving                   troduce Cooling-Weighted Direct Preference Optimization
+calibration and halving convergence steps. This justi-             (CW-DPO), a two-stage strategy that aligns with this evolu-
+fies that smoothing before cooling constitutes a simple            tion. The first stage smooths the loss landscape to enhance
+yet general principle for robust VLM preference optimiza-          stability, while the second applies a competence-aware pref-
+tion. https://github.com/jushengzhang/Dynamics-Aware-              erence optimization to refine training, as depicted in Fig-
+Preference-Optimization                                            ure 2. Specifically, Stage 1 enhances SFT by incorporat-
+                                                                   ing “gentle negatives”, introducing low-weight smoothed
+                                                                   supervision to reduce overconfidence around negative re-
+1. Introduction                                                    sponses without harsh penalties. We define PLthe per-token
+                                                                   average log-probability as ℓ̄θ (y | χ) = L1 l=1 log πθ (yl |
+The finetuning of vision-language models (VLMs) involves           χ≤l ), measuring the model’s average confidence per token
+intricate learning dynamics that pose significant challenges       on any response y given sample χ (elaborated in §3.2),
+for stable optimization [10, 19, 47, 48, 53, 55, 58]. VLMs         with yl (loser) and yw (winner) specifying roles in Stage
+process multimodal inputs, encoding textual and visual             2. The objective, formalized as a constrained optimiza-
+components as high-dimensional sequences, where the vi-            tion (detailed in §4), is: minθ E(x,y+ )∼D [− log πθ (y + |
+sual stream introduces complex state dependencies, such            x)] + ηRsmooth (θ; x, y − ), 0 < η ≪ 1, where Rsmooth
+as pixel embeddings and spatial metadata, that tightly             (e.g., entropy smoothing or a ReLU-based soft constraint)
+couple gradient updates across tokens [17, 28, 51, 57].            regularizes the negative trajectory y − . This “smooth-
+
+
+
+                                                           11610
+before-optimize” approach de-peaks distributions and flat-              Method
+                                                                                        No Reward Visual-
+                                                                                          Model   Aware
+                                                                                                             Online Regularized Dynamics-
+                                                                                                            Efficient Gradients  Aware
+                                                                                                                                            Stable
+                                                                                                                                          Calibration
+tens sharp loss regions, reducing noise in subsequent con-              SFT [27]           ✓         ✓        ✓          ×          ×          ×
+trastive learning, as motivated by the peaking pitfalls in              RLHF [7]           ×         ×        ×          ×          ×          ×
+                                                                        DPO [29]           ✓         ×        ✓          ×          ×          ×
+§3.1. In Stage 2, we transition to preference pairs yw (win-            V-DPO [40]         ✓         ✓        ✓          ×          ×          ×
+ner) and yl (loser), as detailed in §4. Stage 2 advances with           GRPO [34]          ✓         ✓        ×          ✓          ×          ×
+                                                                        OPA-DPO [42]       ✓         ✓        ✓          ×          ×          ×
+a novel DPO-style objective featuring competence-aware                  CW-DPO (ours)      ✓         ✓        ✓          ✓          ✓          ✓
+reweighting [29]. Vanilla DPO minimizes − log σ(β(∆w −
+∆l )), where ∆w = log πθ (yw | x) − log πref (yw | x) and            Table 1. Comparison with representative preference optimiza-
+∆l = log πθ (yl | x) − log πref (yl | x). We enhanceit             tion methods. CW-DPO uniquely integrates learning dynamics
+with a cooling weight: wc (θ; yl , χ) = σ ℓ̄θ (yl |χ)−ℓ
+                                                     τ
+                                                        floor
+                                                                ,    modeling and competence-aware weighting for stable VLM align-
+                                                                     ment.
+which down-weights yl with low probabilities (indicat-
+ing “easy” negatives), steering optimization toward hard
+negatives where uncertainty
+                                 lingers. The resulting loss       and Calibrated Multi-Preference Optimization (CaPO) [16],
+is: LCW-DPO = −E log σ(β(∆w − wc (θ; yl , χ) · ∆l )) ,               extend the paradigm toward task-specific, structured, or
+where ℓfloor sets an easiness baseline and τ adjusts the             calibration-aware formulations. Despite their effectiveness,
+cooling schedule’s sharpness. Negatives are primarily on-            these methods largely treat all preference pairs uniformly,
+policy, with optional dataset-negative mixing to keep con-           overlooking how gradient signals evolve during training.
+trast fresh. Across both stages, ∆ log p probes on a held-out
+set monitor learning dynamics, providing a low-cost signal
+for early stopping and curriculum design. This endogenous            Learning Dynamics and Stable Alignment. Recent
+curriculum adapts to model competence. Extensive and                 studies [11, 26, 31] reveal that alignment follows distinct
+comprehensive experimental evaluations in §5 demonstrate             learning phases—early generalization followed by mem-
+that our CW-DPO surpasses SFT-only and vanilla DPO in                orization—yet uninformative gradients from easy or off-
+stability, efficiency, calibration, and win-rates across visual      policy negatives can distort this trajectory. This leads to
+QA, binary judgments, and open-ended tasks.                          the squeezing effect, where probability mass collapses to-
+                                                                     ward dominant modes, harming calibration and diversity.
+2. Related Work                                                      Our proposed Cooling-Weighted Direct Preference Op-
+                                                                     timization (CW-DPO) explicitly models these dynamics
+Supervised and RLHF-based Alignment. The align-                      via a two-stage scheme: (1) a constrained SFT phase that
+ment of vision-language models (VLMs) with human pref-               smooths the loss landscape through gentle negatives, and
+erences has become a central topic, following the success            (2) a competence-aware cooling mechanism that adaptively
+of large language model (LLM) alignment techniques [1,               scales negative gradients according to the model’s per-token
+13, 19, 36]. Early efforts such as supervised finetuning             log-probability. By jointly smoothing and cooling the learn-
+(SFT) [20, 27] relied on curated image-text pairs, achiev-           ing trajectory, CW-DPO mitigates gradient imbalance, im-
+ing strong descriptive ability but often suffering from over-        proves calibration, and stabilizes convergence.
+confidence and limited generalization to diverse intents. To
+improve alignment fidelity, reinforcement learning from hu-
+                                                                     Comparison with Prior Methods. Table 1 summarizes
+man feedback (RLHF) [9, 14] is extended to multimodal
+                                                                     representative preference optimization methods and high-
+settings using proximal policy optimization (PPO) [33, 37].
+                                                                     lights how CW-DPO uniquely combines learning dynam-
+However, RLHF pipelines are notoriously unstable and
+                                                                     ics modeling and adaptive weighting for robust multimodal
+computationally expensive, requiring online rollouts, a sep-
+                                                                     alignment. As shown in Table Table 1, only CW-DPO
+arate reward model, and careful tuning [30, 59].
+                                                                     simultaneously satisfies all six desirable properties, offer-
+                                                                     ing both theoretical interpretability and empirical stability
+Direct Preference Optimization. Direct Preference Op-                across diverse multimodal benchmarks.
+timization (DPO) [29, 39, 40, 42] simplified RLHF into
+a reward-free objective that directly optimizes on prefer-           3. Problem Formulation: The Unstable Dy-
+ence pairs. Its simplicity and efficiency motivated numer-              namics of VLM Finetuning
+ous multimodal extensions. V-DPO [39] incorporates vi-
+sual preference cues. GRPO [34] introduces group reg-                We systematically dissect the core instabilities afflict-
+ularization to reduce overfitting, and OPA-DPO [42] en-              ing VLM alignment, i.e., a fundamental dilemma in
+hances data efficiency through online preference augmen-             preference-based learning, manifesting as the “squeez-
+tation. Other works, such as Task Preference Optimiza-               ing effect,” in §3.1. This effect underscores a perilous de-
+tion (TPO) [41], Structured Preference Optimization (SPO),           coupling between a sample’s loss-based informativeness
+
+
+
+                                                                11611
+                                                                                                                                             CW-DPO
+                                                  y+ Training
+                                                                                      A kitten runs
+                                                                                                            Without Cooling                           With Cooling
+      SFT with y +                                                                    on the grass                                                      Low Enough
+                                                                                      with flowers
+                                                                                      behind.
+
+
+                          y   Similar
+                                          y+      y   Similar
+                                                                                      A black
+                                                                                      swan swims
+                                                                                      gracefully
+                                                                                      on the lake.
+
+
+                                                                                                                                                          The kitten leaps
+                                                                                      The kitten is                                                       like a playful
+                                                                                      kinda flying                                                        child among
+                                                                                      above the                                                           flowers.
+                                                                                                            y             y+   y
+                                                                                      flowers.
+                                                                                                                Similar            Similar
+
+
+
+
+                                                                                                                                                          The swan glides
+                                                                                      A noble
+                                                                                                                                                          calmly, ripples
+                                                                                      black swan
+                                                                                                                                                          distorting its
+                                                                                      floats on the
+                                                                                                                                                          reflection.
+                                                                                      clear water
+                                  y     Similar
+                                                  y+            y   Similar           surface.
+                                                                      y- Training
+Figure 1. Two-stage optimization process of CW-DPO. Stage 1 (y + Training) leverages positive supervision for stability but yields overly
+uniform language styles (e.g., “A . . . on the . . . ”). Stage 2 (y − Training) introduces negative contrast for variation but risks errors (e.g.,
+a running kitten as “flying”). CW-DPO’s cooling-weighted mechanism dynamically attenuates uninformative negatives while amplifying
+hard ones, mitigating error propagation, and enhancing stylistic diversity.
+
+and its gradient-based influence during training. Subse-                                  DPO implicitly counters this via regularization: the
+quently, in §3.2, we develop a formal analytical lens rooted                              negative-term gradient is modulated by β(1 − a), where
+in learning dynamics to diagnose this issue. This framework                               a = σ(β(∆w − ∆l )) is the sigmoid-transformed margin.
+not only elucidates the root causes of instability but also                               For extremely easy negatives, ∆l drives a → 1, attenuating
+yields a principled blueprint for our dynamics-aware so-                                  the gradient. Theoretically elegant, this falters in practice
+lution.                                                                                   due to a wide “vulnerable region” for moderately easy neg-
+                                                                                          atives, where log πθ (y − ) is low but a (e.g., ∈ [0.8, 0.99])
+3.1. A Core Dilemma: The “Squeezing Effect”                                               insufficiently suppresses the residual gradient β(1 − a), es-
+The fundamental dilemma of preference finetuning is that                                  pecially at high β [31]. This perpetuates instability and the
+aligning with human intent requires penalizing a vast space                               squeezing effect. (See Appendix 18 for a formal analysis).
+of undesirable responses (y − ) [14]. As learning progresses,                             3.2. Analytical Lens: Per-Step Influence Decompo-
+most undesirable responses are gradually converted into                                         sition
+“easy negatives”, i.e., sequences assigned near-zero prob-
+ability by the model. This engenders a destructive feed-                                  To transcend empirical observations and rigorously diag-
+                                                                                          nose the squeezing effect, we adopt a learning-dynamics
+back loop, wherein optimization expends disproportionate
+                                                                                          perspective [12, 15] to enable precise tracing of how a sin-
+gradient bandwidth on these uninformative samples. As                                     gle gradient update impacts global model behavior. Define
+shown in Figure 1, the consequence is the squeezing ef-                                   y = (y1 , . . . , yL ) as a sequence of length L, with logits
+fect, i.e., a decoupling where a sample’s low loss (indicating                            z = (z1 , . . . , zL ), each zl ∈ R|V | (|V | denotes the vocabu-
+minimal informativeness) belies its potentially large, misdi-                             lary size). Gradients are w.r.t. the concatenated z, denoted
+rected gradient [31]. Although the loss from an easy neg-                                 ∇z . A pivotal query: How does an update on “updating”
+ative πθ (y − |x) → 0 is negligible, its gradient can remain                              sample χu = (xu , yw , yl ) alter confidence on “observing”
+substantial and poorly aligned. This misalignment induces                                 sample χo ? Confidence is quantified via average per-token
+                                                                                                                                   PL
+an undesirable redistribution of probability mass: instead of                             log-probability: ℓ̄θ (y | χ) = L1 l=1 log πθ (yl | χ≤l ).
+fostering a calibrated spread across viable alternatives, up-                             A first-order Taylor expansion of ℓ̄θ post-update θt+1 =
+dates “squeeze” mass toward the dominant mode, typically                                  θt − η∇θ L(θt ; χu ) yields:
+y ∗ = arg maxy πθ (y|x), which may correspond to a pre-
+                                                                                                  ∆ℓ̄t (y|χo ) = −η(∇θ ℓ̄θt )⊤ (∇θ L(θt )) + O(η 2 ).                        (3.1)
+ferred response yw in later optimization stages. This engen-
+ders a “rich-get-richer” dynamic, amplifying overconfi-                                      Linearizing logits z(θ; χ) around θt decomposes this into
+dence, curtailing linguistic diversity, and impairing calibra-                              interpretable factors.
+tion.
+                                                                                            Proposition 3.1 (Sequence-Aware One-Step Influence).
+Remark (Insufficiency of DPO’s Implicit Regularization).                                    The log-likelihood change on χo post-update on χu (rate
+
+
+
+                                                                                    11612
+η) approximates:                                                                     negatives (y − ) remains above a threshold C to prevent their
+                                                                                     premature dismissal as:
+∆ℓ̄t (y | χo ) ≈ −η ∇z ℓ̄θt (y | χo ), Kt (χo , χu ) ∇z L(θt ; χu ) .
+                                                                                                    min E(x,y+ )∼D − log πθ (y + | x)
+                    |      {z      } | {z } |            {z      }                                                                   
+                      At : Belief Geometry   eNTK Kernel   Gt : Loss Residual                         θ
+                                                                         (3.2)                                                                       (4.1)
+                                                                                                      s.t. E(x,y− )∼D − log πθ (y − | x) ≥ C
+                                                                                                                                       
+  Key Elements: Belief Geometry (At ) encodes predic-
+tive sensitivity to logit perturbations, capturing belief-                               Here, the objective E(x,y+ )∼D [− log πθ (y + |x)] seeks
+landscape curvature. eNTK Kernel (Kt = Jo Ju⊤ ) (J =                                     to maximize the likelihood of positive responses
+∇θ z(θt ; χ): Jacobian) propagates updates parametrically.                               y + drawn from dataset D, while the constraint
+Loss Residual (Gt ) directs logit adjustments via ∇z L.                                  E(x,y− )∼D [− log πθ (y − |x)] ≥ C ensures that the model
+    Decomposing the DPO Gradient. The power of this                                      assigns sufficient probability to negative examples y − ,
+decomposition becomes evident when we specify the                                        preventing them from being overly suppressed. This dual
+Loss Residual Gt for the DPO objective. For DPO, Gt =                                    focus promotes a more uniform allocation of probability
+∇z LDPO (derived in Appendix 18), whose full form is given                               mass, countering the peaking pitfalls outlined in §3.1,
+in Eq. 4.3 and can be broken down into components related                                where overconfidence on easy negatives distorts the loss
+to the winner yw and the loser yl : Gt = β(1−a)(Gw          l                            landscape. To solve this constrained problem practically,
+                                                       t −Gt ),
+          w        l
+where Gt and Gt are the gradient components for the win-                                 we apply a Lagrangian relaxation, introducing a penalty
+ning and losing responses, respectively. As discussed in Re-                             term to softly approximate the constraint. This leads to the
+mark 3.1, the squeezing effect occurs precisely when yl is                               Smoothed SFT loss:
+an “easy negative.” In this scenario, while the loss itself is                               LSFT-C = Ebatch − log πθ (y + | x)
+                                                                                                                               
+
+small, DPO’s implicit regularization (1 − a) is often insuffi-                                                                                    (4.2)
+                                                                                                      + λ ReLU C − Ebatch − log πθ (y − | x)
+                                                                                                                               
+cient to fully suppress the gradient, leaving the loser compo-
+nent Glt disproportionately large and noisy. This oversized
+                                                                                         The first term, Ebatch [− log πθ (y + |x)], remains the stan-
+residual from uninformative samples is the direct source of
+                                                                                         dard NLL for positive examples, computed over mini-
+instability.
+                                                                                         batches for efficiency. The second term, λ · ReLU(C −
+    Implication for Algorithm Design. This analysis tran-
+                                                                                         Ebatch [− log πθ (y − |x)]), acts as a regularization: if the ex-
+scends explanation: it isolates the instability’s source to
+                                                                                         pected NLL of negatives falls below C, the ReLU acti-
+the oversized, destabilizing "loser" component (Glt ) of
+                                                                                         vates, penalizing the model with a strength proportional to
+the loss residual from negative examples yl . The squeez-
+                                                                                         λ. This soft enforcement encourages the model to maintain
+ing effect, therefore, emerges not from an inherent flaw in
+                                                                                         a balanced response to negatives without rigid enforcement,
+preference optimization but from an unregulated Glt . This
+                                                                                         approximating the original constraint stochastically. Here,
+mandates a surgical solution: instead of heuristically reg-
+                                                                                         mini-batch expectations provide practical approximations,
+ularizing the entire loss, a principled algorithm must di-
+                                                                                         and the ReLU term gently nudges the model toward a well-
+rectly temper this specific residual component. This diag-
+                                                                                         calibrated initialization. This process stabilizes the Belief
+nosis is the analytical foundation for our method, detailed
+                                                                                         Geometry (At in Prop. 3.1), setting the stage for the tar-
+in the next section 4.
+                                                                                         geted adjustments in Stage 2 by smoothing the initial loss
+4. Dynamics-Aware Cooling-Weighted DPO                                                   landscape.
+
+Grounded in the principled insights of our diagnostic anal-                              4.2. Stage 2: Competence-Aware Preference Opti-
+ysis (§3), our CW-DPO in Figure 2 provides a dynamics-                                         mization
+aware manner to align VLMs.                                                           §3.2 reveals that instability stems from gradient updates for
+                                                                                      the negative (loser) sample yl , particularly the loser com-
+4.1. Stage 1: Trajectory Priming via Constrained                                      ponent of the Loss Residual (Gt ), which generates over-
+      SFT                                                                             sized and uninformative updates for easy negatives. By
+This stage prepares the learning trajectory of the model                              asymmetrically applying a cooling weight wc to the loser’s
+                                                                                      log-probability difference ∆l , we achieve precise control
+πθ (θ denotes the model parameters) by curbing overcon-
+                                                                                      over gradient influence. Vanilla DPO Gradient. Con-
+fidence, laying a smoother foundation for subsequent pref-                            sider the DPO loss for a preference pair (yw , yl ): LDPO =
+erence learning. Unlike standard SFT, which focuses solely                            − log σ β(∆w − ∆l ) , where ∆w/l = log πθ (yw/l |x) −
+on positive responses (y + ) and risks entrenching peaky dis-                         log πref (yw/l |x). The gradient with respect to the logits (the
+tributions, we adopt a constrained optimization strategy.                             Loss Residual) is:
+To mitigate overconfidence, we impose a constraint on the                                                                                      
+                                                                                                                            w              l
+model’s response to negatives, minimizing the negative log-                                GDPO
+                                                                                            t   = ∇z LDPO = β(1 − a) (gw − gref ) − (gl − gref ) ,
+likelihood (NLL) on positives while ensuring the NLL on                                                                                         (4.3)
+
+
+
+
+                                                                                 11613
+                Smooth SFT
+              Ori
+                                                                         +
+                                                                                                                                                           Our Inference
+              “Two men are playing poker.”
+                                                          Text
+     [x, y ] Train*1.0             One man is playing paper.
+                                                         Encoder    [x, y-] ain*0.4
+              Little Wrong                                                 Tr
+                                                                                                 Two women are playing card.
+            “Two women are playing poker.”
+                                                                                                  Two men are playing card.
+                                                                        LoRA
+                                         IMG
+                                                    Two men are playing game.
+                                                                                                                                                           Ori Inference
+                                                                             Qwen
+                                        Encoder       Img                                          Two women are Talking.
+                                                    Embedding      Back bone
+
+                GT Answer                                                                                                             Logits
+             A young boy in a blue
+
+                                                                                                                      Preference
+           sweater is happily running
+             on a path in a park.                                               Probability
+                                             Back bone
+                                                                                 0.85     0.15
+                                                                                                        DPO
+                                                                                                                         Loss
+                                               LoRA
+                                                                                                                                      Change in Output
+                                                                               Situation 2                                              Probabilities
+                                               LoRA                             0.65      0.35
+               Little Wrong                                                                                                           Label Annotation
+             A young boy in a Red
+                                                                               Situation 2            Gradient Clipping
+           sweater is happily running        Back bone                          0.95      0.05
+             on a path in a park.                                                                           Cooling
+                                                                                                                                    Trainable      Frozen
+                CW-DPO
+Figure 2. our CW-DPO is designed to balance generalization and precision through a two-stage optimization strategy. In Stage 1, Smooth
+SFT leverages positive samples together with negative samples containing minor errors to construct a smoothed supervision signal. This
+broadens the model’s output probability distribution, thereby enhancing its generalization ability and robustness. In Stage 2, our CW-DPO
+employs preference pairs with fine-grained errors for DPO. By sharpening the probability distribution, this stage strengthens the model’s
+capacity for precise discrimination of critical details.
+Algorithm 1 The Two-Stage CW-DPO Finetuning Protocol                                    dence:
+                                                                                                                                                      
+Require: Pretrained VLM θ0 ,              dataset   D,      hyperparameters                                                    ℓ̄θ (yl | χ) − ℓfloor
+    λ, C, β, τ, ℓfloor , learning rate α.
+                                                                                                     wc (θ; yl , χ) = σ                                    ,               (4.4)
+                                                                                                                                          τ
+Ensure: Finetuned VLM parameters θ.
+ 1: Initialize: Policy model θ ← θ0 .                                                   where ℓ̄θ (yl | χ) is the average per-token log-probability (as
+    Stage 1: Trajectory Priming                                                         defined in §3.2), ℓfloor establishes an “easiness” baseline,
+ 2: for t = 1, . . . , T1 do                                                            and τ controls the transition sharpness, with higher values
+ 3:     Sample a mini-batch (x, y + , y − ) from D.                                     yielding a smoother weighting. For confidently rejected re-
+ 4:     Compute Smoothed SFT loss LSFT-C using Eq. 4.2.
+ 5:     Update parameters: θ ← θ − α∇θ LSFT-C .
+                                                                                        sponses (ℓ̄θ ≪ ℓfloor ), wc → 0, nullifying the gradient; for
+ 6: end for                                                                             uncertain hard negatives (ℓ̄θ ≥ ℓfloor ), wc → 1, preserving
+ 7: Set reference model: πref ← πθ .                                                    the learning signal.
+    Stage 2: Cooled Preference Optimization                                                Core Loss Function. We integrate wc asymmetrically,
+ 8: for t = 1, . . . , T2 do                                                            dampening only ∆l , to define our core loss:
+ 9:     Sample a mini-batch of preferences (x, yw , yl ) from D.
+10:     Compute cooling weight wc for each sample using Eq. 4.4.                              LCW-DPO = − log σ (β (∆w − wc (θ; yl , χ) · ∆l )) ,                          (4.5)
+11:     Compute CW-DPO loss LCW-DPO using Eq. 4.5.                                       Differentiating (treating wc as locally constant) yields the
+12:     Update parameters: θ ← θ − α∇θ LCW-DPO .
+13: end for                                                                             cooled residual GCWt    = ∇z LCW-DPO as:
+                                                                                        ∇z LCW-DPO = β(1 − a′ ) ∇z ∆w − wc ∇z ∆l
+                                                                                                                                               
+14: return Finetuned parameters θ.
+                                                                                                      = β(1 − a′ ) (πθ (· | x) − yw ) − wc (πθ (· | x) − yl )
+                                                                                                                                                             
+                                                                                                                                                       (4.6)
+where a = σ(β(∆w − ∆l )) and gw/l = ∇z log πθ (yw/l |x).                                where a′ = σ(β(∆w − wc ∆l )). This GCW      t  ensures gra-
+Our decomposition pinpoints the squeezing effect to the                                 dients from easy negatives are minimized, preserving pos-
+                  l                                                                     itive updates, and resolves the squeezing effect for stable,
+loser term (gl − gref ), which drives instability for easy neg-
+atives [31].                                                                            superior alignment. See Algorithm 1 for the full protocol.
+   Cooling Weight: Principled Modulator. To address                                     In essence, CW-DPO stabilizes training by smoothing ini-
+this, we introduce the cooling weight wc , which adjusts the                            tial losses and refining preferences with competence-aware
+negative-sample gradient based on real-time model confi-                                weights, as validated empirically in §5.
+
+
+
+                                                                              11614
+Figure 3. Validation of Stage 1 Constrained SFT (SFT-C) vs. standard SFT on: (1) loss; (2) entropy; (3) CIDEr; and (4) SPICE for
+Top-5 generations. SFT-C sustains higher entropy (less squeezing) and overall quality.
+Table 2. Performance comparison on vision-language benchmarks. For COCO, Flickr30k, and NoCaps, we report BLEU-4 (B@4),
+METEOR (M), CIDEr (C), and SPICE (S), with NoCaps split into In, Near, Out, and Entire. We also report accuracy on MMMU and
+MMBench1.1. Best results are in bold.
+
+                               COCO Test             Flickr30k Test               NoCaps Val
+  Method                                                                                                  MMMU      MMBench
+                        B@4     M       C       S      C       S          In     Near    Out     Entire
+  Qwen2.5-VL (Base)     31.2   26.2   128.8   23.8   78.9     17.2       115.6   113.7   117.6   116.2     70.2        84.9
+  SFT                   35.2   28.4   136.5   24.3   83.2     17.5       121.2   118.5   120.1   120.4     71.8        86.2
+  DPO                   33.5   28.0   136.9   24.0   86.5     18.0       119.5   117.2   119.8   118.9     71.1        84.9
+  PPO                   34.9   28.7   139.2   24.7   82.1     17.7       120.2   118.9   120.0   119.7     71.4        85.8
+  V-DPO                 36.6   28.7   138.3   24.8   86.3     18.2       122.5   119.0   121.6   121.0     72.9        86.8
+  GRPO                  36.5   28.8   138.2   24.9   86.4     18.1       122.3   119.1   121.5   120.9     72.8        86.9
+  OPA-DPO               36.8   29.0   138.5   25.1   86.7     18.2       122.6   119.4   121.8   121.3     73.1        87.2
+  CW-DPO (Ours)         39.6   30.4   142.6   25.8   89.2     18.6       125.6   121.3   123.7   123.6     74.6        89.6
+
+
+5. Experiments                                                       DPO achieves a new SOTA CIDEr score of 142.6, surpass-
+                                                                     ing the strongest baseline PPO by 3.4 points (+2.4%). It
+5.1. Main Results on Standard Benchmarks                             also yields a high BLEU-4 score of 39.6, marking a substan-
+                                                                     tial improvement of 2.8 points (+7.6%) over OPA-DPO, re-
+We evaluate our CW-DPO on three standard image cap-                  flecting enhanced overall generation quality. On Flickr30k
+tioning benchmarks: COCO [18], Flickr30k [43], and No-               Test that evaluates cross-domain generalization, our CW-
+Caps [2] for generalization assessment, as well as two com-          DPO continues to lead all baselines with a CIDEr score
+prehensive multi-task evaluation benchmarks: MMMU [44]               of 89.2, 2.5 points higher than the next-best method, OPA-
+and MMBench [21]. For COCO and Flickr30k, we adopt                   DPO. This suggests that the training stability introduced by
+the widely used Karpathy split. The backbone for our CW-             our CW-DPO translates effectively into stronger generaliza-
+DPO in all the experiments is Qwen2.5-VL-72B [4], and                tion across distribution shifts. On the more challenging No-
+we compare it against a series of strong fine-tuning base-           Caps, our CW-DPO achieves leading performance across
+lines, including SFT [27], vanilla DPO [29], PPO [33],               all subsets with an overall score of 123.6. Notably, the
+and GRPO [34]. To ensure robustness, all reported results            gain on the out-of-domain split (+1.9) does not come at the
+are averaged over five independent runs. As for training             expense of in-domain performance (+3.0) when compared
+protocol, our CW-DPO follows a two-stage paradigm, i.e.,             to the strongest baselines, indicating a favorable trade-off
+Constrained SFT on 75% of the data and Preference Align-             between generalization and retention of core knowledge.
+ment on the remaining 25%. In Stage 2, preference pairs              Furthermore, CW-DPO achieves strong adaptability on two
+are built by synthesizing minimally perturbed alternatives           multi-task evaluation suites by obtaining an accuracy of
+yl for each winning caption yw via GPT-4o.                           74.6% on MMMU, outperforming the strongest baseline
+   In Table 2, our CW-DPO consistently outperforms all               OPA-DPO (73.1%) and attaining the highest accuracy of
+compared methods, including recent DPO variants like V-              89.6% on MMBench. This confirms our CW-DPO extends
+DPO [40], GRPO, and OPA-DPO [42], across 5 mainstream                beyond captioning to broader multimodal reasoning tasks.
+vision-language benchmarks. On COCO Test, our CW-
+
+
+
+                                                             11615
+Note that, vanilla DPO underperforms SFT on lexical met-            tween the pre- and post-finetuning output probabilities, and
+rics such as BLEU-4. This justifies our core hypothesis that        visualize changes in the Top-5 token distributions for rep-
+naive preference optimization over easy negatives may in-           resentative samples to provide qualitative insights. To fur-
+duce over-penalization, thereby degrading generation qual-          ther assess whether CW-DPO alleviates overconfidence and
+ity.                                                                calibration degradation caused by unstable gradients, we in-
+                                                                    clude the Expected Calibration Error (ECE) as an evalu-
+5.2. Phase-One Smoothing Validation Experiment                      ation metric. We also report CIDEr and SPICE scores on
+To isolate and verify the effectiveness of our Constrained          the full COCO test set to comprehensively assess generation
+SFT (SFT-C) in mitigating the squeezing effect, we con-             quality.
+duct a targeted validation experiment. We train two mod-                Figure 4 reveals substantial differences in optimization
+els on 75% of the COCO training data (∼85k samples):                dynamics between standard DPO and CW-DPO. From a
+one with standard SFT and the other with SFT-C. During              global standpoint, the first plot shows that standard DPO
+training, both models are periodically evaluated on a fixed         exhibits significantly higher TV and JS divergence, typi-
+probe set of 1,000 examples from the COCO validation                cally around 0.45 for TV and 0.30 for JS, indicating that
+split. To quantify the squeezing effect, we measure the av-         its learning process is overly influenced by simple samples.
+erage entropy of the model’s predictive distribution over           This leads to drastic shifts in the output distribution relative
+the probe set. Lower entropy signifies a sharper, less di-          to the initial SFT model, as the model aggressively reallo-
+verse (“squeezed") distribution. To ensure the increased            cates probability mass in response to uninformative gradi-
+smoothness does not degrade generation quality, we also             ents from easy negatives. In contrast, CW-DPO achieves
+compute the CIDEr and SPICE scores for the Top-5 pre-               much smaller divergences (e.g., approximately 0.15 for TV
+dictions of each model at every evaluation step. Figure 3           and 0.10 for JS), suggesting that it performs more stable
+validates the advantage of our SFT-C. The standard SFT              and conservative updates. By down-weighting easy nega-
+exhibits a rapid decrease in training loss, but this is cou-        tives, CW-DPO preserves the model’s distributional struc-
+pled with a precipitous drop in predictive entropy. This            ture while aligning with preferences, mitigating squeezing,
+confirms that standard SFT quickly develops an overconfi-           and reducing risks of forgetting or collapse. These differ-
+dent, peaky distribution, i.e., a clear indicator of the squeez-    ences are more pronounced at the micro level. As illus-
+ing effect, when overfit to the training data’s dominant pat-       trated in the middle plot of Figure 4 (cross-referenced with
+terns. In contrast, SFT-C successfully maintains a signifi-         Figures 2 and 3), vanilla DPO drives most probability mass
+cantly higher entropy throughout training, preserving pre-          onto the top token, often surpassing 80%, creating a peaked
+dictive diversity. The slightly higher training loss observed       distribution that suppresses alternatives. This overconfi-
+for SFT-C is not a sign of inferior learning but rather an          dence raises ECE (e.g., 0.12 → 0.25), degrading calibration.
+indication that the model is actively avoiding collapse into        By contrast, CW-DPO updates more smoothly, keeping the
+a narrow mode, resulting in a smoother, more generalized            top-1 token around 50–60%, preserving entropy, and sta-
+distribution. Crucially, this enhanced smoothness directly          bilizing ECE at 0.08–0.10. Such dynamic improvements
+translates to superior generation quality. The sustained            also yield higher generation quality, as shown in the right
+higher CIDEr and SPICE scores for SFT-C (Figure 3,                  plot: on the full COCO test set, CW-DPO achieves supe-
+right panels) demonstrate that by preventing the distribu-          rior CIDEr (142.6 vs. 137.2) and SPICE (25.8 vs. 24.2), re-
+tion from becoming overly sharp, our CW-DPO explores a              flecting not only greater accuracy but also richer linguistic
+richer semantic space, consistently producing more accu-            diversity and semantics.
+rate and diverse top-k candidates.
+                                                                    5.4. Ablation Study
+5.3. Phase-Twp: Quantitative Analysis of Squeez-
+                                                                    To evaluate the contributions of each component in our CW-
+      ing Effect Suppression
+                                                                    DPO, we conduct a comprehensive ablation study covering
+To evaluate the effectiveness of our CW-DPO in mitigating           both training stages under identical data splits and hyperpa-
+the “squeezing effect”, we construct an experiment based            rameters. Besides ablating the core algorithmic modules,
+on the COCO Caption dataset. Specifically, we sample                we provide a further study in Appendix 12 to analyze
+10,000 simple examples as the training set and an additional        the model’s robustness to different negative sampling
+1,000 examples as a fixed probe set to analyze distributional       strategies, thereby decoupling algorithmic gains from
+changes. Starting from a unified base model pretrained with         the data generation process. In Stage 1 (SFT), we evaluate
+Smoothed SFT, we apply standard DPO and CW-DPO on                   w/o Smooth SFT, directly applying CW-DPO on the pre-
+the same training split and compare their effects on the out-       trained model to assess the need for smoothed initialization;
+put distributions over the probe set. We compute the To-            w/o Negative Sampling, removing negative-sample con-
+tal Variation (TV) and Jensen-Shannon (JS) distances be-            straints and reducing to standard SFT; and w/o Soft Penalty
+
+
+
+                                                               11616
+Figure 4. CW-DPO alleviates the squeezing effect of vanilla DPO. It yields smaller distribution shifts (left), smoother posteriors (middle),
+and improved generation quality with better calibration (right).
+
+Table 3. Ablation study of CW-DPO on COCO Test, MMMU,                    scores, underscoring the importance of adaptive scaling for
+and MMBench1.1.                                                          generalization.
+
+Method
+                                COCO Test         MMMU MMBench1.1        6. Limitations and Future Work
+                         B@4     M     C    S      ACC     ACC
+                                                                         While CW-DPO demonstrates strong stability and gener-
+CW-DPO                   39.6   30.4 142.6 25.8    74.6    89.6
+                                                                         alization across diverse vision–language benchmarks, sev-
+Phase-One Ablation                                                       eral limitations remain. First, our framework currently as-
+w/o Smooth SFT           34.6   28.4 137.6 24.4    71.8    86.3
+w/o Negative Sampling    35.8   29.4 138.9 24.6    72.8    88.4          sumes access to paired preference data with reliable posi-
+w/o Soft Penalty         36.2   29.7 139.2 24.8    73.2    88.7          tive–negative supervision. Extending CW-DPO to fully un-
+Phase-Two Ablation                                                       supervised or weakly labeled settings, e.g., self-generated
+w/o CW-DPO               36.7   28.8 140.7 24.7    72.9    86.7          or noisy preferences, requires additional robustness mecha-
+w/o Cooling Weight       39.2   30.1 141.5 25.1    73.6    88.3          nisms such as probabilistic confidence calibration or adap-
+w/o Negative Filtering   36.1   27.9 137.4 24.3    73.4    87.4
+                                                                         tive pseudo-label filtering. Second, although the cooling
+                                                                         weight mitigates uninformative gradients, it introduces hy-
+                                                                         perparameters (τ , ℓfloor ) that may require tuning per dataset
+(→ Hard Constraint), replacing the ReLU penalty with a                   to maintain optimal gradient balance. A meta-learned or
+hard constraint. In Stage 2 (DPO), we examine w/o CW-                    automatically scheduled variant could further improve ef-
+DPO (omitting the second-stage preference alignment), w/o                ficiency. Third, our analysis focuses on the alignment dy-
+Cooling Weight (fixing wc to a constant (e.g., 0.7 or 1.0)               namics of captioning-style VLMs; applying CW-DPO to in-
+instead of adaptive scaling), and w/o Negative Filtering                 teractive or long-horizon multimodal reasoning tasks (e.g.,
+(updating on all negatives with extremely easy ones, i.e.,               video QA or embodied agents) demands modeling tem-
+ℓ̄θ ≪ ℓfloor ).                                                          poral dependencies in learning dynamics. Future work
+                                                                         will generalize CW-DPO to model-based alignment and dy-
+    Table 3 validates the independent contributions of each
+                                                                         namic preference settings for a unified multimodal align-
+key component in CW-DPO. In Stage 1, removing Smooth
+                                                                         ment framework.
+SFT (w/o Smooth SFT) reduces CIDEr by about 5 points
+on COCO and also degrades performance on MMMU and
+                                                                         7. Conclusion
+MMBench1.1, indicating the importance of smoothed ini-
+tialization for stable alignment. Further removing negative-             In this paper, we uncovered core instability issues in VLM
+sample constraints (w/o Negative Sampling) or replacing                  preference-based finetuning via a fine-grained learning-
+the soft ReLU penalty with a hard constraint (w/o Soft                   dynamics perspective, focusing on the “squeezing effect”
+Penalty) also leads to consistent drops, showing that both               that causes uninformative gradients and unstable optimiza-
+negative-sample regularization and soft penalization are ef-             tion. Our CW-DPO provides a principled two-stage solu-
+fective in alleviating overconfidence and improving gener-               tion, i.e., constrained SFT for loss landscape smoothing and
+ation quality. In Stage 2, omitting preference optimization              competence-aware cooling weights to suppress easy nega-
+(w/o CW-DPO) markedly reduces cross-task performance,                    tives asymmetrically and adaptively. Extensive empirical
+confirming the need for competence-aware alignment. Us-                  results consistently and clearly demonstrate the strong su-
+ing a fixed cooling weight (w/o Cooling Weight) achieves                 periority of our CW-DPO with faster convergence, stronger
+near CW-DPO CIDEr but lower MMMU and MMBench1.1                          stability, and enhanced generalization.
+
+
+
+                                                                  11617
+8. Acknowledgments                                                     [7] Paul F. Christiano, Jan Leike, Tom B. Brown, Miljan Mar-
+                                                                           tic, Shane Legg, and Dario Amodei. Deep reinforcement
+This work was supported in part by the National Nat-                       learning from human preferences. In Proceedings of the 31st
+ural Science Foundation of China (NSFC) under Grant                        International Conference on Neural Information Processing
+62276283, in part by the China Meteorological Ad-                          Systems, page 4302–4310, Red Hook, NY, USA, 2017. Cur-
+ministration’s Science and Technology Project under                        ran Associates Inc. 1, 2
+Grant CMAJBGS202517, in part by Guangdong-Hong                         [8] Leo Gao, John Schulman, and Jacob Hilton. Scaling laws for
+Kong-Macao Greater Bay Area Meteorological Tech-                           reward model overoptimization. In Proceedings of the 40th
+nology Collaborative Research Project under Grant                          International Conference on Machine Learning. JMLR.org,
+GHMA2024Z04, in part by Fundamental Research Funds                         2023. 1
+for the Central Universities, Sun Yat-sen University un-               [9] Kristian González Barman, Simon Lohse, and Henk W. de
+der Grant 23hytd006, in part by Guangdong Provincial                       Regt. Reinforcement learning from human feedback in llms:
+High-Level Young Talent Program under Grant RL2024-                        Whose culture, whose values, whose perspectives? Philoso-
+151-2-11, and in part by the Key Development Project of                    phy & Technology, 38(2), 2025. 2
+the Artificial Intelligence Institute, Sun Yat-sen University.        [10] Jiaxing Huang and Jingyi Zhang. A survey on evaluation of
+                                                                           multimodal large language models, 2024. 1
+                                                                      [11] Shawn Im and Yixuan Li. Understanding the learning dy-
+References                                                                 namics of alignment with human feedback, 2024. 2
+                                                                      [12] Arthur Jacot, Franck Gabriel, and Clément Hongler. Neu-
+ [1] Harsh Agrawal, Karan Desai, Yufei Wang, Xinlei Chen,
+                                                                           ral tangent kernel: convergence and generalization in neural
+     Rishabh Jain, Mark Johnson, Dhruv Batra, Devi Parikh, Ste-
+                                                                           networks. In Proceedings of the 32nd International Con-
+     fan Lee, and Peter Anderson. nocaps: novel object caption-
+                                                                           ference on Neural Information Processing Systems, page
+     ing at scale. In 2019 IEEE/CVF International Conference on
+                                                                           8580–8589, Red Hook, NY, USA, 2018. Curran Associates
+     Computer Vision (ICCV). IEEE, 2019. 2
+                                                                           Inc. 3, 19
+ [2] Harsh Agrawal, Karan Desai, Yufei Wang, Xinlei Chen,             [13] Ruili Jiang, Kehai Chen, Xuefeng Bai, Zhixuan He, Juntao
+     Rishabh Jain, Mark Johnson, Dhruv Batra, Devi Parikh, Ste-            Li, Muyun Yang, Tiejun Zhao, Liqiang Nie, and Min Zhang.
+     fan Lee, and Peter Anderson. nocaps: novel object caption-            A survey on human preference learning for large language
+     ing at scale. In 2019 IEEE/CVF International Conference on            models, 2024. 2
+     Computer Vision (ICCV). IEEE, 2019. 6                            [14] Timo Kaufmann, Paul Weng, Viktor Bengs, and Eyke
+ [3] Sanjeev Arora, Simon S. Du, Wei Hu, Zhiyuan Li, Ruslan                Hüllermeier. A survey of reinforcement learning from hu-
+     Salakhutdinov, and Ruosong Wang. On exact computation                 man feedback, 2024. 1, 2, 3
+     with an infinitely wide neural net. Curran Associates Inc.,      [15] Pang Wei Koh and Percy Liang. Understanding black-box
+     Red Hook, NY, USA, 2019. 19                                           predictions via influence functions. In Proceedings of the
+ [4] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin               34th International Conference on Machine Learning - Vol-
+     Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun                  ume 70, page 1885–1894. JMLR.org, 2017. 3, 19
+     Tang, Humen Zhong, Yuanzhi Zhu, Mingkun Yang, Zhao-              [16] Kyungmin Lee, Xiaohang Li, Qifei Wang, Junfeng He, Jun-
+     hai Li, Jianqiang Wan, Pengfei Wang, Wei Ding, Zheren Fu,             jie Ke, Ming-Hsuan Yang, Irfan Essa, Jinwoo Shin, Feng
+     Yiheng Xu, Jiabo Ye, Xi Zhang, Tianbao Xie, Zesen Cheng,              Yang, and Yinxiao Li. Calibrated multi-preference optimiza-
+     Hang Zhang, Zhibo Yang, Haiyang Xu, and Junyang Lin.                  tion for aligning diffusion models, 2025. 2
+     Qwen2.5-vl technical report, 2025. 6                             [17] Junnan Li, Dongxu Li, Silvio Savarese, and Steven Hoi.
+ [5] Stephen Casper,         Xander Davies,       Claudia Shi,             Blip-2: bootstrapping language-image pre-training with
+     Thomas Krendl Gilbert, Jérémy Scheurer, Javier Rando,                 frozen image encoders and large language models. In Pro-
+     Rachel Freedman, Tomek Korbak, David Lindner, Pedro                   ceedings of the 40th International Conference on Machine
+     Freire, Tony Tong Wang, Samuel Marks, Charbel-Raphael                 Learning. JMLR.org, 2023. 1
+     Segerie, Micah Carroll, Andi Peng, Phillip J.K. Christof-        [18] Tsung-Yi Lin, Michael Maire, Serge Belongie, Lubomir
+     fersen, Mehul Damani, Stewart Slocum, Usman Anwar,                    Bourdev, Ross Girshick, James Hays, Pietro Perona, Deva
+     Anand Siththaranjan, Max Nadeau, Eric J Michaud, Jacob                Ramanan, C. Lawrence Zitnick, and Piotr Dollár. Microsoft
+     Pfau, Dmitrii Krasheninnikov, Xin Chen, Lauro Langosco,               coco: Common objects in context, 2015. 6
+     Peter Hase, Erdem Biyik, Anca Dragan, David Krueger,             [19] Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee.
+     Dorsa Sadigh, and Dylan Hadfield-Menell. Open problems                Visual instruction tuning, 2023. 1, 2
+     and fundamental limitations of reinforcement learning            [20] Haotian Liu, Chunyuan Li, Yuheng Li, and Yong Jae Lee.
+     from human feedback. Transactions on Machine Learning                 Improved baselines with visual instruction tuning. In 2024
+     Research, 2023. Survey Certification, Featured Certification.         IEEE/CVF Conference on Computer Vision and Pattern
+     1                                                                     Recognition (CVPR), pages 26286–26296, 2024. 1, 2
+ [6] Fei-Long Chen, Du-Zhen Zhang, Ming-Lun Han, Xiu-Yi               [21] Yuan Liu, Haodong Duan, Yuanhan Zhang, Bo Li, Songyang
+     Chen, Jing Shi, Shuang Xu, and Bo Xu. Vlp: A survey                   Zhang, Yike Yuan, Wangbo Zhao, Jiaqi Wang, Conghui He,
+     on vision-language pre-training. Machine Intelligence Re-             Ziwei Liu, Kai Chen, and Dahua Lin. MMBench: Is your
+     search, 20(1):38–56, 2023. 1                                          multi-modal model an all-around player?, 2024. 6
+
+
+
+
+                                                                 11618
+[22] Yue Ma, Yingqing He, Xiaodong Cun, Xintao Wang, Siran            [33] John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Rad-
+     Chen, Xiu Li, and Qifeng Chen. Follow your pose: Pose-                ford, and Oleg Klimov. Proximal policy optimization algo-
+     guided text-to-video generation using pose-free videos. In            rithms, 2017. 2, 6
+     Proceedings of the AAAI Conference on Artificial Intelli-        [34] Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao
+     gence, pages 4117–4125, 2024. 13                                      Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, Y. K. Li,
+[23] Yue Ma, Hongyu Liu, Hongfa Wang, Heng Pan, Yingqing                   Y. Wu, and Daya Guo. Deepseekmath: Pushing the limits of
+     He, Junkun Yuan, Ailing Zeng, Chengfei Cai, Heung-Yeung               mathematical reasoning in open language models, 2024. 2, 6
+     Shum, Wei Liu, et al. Follow-your-emoji: Fine-controllable       [35] Shezheng Song, Xiaopeng Li, Shasha Li, Shan Zhao, Jie Yu,
+     and expressive freestyle portrait animation. In SIGGRAPH              Jun Ma, Xiaoguang Mao, Weimin Zhang, and Meng Wang.
+     Asia 2024 Conference Papers, pages 1–12, 2024.                        How to bridge the gap between modalities: Survey on multi-
+[24] Yue Ma, Yulong Liu, Qiyuan Zhu, Ayden Yang, Kunyu Feng,               modal large language model. IEEE Transactions on Knowl-
+     Xinhua Zhang, Zhifeng Li, Sirui Han, Chenyang Qi, and                 edge and Data Engineering, 37(9):5311–5329, 2025. 1
+     Qifeng Chen. Follow-your-motion: Video motion transfer           [36] Zhiqing Sun, Sheng Shen, Shengcao Cao, Haotian Liu,
+     via efficient spatial-temporal decoupled finetuning. arXiv            Chunyuan Li, Yikang Shen, Chuang Gan, Liang-Yan Gui,
+     preprint arXiv:2506.05207, 2025.                                      Yu-Xiong Wang, Yiming Yang, Kurt Keutzer, and Trevor
+[25] Yue Ma, Zexuan Yan, Hongyu Liu, Hongfa Wang, Heng                     Darrell. Aligning large multimodal models with factually
+     Pan, Yingqing He, Junkun Yuan, Ailing Zeng, Chengfei Cai,             augmented rlhf, 2023. 2
+     Heung-Yeung Shum, et al. Follow-your-emoji-faster: To-           [37] Shuhe Wang, Shengyu Zhang, Jie Zhang, Runyi Hu, Xiaoya
+     wards efficient, fine-controllable, and expressive freestyle          Li, Tianwei Zhang, Jiwei Li, Fei Wu, Guoyin Wang, and Ed-
+     portrait animation. arXiv preprint arXiv:2509.16630, 2025.            uard Hovy. Reinforcement learning enhanced llms: A sur-
+     13                                                                    vey, 2025. 2
+[26] Sonia Krishna Murthy, Tomer Ullman, and Jennifer Hu. One         [38] Jason Wei, Maarten Bosma, Vincent Y. Zhao, Kelvin Guu,
+     fish, two fish, but not the whole sea: Alignment reduces              Adams Wei Yu, Brian Lester, Nan Du, Andrew M. Dai, and
+     language models’ conceptual diversity. In Proceedings of              Quoc V. Le. Finetuned language models are zero-shot learn-
+     the 2025 Conference of the Nations of the Americas Chap-              ers, 2022. 1
+     ter of the Association for Computational Linguistics: Hu-        [39] Yuxi Xie, Guanzhen Li, Xiao Xu, and Min-Yen Kan. V-
+     man Language Technologies (Volume 1: Long Papers), page               DPO: Mitigating hallucination in large vision language mod-
+     11241–11258. Association for Computational Linguistics,               els via vision-guided direct preference optimization. In
+     2025. 2                                                               Findings of the Association for Computational Linguistics:
+                                                                           EMNLP 2024, pages 13258–13273, Miami, Florida, USA,
+[27] Long Ouyang, Jeff Wu, Xu Jiang, Diogo Almeida, Car-
+                                                                           2024. Association for Computational Linguistics. 2
+     roll L. Wainwright, Pamela Mishkin, Chong Zhang, Sandhini
+                                                                      [40] Yuxi Xie, Guanzhen Li, Xiao Xu, and Min-Yen Kan. V-dpo:
+     Agarwal, Katarina Slama, Alex Ray, John Schulman, Jacob
+                                                                           Mitigating hallucination in large vision language models via
+     Hilton, Fraser Kelton, Luke Miller, Maddie Simens, Amanda
+                                                                           vision-guided direct preference optimization, 2024. 2, 6
+     Askell, Peter Welinder, Paul Christiano, Jan Leike, and Ryan
+                                                                      [41] Ziang Yan, Zhilin Li, Yinan He, Chenting Wang, Kunchang
+     Lowe. Training language models to follow instructions with
+                                                                           Li, Xinhao Li, Xiangyu Zeng, Zilei Wang, Yali Wang, Yu
+     human feedback, 2022. 1, 2, 6
+                                                                           Qiao, Limin Wang, and Yi Wang. Task preference optimiza-
+[28] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+                                                                           tion: Improving multimodal large language models with vi-
+     Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+                                                                           sion task alignment, 2025. 2
+     Amanda Askell, Pamela Mishkin, Jack Clark, Gretchen
+                                                                      [42] Zhihe Yang, Xufang Luo, Dongqi Han, Yunjian Xu, and
+     Krueger, and Ilya Sutskever. Learning transferable visual
+                                                                           Dongsheng Li. Mitigating hallucinations in large vision-
+     models from natural language supervision, 2021. 1
+                                                                           language models via dpo: On-policy data hold the key. In
+[29] Rafael Rafailov, Archit Sharma, Eric Mitchell, Christo-               2025 IEEE/CVF Conference on Computer Vision and Pat-
+     pher D Manning, Stefano Ermon, and Chelsea Finn. Direct               tern Recognition (CVPR), pages 10610–10620, 2025. 2, 6
+     preference optimization: Your language model is secretly a       [43] Peter Young, Alice Lai, Micah Hodosh, and Julia Hocken-
+     reward model. In Thirty-seventh Conference on Neural In-              maier. From image descriptions to visual denotations: New
+     formation Processing Systems, 2023. 1, 2, 6, 19                       similarity metrics for semantic inference over event descrip-
+[30] Rafael Rafailov, Archit Sharma, Eric Mitchell, Stefano Er-            tions. Transactions of the Association for Computational
+     mon, Christopher D. Manning, and Chelsea Finn. Direct                 Linguistics, 2:67–78, 2014. 6
+     preference optimization: Your language model is secretly a       [44] Xiang Yue, Yuansheng Ni, Tianyu Zheng, Kai Zhang, Ruoqi
+     reward model, 2024. 2                                                 Liu, Ge Zhang, Samuel Stevens, Dongfu Jiang, Weim-
+[31] Yi Ren and Danica J. Sutherland. Learning dynamics of llm             ing Ren, Yuxuan Sun, Cong Wei, Botao Yu, Ruibin Yuan,
+     finetuning, 2025. 1, 2, 3, 5, 19                                      Renliang Sun, Ming Yin, Boyuan Zheng, Zhenzhu Yang,
+[32] Shiori Sagawa, Aditi Raghunathan, Pang Wei Koh, and                   Yibo Liu, Wenhao Huang, Huan Sun, Yu Su, and Wenhu
+     Percy Liang. An investigation of why overparameterization             Chen. Mmmu: A massive multi-discipline multimodal un-
+     exacerbates spurious correlations. In Proceedings of the 37th         derstanding and reasoning benchmark for expert agi. In
+     International Conference on Machine Learning. JMLR.org,               2024 IEEE/CVF Conference on Computer Vision and Pat-
+     2020. 1                                                               tern Recognition (CVPR), pages 9556–9567, 2024. 6
+
+
+
+
+                                                                 11619
+[45] Jingyi Zhang, Jiaxing Huang, Sheng Jin, and Shijian Lu.        [58] Jusheng Zhang, Yijia Fan, Kaitong Cai, Jing Yang, Jiawei
+     Vision-language models for vision tasks: A survey. IEEE             Yao, Jian Wang, Guanlong Qu, Ziliang Chen, and Keze
+     Transactions on Pattern Analysis and Machine Intelligence,          Wang. Why keep your doubts to yourself? trading visual
+     46(8):5625–5644, 2024. 1                                            uncertainties in multi-agent bandit systems. In The Four-
+[46] Jusheng Zhang, Kaitong Cai, Yijia Fan, Ningyuan Liu, and            teenth International Conference on Learning Representa-
+     Keze Wang. MAT-agent: Adaptive multi-agent training opti-           tions, 2026. 1
+     mization. In The Thirty-ninth Annual Conference on Neural      [59] Chunting Zhou, Pengfei Liu, Puxin Xu, Srini Iyer, Jiao Sun,
+     Information Processing Systems, 2025. 1                             Yuning Mao, Xuezhe Ma, Avia Efrat, Ping Yu, Lili Yu, Susan
+[47] Jusheng Zhang, Kaitong Cai, Yijia Fan, Jian Wang, and               Zhang, Gargi Ghosh, Mike Lewis, Luke Zettlemoyer, and
+     Keze Wang. CF-VLM: Counterfactual vision-language fine-             Omer Levy. Lima: Less is more for alignment, 2023. 2
+     tuning. In The Thirty-ninth Annual Conference on Neural
+     Information Processing Systems, 2025. 1
+[48] Jusheng Zhang, Kaitong Cai, Yijia Fan, Jian Wang, and Keze
+     Wang. Cf-vlm:counterfactual vision-language fine-tuning,
+     2025. 1
+[49] Jusheng Zhang, Kaitong Cai, Xiaoyang Guo, Sidi Liu, Qin-
+     han Lv, Ruiqi Chen, Jing Yang, Yijia Fan, Xiaofei Sun, Jian
+     Wang, Ziliang Chen, Liang Lin, and Keze Wang. Mm-cot:a
+     benchmark for probing visual chain-of-thought reasoning in
+     multimodal models, 2025. 1
+[50] Jusheng Zhang, Kaitong Cai, Qinglin Zeng, Ningyuan Liu,
+     Stephen Fan, Ziliang Chen, and Keze Wang. Failure-driven
+     workflow refinement, 2025. 1
+[51] Jusheng Zhang, Yijia Fan, Kaitong Cai, Zimeng Huang,
+     Xiaofei Sun, Jian Wang, Chengpei Tang, and Keze Wang.
+     Drdiff: Dynamic routing diffusion with hierarchical atten-
+     tion for breaking the efficiency-quality trade-off, 2025. 1
+[52] Jusheng Zhang, Yijia Fan, Wenjun Lin, Ruiqi Chen, Haoyi
+     Jiang, Wenhao Chai, Jian Wang, and Keze Wang. GAM-
+     agent: Game-theoretic and uncertainty-aware collaboration
+     for complex visual reasoning. In The Thirty-ninth An-
+     nual Conference on Neural Information Processing Systems,
+     2025. 1
+[53] Jusheng Zhang, Yijia Fan, Wenjun Lin, Ruiqi Chen, Haoyi
+     Jiang, Wenhao Chai, Jian Wang, and Keze Wang. Gam-
+     agent: Game-theoretic and uncertainty-aware collaboration
+     for complex visual reasoning, 2025. 1
+[54] Jusheng Zhang, Yijia Fan, Zimo Wen, Jian Wang, and
+     Keze Wang. Tri-MARF: A tri-modal multi-agent responsive
+     framework for comprehensive 3d object annotation. In The
+     Thirty-ninth Annual Conference on Neural Information Pro-
+     cessing Systems, 2025. 1
+[55] Jusheng Zhang, Xiaoyang Guo, Kaitong Cai, Qinhan Lv,
+     Yijia Fan, Wenhao Chai, Jian Wang, and Keze Wang.
+     Hybridtoken-vlm: Hybrid token compression for vision-
+     language models, 2025. 1
+[56] Jusheng Zhang, Zimeng Huang, Yijia Fan, Ningyuan Liu,
+     Mingyan Li, Zhuojie Yang, Jiawei Yao, Jian Wang, and
+     Keze Wang. KABB: Knowledge-aware bayesian bandits
+     for dynamic expert coordination in multi-agent systems. In
+     Forty-second International Conference on Machine Learn-
+     ing, 2025. 1
+[57] Jusheng Zhang, Zimeng Huang, Yijia Fan, Ningyuan Liu,
+     Mingyan Li, Zhuojie Yang, Jiawei Yao, Jian Wang, and
+     Keze Wang. KABB: Knowledge-aware bayesian bandits
+     for dynamic expert coordination in multi-agent systems. In
+     Forty-second International Conference on Machine Learn-
+     ing, 2025. 1
+
+
+
+
+                                                               11620
+

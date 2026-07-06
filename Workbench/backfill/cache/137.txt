@@ -1,0 +1,641 @@
+                    This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                 Except for this watermark, it is identical to the accepted version;
+                           the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+ EG-3DVG: Expression and Geometry Aware Grounding Decoder for 3D Visual
+                             Grounding
+
+     GwangWook Park1 Hyo-Jun Lee2 Jong-Hyeon Baek1 Hanul Kim3 Yeong Jun Koh1∗
+               1
+                 Chungnam National University 2 Kangwon National University
+                     3
+                       Seoul National University of Science and Technology
+             ccocco0609@o.cnu.ac.kr, gywns6298@kangwon.ac.kr, jonghyeon9587@o.cnu.ac.kr
+                                       hukim@seoultech.ac.kr, yjkoh@cnu.ac.kr
+
+
+
+                            Abstract
+
+Despite recent progress in 3D visual grounding, existing
+methods still struggle with three core challenges: 1) cross-
+modal misalignment that prevents textual cues from being
+reliably delivered to visual representations, 2) intra-class
+confusion arising from insufficient understanding of fine-
+grained expression cues, and 3) geometric reasoning errors
+caused by inaccurate aggregation of spatially relevant vi-
+sual features. We propose EG-3DVG, a unified framework
+that addresses these issues through an expression and ge-
+ometry aware grounding decoder. The decoder integrates
+two complementary attention modules—position-guided ex-
+pression cross-attention (PECA) for reliable text–vision
+alignment and geometry-aware masked attention (GMA) for
+selective aggregation of geometry-consistent visual cues. To
+further distinguish semantically similar instances, we intro-
+duce expression-aware contrastive learning (ECL), which                Figure 1. Illustration of failure examples on ScanRefer [6]: (a)
+strengthens the alignment between the target object token              cross-modal misalignment, (b) intra-category confusion, and (c)
+                                                                       geometric reasoning error.
+and expression-relevant words. Extensive experiments on
+ScanRefer and SR3D/NR3D demonstrate that EG-3DVG
+achieves state-of-the-art performance in both 3D bound-                target object within a 3D point cloud scene based on a tex-
+ing box localization and mask prediction, validating the               tual description that depicts the object’s attributes, such as
+effectiveness of our geometry- and expression-aware de-                its appearance (e.g. ”blue”, ”red”), category (e.g. ”desk”,
+sign. Code is available at https://github.com/                         ”chair”), and spatial relationships with other objects (e.g.
+Gwan9Wook/EG3DVG.                                                      “next to the table”, “on the left of the sofa”).
+                                                                           General 3DVG methods represent the target object men-
+1. Introduction                                                        tioned in text descriptions using 3D bounding boxes [11, 16,
+                                                                       27, 30, 33, 38] or semantic masks [26, 27, 35, 36]. Specifi-
+Understanding 3D environments through natural language
+                                                                       cally, the model first encodes the input 3D point cloud and
+is crucial for advancing human-computer interaction, with
+                                                                       the text description into visual and text tokens, respectively.
+broad applications in virtual and augmented reality, au-
+                                                                       These tokens are then fused via transformer-based archi-
+tonomous robotics, and self-driving technologies. Recently,
+                                                                       tectures [32] to capture cross-modal interactions. A de-
+3D Visual Grounding (3DVG) [11, 15, 16, 27, 30, 31, 33,
+                                                                       coder module transforms the visual tokens into candidate
+35, 36, 38] has gained significant attention as a promising
+                                                                       3D bounding boxes or segmentation masks. In parallel, the
+solution to facilitate natural language-based understanding
+                                                                       text tokens can be syntactically parsed into main, attribute,
+of 3D environments. The objective of 3DVG is to localize a
+                                                                       pronoun, relationship, and auxiliary tokens using off-the-
+   ∗ Corresponding author                                              shelf tools [29, 37]. Finally, the target object is identified
+
+
+
+                                                                2625
+by selecting the candidate associated with the visual token              2. Related Works
+that achieves the highest text-alignment score [27, 33, 38],
+which is computed by considering its contextual similarity               Vision and Language: With growing interest in multi-
+with multiple types of text tokens (e.g., main, attribute, pro-          modal learning [17, 28], various methods combining vi-
+noun, and relationship tokens).                                          sion and language have recently been introduced. Early
+                                                                         methods have usually focused on 2D vision-language tasks,
+   Despite recent advances in 3D visual grounding, existing              such as image captioning [13, 19], visual question answer-
+models still suffer from three representative types of failure,          ing [3, 40], and visual grounding [18, 34, 41]. More re-
+as illustrated in Figure 1. (1) Cross-modal misalignment:                cently, vision-and-language methods are increasingly be-
+The model often fails to accurately localize the referred ob-            ing explored to understand 3D environments. 3D open-
+ject because textual semantics are not reliably conveyed to              vocabulary object detection or segmentation [22, 24] en-
+visual features through cross-attention, leading to incom-               riches the diversity of text queries by aligning visual and
+plete text–vision alignment. (2) Intra-class confusion: The              textual feature spaces, rather than classifying into fixed cat-
+model often mislocalizes among semantically similar in-                  egories. 3D dense captioning [7, 43] focuses on generat-
+stances due to its limited ability to capture fine-grained ex-           ing natural language descriptions for each object in a 3D
+pression cues in the input text. (3) Geometric reasoning                 scene, while 3D scene generation [12] aims to synthesize
+error: The model misinterprets the 3D spatial configuration              realistic 3D scenes from text prompts. These methods en-
+of surrounding points, including those from other objects or             able fine-grained semantic understanding of spatial environ-
+background regions, resulting in inaccurate localization of              ments, bridging the gap between textual and visual context.
+the referred target.                                                     3D Visual Grounding: 3D Visual Grounding (3DVG) is
+   Motivated by these observations, we propose EG-3DVG,                  the task of localizing a target object described by a text
+a novel 3D visual grounding framework that integrates                    description within a 3D scene. 3DVG is commonly di-
+the proposed modules within an expression and geometry                   vided into two sub-tasks: 3D Referring Expression Com-
+aware grounding decoder to explicitly resolve these failure              prehension (3DREC), which aims to predict a 3D bounding
+cases. To alleviate cross-modal misalignment, we intro-                  box, and 3D Referring Expression Segmentation (3DRES),
+duce the position-guided expression cross-attention (PECA)               which generates a semantic mask of the target object.
+module, which enriches text tokens with 3D positional cues                  In 3DRES field, X-RefSeg3D [26] constructs a cross-
+and enables more reliable alignment between textual se-                  modal relational graph that connects object nodes and tex-
+mantics and visual representations. To address intra-class               tual cues, and uses graph reasoning to resolve relation ex-
+confusion, we propose expression-aware contrastive learn-                pressions. 3D-STMN [36] introduces a superpoint-based
+ing (ECL), where the model learns to associate fine-grained              end-to-end framework that includes the matching between
+expression cues with the correct visual instance by con-                 superpoint and text to enable dense supervision and effi-
+trasting the target object against semantically similar neg-             cient inference for 3D-RES. In 3DREC field, multi-view
+atives within the same scene. To reduce geometric reason-                based approaches [11, 15] project 3D scenes into multiple
+ing errors, we develop the geometry-aware masked atten-                  rendered views and aggregate view-specific features to cap-
+tion (GMA) module, which selectively aggregates spatially                ture spatial context. To reduce computational cost, VPP-
+consistent visual information by exploiting 3D geometric                 Net [30] predicts informative viewpoints from a single in-
+relations between candidates and surrounding points. Ex-                 put and performs grounding based on the predicted view.
+tensive experiments on ScanRefer and SR3D/NR3D bench-                    TSP3D [10] presents a lightweight framework that real-time
+marks demonstrate that EG-3DVG achieves state-of-the-art                 grounding via text-guided sparse voxel pruning. MCLN
+results in both 3D bounding box localization and mask pre-               [27] introduces a multi-branch architecture that jointly per-
+diction, validating the effectiveness of each proposed com-              forms 3D object localization and semantic mask prediction.
+ponent. To summarize, the main contributions of this work                While existing methods have made progress, they still suf-
+are as follows:                                                          fer from three major challenges, as illustrated in Figure 1.
+
+• PECA injects 3D positional cues into text tokens to                    3. Proposed Method
+  achieve spatially consistent text–visual alignment.
+• ECL enhances the model’s ability to distinguish same-
+                                                                         3.1. Model Overview
+  category objects with different expressions.                           Given an input text description consisting of Ntext words
+• GMA selectively aggregates visual information based on                 and a 3D scene represented by Npoint points, the proposed
+  geometric relations between candidate tokens and sur-                  EG-3DVG predicts a mask m ∈ RNpoint and a 3D bounding
+  rounding points.                                                       box b ∈ R6 corresponding to the target object described in
+• EG-3DVG achieves superior performance on benchmarks                    the text description. Figure 2 illustrates the overall architec-
+  in both 3D bounding box and mask prediction.                           ture of the proposed EG-3DVG.
+
+
+
+                                                                  2626
+Figure 2. Overview of EG-3DVG. In expression and geometry aware grounding decoder, position-guided expression cross-attention injects
+positional information to each text tokens and geometry-aware masked attention incorporates geometric relationship into the attention
+mechanism. Expression-aware contrastive learning encourages the selected visual token to align with expression-relevant words (e.g.
+attribute, pronoun, relationship) from the text description while contrasting against other texts describing same-category distractors.
+
+
+3.2. Cross-Modal Encoder                                                of the superpoint centers. For each superpoint s, the K near-
+                                                                        est visual tokens are selected based on the spatial distance
+Text and Visual Token Generation: Following [16, 27,
+                                                                        between psuper
+                                                                                    s    and each visual token coordinate to com-
+30, 33, 38], we use pre-trained RoBERTa [20] and Point-
+                                                                        pose Vsknn ∈ RK×C and Pknn    s   ∈ RK×3 , where each row
+Net++ [25] to extract text tokens and visual tokens from the
+                                                                        of Vs is the visual token feature and that of Pknn
+                                                                              knn
+                                                                                                                             s   con-
+input text description and 3D point cloud, respectively. The
+                                                                        tains the corresponding 3D position. Then, we encode the
+text and visual tokens are then projected into T ∈ RNtext ×C
+                                                                        relative positional relationship between the s-th superpoint
+and V ∈ RNvis ×C , through a cross-modal encoder, where
+                                                                        and its K nearest tokens by:
+C is the feature dimension. The cross-modal encoder con-
+sists of two transformer branches that separately process                     Ṽsknn = Vsknn + FFN(1K (psuper )⊤ − Pknn
+                                                                                                        s           s )            (1)
+text and visual tokens, as shown in Figure 2. To facilitate
+cross-modal interaction, a cross-attention module in each               where 1K ∈ RK is a vector of ones and FFN(·) denotes
+branch uses opposite-modality tokens as key-value, while                feed forward networks consisting of two fully connected
+retaining processed tokens as queries. For the visual branch,           layers with ReLU activation. We then apply channel-wise
+3D coordinates of each point are incorporated as positional             max pooling over Ṽsknn to obtain the aggregated superpoint
+embeddings in attention computation.                                    feature vs ∈ RC , and stack all vs to form the final super-
+Candidate Visual Token Generation: Each visual token                    point tokens Vsuper = [v1 . . . vNsuper ] ∈ RNsuper ×C .
+predicts a candidate score of the target object through a mul-
+tilayer perceptron supervised with the KPS loss [16, 21, 27,            3.3. Expression and Geometry Aware Grounding
+30, 33, 38]. Based on the candidate scores of the visual to-                  Decoder
+kens, we select the top-Ncand tokens as candidate tokens                The expression and geometry aware grounding decoder
+Vcand ∈ RNcand ×C , which are subsequently used for 3D                  (EGD) refines candidate representations by jointly exploit-
+bounding box and mask prediction in the expression and                  ing textual and visual cues to accurately localize and seg-
+geometry aware grounding decoder (Section 3.3).                         ment the referred object. It consists of two complementary
+Superpoint Token Generation: To obtain a more informa-                  attention modules: the position-guided expression cross-
+tive visual representation, we project the Nvis visual tokens           attention (PECA), which aligns visual tokens with lin-
+onto a superpoint resolution of size Nsuper using a super-              guistic expressions in a spatially consistent manner, and
+point aggregation process [27], where Nsuper ≪ Npoint .                 the geometry-aware masked attention (GMA), which se-
+                     Nsuper
+Let {psuper
+        s     ∈ R3 }s=1     denote the set of 3D coordinates            lectively aggregates geometry-consistent visual cues to en-
+
+
+
+                                                                 2627
+Figure 3. A diagram of (a) the expression and geometry aware grounding decoder, (b) position-guided expression cross-attention (PECA),
+and (c) geometric-aware masked attention (GMA). The top-right symbols on the cross-attention, PECA, and GMA blocks indicate the
+source tokens used to refine their input tokens.
+
+
+hance candidate tokens with object-level representations.                a mask embedding e ∈ RC , and then generate the tar-
+Token Refinement: As shown in Figure 3(a), EGD con-                      get mask over superpoints as m̂ = Ṽsuper e. Finally, the
+sists of two branches: a superpoint token branch and a can-              superpoint-level mask m̂ is transformed into the point-level
+didate token branch. The superpoint token branch refines                 mask m ∈ RNpoint by assigning each superpoint’s mask
+Vsuper into Ṽsuper through cross-attention with the candi-              probability to all points it contains.
+date tokens Vcand , cross-attention with the text tokens T,                  For 3D bounding box prediction, we first project the se-
+and subsequent feed-forward networks. Since the super-                   lected target token vtarget to an initial bounding box bini ∈
+point tokens Vsuper are derived solely from visual features,             R6 via a multilayer perceptron (MLP). To incorporate spa-
+they lack both the contextual semantics of text tokens and               tial consistency with the predicted mask, we also construct
+the object-specific cues of candidate tokens. Therefore, this            a mask-derived bounding box bmask that tightly encloses
+branch enriches semantics of Vsuper by integrating textual               the predicted point-level mask m. The final bounding box
+semantics from T and object-aware cues from Vcand .                      b is then obtained by a weighted sum of the two boxes:
+    The candidate token branch refines Vcand into Ṽcand
+by incorporating contextual cues from text tokens, vi-                                   b = αbini + (1 − α)bmask                  (3)
+sual tokens, and superpoint features through the pro-
+posed position-guided expression cross-attention (PECA)                  where we set the weighting hyperparameter α to 0.5.
+and geometry-aware masked attention (GMA). Given the                     Position-Guided Expression Cross-Attention (PECA):
+candidate tokens Vcand , this branch first produces VPECA
+                                                      cand               To inject the contextual information of text tokens into vi-
+through self-attention and PECA, and then further refines                sual tokens, the cross-attention operation where the visual
+   cand
+VPECA           cand
+          into Vsuper        cand
+                      and VGMA    through two parallel mod-              tokens serve as queries and the text tokens act as key–value
+ules, cross-attention with the refined superpoint tokens                 pairs is typically adopted. In this cross-attention, accurate
+Ṽsuper and GMA, respectively. The final refined candidate               attention weights between visual and text tokens is crucial
+tokens Ṽcand are obtained by                                            for effective feature fusion. However, conventional cross-
+                                                                         attention between visual and text tokens often produces sub-
+             Ṽcand = FFN Vsuper
+                           cand     cand
+                                 + VGMA  ).                 (2)          optimal alignment, as the two modalities contain inherently
+                                                                         unbalanced spatial cues. Specifically, each visual token
+Mask and 3D Bounding Box Prediction: To estimate the                     in Vcand encodes 3D positional information derived from
+target object’s mask m and 3D bounding box b, we se-                     the input point cloud (through PointNet++ feature extrac-
+lect the target object token vtarget ∈ RC as the candidate               tion), whereas text tokens lack such explicit spatial context.
+with the highest text-alignment score [27, 33, 38] among                 To bridge this gap, we introduce the position-guided ex-
+all refined candidate tokens Ṽcand ∈ RNcand ×C . For mask               pression cross-attention (PECA) module, which injects 3D
+prediction, we project the target object token vtarget into              positional information into text tokens, enabling spatially
+
+
+
+                                                                  2628
+consistent attention weight computation between visual and                geometry-aware attention map indicating how strongly each
+text tokens.                                                              visual token should contribute to a given candidate based
+    Figure 3(b) illustrates the overall architecture of the pro-          on their spatial proximity and text relevance. Then, we gen-
+posed PECA module. Let P ∈ RNvis ×3 denote the 3D co-                     erate the binary attention mask Ãgeo ∈ {0, 1}Ncand ×Nvis
+ordinates corresponding to the visual tokens V. The po-                   from Ageo using a trainable thresholding scheme based on
+sitional embeddings Epos ∈ RNvis ×C are then projected                    the straight-through estimator (STE) [5]. The final output
+from P using an MLP. These positional embeddings are in-                  of GMA VGMA cand
+                                                                                             ∈ RNcand ×C is then obtained by masked-
+terfused into the text tokens T as follows:                               attention:
+                                                                                                            VPECA V⊤
+                                                                                                           cand                        
+                                     T · V⊤
+                                             
+                                                                             cand       cand                                       geo
+          Tpos = T + Softmax           √        Epos .       (4)          VGMA = VPECA + Softmax                √         + log(Ã ) V.
+                                          C                                                                        C
+                                                                                                                                      (7)
+Then, we fuse the text tokens into the candidate tokens us-               We apply learnable linear projections to all query, key, and
+ing cross-attention, where Vcand serves as the query, Tpos                value tokens before attention computation, but omit them in
+                                                  cand
+as the key, and T as the value, producing VPECA          as the           equations for simplicity. Here, log(Ãgeo ) acts as an additive
+                   cand
+output. Since V          include positional embeddings from               attention mask [32], where non-related visual tokens are as-
+the previous process, PECA thus guides a spatially consis-                signed −∞ to suppress their contributions. Thus, GMA
+tent fusion between visual and textual features.                          enables each candidate token to selectively aggregate spa-
+Geometry-Aware Masked Attention (GMA): Although                           tially consistent visual cues, suppressing interference from
+                           cand
+the candidate tokens VPECA       contain semantically aligned             geometrically distant or irrelevant tokens.
+features, they are insufficient to fully represent the geomet-
+ric extent of the target object. Many visual tokens within                3.4. Expression-Aware Contrastive Learning
+the object’s bounding box are not selected as candidates,                 As shown in Figure 1(b), when multiple objects of the same
+leading to incomplete spatial coverage. To incorporate this               category are present in a scene, called “multiple” setting
+missing geometric information, we exploit the full set of vi-             in 3DVG, the performance significantly decreases due to
+sual tokens V to enrich VPECA . However, directly attend-                 intra-category misidentification. In such cases, the visual
+ing to all visual tokens introduces noise, since many tokens              token corresponding to the target object should accurately
+belong to irrelevant objects or background regions. To al-                capture the descriptive expressions provided in the input
+leviate this issue, we propose the geometry-aware masked                  text description, including attribute, pronoun, and relation-
+attention (GMA) module in Figure 3(c), which selectively                  ship words. To address this challenge, we introduce an
+aggregates geometric cues from V based on their spatial re-               expression-aware contrastive learning that encourages the
+lationships with each candidate token.                                    visual token of the target object to align with the expression
+    Let Pcand ∈ RNcand ×3 denote the 3D coordinates of                    words from the input text description, while remaining dis-
+candidate tokens. The geometric relation tensor G ∈                       tinct from negative text samples, as illustrated in Figure 2.
+RNcand ×Nvis ×4 is then defined as                                        Negative Text Sampling: For each text description in a
+                                                                          “multiple” scene, we construct negative text samples by se-
+         G(i, j) = Pcand      − Pj , ∥Pcand
+                                                     
+                        i                i   − Pj ∥2        (5)           lecting other text descriptions within the same scene that
+where i indexes candidate tokens (i ∈ [1, Ncand ]) and j                  refer to different objects of the same category as the tar-
+indexes visual tokens (j ∈ [1, Nvis ]). Each element G(i, j)              get. These text descriptions serve as negative supervision
+thus represents the relative coordinate offset and Euclidean              for contrastive learning, providing semantically similar but
+distance between the i-th candidate token and the j-th visual             referentially different contexts.
+token. We project G into the geometric feature tensor G̃ ∈                Expression-Aware Contrastive Loss: We first construct
+                                                                                                                  −
+
+RNcand ×Nvis ×C using an MLP.                                             the negative text features T− ∈ RN ×C by randomly se-
+   To emphasize text-guided geometric relationships, we                   lecting one negative description from the sampled descrip-
+compute a geometry-based attention prior Ageo ∈                           tions and processing it through RoBERTa followed by the
+RNcand ×Nvis from the relation tensor G̃ as                               cross-modal encoder. From the resulting token embeddings,
+                                                                      we retain only those corresponding to expression-related
+   Ageo = Sigmoid F −1 F(G̃) · MaxPool(T)⊤                (6)             words: attribute, pronoun, and relationship words. We use
+                                                                          off-the-shelf language parsing tools [29, 37] to categorize
+where F (·) denotes spatial flattening and F −1 (·) is its in-            these word categories. Similarly, we extract the positive text
+                                                                                              +
+verse reshaping operator. Here, MaxPool(T) ∈ R1×C                         features T+ ∈ RN ×C for the input text description, by fil-
+summarizes the expression-related text embeddings, serv-                  tering the text embeddings T to include only the expression-
+ing as a global linguistic context to modulate the geomet-                related tokens. We then define the expression-aware con-
+ric affinity in G̃. The resulting Ageo thus provides a soft               trastive loss, which encourages the visual token correspond-
+
+
+
+                                                                   2629
+                                                          Unique (∼19%)                 Multiple (∼81%)             Overall
+                     Method               Input
+                                                       Acc@0.25 Acc@0.5               Acc@0.25 Acc@0.5        Acc@0.25 Acc@0.5
+                Two-stage Model
+                   ScanRefer [6]         3D+2D              76.33       53.51           32.73       21.11       41.19       27.40
+                   ReferIt3D [2]           3D               53.8        37.5             21.0        12.8        26.4        16.9
+                    TGNN [14]              3D               68.61       56.80           29.84       23.18       37.37       29.70
+                InstanceRefer [42]         3D               77.45       66.83           31.27       24.77       40.23       32.93
+                  FFL-3DOG [9]             3D               78.80       67.94           35.19       25.70       41.33       34.01
+                BUTD-DETR [16]             3D               82.88       64.98           44.73       33.97       50.42       38.60
+                     EDA [38]              3D               85.76       68.57           49.13       37.64       54.59       42.26
+                   VPP-Net [30]            3D               86.05       67.09           50.32       39.03       55.65       43.29
+                    G3 -LQ [33]            3D               88.09       72.73           51.48       40.80       56.90       45.58
+                 ConcreteNet [31]          3D               86.40       82.05           42.41       38.39       50.61       46.53
+                    MCLN [27]              3D               86.89       72.73           51.96       40.76       57.17       45.53
+                EG-3DVG (Ours)             3D               90.84       84.57           52.87       46.71       58.54       52.36
+                Single-stage Model
+                BUTD-DETR [16]             3D               81.47       61.24           44.20       32.81       49.76       37.05
+                   EDA [38]                3D               86.40       69.42           48.11       36.82       53.83       41.70
+                  G3 -LQ [33]              3D               88.59       73.28           50.23       39.72       55.95       44.72
+                  MCLN [27]                3D               84.43       68.36           49.72       38.41       54.30       42.64
+                  TSP3D [10]               3D               87.25       71.41           51.04       42.37       56.45       46.71
+                EG-3DVG (Ours)             3D               91.54       83.79           51.09       44.16       57.13       50.07
+
+Table 1. 3DREC results on ScanRefer [6]. The unique refers to cases where the target instance is the only one of its category, and the
+multiple indicates situations where there is at least one more object of the target’s category. The best results are bold, and the second best
+results are underlined.
+
+ing to the target object to be aligned with T+ while being                           4. Experimental Results
+dissimilar from T− .
+                                                                                     4.1. Dataset and Evaluation Metrics
+Lcont =                                                                              We evaluate the performance of the proposed EG-3DVG on
+                                                                         
+                              +
+                                                                                     two representative 3D visual grounding benchmarks, Scan-
+                            N
+                                                        !
+                                                  +
+                                         Ṽcand (T )⊤
+                         w+                igt
+                            X                     i
+                               exp                                        
+                        N+                    ρ                                    Refer [6] and SR3D/NR3D [2]. ScanRefer is built on 800
+                           i=1                                            
+− log                                                                     
+      
+          N+
+                      Ṽcand
+                               +
+                             (T )⊤
+                                     !           N−            cand  + ⊤
+                                                             Ṽ gt (T )
+                                                                         ! 
+                                                                                    3D scenes from ScanNet [8], and includes 51,583 manually
+       w+ Xexp         igt    i               − X                   j
+                                         + w−         exp      i           
+                                                                                     annotated natural language expressions referring to 11,046
+          N+                ρ              N                        ρ
+               i=1                              j=1
+                                                                        (8)          respective target objects. SR3D/NR3D is also built on 707
+                                                                                     ScanNet scenes, where SR3D includes 83,572 machine-
+where Ṽicand
+          gt  is igt -th row vector of Ṽcand , and igt is the                       generated descriptions and NR3D contains 41,503 human
+index of candidate whose predicted bounding box has the                              annotated descriptions. Following previous works, we de-
+highest IoU with the ground-truth. This feature corresponds                          fine the two sub-tasks of 3D visual grounding as follows:
+to the target and is used as its visual representation. We set                       3D Referring Expression Comprehension (3DREC) for 3D
+the temperature scaling factor to ρ = 0.07, and the positive                         bounding box prediction [11, 16, 27, 30, 33, 38], and 3D
+and negative weights to w+ = 1 and w− = 2, respectively.                             Referring Expression Segmentation (3DRES) for mask pre-
+                                                                                     diction [26, 27, 35, 36]. We evaluate 3DREC performance
+3.5. Loss Functions
+                                                                                     using Acc@0.25IoU and Acc@0.5IoU between predicted
+Following [11, 27, 30, 33, 35, 36, 38], we apply 3DREC                               and ground-truth 3D bounding boxes, while 3DRES per-
+loss Lrec for bounding box prediction and 3DRES loss                                 formance is evaluated using mean IoU, Acc@0.25IoU, and
+Lres for semantic mask prediction. Also, we use KPS loss                             Acc@0.5IoU between predicted and ground-truth masks.
+Lkps [16, 21, 27, 30, 33, 38], and the proposed expression-
+aware contrastive loss Lcont . The total loss is defined as                          4.2. Implementation Details
+                                                                                     The numbers of visual tokens Nvis and candidate visual to-
+  L = λrec Lrec + λres Lres + λkps Lkps + λcont Lcont                   (9)
+                                                                                     kens Ncand are set to 1,024 and 256, respectively. The max-
+where, scaling weights λrec , λres , λkps , and λcont are set to                     imum number of text tokens Ntext is set to 256. The feature
+0.14, 0.14, 8, and 0.1 respectively.                                                 dimension for both modalities is fixed to C = 288. The
+
+
+
+                                                                              2630
+      Method         Input   Acc@0.25     Acc@0.5     mIoU                                              SR3D              NR3D
+                                                                                  Method
+                                                                                                    Overall Hard      Overall Hard
+     TGNN [14]        3D        37.50       31.40     27.80
+  X-RefSeg3D [26]     3D        40.33       37.77     29.94               3DREC
+   3D-STMN [36]       3D        54.60       39.80     39.50
+                                                                              ReferIt3D [2]           39.8      -       35.6     27.9
+    RG-SAN [35]       3D        61.67       44.92     44.66
+                                                                                TGNN [14]             45.0     36.9     37.3     30.6
+     MCLN [27]        3D        58.70       50.70     44.72
+                                                                            InstanceRefer [42]        48.0     40.5     38.8     31.8
+  EG-3DVG (Ours)      3D        59.77       53.77     47.28
+                                                                          3DVG-Transformer [44]       51.4     44.9     40.8     34.8
+                                                                                 SAT [39]             57.9     50.0     49.2     42.4
+           Table 2. 3DRES results on ScanRefer [6].                        3DRefTransformer [1]       47.0     38.3     39.0     32.0
+                                                                               3D-SPS [23]            62.6     65.4     51.5     45.1
+                                                                            BUTD-DETR [16]            67.0     63.2     54.6     48.4
+cross-modal encoder is repeated three times, while EGD is                        LAR [4]              59.4     51.2     48.9     42.3
+repeated six times. RoBERTa is kept frozen during training.                      EDA [38]             68.1     62.9     52.1     46.1
+All experiments are conducted on two NVIDIA RTX A6000                         VPP-Net [30]            68.7      -       56.9      -
+GPUs with a batch size of 8 per GPU. We use the AdamW                           G3 -LQ [33]           73.1     66.3     58.4     50.7
+optimizer with a learning rate of 1 × 10−5 for PointNet++                      MCLN [27]              68.4      -       59.8      -
+and 2 × 10−4 for the remaining layers.                                       EG-3DVG (Ours)           75.2     66.6     59.9     52.4
+                                                                          3DRES
+4.3. Main Results
+                                                                                TGNN [14]             20.2     21.9     19.1     17.4
+Quantitative Results: Tables 1 and 2 compare the pro-                         3D-STMN [36]            34.4     30.1     27.6     23.0
+posed EG-3DVG with existing 3DREC methods [10, 11,                             RG-SAN [35]            39.6     35.2     28.6     24.0
+16, 27, 30, 33, 38] and 3DRES methods [26, 27, 35, 36]                          MCLN [27]             49.8      -       46.1      -
+on ScanRefer. The scores of other methods are from their                     EG-3DVG (Ours)           58.9     52.0     48.0     41.9
+respective papers. In Table 1, the single-stage models di-
+rectly estimate the target object’s bounding box from the               Table 3. 3DREC and 3DRES results on SR3D/NR3D. For
+input scene, as in the proposed EG-3DVG. The two-stage                  3DREC, we assess performance using Acc@0.25. For 3DRES,
+methods [16, 27, 33, 38] first perform 3D object detection              we assess performance using mIoU. The best results are bold, and
+                                                                        the second best results are underlined.
+using off-the-shelf networks [21] and auxiliary use the de-
+tections in the grounding decoder. For the two-stage setting,
+we further extend EG-3DVG to use 3D detections as source
+                                                                        alignment (Figures 4(a,b)), intra-category confusion (Fig-
+features for the candidate branch. A detailed description
+                                                                        ure 4(c,d)), and geometric reasoning error (Figures 4(e)).
+of this extension is provided in the supplementary material.
+                                                                        These results indicate that the proposed PECA, ECL, and
+Unique refers to cases where the target is the only one of its
+                                                                        GMA effectively address each failure type in Figure 1.
+category, while multiple indicates situations where there is
+at least one more object of the target’s category.
+                                                                        4.4. Ablation Study
+    In Table 1, EG-3DVG significantly outperforms existing
+methods. Compared to the previous state-of-the-art method,              Table 4 reports the ablation study accroding to different
+TSP3D [10], EG-3DVG achieves gains of +0.68 and +3.36                   combinations of position-guided expression cross-attention
+in Acc@0.25IoU and Acc@0.5IoU, respectively. In the                     (PECA), geometry-aware masked attention (GMA), and
+two-stage setting, EG-3DVG further surpasses MCLN [27]                  expression-aware contrastive learning (ECL). The models
+by +1.37 in Acc@0.25IoU and +6.83 in Acc@0.5IoU.                        without PECA and GMA use standard cross-attention with
+In Table 2, EG-3DVG achieves the highest 3DRES per-                     text tokens and visual tokens, respectively. As in Table 4,
+formance, with margins of +1.07 Acc@0.25IoU, +3.07                      removing any of these components results in a clear drop
+Acc@0.5IoU, and +2.56 mIoU compared to MCLN. Ta-                        in both 3DREC and 3DRES performance. This validates
+ble 3 further reports the 3DVG performance of EG-3DVG                   the effectiveness of each module: PECA guides spatially
+on the SR3D/NR3D datasets. The hard case corresponds                    consistent fusion between visual and textual features, GMA
+to the multiple setting. EG-3DVG surpasses the previous                 enhances the model’s understanding of geometric relation-
+3DREC model, G3 -LQ [33], by a margin of +2.1 in SR3D                   ships among visual tokens, and ECL improves model’s abil-
+Acc@0.25 and +1.5 in NR3D Acc@0.25, while outper-                       ity to distinguish fine-grained linguistic expressions.
+forming the 3DRES method, MCLN [27], by +9.1 in SR3D                        In Table 5, we compare the proposed attention mask
+mIoU and +1.9 in NR3D mIoU.                                             Ageo in the proposed GMA with other alternative meth-
+Qualitative Results: Figure 4 presents qualitative compar-              ods. First, we use a fixed-radius mask, where the attention
+isons between MCLN [27] and EG-3DVG. We observe that                    mask is defined as 1 for visual tokens within a fixed radius
+EG-3DVG is robust to the three types: cross-modal mis-                  around each candidate and 0 otherwise. The radius is set
+
+
+
+                                                                 2631
+    Ground Truth
+
+
+
+
+    Ours
+
+
+
+
+   MCLN [27]
+
+
+
+                                                                                                     (d) a white top square
+                    (a) the furniture is                                                                                        (e) the cabinet is tall
+                                                (b) the window is           (c) the table is          table in the corner of
+
+   Description
+                     north of the round                                                                                            and brown. it is
+                                               behind the trash can.        underneath the             the room. there are
+                   table. the furniture is                                                                                       located to the left of
+                                               the window is to the      windows. the table is a      two bench style seats
+                   curved and has many                                                                                         the smaller cabinet. it
+                                                 left of the door.       long brown rectangle.       around the sides of the
+                            bars.                                                                                              has a picture above it.
+                                                                                                              table.
+
+Figure 4. Qualitative results on ScanRefer: (a-b) cross-modal misalignment, (c-d) intra-category confusion, (e) geometric reasoning error.
+
+                                              3DREC                    3DRES                                           3DREC                 3DRES
+  PECA                 GMA       ECL                                                               Method
+                                         Acc@0.25 Acc@0.5               mIoU                                      Acc@0.25 Acc@0.5            mIoU
+                                             57.04       49.62         44.19                 Fixed radius           57.76        51.12        46.23
+       ✓                                     57.73       50.92         45.69               Geometric feature        58.16        51.20        46.70
+                         ✓                   57.05       50.55         46.19                    GMA                 58.54        52.36        47.28
+                                  ✓          57.56       50.85         45.84
+       ✓                 ✓                   58.06       51.84         46.57           Table 5. Ablation study according to the generation methods of
+       ✓                          ✓          58.18       50.95         46.34           attention mask in GMA.
+                         ✓        ✓          57.86       51.64         46.59
+       ✓                 ✓        ✓          58.54       52.36         47.28
+                                                                                       5. Conclusion
+Table 4. Ablation study on different combinations of PECA,                             In this work, we presented EG-3DVG, a 3D visual ground-
+GMA, and ECL on ScanRefer.                                                             ing framework that addresses three major limitations: cross-
+                                                                                       modal misalignment, intra-class confusion, and geometric
+to 0.75m, corresponding to the average object size in Scan-                            reasoning errors. We introduced an expression and ge-
+Refer. This approach simply aggregates information from                                ometry aware grounding decoder that integrates two com-
+nearby tokens without considering their geometric relation-                            plementary modules, PECA and GMA, to achieve reliable
+ships. Second, we directly project the geometric feature G                             text–vision alignment and geometry-consistent feature ag-
+into a softened attention map through an MLP followed by                               gregation. In addition, we proposed an expression-aware
+a sigmoid function. This method excludes text tokens from                              contrastive learning to enhance the model’s ability to distin-
+the attention mask generation, leading to the aggregation of                           guish semantically similar instances based on fine-grained
+spatially close but expression-irrelevant visual features. In                          expression cues. Experimental results on ScanRefer and
+contrast, the proposed GMA jointly explores geometric and                              SR3D/NR3D demonstrate that EG-3DVG achieves state-of-
+textual features for attention mask, consistently achieving                            the-art performance on both 3D bounding box localization
+the highest 3DREC and 3DRES performance.                                               and mask prediction.
+
+
+
+                                                                                2632
+Acknowledgements                                                              [13] Xiaowei Hu, Zhe Gan, Jianfeng Wang, Zhengyuan Yang,
+                                                                                   Zicheng Liu, Yumao Lu, and Lijuan Wang. Scaling up
+This work was partly by the National Research Foun-                                vision-language pre-training for image captioning. In CVPR,
+dation of Korea (NRF) grants funded by the Korea                                   pages 17980–17989, 2022. 2
+government (MSIT) (No.      RS-2024-00397293, No.                             [14] Pin-Hao Huang, Han-Hung Lee, Hwann-Tzong Chen, and
+RS-2024-00352566, and No.        RS-2025-00559165).                                Tyng-Luh Liu. Text-guided graph neural networks for refer-
+                                                                                   ring 3d instance segmentation. In AAAI, pages 1610–1618,
+                                                                                   2021. 6, 7
+References                                                                    [15] Shijia Huang, Yilun Chen, Jiaya Jia, and Liwei Wang. Multi-
+ [1] Ahmed Abdelreheem, Ujjwal Upadhyay, Ivan Skorokhodov,                         view transformer for 3d visual grounding. In CVPR, pages
+     Rawan Al Yahya, Jun Chen, and Mohamed Elhoseiny. 3dref-                       15524–15533, 2022. 1, 2
+     transformer: Fine-grained object identification in real-world            [16] Ayush Jain, Nikolaos Gkanatsios, Ishita Mediratta, and Kate-
+     scenes using natural language. In WACV, pages 3941–3950,                      rina Fragkiadaki. Bottom up top down detection transform-
+     2022. 7                                                                       ers for language grounding in images and point clouds. In
+ [2] Panos Achlioptas, Ahmed Abdelreheem, Fei Xia, Mohamed                         ECCV, pages 417–433, 2022. 1, 3, 6, 7
+     Elhoseiny, and Leonidas Guibas. Referit3d: Neural listeners              [17] Chao Jia, Yinfei Yang, Ye Xia, Yi-Ting Chen, Zarana Parekh,
+     for fine-grained 3d object identification in real-world scenes.               Hieu Pham, Quoc Le, Yun-Hsuan Sung, Zhen Li, and Tom
+     In ECCV, pages 422–440, 2020. 6, 7                                            Duerig. Scaling up visual and vision-language representation
+ [3] Jean-Baptiste Alayrac, Jeff Donahue, Pauline Luc, Antoine                     learning with noisy text supervision. In ICML, pages 4904–
+     Miech, Iain Barr, Yana Hasson, Karel Lenc, Arthur Mensch,                     4916, 2021. 2
+     Katherine Millican, Malcolm Reynolds, et al. Flamingo: a                 [18] Aishwarya Kamath, Mannat Singh, Yann LeCun, Gabriel
+     visual language model for few-shot learning. In NeurIPS,                      Synnaeve, Ishan Misra, and Nicolas Carion.            Mdetr-
+     pages 23716–23736, 2022. 2                                                    modulated detection for end-to-end multi-modal understand-
+ [4] Eslam Bakr, Yasmeen Alsaedy, and Mohamed Elhoseiny.                           ing. In ICCV, pages 1780–1790, 2021. 2
+     Look around and refer: 2d synthetic semantics knowledge                  [19] Yehao Li, Yingwei Pan, Ting Yao, and Tao Mei. Compre-
+     distillation for 3d visual grounding. In NeurIPS, pages                       hending and ordering semantics for image captioning. In
+     37146–37158, 2022. 7                                                          CVPR, pages 17990–17999, 2022. 2
+ [5] Yoshua Bengio, Nicholas Léonard, and Aaron Courville.                   [20] Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Mandar
+     Estimating or propagating gradients through stochastic                        Joshi, Danqi Chen, Omer Levy, Mike Lewis, Luke Zettle-
+     neurons for conditional computation.            arXiv preprint                moyer, and Veselin Stoyanov. Roberta: A robustly optimized
+     arXiv:1308.3432, 2013. 5                                                      bert pretraining approach. arXiv preprint arXiv:1907.11692,
+ [6] Dave Zhenyu Chen, Angel X Chang, and Matthias Nießner.                        2019. 3
+     Scanrefer: 3d object localization in rgb-d scans using natural           [21] Ze Liu, Zheng Zhang, Yue Cao, Han Hu, and Xin Tong.
+     language. In ECCV, pages 202–221, 2020. 1, 6, 7                               Group-free 3d object detection via transformers. In ICCV,
+ [7] Sijin Chen, Hongyuan Zhu, Xin Chen, Yinjie Lei, Gang                          pages 2949–2958, 2021. 3, 6, 7
+     Yu, and Tao Chen. End-to-end 3d dense captioning with                    [22] Yuheng Lu, Chenfeng Xu, Xiaobao Wei, Xiaodong Xie,
+     vote2cap-detr. In CVPR, pages 11124–11133, 2023. 2                            Masayoshi Tomizuka, Kurt Keutzer, and Shanghang Zhang.
+ [8] Angela Dai, Angel X Chang, Manolis Savva, Maciej Hal-                         Open-vocabulary point-cloud object detection without 3d an-
+     ber, Thomas Funkhouser, and Matthias Nießner. Scannet:                        notation. In CVPR, pages 1190–1199, 2023. 2
+     Richly-annotated 3d reconstructions of indoor scenes. In                 [23] Junyu Luo, Jiahui Fu, Xianghao Kong, Chen Gao, Haibing
+     CVPR, pages 5828–5839, 2017. 6                                                Ren, Hao Shen, Huaxia Xia, and Si Liu. 3d-sps: Single-stage
+ [9] Mingtao Feng, Zhen Li, Qi Li, Liang Zhang, XiangDong                          3d visual grounding via referred point progressive selection.
+     Zhang, Guangming Zhu, Hui Zhang, Yaonan Wang, and Aj-                         In CVPR, pages 16454–16463, 2022. 7
+     mal Mian. Free-form description guided 3d visual graph net-              [24] Songyou Peng, Kyle Genova, Chiyu Jiang, Andrea
+     work for object grounding in point cloud. In ICCV, pages                      Tagliasacchi, Marc Pollefeys, Thomas Funkhouser, et al.
+     3722–3731, 2021. 6                                                            Openscene: 3d scene understanding with open vocabularies.
+[10] Wenxuan Guo, Xiuwei Xu, Ziwei Wang, Jianjiang Feng, Jie                       In CVPR, pages 815–824, 2023. 2
+     Zhou, and Jiwen Lu. Text-guided sparse voxel pruning for                 [25] Charles Ruizhongtai Qi, Li Yi, Hao Su, and Leonidas J
+     efficient 3d visual grounding. In CVPR, pages 3666–3675,                      Guibas. Pointnet++: Deep hierarchical feature learning on
+     2025. 2, 6, 7                                                                 point sets in a metric space. In NeurIPS, 2017. 3
+[11] Zoey Guo, Yiwen Tang, Ray Zhang, Dong Wang, Zhigang                      [26] Zhipeng Qian, Yiwei Ma, Jiayi Ji, and Xiaoshuai Sun. X-
+     Wang, Bin Zhao, and Xuelong Li. Viewrefer: Grasp the                          refseg3d: Enhancing referring 3d instance segmentation via
+     multi-view knowledge for 3d visual grounding. In ICCV,                        structured cross-modal graph neural networks. In AAAI,
+     pages 15372–15383, 2023. 1, 2, 6, 7                                           pages 4551–4559, 2024. 1, 2, 6, 7
+[12] Lukas Höllein, Ang Cao, Andrew Owens, Justin Johnson,                   [27] Zhipeng Qian, Yiwei Ma, Zhekai Lin, Jiayi Ji, Xiawu Zheng,
+     and Matthias Nießner. Text2room: Extracting textured 3d                       Xiaoshuai Sun, and Rongrong Ji. Multi-branch collaborative
+     meshes from 2d text-to-image models. In ICCV, pages 7909–                     learning network for 3d visual grounding. In ECCV, pages
+     7920, 2023. 2                                                                 381–398, 2024. 1, 2, 3, 4, 6, 7, 8
+
+
+
+
+                                                                       2633
+[28] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya                        tention network for referring expression comprehension. In
+     Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,                     CVPR, pages 1307–1315, 2018. 2
+     Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learn-             [42] Zhihao Yuan, Xu Yan, Yinghong Liao, Ruimao Zhang,
+     ing transferable visual models from natural language super-               Sheng Wang, Zhen Li, and Shuguang Cui. Instancerefer:
+     vision. In ICML, pages 8748–8763, 2021. 2                                 Cooperative holistic understanding for visual grounding on
+[29] Sebastian Schuster, Ranjay Krishna, Angel Chang, Li Fei-                  point clouds through instance multi-level contextual refer-
+     Fei, and Christopher D Manning. Generating semantically                   ring. In ICCV, pages 1791–1800, 2021. 6, 7
+     precise scene graphs from textual descriptions for improved          [43] Zhihao Yuan, Xu Yan, Yinghong Liao, Yao Guo, Guanbin
+     image retrieval. In Proceedings of the fourth workshop on                 Li, Shuguang Cui, and Zhen Li. X-trans2cap: Cross-modal
+     vision and language, pages 70–80, 2015. 1, 5                              knowledge transfer using transformer for 3d dense caption-
+[30] Xiangxi Shi, Zhonghua Wu, and Stefan Lee. Viewpoint-                      ing. In CVPR, pages 8563–8573, 2022. 2
+     aware visual grounding in 3d scenes. In CVPR, pages 14056–           [44] Lichen Zhao, Daigang Cai, Lu Sheng, and Dong Xu. 3dvg-
+     14065, 2024. 1, 2, 3, 6, 7                                                transformer: Relation modeling for visual grounding on
+[31] Ozan Unal, Christos Sakaridis, Suman Saha, and Luc                        point clouds. In ICCV, pages 2928–2937, 2021. 7
+     Van Gool. Four ways to improve verbo-visual fusion for
+     dense 3d visual grounding. In ECCV, pages 196–213, 2024.
+     1, 6
+[32] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszko-
+     reit, Llion Jones, Aidan N Gomez, Łukasz Kaiser, and Illia
+     Polosukhin. Attention is all you need. In NeurIPS, 2017. 1,
+     5
+[33] Yuan Wang, Yali Li, and Shengjin Wang. Gˆ 3-lq: Marrying
+     hyperbolic alignment with explicit semantic-geometric mod-
+     eling for 3d visual grounding. In CVPR, pages 13917–13926,
+     2024. 1, 2, 3, 4, 6, 7
+[34] Zhaoqing Wang, Yu Lu, Qiang Li, Xunqiang Tao, Yandong
+     Guo, Mingming Gong, and Tongliang Liu. Cris: Clip-driven
+     referring image segmentation. In CVPR, pages 11686–
+     11695, 2022. 2
+[35] Changli Wu, Qi Chen, Jiayi Ji, Haowei Wang, Yiwei Ma,
+     You Huang, Gen Luo, Hao Fei, Xiaoshuai Sun, and Ron-
+     grong Ji. RG-SAN: Rule-guided spatial awareness network
+     for end-to-end 3d referring expression segmentation. In
+     NeurIPS, 2024. 1, 6, 7
+[36] Changli Wu, Yiwei Ma, Qi Chen, Haowei Wang, Gen Luo,
+     Jiayi Ji, and Xiaoshuai Sun. 3d-stmn: Dependency-driven
+     superpoint-text matching network for end-to-end 3d refer-
+     ring expression segmentation. In AAAI, pages 5940–5948,
+     2024. 1, 2, 6, 7
+[37] Hao Wu, Jiayuan Mao, Yufeng Zhang, Yuning Jiang, Lei
+     Li, Weiwei Sun, and Wei-Ying Ma. Unified visual-semantic
+     embeddings: Bridging vision and language with structured
+     meaning representations. In CVPR, pages 6609–6618, 2019.
+     1, 5
+[38] Yanmin Wu, Xinhua Cheng, Renrui Zhang, Zesen Cheng,
+     and Jian Zhang. Eda: Explicit text-decoupling and dense
+     alignment for 3d visual grounding. In CVPR, pages 19231–
+     19242, 2023. 1, 2, 3, 4, 6, 7
+[39] Zhengyuan Yang, Songyang Zhang, Liwei Wang, and Jiebo
+     Luo. Sat: 2d semantics assisted training for 3d visual
+     grounding. In ICCV, pages 1856–1866, 2021. 7
+[40] Zhengyuan Yang, Zhe Gan, Jianfeng Wang, Xiaowei Hu, Yu-
+     mao Lu, Zicheng Liu, and Lijuan Wang. An empirical study
+     of gpt-3 for few-shot knowledge-based vqa. In AAAI, pages
+     3081–3089, 2022. 2
+[41] Licheng Yu, Zhe Lin, Xiaohui Shen, Jimei Yang, Xin Lu,
+     Mohit Bansal, and Tamara L Berg. Mattnet: Modular at-
+
+
+
+
+                                                                   2634
+

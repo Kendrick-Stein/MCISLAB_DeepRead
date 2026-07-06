@@ -1,0 +1,733 @@
+                    This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                 Except for this watermark, it is identical to the accepted version;
+                           the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+   VLM-PTQ: Efficient Post-Training Quantization for Large Vision-Language
+                                   Models
+
+                                               Juncan Deng1 Kejie Huang1 *
+                                                  1
+                                                    Zhejiang University
+                                         {dengjuncan,huangkejie}@zju.edu.cn
+
+
+
+                            Abstract                              memory and computational requirements limit their use on
+                                                                  edge devices and increase costs in data centers. Therefore,
+Post-training quantization (PTQ) serves as a vital tech-          model compression methods like quantization are necessary
+nique for efficiently compressing large-scale models, with        to apply VLMs in real-world scenarios.
+weight-compensation methods such as GPTQ (symmetric                   Quantization compresses neural networks by mapping
+calibration) and GPTAQ (asymmetric calibration) show-             high-precision weights and activations to low-bit integer
+ing remarkable success. However, directly applying these          formats. This technique cuts memory and computation
+methods to Vision-Language Models (VLMs) exposes two              costs, yet it leaves the original architecture unchanged [13].
+notable shortcomings: 1) the standard rounding-to-nearest         Quantization methods generally fall into two categories.
+(RTN) method is suboptimal for the asymmetric objective,          Quantization-Aware Training (QAT) [15, 29, 34] learns
+failing to account for residual-induced shifts in the opti-       quantization parameters via gradient updates during a brief
+mal quantization target; and 2) all input channels are pro-       fine-tuning stage, but its computational demand makes it
+cessed uniformly across modalities, overlooking the distinct      impractical for large-scale models. Post-Training Quanti-
+information densities. In this paper, we introduce VLM-           zation (PTQ) [10, 12, 23] skips retraining and calibrates
+PTQ, an asymmetric post-training quantization framework           a frozen network. This approach significantly reduces
+for VLMs. First, we derive a closed-form correction term          computational costs, making it the standard choice for
+that shifts the quantization target, which explicitly accounts    most compression pipelines. As a primary PTQ method,
+for the output residual and the corresponding inverse Hes-        GPTQ [11] applies layer-wise calibration and exploits Hes-
+sian column, yielding a better local optimum than RTN.            sian information to correct the quantization error of each
+Second, we propose a modality-aware quantization that             weight column. Building upon this work, GPTAQ [22] in-
+differentiates channel importance between vision and lan-         troduces an asymmetric calibration. It propagates the pre-
+guage tokens, allowing the quantizer to pre-compute better        ceding layer’s output deviation to the current layer, where
+quantization parameters through a lightweight search. Our         it induces an output residual that drives the asymmetric ob-
+method extends weight-compensation methods with mini-             jective. This alignment matches the quantized layer to its
+mal overhead while achieving significant performance im-          full-precision target and limits error accumulation.
+provements in low-bit scenarios. Extensive experiments                While these techniques work well for Large Language
+demonstrate that VLM-PTQ achieves competitive results             Models (LLMs), transplanting them to VLMs without mod-
+compared to existing methods, effectively compressing mod-        ification reveals two shortcomings that we address in this
+els from 1B to 72B parameters on a single GPU.                    work. First, through analysis of the asymmetric objective,
+                                                                  we demonstrate that the optimal choice at each quantiza-
+                                                                  tion step is not simply applying RTN to the full-precision
+1. Introduction                                                   weight. The continuous optimum adds a closed-form cor-
+                                                                  rection term to the original weight. This specific correction
+Recent Vision-Language Models (VLMs) [5, 17, 27, 36–
+                                                                  depends on the output residual and the matching column of
+38, 40, 47] show strong abilities in understanding and pro-
+                                                                  the inverse Hessian. The actual optimal point is the level
+cessing multi-modal information. These models range from
+                                                                  closest to this corrected weight, instead of the raw weight.
+1 billion to over 72 billion parameters and achieve high ac-
+                                                                      PTQ methods assign equal weights to all input chan-
+curacy across various vision-language tasks. However, such
+                                                                  nels during the calculation of quantization parameters. In
+massive sizes make practical deployment difficult. High
+                                                                  VLMs, vision and language tokens have completely differ-
+  * Corresponding Authors                                         ent statistics and information densities. Since the Hessian
+
+
+
+                                                             24696
+is computed over all tokens jointly, the bias in the Hessian      isolation of extreme channels [10], activation smoothing
+leads to imbalanced quantization parameters and degrades          to suppress outliers [8, 9, 19, 20, 41], channel reorder-
+performance. We address this by computing separate Hes-           ing [21, 43], and weight rotations [2, 3, 14, 29]. Con-
+sians for vision and language tokens and fusing them to           versely, weight-compensation methods focus on the distor-
+build a modality-aware importance vector. The awareness           tion from quantized weights and cancel it out. OBQ [12]
+coefficient is chosen through a lightweight search that min-      and GPTQ [11] formulate a layer-wise reconstruction ob-
+imizes a small-sample output error proxy. Consequently,           jective and then apply Hessian information to update re-
+the process steers the quantizer toward the critical channels.    maining full-precision weights after each quantization step.
+    Our main contributions are summarized as follows:             GPTAQ [22] extends these approaches through an asym-
+• We identify and correct a suboptimality in weight-              metric calibration mechanism that propagates prior-layer
+   compensation methods by deriving a closed-form cor-            output deviations as a residual to align each layer’s quan-
+   rection term that shifts the quantization target, which ex-    tized output with its full-precision target. However, when
+   plicitly accounts for residual-induced shifts and yields a     directly applied to VLMs, these methods exhibit two critical
+   better local optimum.                                          shortcomings: they overlook residual-induced shifts in the
+• We introduce a modality-aware quantization that differ-         optimal quantization target and fail to account for modality-
+   entiates channel importance between vision and language        specific channel importance, limiting their effectiveness in
+   tokens, enabling the quantizer to prioritize salient chan-     multi-modal compression scenarios.
+   nels and alleviate modality imbalance in VLMs.
+• We provide an efficient implementation that integrates          3. Background
+   seamlessly with weight-compensation methods, requiring
+                                                                  3.1. Notations
+   only minimal changes while achieving competitive results
+   in low-bit settings across diverse VLMs.                      Throughout this paper, we use row-vector conventions for
+                                                                 clarity. Lowercase boldface symbols (e.g., w ∈ R1×n )
+2. Related Work                                                  represent vectors, while uppercase boldface symbols (e.g.,
+                                                                 W ∈ Rm×n ) denote matrices. Linear transformations take
+Large Vision-Language Models. Vision-language mod-               the form y = wX, in which w stands for a row-vector
+els [1, 6, 18, 25, 26] evolve from early cross-modal ar-         of weights, X ∈ Rn×k captures the input activations with
+chitectures into foundation models that jointly reason over      feature dimension n, and y ∈ R1×k holds the computed
+images and text. Architecturally, these models contain           output. We write ŵq = RTN(wq ) for the q-th quantized el-
+three main components. A vision encoder extracts visual          ement. When a negative subscript appears, it signals the ex-
+features from images. A projection layer maps these vi-          clusion of a particular row; for instance, X−q ∈ R(n−1)×k
+sual representations into the embedding space of the lan-        is the matrix X after dropping its q-th row.
+guage model. Finally, a large language model (LLM) back-
+bone processes the fused multimodal tokens and gener-            3.2. Vision-Language Models
+ates textual responses. This design directly combines vi-        Modern large vision-language models (VLMs) [5, 36–38,
+sual and linguistic information, allowing the LLM to rea-        40, 47] achieve remarkable progress in processing multi-
+son over both modalities simultaneously. Recent architec-        modal data spanning text, images, and videos. These mod-
+tures [17, 24, 39, 42, 46] perform well on tasks such as vi-     els typically consist of three core components: a vision en-
+sual question answering, image captioning, and multimodal        coder V, a cross-modal adapter A, and a large language
+reasoning. The latest generation [5, 36–38, 40, 47] scales       model L. Notably, the language model accounts for the vast
+up parameter counts. These models also introduce struc-          majority of the parameter count. For example, the language
+tural updates, such as dynamic resolution adaptation and         model has 32B parameters in InternVL-3-38B-Instruct.
+improved cross-modal alignment mechanisms. As these                  Given an input image I ∈ RH×W ×3 and text prompt
+models scale to tens of billions of parameters, their mem-       t, the VLM processes them through the following pipeline.
+ory and computational footprints grow accordingly, creat-        First, the vision encoder extracts visual features:
+ing significant deployment barriers on edge devices.
+   Post-Training Quantization. Post-Training Quantiza-                              Zv = V(I) ∈ Rnv ×dv ,                   (1)
+tion (PTQ) serves as a primary method for the compression
+                                                                 where nv is the number of visual tokens and dv is the vi-
+of large-scale models without additional training cost [13].
+                                                                 sion embedding dimension. Then, the adapter projects these
+Existing PTQ approaches can be broadly categorized into
+                                                                 features to the hidden dimension of the language model. Si-
+distribution-shaping techniques and weight-compensation
+                                                                 multaneously, the tokenizer T converts the text prompt into
+frameworks. Distribution-shaping methods reduce the diffi-
+                                                                 token embeddings:
+culty of low-bit mapping by modifying activation or weight
+statistics before quantization, including mixed-precision               Hv = A(Zv ) ∈ Rnv ×d , Ht = T (t) ∈ Rnt ×d ,       (2)
+
+
+
+                                                             24697
+where d is the hidden dimension of the language model and
+nt represents the number of text tokens. The visual and tex-
+tual embeddings are then interleaved according to a vision
+mask v ∈ {0, 1}nv +nt , where vi = 1 indicates position i
+contains a visual token:
+           X = Interleave(Hv , Ht , v) ∈ R(nv +nt )×d .     (3)
+Finally, the language model processes the combined repre-
+sentation to generate the output.
+3.3. GPTQ
+GPTQ [11] extends the framework of OBQ [12], inherit-
+ing its Hessian optimization strategy while introducing key
+innovations that enable practical large-scale deployment.
+OBQ addresses the problem of compressing floating-point
+model weights w into low-bit integer codes ŵ by minimiz-
+ing the layer-wise output discrepancy:
+  min ||(w + ∆w)X − wX||2F , s.t. ∆w = ŵ − w, (4)
+      ∆w
+
+where X denotes the layer input from the previous quan-
+tized layer. For each weight coordinate q, OBQ identifies
+the best quantized level and corresponding compensation
+∆w via:
+               (ŵq − wq )2            (ŵq − wq )
+ q = arg min                 , ∆w =                  · (H−1
+                                                          q,: ),    Figure 1. Visualization of (a) per-layer output activation MAE
+          q         H−1
+                     qq                   H  −1
+                                             qq                     of W3A16 Qwen2.5-VL-7B-Instruct, (b) relative accuracy on 8
+                                                             (5)
+                                                                    benchmarks compared with the original 7B model, (c) relative av-
+in which H = XX⊤ is the Hessian matrix and H−1 de-                  erage accuracy compared with 6 models with different parameters,
+notes its inverse. After the quantization of each coordinate,       (d) W3A16 model output and its MAE distributions.
+Gaussian elimination updates the inverse Hessian:
+                                         H−1      −1 
+                                            :,q Hq,:
+    H−1−q  = (X  −q X ⊤ −1
+                      −q )   =   H −1
+                                       −                .    (6)
+                                            H−1 qq                  GPTAQ formulates a Lagrangian to solve constrained opti-
+                                                                    mization:
+The direct formulation of OBQ requires massive compu-
+tation, which is unsuitable for modern large-scale mod-                   L = ||∆wX − r||2F + λ(∆we⊤
+                                                                                                   q + wq − ŵq ).              (9)
+els. GPTQ overcomes this limitation by leveraging im-
+                                                                   Setting the derivatives of L to zero yields better weight com-
+proved parallelization strategies and a numerically stable
+                                                                   pensation:
+Cholesky-based reformulation, making Hessian calculation
+feasible and reliable.                                                               (ŵq − wq )               ⊤ −1
+                                                                             ∆w =                · (H−1
+                                                                                                     q,: ) + rX H−q .          (10)
+3.4. GPTAQ                                                                              H−1
+                                                                                          qq
+
+                                                                    This compensation combines the GPTQ update with an ad-
+GPTAQ [22] addresses the accumulation of quantization er-
+                                                                    ditional term based on the propagated output residual.
+rors across layers through an asymmetric calibration strat-
+egy. Unlike GPTQ, GPTAQ maintains fidelity to the orig-
+                                                                    4. Method
+inal model’s full-precision layer inputs X̃, where the dis-
+crepancy (X̃ − X) arises from preceding quantized layers.           4.1. Closed-form Correction Term
+This difference results in a modified objective function:
+                                                                    As derived in Section 3.4, substituting ∆w into the La-
+  min ||(w + ∆w)X − wX̃||2F , s.t. ∆w = ŵ − w. (7)                 grangian L yields the per-column loss function for the quan-
+      ∆w
+                                                                    tization of the q-th weight column:
+GPTAQ defines the output residual as r = wX̃ − wX,
+                                                                              (ŵq − wq )2
+which transforms the problem into:                                       Lq =               + rr⊤ − rX⊤ H−1
+                                                                                                         −q Xr
+                                                                                                               ⊤
+                                                                                   H−1
+                                                                                     qq
+min min{||∆wX − r||2F } s.t. ∆we⊤
+                                                                                                                              (11)
+                                   q + wq − ŵq = 0 .                           (ŵq − wq ) ⊤ −1
+  q        ∆w
+                                                                             −2            rX H:,q .
+                                                            (8)                    H−1
+                                                                                     qq
+
+
+
+
+                                                               24698
+                  50                                                              0.100
+                             GPTAQ                                                                                                                2k    Language
+
+
+
+
+                                                                                          Closed-form Correction Cq       Mean of Diag Hessian
+                  40         VLM-PTQ                                              0.075
+                                                                                                                                                        Vision
+                                                                                                                                                  2k
+
+
+
+
+Channel-wise Lq
+                                                                                  0.050
+                  30                                                              0.025
+                                                                                                                                                  1k
+                                                                                  0.000
+                  20                                                                                                                              1k
+                                                                                   0.025
+                  10                                                               0.050                                                         500
+                                                                                   0.075
+                  0                                                                                                                               0
+                        0    2500   5000   7500   10000   12500   15000   17500                                                                         0
+                                                                                                                                                        1
+                                                                                                                                                        2
+                                                                                                                                                        3
+                                                                                                                                                        4
+                                                                                                                                                        5
+                                                                                                                                                        6
+                                                                                                                                                        7
+                                           Input channel                                                                                                              Layer Index
+                                                                                                                                                        8
+                                                                                                                                                        9
+                                                                                                                                                       10
+                                                                                                                                                       11
+                                                                                                                                                       12
+                                                                                                                                                       13
+                                                                                                                                                       14
+                                                                                                                                                       15
+                                                                                                                                                       16
+                                                                                                                                                       17
+                                                                                                                                                       18
+                                                                                                                                                       19
+                                                                                                                                                       20
+                                                                                                                                                       21
+                                                                                                                                                       22
+                                                                                                                                                       23
+                                                                                                                                                       24
+                                                                                                                                                       25
+                                                                                                                                                       26
+                                                                                                                                                       27
+
+
+
+Figure 2. Channel-wise quantization loss Lq and correction                                                                 Figure 3. Magnitude disparity between vision and language Hes-
+term Cq in the last down-proj layer of W3A16 Qwen2.5-VL-7B-                                                                sians across layers in the original 7B VLM, where the standard
+Instruct, where VLM-PTQ adopts correction term in Eq. 19.                                                                  quantizer is biased toward the modality with the larger Hessian.
+
+
+
+GPTAQ employs round-to-nearest (RTN) quantization,                                                                         By exploiting the structure of the weight matrix update,
+which selects the quantized value closest to the original                                                                  each row of W can be processed independently. Specifi-
+weight wq . However, we demonstrate that the RTN strategy                                                                  cally, for the m-th row and q-th column, the correction term
+is suboptimal under the asymmetric calibration objective:                                                                  simplifies to Wm,q ·(∆Xq,: X⊤          −1
+                                                                                                                                                             q,: H:,q ), where the scalar fac-
+                                                                                                                                               −1
+                                                                                                                           tor (∆Xq,: X⊤  q,: H:,q ) is shared across all rows. This allows
+                                    RTN(wq ) ̸= arg min Lq .                               (12)
+                                                          ŵq ∈Q                                                           us to precompute a correction vector C ∈ Rn as:
+We compute the derivative of Lq with respect to ŵq and set                                                                                            C = diag(∆XX⊤ H−T ) ⊙ diag(H−T ),   (18)
+the result to zero:
+                                                                                                                           where ⊙ denotes element-wise multiplication, and H−T =
+                       ∂Lq     2(ŵq − wq )   2
+                             =       −1     − −1 rX⊤ H−1
+                                                      :,q = 0.                             (13)                            (H−1 )⊤ . Computing C introduces minimal overhead:
+                       ∂ ŵq       Hqq       Hqq                                                                           ∆XX⊤ is already computed in the residual decomposition
+Solving for ŵq gives the continuous optimum:                                                                              of the original pipeline. Extracting diagonal elements from
+                                                                                                                           (∆XX⊤ )H−T takes O(n2 ) operations.
+                                     ŵq∗ = wq + rX⊤ H−1
+                                                      :,q .                                (14)                               Each element Cq serves as a correction coefficient for
+                                                                                                                           the corresponding column. The corrected quantization point
+Since H−1 is positive definite (as H is regularized via
+                                ∂2L                                                                                        for column q becomes:
+damping), the second derivative ∂ ŵ2q = H2−1 > 0 confirms
+                                    q      qq
+this is a minimum. Under the discrete constraint ŵq ∈ Q,                                                                                                 Ŵ:,q = RTN(W:,q · (1 + Cq )).   (19)
+where Q denotes the set of quantization levels, we find the                                                                   As shown in Figure 2, we analyze the impact of the closed-
+quantized value that minimizes Lq . We define the correc-                                                                     form correction term on the channel-wise Lq . Our cor-
+tion term δ = rX⊤ H−1:,q and complete the square in Eq. 11:                                                                   rection term shifts the quantization target from the original
+                                     1                  2
+                                                                                                                              weight to the theoretical optimum of the asymmetric objec-
+                            Lq =        [ŵq − (wq + δ)] + const.                          (15)                               tive, thus minimizing Lq , whereas GPTAQ yields a higher
+                                    H−1
+                                     qq
+                                                                                                                              loss due to the RTN strategy.
+As a result, the discrete optimal solution becomes:
+                                                                                                                              4.2. Modality-Aware Quantization
+            ŵqopt = arg min |x − (wq + δ)| = RTN(wq + δ).                                 (16)
+                                x∈Q                                                                                           A second challenge arises from the modality imbalance.
+The optimal quantized weight aligns with the nearest quan-                                                                    Specifically, the quantizer in existing methods treats all
+tization level to (wq + δ) rather than wq . When the cor-                                                                     input channels uniformly, without accounting for the dis-
+rection term is non-zero (δ ̸= 0), RTN deviates from the                                                                      tinct characteristics of the vision and language modalities.
+optimal solution.                                                                                                             This uniform treatment causes quantization parameters to
+   We apply the neuron decomposition technique from GP-                                                                       be dominated by the statistically dominant modality. There-
+TAQ to compute the correction term. The output residual                                                                       fore, we propose a modality-aware quantization strategy
+can be decomposed as r = W∆X, where ∆X = X̃ − X.                                                                              that explicitly decouples vision and language contributions
+For the q-th weight column, the correction term becomes:                                                                      to compute the input-channel importance score.
+                                                                                                                                 Given the input activation matrix X ∈ Rn×k comprising
+                             δq = rX⊤ H−1        ⊤ −1
+                                       :,q = W∆XX H:,q .                                   (17)                               k tokens, we employ a binary mask v ∈ {0, 1}k to distin-
+
+
+
+                                                                                                                      24699
+                                                                        Algorithm 1 VLM-PTQ for one linear layer in VLMs
+                                                                       Require: FP weight W ∈ Rm×n , quantized input X ∈
+                                                                         Rn×k , full-precision input X̃, vision mask v ∈ {0, 1}k ,
+                                                                         block size B, damp params λ1 , strictly upper-triangular
+                                                                         mask maskU
+                                                                       Ensure: Quantized weight Ŵ
+                                                                         H ← XX⊤ , Hv ← X:,v X⊤                        ⊤
+                                                                                                     :,v , Hl ← X:,¬v X:,¬v
+                                                                         L = Inverse
+                                                                                       Cholesky(H +     λ1 I)
+                                                                           P ← (∆XX⊤ L) ⊙ maskU L⊤
+                                                                           E ← 0m×B
+Figure 4. Visualization of awareness coefficient µ in input lay-
+                                                                           C = diag(∆XX⊤ H−T ) ⊙ diag(H−T )
+ers of W3A16 Qwen2.5-VL-7B-Instruct, which shows the varying
+                                                                           Mµ = µ · diag(Hv ) + (1 − µ) · diag(Hl )
+modality sensitivities across different layers.
+                                                                           µ∗ , S∗ , Z∗ ← arg min ∥WX̃ − RTN(W, Mµ )X∥22
+                                                                           for i = 0, B, 2B, . . . do
+                                                                                for j = i, i + 1, . . . , i + B − 1 do
+guish vision tokens (vi = 1) from language tokens (vi = 0).                          Ŵ:,j ← RTN(W:,j · (1 + Cj ); S∗ , Z∗ )
+We compute a separate Hessian matrix for each modality:                              E:,j−i ← (W:,j − Ŵ:,j )/Ljj
+           Hv = X:,v X⊤
+                      :,v ,     Hl = X:,¬v X⊤
+                                            :,¬v ,         (20)                      W:,j:(i+B) ← W:,j:(i+B) − E:,j−i L⊤ j,j:(i+B)
+
+                                                                                              + W:,j Pj,j:(i+B)
+where X:,v ∈ Rn×|v| represents the columns of the vision
+                                                                              end for
+tokens and X:,¬v ∈ Rn×(k−|v|) represents the columns of                       W:,(i+B): ← W:,(i+B): − E · L⊤
+                                                                                                           i:(i+B),(i+B):
+the language tokens. Both Hv and Hl are n × n matrices.
+   To obtain the modality-aware importance vector, we ex-                                     + W:,i:(i+B) Pi:(i+B),(i+B):
+tract the diagonal elements of each Hessian matrix:                        end for
+                                                                           return Ŵ
+          Hdiag
+           v    = diag(Hv ),     Hdiag
+                                  l    = diag(Hl ).        (21)
+Figure 3 illustrates the magnitude disparity between vision
+                                                                        Figure 4 visualizes the resulting µ distribution across input
+and language Hessians across layers. Without rebalancing,
+                                                                        layers. The plot shows the distinct sensitivity of different
+the quantizer is biased toward the modality with the larger
+                                                                        layers to vision versus language modalities.
+Hessian, leading to high initial quantization errors. There-
+                                                                           Finally, we integrate both the closed-form correction
+fore, we combine these statistics into a single modality-
+                                                                        term and the modality-aware quantization into a unified
+aware importance vector:
+                                                                        quantization procedure. The corrected quantization point
+             Mµ = µ · Hdiag
+                       v    + (1 − µ) · Hdiag
+                                         l ,               (22)         for the q-th weight column is computed as:
+where µ ∈ [0, 1] is a layer-wise awareness coefficient that                       Ŵ:,q = RTN W:,q · (1 + Cq ); S∗ , Z∗ .
+                                                                                                                          
+                                                                                                                                 (26)
+adaptively balances the relative contribution of vision and
+language modalities. Mµ directly guides the calculation
+process of the quantization parameter.                                 5. Experiments
+   Specifically, when determining per-channel (or per-
+                                                                       Models. We conduct experiments on open-source VLMs
+group) quantization scales S and zero-points Z, we incorpo-
+                                                                       ranging from 1B to 72B parameters, including Qwen2.5-
+rate Mµ as a weighting term in the reconstruction objective,
+                                                                       VL-3B/7B/72B-Instruct [37] and InternVL3-1B/14B/38B-
+thereby prioritizing channels with higher importance:
+                    X                                                  Instruct [47]. All models are quantized on a single NVIDIA
+ S∗ , Z∗ = arg min      Mµn · ∥Wn − RTN(Wn ; S, Z)∥22 ,                H20 GPU with 96GB of memory.
+                S,Z
+                      n                                                    Setup. We implement the methods in PyTorch [33]. We
+                                                           (23)        apply 2 bits per-group asymmetric quantization (g128) and
+                 Ŵµ = RTN(W; S∗ , Z∗ ).                   (24)        3-4bits per-channel symmetric quantization for weights,
+The optimal awareness coefficient µ in Eq. 22 is determined            and per-token asymmetric quantization for activations. The
+through a lightweight grid search over a few candidates                calibration process matches the GPTAQ [22] configuration.
+(e.g., 6). For each candidate µ, we evaluate the output re-            The clipping ratio for input activations is set to 0.9, while
+construction error on a small calibration batch:                       the weight clipping range is searched by minimizing the
+                                                                       mean squared error [11]. We disable act order across
+             µ∗ = arg min ∥WX̃ − Ŵµ X∥22 .                (25)        all experiments to match the logic of quantized inference.
+                          µ
+
+
+
+
+                                                                   24700
+Table 1. Performance of 3-bit and 2-bit weight-only quantization on eight benchmarks: ChartQA, DocVQA (Validation set), MME-
+RealWorld (English), MME-RealWorld (Chinese), OCRBench, ScienceQA, SeedBench 2 Plus, and TextVQA (Validation set).
+
+     Model          Method     Bits   Chart    Docval   MMEen      MMEcn     OCR      SciQA    Seed2+    Textval   Avg (↑)
+                     FP16       -      75.1     80.2     39.0       31.9     78.8      91.1     58.3      73.8      66.0
+  InternVL3-1B      GPTQ        3      61.0     64.5     32.4       26.7     64.5      67.6     48.4      61.8      53.4
+     -Instruct      GPTAQ       3      64.0     66.4     30.6       28.2     64.6      74.5     51.6      62.0      55.2
+                     Ours       3      66.6     72.7     28.0       19.0     71.7      82.1     52.0      69.9      57.8
+                     FP16       -      83.3     82.9     50.1       40.4     78.2      83.4     68.1      78.9      70.6
+                    GPTQ        3      72.7     78.9     39.6       30.8     66.2      74.2     58.6      68.4      61.2
+                    GPTAQ       3      73.0     79.8     43.9       32.1     67.0      74.4     59.9      70.8      62.6
+  Qwen2.5-VL
+                     Ours       3      73.3     86.9     45.9       36.3     71.2      75.2     64.3      74.1      65.9
+  -3B-Instruct
+                    GPTQ        2      25.7     19.1     17.9        0.9     36.5      30.8      7.9      34.8      21.7
+                    GPTAQ       2      28.6     22.8     16.2        3.2     38.6      32.3      3.3      37.4      22.8
+                     Ours       2      40.4     45.0     26.4       25.8     45.2      28.9     30.1      53.6      36.9
+                     FP16       -      83.8     94.9     58.7       52.8     84.7      88.8     70.9      83.0      77.2
+                    GPTQ        3      62.5     87.8     38.4       30.9     76.4      73.4     61.3      78.7      63.8
+                    GPTAQ       3      61.8     87.6     38.4       34.9     76.0      77.8     64.5      79.0      65.0
+  Qwen2.5-VL
+                     Ours       3      69.8     92.3     51.3       43.8     80.2      84.1     67.9      81.4      71.3
+  -7B-Instruct
+                    GPTQ        2      51.4     64.4     32.3        8.6     66.0      26.4     20.1      67.1      42.0
+                    GPTAQ       2      50.5     65.6     38.2        5.3     67.8      27.7     22.2      67.2      43.1
+                     Ours       2      55.8     69.1     45.9       20.3     69.8      31.9     23.1      71.3      48.4
+                     FP16       -      87.8     92.9     58.5       53.9     83.8      98.0     70.2      80.9      78.2
+                    GPTQ        3      77.3     80.8     37.8       35.9     73.7      90.9     65.8      73.6      67.0
+                    GPTAQ       3      80.8     82.6     46.9       36.1     76.8      92.6     67.6      74.4      69.7
+ InternVL3-14B
+                     Ours       3      84.7     90.3     54.7       52.3     82.4      95.0     68.8      79.5      76.0
+     -Instruct
+                    GPTQ        2      52.8     65.3     36.4       32.8     61.3      66.3     50.3      67.8      54.1
+                    GPTAQ       2      54.2     68.1     36.7       32.2     62.6      69.6     55.6      70.1      56.1
+                     Ours       2      58.2     79.6     42.0       39.4     70.2      77.7     61.1      73.5      62.7
+                     FP16       -      88.7     93.3     61.1       60.0     85.1      98.6     71.5      83.6      80.2
+                    GPTQ        3      74.8     83.5     45.8       38.9     77.4      89.1     65.9      77.8      69.2
+                    GPTAQ       3      83.6     85.7     48.3       38.8     79.6      96.0     68.6      81.2      72.7
+ InternVL3-38B
+                     Ours       3      86.7     90.8     57.4       57.1     83.2      97.2     70.4      82.6      78.2
+     -Instruct
+                    GPTQ        2      59.8     76.7     38.4       34.7     71.0      67.4     53.6      73.8      59.4
+                    GPTAQ       2      57.4     70.7     42.3       39.1     78.7      79.4     55.7      80.3      62.9
+                     Ours       2      66.9     88.3     43.8       45.8     80.1      81.8     67.4      81.1      69.4
+                     FP16       -      88.4     95.6     57.5       51.5     83.8      94.1     72.7      82.0      78.2
+                    GPTQ        3      72.8     82.0     44.3       37.6     76.2      87.2     64.4      76.5      68.1
+                    GPTAQ       3      81.5     84.2     46.8       37.4     78.4      94.3     67.2      79.9      71.2
+  Qwen2.5-VL
+                     Ours       3      85.2     89.4     56.2       55.8     82.1      95.7     69.2      81.4      76.9
+  -72B-Instruct
+                    GPTQ        2      58.2     75.3     37.2       33.5     69.8      65.8     52.2      72.9      58.1
+                    GPTAQ       2      55.9     69.3     40.8       37.8     77.4      77.4     54.3      78.5      61.4
+                     Ours       2      65.2     86.5     42.5       44.4     78.9      79.9     65.7      79.6      67.8
+
+
+We only quantize language models in VLMs for fair com-          OCRBench [28], ScienceQA [30], SeedBench 2 Plus [16],
+parison. We select the improved COCO Caption dataset            and TextVQA [35], comprehensively measuring the text
+introduced by ShareGPT4V [4] and randomly sample 128            recognition, visual perception, and visual reasoning capa-
+text-image pairs as our calibration set.                        bilities of models. All experiments are run with Flash At-
+                                                                tention [7] and default configurations.
+   Datasets.     We conduct an extensive evaluation
+of quantized VLMs using multiple challenging vision-            5.1. Weight-Only Quantization
+language tasks based on the LMMs-Eval framework [44].
+Specifically, we employ representative tasks including          As shown in Figure 1, we first evaluate our method in the
+ChartQA [31], DocVQA [32], MME-RealWorld [45],                  weight-only quantization setting, which is a standard bench-
+
+
+
+                                                           24701
+Table 2. Performance of W2A8KV8 quantization on eight benchmarks: ChartQA, DocVQA (Validation set), MME-RealWorld (English),
+MME-RealWorld (Chinese), OCRBench, ScienceQA, SeedBench 2 Plus, and TextVQA (Validation set).
+
+       Model         Method      Chart    Docval    MMEen      MMEcn      OCR     SciQA     Seed2+     Textval   Avg (↑)
+                      FP16        83.3     82.9      50.1       40.4      78.2     83.4      68.1       78.9      70.6
+   Qwen2.5-VL        GPTQ         21.8     16.3      15.4       0.7       32.8     27.5       6.1       31.3      18.7
+   -3B-Instruct      GPTAQ        24.0     18.9      13.9       2.5       34.7     28.9       2.7       33.7      19.8
+                      Ours        35.2     39.3      22.8       21.5      41.8     26.3      26.7       48.3      32.7
+                      FP16        83.8     94.9      58.7       52.8      84.7     88.8      70.9       83.0      77.2
+   Qwen2.5-VL        GPTQ         48.3     58.9      29.2       6.5       61.8     21.8      17.3       62.4      38.0
+   -7B-Instruct      GPTAQ        47.4     60.2      34.3       4.2       63.5     23.2      18.9       62.8      39.3
+                      Ours        52.2     64.7      40.4       15.7      67.1     28.5      20.2       68.0      44.6
+                      FP16        87.8     92.9      58.5       53.9      83.8     98.0      70.2       80.9      78.2
+  InternVL3-14B      GPTQ         47.5     55.5      21.5       23.0      60.1     53.8      33.7       64.6      45.0
+      -Instruct      GPTAQ        47.5     56.2      21.3       17.8      57.3     63.1      39.4       66.5      46.1
+                      Ours        52.6     73.7      37.5       27.2      64.6     70.0      45.4       68.9      55.0
+                      FP16        88.7     93.3      61.1       60.0      85.1     98.6      71.5       83.6      80.2
+  InternVL3-38B      GPTQ         54.3     70.2      34.3       29.8      67.2     59.3      48.3       70.4      54.2
+      -Instruct      GPTAQ        52.6     64.8      37.6       33.5      72.8     71.3      50.3       75.8      57.3
+                      Ours        61.5     82.7      40.3       41.4      76.2     76.4      62.8       77.3      64.1
+                      FP16        88.4     95.6      57.5       51.5      83.8     94.1      72.7       82.0      78.2
+   Qwen2.5-VL        GPTQ         52.8     68.7      33.2       28.8      66.1     57.8      46.9       69.3      52.9
+   -72B-Instruct     GPTAQ        51.3     63.4      36.4       32.2      71.6     69.5      48.9       74.2      55.9
+                      Ours        59.8     80.9      38.9       39.9      75.1     74.3      60.6       75.8      63.2
+
+
+mark for VLM PTQ. As presented in Table 1, our method           2 Plus moves from 22.2% to 23.1%. The improvements
+outperforms existing baselines across eight challenging         extend across the entire model spectrum: InternVL3-38B-
+vision-language benchmarks, spanning diverse VLM fam-           Instruct reaches 69.4% versus 62.9%, and Qwen2.5-VL-
+ilies and model scales from 1B to 72B parameters. Under         72B-Instruct attains 67.8% versus 61.4%, with particularly
+3-bit quantization, our method achieves substantial gains       strong improvements on OCRBench from 77.4% to 78.9%
+across all evaluated models. On the Qwen2.5-VL-7B-              and DocVQA from 69.3% to 86.5%. These results validate
+Instruct, our method improves the average accuracy from         the generalizability of the proposed method across differ-
+65.0% to 71.3%, with pronounced gains on text-intensive         ent architectures and scales. Our method accurately mod-
+tasks such as DocVQA from 87.6% to 92.3% and MME-               els and compensates for the complex errors from low-bit
+RealWorld English from 38.4% to 51.3%. The InternVL3            weight quantization. Consequently, it preserves the vision-
+series exhibits similar trends across all sizes: InternVL3-     language alignment and multimodal reasoning capabilities
+14B-Instruct reaches 76.0% versus 69.7% with 97.2% of           of VLMs even under extreme compression constraints.
+FP16 performance retained, and InternVL3-38B-Instruct at-
+tains 78.2% average accuracy. Notably, on the massive           5.2. Weight-Activation Quantization
+Qwen2.5-VL-72B-Instruct, our method achieves 76.9% av-
+erage accuracy, retaining 98.3% of the FP16 performance         To further validate the efficacy of our method, we extend the
+while using only 3 bits per weight. Breaking down the           evaluation to the challenging weight-and-activation quanti-
+results by benchmark categories reveals that our method         zation setting. As presented in Table 2, our method achieves
+excels on tasks requiring fine-grained visual understanding     substantial performance improvements across all evaluated
+and text recognition, such as OCRBench and DocVQA.              VLM models under the W2A8KV8 configuration. For
+                                                                the Qwen2.5-VL-7B-Instruct model, our method achieves
+   To assess robustness under extreme compression, we           44.6% average accuracy, surpassing GPTAQ by 5.3 percent-
+extend our evaluation to 2-bit quantization, in which our       age points. Multimodal understanding tasks show specific
+method maintains higher accuracy than the baselines. At         gains: DocVQA increases from 60.2% to 64.7%, MME-
+2-bit precision, the Qwen2.5-VL-7B-Instruct average ac-         RealWorld English improves from 34.3% to 40.4%, and
+curacy increases from 43.1% to 48.4%. Vision-language           SeedBench 2 Plus gains from 18.9% to 20.2%. Similar per-
+reasoning tasks demonstrate clear gains: MME-RealWorld          formance gains are observed on the InternVL3-14B-Instruct
+Chinese accuracy rises from 5.3% to 20.3%, and SeedBench        model, where our method improves the average accuracy
+
+
+
+                                                           24702
+Table 3. Ablation study on the effectiveness of closed-form correction term C and modality-aware importance vector M under W3A16
+quantization. We evaluate on MME-RealWorld (English) and average accuracy across eight VLM benchmarks. M.5 denotes µ is fixed to
+0.5 across all layers. ’Mem’ and ’Time’ denote the memory usage and time consumption of calibrating one layer, respectively.
+
+                                                                                                     Qwen2.5-VL-7B-Instruct
+ Method           ∆W
+                                                                                                  Mem    Time MMEen Avg
+ FP16             -                                                                                 -      -      58.7    77.2
+ GPTQ             −[(W:,j − RTN(W:,j ))/Ljj ]L⊤
+                                              j,j:(i+B)                                          0.5GB 748s       38.4    63.8
+ GPTAQ            −[(W:,j − RTN(W:,j ))/Ljj ]L⊤
+                                              j,j:(i+B) + W:,j Pj,j:(i+B)                        0.7GB 921s       38.4    65.0
+ GPTAQ+C          −[(W:,j − RTN(W:,j · (1 + Cj )))/Ljj ]L⊤  j,j:(i+B) + W:,j Pj,j:(i+B)          0.7GB 955s       40.6    66.2
+ GPTAQ+M.5        −[(W:,j − RTN(W:,j , M.5 ))/Ljj ]L⊤j,j:(i+B) + W:,j Pj,j:(i+B)                 0.7GB 970s       49.2    69.8
+          ∗                               ∗
+ GPTAQ+Mµ         −[(W:,j − RTN(W:,j , Mµ ))/Ljj ]L⊤  j,j:(i+B) + W:,j Pj,j:(i+B)                0.9GB 1008s      50.4    70.4
+                                                       ∗
+ Ours             −[(W:,j − RTN(W:,j · (1 + Cj ), Mµ ))/Ljj ]L⊤    j,j:(i+B) + W:,j Pj,j:(i+B)   0.9GB 1020s      51.3    71.3
+
+
+
+from 46.1% to 55.0%, an absolute gain of 8.9%.                      is further enhanced to 71.3% average accuracy, surpassing
+    Larger models show even wider accuracy margins. For             the GPTAQ baseline by 6.3 percentage points and achiev-
+the Qwen2.5-VL-72B-Instruct model, our method improves              ing 92.3% of the FP16 performance. These results show
+average accuracy from 55.9% to 63.2%, while remark-                 that the two components address complementary aspects of
+ably preserving 80.8% of the FP16 performance even under            the quantization problem.
+such extreme compression. On the InternVL3-38B-Instruct                Our method also remains computationally efficient. The
+model, our method achieves 64.1% average accuracy versus            calibration time increases from 921 seconds for GPTAQ
+57.3% for GPTAQ, with strong gains on OCRBench from                 to 1020 seconds for our full method, representing approx-
+72.8 to 76.2 and DocVQA from 64.8% to 82.7%. These re-              imately 99 seconds of additional computation time. The
+sults indicate that our modality-aware quantization strategy        memory footprint per layer grows from 0.7GB to 0.9GB, a
+effectively addresses the complex errors introduced by si-          modest increase of 0.2GB that remains within the capacity
+multaneous weight and activation quantization. Ultimately,          constraints of modern GPUs. The baseline GPTQ method
+it reduces the memory footprint and computational cost of           needs 748 seconds and 0.5GB of memory per layer. Against
+large-scale VLMs for practical deployment.                          this baseline, our method provides a 7.5 percentage point
+                                                                    accuracy gain. This favorable trade-off between accuracy
+5.3. Ablation Study                                                 and computational cost makes our method highly practical
+To evaluate the contribution of each component, we con-             for deployment scenarios.
+duct comprehensive ablation studies on the Qwen2.5-VL-
+7B-Instruct model under the W3A16 quantization setting.
+As shown in Table 3, both components deliver consistent             6. Conclusion
+performance improvements, and their combination yields
+the best results. Starting from the GPTAQ baseline with             In this work, we analyze and refine the asymmetric cali-
+65.0% average accuracy, adding only the correction term             bration objective for weight-compensation quantization in
+C improves the accuracy to 66.2% with negligible compu-             Vision-Language Models (VLMs). Effective VLM quan-
+tational overhead. The modality-aware importance vector             tization requires two specific adjustments. First, the op-
+M yields a substantial improvement of 70.4%, representing           timal quantization target directly accounts for residual-
+a 5.4% gain over the baseline. To investigate the impor-            induced shifts instead of using the standard rounding-to-
+tance of adaptive µ selection, we compare GPTAQ+M with              nearest method. Second, the channel importance met-
+GPTAQ+M.5 , where µ is fixed to 0.5 across all layers. The          ric differentiates between vision and language modalities
+fixed strategy achieves 69.8% average accuracy, lower than          to handle better quantization parameters. To implement
+the adaptive selection (70.4%). This 0.6 percentage point           these adjustments, we propose VLM-PTQ. This asymmetric
+gap demonstrates that different layers exhibit varying sen-         post-training quantization framework strictly integrates the
+sitivity to vision and language modalities. As visualized           closed-form correction term and the modality-aware quan-
+in Figure 4, the q/k/v proj layers display diverse optimal µ        tization strategy. As demonstrated through extensive exper-
+values across transformer layers. For the MME-RealWorld             iments, our method achieves competitive results across di-
+English benchmark, the modality-aware importance alone              verse VLMs ranging from 1B to 72B parameters in both
+drives performance from 38.4% to 50.4%. When both com-              weight-only quantization settings with 3-bit and 2-bit preci-
+ponents are combined in our full method, the performance            sion and extreme weight-activation quantization scenarios.
+
+
+
+                                                              24703
+Acknowledgements                                                     [11] Elias Frantar, Saleh Ashkboos, Torsten Hoefler, and Dan
+                                                                          Alistarh.      Gptq: Accurate post-training quantization
+This work was supported by the National Science and Tech-                 for generative pre-trained transformers. arXiv preprint
+nology Major Project (2026ZD1305800), Ningbo Key Re-                      arXiv:2210.17323, 2022. 1, 2, 3, 5
+search and Development Program (2025Z082), Zhejiang                  [12] Elias Frantar, Sidak Pal Singh, and Dan Alistarh. Optimal
+Province’s Leading Talent Project in Science and Technol-                 brain compression: A framework for accurate post-training
+ogy Innovation (2023R5204), and Zhejiang University -                     quantization and pruning, 2023. 1, 2, 3
+Vivo Information Technology Joint Research Center.                   [13] Amir Gholami, Sehoon Kim, Zhen Dong, Zhewei Yao,
+                                                                          Michael W Mahoney, and Kurt Keutzer. A survey of quan-
+References                                                                tization methods for efficient neural network inference. In
+                                                                          Low-power computer vision, pages 291–326. Chapman and
+ [1] Jean-Baptiste Alayrac, Jeff Donahue, Pauline Luc, Antoine            Hall/CRC, 2022. 1, 2
+     Miech, Iain Barr, Yana Hasson, Karel Lenc, Arthur Men-          [14] Xing Hu, Yuan Cheng, Dawei Yang, Zukang Xu, Zhihang
+     sch, Katherine Millican, Malcolm Reynolds, et al. Flamingo:          Yuan, Jiangyong Yu, Chen Xu, Zhe Jiang, and Sifan Zhou.
+     a visual language model for few-shot learning. Advances              Ostquant: Refining large language model quantization with
+     in neural information processing systems, 35:23716–23736,            orthogonal and scaling transformations for better distribution
+     2022. 2                                                              fitting. arXiv preprint arXiv:2501.13987, 2025. 2
+ [2] Saleh Ashkboos, Amirkeivan Mohtashami, Maximilian L             [15] Benoit Jacob, Skirmantas Kligys, Bo Chen, Menglong Zhu,
+     Croci, Bo Li, Pashmina Cameron, Martin Jaggi, Dan Alis-              Matthew Tang, Andrew Howard, Hartwig Adam, and Dmitry
+     tarh, Torsten Hoefler, and James Hensman. Quarot: Outlier-           Kalenichenko. Quantization and training of neural networks
+     free 4-bit inference in rotated llms. Advances in Neural In-         for efficient integer-arithmetic-only inference. In Proceed-
+     formation Processing Systems, 37:100213–100240, 2024. 2              ings of the IEEE conference on computer vision and pattern
+ [3] Jerry Chee, Yaohui Cai, Volodymyr Kuleshov, and Christo-             recognition, pages 2704–2713, 2018. 1
+     pher M De Sa. Quip: 2-bit quantization of large language        [16] Bohao Li, Yuying Ge, Yi Chen, Yixiao Ge, Ruimao Zhang,
+     models with guarantees. Advances in neural information               and Ying Shan. Seed-bench-2-plus: Benchmarking multi-
+     processing systems, 36:4396–4429, 2023. 2                            modal large language models with text-rich visual compre-
+ [4] Lin Chen, Jinsong Li, Xiaoyi Dong, Pan Zhang, Conghui                hension. arXiv preprint arXiv:2404.16790, 2024. 6
+     He, Jiaqi Wang, Feng Zhao, and Dahua Lin. Sharegpt4v:           [17] Bo Li, Yuanhan Zhang, Dong Guo, Renrui Zhang, Feng Li,
+     Improving large multi-modal models with better captions. In          Hao Zhang, Kaichen Zhang, Peiyuan Zhang, Yanwei Li, Zi-
+     European Conference on Computer Vision, pages 370–387.               wei Liu, et al. Llava-onevision: Easy visual task transfer.
+     Springer, 2024. 6                                                    arXiv preprint arXiv:2408.03326, 2024. 1, 2
+ [5] Zhe Chen, Weiyun Wang, Yue Cao, Yangzhou Liu, Zhang-            [18] Junnan Li, Dongxu Li, Silvio Savarese, and Steven Hoi.
+     wei Gao, Erfei Cui, Jinguo Zhu, Shenglong Ye, Hao Tian,              Blip-2: Bootstrapping language-image pre-training with
+     Zhaoyang Liu, et al. Expanding performance boundaries of             frozen image encoders and large language models. In In-
+     open-source multimodal models with model, data, and test-            ternational conference on machine learning, pages 19730–
+     time scaling. arXiv preprint arXiv:2412.05271, 2024. 1, 2            19742. PMLR, 2023. 2
+ [6] Wenliang Dai, Junnan Li, Dongxu Li, Anthony Tiong, Junqi        [19] Shuaiting Li, Juncan Deng, Chengxuan Wang, Kedong Xu,
+     Zhao, Weisheng Wang, Boyang Li, Pascale N Fung, and                  Rongtao Deng, Hong Gu, Haibin Shen, and Kejie Huang.
+     Steven Hoi. Instructblip: Towards general-purpose vision-            Ssvq: Unleashing the potential of vector quantization with
+     language models with instruction tuning. Advances in neural          sign-splitting. In Proceedings of the IEEE/CVF International
+     information processing systems, 36:49250–49267, 2023. 2              Conference on Computer Vision, pages 23710–23719, 2025.
+ [7] Tri Dao, Dan Fu, Stefano Ermon, Atri Rudra, and Christo-             2
+     pher Ré. Flashattention: Fast and memory-efficient exact       [20] Shuaiting Li, Juncan Deng, Kedong Xu, Rongtao Deng,
+     attention with io-awareness. Advances in neural information          Hong Gu, Minghan Jiang, Haibin Shen, and Kejie Huang.
+     processing systems, 35:16344–16359, 2022. 6                          Rethinking residual errors in compensation-based llm quan-
+ [8] Juncan Deng, Shuaiting Li, Zeyu Wang, Hong Gu, Kedong                tization. In The Fourteenth International Conference on
+     Xu, and Kejie Huang. Vq4dit: Efficient post-training vector          Learning Representations, 2025. 2
+     quantization for diffusion transformers. In Proceedings of      [21] Shuaiting Li, Chengxuan Wang, Juncan Deng, Zeyu Wang,
+     the AAAI Conference on Artificial Intelligence, pages 16226–         Zewen Ye, Zongsheng Wang, Haibin Shen, and Kejie Huang.
+     16234, 2025. 2                                                       Mvq: Towards efficient dnn compression and acceleration
+ [9] Juncan Deng, Shuaiting Li, Zeyu Wang, Kedong Xu, Hong                with masked vector quantization. In Proceedings of the 30th
+     Gu, and Kejie Huang. Vim-vq: Efficient post-training vec-            ACM International Conference on Architectural Support for
+     tor quantization for visual mamba. In Proceedings of the             Programming Languages and Operating Systems, Volume 1,
+     IEEE/CVF International Conference on Computer Vision,                pages 731–745, 2025. 2
+     pages 24518–24527, 2025. 2                                      [22] Yuhang Li, Ruokai Yin, Donghyun Lee, Shiting Xiao,
+[10] Tim Dettmers, Mike Lewis, Younes Belkada, and Luke                   and Priyadarshini Panda. Gptaq: Efficient finetuning-free
+     Zettlemoyer. Llm.int8(): 8-bit matrix multiplication for             quantization for asymmetric calibration. arXiv preprint
+     transformers at scale, 2022. 1, 2                                    arXiv:2504.02692, 2025. 1, 2, 3, 5
+
+
+
+
+                                                                24704
+[23] Ji Lin, Jiaming Tang, Haotian Tang, Shang Yang, Wei-Ming        [35] Amanpreet Singh, Vivek Natarajan, Meet Shah, Yu Jiang,
+     Chen, Wei-Chen Wang, Guangxuan Xiao, Xingyu Dang,                    Xinlei Chen, Dhruv Batra, Devi Parikh, and Marcus
+     Chuang Gan, and Song Han. Awq: Activation-aware weight               Rohrbach. Towards vqa models that can read. In Proceedings
+     quantization for on-device llm compression and accelera-             of the IEEE/CVF conference on computer vision and pattern
+     tion. Proceedings of machine learning and systems, 6:87–             recognition, pages 8317–8326, 2019. 6
+     100, 2024. 1                                                    [36] Qwen Team. Qwen2-vl: Enhancing vision-language model’s
+[24] Ji Lin, Hongxu Yin, Wei Ping, Pavlo Molchanov, Moham-                perception of the world at any resolution. arXiv preprint
+     mad Shoeybi, and Song Han. Vila: On pre-training for vi-             arXiv:2409.12191, 2024. 1, 2
+     sual language models. In Proceedings of the IEEE/CVF con-       [37] Qwen Team. Qwen2.5-vl technical report. arXiv preprint
+     ference on computer vision and pattern recognition, pages            arXiv:2502.13923, 2025. 5
+     26689–26699, 2024. 2                                            [38] Qwen Team. Qwen3-vl technical report. arXiv preprint
+[25] Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee.             arXiv:2511.21631, 2025. 1, 2
+     Visual instruction tuning. Advances in neural information       [39] Weihan Wang, Qingsong Lv, Wenmeng Yu, Wenyi Hong, Ji
+     processing systems, 36:34892–34916, 2023. 2                          Qi, Yan Wang, Junhui Ji, Zhuoyi Yang, Lei Zhao, Xixuan
+[26] Haotian Liu, Chunyuan Li, Yuheng Li, and Yong Jae Lee.               Song, et al. Cogvlm: Visual expert for pretrained language
+     Improved baselines with visual instruction tuning. In Pro-           models. Advances in Neural Information Processing Sys-
+     ceedings of the IEEE/CVF conference on computer vision               tems, 37:121475–121499, 2024. 2
+     and pattern recognition, pages 26296–26306, 2024. 2             [40] Weiyun Wang, Zhangwei Gao, Lixin Gu, Hengjun Pu, Long
+[27] Haotian Liu, Chunyuan Li, Yuheng Li, Bo Li, Yuanhan                  Cui, Xingguang Wei, Zhaoyang Liu, Linglin Jing, Shenglong
+     Zhang, Sheng Shen, and Yong Jae Lee. Llava-next: Im-                 Ye, Jie Shao, et al. Internvl3. 5: Advancing open-source
+     proved reasoning, ocr, and world knowledge, 2024. 1                  multimodal models in versatility, reasoning, and efficiency.
+[28] Yuliang Liu, Zhang Li, Mingxin Huang, Biao Yang, Wenwen              arXiv preprint arXiv:2508.18265, 2025. 1, 2
+     Yu, Chunyuan Li, Xu-Cheng Yin, Cheng-Lin Liu, Lianwen           [41] Guangxuan Xiao, Ji Lin, Mickael Seznec, Hao Wu, Julien
+     Jin, and Xiang Bai. Ocrbench: on the hidden mystery of               Demouth, and Song Han. Smoothquant: Accurate and effi-
+     ocr in large multimodal models. Science China Information            cient post-training quantization for large language models. In
+     Sciences, 67(12):220102, 2024. 6                                     International conference on machine learning, pages 38087–
+[29] Zechun Liu, Changsheng Zhao, Igor Fedorov, Bilge So-                 38099. PMLR, 2023. 2
+     ran, Dhruv Choudhary, Raghuraman Krishnamoorthi, Vikas          [42] Qinghao Ye, Haiyang Xu, Guohai Xu, Jiabo Ye, Ming Yan,
+     Chandra, Yuandong Tian, and Tijmen Blankevoort. Spin-                Yiyang Zhou, Junyang Wang, Anwen Hu, Pengcheng Shi,
+     quant: Llm quantization with learned rotations. arXiv                Yaya Shi, et al. mplug-owl: Modularization empowers
+     preprint arXiv:2405.16406, 2024. 1, 2                                large language models with multimodality. arXiv preprint
+[30] Pan Lu, Swaroop Mishra, Tanglin Xia, Liang Qiu, Kai-Wei              arXiv:2304.14178, 2023. 2
+     Chang, Song-Chun Zhu, Oyvind Tafjord, Peter Clark, and          [43] Zhihang Yuan, Lin Niu, Jiawei Liu, Wenyu Liu, Xinggang
+     Ashwin Kalyan. Learn to explain: Multimodal reasoning via            Wang, Yuzhang Sheng, Guangyu Zeng, Wenzhao Ouyang,
+     thought chains for science question answering. Advances              Hangbo Zhang, et al. Rptq: Reorder-based post-training
+     in neural information processing systems, 35:2507–2521,              quantization for large language models. arXiv preprint
+     2022. 6                                                              arXiv:2304.01089, 2023. 2
+[31] Ahmed Masry, Xuan Long Do, Jia Qing Tan, Shafiq Joty, and       [44] Kaichen Zhang, Bohao Li, Peiyuan Zhang, Fanyi Pu,
+     Enamul Hoque. Chartqa: A benchmark for question answer-              Joshua Adrian Cahyono, Kairui Hu, Shuai Liu, Yuanhan
+     ing about charts with visual and logical reasoning. In Find-         Zhang, Jingkang Yang, Chunyuan Li, and Ziwei Liu. Lmms-
+     ings of the association for computational linguistics: ACL           eval: Reality check on the evaluation of large multimodal
+     2022, pages 2263–2279, 2022. 6                                       models. arXiv preprint arXiv:2407.12772, 2024. 6
+[32] Minesh Mathew, Dimosthenis Karatzas, and CV Jawahar.            [45] Yi-Fan Zhang, Huanyu Zhang, Haochen Tian, Chaoyou Fu,
+     Docvqa: A dataset for vqa on document images. In Proceed-            Shuangqing Zhang, Junfei Wu, Feng Li, Kun Wang, Qing-
+     ings of the IEEE/CVF winter conference on applications of            song Wen, Zhang Zhang, et al. Mme-realworld: Could
+     computer vision, pages 2200–2209, 2021. 6                            your multimodal llm challenge high-resolution real-world
+[33] Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer,                 scenarios that are difficult for humans?        arXiv preprint
+     James Bradbury, Gregory Chanan, Trevor Killeen, Zeming               arXiv:2408.13257, 2024. 6
+     Lin, Natalia Gimelshein, Luca Antiga, et al. Pytorch: An im-    [46] Deyao Zhu, Jun Chen, Xiaoqian Shen, Xiang Li, and Mo-
+     perative style, high-performance deep learning library. Ad-          hamed Elhoseiny. Minigpt-4: Enhancing vision-language
+     vances in neural information processing systems, 32, 2019.           understanding with advanced large language models. arXiv
+     5                                                                    preprint arXiv:2304.10592, 2023. 2
+[34] Wenqi Shao, Mengzhao Chen, Zhaoyang Zhang, Peng Xu,             [47] Jinguo Zhu, Weiyun Wang, Zhe Chen, Zhaoyang Liu, Shen-
+     Lirui Zhao, Zhiqian Li, Kaipeng Zhang, Peng Gao, Yu Qiao,            glong Ye, Lixin Gu, Hao Tian, Yuchen Duan, Weijie Su,
+     and Ping Luo. Omniquant: Omnidirectionally calibrated                Jie Shao, et al. Internvl3: Exploring advanced training and
+     quantization for large language models. arXiv preprint               test-time recipes for open-source multimodal models. arXiv
+     arXiv:2308.13137, 2023. 1                                            preprint arXiv:2504.10479, 2025. 1, 2, 5
+
+
+
+
+                                                                24705
+

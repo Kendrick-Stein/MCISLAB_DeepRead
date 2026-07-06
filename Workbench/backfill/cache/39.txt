@@ -1,0 +1,1105 @@
+                                                           GTR-Turbo: Merged Checkpoint is Secretly a Free Teacher
+                                                                        for Agentic VLM Training
+
+                                                                  Tong Wei1† Yijun Yang2∗ Changhao Zhang1 Junliang Xing1‡
+                                                                            Yuanchun Shi1 Zongqing Lu3 Deheng Ye2‡
+                                                                  1
+                                                                    Tsinghua University 2 Tencent Hunyuan 3 Peking University
+                                                          {wt22,zhangcha25}@mails.tsinghua.edu.cn, yijun.steven.yang@gmail.com,
+
+
+
+
+arXiv:2512.13043v2 [cs.CV] 11 Mar 2026
+                                                     {jlxing,shiyc}@tsinghua.edu.cn, zongqing.lu@pku.edu.cn, dericye@tencent.com
+
+
+
+                                                                     Abstract                                         such as mathematics and code generation [7, 14, 28, 29, 43].
+                                                                                                                      However, when applied to multi-turn agentic tasks, vanilla
+                                         Multi-turn reinforcement learning (RL) for multi-modal                       RL methods often struggle due to sparse rewards, long-
+                                         agents built upon vision–language models (VLMs) is ham-                      horizon trajectories, and noisy environments. These chal-
+                                         pered by sparse rewards and long-horizon credit assignment.                  lenges can lead to incomplete, inconsistent, and low-diversity
+                                         Recent methods densify the reward by querying a teacher                      responses and actions, ultimately degrading performance, re-
+                                         that provides step-level feedback, e.g., Guided Thought                      ferred to as thought collapse [51] or similar concepts (e.g.,
+                                         Reinforcement (GTR) [51] and On-Policy Distillation [25],                    “entropy collapse”) in many recent literatures [6, 41, 49].
+                                         but rely on costly, often privileged models as the teacher,                     To this end, methods such as Guided Thought Reinforce-
+                                         limiting practicality and reproducibility. We introduce                      ment (GTR) [51] and On-Policy Distillation [25] have intro-
+                                         GTR-Turbo, a highly efficient upgrade to GTR that                            duced a new paradigm for multi-turn agent training by distill-
+                                         matches its performance without training on or querying                      ing knowledge from a larger and stronger teacher model that
+                                         an expensive teacher model. Specifically, GTR-Turbo                          provides step- and even token-level guidance/supervision.
+                                         merges the weights of checkpoints produced during ongoing                    They effectively regulate the agent’s reasoning process and
+                                         RL training and then uses the resulting merged model as                      improve the quality of resulting actions. However, to achieve
+                                         a “free” teacher to guide subsequent RL via supervised                       the most appealing performance, such a paradigm typically
+                                         fine-tuning or soft logit distillation. This design removes                  relies on expensive, often privileged models as the teacher,
+                                         dependence on privileged VLMs (e.g., GPT or Gemini),                         imposing severe scalability constraints, including high com-
+                                         mitigates the “entropy collapse” observed in prior work,                     putational cost, longer training times, and the potential inac-
+                                         and maintains stable training. Across diverse visual agentic                 cessibility of cutting-edge models.
+                                         tasks, GTR-Turbo improves the accuracy of the baseline
+                                                                                                                         In this paper, we propose GTR-Turbo, a highly efficient
+                                         model by 10–30% while reducing wall-clock training time
+                                                                                                                      solution to the above challenge. We highlight that merg-
+                                         by 50% and compute cost by 60% relative to GTR.
+                                                                                                                      ing historical checkpoints generated throughout the RL
+                                                                                                                      training secretly creates a capable teacher for guidance,
+                                                                                                                      completely free of additional training or external model de-
+                                         1. Introduction
+                                                                                                                      pendency (see Figure 3 for a visualized explanation). This
+                                         Vision-language models (VLMs) have evolved beyond sim-                       design not only preserves the automated reward mechanism,
+                                         ple static multi-modal question-answering systems, demon-                    flexibility, and final performance of the original GTR method
+                                         strating the capability to perceive, reason, and act au-                     but also significantly accelerates training, reduces computa-
+                                         tonomously in interactive environments to achieve specific                   tional overhead, and thus achieves superior scalability.
+                                         goals. Reinforcement learning with verifiable outcome re-                       Specifically, after each RL update [37], we save the model
+                                         wards (RLVR) [38] enables such models to be fine-tuned di-                   weights and include them in our checkpoint buffer. By em-
+                                         rectly through verifiable reward signals provided by the envi-               ploying the TIES merging technique [57], we effectively
+                                         ronment dynamics, effectively replacing learned reward mod-                  avoid parameter interference among these models. The re-
+                                         els. This approach has shown remarkable success in domains                   sulting merged model aggregates prior experience and consis-
+                                           † Work done during an internship at Tencent. Code can be found here.       tently outperforms the current training agent, thereby serving
+                                           ‡ Corresponding Authors. ∗ Project Lead.                                   as a teacher (see Figure 2 for a proof-of-concept result). The
+
+
+                                                                                                                  1
+guidance information can be used either through SFT-based            reference point for many subsequent studies [47, 51].
+online imitation learning, as in the original GTR frame-
+work, or via soft logit distillation with KL regularization,         2.2. Process Guidance Providing Dense Rewards
+which replaces the teacher model’s autoregressive generation         Sparse rewards have long been a core challenge in reinforce-
+with a single forward pass to further improve training effi-         ment learning. Prior research on deep-thinking LLMs has
+ciency and encourage exploration. As illustrated in Figure 3,        affirmed the critical role of process supervision in enhancing
+GTR-Turbo is a flexible, scalable, and self-evolving agent           the logical consistency of reasoning [38]. One approach
+training method that does not require external supervision           trains a Process Reward Model (PRM) to assess the reason-
+signals from the API model or human annotations, yet en-             ing process [24, 44], but requires costly human annotations
+ables reliable and controllable decision-making in complex           to obtain high-quality data. Another solution focuses on
+and challenging visual interactive environments.                     credit assignment [5, 9, 45, 67], which decomposes the final
+   Empirically, we post-train the Qwen2.5-VL-7B [3]                  reward into finer-grained signals to better attribute contri-
+and Qwen3-VL-8B [2] using GTR-Turbo. In the complex                  butions across intermediate reasoning steps. Additionally,
+Points24 card game task [70], the resulting agent achieves           many studies have sought to enhance process guidance by
+state-of-the-art (SOTA) results, surpassing both GTR and             leveraging large models, such as LLM-as-a-judge mecha-
+other strong baselines while cutting 50% training time, 100%         nisms [11, 55, 72], automated label generation [51], or world
+API calling, and 60% of the compute cost, demonstrating              models to provide future information [47].
+remarkable efficiency improvement. In the widely adopted
+and more challenging ALFWorld visual environments [40],              2.3. Model Merging Techniques
+where the observation only consists of images, an episode            Merging the weights of multiple models is a well-established
+can span over 50 steps, and rewards are extremely sparse,            technique in machine learning for enhancing model per-
+typically provided at the end of tasks, GTR-turbo still makes        formance [58]. Studies have demonstrated that merging
+rapid and stable progress on task success rate, outperforming        models trained on different downstream tasks can produce
+many baselines with a comparable model size. Furthermore,            a unified and more versatile model [19, 59, 64]; combining
+we conduct comprehensive ablation studies to evaluate                models under varying hyperparameter settings can further
+different design choices and configurations.                         boost performance [52]; and merging historical checkpoints
+                                                                     can help escape local optima while mitigating catastrophic
+2. Related Works                                                     forgetting [16, 23]. Recently, model-merging techniques
+                                                                     have also seen rapid adoption in large language models,
+2.1. Agent Training for LLMs and VLMs
+                                                                     proving effective in both pre-training [22, 35] and post-
+Training agents that utilize general-purpose foundation mod-         training [19, 23, 64] stages. Beyond simple averaging,
+els to solve specific decision-making problems has long been         studies have explored a range of additional model-merging
+a central research topic. Early work primarily focuses on            techniques. Fisher Merging [26] estimates the importance
+training-free prompting techniques or adding adapter mod-            of each parameter using the Fisher Information Matrix; Task
+ules to fixed base models [1, 17, 31, 39, 46, 48, 50, 53, 62,        Arithmetic [19] constructs task vectors and performs arith-
+63, 73]. For multimodal tasks built upon VLM backbones,              metic operations; TIES-merging [57] introduces trimming
+common approaches involve translating observations into              and sign elections to mitigate parameter interference; and
+textual descriptions or aligning their embeddings with LLMs          DARE [64] incorporates random dropouts to enhance the
+[1, 4, 8, 12, 18, 27, 42, 60, 61]. However, such limited model       effectiveness of multi-task model integration.
+adjustments struggle to cope with dynamic and complex envi-
+ronments, restricting the agent’s robustness and adaptability.       3. The GTR-Turbo Framework
+    More recent studies have focused on using RL to obtain
+improved agent policies through interaction with the environ-        3.1. Revisiting Guided Thought Reinforcement
+ment. Beyond traditional PPO [37], variants such as GRPO             Guided Thought Reinforcement (GTR) [51] is a flexible
+[38] and DAPO [65] improve training stability and sample             reinforcement learning framework designed for training
+efficiency, while enabling long Chain-of-Thought reasoning           VLM agents in multi-turn decision-making tasks. As shown
+and inference-time scaling, achieving strong performance on          in Figure 1, it leverages a VLM-as-a-corrector mechanism,
+single-turn tasks such as math and code.                             where an external VLM model acts as a corrector to evaluate
+    For multi-turn agentic tasks, concurrently with our work,        and refine the agent’s reasoning at each RL step. By jointly
+a variety of large-scale RL training systems have emerged            performing SFT on reasoning tokens and RL on action
+[10, 21, 49, 66, 71]. In the context of general visual reason-       tokens simultaneously, GTR effectively solves “thought
+ing, RL4VLM [70] introduced a foundational framework                 collapse” caused by the absence of reliable thinking rewards.
+that directly applies PPO to VLM post-training, providing a          GTR also incorporates Dataset Aggregation (DAgger) [34]
+
+
+                                                                 2
+                       Time-consuming, Expensive, Potentially Inaccessible
+                                                                                                           Corrector Model    Performance         Token Usage (Cost)   Time
+Environment            External API Model                                       SFT Thought
+                                              Corrected Thought
+Interaction             (e.g., GPT, Gemini)     "evaluation": "Wrong"
+                                                                                   Guidance                   GPT-4o                17.5%         33.5M (∼$146.56)     86h
+                                                                            Thought
+                                                "thoughts": "Since ..., I    Dataset                       Qwen2.5-VL-72B           6.5%           33.8M (∼$18.59)     110h
+Obs + Prompt                                    should go to the fridge."
+                                                                                                           Qwen2.5-VL-7B             0%*           31.2M (∼$4.29)      56h
+                       Corrector Model                                                 SFT Loss
+
+
+                                               Thought
+                                                "thoughts": "Since..., I
+                                                                                          +
+                                                                                                      Table 1. Training time and token usage of the GTR framework.
+ <TASK>,                                        should go to the
+                      VLM Agent
+ <FORMAT>                                       countertop."
+                                                "action": "go to
+                                                                                                      Experiments to train the LLaVA-v1.6-mistral-7B model for 15,000
+                                                countertop 1"
+                      Game Env                 Action                                  PPO Loss       steps on the Points24 task, using different models as the corrector.
+                                                                            RL Data      RL           * - The corrector model fails to provide valid thought guidance.
+                                                     Reward
+                                                                             Buffer Finetune
+
+
+Figure 1. Illustration of the original GTR framework [51]. It                                         generated during the RL training constructs a teacher
+uses a multi-modal API model as the corrector, such as GPT or                                         model for free, as shown in Figure 3, thereby eliminating
+Gemini, to evaluate and refine the agent’s reasoning content (i.e.,
+                                                                                                      the dependence on expensive external models. Empirical re-
+thought tht ) at each RL step, which is costly, time-consuming, and
+potentially inaccessible, constraining its own scalability.
+                                                                                                      sults demonstrate that this approach can achieve comparable
+                                                                                                      and even superior performance while dramatically reducing
+                                                                                                      both training time and token cost.
+to mitigate the distribution shift issue that arises during the
+dynamic RL training.
+                                                                                                      3.2. Merged Checkpoints as the Teacher
+   Formally, we denote the agent’s observation as o, thought                                          As an efficient model adaptation method, model merging
+output as th, and action as a, given agent model πθ and                                               has been widely adopted in the post-training stage. It in-
+corrector model πcorr . B represents the PPO data buffer and                                          cludes merging heterogeneous models trained on different
+D denotes the thought data buffer. If we term [l] as the l-th                                         downstream tasks, enabling continual learning and capabil-
+token and [< l] as the first l tokens, then the objective of                                          ity expansion [19, 59, 64], or merging homogeneous models
+GTR can be represented as:                                                                            trained on the same task, achieving stronger overall perfor-
+                                                                                                      mance [16, 23, 52]. In GTR-Turbo, we design a buffer that
+  min         E LPPO (o, a) +                 E LSFT (o, πcorr (o, th)), (1)                          comprises historical model checkpoints as the agent’s RL
+     θ      (o,a)∼B                      (o,th)∼D
+                                                                                                      training progresses. The merged model in the k-th update
+where                                                                                                 epoch is formulated by Equation 3:
+                                   
+                             πθ (a|o) πθ                                                                                                    k−1
+ LPPO (o, a) = − min                    A (o, a),                                                                             (k)
+                                                                                                                                            X          (i)
+                            πθold (a|o)                                                                                      πmerged =            w i πθ .                    (3)
+                                                       
+                      πθ (a|o)                      πθ                                                                                      i=1
+              clip                , 1 − c, 1 + c A (o, a) ,
+                     πθold (a|o)
+                   X                                                                                     The merged teacher requires no additional training and
+ LSFT (o, th) = −       log πθ (th[l] |o, th[<l] ).       (2)                                         yields a better model by optimizing over a smoother loss
+                              l                                                                       surface while effectively preserving past experiences. To val-
+   Although GTR has achieved remarkable progress across                                               idate this statement, we use a checkpoint trajectory produced
+multiple tasks, it comes with significant prerequisites and                                           by training Qwen2.5-VL-7B on Points24 with GTR. At each
+costs. First, GTR requires a larger and more powerful ex-                                             update, we evaluate both the current model and the merged
+ternal model to ensure correctness and serve as a reliable                                            model obtained from all preceding checkpoints. As shown
+teacher. However, such models for downstream domains                                                  in Figure 2, the merged model is more stable and achieves
+are sometimes inaccessible in practice, and their capabili-                                           better performance, serving as a capable teacher.
+ties directly affect training quality. Moreover, when using
+closed-source models such as GPT or Gemini as teachers,                                               Merging Method Directly merging all parameters of
+the need for step-level online API calls significantly slows                                          checkpoints can introduce harmful interference, where
+training and incurs substantial costs. As shown in Table 1,                                           changes in redundant parameters affect the model’s perfor-
+using GPT-4o (even a lightweight model in the GPT fam-                                                mance after merging. To avoid this issue, we adopt the Trim,
+ily) as the teacher requires approximately 4 days and costs                                           Elect Sign, and Merge (TIES) method [57], which consists
+approximately 150 USD to post-train LLaVA-1.6-7B with                                                 of three steps, (1) Trimming: redundant parameter changes
+GTR for 15,000 steps. Using smaller teacher models can                                                are removed by retaining only those with magnitudes in the
+reduce overhead but degrade final performance, even failing                                           top-k%; (2) Sign election: for each parameter, we compute
+to provide meaningful guidance.                                                                       the total magnitude of its positive and negative values across
+   In this paper, we introduce an elegant solution to the                                             all models and apply a majority vote to determine the elected
+above limitation: merging the historical checkpoints                                                  sign vector; (3) Selective averaging: only parameters whose
+
+
+                                                                                                  3
+                             Merged Checkpoint                  Current Checkpoint
+                                                           6                                            3.4. Soft Logit Distillation via Minimizing Reverse
+             0.6                                           4                                                  KL Divergence
+
+  Success Rate
+             0.5                                           2
+                                                  Return   0
+                                                                                                        As discussed in the prior section, GTR-Turbo (SFT) adopts
+             0.4
+                                                           2                                            an SFT loss as the online imitation objective. However,
+             0.3                                                                                        this formulation requires autoregressive generation from the
+                                                           4
+             0.20         5000   10000    15000             0         5000    10000   15000             teacher, which incurs substantial computational overhead.
+              Training Steps                Training Steps                                              To improve efficiency, we replace the SFT objective with
+Figure 2. The performance comparison of the merged check-                                               a KL-based guidance that only requires parallel inference:
+point and the current checkpoint on Points24. We adopt the                                              we compute the negative KL divergence between the agent
+Qwen2.5-VL-7B as the base model and highlight that model merg-
+                                                 (k)                                                    and the teacher as thought reward, encouraging the agent
+ing leads to a stronger and more stable agent πmerged (red line) that
+                                                                 (k)
+                                                                                                        to align its token-level output distribution with that of the
+can serve as a teacher to guide the following RL for training πθ .                                      teacher. This soft logit distillation imposes a more relaxed
+                                                                                                        constraint on the student, significantly accelerates training,
+                                                                                                        and improves performance.
+signs match the elected sign are included in the merging com-                                               Using KL divergence offers non-trivial advantages.
+putation. This procedure mitigates the influence of minor                                               First, since it is grounded in the model’s logit outputs, it
+perturbations, ensuring a tractable merging process.                                                    is almost unhackable. A smaller KL value indicates closer
+                                                                                                        alignment between the agent and teacher outputs, with zero
+Weight Adjustment Variants Adjusting weights for every                                                  achieved when they are identical. Second, KL divergence
+checkpoint results in different variants of merging methods.                                            captures probability information over all candidate tokens,
+We study two commonly used strategies in this work: Simple                                              whereas an SFT label is one-hot supervision for the target
+Moving Average (SMA) and Exponential Moving Average                                                     token. Finally, computing the KL divergence requires only
+(EMA). SMA treats all checkpoints equally and computes                                                  a single forward pass, making it highly efficient. This KL
+the arithmetic mean of them. EMA prioritizes more recent                                                variant also eliminates the need for an additional thought
+checkpoints by applying a sequence of decayed weights with                                              dataset in GTR, thereby reducing memory consumption.
+a smoothing factor α:                                                                                       Previous research [13, 25, 54] has proven the advantages
+                                                                                                        of using reverse KL for knowledge distillation. As shown in
+                                 k−1                                                                    Figure 3 (b) and Equation 6, given the thought output, we
+            (k)              1 X (i)
+     πmerged =                       π ,                                        (SMA)                   compute the reverse KL between the agent and the teacher,
+                           k − 1 i=1 θ
+                                                                                                        average over all tokens, and take its negative value as an aux-
+            (k)                  (k−1)                             (k−1)
+     πmerged = α · πθ                    + (1 − α) · πmerged .                  (EMA)         (4)       iliary reward for PPO updates, which is a required approach
+                                                                                                        for multi-step RL optimization. Since this sentence-level KL
+3.3. Thought Guidance via Supervised Fine-tuning                                                        estimation may yield negative values and produce mislead-
+                                                                                                        ing reward signals, we clip the negative parts to ensure the
+After merging checkpoints, we can replace the corrector
+                                                                                                        reward’s validity (see Section 4.3 for a detailed analysis).
+model (red dashed box in Figure 1) in the original GTR
+framework with the new merged teacher model. Since the                                                   max           E        [min (rA′ , clip (r, 1 − c, 1 + c) A′ )] , (6)
+                                                                                                           θ     (o,(th,a))∼B
+teacher and agent are homologous, they take the same input.
+Similar to GTR, GTR-Turbo (SFT) implements the guidance                                                 in which,
+by minimizing the SFT loss between thought tokens
+generated by two models, as demonstrated in Figure 3 (a).                                                       πθ (a|o)
+                                                                                                        r=               A′ = Aπθ (o, a) − RevKL(πθ , πmerged ; th),
+                                                                                                                           ,
+    At each RL step, after the agent generates its action and                                                  πθold (a|o)
+thought given the observation, the same context is provided                                                                          
+                                                                                                        RevKL(πθ , πmerged ; th) = El log πθ (th[l] |th[<l] )
+to the teacher to produce a reference thought, which is then                                                                                                         
+stored in a replay buffer. In subsequent PPO updates, we                                                                               − log πmerged (th[l] |th[<l] ) .
+sample data pairs from the thought to compute the SFT loss,
+which is added to the original PPO loss for backpropagation.                                            4. Experiments
+Similar to GTR, we also incorporate format rewards and                                                  4.1. Experimental Setup
+DAgger [34] techniques to further stabilize training. If
+ ˆ
+th represents the thought output of the teacher model                                                   Environments We conduct our experiments on two widely
+πmerged (o), the optimization target can be written as:                                                 used and challenging visual agentic benchmarks: Points24
+                                                                                                        [70] and ALFWorld [40].
+                                                                                                           In Points24, the model must first perform fine-grained
+                    min      E LPPO (o, a) +                    E LSFT (o, ˆ
+                                                                          th).                (5)
+                     θ    (o,a)∼B                              ˆ
+                                                           (o,th)∼D                                     poker card recognition, followed by logical reasoning. At
+
+
+                                                                                                    4
+                                                     Back-propagation                    Save Checkpoint After Update                       Model Merging
+
+       Environment                                   Reference Thought                 SFT Thought       Environment                                                                     KL Thought
+                                                                                                                                Merged Teacher
+       Interaction              Merged Teacher       "thoughts": "Since ..., I            Guidance       Interaction                                                                       Guidance
+                                                     should go to the fridge."
+                                                                                                                                                      Reference Logits
+                                                                                  Thought
+      Obs + Prompt                                                                 Dataset               Obs + Prompt                                                            - KL Divergence
+                                                                                             SFT Loss                                 ...
+                                      ...
+
+                                                                                                                        Ckpt Buffer                 Thought
+                        Ckpt Buffer                  Thought
+         <TASK>,
+                                                     "thoughts": "Since..., I
+                                                                                                +         <TASK>,
+                                                                                                                                                     "thoughts":
+                                                                                                                                                     "Since..., I
+         <FORMAT>
+                                                                                                          <FORMAT>                                   should go to the
+                               VLM Agent
+                                                     should go to the                                                          VLM Agent             countertop."       Logits
+                                                     countertop."
+                                                     "action": "go to                                                                                "action": "go to
+                                                     countertop 1"                                                                                   countertop 1"
+                              Game Env               Action                                  PPO Loss                        Game Env                Action                                    PPO Loss
+
+                                                                                  RL Data      RL                                                         Reward                  RL Data      RL
+                                                          Reward
+                                                                                   Buffer Finetune                                                                                 Buffer Finetune
+
+
+                                  (a) GTR-Turbo with SFT Guidance                                                               (b) GTR-Turbo with KL Guidance
+Figure 3. Overview of the GTR-Turbo framework. Beyond the GTR training of VLM agents (Figure 1), GTR-Turbo stores historical check-
+points and merges them into a teacher model (blue region), and then incorporates the PPO update (orange region) with thought guidance by
+minimizing either SFT loss (green region) or KL divergence (purple region), enabling flexible, scalable, and self-guided agentic RL training.
+
+                     GTR-Turbo (KL)              GTR-Turbo (SFT)                   GTR              RL4VLM
+                                                                                                                                                   Model                  SR(%)         ER
+              0.5
+                                                                       4
+
+
+                                                          Episode Return
+                                                                                                                                                CNN+RL*                     0          -1.12
+              0.4
+
+   Success Rate
+                                                                                                                                                  GPT-4o                   2.5         -6.35
+              0.3                                                      2
+                                                                                                                                               GPT-4o + Tool
+                                                                                                                                              Qwen2.5-VL-72B
+                                                                                                                                                                           13.5
+                                                                                                                                                                           5.6
+                                                                                                                                                                                       -3.59
+                                                                                                                                                                                       -5.69
+              0.2                                                                                                                             Qwen2.5-VL-32B                0          -7.25
+                                                                                                                                             Qwen2.5-VL-7B-sft             22.0         -3.2
+              0.1                                                      0                                                                         RL4VLM                    3.5         -13.3
+              0.0                                                                                                                                  GTR                     44.5         0.53
+                 0     10000          20000       30000                    0     10000       20000       30000                                GTR-Turbo (SFT)              48.0        1.32
+                       Training Steps                                            Training Steps                                              GTR-Turbo (KL)                53.5         2.39
+
+
+Figure 4. Training curves on the Points24 game environment. While GTR benefits                                            Table 2. Evaluation result of different models on
+from external knowledge in the early stage, our GTR-Turbo framework is also able                                          the Points24 task. GTR-Turbo significantly outper-
+to maintain a rational reasoning process and ultimately achieves the best overall                                         forms other RL training methods and commercial
+performance. All curves are smoothed for better readability. All experiments employ                                       models in both success rate (SR) and episode return
+the early-truncation strategy introduced by GTR for a fair comparison.                                                    (ER). * - Reported in previous work.
+
+each step, the agent decides which number (1-10) or op-                                                  rewards. GTR [51] introduces thought guidance via an ex-
+erator (e.g., +, −, ×, ÷) to append to the current formula,                                              ternal GPT-4o corrector model for knowledge distillation,
+ultimately forming the one equal to 24. Episodes some-                                                   enabling rapid improvement and representing the current
+times involve more than 10 steps and require domain-specific                                             SOTA method. In addition, we also compare the agent’s
+skills, such as arithmetic computation, making them com-                                                 final performance with several privileged API models.
+plex. ALFWorld is a multimodal embodied simulator fea-
+turing diverse household tasks. The well-trained agent is
+expected to navigate in unfamiliar environments, locate and                                              Training Details Compared to previous work, we adopt a
+interact with objects to reach certain goals, which poses sub-                                           stronger backbone model, Qwen2.5-VL-7B. We start from
+stantial challenges in visual perception, long-horizon plan-                                             an SFT-initialized model that exhibits reasonable instruction-
+ning, and commonsense reasoning. The length of ALFWorld                                                  following capabilities, consistent with prior studies. The full
+tasks can exceed 50 steps, and each step may involve more                                                configuration details are provided in the appendix. To better
+than 20 possible actions, creating a huge action space that                                              evaluate training stability, we train the agent for 30,000 steps
+surpasses a large portion of existing agentic VLM bench-                                                 on Points24 and 20,000 steps on ALFWorld, which are 2x
+marks, including many GUI device control environments                                                    and 4x the budgets reported in previous work, respectively.
+[32, 33, 56]. The reward signals in both environments are                                                We use two NVIDIA GPUs with 40GB of memory, one for
+sparse. This makes them significantly more difficult than                                                the merged checkpoint teacher and the other for the LoRA
+tasks with heuristic/oracle process rewards.                                                             [15] fine-tuned agent.
+
+                                                                                                         4.2. Effectiveness of the GTR-Turbo Framework
+Baselines We select other competitive methods for multi-                                                 Points24 Figure 4 demonstrates the training curves of all
+turn VLM agent RL training as our baselines. RL4VLM                                                      methods. RL4VLM suffers from thought collapse, where the
+[70] directly applies PPO optimization on raw environment                                                outputs become repetitive, incoherent, and templated. Con-
+
+
+                                                                                                     5
+                     GTR-Turbo (KL)    GTR
+                     GTR-Turbo (SFT)   RL4VLM
+                                                                    Model          Average   Pick    Clean   Heat   Cool   Look     Pick2
+            0.125                                               CNN+RL*              0         0       0       0      0      0         0
+
+
+
+
+ Success Rate
+            0.100                                             LLaMA-Adapter*
+                                                                  GPT-4o
+                                                                                    0.13
+                                                                                    0.42
+                                                                                             0.17
+                                                                                             0.53
+                                                                                                     0.10
+                                                                                                     0.67
+                                                                                                             0.27
+                                                                                                             0.22
+                                                                                                                    0.22
+                                                                                                                      0
+                                                                                                                             0
+                                                                                                                            0.25
+                                                                                                                                       0
+                                                                                                                                     0.47
+            0.075                                             Qwen-2.5-VL-72B       0.32     0.38    0.14    0.50   0.27    0.63     0.21
+                                                              Qwen-2.5-VL-32B       0.21     0.44    0.25      0     0.2    0.16      0.2
+            0.050                                            Qwen-2.5-VL-7B-sft     0.08     0.26    0.07    0.09     0     0.05       0
+            0.025                                                RL4VLM
+                                                                   GTR
+                                                                                    0.08
+                                                                                    0.16
+                                                                                             0.40
+                                                                                             0.44
+                                                                                                       0
+                                                                                                     0.14
+                                                                                                               0
+                                                                                                               0
+                                                                                                                      0
+                                                                                                                    0.14
+                                                                                                                              0
+                                                                                                                            0.05
+                                                                                                                                       0
+                                                                                                                                       0
+                 0      5000 10000 15000 20000                GTR-Turbo (SFT)       0.12     0.36      0     0.13     0    0.125       0
+                           Training Steps                     GTR-Turbo (KL)        0.15     0.40    0.09      0    0.14   0.08      0.07
+
+
+Figure 5. Comparison of training curves in the        Table 3. Comparison of success rates across different models in the ALFWorld
+ALFWorld environment. Without relying on any          environment. We present the peak performance in the training curve for RL methods.
+powerful external models, GTR-Turbo achieves com-     GTR-Turbo achieves the same task success rate compared to GTR with significantly
+parable performance purely through its own explo-     less training time and lower computational cost, maintaining excellent performance
+ration, experience, and thought guidance.             under its model scale. * - Reported in previous work.
+
+sequently, the task success rate and episode return rapidly             Computation Time and Cost Table 4 provides a com-
+decline until the agent fails to succeed. By introducing an             parison of the overhead across training methods. The cost
+external GPT-4o model, GTR enables rapid knowledge distil-              estimates include only the additional expenses required to
+lation, leading to improvements in the early stages. However,           implement each training mechanism and exclude the base
+as training progresses, the fixed external model cannot accu-           cost of fine-tuning the VLM agent itself. For GTR, we com-
+mulate additional knowledge, thus limiting further learning.            pute the cost based on the token count via API calls. For
+In contrast, our GTR-Turbo, without any external knowl-                 GTR-Turbo, which requires an additional GPU to deploy the
+edge, also achieves stable and consistent improvement purely            teacher model, we estimate the training cost by multiplying
+through environmental feedback. Ultimately, the SFT-guided              the hourly deployment cost per GPU by the total training
+method reaches performance comparable to GTR, while the                 time. Note that both OpenAI API pricing and GPU costs can
+KL-guided version further surpasses all baselines.                      change over time. Moreover, different API providers may
+    In Table 2, we present the final evaluation results of agents       charge different prices due to their hardware configurations.
+on the Points24 task, which are either trained using different          which further corrupts the precision of our cost estimates.
+RL methods or built upon privileged API models. GTR-                       We assume that the original RL4VLM framework in-
+Turbo achieves the best performance. The fine-tuned smaller             curs no additional overhead but exhibits poor training per-
+model can easily outperform general-purpose models that are             formance. GTR leverages large external models such as
+more than 10 times larger on tasks that require specialized             GPT-4o to guide RL training, but the resulting API costs
+domain knowledge. GTR-Turbo thus offers a promising ap-                 are computationally prohibitive. Additionally, this approach
+proach to the customization/personalization of VLM agents.              introduces network latency and raises data privacy concerns.
+                                                                        As a result, GTR requires much longer training time and
+ALFWorld As illustrated in Figure 5 and Table 3, the                    also considerable expense, both of which limit its real-world
+baseline RL4VLM still exhibits model collapse, which un-
+dermines its training effectiveness. In such complex naviga-                 Env       Method         SR     Time      Cost Estimation
+tion tasks, advanced API models demonstrate substantially                             RL4VLM           4%     86h              $0
+superior capabilities and thus can provide richer and more                   P24
+                                                                                        GTR           41%    191h   $307.78 / 70.35M tokens
+                                                                                   GTR-Turbo (SFT)    48%    168h          $216.72*
+accurate guidance for GTR, enabling a rapid early increase.                        GTR-Turbo (KL)     54%    89h           $114.81*
+A closer analysis shows that external knowledge markedly re-                          RL4VLM           8%     70h              $0
+duces the need for exploration, allowing the agent to directly               ALF
+                                                                                        GTR           16%    164h   $145.76 / 30.94M tokens
+imitate correct trajectories. While GTR-Turbo lacks access                         GTR-Turbo (SFT)    12%    118h          $152.22*
+                                                                                   GTR-Turbo (KL)     15%    78h           $100.62*
+to such extensive knowledge and instead learns from its
+own exploration experience under the guidance of a merged               Table 4. Computation Time and Cost Comparison. GTR-Turbo
+teacher, the results show that the agent can learn indepen-             has comparable or even superior performance to GTR with signif-
+dently and effectively. Even under this unfair comparison               icantly shorter training time and lower monetary cost. Reported
+setting, GTR-Turbo (KL) obtains appealing scores on par                 costs account only for additional overhead (excluding the base cost
+with GTR while offering better efficiency. These findings               of agent training) and may fluctuate with market conditions. P24 -
+highlight the potential of GTR-Turbo for training agents in             Points24, ALF - ALFWorld, SR - task success rate, * - Estimation
+hard tasks where off-the-shelf teachers may not exist.                  based on the deployment cost of an additional GPU.
+
+
+                                                                    6
+                   GTR-Turbo                                              Thought Only                                        GTR-Turbo
+                   KL w/ Static Base Model                                Thought + Action                                    w/o TIES Merging
+                   Rejection Sampling                                                                                 0.5
+
+
+                                                      Success Rate                                         Success Rate
+                                                                 0.4
+
+
+ Success Rate
+            0.4                                                                                                       0.4
+                                                                                                                      0.3
+            0.2                                                  0.2
+                                                                                                                      0.2
+            0.0                                                                                                       0.10
+               0   10000        20000        30000                   0   10000       20000     30000                         10000     20000     30000
+                    Training Steps                                       Training Steps                                      Training Steps
+Figure 6. Comparison with other self-                Figure 7. Comparing different ranges of              Figure 8. Performance comparison with
+improvement baselines. The advantage over            guidance. Guiding full responses, including          and without TIES merging. The results
+static-model KL regularization shows the ne-         both the thoughts and actions simultaneously,        demonstrate the robustness of TIES in the
+cessity of model merging. The comparison             is less effective, primarily because it limits       merging process, effectively enhancing the
+with Rejection Sampling highlights the criti-        the model’s exploration, a process that is cru-      quality of the teacher model and improving
+cal role of RL exploration.                          cial for self-evolution in GTR-Turbo.                the overall training gains.
+
+applicability.                                                                       constraints may improve the agent’s ability to imitate the
+   Our proposed GTR-Turbo is an elegant solution to this                             teacher, but at the cost of restricting the agent’s exploratory
+dilemma. By replacing costly external model calls with lo-                           freedom, limiting overall ability to adapt to the environment.
+cal inference, the SFT-guided GTR-Turbo already achieves
+noticeable reductions in overall time and cost. The KL-                              Effectiveness of TIES Merging We experiment between
+guided variant further reduces the total training time to that                       TIES merging and the traditional linear averaging method
+of RL4VLM, roughly half that of GTR. It also reduces the                             [19] to validate the effectiveness of this technique. Results
+computational cost to as low as 40% of that of GTR. More-                            in Figure 8 show that TIES can indeed boost performance
+over, in scenarios where cutting-edge models are inaccessi-                          by mitigating the interference of redundant parameters and
+ble or data privacy is critical, the fully self-contained and                        sign disagreement, allowing the merged model to better pre-
+locally deployable GTR-Turbo offers an unparalleled advan-                           serve and integrate learned capabilities. Meanwhile, linear
+tage.                                                                                merging also yields reasonable training gains, confirming
+                                                                                     the validity of the merged checkpoint as a teacher.
+4.3. Ablation Studies and Discussions
+Comparison with other self-improvement baselines We
+                                                                                     Different KL Estimation Methods Considering the large
+conducted a study to compare the effects of our model merg-
+                                                                                     output space of VLMs, KL divergence cannot be computed
+ing and the regularization trick commonly used by RLVR. As
+                                                                                     analytically from logits; instead needs sampling. Conse-
+shown in Figure 6, using the initial checkpoint (static base
+                                                                                     quently, the choice of the KL estimation method is criti-
+model) as the KL reference fails to achieve stable improve-
+                                                                                     cal, especially in GTR-Turbo. Directly computing the log-
+ment as GTR-Turbo does. We also compare GTR-Turbo with
+                                                                                     probability difference can yield negative estimates, which is
+a simple yet provenly effective self-improvement baseline,
+                                                                                     problematic because we use the negative sentence-level KL
+Rejection Sampling [68], which uses SFT on self-generated
+                                                                                     as auxiliary rewards. As demonstrated by the blue curve in
+successful trajectories and thus does not rely on external
+                                                                                     Figure 9, such KL estimation can grow increasingly negative,
+models. While simpler and faster, Rejection Sampling can-
+                                                                                     pushing the agent further away from the teacher.
+not solve the challenging Point24 as it struggles to generate
+                                                                                        Several approaches can resolve this issue. The simplest
+the correct trajectories that the VLM agent can imitate. On
+                                                                                     method is to clip the negative part or take its absolute value.
+the contrary, RL has the potential to explore better actions
+                                                                                     Additionally, a non-negative and unbiased K3 estimator is
+leveraging the reward feedback.
+                                                                                     proposed by Schulman [36]. We also try the forward KL
+                                                                                     calculation. All estimators are presented in Equation 7:
+Range of Guidance In Figure 7, we try guiding the agent’s
+full response, including both the thought and action. Con-
+                                                                                              K1 = log πθ − log πmerged ;
+sistent with observations from GTR, this approach is less
+effective. Combined with earlier results showing the advan-                                   KLclip = clip(K1, 0, +∞);
+tage of KL-based guidance over SFT, we argue that for a                                       KLabs = |K1|;
+self-contained system like GTR-Turbo, efficient exploration
+                                                                                              K3 = K1 + e−K1 − 1;
+is critical as it directly determines the diversity of feedback
+and experience. Guiding actions or imposing stronger SFT                                      KLforward = clip(−K1, 0, +∞).                         (7)
+
+
+                                                                                 7
+                                                                                       Clip                     K1           K3          Abs       Forward KL
+                                                                                                                                                                    1.5
+                            0.5
+                                                                                                           4                                                        1.0
+
+
+                 Success Rate                                                                 Episode Return                                        KL Estimation
+                            0.4
+                                                                                                                                                                    0.5
+                            0.3                                                                            2                                                        0.0
+                            0.2
+                                                                                                                                                                    0.5
+                            0.1                                                                            0
+                               0           10000        20000                    30000                      0            10000       20000     30000                1.00   10000    20000   30000
+                                            Training Steps                                                               Training Steps                                    Training Steps
+Figure 9. Comparison among different KL estimation methods. All methods with non-negative output can achieve increased performance.
+The clipping method yields the best results, as it controls the magnitude of the KL value, leading to finer-grained updates and improved
+stability. The slightly lower result of forward KL proves the mode-seeking advantage of reverse KL.
+
+
+                       SMA          EMA ( =0.2)     EMA ( =0.3)                 EMA ( =0.5)                EMA ( =0.8)               model merging in terms of optimization smoothing and past
+                                                                        4                                                            knowledge integration. A very low α, while theoretically
+
+  Success Rate                                             Episode Return
+             0.4
+                                                                                                                                     closer to the SMA and shown to perform similarly in related
+                                                                        2
+             0.2                                                                                                                     pre-training research [22], quickly fails in our experiments.
+                                                                        0                                                               Although a lower α results in a set of weights closer to
+             0.0
+                0                  10000   20000     30000                  0     10000        20000             30000               average after convergence, the online recursive computation
+                                   Training Steps                                 Training Steps                                     (Eqn. 4) introduces substantial bias when k is small, leading
+Figure 10. Comparing different weights assignment methods.                                                                           to unbalanced merging where the latest models have minimal
+Simple SMA already yields strong performance. A balanced choice                                                                      impact, thus degrading in the early stage. This issue is less
+of α is critical for realizing the benefit of EMA.                                                                                   pronounced in pretraining, where the number of checkpoints
+                                                                                                                                     is much larger. Overall, choosing a balanced α is important
+                                                                                                                                     for maximizing the effectiveness of the EMA strategy.
+   Results in Figure 9 demonstrate that all non-negative
+estimators lead to model improvements, the clipping method                                                                           5. Conclusions and Limitations
+achieved the best results, and the differences among other
+methods are minor. As observed from the KL estimation                                                                                Credit assignment with sparse rewards remains a core chal-
+curves, this is likely because clipping controls the scale of KL                                                                     lenge in the multi-turn RL of VLM agents. Previous process-
+values, providing finer-grained updates and better stability                                                                         guided approaches, such as GTR, rely on costly and possibly
+when both the teacher and student are dynamically changing.                                                                          inaccessible external API models, severely limiting their
+   The forward KL can also achieve high peak performance,                                                                            scalability and practicality. In this work, we introduce the
+but it still underperforms the reverse KL, consistent with                                                                           GTR-Turbo framework, which leverages the merged check-
+prior studies [13, 20]. This is because reverse KL exhibits a                                                                        point as a free teacher and provides thought guidance through
+“mode-seeking” characteristic, allowing the agent to capture                                                                         either SFT or KL-regularized objectives. This simple yet
+a specific peak in the teacher’s behavior rather than span                                                                           powerful framework enables self-evolving agents while re-
+over the broader distribution, making it more targeted and                                                                           ducing training time and cost, and achieving comparable
+effective for guidance.                                                                                                              or even superior performance to GTR. By better unleash-
+                                                                                                                                     ing the model’s decision-making and reflective capabilities,
+Different Weights Assignment Methods As described                                                                                    GTR-Turbo offers a more practical and efficient paradigm
+in Section 3.2, there are different strategies for assigning                                                                         for complex multi-turn visual agentic tasks.
+weights during merging. In Figure 10, we explore various                                                                                GTR-Turbo can be regarded as a bootstrapped training
+weight assignment methods and parameter choices.                                                                                     paradigm, which is feasible when external teacher models
+   The aforementioned experiments use the simplest arith-                                                                            are inaccessible, or training data cannot be uploaded due to
+metic mean (SMA), which already yields satisfactory per-                                                                             privacy concerns. However, in certain extreme scenarios in
+formance. The exponential moving average (EMA) strategy,                                                                             which the base model is too weak (e.g., an initial success
+controlled by a parameter α, gives greater influence to more                                                                         rate of <5%), self-improvement approaches can fail. Then
+recent models with larger weights (see Equation 4). Results                                                                          traditional GTR is needed since an expensive but stronger
+show that a balanced α = 0.5 performs the best among all                                                                             external teacher can provide better guidance. Moreover,
+candidates, with peak performance comparable to SMA.                                                                                 due to resource constraints, our experiments are primarily
+   An excessively high α causes the influence of historical                                                                          conducted on 7B models. Future research will verify the
+checkpoints to diminish rapidly, weakening the benefits of                                                                           effectiveness of GTR-Turbo at different model sizes.
+
+
+                                                                                                                                 8
+Acknowledgement                                                               tion. In 2024 IEEE international conference on robotics and
+                                                                              automation, pages 12462–12469. IEEE, 2024. 2
+This work is supported by the National Key Research and                  [13] Yuxian Gu, Li Dong, Furu Wei, and Minlie Huang. Minillm:
+Development Plan under Grant No. 2024YFB4505500 &                             Knowledge distillation of large language models. In The
+2024YFB4505503.                                                               Twelfth International Conference on Learning Representa-
+                                                                              tions. 4, 8
+References                                                               [14] Daya Guo, Dejian Yang, Haowei Zhang, Junxiao Song,
+                                                                              Ruoyu Zhang, Runxin Xu, Qihao Zhu, Shirong Ma, Peiyi
+ [1] Michael Ahn, Anthony Brohan, Noah Brown, Yevgen Chebo-                   Wang, Xiao Bi, et al. Deepseek-r1: Incentivizing reasoning
+     tar, Omar Cortes, Byron David, Chelsea Finn, Chuyuan Fu,                 capability in llms via reinforcement learning. arXiv preprint
+     Keerthana Gopalakrishnan, Karol Hausman, et al. Do as i                  arXiv:2501.12948, 2025. 1
+     can, not as i say: Grounding language in robotic affordances.       [15] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu,
+     arXiv preprint arXiv:2204.01691, 2022. 2                                 Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen, et al. Lora:
+ [2] Shuai Bai, Yuxuan Cai, Ruizhe Chen, Keqin Chen, Xionghui                 Low-rank adaptation of large language models. ICLR, 1(2):3,
+     Chen, Zesen Cheng, Lianghao Deng, Wei Ding, Chang Gao,                   2022. 5, 13
+     Chunjiang Ge, et al. Qwen3-vl technical report. arXiv               [16] Gao Huang, Yixuan Li, Geoff Pleiss, Zhuang Liu, John E
+     preprint arXiv:2511.21631, 2025. 2                                       Hopcroft, and Kilian Q Weinberger. Snapshot ensembles:
+ [3] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin                  Train 1, get m for free. In International Conference on Learn-
+     Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun                     ing Representations, 2017. 2, 3
+     Tang, et al. Qwen2.5-vl technical report. arXiv preprint            [17] Wenlong Huang, Pieter Abbeel, Deepak Pathak, and Igor Mor-
+     arXiv:2502.13923, 2025. 2, 13                                            datch. Language models as zero-shot planners: Extracting
+ [4] Anthony Brohan, Noah Brown, Justice Carbajal, Yevgen                     actionable knowledge for embodied agents. In International
+     Chebotar, Xi Chen, Krzysztof Choromanski, Tianli Ding,                   conference on machine learning, pages 9118–9147. PMLR,
+     Danny Driess, Avinava Dubey, Chelsea Finn, et al. Rt-2:                  2022. 2
+     Vision-language-action models transfer web knowledge to             [18] Wenlong Huang, Chen Wang, Ruohan Zhang, Yunzhu Li,
+     robotic control. arXiv preprint arXiv:2307.15818, 2023. 2                Jiajun Wu, and Li Fei-Fei. Voxposer: Composable 3d value
+ [5] Ganqu Cui, Lifan Yuan, Zefan Wang, Hanbin Wang, Wendi                    maps for robotic manipulation with language models. arXiv
+     Li, Bingxiang He, Yuchen Fan, Tianyu Yu, Qixin Xu, Weize                 preprint arXiv:2307.05973, 2023. 2
+     Chen, et al. Process reinforcement through implicit rewards.        [19] Gabriel Ilharco, Marco Tulio Ribeiro, Mitchell Wortsman,
+     arXiv preprint arXiv:2502.01456, 2025. 2                                 Ludwig Schmidt, Hannaneh Hajishirzi, and Ali Farhadi. Edit-
+ [6] Ganqu Cui, Yuchen Zhang, Jiacheng Chen, Lifan Yuan, Zhi                  ing models with task arithmetic. In The Eleventh International
+     Wang, Yuxin Zuo, Haozhan Li, Yuchen Fan, Huayu Chen,                     Conference on Learning Representations, 2023. 2, 3, 7
+     Weize Chen, et al. The entropy mechanism of reinforce-              [20] Eric Jang. A beginner’s guide to variational methods: Mean-
+     ment learning for reasoning language models. arXiv preprint              field approximation, 2016. 8
+     arXiv:2505.22617, 2025. 1                                           [21] Pengxiang Li, Zechen Hu, Zirui Shang, Jingrong Wu, Yang
+                                                                              Liu, Hui Liu, Zhi Gao, Chenrui Shi, Bofei Zhang, Zihao
+ [7] Google Deepmind. Gemini 2.5 pro, 2025. 1
+                                                                              Zhang, et al. Efficient multi-turn rl for gui agents via de-
+ [8] Danny Driess, Fei Xia, Mehdi SM Sajjadi, Corey Lynch,                    coupled training and adaptive data curation. arXiv preprint
+     Aakanksha Chowdhery, Ayzaan Wahid, Jonathan Tompson,                     arXiv:2509.23866, 2025. 2
+     Quan Vuong, Tianhe Yu, Wenlong Huang, et al. Palm-e:
+                                                                         [22] Yunshui Li, Yiyuan Ma, Shen Yan, Chaoyi Zhang, Jing Liu,
+     An embodied multimodal language model. International
+                                                                              Jianqiao Lu, Ziwen Xu, Mengzhao Chen, Minrui Wang, Shiyi
+     conference on machine learning, 2023. 2
+                                                                              Zhan, et al. Model merging in pre-training of large language
+ [9] Lang Feng, Zhenghai Xue, Tingcong Liu, and Bo An. Group-                 models. arXiv preprint arXiv:2505.12082, 2025. 2, 8
+     in-group policy optimization for llm agent training. arXiv          [23] Yuetai Li, Zhangchen Xu, Fengqing Jiang, Bhaskar Ramasub-
+     preprint arXiv:2505.10978, 2025. 2                                       ramanian, Luyao Niu, Bill Yuchen Lin, Xiang Yue, and Radha
+[10] Wei Fu, Jiaxuan Gao, Xujie Shen, Chen Zhu, Zhiyu Mei,                    Poovendran. Temporal sampling for forgotten reasoning in
+     Chuyi He, Shusheng Xu, Guo Wei, Jun Mei, Jiashu Wang,                    llms. arXiv preprint arXiv:2505.20196, 2025. 2, 3
+     et al. Areal: A large-scale asynchronous reinforcement              [24] Hunter Lightman, Vineet Kosaraju, Yuri Burda, Harrison Ed-
+     learning system for language reasoning. arXiv preprint                   wards, Bowen Baker, Teddy Lee, Jan Leike, John Schulman,
+     arXiv:2505.24298, 2025. 2                                                Ilya Sutskever, and Karl Cobbe. Let’s verify step by step. In
+[11] Bofei Gao, Zefan Cai, Runxin Xu, Peiyi Wang, Ce Zheng,                   The twelfth international conference on learning representa-
+     Runji Lin, Keming Lu, Dayiheng Liu, Chang Zhou, Wen Xiao,                tions, 2023. 2
+     et al. Llm critics help catch bugs in mathematics: Towards a        [25] Kevin Lu and Thinking Machines Lab. On-policy dis-
+     better mathematical verifier with natural language feedback.             tillation. Thinking Machines Lab: Connectionism, 2025.
+     arXiv preprint arXiv:2406.14024, 2024. 2                                 https://thinkingmachines.ai/blog/on-policy-distillation. 1, 4
+[12] Jensen Gao, Bidipta Sarkar, Fei Xia, Ted Xiao, Jiajun Wu,           [26] Michael S Matena and Colin A Raffel. Merging models with
+     Brian Ichter, Anirudha Majumdar, and Dorsa Sadigh. Physi-                fisher-weighted averaging. Advances in Neural Information
+     cally grounded vision-language models for robotic manipula-              Processing Systems, 35:17703–17716, 2022. 2
+
+
+                                                                     9
+[27] Yao Mu, Qinglong Zhang, Mengkang Hu, Wenhai Wang,                             when trained on recursively generated data. Nature, 631
+     Mingyu Ding, Jun Jin, Bin Wang, Jifeng Dai, Yu Qiao, and                      (8022):755–759, 2024. 1
+     Ping Luo. Embodiedgpt: Vision-language pre-training via                  [42] Theodore Sumers, Kenneth Marino, Arun Ahuja, Rob Fer-
+     embodied chain of thought. Advances in neural information                     gus, and Ishita Dasgupta. Distilling internet-scale vision-
+     processing systems, 36:25081–25094, 2023. 2                                   language models into embodied agents. arXiv preprint
+[28] OpenAI. Introducing gpt-5, 2025. 1                                            arXiv:2301.12507, 2023. 2
+[29] OpenAI. Introducing openai o3 and o4-mini, 2025. 1                       [43] Qwen Team. Qwen3: Think deeper, act faster, 2025. 1
+[30] Long Ouyang, Jeffrey Wu, Xu Jiang, Diogo Almeida, Car-                   [44] Jonathan Uesato, Nate Kushman, Ramana Kumar, Francis
+     roll Wainwright, Pamela Mishkin, Chong Zhang, Sandhini                        Song, Noah Siegel, Lisa Wang, Antonia Creswell, Geoffrey
+     Agarwal, Katarina Slama, Alex Ray, et al. Training language                   Irving, and Irina Higgins. Solving math word problems
+     models to follow instructions with human feedback. Advances                   with process-and outcome-based feedback. arXiv preprint
+     in neural information processing systems, 35:27730–27744,                     arXiv:2211.14275, 2022. 2
+     2022. 13                                                                 [45] Chaojie Wang, Yanchen Deng, Zhiyi Lyu, Liang Zeng, Jujie
+[31] Joon Sung Park, Joseph O’Brien, Carrie Jun Cai, Mered-                        He, Shuicheng Yan, and Bo An. Q*: Improving multi-step
+     ith Ringel Morris, Percy Liang, and Michael S Bernstein.                      reasoning for llms with deliberative planning. arXiv preprint
+     Generative agents: Interactive simulacra of human behavior.                   arXiv:2406.14283, 2024. 2
+     In Proceedings of the 36th annual acm symposium on user
+                                                                              [46] Guanzhi Wang, Yuqi Xie, Yunfan Jiang, Ajay Mandlekar,
+     interface software and technology, pages 1–22, 2023. 2
+                                                                                   Chaowei Xiao, Yuke Zhu, Linxi Fan, and Anima Anandkumar.
+[32] Christopher Rawles, Alice Li, Daniel Rodriguez, Oriana Riva,
+                                                                                   Voyager: An open-ended embodied agent with large language
+     and Timothy Lillicrap. Androidinthewild: A large-scale
+                                                                                   models. arXiv preprint arXiv:2305.16291, 2023. 2
+     dataset for android device control. Advances in Neural In-
+                                                                              [47] Kangrui Wang, Pingyue Zhang, Zihan Wang, Yaning Gao,
+     formation Processing Systems, 36:59708–59728, 2023. 5,
+                                                                                   Linjie Li, Qineng Wang, Hanyang Chen, Chi Wan, Yip-
+     14
+                                                                                   ing Lu, Zhengyuan Yang, et al. Vagen: Reinforcing world
+[33] Christopher Rawles, Sarah Clinckemaillie, Yifan Chang,
+                                                                                   model reasoning for multi-turn vlm agents. arXiv preprint
+     Jonathan Waltz, Gabrielle Lau, Marybeth Fair, Alice Li,
+                                                                                   arXiv:2510.16907, 2025. 2
+     William Bishop, Wei Li, Folawiyo Campbell-Ajala, et al.
+     Androidworld: A dynamic benchmarking environment for                     [48] Zihao Wang, Shaofei Cai, Guanzhou Chen, Anji Liu, Xiaojian
+     autonomous agents. arXiv preprint arXiv:2405.14573, 2024.                     Ma, and Yitao Liang. Describe, explain, plan and select:
+     5                                                                             Interactive planning with large language models enables open-
+[34] Stéphane Ross, Geoffrey Gordon, and Drew Bagnell. A re-                      world multi-task agents. arXiv preprint arXiv:2302.01560,
+     duction of imitation learning and structured prediction to                    2023. 2
+     no-regret online learning. In Proceedings of the fourteenth in-          [49] Zihan Wang, Kangrui Wang, Qineng Wang, Pingyue Zhang,
+     ternational conference on artificial intelligence and statistics,             Linjie Li, Zhengyuan Yang, Xing Jin, Kefan Yu, Minh Nhat
+     pages 627–635. JMLR Workshop and Conference Proceed-                          Nguyen, Licheng Liu, et al. Ragen: Understanding self-
+     ings, 2011. 2, 4                                                              evolution in llm agents via multi-turn reinforcement learning.
+[35] Sunny Sanyal, Atula Tejaswi Neerkaje, Jean Kaddour, Ab-                       arXiv preprint arXiv:2504.20073, 2025. 1, 2
+     hishek Kumar, et al. Early weight averaging meets high                   [50] Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten Bosma,
+     learning rates for llm pre-training. In First Conference on                   Fei Xia, Ed Chi, Quoc V Le, Denny Zhou, et al. Chain-of-
+     Language Modeling, 2024. 2                                                    thought prompting elicits reasoning in large language models.
+[36] John Schulman. Approximating kl divergence, 2020. 7                           Advances in neural information processing systems, 35:24824–
+[37] John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Rad-                     24837, 2022. 2
+     ford, and Oleg Klimov. Proximal policy optimization algo-                [51] Tong Wei, Yijun Yang, Junliang Xing, Yuanchun Shi,
+     rithms. arXiv preprint arXiv:1707.06347, 2017. 1, 2                           Zongqing Lu, and Deheng Ye. Gtr: Guided thought rein-
+[38] Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao                       forcement prevents thought collapse in rl-based vlm agent
+     Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, YK Li,                          training. arXiv preprint arXiv:2503.08525, 2025. 1, 2, 3, 5,
+     Y Wu, et al. Deepseekmath: Pushing the limits of mathe-                       13
+     matical reasoning in open language models. arXiv preprint                [52] Mitchell Wortsman, Gabriel Ilharco, Samir Ya Gadre, Re-
+     arXiv:2402.03300, 2024. 1, 2                                                  becca Roelofs, Raphael Gontijo-Lopes, Ari S Morcos,
+[39] Noah Shinn, Federico Cassano, Ashwin Gopinath, Karthik                        Hongseok Namkoong, Ali Farhadi, Yair Carmon, Simon Ko-
+     Narasimhan, and Shunyu Yao. Reflexion: Language agents                        rnblith, et al. Model soups: averaging weights of multiple
+     with verbal reinforcement learning. Advances in neural infor-                 fine-tuned models improves accuracy without increasing infer-
+     mation processing systems, 36:8634–8652, 2023. 2                              ence time. In International conference on machine learning,
+[40] Mohit Shridhar, Xingdi Yuan, Marc-Alexandre Côté, Yonatan                   pages 23965–23998. PMLR, 2022. 2, 3
+     Bisk, Adam Trischler, and Matthew Hausknecht. Alfworld:                  [53] Qingyun Wu, Gagan Bansal, Jieyu Zhang, Yiran Wu, Beibin
+     Aligning text and embodied environments for interactive                       Li, Erkang Zhu, Li Jiang, Xiaoyun Zhang, Shaokun Zhang,
+     learning. arXiv preprint arXiv:2010.03768, 2020. 2, 4                         Jiale Liu, et al. Autogen: Enabling next-gen llm ap-
+[41] Ilia Shumailov, Zakhar Shumaylov, Yiren Zhao, Nicolas Pa-                     plications via multi-agent conversation. arXiv preprint
+     pernot, Ross Anderson, and Yarin Gal. Ai models collapse                      arXiv:2308.08155, 2023. 2
+
+
+                                                                         10
+[54] Taiqiang Wu, Chaofan Tao, Jiahao Wang, Runming Yang,                       Zhicong Lu, et al. Proact: Agentic lookahead in interac-
+     Zhe Zhao, and Ngai Wong. Rethinking kullback-leibler diver-                tive environments. arXiv preprint arXiv:2602.05327, 2026.
+     gence in knowledge distillation for large language models. In              2
+     Proceedings of the 31st International Conference on Compu-            [67] Lifan Yuan, Wendi Li, Huayu Chen, Ganqu Cui, Ning Ding,
+     tational Linguistics, pages 5737–5755, 2025. 4                             Kaiyan Zhang, Bowen Zhou, Zhiyuan Liu, and Hao Peng.
+[55] Shijie Xia, Xuefeng Li, Yixin Liu, Tongshuang Wu, and                      Free process rewards without process labels. arXiv preprint
+     Pengfei Liu. Evaluating mathematical reasoning beyond ac-                  arXiv:2412.01981, 2024. 2
+     curacy. arXiv preprint arXiv:2404.05692, 2024. 2                      [68] Zheng Yuan, Hongyi Yuan, Chengpeng Li, Guanting Dong,
+[56] Tianbao Xie, Danyang Zhang, Jixuan Chen, Xiaochuan Li,                     Keming Lu, Chuanqi Tan, Chang Zhou, and Jingren Zhou.
+     Siheng Zhao, Ruisheng Cao, Toh J Hua, Zhoujun Cheng,                       Scaling relationship on learning mathematical reasoning with
+     Dongchan Shin, Fangyu Lei, et al. Osworld: Benchmarking                    large language models. arXiv preprint arXiv:2308.01825,
+     multimodal agents for open-ended tasks in real computer                    2023. 7
+     environments. Advances in Neural Information Processing               [69] Yang Yue, Zhiqi Chen, Rui Lu, Andrew Zhao, Zhaokai Wang,
+     Systems, 37:52040–52094, 2024. 5                                           Shiji Song, and Gao Huang. Does reinforcement learning
+[57] Prateek Yadav, Derek Tam, Leshem Choshen, Colin A Raf-                     really incentivize reasoning capacity in llms beyond the base
+     fel, and Mohit Bansal. Ties-merging: Resolving interference                model? arXiv preprint arXiv:2504.13837, 2025. 14
+     when merging models. Advances in Neural Information Pro-              [70] Simon Zhai, Hao Bai, Zipeng Lin, Jiayi Pan, Peter Tong,
+     cessing Systems, 36:7093–7115, 2023. 1, 2, 3                               Yifei Zhou, Alane Suhr, Saining Xie, Yann LeCun, Yi Ma,
+[58] Enneng Yang, Li Shen, Guibing Guo, Xingwei Wang, Xi-                       et al. Fine-tuning large vision-language models as decision-
+     aochun Cao, Jie Zhang, and Dacheng Tao. Model merging in                   making agents via reinforcement learning. Advances in neural
+     llms, mllms, and beyond: Methods, theories, applications and               information processing systems, 37:110935–110971, 2025. 2,
+     opportunities. CoRR, 2024. 2                                               4, 5, 13
+[59] Enneng Yang, Zhenyi Wang, Li Shen, Shiwei Liu, Guibing                [71] Hanchen Zhang, Xiao Liu, Bowen Lv, Xueqiao Sun, Bo-
+     Guo, Xingwei Wang, and Dacheng Tao. Adamerging: Adap-                      hao Jing, Iat Long Iong, Zhenyu Hou, Zehan Qi, Hanyu Lai,
+     tive model merging for multi-task learning. In The Twelfth                 Yifan Xu, et al. Agentrl: Scaling agentic reinforcement learn-
+     International Conference on Learning Representations, 2024.                ing with a multi-turn, multi-task framework. arXiv preprint
+     2, 3                                                                       arXiv:2510.04206, 2025. 2
+[60] Jingkang Yang, Yuhao Dong, Shuai Liu, Bo Li, Ziyue Wang,              [72] Lunjun Zhang, Arian Hosseini, Hritik Bansal, Mehran
+     Haoran Tan, Chencheng Jiang, Jiamu Kang, Yuanhan Zhang,                    Kazemi, Aviral Kumar, and Rishabh Agarwal. Generative
+     Kaiyang Zhou, et al. Octopus: Embodied vision-language                     verifiers: Reward modeling as next-token prediction. arXiv
+     programmer from environmental feedback. In European con-                   preprint arXiv:2408.15240, 2024. 2
+     ference on computer vision, pages 20–38. Springer, 2024.              [73] Siyu Zhou, Tianyi Zhou, Yijun Yang, Guodong Long, Deheng
+     2                                                                          Ye, Jing Jiang, and Chengqi Zhang. Wall-e: World alignment
+[61] Yijun Yang, Tianyi Zhou, Kanxue Li, Dapeng Tao, Lusong Li,                 by rule learning improves world model-based llm agents.
+     Li Shen, Xiaodong He, Jing Jiang, and Yuhui Shi. Embodied                  arXiv preprint arXiv:2410.07484, 2024. 2
+     multi-modal agent trained by an llm from a parallel textworld.
+     In Proceedings of the IEEE/CVF conference on computer
+     vision and pattern recognition, pages 26275–26285, 2024. 2
+[62] Shunyu Yao, Dian Yu, Jeffrey Zhao, Izhak Shafran, Tom Grif-
+     fiths, Yuan Cao, and Karthik Narasimhan. Tree of thoughts:
+     Deliberate problem solving with large language models. Ad-
+     vances in neural information processing systems, 36:11809–
+     11822, 2023. 2
+[63] Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran,
+     Karthik Narasimhan, and Yuan Cao. React: Synergizing
+     reasoning and acting in language models. In International
+     conference on learning representations, 2023. 2
+[64] Le Yu, Bowen Yu, Haiyang Yu, Fei Huang, and Yongbin Li.
+     Language models are super mario: Absorbing abilities from
+     homologous models as a free lunch. In Forty-first Interna-
+     tional Conference on Machine Learning, 2024. 2, 3
+[65] Qiying Yu, Zheng Zhang, Ruofei Zhu, Yufeng Yuan, Xi-
+     aochen Zuo, Yu Yue, Tiantian Fan, Gaohong Liu, Lingjun
+     Liu, Xin Liu, et al. Dapo: An open-source llm reinforcement
+     learning system at scale. CoRR, 2025. 2
+[66] Yangbin Yu, Mingyu Yang, Junyou Li, Yiming Gao, Feiyu
+     Liu, Yijun Yang, Zichuan Lin, Jiafei Lyu, Yicheng Liu,
+
+
+                                                                      11
+A. Pseudocodes
+
+We present the GTR-Turbo pseudocodes, both for the SFT and KL thought guidance variants.
+
+
+Algorithm 1 Training Procedure of GTR-Turbo (SFT)
+ 1: Input: Environment env, agent model πθ0 , Replay buffer size B, update epoch K
+ 2: C ← [πθ0 ]                                                                                       ▷ Checkpoint buffer
+ 3: D ← ∅                                                                                              ▷ Thought dataset
+ 4: for k = 0 to K − 1 do
+ 5:     B←∅                                                                                   ▷ On-policy RL data buffer
+                  (k)
+ 6:     Obtain πmerged by merging all checkpoints in C                                                         ▷ Eqn. 3
+ 7:     ot = env.reset()
+ 8:     while |B| < B do
+ 9:        Generate (tht , at ) using πθk given ot
+10:        Generate (thˆ t , ât ) using π (k) given ot                                              ▷ Reference thought
+                                          merged
+11:        rt , ot+1 = env.step(at )
+12:        B ← B ∪ (ot , at , rt , ot+1 )
+13:        D ← D ∪ (ot , th   ˆ t)
+14:     Sample mini-batch b from B, d from D
+15:     Compute LPPO with b
+16:     Compute LSFT with d                                                                                     ▷ Eqn. 2
+17:     θk+1 = arg minθ (LPPO + LSFT )                                                                          ▷ Eqn. 5
+18:     C ← C ∪ πθk+1
+19: Output: πθK
+
+
+
+
+Algorithm 2 Training Procedure of GTR-Turbo (KL)
+ 1: Input: Environment env, agent model πθ0 , Replay buffer size B, update epoch K
+ 2: C ← [πθ0 ]                                                                                       ▷ Checkpoint buffer
+ 3: for k = 0 to K − 1 do
+ 4:     B←∅                                                                                   ▷ On-policy RL data buffer
+                 (k)
+ 5:     Obtain πmerged by merging all checkpoints in C                                                          ▷ Eqn.3
+ 6:     ot = env.reset()
+ 7:     while |B| < B do
+ 8:        Generate (tht , at )using πθk given 
+                                                ot
+                                    (k)
+ 9:        Calculate RevKL πθk , πmerged ; tht                                                                  ▷ Eqn. 6
+10:        rt , ot+1 =env.step(at )                                 
+                                                   (k)
+11:        B ← B ∪ ot , at , rt − β · RevKL πθk , πmerged ; tht , ot+1
+12:    Sample mini-batch b from B
+13:    Compute LPPO with b
+14:    θk+1 = arg minθ LPPO
+15:    C ← C ∪ πθk+1
+16: Output: πθK
+
+
+
+
+   In GTR-Turbo (KL), β controls the contribution of the reserve KL term within the reward. Throughout this paper, we use
+the default setting of β = 1.
+
+
+                                                            12
+B. Additional Details on Training
+B.1. Training Setting
+Drawing inspiration from the common practice in RL post-training frameworks, [30, 51, 70], we perform one epoch of
+supervised fine-tuning on the base Qwen2.5-VL model [3] before RL training, so that the agent possesses a basic instruction-
+following capability. The datasets are sourced from the RL4VLM paper [70], with labels for the Points24 provided by a task
+solver and labels for the ALFWorld environment generated by GPT-4V.
+B.2. Hyperparameters
+We provide the hyperparameters used for GTR-Turbo training in Table 5, which are primarily derived from previous work
+[51, 70]. We employ LoRA [15] to fine-tune the entire VLM model.
+
+                  Hyperparameter                                                              Value
+                                                    General Setup - Training
+                  Learning rate                                                         CosineAnnealingLR
+                  Initial learning rate                                                       1e − 5
+                  Final learning rate                                                         1e − 9
+                  Maximum learning rate step                                                    25
+                  Discount factor γ                                                            0.9
+                  GAE λ                                                                        0.95
+                  PPO entropy coefficient                                                      0.01
+                  PPO value loss coefficient                                                    0.5
+                  PPO clip parameter c                                                         0.1
+                  PPO epoch                                                                      4
+                  Gradient accumulation steps                                                  128
+                  LoRA r                                                                       128
+                  LoRA α                                                                       256
+                  LoRA dropout                                                                 0.05
+                  KL loss coefficient β                            (for KL guidance)             1
+                                                    General Setup - Models
+                  Generation max text length                                                  256
+                  Generation temperature                                                       0.2
+                  Generation repetition penalty                                                1.2
+                  Model Merging Method                                                        TIES
+                  TIES Density                                                                 0.8
+                  Teacher Generation base temperature              (for SFT guidance)          0.2
+                  Teacher Generation max temperature               (for SFT guidance)          0.9
+                  Teacher Generation temperature retry coefficient (for SFT guidance)          1.1
+                                                       For Points24 task
+                  Environmental steps                                                         30000
+                  Thought probability coefficient                                              0.5
+                                                      For ALFWorld task
+                  Environmental steps                                                         20000
+                  Thought probability coefficient                                              0.2
+
+
+                                            Table 5. Hyperparameters of GTR-Turbo
+
+
+
+
+                                                              13
+C. Additional Experiment Results
+C.1. Results on stronger and more recent models
+We also evaluate the efficacy of GTR-Turbo using the newly released Qwen3-VL-8B-Instruct model. We evaluate on
+ALFWorld using the KL variant of GTR-Turbo. The results show that GTR-Turbo remains compatible with the latest model
+family, and the stronger base capability of Qwen3-VL leads to improved performance, even surpassing the success rate of
+Qwen2.5-VL-32B, a model that is four times larger in scale.
+   Moreover, we observe that, in general-knowledge reasoning tasks such as ALFWorld, Qwen3-VL can perform RL directly
+without any SFT initialization. This suggests that as foundation models continue to evolve, GTR-Turbo may become even
+simpler to use and more broadly applicable.
+
+                                                              Qwen3-VL-8B
+                                                  0.25
+                                                                     Qwen2.5-VL-32B
+
+
+                                       Success Rate
+                                                  0.20
+                                                  0.15
+                                                  0.10
+                                                  0.05
+                                                      0     5000         10000     15000
+                                                            Training Steps
+                                      Figure 11. Result of Qwen3-VL-8B on ALFWorld.
+
+
+C.2. Additional Experiments on other open-ended tasks
+We conduct an experiment on the challenging GUI benchmark Android-in-the-Wild (AitW) [32] using Qwen3-VL-8B-Instruct,
+as shown in Table 6. GTR-Turbo still outperforms strong DigiRL and PPO baselines without heavy hyperparameter tuning and
+reward shaping. Moreover, we also compare the quality of reasoning traces between PPO and GTR-Turbo using GPT-5.2 with
+a simple LLM-as-a-judge method. These results demonstrate the efficacy of GTR-Turbo across diverse visual environments.
+
+                                             Method       Success Rate     Reasoning Score
+                                        DigiRL              71.9%                  -
+                                         PPO                75.0%                3.26
+                                       GTR-Turbo            80.2%                3.93
+
+                                     Table 6. Experiment results on Android-in-the-Wild.
+
+
+C.3. Pass@k Comparison
+Following prior work [69], we use pass@k success rate with increasing k until convergence (k = 32 achieves the same
+performance as k = 16) to assess the upper bound of the base model’s capability. Figure 12 shows that the agent trained by
+GTR-Turbo can easily surpass the ceiling, indicating that GTR-Turbo enables the model to acquire capabilities beyond its
+original distribution.
+
+C.4. Ablation study regarding merging frequency
+In Figure 13, we ablate the merging frequency. GTR-Turbo continues to yield appealing results up to a merging interval of 10,
+demonstrating its robustness to this hyperparameter.
+
+C.5. Reasoning Score Evaluation
+To further verify whether GTR-Turbo can mitigate “thought collapse”, we employ an LLM-as-a-judge approach using GPT-5.2
+to evaluate the quality of agent-generated reasoning traces during RL in terms of factual correctness, logical rigor, and
+coherence. Figure 14 shows that the RL-trained agent without guidance from the merged teacher exhibits a clear “thought
+
+
+                                                                14
+                   GTR-Turbo                                          GTR-Turbo                                           Agent (GTR-Turbo)
+                   Qwen2.5-VL-7B-Instruct                             Merging every 5 epochs                              Merged Teacher (GTR-Turbo)
+           0.45                                                       Merging every 10 epochs                             Agent (KL w/ Static Base Model)
+                                                                                                                  3.00
+
+
+                                                                                                    Reasoning Score
+           0.40
+
+Success Rate
+                                                   Success Rate
+                                  pass@16&32                  0.4                                                 2.75
+           0.35                                                                                                                  Qwen2.5-VL-7B-Instruct
+                                                                                                                  2.50
+           0.30                        pass@1                 0.2
+                                                                                                                  2.25
+           0.250                                                                                                  2.00
+                     10000     20000      30000                   0     10000     20000     30000                     0         10000      20000     30000
+                      Training Steps                                     Training Steps                                          Training Steps
+   Figure 12. Comparison of GTR-Turbo                 Figure 13. Success rate results of GTR-           Figure 14. Reasoning score evaluation of
+   training curve with the pass@k results             Turbo using different merging frequen-            models in GTR-Turbo and baseline with
+   of the base model.                                 cies.                                             static teacher.
+
+ collapse” phenomenon. This indicates that the merged checkpoint is certainly a teacher with better reasoning rather than a
+ simple regularized reference.
+
+ D. Additional Details on Environments
+ We provide a detailed introduction to the experimental environments used in this study.
+ D.1. Points24
+ State and action space. At each observation ot in the Points24 task, the agent observes an image showing four poker cards
+ and a text-based representation of the current formula. The goal is to form a formula equal to 24 using the numbers represented
+ by the four cards and basic operators. Cards “J”, “Q”, “K” are all treated as number 10. The action space includes {“1”, “2”,
+ . . ., “10”, “+”, “-”, “*”, “/”, “(”, “)”, “=”}, and each card can only be used once. Selecting a number not present in the image
+ or one that has already been used is considered an illegal action. If the action is legal, the corresponding number or operator
+ is appended to the current formula, forming the next observation ot+1 ; if the action is illegal, the state remains unchanged
+ ot+1 = ot . The environment does not guarantee that the four cards in the image have a feasible solution equal to 24.
+
+ Reward function. At each step, the agent receives a reward r = −1 for outputting an illegal action and a reward r = 0 for a
+ legal action. The episode terminates when the agent outputs “=” as an action or the step count exceeds T = 20. At termination,
+ if the formula evaluates to 24, the agent receives an outcome reward r = 10; otherwise, it receives r = −1.
+ D.2. ALFWorld
+ State and action space. In the ALFWorld environment in our experiments, the agent receives an RGB observation image and
+ a history of past actions at each observation ot . The action space includes all possible interactions in the current scenario, typi-
+ cally categorized as: (1) go to {recep}, (2) take {obj} from {recep}, (3) put {obj} in/on {recep}, (4) open {recep},
+ (5) close {recep}, (6) toggle {obj} {recep}, (7) clean {obj} with {recep}, (8) heat {obj} with {recep}, (9)
+ cool {obj} with {recep}, where {obj} and {recep} denote objects and receptacles. After an admissible action is taken,
+ ALFWorld renders the updated scene from the agent’s view as the next observation ot+1 . ot+1 = ot if the action is illegal.
+    Notably, the ALFWorld environment provides both an image and a text description of the observation scene at each step.
+ As noted in GTR, the VLM agent may rely heavily on textual descriptions rather than visual observations, which contradicts
+ the purpose of visual agentic tasks. GTR therefore modified the state by removing the text description, which we adopt in
+ GTR-Turbo. We also align with GTR by including the action history in the input prompt to more closely simulate real-world
+ scenarios. These adjustments increase the task’s difficulty, thereby emphasizing the agent’s comprehensive visual recognition
+ and long-horizon decision-making capabilities.
+
+ Reward function. The reward of ALFWorld consists of two components. Each observation o has a set of admissible actions
+ Aadm (s), and illegal actions are penalized. Additionally, each task in ALFWorld has both the final goal gtask and sub-goals gsub ,
+ and achieving these goals also provides rewards. Formally, the reward function can be written as:
+                             r(st , at , st+1 |gtask ) = 50 × 1(st+1 = gtask ) + 1(st+1 = gsub ) − 1(at ∈
+                                                                                                        / Aadm (s)).                                        (8)
+
+
+                                                                             15
+                                         "4"                                  "="
+                                                                                                                Terminated!
+
+
+                                                                                                         (correct formula)
+
+
+
+                                         "2"
+                                                                                       ...
+
+
+                                                                    (illegal action)
+
+
+
+                                         "="
+                                                                           Terminated!
+
+
+                                                                    (incorrect formula)
+
+
+                                                   Figure 15. The Points24 task.
+
+
+
+
+                                               Task: find two boxes and put them in coffeetable
+
+                              take                                                put                                         put
+                             box 1                                              box 1                                       box 2
+                              from                 go to                         in/on                                       in/on
+                            dresser 1          coffeetable 1                 coffeetable 1                               coffeetable 1
+                                                                                                                   ...
+                                                                                                                                   (reach sub-goal
+                                                                                                                                     & final goal)
+
+   put box 1
+in/on dresser 1                                                                              (reach sub-goal)
+(not admissible)
+                              go to
+          Random Choice     armchair 1
+          from Admissible                                ...
+              Actions
+
+
+
+
+                                                 Figure 16. The ALFWorld task.
+
+
+
+
+                                                                  16
+

@@ -1,0 +1,654 @@
+                   This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                Except for this watermark, it is identical to the accepted version;
+                          the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+  A Multi-Agent Perception-Action Alliance for Efficient Long Video Reasoning
+
+           Yichang Xu1 , Gaowen Liu2 , Ramana Rao Kompella2 , Tiansheng Huang1 , Sihao Hu1
+                     Fatih Ilhan1 , Selim Furkan Tekin1 , Zachary Yahn1 , Ling Liu1
+                             1
+                               Georgia Institute of Technology, Atlanta, GA
+                                          2
+                                            Cisco Systems, USA
+                             xuyichang@gatech.edu, {gaoliu,rkompell}@cisco.com,
+         {sihaohu,thuang,filhan,stekin6,zachary.yahn}@gatech.edu, ling.liu@cc.gatech.edu
+
+
+
+                         Abstract
+
+This paper presents a multi-agent perception-action explo-
+ration alliance, dubbed A4VL, for efficient long-video rea-
+soning. A4VL operates in a multi-round perception-action
+exploration loop with a selection of VLM agents. In each
+round, the team of agents performs video question-answer
+(VideoQA) via perception exploration followed by action
+exploration. During perception exploration, each agent
+learns to extract query-specific perception clue(s) from a
+few sampled frames and performs clue-based alignment to
+find the video block(s) that are most relevant to the query-
+specific event. During action exploration, A4VL performs
+video reasoning in three steps: (1) each agent produces
+its initial answer with rational, (2) all agents collabora-
+tively scores one another through cross-reviews and rele-
+vance ranking, and (3) based on whether a satisfactory con-
+sensus is reached, the decision is made either to start a new
+round of perception-action deliberation by pruning (e.g., fil-
+tering out the lowest performing agent) and re-staging (e.g.,
+new-clue and matching block based perception-action ex-
+ploration), or to conclude by producing its final answer. The
+integration of the multi-agent alliance through multi-round       Figure 1. Responses from A4VL and three of the strongest closed-
+perception-action exploration, coupled with event-driven          sourced models.
+partitioning and cue-guided block alignment, enables A4VL
+to effectively scale to real world long videos while preserv-
+ing high quality video reasoning. Evaluation Results on five      Compared to traditional approaches [11, 14, 46, 56, 57, 59],
+popular VideoQA benchmarks show that A4VL outperforms             MLLM-based methods [15–17, 33, 37, 38, 41, 49, 51, 53,
+18 existing representative VLMs and 11 recent methods op-         54] exhibit strong ability for spatiotemporal visual reason-
+timized for long-video reasoning, while achieving signifi-        ing, as well as human-level text understanding and gener-
+cantly lower inference latency. Our code is released at           ation. However, most models often fail to produce high
+https://github.com/git-disl/A4VL.                                 performance reasoning on long videos, because when the
+                                                                  number of frames is large, the memory and time costs scale
+                                                                  quadratically. Even with enough computing resources and
+1. Introduction                                                   time, some recent works [20, 29] show that simply increas-
+                                                                  ing the frame sampling density may even hurt performance,
+Multimodal large language models (MLLMs) have been                for example, due to redundant frames introducing noise
+developed to support video understanding in recent years.         and distracting attention away from truly informative key
+
+
+
+                                                             19497
+frames. The problem is especially aggravated for video           shows the responses from three of the strongest closed-
+QA workloads that center on questioning events covered in        sourced models to date (GPT-5-Thinking [26], Gemini-2.5-
+only a small subset of frames, as the problem of identifying     Pro [4], and Qwen3-Max [39]), as well as our A4VL, on an
+accurately where the most relevant frames reside is chal-        example from the EgoSchema dataset. Although all these
+lenging. Eefficient and scalable solutions are on-demand         MLLM-based methods generate incorrect answers, A4VL
+to improve video understanding performance for complex           remains correct. Figure 2 shows the general framework
+vision–language reasoning about long and complex videos.         of A4VL. Figure 3 illustrates our agent teaming strategy,
+    Our work is inspired by some pioneering efforts in           which selects the team that collaborates best from a pool
+this direction. For example, GPT-4o [25] is trained on a         of agents. Figure 4 in Section 2 visualizes the reasoning
+large multimodal corpus and, after such training, is able        procedure of A4VL on this example.
+to process long videos by taking many more frames. Al-               Upon receiving a query, A4VL first goes through the per-
+though this yields higher accuracy, it is much slower. On        ception exploration step. During this step, each agent sam-
+Video-MME [7], GPT-4o takes more than 150 s on aver-             ples a small number of frames (e.g., 4) to generate a percep-
+age to answer a multiple-choice question. Therefore, the         tion clue. We then apply an event-based partition method
+community has begun to explore optimization strategies.          to divide the video into several blocks and use models like
+Some works focus on token merging [1, 55], sparsifica-           CLIP [30] to obtain the similarity score of each block, mea-
+tion [9, 13, 18, 20], or training-free agent approaches [2,      suring its consistency with the perception clue. Each agent
+10, 35, 40, 45, 47, 52], while others design more efficient      samples from high-scoring blocks and forms a set of frames
+neural architectures [8, 44, 50] or memory-retrieval-based       for the next step, e.g., 16 sampled frames. Next, agents
+systems [22, 31, 34, 48]. For example, DYTO [55] proposes        move into the action exploration step: they first generate
+a dynamic bipartite token merging strategy, which supports       answers and reasons for the sampled frames relevant to a
+a higher frame sampling rate while keeping the resource us-      query. If the answers are consistent, a summarizer aggre-
+age acceptable; AuroraLong [44] replaces the LLM com-            gates the reasons and returns the final answer to the user.
+ponent of MLLMs with a linear RNN layer to handle input          Otherwise, each agent is asked to rate every other agent,
+sequences and also combines token merging techniques to          and the agent team is pruned based on these scores. The
+improve efficiency. Among these methods, agent-based ap-         surviving agents then revise their perception clues based on
+proaches and memory retrieval methods are orthogonal to          the current state and move back to Stage 2 of the perception
+token-based and architecture-focused optimizations. In this      exploration step, starting the next round of collaboration.
+paper, we present an innovative multi-Agent Perception-              Our main contributions are summarized as follows:
+Action Alliance based method for long video reasoning.           • A4VL framework. We develop A4VL, a training-free
+    Problem Statement. We note some limitations of ex-              multi-agent perception–action framework for long-video
+isting agent-based methods. First, their inference speed is         question answering under tight frame budgets.
+low. For example, VideoAgent [5] takes over ten minutes on       • Teaming and clue-guided perception. We empower
+a long video that lasts for an hour. Second, most of them use       A4VL with an unsupervised agent teaming method and
+a single MLLM to perform decision making and inference;             an event-based sample→clue→block pipeline, optimized
+they do not support effective collaboration among multiple          by combining CLIP-similarity enhanced block selection
+agents. In addition, they often rely on strong video ground-        with adaptive frame allocation, enabling A4VL agents to
+ing models, and yet when the question is long or complex,           focus on key frames without retraining.
+they remain struggling to locate key frames. For example,        • Accuracy–latency gains. On five long-video bench-
+MoReVQA [24] uses object detection and image QA mod-                marks against 28 baselines, A4VL achieves the best ac-
+els to find keyframes and achieves good performance on              curacy while being substantially faster than strong closed-
+NeXT-QA [43]. However, its accuracy falls behind other              and open-source MLLMs that process many more frames.
+approaches on the long and complex video datasets, e.g.,
+EgoSchema [23] (see Table 1 in Section 3.2).                     2. Methodology
+    To address these limitations, we propose a multi-agent
+                                                                 2.1. Design Overview
+perception–action alliance framework (A4VL), featured
+with three core components: (i) an agent teaming strategy        In this section, we provide an architecture overview of
+that leverages multiple diverse MLLMs to enhance video           A4VL. As shown in Figure 2, A4VL consists of a percep-
+reasoning performance; (ii) an event-based partitioning          tion exploration step and an action exploration step, where
+and random sampling strategy to handle resource-intensive        multiple agents work collaboratively to produce the final
+long-video processing; and (iii) an iterative agent coordina-    answer. The two steps run iteratively until agents reach a
+tion framework for perception exploration and action explo-      consensus. When we have multiple MLLMs available, we
+ration that further boosts reasoning performance. Figure 1       prefer to use a small subset as the agent pool. Hence, we de-
+
+
+
+                                                            19498
+                                            Figure 2. Overview of A4VL architecture.
+
+
+
+
+                                            Figure 3. A4VL agent teaming workflow.
+
+
+sign an optional agent teaming stage (Figure 3) that selects         choose m (m = 3 in our implementation) agents with high-
+a task-specific subset of agents. Thereafter, all questions          est scores to form the task-specific agent pool. As illustrated
+under the same task reuse the same agent subset. The agent           in Figure 3, the teaming process has three steps.
+teaming process is as follows. Suppose we have M agents              • Step 1: we prepare the agent library and sample a small
+and K unlabeled video-question pairs from the task, each               set of video-question pairs from the task.
+with C answer choices. These K samples can be randomly               • Step 2: each agent runs part of the A4VL workflow and
+drawn from the task dataset. Using labels would make the               independently generates answers, and we compute the
+teaming algorithm more accurate, but we assume unlabeled               frequency of each answer for each question. For the ex-
+data for practical deployment. In the agent teaming step,              ample in Figure 3, the frequencies of choices A–E are
+each agent independently runs the perception exploration               1/2, 0, 1/3, 1/6, and 0, respectively. Purple, blue, and
+and answer generation steps to produce predictions. We                 light green agents therefore receive a score of 0.5 on that
+count the frequency of each choice in each sample and de-              question, while the green and pink agents receive 1/3,
+note them as {fqr }q=1:K,r=1:C , where each fqr is the frac-           and so on.
+tion of agents that choose the rth option for question q. For        • Step 3: we average each agent’s score over all sampled
+each agent, let rq denote the index of the option it selects           questions, and the top 3 agents (green, yellow, and pink)
+                                          1
+                                            PK
+for question q. We define its score as K       q=1 fqrq . We           are selected for this task.
+
+
+
+                                                             19499
+Figure 4. Example of A4VL on EgoSchema. Here all agents have wrong answers at the beginning, but later one of them turns to the correct
+answer and other agents are pruned.
+
+
+    Within the task, after A4VL receives a video and the              rize the reason to explain the answer. Otherwise, each agent
+user’s question (including choices, and additional informa-           is asked to evaluate all agents’ answers, and the agent with
+tion like subtitles under some benchmarks), it first goes             the lowest total score (based on self- and peer evaluations)
+through the perception exploration step. As shown in Fig-             is pruned. For the example shown in Figure 2, the yellow
+ure 2, the perception exploration step consists of two stages.        agent is pruned and other agents are required to generate a
+In Stage 1, each agent randomly samples N1 frames (N1 =               new perception clue in order to better distinguish between
+4 in our settings) to preview the entire video, and then gen-         conflicting answers in the next round. After that, all agents
+erates a perception clue to identify keyframes. In the illus-         will go back to the stage 2 of perception exploration to start
+trative example, the video is divided into six blocks using           a new round, until finally all agents reach a consensus.
+an event-based approach. For each agent, a CLIP model
+like [3] is used to compute similarity scores between its             2.2. Perception Exploration
+perception clue and each block. These scores indicate how
+relevant each block is to the current question. Then, N2              The top part of Figure 2 shows our perception exploration
+frames (set to 16 in our experiments) are sampled from the            step workflow. We index rounds by j. In the first round,
+blocks according to their scores, as described in the percep-         each agent goes through the entire perception exploration
+tion exploration subsection, and are used in the next action          step; in subsequent rounds (j > 1), each agent starts di-
+exploration step.                                                     rectly from selecting relevant blocks. Suppose we have a
+                                                                      video V which consists of n frames: V = {v1 , v2 , · · · , vn },
+   During the action exploration step, each agent is asked            question Q, options O, and agent pool A = {Ai : 1 ≤ i ≤
+to provide an answer and a corresponding reason, given its            m}, where m is the number of selected agents after agent
+N2 frames obtained from the previous step. If they reach a            teaming. As shown in Figure 2, perception exploration step
+consensus, then we give the answer to the user and summa-             has two stages: sample-clue based exploration and block-
+
+
+
+                                                                19500
+                                                                                                                ∗
+based perception sampling.                                          p2 : 2V × N+ → 2V to sample N2 frames from Bi,j :
+   In the first stage, each agent generates a perception clue,
+which contains necessary information that can be used to                                                                 V_{act}^{(i)} = p_2(B_{i,j}^\ast , N_2).                                                           (3)
+identify keyframes in stage 2. For each agent Ai ∈ A,
+we first sample N1 frames from the video using a sampling          (ii) Otherwise, we retain blocks with similarity score > ρ.
+strategy p1 : 2V × N+ → 2V :                                       For each agent Ai , we obtain a score vector s(i) over blocks.
+                                                                   We first normalize it by s(i) ← s(i) − max(s(i) ), and
+                          \hat {v}_{A_i}=p_1(V,N_1).         (1)   then compute an integer allocation vector c(i) := ⌊N2 ·
+                                                                                                        P (i)
+                                                                   Sof tM ax(s(i) )⌋ for the blocks. If k ck < N2 , we ran-
+                                                                                                          P (i)
+For p1 , we have two choices: (i) we can randomly select N1        domly distribute the remaining N2 − k ck samples over
+frames from the entire video, or (ii) we can divide the video      the blocks to ensure a total of N2 action frames. We then
+                                                                            (i)
+into event-based blocks, and sample a few from each block.         sample ck frames from each retained block Bk using p2
+In experiments, we test both alternatives and find that (i) is                                     (i)
+                                                                   and take their union to form Vact .
+better, so we use choice (i) as our final choice. The reason
+is that agents do not need fine-grained understanding of the           2.3. Action Exploration
+video to generate a coarse perception clue, so uniform ran-            Now each agent has its own set of N2 sampled frames, de-
+dom sampling provides higher diversity and better tempo-                           (i)
+                                                                       noted by Vact . The action exploration step uses these frames
+ral coverage. Given the sampled N1 frames, question, and               to generate answers and, when necessary, to prune agents.
+options, each agent is asked to generate a perception clue,            It has two stages: answer and reason generation, and prun-
+which is later used to identify relevant blocks. We denote             ing with multi-round deliberation, as shown in the bottom
+the perception clue for agent Ai at jth round as Pi,j . In the         part of Figure 2.
+first round,                                                               In the first stage, each agent is asked to generate an
+                                                                       answer and corresponding reason given its own sampled
+                   P_{i,1}=A_{i,clue}(\hat {v}_{A_i},Q,O).   (2)       frames and the question information. For agent Ai , it gen-
+                                                                       erates the answer ai,j and reason Ri,j as follows:
+For subsequent rounds, Pi,j is generated at the end of the
+action exploration step. For example, by the end of the first                                          a_{i,j}&=A_{i,act}(V_{act}^{(i)},Q,O),\\ R_{i,j}&=A_{i,reason}(V_{act}^{(i)},a_{i,j},Q).
+round, Pi,2 is generated for each Ai ∈ A.
+    In the second stage, we first partition the video into at                                                                                                                                                               (5)
+most B blocks, B1 , B2 , · · · , Bb . We provide two parti-        Then for all agents, we have the answer set Sa,j and reason
+tion strategies: (i) uniform partition, which means Bi =           set Sr,j :
+V(i−1)⌊ Bn ⌋+1:i⌊ Bn ⌋ ; (ii) event-based division, where we de-
+tect scene changes using DINOv2 embeddings [27] and                                                 S_{a,j}&=\{a_{1,j},a_{2,j},\cdots ,a_{|\mathbb {A}|,j}\},\\ S_{r,j}&=\{R_{1,j},R_{2,j},\cdots ,R_{|\mathbb {A}|,j}\}.
+simple pixel cues (HSV/motion/sharpness), generate can-
+                                                                                                                                                                                                                            (7)
+didates with KTS [28], PELT [12], and SSM-based nov-
+elty [6], merge them and apply non-maximum suppression             If all agents reach a consensus, we send all Pi,j values in
+(NMS), and keep the top B − 1 boundaries (at most B                round j, Sa,j , and Sr,j to our reason summarizer to give the
+blocks). This procedure is efficient, as most videos in our        user the final answer and an explanation. We consider two
+benchmarks can be processed within two seconds. Details            ways to check for consensus: (i) Majority consensus: the
+are given in the appendix. We also test both strategies in         most frequent answer appears more than |A|/2 times; (ii)
+our experiments, and finally choose (ii). After dividing the       Full consensus: all agents output the same answer. We test
+video into blocks, we compute the similarity between each          both strategies and ultimately adopt (ii).
+block and each agent’s perception clue. In this paper, we             If the agents do not reach a consensus, then we step
+use a CLIP model to compute the similarity scores. Other           into the second stage. Given Sa,j , Sr,j , Q and O, each
+approaches, such as computing the similarity between the           agent evaluates the soundness of its answer and every other
+caption of each block and each perception clue, are also           agent’s answer. It is asked to give a rating from 1 to 10:
+possible, but since CLIP is the fastest, we leave the explo-
+ration of more advanced similarity computation as future
+work. We then sample the target frames under two sce-                     \{s_{i,\mathbb {A}_1},\cdots ,s_{i,\mathbb {A}_{|\mathbb {A}|}}\}\leftarrow A_{i,eval}(Q,S_{a,j},S_{r,j}), \forall A_i\in \mathbb {A}.
+narios. (i) If all blocks have similarity scores below ρ (set                                                                                                                                                (8)
+to 0.8 in our settings), we sample from the most relevant
+block for each agent: for agent Ai , we identify the block          In Figure 2, the yellow agent has a rating of 8/10, 6/10 and
+   ∗
+Bi,j  with the maximum score and use a sampling strategy            2/10 given by three agents. After that, for each agent, we
+
+
+
+                                                               19501
+sum up the ratings given by all agents:                                                                                                                 durations between 3 minutes and 2 hours, and the task is to
+                                                                                                                                                        select the correct answer out of six options. Video-MME
+                           s_{A_i}:=\sum _{A_k\in \mathbb {A}} s_{k,\mathbb {A}_i}                                                        (9)           consists of 2,700 QA pairs and is divided into short,
+                                                                                                                                                        medium, and long groups according to video duration, with
+                                                                                                                                                        900 QA pairs in each group. Videos in the short group last
+For example, the yellow agent now has an overall score of                                                                                               about 10 seconds, whereas videos in the long group can
+16/30, which is the lowest. Suppose it’s A2 , then we have                                                                                              last for over an hour.
+sA2 = 16. Now we do agent pruning, where the agent with
+                                                                                                                                                           In the agent teaming step, we select m = 3
+the lowest score is removed from the agent pool:
+                                                                                                                                                        agents from a pool of 8 models: LLaVA-Video-7B-
+                                \mathbb {A}&\leftarrow \mathbb {A}\setminus \{A_{min}\},\\ A_{min}&:=\arg \min _{A\in \mathbb {A}}s_A.                  Qwen2 [54], QwenVL-2.5-7B [38], InternVL3.5-8B [41],
+                                                                                                                                                        QwenVL-2.5-32B [38], InternVL3.5-38B [41], InternVL3-
+                                                                                                                                         (11)           78B [41], QwenVL-2.5-72B [38], and LLaVA-Video-72B-
+                                                                                                                                                        Qwen2 [54]. Selecting m > 3 agents may further boost the
+In the Figure 2 case, Amin = A2 , and the yellow agent is                                                                                               accuracy score, but it will harm the efficiency. Unless oth-
+removed. For each of the remaining agent Ai , we generate                                                                                               erwise specified, all experiments involving A4VL are con-
+Pi,j+1 using Pi,j , Sa,j , Sr,j , Amin , Q, O to generate the re-                                                                                       ducted on six H200 GPUs.
+fined perception clue, which is used in the next round:
+                                                                                                                                                        3.2. Results
+     P_{i,j+1}=A_{i,refine}(P_{i,j},S_{a,j},S_{r,j},A_{min},Q,O).                                                                        (12)
+                                                                                                                                                        We compare A4VL against two closed-source MLLMs,
+    Figure 4 shows an example from EgoSchema. We can                                                                                                    GPT-4o [25] and Gemini 1.5 Pro [37], 16 open-source
+see at the beginning, all agents generate different and in-                                                                                             MLLMs, and 10 agent-based or long-video-oriented meth-
+correct answers. However, in the second round, the orange                                                                                               ods. As shown in Table 1, A4VL outperforms all base-
+agent begins to realize that choices B, C, D, and E do not                                                                                              lines on every benchmark. On NeXT-QA, accuracy sat-
+have clear visual evidence, and it revises the perception clue                                                                                          urates near 80% as the backbone size increases; the best
+to focus on the interaction between the person and the book.                                                                                            baseline, InternVL3-78B, reaches 84.0%, while A4VL fur-
+In the third round, the keyframe where the person is putting                                                                                            ther improves to 85.1%. On EgoSchema, InternVL3-
+a brochure into the book is sampled (highlighted by the red                                                                                             78B achieves 76.8%, and A4VL is the only method ex-
+circle), and therefore the orange agent continues to generate                                                                                           ceeding 80%, with 82.2% (+3.2). LongVideoBench is
+the correct answer. Finally, our summarizer reads the entire                                                                                            where we observe the largest gain: compared to GPT-4o
+multi-round process and returns the final answer together                                                                                               at 66.7%, A4VL (built solely from open-source models)
+with a concise explanation to the user. The pseudocode of                                                                                               reaches 72.2% (+5.5). MLVU-Test is substantially harder,
+A4VL is provided in the appendix.                                                                                                                       with more answer choices and more complex question types
+                                                                                                                                                        (e.g., tracking specific players in long sports videos), yet
+3. Experiment                                                                                                                                           A4VL still improves over prior methods by 1.9–19.6 points.
+                                                                                                                                                        On Video-MME, A4VL surpasses all baselines across all
+3.1. Experimental Settings                                                                                                                              duration groups and on the overall average. Notably, al-
+We evaluate A4VL on five benchmarks that cover both short                                                                                               though the strongest single MLLM backbone reaches at
+and long videos, with an emphasis on long-video reasoning.                                                                                              most 67.1% without subtitles, A4VL attains 77.2% on av-
+    To test our method on short videos with strong tempo-                                                                                               erage, 2.2 points higher than the best closed-source model,
+ral/causal reasoning requirements, we evaluate A4VL on                                                                                                  Gemini 1.5 Pro (75.0%). The models selected by our agent
+NeXT-QA [43]. We randomly sample 200 QA pairs per                                                                                                       teaming step for each benchmark are listed in Table 2.
+question type from its test split, resulting in a subset of                                                                                                Table 3 reports the average inference time per sample
+1,493 QA pairs. EgoSchema [23] is a medium-length video                                                                                                 for four representative methods—the closed-source MLLM
+QA dataset consisting of videos lasting about 3 minutes.                                                                                                GPT-4o, the strong open-source MLLM InternVL3-78B,
+We evaluate on its test split with ground-truth labels, which                                                                                           and two well-known agent-based systems, VideoAgent and
+contains 500 QA pairs.                                                                                                                                  TraveLER—as well as our A4VL. We measure efficiency
+    For long videos, we evaluate on LongVideoBench [42],                                                                                                on NeXT-QA, EgoSchema, and MLVU, which correspond
+MLVU [58] (test split), and Video-MME [7].                                                                                                              to short-, medium-, and long-video settings. On short
+LongVideoBench consists of 1,337 QA pairs, and                                                                                                          videos (NeXT-QA), all methods except TraveLER exhibit
+each video is accompanied by subtitles; many questions                                                                                                  similar and acceptable latency. As video length increases,
+are strongly subtitle-related. The videos range from about                                                                                              however, the inference time of other methods grows rapidly;
+3 minutes to 2 hours in length. MLVU-Test is the harder                                                                                                 for example, on MLVU, even GPT-4o takes over two min-
+test split of MLVU, containing roughly 500 videos with                                                                                                  utes to answer a single question, whereas A4VL scales
+
+
+
+                                                                                                                                                19502
+Table 1. A4VL compared with other methods on five benchmarks. For Video-MME, the result is in format w. subtitle/wo. subtitle. For
+Video-MME, the improvement row shows the improvement without subtitle, since A4VL is mainly designed to optimize visual reasoning.
+* near the model names mean we take the results from the model paper or benchmark leaderboard.
+
+                                                                                                                      Video-MME
+                Model                  NeXT-QA         EgoSchema    LongVideoBench     MLVU          Short       Medium        Long        Average
+            GPT-4o* [25]                   -              72.2           66.7            54.9      80.0/82.8    70.3/76.6    65.3/72.1    71.9/77.2
+          Gemini 1.5Pro* [37]              -              71.1           64.0             -        81.7/84.5    74.3/81.0    67.4/77.4    75.0/81.3
+      LLaVA-Video-7B-Qwen2 [54]           81.2            61.8           61.1            51.7      72.4/75.6    58.1/63.3    50.7/60.4    60.4/66.4
+         VideoLlama3-7B [49]              67.4            52.6           52.5            43.9      80.1/80.2    63.7/69.6    54.9/61.0    66.2/70.3
+          InternVL3.5-8B [41]             76.2            62.0           53.6            47.1      69.6/74.0    56.3/63.9    47.7/61.9    57.9/66.6
+      LLaVA-NeXT-Video-7B [53]            39.7            39.6           43.5            26.3      36.4/40.1    30.8/38.0    27.9/17.2    31.7/31.8
+         QwenVL-2.5-7B [38]               76.8            60.7           54.7            47.7      72.1/73.6    55.7/63.9    48.2/60.9    58.7/66.1
+           LongVA-7B* [51]                69.3             -             51.3            41.1      61.1/61.6    50.4/53.6    46.2/47.6    52.6/54.3
+           LongVU-7B* [33]                 -              37.6            -               -            -            -         -/59.5       -/60.6
+         VideoChat2-7B* [17]              61.7            56.7           39.3            30.1      48.3/52.8    37.0/39.4    33.2/39.2    39.5/43.8
+     LLaVA-Video-72B-Qwen2 [54]           83.7            69.4           60.7            51.5      77.8/80.0    64.9/70.8    58.6/73.0    67.1/74.6
+         InternVL3.5-38B [41]             78.9            75.4           57.0            56.1      76.1/79.1    58.6/68.9    57.4/68.3    64.0/72.1
+          InternVL3-78B [41]              84.0            76.8           56.4            55.3      78.6/80.4    65.4/73.4    56.7/67.8    66.9/73.9
+     LLaVA-NeXT-Video-34B [53]            70.1            46.6           50.5            39.5      63.1/66.4    51.1/53.2    44.6/48.7    52.5/56.0
+        QwenVL-2.5-32B [38]               76.8            64.8           53.3            48.5      73.2/77.1    61.6/68.2    54.1/68.6    63.0/71.3
+        QwenVL-2.5-72B [38]               79.6            70.7           56.1            53.7      75.1/77.0    66.3/73.3    59.6/70.8    67.0/73.7
+      LLaVA-OneVision-72B* [15]           80.2            62.0           63.2             -        76.7/79.3    62.2/66.9    66.0/62.4    66.3/69.6
+            Aria-25.3B* [16]               -               -             63.0             -        67.9/78.3    67.0/71.7    58.8/66.3    67.6/72.1
+            ViperGPT [36]                 56.9            24.8            -              24.9          -            -             -           -
+             SeViLA [19]                  64.0            28.4            -              31.7          -            -             -           -
+            VideoAgent [5]                66.1            55.0            -              34.3          -            -                         -
+            TraveLER [32]                 66.0            55.4            -              36.3          -            -            -            -
+           MoReVQA* [24]                  69.2            51.7            -               -            -            -            -            -
+         VideoRAG-72B* [21]                -               -             65.4             -         81.1/-       72.9/-       73.1/-       75.7/-
+          AuroraLong* [44]                 -               -              -              52.7          -            -            -            -
+           DYTO-34B* [55]                 72.9            56.8            -               -            -            -            -         -/53.4
+             BOLT* [20]                   79.5            64.0           59.6             -         70.1/-       66.0/-       49.6/-       59.9/-
+            DynFocus* [8]                  -               -             31.8            49.6      50.9/53.9    43.7/46.0    37.7/43.6    44.1/47.8
+             LVAgent [2]                  83.0            78.4           66.9            50.0      82.4/83.6    72.8/78.6    66.3/76.4    73.9/79.5
+               A4VL                       85.1            82.2           72.2            58.0       86.6/87.3    76.8/83.2    68.3/77.9    77.2/82.8
+            Improvement↑               1.9 ∼ 45.4      3.8 ∼ 57.4     5.3 ∼ 41.6      1.9 ∼ 19.6   4.2 ∼ 20.2   2.5 ∼ 46.0   0.9 ∼ 40.4   2.2 ∼ 45.5
+
+
+
+Table 2. Models used for each benchmark. Intern-78B refers to                      this dataset, yet A4VL still requires about 60% less time
+InternVL3-78B [41], Intern-38B refers to InternVL3.5-38B [41],                     than TraveLER.
+QwenVL-72B refers to QwenVL-2.5-72B [38], and LLaVA-72B
+refers to LLaVA-Video-72B-Qwen2 [54].                                              3.3. Ablation Study
+        Benchmark                          Models                                  Since multi-round collaboration is a core component of
+        NeXT-QA           Intern-78B    Intern-38B       QwenVL-72B                A4VL, we first study how the maximum number of rounds
+       EgoSchema          Intern-78B    Intern-38B       QwenVL-72B                affects accuracy. In our default implementation, A4VL can
+     LongVideoBench       Intern-78B    Intern-38B       QwenVL-72B
+         MLVU             Intern-78B    Intern-38B        LLaVA-72B                run at most three rounds because there are three agents in
+       Video-MME          Intern-78B    LLaVA-72B        QwenVL-72B                total. In this ablation, we stop the procedure after a fixed
+                                                                                   maximum round and take the majority answer at that round
+Table 3. Average inference time per sample on four representative                  as the final prediction; if there are multiple majorities, we
+methods and A4VL.                                                                  choose the answer with the highest score. Figure 5 shows
+                                                                                   how accuracy changes as the maximum number of rounds
+              Model         NeXT-QA       EgoSchema       MLVU                     increases. On all benchmarks, accuracy consistently im-
+              GPT-4o            23s              54s       127s                    proves when more rounds are allowed. Table 4 reports the
+          InternVL3-78B         15s              50s       204s                    actual number of rounds used in the default A4VL setting.
+            VideoAgent          20s              83s       175s
+             TraveLER           101s             94s       450s                    As the dataset becomes harder, agents tend to collaborate
+               A4VL             18s              37s        74s                    for more rounds. Even within Video-MME, when subti-
+                                                                                   tles are available the task becomes easier and thus requires
+                                                                                   fewer rounds.
+much more gracefully. For TraveLER, the inference time                                 We also test several design choices discussed in Sec-
+on EgoSchema is lower because its official implementation                          tion 2, using EgoSchema as the testbed. We first vary the
+uses image captions only to extract visual information on                          sampling strategies. For perception-frame sampling p1 , we
+
+
+
+                                                                           19503
+           0.90                                                                            Section 2.3. Both standards yield strong accuracy; FCon-
+           0.85                                                                            sens has an accuracy of 82.2%, which is better than MCon-
+           0.80                                                                            sensus (81.4%) but incurs higher (still moderate) latency.
+           0.75                                                                            The reason is FConsens benefits from increasing collabora-
+
+Accuracy
+                                                                                           tion rounds to make sure the final answer is strongly confi-
+           0.70                                                    NextQA                  dent. Since the additional latency is acceptable, our default
+           0.65                                                    EgoSchema               method uses FConsens.
+                                                                   MLVU
+           0.60                                                    LongVideoBench
+                                                                   VideoMMe w/ Sub         Table 6. Results of different consensus conditions on EgoSchema.
+           0.55                                                    VideoMMe w/o Sub        M means majority and F means full.
+           0.50
+                     1                              2                            3
+                                                 Rounds
+                                                                                                                 Method       MConsens       FConsens
+                                                                                                            Accuracy (%)          81.4         82.2
+                                                                                                            Time/Sample           26s          37s
+   Figure 5. Relationship between accuracy and maximum number
+   of rounds.
+                                                                                              Finally, we test whether agent pruning is necessary. We
+   Table 4. Number of actual running rounds in A4VL. The data of                           design two variants without pruning. NoPruneSum selects
+   Video-MME is shown in w/o subtitle / w. subtitle format.                                the answer with the highest total score, and NoPruneMaj
+                                                                                           selects the majority answer as the final prediction (break-
+                         #Rounds             1                 2      3
+                                                                                           ing ties by total score). For both variants, the early stop
+                        NeXT-QA           1072             230        191
+                       EgoSchema           303             101         96
+                                                                                           condition is either (i) all agents in one round generates the
+                     LongVideoBench        566             341        430                  same answer (FConsens) or (ii) in two subsequent rounds,
+                         MLVU              183             116        203
+                       Video-MME        1289/1667        557/421    854/612
+                                                                                           the highest score corresponds to the same answer. As shown
+                                                                                           in Table 7, no matter how we choose the final answer, re-
+                                                                                           moving pruning leads to lower accuracy and substantially
+   either perform random sampling over the entire video (R)                                higher latency, indicating that pruning is important for both
+   or sample one frame from each event-based block (E). For                                effectiveness and efficiency.
+   action-frame sampling p2 , we either sample from uniformly
+                                                                                              Table 7. Results of different pruning strategies on EgoSchema.
+   divided blocks (R) or from event-based blocks (E). We eval-
+   uate three variants: RRSampling, RESampling, and ER-
+                                                                                                        Method        NoPruneSum         NoPruneMaj     A4VL
+   Sampling, where the first character denotes p1 and the sec-
+                                                                                                     Accuracy (%)          80.8             79.4        82.2
+   ond denotes p2 . A4VL corresponds to RESampling. The                                              Time/Sample           60s              60s         37s
+   accuracy and latency of each variant are shown in Table 5.
+   Among all strategies, RESampling achieves the best accu-
+   racy with similar latency, so we adopt it as our default. In-                           4. Conclusion
+   tuitively, perception exploration benefits from coarse, uni-
+                                                                                           We presented A4VL, a training-free multi-agent framework
+   formly distributed frames to cover the whole video, while
+                                                                                           that tightly couples perception exploration with action ex-
+   action exploration benefits from frames concentrated on ac-
+                                                                                           ploration for long video question answering. By combin-
+   tive events. From the table, we can also know the event-
+                                                                                           ing event-aware block partitioning, clue-guided frame se-
+   based partitioning only takes about 2 seconds.
+                                                                                           lection, and multi-round agent alliance with consensus and
+                                                                                           pruning, A4VL turns a pool of heterogeneous MLLMs into
+   Table 5. Accuracy and latency of different sampling strategies on
+   EgoSchema. R means random sampling and E means sampling                                 a coordinated reasoner over long videos under fixed com-
+   from event-based blocks. The first character represents the sam-                        pute budgets. Across five different benchmarks, A4VL con-
+   pling strategy for N1 perception frames, and the second character                       sistently improves over strong baselines and prior agent-
+   represents the sampling strategy for N2 action frames.                                  based systems, and our round-level ablations show stable
+                                                                                           gains from each collaboration round.
+                    Method         RRSampling     RESampling       ERSampling                  Looking ahead, we believe that perception–action coor-
+                  Accuracy (%)        80.2              82.2          79.6                 dination at the agent level is a promising direction for long-
+                  Time/Sample         35s               37s           37s
+                                                                                           video understanding. Extending A4VL to audio–text–video
+                                                                                           tri-modal inputs, richer task-conditioned similarity func-
+      Next, we compare different consensus criteria. Table 6                               tions, and neuro-symbolic techniques are natural next steps
+   shows results on EgoSchema under majority consensus                                     for enhanced perception exploration toward high perfor-
+   (MConsens) and full consensus (FConsens), as defined in                                 mance general long-horizon video agents.
+
+
+
+                                                                                      19504
+Acknowledgement. This research is partially sponsored                      Zachary Yahn, and Ling Liu. A survey on large language
+by NSF CISE grants 2302720 and 2312758, a grant from                       model-based game agents. arXiv preprint arXiv:2404.02039,
+CISCO Edge AI programs, and PACE at the Georgia In-                        2024. 2
+stitute of Technology. The first and the last author are the          [11] Yunseok Jang, Yale Song, Youngjae Yu, Youngjin Kim, and
+primary contacts for this work.                                            Gunhee Kim. Tgif-qa: Toward spatio-temporal reasoning in
+                                                                           visual question answering. In Proceedings of the IEEE con-
+                                                                           ference on computer vision and pattern recognition, pages
+References                                                                 2758–2766, 2017. 1, 17
+ [1] Xiaoyi Bao, Chenwei Xie, Hao Tang, Tingyu Weng, Xi-              [12] Rebecca Killick, Paul Fearnhead, and Idris A Eckley. Op-
+     aofeng Wang, Yun Zheng, and Xingang Wang. Dynimg:                     timal detection of changepoints with a linear computational
+     Key frames with visual prompts are good representation for            cost. Journal of the American Statistical Association, 107
+     multi-modal video understanding. In Proceedings of the                (500):1590–1598, 2012. 5, 16
+     IEEE/CVF International Conference on Computer Vision,            [13] Bruno Korbar, Yongqin Xian, Alessio Tonioni, Andrew Zis-
+     pages 23678–23688, 2025. 2, 18                                        serman, and Federico Tombari. Text-conditioned resampler
+ [2] Boyu Chen, Zhengrong Yue, Siran Chen, Zikang Wang,                    for long form video understanding. In European Conference
+     Yang Liu, Peng Li, and Yali Wang. Lvagent: Long video un-             on Computer Vision, pages 271–288. Springer, 2024. 2, 18
+     derstanding by multi-round dynamical collaboration of mllm       [14] Jie Lei, Licheng Yu, Mohit Bansal, and Tamara L Berg.
+     agents. In Proceedings of the IEEE/CVF International Con-             Tvqa: Localized, compositional video question answering.
+     ference on Computer Vision (ICCV), pages 20237–20246,                 arXiv preprint arXiv:1809.01696, 2018. 1, 17
+     2025. 2, 7                                                       [15] Bo Li, Yuanhan Zhang, Dong Guo, Renrui Zhang, Feng
+ [3] Siran Chen, Qinglin Xu, Yue Ma, Yu Qiao, and Yali Wang.               Li, Hao Zhang, Kaichen Zhang, Yanwei Li, Ziwei Liu, and
+     Attentive snippet prompting for video retrieval. IEEE Trans-          Chunyuan Li. Llava-onevision: Easy visual task transfer,
+     actions on Multimedia, 26:4348–4359, 2023. 4                          2024. 1, 7, 18
+                                                                      [16] Dongxu Li, Yudong Liu, Haoning Wu, Yue Wang, Zhiqi
+ [4] Gheorghe Comanici, Eric Bieber, Mike Schaekermann, Ice
+                                                                           Shen, Bowen Qu, Xinyao Niu, Fan Zhou, Chengen Huang,
+     Pasupat, Noveen Sachdeva, Inderjit Dhillon, Marcel Blis-
+                                                                           Yanpeng Li, et al. Aria: An open multimodal native mixture-
+     tein, Ori Ram, Dan Zhang, Evan Rosen, et al. Gemini 2.5:
+                                                                           of-experts model. arXiv preprint arXiv:2410.05993, 2024. 7,
+     Pushing the frontier with advanced reasoning, multimodality,
+                                                                           18
+     long context, and next generation agentic capabilities. arXiv
+                                                                      [17] Kunchang Li, Yali Wang, Yinan He, Yizhuo Li, Yi Wang,
+     preprint arXiv:2507.06261, 2025. 2, 18
+                                                                           Yi Liu, Zun Wang, Jilan Xu, Guo Chen, Ping Luo, et al.
+ [5] Yue Fan, Xiaojian Ma, Rujie Wu, Yuntao Du, Jiaqi Li, Zhi
+                                                                           Mvbench: A comprehensive multi-modal video understand-
+     Gao, and Qing Li. Videoagent: A memory-augmented mul-
+                                                                           ing benchmark. In Proceedings of the IEEE/CVF Conference
+     timodal agent for video understanding. In European Confer-
+                                                                           on Computer Vision and Pattern Recognition, pages 22195–
+     ence on Computer Vision, pages 75–92. Springer, 2024. 2, 7,
+                                                                           22206, 2024. 1, 7, 18
+     18
+                                                                      [18] Yanwei Li, Chengyao Wang, and Jiaya Jia. Llama-vid:
+ [6] Jonathan Foote. Automatic audio segmentation using a mea-             An image is worth 2 tokens in large language models. In
+     sure of audio novelty. In 2000 ieee international conference          European Conference on Computer Vision, pages 323–340.
+     on multimedia and expo. icme2000. proceedings. latest ad-             Springer, 2024. 2, 18
+     vances in the fast changing world of multimedia (cat. no.        [19] Runze Liu, Yaqun Fang, Fan Yu, Ruiqi Tian, Tongwei Ren,
+     00th8532), pages 452–455. IEEE, 2000. 5, 16                           and Gangshan Wu. Deep video understanding with video-
+ [7] Chaoyou Fu, Yuhan Dai, Yondong Luo, Lei Li, Shuhuai Ren,              language model. In Proceedings of the 31st ACM Interna-
+     Renrui Zhang, Zihan Wang, Chenyu Zhou, Yunhang Shen,                  tional Conference on Multimedia, pages 9551–9555, 2023.
+     Mengdan Zhang, et al. Video-mme: The first-ever compre-               7
+     hensive evaluation benchmark of multi-modal llms in video        [20] Shuming Liu, Chen Zhao, Tianqi Xu, and Bernard Ghanem.
+     analysis. arXiv preprint arXiv:2405.21075, 2024. 2, 6, 18             Bolt: Boost large vision-language model without training
+ [8] Yudong Han, Qingpei Guo, Liyuan Pan, Liu Liu, Yu Guan,                for long-form video understanding. In Proceedings of the
+     and Ming Yang. Dynfocus: Dynamic cooperative network                  Computer Vision and Pattern Recognition Conference, pages
+     empowers llms with video understanding. In Proceedings                3318–3327, 2025. 1, 2, 7, 18
+     of the Computer Vision and Pattern Recognition Conference,       [21] Yongdong Luo, Xiawu Zheng, Xiao Yang, Guilin Li,
+     pages 8512–8522, 2025. 2, 7                                           Haojia Lin, Jinfa Huang, Jiayi Ji, Fei Chao, Jiebo Luo,
+ [9] Kai Hu, Feng Gao, Xiaohan Nie, Peng Zhou, Son Tran,                   and Rongrong Ji. Video-rag: Visually-aligned retrieval-
+     Tal Neiman, Lingyun Wang, Mubarak Shah, Raffay Hamid,                 augmented long video comprehension. arXiv preprint
+     Bing Yin, et al. M-llm based video frame selection for effi-          arXiv:2411.13093, 2024. 7, 18
+     cient video understanding. In Proceedings of the Computer        [22] Ziyu Ma, Chenhui Gou, Hengcan Shi, Bin Sun, Shutao Li,
+     Vision and Pattern Recognition Conference, pages 13702–               Hamid Rezatofighi, and Jianfei Cai. Drvideo: Document
+     13712, 2025. 2, 18                                                    retrieval based long video understanding. In Proceedings of
+[10] Sihao Hu, Tiansheng Huang, Gaowen Liu, Ramana Rao                     the Computer Vision and Pattern Recognition Conference,
+     Kompella, Fatih Ilhan, Selim Furkan Tekin, Yichang Xu,                pages 18936–18946, 2025. 2, 18
+
+
+
+
+                                                                 19505
+[23] Karttikeya Mangalam, Raiymbek Akshulakov, and Jitendra               self-reward alignment. arXiv preprint arXiv:2503.20472,
+     Malik. Egoschema: A diagnostic benchmark for very long-              2025. 2, 18
+     form video language understanding. Advances in Neural In-       [36] Dı́dac Surı́s, Sachit Menon, and Carl Vondrick. Vipergpt:
+     formation Processing Systems, 36:46212–46244, 2023. 2, 6,            Visual inference via python execution for reasoning. In Pro-
+     18                                                                   ceedings of the IEEE/CVF international conference on com-
+[24] Juhong Min, Shyamal Buch, Arsha Nagrani, Minsu Cho,                  puter vision, pages 11888–11898, 2023. 7, 18
+     and Cordelia Schmid. Morevqa: Exploring modular reason-         [37] Gemini Team, Petko Georgiev, Ving Ian Lei, Ryan Burnell,
+     ing models for video question answering. In Proceedings of           Libin Bai, Anmol Gulati, Garrett Tanzer, Damien Vincent,
+     the IEEE/CVF Conference on Computer Vision and Pattern               Zhufeng Pan, Shibo Wang, et al. Gemini 1.5: Unlocking
+     Recognition, pages 13235–13245, 2024. 2, 7, 18                       multimodal understanding across millions of tokens of con-
+[25] OpenAI. Gpt-4o system card, 2024. Accessed: 2025-11-04.              text. arXiv preprint arXiv:2403.05530, 2024. 1, 6, 7, 18
+     2, 6, 7, 18                                                     [38] Qwen Team. Qwen2.5-vl, 2025. 1, 6, 7, 13, 18
+[26] OpenAI. Gpt-5 system card. OpenAI System Card, 2025. 2          [39] Qwen Team. Qwen3-max: Just scale it, 2025. 2, 18
+[27] Maxime Oquab, Timothée Darcet, Théo Moutakanni, Huy           [40] Lucas Ventura, Antoine Yang, Cordelia Schmid, and Gül
+     Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez,               Varol. Chapter-llama: Efficient chaptering in hour-long
+     Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, et al.           videos with llms. In Proceedings of the Computer Vision and
+     Dinov2: Learning robust visual features without supervision.         Pattern Recognition Conference, pages 18947–18958, 2025.
+     arXiv preprint arXiv:2304.07193, 2023. 5, 15                         2, 18
+[28] Danila Potapov, Matthijs Douze, Zaid Harchaoui, and
+                                                                     [41] Weiyun Wang, Zhangwei Gao, Lixin Gu, Hengjun Pu, Long
+     Cordelia Schmid. Category-specific video summarization.
+                                                                          Cui, Xingguang Wei, Zhaoyang Liu, Linglin Jing, Sheng-
+     In European conference on computer vision, pages 540–555.
+                                                                          long Ye, Jie Shao, et al. Internvl3.5: Advancing open-source
+     Springer, 2014. 5, 17
+                                                                          multimodal models in versatility, reasoning, and efficiency.
+[29] Tianyuan Qu, Longxiang Tang, Bohao Peng, Senqiao Yang,               arXiv preprint arXiv:2508.18265, 2025. 1, 6, 7, 12, 13, 18
+     Bei Yu, and Jiaya Jia. Does your vision-language model get
+                                                                     [42] Haoning Wu, Dongxu Li, Bei Chen, and Junnan Li.
+     lost in the long video sampling dilemma? arXiv preprint
+                                                                          Longvideobench: A benchmark for long-context interleaved
+     arXiv:2503.12496, 2025. 1
+                                                                          video-language understanding, 2024. 6, 18
+[30] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+                                                                     [43] Junbin Xiao, Xindi Shang, Angela Yao, and Tat-Seng Chua.
+     Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+                                                                          Next-qa: Next phase of question-answering to explaining
+     Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning
+                                                                          temporal actions. In Proceedings of the IEEE/CVF Confer-
+     transferable visual models from natural language supervi-
+                                                                          ence on Computer Vision and Pattern Recognition (CVPR),
+     sion. In International conference on machine learning, pages
+                                                                          pages 9777–9786, 2021. 2, 6
+     8748–8763. PmLR, 2021. 2
+[31] Saul Santos, António Farinhas, Daniel C McNamee, and An-       [44] Weili Xu, Enxin Song, Wenhao Chai, Xuexiang Wen, Tian
+     dre Martins. ∞-video: A training-free approach to long               Ye, and Gaoang Wang. Auroralong: Bringing rnns back
+     video understanding via continuous-time memory consoli-              to efficient open-ended video understanding. arXiv preprint
+     dation. In International Conference on Machine Learning,             arXiv:2507.02591, 2025. 2, 7, 18
+     pages 52877–52893. PMLR, 2025. 2, 18                            [45] Yichang Xu, Gaowen Liu, Ramana Rao Kompella, Sihao Hu,
+[32] Chuyi Shang, Amos You, Sanjay Subramanian, Trevor Dar-               Fatih Ilhan, Selim Furkan Tekin, Zachary Yahn, and Ling
+     rell, and Roei Herzig. Traveler: A modular multi-lmm agent           Liu. A neurosymbolic agent system for compositional visual
+     framework for video question-answering. arXiv preprint               reasoning, 2025. 2
+     arXiv:2404.01476, 2024. 7, 18                                   [46] Hongyang Xue, Zhou Zhao, and Deng Cai. Unifying the
+[33] Xiaoqian Shen, Yunyang Xiong, Changsheng Zhao, Lemeng                video and question attentions for open-ended video question
+     Wu, Jun Chen, Chenchen Zhu, Zechun Liu, Fanyi Xiao, Bal-             answering. IEEE Transactions on Image Processing, 26(12):
+     akrishnan Varadarajan, Florian Bordes, Zhuang Liu, Hu Xu,            5656–5666, 2017. 1, 17
+     Hyunwoo J. Kim, Bilge Soran, Raghuraman Krishnamoor-            [47] Zeyuan Yang, Delin Chen, Xueyang Yu, Maohao Shen, and
+     thi, Mohamed Elhoseiny, and Vikas Chandra. Longvu: Spa-              Chuang Gan. Vca: Video curious agent for long video un-
+     tiotemporal adaptive compression for long video-language             derstanding. In Proceedings of the IEEE/CVF International
+     understanding. arXiv:2410.17434, 2024. 1, 7, 18                      Conference on Computer Vision, pages 20168–20179, 2025.
+[34] Enxin Song, Wenhao Chai, Guanhong Wang, Yucheng                      2, 18
+     Zhang, Haoyang Zhou, Feiyang Wu, Haozhe Chi, Xun Guo,           [48] Jinhui Ye, Zihan Wang, Haosen Sun, Keshigeyan Chan-
+     Tian Ye, Yanting Zhang, et al. Moviechat: From dense token           drasegaran, Zane Durante, Cristobal Eyzaguirre, Yonatan
+     to sparse memory for long video understanding. In Proceed-           Bisk, Juan Carlos Niebles, Ehsan Adeli, Li Fei-Fei, et al. Re-
+     ings of the IEEE/CVF Conference on Computer Vision and               thinking temporal search for long-form video understanding.
+     Pattern Recognition, pages 18221–18232, 2024. 2, 18                  In Proceedings of the Computer Vision and Pattern Recogni-
+[35] Yucheng Suo, Fan Ma, Linchao Zhu, Tianyi Wang, Fengyun               tion Conference, pages 8579–8591, 2025. 2
+     Rao, and Yi Yang. From trial to triumph: Advancing long         [49] Boqiang Zhang, Kehan Li, Zesen Cheng, Zhiqiang Hu,
+     video understanding via visual context sample scaling and            Yuqian Yuan, Guanzheng Chen, Sicong Leng, Yuming Jiang,
+
+
+
+
+                                                                19506
+     Hang Zhang, Xin Li, et al. Videollama 3: Frontier multi-
+     modal foundation models for image and video understand-
+     ing. arXiv preprint arXiv:2501.13106, 2025. 1, 7
+[50] Boqiang Zhang, Kehan Li, Zesen Cheng, Zhiqiang Hu,
+     Yuqian Yuan, Guanzheng Chen, Sicong Leng, Yuming Jiang,
+     Hang Zhang, Xin Li, et al. Videollama 3: Frontier multi-
+     modal foundation models for image and video understand-
+     ing. arXiv preprint arXiv:2501.13106, 2025. 2, 18
+[51] Peiyuan Zhang, Kaichen Zhang, Bo Li, Guangtao Zeng,
+     Jingkang Yang, Yuanhan Zhang, Ziyue Wang, Haoran Tan,
+     Chunyuan Li, and Ziwei Liu. Long context transfer from
+     language to vision. arXiv preprint arXiv:2406.16852, 2024.
+     1, 7, 18
+[52] Xiaoyi Zhang, Zhaoyang Jia, Zongyu Guo, Jiahao Li, Bin
+     Li, Houqiang Li, and Yan Lu. Deep video discovery: Agen-
+     tic search with tool use for long-form video understanding.
+     arXiv preprint arXiv:2505.18079, 2025. 2, 18
+[53] Yuanhan Zhang, Bo Li, haotian Liu, Yong jae Lee, Liangke
+     Gui, Di Fu, Jiashi Feng, Ziwei Liu, and Chunyuan Li. Llava-
+     next: A strong zero-shot video understanding model, 2024.
+     1, 7, 18
+[54] Yuanhan Zhang, Jinming Wu, Wei Li, Bo Li, Zejun Ma, Zi-
+     wei Liu, and Chunyuan Li. Video instruction tuning with
+     synthetic data, 2024. 1, 6, 7, 13
+[55] Yiming Zhang, Zhuokai Zhao, Zhaorun Chen, Zenghui
+     Ding, Xianjun Yang, and Yining Sun. Beyond training: Dy-
+     namic token merging for zero-shot video understanding. In
+     Proceedings of the IEEE/CVF International Conference on
+     Computer Vision, pages 22046–22055, 2025. 2, 7, 18
+[56] Zhou Zhao, Jinghao Lin, Xinghua Jiang, Deng Cai, Xiaofei
+     He, and Yueting Zhuang. Video question answering via hi-
+     erarchical dual-level attention network learning. In Proceed-
+     ings of the 25th ACM international conference on Multime-
+     dia, pages 1050–1058, 2017. 1, 17
+[57] Zhou Zhao, Qifan Yang, Deng Cai, Xiaofei He, Yueting
+     Zhuang, Zhou Zhao, Qifan Yang, Deng Cai, Xiaofei He, and
+     Yueting Zhuang. Video question answering via hierarchical
+     spatio-temporal attention networks. In IJCAI, page 8, 2017.
+     1, 17
+[58] Junjie Zhou, Yan Shu, Bo Zhao, Boya Wu, Shitao Xiao, Xi
+     Yang, Yongping Xiong, Bo Zhang, Tiejun Huang, and Zheng
+     Liu. Mlvu: A comprehensive benchmark for multi-task
+     long video understanding. arXiv preprint arXiv:2406.04264,
+     2024. 6, 18
+[59] Linchao Zhu, Zhongwen Xu, Yi Yang, and Alexander G
+     Hauptmann. Uncovering the temporal context for video
+     question answering. International Journal of Computer Vi-
+     sion, 124(3):409–421, 2017. 1, 17
+
+
+
+
+                                                                 19507
+

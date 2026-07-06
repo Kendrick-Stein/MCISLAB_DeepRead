@@ -1,0 +1,849 @@
+                                                           MVP: Multiple View Prediction Improves GUI Grounding
+
+                                         Yunzhu Zhang1          Zeyu Pan2 Zhengwen Zeng3 Shuheng Shen3∗ Changhua Meng3 Linchao Zhu1 *
+                                                                1
+                                                                  College of Computer Science and Technology, Zhejiang University
+                                                           2
+                                                             College of Computer Science and Technology, Hangzhou Dianzi University
+                                                                                    3
+                                                                                      Venus Team, Ant Group
+                                                                {yunzhuzhang0918,zhulinchao7}@gmail.com, panzeyucs@hdu.edu.cn,
+                                                                     {zengzhengwen.zzw,shuheng.ssh,changhua.mch}@antgroup.com
+
+
+
+
+arXiv:2512.08529v1 [cs.CV] 9 Dec 2025
+                                                                    Abstract                                ing actionable elements within screenshots or live inter-
+                                                                                                            faces [12, 14, 17, 33].
+                                        GUI grounding, which translates natural language instruc-               GUI grounding models are built upon Large Vision
+                                        tions into precise pixel coordinates, is essential for devel-       Language Models (LVLMs), typically formulating GUI
+                                        oping practical GUI agents. However, we observe that ex-            grounding as a generation task, where models output pixel
+                                        isting grounding models exhibit significant coordinate pre-         coordinates as text tokens (e.g., “x=123, y=456”) [6, 10,
+                                        diction instability—minor visual perturbations (e.g., crop-         24]. However, it is inherently challenging for language
+                                        ping a few pixels) can drastically alter predictions, flip-         models to establish a robust correspondence between vi-
+                                        ping results between correct and incorrect. This instabil-          sual elements and text coordinates tokens based on instruc-
+                                        ity severely undermines model performance, especially for           tions [32, 34, 50]. Despite extensive training on GUI im-
+                                        samples with high-resolution and small UI elements. To ad-          ages through supervised fine-tuning (SFT) or reinforcement
+                                        dress this issue, we propose Multi-View Prediction (MVP),           learning (RL), grounding models still generate unexplain-
+                                        a training-free framework that enhances grounding perfor-           able erroneous coordinates, particularly when facing high-
+                                        mance through multi-view inference. Our key insight is              resolution images and small target UI elements that are dif-
+                                        that while single-view predictions may be unstable, aggre-          ficult to identify.
+                                        gating predictions from multiple carefully cropped views                We carefully analyze the failure cases and discover that
+                                        can effectively distinguish correct coordinates from out-           an incorrect prediction does not mean the model lacks the
+                                        liers. MVP comprises two components: (1) Attention-                 capability to locate the target. Rather, the models suffer
+                                        Guided View Proposal, which derives diverse views guided            from prediction instability, where minimal perturbations
+                                        by instruction-to-image attention scores, and (2) Multi-            to input images (e.g., shifting by a few pixels) cause dra-
+                                        Coordinates Clustering, which ensembles predictions by              matic changes in predicted coordinates. As shown in Fig-
+                                        selecting the centroid of the densest spatial cluster. Exten-       ure 1(a), such minor visual variations can flip predictions
+                                        sive experiments demonstrate MVP’s effectiveness across             between correct and incorrect states, revealing high sensi-
+                                        various models and benchmarks. Notably, on ScreenSpot-              tivity to input perturbations.
+                                        Pro, MVP boosts UI-TARS-1.5-7B to 56.1%, GTA1-7B to                     This observation suggests that single full-screenshot in-
+                                        61.7%, Qwen3VL-8B-Instruct to 65.3%, and Qwen3VL-                   ference inadequately unleashes the model’s true grounding
+                                        32B-Instruct to 74.0%. The code is available at https:              capability. To verify this hypothesis, we conduct a pre-
+                                        //github.com/ZJUSCL/MVP.                                            liminary experiment. Specifically, we randomly crop mul-
+                                                                                                            tiple 1280×720 sub-regions from the original ScreenSpot-
+                                                                                                            Pro [14] screenshots, ensuring each view contains the target
+                                        1. Introduction                                                     bounding box. We then predict coordinates for each view.
+                                                                                                            As shown in Figure 1(b), the pass@N accuracy (whether at
+                                        The development of automated agents for graphical user
+                                                                                                            least one prediction among N views is correct) consistently
+                                        interfaces (GUIs) represents a pivotal frontier in artificial
+                                                                                                            improves as the number of views increases. This motivate
+                                        general intelligence (AGI) research [21, 28, 31, 45, 51].
+                                                                                                            us to leverage multiple sub-regions during inference to im-
+                                        These agents fundamentally rely on GUI grounding, which
+                                                                                                            prove prediction performance.
+                                        mappings natural language instructions to their correspond-
+                                                                                                                Based on this observation, we propose the Multiple
+                                          * Corresponding Author.                                           View Prediction (MVP) framework. It operates in two
+
+
+                                                                                                        1
+                     wrong                         correct
+
+            Origin                     shift to upper left
+
+
+
+
+                  correct                           wrong
+
+     shift to lower right                 shift to upper
+         target bbox         correct prediction   wrong prediction
+
+
+
+        (a) Example of prediction instability.                       (b) Pass@N increases with number of views.   (c) MVP significantly boosts performance.
+
+Figure 1. (a) An example of model’s prediction instability from ScreenSpot-Pro. The instruction is “save image in a specific format”.
+Slightly shifting the screenshot causes significantly different predicted coordinates. (b) We crop different views from the original screen-
+shots in ScreenSpot-Pro and then perform inference separately on them using GTA1-7B. The pass@N accuracy improves with number of
+views increasing, indicting the model possessing the ability to predict the correct prediction. (c) Our MVP significantly improves perfor-
+mance of different architectures and sizes grounding models by aggregating results of different views.
+
+
+key stages: Attention-Guided View Proposal and Multi-                                      attention-guided views through spatial clustering to miti-
+Coordinate Clustering. First, MVP generates multiple                                       gate prediction instability.
+views by cropping sub-regions from the original screenshot,                              • We demonstrate that MVP can integrate with grounding
+using instruction-to-image attention scores to guide the pro-                              models of different architectures, improving accuracy on
+cess. These views maintain diversity while ensuring a high                                 three challenging grounding benchmarks.
+likelihood of containing the target UI elements. Each re-
+sulting view, along with the original image, undergoes inde-                             2. Related Work
+pendent inference to yield multiple coordinate predictions.
+                                                                                         GUI grounding, the task of mapping natural language in-
+Finally, the Multi-Coordinate Clustering component aggre-
+                                                                                         structions to precise coordinates, is a core capability for de-
+gates these results by performing spatial clustering on all
+                                                                                         veloping GUI agents capable of real-world application.
+predicted coordinates and outputs the centroid of the largest
+                                                                                             The task was first introduced by SeeClick [6] through the
+cluster as the final prediction.
+                                                                                         ScreenSpot benchmark, showing that grounding pretraining
+    The core intuition behind MVP is to mitigate predic-                                 improves end-to-end success across mobile, web, and desk-
+tion instability through multi-view integration. Although                                top UIs scenarios. Subsequent research in this area can be
+individual view predictions may be unreliable, they usually                              broadly categorized into following directions:
+exhibit spatial patterns that the incorrect coordinates tend
+                                                                                         • Direct Coordinate Optimization methods enhance the
+to scatter arbitrarily whereas the correct ones consistently
+                                                                                            model’s grounding ability by supervised fine-tuning
+fall within the target bounding box region. By clustering
+                                                                                            (SFT) on large-scale GUI-specific datasets [7, 16, 24, 35,
+predictions from diverse views and identifying the densest
+                                                                                            42], or employing reinforcement learning (RL) with rule-
+cluster, MVP effectively distinguishes reliable coordinates
+                                                                                            based rewards [18, 27, 41], directly optimizing the output
+from outliers, thereby enhancing grounding performance.
+                                                                                            coordinates tokens. While these methods improve perfor-
+    MVP is a training-free framework that can be eas-                                       mance, they require substantial computational resources
+ily integrated with different grounding models, such as                                     for training and still struggle with high resolution and
+GTA1-7B [41], UI-TARS-1.5-7B [26], and Qwen3VL-{8B,                                         small UI elements. Unlike these resource-intensive ap-
+32B}-Instruct [25], spanning from 7B/8B to 32B param-                                       proaches, MVP requires no additional training.
+eter scales. Experimental results on ScreenSpot-Pro [14],                                • Iterative Zoom-in methods reframe grounding as a
+UI-Vision [20] and OS-World-G [37] benchmarks demon-                                        multi-step decision process. These approaches either
+strate that MVP can significantly improve existing ground-                                  leverage execution feedback from GUI agents [19] or ex-
+ing models’ performance.                                                                    ploit the model’s own reasoning capability [5, 13, 43, 50]
+Contributions. Our contributions are threefold:                                             to iteratively narrow down to a correct sub-region and
+• We identify coordinate prediction instability in grounding                                then make the final prediction. However, these methods
+   models, which severely undermines model performance.                                     suffer from (1) error accumulation, where a mistake in an
+• We propose Multi-View Prediction (MVP), a training-                                       early step propagates to subsequent stages; (2) additional
+   free framework that aggregates predictions from multiple                                 training or requiring feedback from external agents. In
+
+
+                                                                                     2
+    (a) Prediction flips under visual perturbation.   (b) Instability intensifies with image resolution.   (c) Instability intensifies with smaller targets.
+
+Figure 2. We evaluate model instability by adding a 28-pixel border to ScreenSpot-Pro images and performing separate inference runs with
+GTA1-7B. (a) This minor visual perturbation causes 7.3% of originally correct predictions to become incorrect, and 7.8% of originally
+wrong predictions to become correct, revealing high sensitivity to input variations. (b) When analyzing the distance between the two
+predicted coordinates grouped by image resolution, we observe that instability increases significantly with higher resolutions. (c) Similarly,
+when grouping by the area of the target region, we find that instability is more pronounced for smaller UI elements.
+
+
+  contrast to this sequential search for one optimal view, our                when considering at least one of the two predictions as cor-
+  MVP employs a parallel multi-view strategy, aggregating                     rect—significantly higher than its 49.8% single-prediction
+  predictions via clustering, thereby avoiding error propa-                   accuracy. This gap confirms that the model possesses the
+  gation. Meanwhile, MVP operates in a fully training-free                    requisite capability, but single-view inference fails to har-
+  manner without relying on any external feedback.                            ness it consistently.
+• Attention-Based methods leverage the intrinsic instruc-
+  tion–spatial alignment in LVLMs. They derive cross-                         3.2. What Drives Instability
+  attention scores from transformer layers to identify the                    To understand what makes predictions unstable, we analyze
+  most relevant visual patch and directly output its cen-                     how instability varies with input resolution and target UI el-
+  ter coordinates [4, 34, 39]. However, these methods                         ement size. Figure 5(b) and 5(c) reveal a clear trend: insta-
+  are highly dependent on the precision of the attention                      bility intensifies dramatically for (1) high-resolution screen-
+  scores, limiting their generalizability across different in-                shots and (2) samples with small target elements.
+  structions. Different from these methods, MVP preserves                         We attribute these challenges to both architectural and
+  the standard text generation paradigm as well as better                     data-driven limitations. At the architectural level, the task
+  generalization across diverse scenarios.                                    of mapping high-dimensional visual patches to discrete co-
+                                                                              ordinate tokens via a language head is inherently difficult,
+3. Preliminary Analysis                                                       especially for high-resolution inputs where minor spatial
+                                                                              changes yield vastly different token sequences. Addition-
+In this section, we systematically diagnose the predic-
+                                                                              ally, current training datasets lack sufficient examples of
+tion instability in GUI grounding models. We experiment
+                                                                              high-resolution screenshots and small UI elements samples,
+with GTA1-7B model [41] on the ScreenSpot-Pro bench-
+                                                                              creating a generalization shortfall at test time.
+mark [14] to demonstrate that this instability severely limits
+                                                                                  This diagnosis naturally leads to our solution: if a single
+model reliability and then discuss on its underlying causes.
+                                                                              view is unreliable, but the model can sometimes predict cor-
+3.1. Single Inference is Unreliable                                           rectly, then aggregating predictions from multiple views
+                                                                              should yield more robust and accurate results.
+Our core finding is that grounding models are highly sen-
+sitive to visual perturbations, making single-inference re-
+                                                                              4. Methods
+sults unreliable. Specifically, by adding a mere 28-pixel
+border (significantly smaller than the image resolution) to                   In this section, we propose the training-free Multiple View
+screenshots, we observe drastically different coordinate pre-                 Prediction (MVP) framework to address the identified in-
+dictions from the same model: the average coordinate shift                    stability issues. The MVP framework consists of two main
+of 193 pixels far exceeds the size of typical UI elements in                  components: (1) Attention-Guided View Proposal identifies
+ScreenSpot-Pro (Figure 5(b)).                                                 sub-regions containing the target bounding box and gener-
+    Crucially, this instability directly impacts accuracy. As                 ates different views, reducing input resolution and enhanc-
+shown in Figure 5(a), the model achieved 57.5% accuracy                       ing small target visibility (2) Multi-Coordinate Clustering
+
+
+                                                                          3
+        Instruction: edit font in plot              1. Attention Scores Computation                   2. Candidate Sub-region Selection
+
+
+
+
+                                                        top-k visual tokens                    center around each top token and crop k regions
+
+        3. Region Ranking & Resizing
+                                                                                       4. Coordinate Clustering      5. Final Prediction Decision
+                                                           (1843,532)
+
+                                                                        k-means                                       select largest
+                                                        (1839,530)
+                                                                         cluster                                          group
+                                                                                                                                   (1841,531)
+
+
+
+
+    select m regions containing most top-k tokens
+                                                      (1425,535)
+
+                                                     inference
+
+
+Figure 3. Overview of our Multiple View Prediction (MVP) pipeline, which consists of two main stages: Attention-Guided View Proposal
+and Multi-Coordinate Clustering. First, MVP takes the user instruction and screenshot, forwarding through the language model to derive
+attention scores from the instruction to each visual token. Then the top-k scores tokens are selected, and an h×w sub-region is cropped
+around the center of each corresponding visual patch. These sub-regions are ranked by the number of top-k tokens they contain. The top-m
+regions are chosen and enlarged to form the final set of views. The model independently predicts coordinates for each view. Finally, MVP
+aggregates all the predictions by clustering the coordinates based on spatial proximity and outputs the center of the largest cluster as the
+final prediction.
+
+
+aggregates the predictions from multiple views and deter-                          token. The cross-attention scores are computed as:
+mines the final coordinates, identifying the spatially consis-
+                                                                                                            Tcomma V T
+                                                                                                                      
+tent cluster to filter out outliers and enhance robustness.                                A = Softmax         √         , A ∈ RH×Lv                (1)
+                                                                                                                 d
+                                                                                   The final attention score assigned to each visual token is
+4.1. Attention-Guided View Proposal
+                                                                                   obtained by averaging across all attention heads:
+This module aims to generate multiple views by locating                                                      H
+sub-regions that contain the target UI elements, guided by                                            1 X
+                                                                                             scores =       A[i, :],         scores ∈ RLv           (2)
+cross-attention scores. It leverages the strong text-visual                                           H i=1
+alignment capability of LVLMs, whose attention mech-
+anisms in middle-to-deep layers can effectively localize                           where Lv is the number of visual tokens, H is the number
+instruction-relevant regions [11, 38, 39, 48]. Given the sys-                      of attention heads, and d is the dimension of the model.
+tem prompt, a GUI screenshot, and the user instruction,                               Candidate Sub-region Selection. We select k candidate
+this module outputs m cropped image regions. The pro-                              regions based on the computed attention scores. Specifi-
+cess consists of three main steps: Attention Score Computa-                        cally, we choose the top-k visual tokens with the highest
+tion, Candidate Sub-region Selection, and Region Ranking                           scores. Let T = {(tj , xj , yj ) | j = 1, . . . , k} denote the set
+& Resizing.                                                                        of top-k visual tokens and their corresponding patch center
+                                                                                   coordinates, for each top-k token, we crop an h × w sub-
+    Attention Score Computation. We compute the cross-                             region centered at (xi , yi ) in the original image, resulting in
+attention scores using the text token as the query and the                         k candidate regions:
+visual tokens as the keys. Specifically, we use the center
+                                                                                                                              
+comma token (“,”) from the predicted coordinate format                                                       w          h
+(e.g. “(123,456)”) as the query token, as it demonstrates                            Ri = Crop I, xi − , yi − , w, h , i ∈ [1, k] (3)
+                                                                                                             2          2
+better region localization performance, with further analy-
+sis provided in the Appendix. Let V ∈ RH×Lv ×d represent                           where I is the original GUI image and Crop(I, x, y, w, h)
+the visual tokens and Tcomma ∈ RH×1×d denote the comma                             function extracts a rectangular region.
+
+
+                                                                            4
+Algorithm 1 Attention-Guided View Proposal                                 Algorithm 2 Multi-Coordinate Clustering
+Require: Text instruction T , original image I, view size                  Require: Distance threshold τ , coordinate set C                 =
+    (h, w), view number m, resize ratio α                                      {p1 , p2 , . . . , pm+1 }
+Ensure: Candidate views set V = {R1resized , . . . , Rm   resized
+                                                                  }        Ensure: Final coordinate pfinal
+ 1: 1. Attention Score Computation                                          1: Step 1: Cluster coordinates
+ 2: Extract visual tokens V ∈ RH×Lv ×d from I                               2: Initialize clusters G = {}, unassigned U = C
+ 3: Get comma token Tcomma ∈ RH×1×d as query token                          3: while U ̸= ∅ do
+ 4: Use Eq 1. and Eq 2. to compute attention scores                         4:      pseed ← U [0], G ← {pseed }, U ← U \ {pseed }
+ 5: 2. Candidate Sub-region Selection                                       5:      repeat
+ 6: Sort visual tokens by scores in descending order                        6:           Gprev ← G
+ 7: Select top-k tokens: tokens = {t1 , t2 , . . . , tk }                   7:           for p ∈ U do
+                                                                                                            1
+                                                                                                              P
+ 8: Get corresponding positions: {(x1 , y1 ), . . . , (xk , yk )}           8:                 center ← |G|     q∈G q
+ 9: Initialize empty region set R = ∅                                       9:                 if ∥p − center∥2 ≤ τ then
+10: for each selected token ti at position (xi , yi ) do                   10:                      G ← G ∪ {p}, U ← U \ {p}
+11:     Crop candidate region {Ri } using Eq 3.                            11:                 end if
+12:     Compute ranking score rank(Ri ) using Eq 4.                        12:           end for
+13:     R = R ∪ {Ri }                                                      13:      until G = Gprev
+14: end for                                                                14:      G ← G ∪ {G}
+15: 3. Region Ranking & Resizing                                           15: end while
+16: Sort regions by ranking scores: R(1) , R(2) , . . . , R(k)             16: Step 2: Final Prediction Decision
+17: Select top-m regions: V = {R(1) , . . . , R(m) }                       17: G∗ = arg maxG∈G |G|
+18: Resize each region R(i) in selected set using Eq 5.                    18: if ∃ multiple G with max size then
+19: return V                                                                        G∗ = arg maxGk ∈G rank(Ri ), pi ∈ Gk
+                                                                                                              P
+                                                                           19:
+                                                                           20: end if
+                                                                           21: pfinal = |G1∗ |
+                                                                                                  P
+                                                                                                    pi ∈G∗ pi
+   Region Ranking & Resizing. We select m regions from                     22: return pfinal
+k candidates to form the final views. Regions containing
+more top-k visual tokens are considered more likely to con-
+tain the target bounding box. We rank the candidate regions
+by the number of these tokens whose patch center coordi-                   tween any two predictions pi and pj is calculated as:
+nates fall within the region, and choose the top-m regions:                                          q
+                       k
+                                                                                     d(pi , pj ) =       (xi − xj )2 + (yi − yj )2          (6)
+                       X
+        rank(Ri ) =          I [(xj , yj ) ∈ Ri ] , i ∈ [1, k]   (4)
+                       j=1
+                                                                           Final Prediction Decision The reliability of a prediction
+   Considering small UI elements poses more instability to                 cluster Gk is determined by its size |Gk |—while incorrect
+grounding models (Section 3.2), we enlarge the selected re-                predictions may scatter arbitrarily, correct ones are spatially
+gions to enhance the visibility of small targets:                          consistent as they all fall within the target bounding box.
+                                                                           We select the center coordinates of the largest cluster as the
+          Riresized = Resize(Ri , αh, αw),          α>1          (5)
+                                                                           final prediction:
+
+4.2. Multi-Coordinate Clustering
+                                                                                                                                 1 X
+This module takes the m cropped views as input and out-                     G∗ = arg max |Gk |,          (xfinal , yfinal ) =           pi (7)
+puts the final predicted coordinate. It firstly performs in-                            Gk                                      |G∗ | ∗
+                                                                                                                                    pi ∈G
+ference on each of the m views along with the original full
+                                                        m+1
+image, yielding m + 1 coordinate predictions (xi , yi )i=1 ,                  In cases when multiple clusters have the same maximum
+then identifies the correct prediction by clustering spatially             size, we leverage the attention-based ranking for decision,
+consistent coordinates and filtering out outliers. This pro-               selecting the cluster whose points corresponding regions
+cess consists of two steps: Coordinate Clustering and Final                containing the most top-k visual tokens:
+Prediction Decision.
+                                                                                                          X
+                                                                                     G∗ = arg max               rank(Ri ), pi ∈ Gk          (8)
+Coordinate Clustering We cluster the coordinate predic-                                         Gk ∈G
+tions using K-means based on the distance. The metric be-
+
+
+                                                                       5
+ Model                                 Development      Creative          CAD       Scientific     Office         OS          Overall
+                                                         Closed-source Models
+ GPT-4o [22]                                0.7            0.6           1.5           1.2           0.9          0.0           0.8
+ Claude Computer Use [1]                   12.6           16.8          11.9          25.8          26.9          8.1          17.1
+ UI-TARS-1.5 [26]                          63.9           50.4          58.2          69.3          79.6         51.0          61.6
+ Seed1.5-VL [9]                            53.8           59.2          59.0          61.4          74.8         60.2          60.9
+                                                         Open-Source Models
+ SeeClick-7B [6]                            0.3            0.6         1.9             2.0           0.9          1.5           1.1
+ UGround-V1-7B [7]                         28.1           31.7        14.6            39.0          49.6         24.5          31.1
+ UGround-V1-72B [7]                        31.1           35.8        13.8            50.0          51.3         25.5          34.5
+ Qwen2.5-VL-32B-Instruct [3]               48.8           42.2        31.0            55.5          64.3         50.5          48.0
+ RegionFocus (Qwen2.5VL-72B) [19]          51.2           57.2        60.9            66.5          80.9         57.1          61.6
+ GTA1-72B [41]                             57.2           51.0        49.8            63.0          77.0         57.1          58.4
+ GUI-Actor-2.5VL-7B [34]                   38.1           41.3        38.3            50.8          63.0         38.8          44.6
+ SE-GUI-7B [44]                            44.5           37.2        42.1            54.7          70.4         38.8          47.2
+ UI-Venus-72B [8]                          59.5           55.4        57.5            66.5          77.8         57.7          61.9
+ V2P-7B [4]                                46.8           43.1        47.1            56.3          68.3         45.4          50.6
+ GMS (Gemini-2.5-Flash-Lite) [15]          44.8           54.8        57.5            55.9          70.4         44.9          54.6
+ GUI-Spotlight [13]                        53.3           44.4        51.0            52.4          71.3         46.9          52.8
+ GUI-Cursor-7B [49]                        57.5           45.8        53.2            61.4          74.8         50.0          56.5
+ UI-INS-32B [5]                            55.8           46.4        48.4            62.2          80.0         54.1          57.0
+ HyperClick [47]                           46.9           45.1        48.5            56.7          60.9         40.8          48.2
+ UI-TARS-1.5-7B                            36.4            38.1            20.5        49.6         68.7          31.5          41.9
+ + MVP                                  51.8↑15.4       50.0↑11.9       53.3↑32.8    57.9↑8.3     73.0↑4.3     54.6↑23.1     56.1↑14.2
+ GTA1-7B                                   43.4            44.8            44.4        55.9         74.8          35.2          49.8
+ + MVP                                  58.9↑15.5        52.6↑7.8       60.2↑15.8    63.0↑7.1     79.1↑4.3     56.1↑20.9     61.7↑11.9
+ Qwen3VL-8B-Instruct                       52.8            49.1            49.0        56.7         75.2          50.5          55.0
+ + MVP                                   61.5↑8.7       60.2↑11.1       61.3↑12.3   67.3↑10.6     82.6↑7.4     62.8↑12.3     65.3↑10.3
+ Qwen3VL-32B-Instruct                      43.1            54.4            57.5        62.6         73.0          42.3          55.3
+ + MVP                                  71.6↑28.5       69.3↑14.9       74.7↑17.2    70.5↑7.9    87.4↑14.4     73.5↑31.2     74.0↑18.7
+
+
+Table 1. Evaluation results on the ScreenSpot-Pro benchmark. Baseline models are evaluated using official instructions, while other mod-
+els’ results are sourced from the benchmark leaderboard. Our method shows significant performance improvements across all categories.
+These consistent gains across diverse model architectures validate MVP’s effectiveness in addressing high-resolution GUI grounding chal-
+lenges through its multi-view prediction mechanism.
+
+5. Experiments                                                          all experiments, and then are resized to 2560 × 1440. The
+                                                                        view number m is set to 4 for GTA1-7B and UI-TARS-1.5-
+5.1. Models and Benchmarks                                              7B, and 2 for Qwen3VL-{8B,32B}-Instruct by default. For
+We conduct comprehensive evaluations across diverse                     screenshots with resolution lower than 720P, we generate
+grounding models and scales to assess the generalizabil-                different views by adding 28-pixel black border to the left,
+ity and effectiveness of our MVP framework, including                   right, upper and bottom of the image accordingly, or we
+UI-TARS-1.5-7B [26], GTA1-7B [41] and Qwen3VL-{8B,                      apply the Attention Heuristic Cropping to crop views. Ac-
+32B}-Instruct [25]. The models are evaluated on three                   cording to FlexSelect [48], we choose attention scores from
+challenging GUI grounding benchmarks: (1) ScreenSpot-                   layer 20 of the language model for GTA1-7B and UI-TARS-
+Pro [14], a benchmark for evaluating visual grounding on                1.5-7B, layer 24 for Qwen3VL-8B-Instruct and layer 48 for
+high-resolution screenshots of professional software, cov-              Qwen3VL-32B-Instruct to crop views. Top-100 visual to-
+ering application domains such as creative tools, office. (2)           kens are selected to crop candidate regions. The K-means
+UI-Vision [20], a diverse benchmark which samples from                  threshold τ is set to 14 pixels for all models. The evaluation
+83 applications across 6 domains with dense referring ex-               prompt follows the model’s official GitHub repository.
+pressions platforms. (3) OS-World-G [37], a real-world in-
+teractive benchmark containing 564 screenshots from OS-                 5.3. Evaluation Results
+World [36], focusing on operating-system tasks like file op-            Results on ScreenSpot-Pro Grounding models exhibit
+erations and app launching.                                             greater instability when processing high-resolution screen-
+                                                                        shots, leading to suboptimal performance. Our MVP frame-
+5.2. Implementation Details
+                                                                        work effectively addresses this issue through its multi-view
+We run 7B/8B model on 8 RTX4090 and 32B model on                        prediction mechanism, as demonstrated by consistent per-
+4 A100. The view size (h, w) is set to 1280 × 720 for                   formance gains across all categories and model scales on
+
+
+                                                                    6
+     Model                     Text Match Element Recognition Layout Understanding Fine-grained Manipulation Refusal Average
+                                                           Closed-source Models
+     Operator [23]                51.3            42.4                    46.6                   31.5               -       40.6
+     Gemini-2.5-pro [30]          59.8            45.5                    49.0                   33.6              38.9     45.2
+     Seed1.5-VL [9]               73.9            66.7                    69.6                   47.0              18.5     62.9
+                                                           Open-Source Models
+     Qwen2.5-VL-72B [3]           52.6            74.6                  74.7                     55.3                -      62.2
+     UI-TARS-72B [24]             69.4            60.6                  62.9                     45.6                -      57.1
+     UI-Venus-Ground-72B [8]      82.1            71.2                  70.7                     64.4                -      70.4
+     OS-Atlas-7B [35]             44.1            29.4                  35.2                     16.8               7.4     27.7
+     UGround-V1-7B [7]            51.3            40.3                  43.5                     24.8                -      36.4
+     Aguvis-7B [40]               55.9            41.2                  43.9                     28.2                -      38.7
+     Jedi-7B [37]                 65.9            55.5                  57.7                     46.9               7.4     54.1
+     GTA1-72B [41]                57.9            76.9                  77.3                     66.7                -      66.7
+     GUI-Spotlight [13]           68.2            60.6                  63.2                     45.6                -      62.7
+     UI-TARS-1.5-7B               67.3            64.5                    65.2                    42.9               -      61.9
+     + MVP                     78.5↑11.2        69.1↑4.6                70.0↑4.8               59.7↑16.8             -    66.8↑4.9
+     GTA1-7B                      80.4            69.4                    69.1                    60.4               -      67.5
+     + MVP                      80.8↑0.4        71.6↑2.2                71.1↑2.0                61.0↑0.6             -    68.7↑1.2
+     Qwen3VL-8B-Instruct          79.7            71.8                    74.3                    59.1               -      68.8
+     + MVP                      82.4↑2.7        76.7↑4.9                79.5↑5.2                61.7↑2.6             -    72.7↑3.9
+     Qwen3VL-32B-Instruct         81.6            75.7                    77.1                    62.4               -      71.7
+     + MVP                        81.6          76.4↑0.7                77.5↑0.4                  62.4               -    72.0↑0.3
+
+Table 2. Evaluation results on the OS-World-G benchmark. The baseline results are evaluated using the corresponding official GitHub
+instructions, while other models’ results are sourced directly from the UI-Venus Technical Report [8]. These experimental results demon-
+strate the effectiveness of our MVP framework in real-world interactive scenarios.
+
+ScreenSpot-Pro (Table 1). Specifically, MVP improves                    age gains of +3.4 (UI-TARS-1.5-7B) and +4.0 (GTA1-7B)
+GTA1-7B by 11.9 points (49.8 → 61.7), UI-TARS-1.5-7B                    points, with Qwen3VL-8B-Instruct achieving +4.7 points
+by 14.2 points (41.9 → 56.1), and Qwen3VL-8B-Instruct                   improvement. Most notably, Qwen3VL-32B-Instruct with
+by 10.3 points (55.0 → 65.3). Most notably, when in-                    MVP establishes new state-of-the-art performance with
+tegrated with Qwen3VL-32B-Instruct, MVP elevates per-                   +7.7 points overall (36.4 → 44.1), surpassing even the 72B
+formance from 55.3 to 74.0, establishing new state-of-the-              UI-Venus-Ground-72B (36.8) by +7.3 points. These results
+art results that surpass all existing open-source and closed-           demonstrate that our method effectively improves model
+source models. These substantial improvements across                    performance across different applications and platforms,
+diverse architectures confirm MVP’s effectiveness in ad-                showing strong generalizability across various domains.
+dressing the challenges of high-resolution GUI grounding
+through its multi-view prediction mechanism.                            5.4. Ablations
+                                                                        Influence of Attention-Guided View Proposal This
+                                                                        study ablates the Attention-Guided View Proposal module,
+Results on OS-World-G As shown in Table 2, our MVP
+                                                                        which generates diverse views by preserving semantically
+framework demonstrates consistent performance improve-
+                                                                        rich regions at a reduced input resolution. We compare
+ments on OS-World-G, enhancing the average scores of UI-
+                                                                        it against a Border Padding strategy that creates views by
+TARS-1.5-7B by 4.9 points (61.9→66.8), GTA1-7B by 1.2
+                                                                        adding 28-pixel borders around the original screenshot. Re-
+points (67.5→68.7), Qwen3VL-8B-Instruct by 3.9 points
+                                                                        sults in Table 4 show that while Border Padding improves
+(68.8→72.7), and Qwen3VL-32B-Instruct by 0.3 points
+                                                                        upon the baseline, our Attention-Guided View Proposal
+(71.7→72.0). These results validate MVP’s effectiveness in
+                                                                        method delivers a significantly larger gain. This demon-
+real-world interactive scenarios. The smaller performance
+                                                                        strates that our attention-guided strategy for selecting infor-
+gains on OS-World-G relative to UI-Vision and ScreenSpot-
+                                                                        mative sub-regions is effective on view generation.
+Pro stem from its lower-resolution (720P/1080P), which in-
+herently poses less instability to models and consequently
+limits improvement potential.                                           Influence of Multi-Coordinate Clustering This ablation
+                                                                        study evaluates the efficacy of our Multi-Coordinate Clus-
+                                                                        tering module in mitigating prediction instability by aggre-
+Results on UI-Vision As shown in Table 3, our MVP                       gating coordinates from multiple views. We compare it
+framework consistently enhances performance across all                  against two alternative strategies: (1) randomly selecting
+UI-Vision categories. For 7B models, MVP brings aver-                   one prediction, and (2) averaging over all predicted coordi-
+
+
+                                                                    7
+Model                         Basic     Functional   Spatial    Average                 Aggregation Method          View Number      SS-Pro Avg.
+                        Closed-source Models                                        Baseline (Single Full Image)         –              49.8
+GPT-4o [22]                     1.6       1.5          1.0           1.4              Average of Coordinates             4              46.6
+Claude-3.7-Sonnet [2]           9.5       7.7          7.6           8.3                Random Selection                 4              55.7
+                                                                                    Multi-Coordinate Clustering          4              61.7
+                        Open-Source Models
+Qwen2.5-VL-7B [3]              1.2       0.8            0.5          0.9
+UI-TARS-7B [24]               20.1      24.3            8.4          17.6       Table 5. Comparison of aggregation strategies on the ScreenSpot-
+UI-TARS-72B [24]              31.4      30.5           14.7          25.5       Pro benchmark using GTA1-7B. Our proposed Multi-Coordinates
+UI-Venus-Ground-7B [8]        36.1      32.8           11.9          26.5       Clustering method demonstrates superior performance, highlight-
+UI-Venus-Ground-72B [8]       45.6      42.3           23.7          36.8       ing the importance of robust spatial consensus over naive averag-
+OS-Atlas-7B [35]              12.2      11.2            3.7          9.0
+Phi-Ground-7B-16C-DPO [46]    36.8      37.1            7.6          27.2
+                                                                                ing or random selection.
+UGround-V1-7B [7]             15.4      17.1            6.3          12.9                   Method                 Number of Views    SS-Pro Avg.
+HyperClick [47]               35.3      32.1           11.0          25.7
+GUI-Spotlight [13]            32.1      30.2           9.1           23.4          Baseline (Single Full Image)          –                49.8
+                                                                                        Without Resizing                 4                59.1
+UI-TARS-1.5-7B                 29.3        27.4        10.0       22.2                    With Resizing                  4                61.7
++ MVP                        31.8↑2.5    31.8↑4.4    13.2↑3.2   25.6↑3.4
+GTA1-7B                        35.2        32.9        11.5       26.5
++ MVP                        38.9↑3.7    37.7↑4.8    14.9↑3.4   30.5↑4.0        Table 6. Ablation study on view resizing using the ScreenSpot-Pro
+Qwen3VL-8B-Instruct            32.9        34.1        14.7       27.2          benchmark and GTA1-7B. Enlarging the cropped views to twice
++ MVP                        38.3↑5.4    38.8↑4.7    18.7↑4.0   31.9↑4.7        their original size improves the visibility of target UI elements and
+Qwen3VL-32B-Instruct           43.9        42.8        22.4       36.4          yields a performance gain of 2.6 points.
++ MVP                        49.4↑5.5    52.0↑9.2    30.8↑8.4   44.1↑7.7
+
+Table 3. Evaluation results on UI-Vision. Baseline models are
+evaluated using the official GitHub instructions, while results
+for other models are taken directly from the UI-Vision leader-
+board [20]. Our method effectively improves model performance
+across diverse applications, exhibiting strong generalizability.
+
+
+     View Proposal Method         Number of Views       SS-Pro Avg.
+  Baseline (Single Full Image)            –                   49.8
+         Border Padding                   4                   57.3
+ Attention-Guided View Proposal           4                   61.7
+
+                                                                                Figure 4. We evaluate GTA1-7B on ScreenSpot-Pro under differ-
+Table 4. Comparison of view generation methods on the
+                                                                                ent view number. Increasing the number of views does not consis-
+ScreenSpot-Pro benchmark using GTA1-7B. Our Attention
+                                                                                tently lead to performance improvements. We suggest 4 views as
+Heuristic Cropping method significantly outperforms both the
+                                                                                the optimal configuration
+Border Padding strategy and the single full image baseline, un-
+derscoring the importance of content-aware cropping over simple
+spatial augmentation.                                                           out this resizing operation. As shown in Table 6, resizing
+                                                                                improves the SS-Pro Avg. score by 2.6 points (from 59.1 to
+nates. As presented in Table 5, our clustering-based method                     61.7), confirming its contribution to final performance.
+achieves a SS-Pro Avg. of 61.7, substantially outperforming
+both alternatives and the baseline. This result confirms that                   Influence of View Number We compare the performance
+identifying spatial consensus through clustering is a more                      under different view numbers. As shown in Figure 4, we ob-
+effective aggregation strategy than simple averaging or ran-                    serve that increasing the number of views does not consis-
+dom selection for determining the final prediction, since in-                   tently lead to performance improvements. Although differ-
+correct predictions may scatter arbitrarily, correct ones are                   ent views generate distinct coordinates, they tend to cluster
+spatially consistent as they all fall within the target bound-                  around several fixed positions. Consequently, adding more
+ing box.                                                                        views has limited impact on the final clustering results while
+                                                                                increases the time cost. We suggest 4 views as the optimal
+                                                                                configuration.
+Influence of View Resizing This experiment evaluates
+the impact of resizing cropped views to a higher resolution                     6. Conclusion
+(2× of the original size) to enhance the visibility of small
+target UI elements, thereby mitigating model instability on                     In this paper, We find that current existing grounding mod-
+small regions. We compare the performance with and with-                        els are highly sensitive to visual input variations. Even
+
+
+                                                                            8
+slight perturbations may flip the result between correct and                Tang. Cogagent: A visual language model for gui agents.
+incorrect, which indicates significant prediction instability               In Conference on Computer Vision and Pattern Recognition,
+and undermines model performance. To address this, we                       2024. 1
+propose the training-free Multiple View Prediction (MVP)               [11] Xiaohu Huang, Hao Zhou, and Kai Han. Prunevid: Visual
+framework. MVP stabilizes predictions by cropping mul-                      token pruning for efficient video large language models. In
+tiple views of screenshots, obtaining independent predic-                   Annual Meeting of the Association for Computational Lin-
+                                                                            guistics, 2025. 4
+tions, and aggregating them via spatial clustering. Extensive
+experiments on ScreenSpot-Pro, UI-Vision, and OS-World-                [12] Zheng Hui, Yinheng Li, Dan Zhao, Colby Banbury, Tianyi
+                                                                            Chen, and Kazuhito Koishida. WinSpot: GUI grounding
+G validate that MVP consistently and significantly boosts
+                                                                            benchmark with multimodal large language models. In Pro-
+the performance of diverse grounding models, effectively                    ceedings of the 63rd Annual Meeting of the Association for
+unleashing their potential without any retraining.                          Computational Linguistics (Volume 2: Short Papers), pages
+                                                                            1086–1096, Vienna, Austria, 2025. Association for Compu-
+References                                                                  tational Linguistics. 1
+ [1] anthropic. Introducing computer use, a new claude 3.5 son-        [13] Bin Lei, Nuo Xu, Ali Payani, Mingyi Hong, Chunhua Liao,
+     net, and claude 3.5 haiku, 2024. Accessed: 2024-10-22. 6               Yu Cao, and Caiwen Ding. GUI-S POTLIGHT: Adaptive it-
+ [2] Anthropic. Claude 3.7 sonnet and claude code, 2025. Ac-                erative focus refinement for enhanced gui visual grounding,
+     cessed: 2025-02-25. 8                                                  2025. 2, 6, 7, 8
+ [3] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin           [14] Kaixin Li, Meng Ziyang, Hongzhan Lin, Ziyang Luo,
+     Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun                   Yuchen Tian, Jing Ma, Zhiyong Huang, and Tat-Seng
+     Tang, Humen Zhong, Yuanzhi Zhu, Mingkun Yang, Zhao-                    Chua. Screenspot-pro: GUI grounding for professional high-
+     hai Li, Jianqiang Wan, Pengfei Wang, Wei Ding, Zheren Fu,              resolution computer use. In Workshop on Reasoning and
+     Yiheng Xu, Jiabo Ye, Xi Zhang, Tianbao Xie, Zesen Cheng,               Planning for Large Language Models, 2025. 1, 2, 3, 6
+     Hang Zhang, Zhibo Yang, Haiyang Xu, and Junyang Lin.              [15] Zhecheng Li, Guoxian Song, Yiwei Wang, Zhen Xiong, Jun-
+     Qwen2.5-vl technical report, 2025. 6, 7, 8                             song Yuan, and Yujun Cai. Generalist scanner meets special-
+ [4] Jikai Chen, Long Chen, Dong Wang, Leilei Gan, Chenyi                   ist locator: A synergistic coarse-to-fine framework for robust
+     Zhuang, and Jinjie Gu. V2p: From background suppression                gui grounding, 2025. 6
+     to center peaking for robust gui grounding task, 2025. 3, 6       [16] Kevin Qinghong Lin, Linjie Li, Difei Gao, Zhengyuan Yang,
+ [5] Liangyu Chen, Hanzhang Zhou, Chenglin Cai, Jianan                      Shiwei Wu, Zechen Bai, Weixian Lei, Lijuan Wang, and
+     Zhang, Panrong Tong, Quyu Kong, Xu Zhang, Chen                         Mike Zheng Shou. Showui: One vision-language-action
+     Liu, Yuqi Liu, Wenxuan Wang, Yue Wang, Qin Jin, and                    model for gui visual agent. In Conference on Computer Vi-
+     Steven Hoi. Ui-ins: Enhancing gui grounding with multi-                sion and Pattern Recognition, 2025. 2
+     perspective instruction-as-reasoning, 2025. 2, 6                  [17] Junpeng Liu, Yifan Song, Bill Yuchen Lin, Wai Lam, Gra-
+ [6] Kanzhi Cheng, Qiushi Sun, Yougang Chu, Fangzhi Xu, Li                  ham Neubig, Yuanzhi Li, and Xiang Yue. Visualwebbench:
+     YanTao, Jianbing Zhang, and Zhiyong Wu. SeeClick: Har-                 How far have multimodal llms evolved in web page under-
+     nessing GUI grounding for advanced visual GUI agents. In               standing and grounding?, 2024. 1
+     Proceedings of the 62nd Annual Meeting of the Associa-            [18] Run Luo, Lu Wang, Wanwei He, Longze Chen, Jiaming
+     tion for Computational Linguistics (Volume 1: Long Papers),            Li, and Xiaobo Xia. Gui-r1 : A generalist r1-style vision-
+     pages 9313–9332, Bangkok, Thailand, 2024. Association for              language action model for gui agents, 2025. 2
+     Computational Linguistics. 1, 2, 6                                [19] Tiange Luo, Lajanugen Logeswaran, Justin Johnson, and
+ [7] Boyu Gou, Ruohan Wang, Boyuan Zheng, Yanan Xie, Cheng                  Honglak Lee. Visual test-time scaling for gui agent ground-
+     Chang, Yiheng Shu, Huan Sun, and Yu Su. Navigating the                 ing, 2025. 2, 6
+     digital world as humans do: Universal visual grounding for        [20] Shravan Nayak, Xiangru Jian, Kevin Qinghong Lin, Juan A.
+     GUI agents. In The Thirteenth International Conference on              Rodriguez, Montek Kalsi, Rabiul Awal, Nicolas Chapa-
+     Learning Representations, 2025. 2, 6, 7, 8                             dos, M. Tamer Özsu, Aishwarya Agrawal, David Vazquez,
+ [8] Zhangxuan Gu, Zhengwen Zeng, Zhenyu Xu, Xingran Zhou,                  Christopher Pal, Perouz Taslakian, Spandana Gella, and Sai
+     Shuheng Shen, Yunfei Liu, Beitong Zhou, Changhua Meng,                 Rajeswar. Ui-vision: A desktop-centric gui benchmark for
+     Tianyu Xia, Weizhi Chen, Yue Wen, Jingya Dou, Fei Tang,                visual perception and interaction. In Conference on Interna-
+     Jinzhen Lin, Yulin Liu, Zhenlin Guo, Yichen Gong, Heng                 tional Conference on Machine Learning, 2025. 2, 6, 8
+     Jia, Changlong Gao, Yuan Guo, Yong Deng, Zhenyu Guo,              [21] Dang Nguyen, Jian Chen, Yu Wang, Gang Wu, Namyong
+     Liang Chen, and Weiqiang Wang. Ui-venus technical report:              Park, Zhengmian Hu, Hanjia Lyu, Junda Wu, Ryan Aponte,
+     Building high-performance ui agents with rft, 2025. 6, 7, 8            Yu Xia, Xintong Li, Jing Shi, Hongjie Chen, Viet Dac
+ [9] Dong Guo, Faming Wu, and etc. Feida Zhu. Seed1.5-vl tech-              Lai, Zhouhang Xie, Sungchul Kim, Ruiyi Zhang, Tong Yu,
+     nical report, 2025. 6, 7                                               Mehrab Tanjim, Nesreen K. Ahmed, Puneet Mathur, Se-
+[10] Wenyi Hong, Weihan Wang, Qingsong Lv, Jiazheng Xu,                     unghyun Yoon, Lina Yao, Branislav Kveton, Jihyung Kil,
+     Wenmeng Yu, Junhui Ji, Yan Wang, Zihan Wang, Yuxuan                    Thien Huu Nguyen, Trung Bui, Tianyi Zhou, Ryan A. Rossi,
+     Zhang, Juanzi Li, Bin Xu, Yuxiao Dong, Ming Ding, and Jie              and Franck Dernoncourt. Gui agents: A survey. In Proceed-
+
+
+                                                                   9
+     ings of Annual Meeting of the Association for Computational             Jianfeng Gao. Gui-actor: Coordinate-free visual grounding
+     Linguistics, 2025. 1                                                    for gui agents, 2025. 1, 3, 6
+[22] OpenAI. Hello GPT-4o, 2024. Accessed: 2024-05-20. 6, 8             [35] Zhiyong Wu, Zhenyu Wu, Fangzhi Xu, Yian Wang, Qiushi
+[23] OpenAI. Introducing operator, 2025. Accessed: 2025-01-23.               Sun, Chengyou Jia, Kanzhi Cheng, Zichen Ding, Liheng
+     7                                                                       Chen, Paul Pu Liang, and Yu Qiao. Os-atlas: A foundation
+[24] Yujia Qin, Yining Ye, Junjie Fang, Haoming Wang, Shihao                 action model for generalist gui agents, 2024. 2, 7, 8
+     Liang, Shizuo Tian, Junda Zhang, Jiahao Li, Yunxin Li, Shi-        [36] Tianbao Xie, Danyang Zhang, Jixuan Chen, Xiaochuan Li,
+     jue Huang, Wanjun Zhong, Kuanye Li, Jiale Yang, Yu Miao,                Siheng Zhao, Ruisheng Cao, Toh Jing Hua, Zhoujun Cheng,
+     Woyu Lin, Longxiang Liu, Xu Jiang, Qianli Ma, Jingyu Li,                Dongchan Shin, Fangyu Lei, Yitao Liu, Yiheng Xu, Shuyan
+     Xiaojun Xiao, Kai Cai, Chuang Li, Yaowei Zheng, Chaolin                 Zhou, Silvio Savarese, Caiming Xiong, Victor Zhong, and
+     Jin, Chen Li, Xiao Zhou, Minchao Wang, Haoli Chen, Zhao-                Tao Yu. Osworld: Benchmarking multimodal agents for
+     jian Li, Haihua Yang, Haifeng Liu, Feng Lin, Tao Peng, Xin              open-ended tasks in real computer environments, 2024. 6
+     Liu, and Guang Shi. Ui-tars: Pioneering automated gui in-          [37] Tianbao Xie, Jiaqi Deng, Xiaochuan Li, Junlin Yang,
+     teraction with native agents, 2025. 1, 2, 7, 8                          Haoyuan Wu, Jixuan Chen, Wenjing Hu, Xinyuan Wang,
+[25] qwen. Qwen3vl, 2025. 2, 6                                               Yuhui Xu, Zekun Wang, Yiheng Xu, Junli Wang, Doyen Sa-
+                                                                             hoo, Tao Yu, and Caiming Xiong. Scaling computer-use
+[26] ByteDance Seed. Ui-tars-1.5. https://seed-tars.
+                                                                             grounding via user interface decomposition and synthesis.
+     com/1.5, 2025. 2, 6
+                                                                             In Conference on Neural Information Processing Systems,
+[27] Fei Tang, Zhangxuan Gu, Zhengxi Lu, Xuyang Liu,
+                                                                             2025. 2, 6, 7
+     Shuheng Shen, Changhua Meng, Wen Wang, Wenqi Zhang,
+                                                                        [38] Long Xing, Qidong Huang, Xiaoyi Dong, Jiajie Lu, Pan
+     Yongliang Shen, Weiming Lu, Jun Xiao, and Yueting
+                                                                             Zhang, Yuhang Zang, Yuhang Cao, Conghui He, Jiaqi Wang,
+     Zhuang. Gui-g2 : Gaussian reward modeling for gui ground-
+                                                                             Feng Wu, and Dahua Lin. Pyramiddrop: Accelerating your
+     ing, 2025. 2
+                                                                             large vision-language models via pyramid visual redundancy
+[28] Fei Tang, Haolei Xu, Hang Zhang, Siqi Chen, Xingyu Wu,                  reduction. In Conference on Computer Vision and Pattern
+     Yongliang Shen, Wenqi Zhang, Guiyang Hou, Zeqi Tan,                     Recognition, 2025. 4
+     Yuchen Yan, Kaitao Song, Jian Shao, Weiming Lu, Jun Xiao,
+                                                                        [39] Hai-Ming Xu, Qi Chen, Lei Wang, and Lingqiao Liu.
+     and Yueting Zhuang. A survey on (m)llm-based gui agents,
+                                                                             Attention-driven gui grounding: Leveraging pretrained mul-
+     2025. 1
+                                                                             timodal large language models without fine-tuning. In The
+[29] Keda Tao, Can Qin, Haoxuan You, Yang Sui, and Huan                      39th Annual AAAI Conference on Artificial Intelligence,
+     Wang. Dycoke: Dynamic compression of tokens for fast                    2025. 3, 4, 1
+     video large language models. In Conference on Computer             [40] Yiheng Xu, Zekun Wang, Junli Wang, Dunjie Lu, Tian-
+     Vision and Pattern Recognition, pages 18992–19001, 2025.                bao Xie, Amrita Saha, Doyen Sahoo, Tao Yu, and Caiming
+     1                                                                       Xiong. Aguvis: Unified pure vision agents for autonomous
+[30] Gemini Team, Rohan Anil, Sebastian Borgeaud, Jean-                      gui interaction. In International Conference on Machine
+     Baptiste Alayrac, Jiahui Yu, Radu Soricut, Johan Schalkwyk,             Learning, 2025. 7
+     Andrew M. Dai, Anja Hauth, and et al. Gemini: A family of          [41] Yan Yang, Dongxu Li, Yutong Dai, Yuhao Yang, Ziyang
+     highly capable multimodal models, 2024. 7                               Luo, Zirui Zhao, Zhiyuan Hu, Junzhe Huang, Amrita Saha,
+[31] Shuai Wang, Weiwen Liu, Jingxuan Chen, Yuqi Zhou,                       Zeyuan Chen, Ran Xu, Liyuan Pan, Silvio Savarese, Caim-
+     Weinan Gan, Xingshan Zeng, Yuhan Che, Shuai Yu, Xin-                    ing Xiong, and Junnan Li. Gta1: Gui test-time scaling agent,
+     long Hao, Kun Shao, Bin Wang, Chuhan Wu, Yasheng Wang,                  2025. 2, 3, 6, 7, 1
+     Ruiming Tang, and Jianye Hao. Gui agents with foundation           [42] Yuhao Yang, Yue Wang, Dongxu Li, Ziyang Luo, Bei Chen,
+     models: A comprehensive survey, 2025. 1                                 Chao Huang, and Junnan Li. Aria-ui: Visual grounding for
+[32] Suyuchen Wang, Tianyu Zhang, Ahmed Masry, Christopher                   gui instructions. In Proceedings of Annual Meeting of the
+     Pal, Spandana Gella, Bang Liu, and Perouz Taslakian. Im-                Association for Computational Linguistics, 2025. 2
+     proving gui grounding with explicit position-to-coordinate         [43] Xianhang Ye, Yiqing Li, Wei Dai, Miancan Liu, Ziyuan
+     mapping, 2025. 1                                                        Chen, Zhangye Han, Hongbo Min, Jinkui Ren, Xiantao
+[33] Xuehui Wang, Zhenyu Wu, JingJing Xie, Zichen Ding,                      Zhang, Wen Yang, and Zhi Jin. Gui-arp: Enhancing ground-
+     Bowen Yang, Zehao Li, Zhaoyang Liu, Qingyun Li, Xuan                    ing with adaptive region perception for gui agents, 2025. 2
+     Dong, Zhe Chen, Weiyun Wang, Xiangyu Zhao, Jixuan                  [44] Xinbin Yuan, Jian Zhang, Kaixin Li, Zhuoxuan Cai, Lujian
+     Chen, Haodong Duan, Tianbao Xie, Chenyu Yang, Shiqian                   Yao, Jie Chen, Enguang Wang, Qibin Hou, Jinwei Chen,
+     Su, Yue Yu, Yuan Huang, Yiqian Liu, Xiao Zhang, Yant-                   Peng-Tao Jiang, and Bo Li. Enhancing visual grounding
+     ing Zhang, Xiangyu Yue, Weijie Su, Xizhou Zhu, Wei Shen,                for gui agents via self-evolutionary reinforcement learning.
+     Jifeng Dai, and Wenhai Wang. Mmbench-gui: Hierarchical                  In Conference on Neural Information Processing Systems,
+     multi-platform evaluation framework for gui agents, 2025. 1             2025. 6
+[34] Qianhui Wu, Kanzhi Cheng, Rui Yang, Chaoyun Zhang,                 [45] Chaoyun Zhang, Shilin He, Jiaxu Qian, Bowen Li, Liqun Li,
+     Jianwei Yang, Huiqiang Jiang, Jian Mu, Baolin Peng, Bo                  Si Qin, Yu Kang, Minghua Ma, Guyue Liu, Qingwei Lin,
+     Qiao, Reuben Tan, Si Qin, Lars Liden, Qingwei Lin, Huan                 Saravan Rajmohan, Dongmei Zhang, and Qi Zhang. Large
+     Zhang, Tong Zhang, Jianbing Zhang, Dongmei Zhang, and                   language model-brained gui agents: A survey, 2025. 1
+
+
+                                                                   10
+[46] Miaosen Zhang, Ziqiang Xu, Jialiang Zhu, Qi Dai, Kai Qiu,
+     Yifan Yang, Chong Luo, Tianyi Chen, Justin Wagle, Tim
+     Franklin, and Baining Guo. Phi-ground tech report: Advanc-
+     ing perception in gui grounding, 2025. 8
+[47] Shaojie Zhang, Pei Fu, Ruoceng Zhang, Jiahui Yang, Anan
+     Du, Xiuwen Xi, Shaokang Wang, Ying Huang, Bin Qin,
+     Zhenbo Luo, and Jian Luan. Hyperclick: Advancing reliable
+     gui grounding via uncertainty calibration, 2025. 6, 8
+[48] Yunzhu Zhang, Yu Lu, Tianyi Wang, Fengyun Rao, Yi Yang,
+     and Linchao Zhu. Flexselect: Flexible token selection for
+     efficient long video understanding. In Conference on Neural
+     Information Processing Systems, 2025. 4, 6, 1
+[49] Yu Zhao, Wei-Ning Chen, Huseyin Atahan Inan, Samuel
+     Kessler, Lu Wang, Lukas Wutschitz, Fangkai Yang, Chaoyun
+     Zhang, Pasquale Minervini, Saravan Rajmohan, and Robert
+     Sim. Learning gui grounding with spatial reasoning from
+     visual feedback, 2025. 6
+[50] Yu Zhao, Wei-Ning Chen, Huseyin Atahan Inan, Samuel
+     Kessler, Lu Wang, Lukas Wutschitz, Fangkai Yang, Chaoyun
+     Zhang, Pasquale Minervini, Saravan Rajmohan, and Robert
+     Sim. Learning gui grounding with spatial reasoning from
+     visual feedback, 2025. 1, 2
+[51] Boyuan Zheng, Boyu Gou, Jihyung Kil, Huan Sun, and Yu
+     Su. Gpt-4v(ision) is a generalist web agent, if grounded. In
+     Forty-first International Conference on Machine Learning,
+     2024. 1
+
+
+
+
+                                                                    11
+                   MVP: Multiple View Prediction Improves GUI Grounding
+                                                  Supplementary Material
+7. Details About Attention Heuristic Cropping                           least one correct prediction among the views (Pass@N) in-
+                                                                        creases with the number of views. However, as shown in
+This section details our exploration of leveraging atten-               Table 8, while our clustering method significantly surpasses
+tion scores to better locate regions containing target UI               the single-view baseline, its accuracy remains lower than
+elements in screenshots. Large Vision-Language Models                   the Pass@N upper bound. This indicates a potential per-
+(LVLMs) inherently possess strong text-visual alignment                 formance gap that could be bridged by a perfect selection
+capabilities. Prior work indicates that text-to-vision atten-           model.
+tion scores from specific decoder layers can effectively lo-
+cate instruction-relevant visual patches [39, 48]. Further-                       View Number    Clustering Acc   Pass@N Acc
+more, models adaptively adjust the attention assigned to vi-                      2                   61.0            69.0
+sual tokens during text generation [29]. Denoting the visual                      4                   61.7            70.2
+                                                                                  10                  60.6            73.0
+tokens as V ∈ RLv ×d , we experiment with different text
+tokens as queries to compute the attention scores:                      Table 8. Comparison between clustering accuracy and Pass@N
+• Using all instruction tokens Tinstruct as queries, averaging          accuracy. The gap indicates the potential room for improvement
+   the final scores over the text length dimension.                     with an ideal selection model.
+• Using the first generated token “<im start>” as the                   Data Preparation We utilize the open-source GUI
+   query.                                                               grounding dataset from GTA1 [41]. The data is firstly fil-
+• Using the comma token from the generated coordinate                   tered with the following rules: (1) image resolution larger
+   format “(x, y)” as the query, an insight inspired by GUI-            than 2560 × 1440; (2) bounding box area smaller than 500
+   Actor [34].                                                          pixels2 . This process yields approximately 20k samples.
+• Using the final generated token “<im end>” as the query.              For each sample, we annotate 2-4 distinct red points on the
+    We conduct experiments with GTA1-7B on the                          image, each with a numerical label, as shown in Figure 5.
+ScreenSpot-Pro benchmark. Following the cropping pro-                   One point is placed within the target bounding box, while
+cedure described in Section 3.1, we derive attention scores             the others are randomly distributed outside it. The anno-
+from the 20th decoder layer, set k = 100 and m = 4, and                 tation metadata, including the instruction, target bounding
+then evaluate two metrics: the ratio of top-m regions con-              box, point coordinates, and the image, is saved for training.
+taining the target bounding box, and the final grounding ac-
+curacy after clustering.
+
+    Query Tokens   Target BBox Containing Ratio   SS-Pro Avg.
+    Tinstruct                79.5%                   60.5
+    T<im start>              73.1%                   52.2
+    T<im end>                50.9%                   33.3
+    Tcomma                   83.4%                   61.7
+
+Table 7. Comparison of cross-attention scores computed using dif-
+ferent query tokens. The comma token yields the best performance
+and is therefore chosen as our default setting.
+   Our results(Table 7) show that using the comma token
+as the query yields the best localization performance, with
+83.4% of the 4 selected views containing the target bound-
+ing box, which also translates to the highest final grounding
+                                                                        Figure 5. Example of annotated image. We annotate 2-4 visible
+accuracy. Consequently, we adopt this as our default con-               red dots with corresponding numerical label for each sample. The
+figuration.                                                             model is trained to directly output the correct label.
+
+8. Coordinate Selection via Trained Model
+                                                                        Model Training We employ GRPO (Guided Reinforce-
+In this section, we explore an alternative to clustering: train-        ment Policy Optimization) to train a model to directly out-
+ing a dedicated model to select the correct coordinate from             put the numerical label of the correct point. The model takes
+multiple candidate predictions. The motivation stems from               the annotated image and user instruction as input. The rule-
+Figure 1(b), which shows that the probability of having at              based reward is defined as follows: if the model outputs the
+
+
+                                                                    1
+              Coordinate 3                                                                                       Coordinate 1
+             Coordinate 4                                                                                   Origin Coordinate
+        Coordinate 2
+
+
+                                                       View 3
+                                                                     View 1
+
+
+
+
+        view 4
+
+                                              View 2
+
+
+
+
+           Figure 6. Multi-view example from SS-Pro evaluated by GTA1-7B. Instruction is “change to export workspace”.
+
+correct point label, the reward is 1; otherwise, it is 0. We        performance close to the Pass@N upper bound. Specif-
+use Qwen3VL-4B-Instruct as the base model and train it on           ically, after obtaining coordinate predictions from diverse
+8 A6000 GPUs, with 8 rollouts per group and a gradient ac-          views, we annotate them as red dots with number labels on
+cumulation step of 32, for a total of 170 optimization steps.       the screenshot and prompt the trained model to generate the
+The average reward converged, rising from 0.47 to 0.68.             label of the point a user is most likely to click based on the
+                                                                    instruction.
+    Prompt For Coordinate Selection Model
+                                                                     Base Model                   Aggregation Method           SS-Pro Avg.
+                                                                     GTA1-7B                     Qwen3VL-4B-Instruct              60.5
+    System Prompt:                                                   GTA1-7B                  Qwen3VL-4B-Instruct (Trained)       62.8
+    You are an expert UI element verifier.                           GTA1-7B                       Clustering (Ours)              61.7
+        Given a original GUI screenshot, the                         Qwen3VL-8B-Instruct         Qwen3VL-4B-Instruct              62.7
+        GUI screenshot annotated with some                           Qwen3VL-8B-Instruct      Qwen3VL-4B-Instruct (Trained)       65.3
+        numbered candidate points (each marked                       Qwen3VL-8B-Instruct           Clustering (Ours)              65.5
+         with a red dot and a corresponding
+        number label under the dot) and a user
+                                                                    Table 9. Performance comparison when using another LVLM ver-
+        's instruction, you are expected to
+        choose single most appropriate point                        sus our clustering method for coordinate aggregation. The training
+        that user most likely to click based                        improves performance of selector model over it’s baseline, but still
+        on the instruction step by step.                            fails to consistently outperform the simple clustering.
+        Return the annotated number under the                          As shown in Table 9, the trained selector model fails to
+        optimal point in bracket: [Number].
+                                                                    consistently surpass our clustering method. While it shows
+    User Prompt:                                                    a minor improvement, it is outperformed by clustering in
+    Instruction + Annotated Image                                   the critical comparison with Qwen3VL-8B-Instruct. This
+                                                                    result suggests that training a separate model for this se-
+    Output Format:
+    [Number Label]
+                                                                    lection task is not an effective strategy, as the performance
+                                                                    gain is marginal and inconsistent, failing to justify the addi-
+                                                                    tional complexity and training cost. The clustering method
+                                                                    remains a more robust and reliable aggregation strategy.
+
+Evaluation and Analysis We evaluate the trained model               9. Case Study
+by having it determine the final coordinate from multiple
+view predictions, with the expectation that it could achieve
+
+
+                                                                2
+ Coordinate 4                        View 3
+      Coordinate 3
+  Origin Coordinate                                                                                          Coordinate 2
+                                                                                                               Coordinate 1
+
+                                                           View 2
+
+
+
+
+                        View 4
+                                                                                             View 1
+
+
+
+
+                 Figure 7. Multi-view example from SS-Pro evaluated by GTA1-7B. Instruction is “find text on the page”.
+
+
+                                                                 View 2
+                                                                              View 1
+
+                                       Coordinate 2
+                                             Origin Coordinate
+Coordinate 4                           Coordinate 1
+Coordinate 3
+               View 4
+
+                            View 3
+
+
+
+
+        Figure 8. Multi-view example from SS-Pro evaluated by GTA1-7B. Instruction is “zoom in the image in pycharm”.
+
+
+
+
+                                                                          3
+

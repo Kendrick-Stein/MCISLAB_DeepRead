@@ -1,0 +1,1179 @@
+                                                                                                                                                                                                 Dec 2025
+
+
+
+
+                                        Training One Model to Master Cross-Level
+                                        Agentic Actions via Reinforcement Learning
+                                        Kaichen He1 , Zihao Wang1 , Muyao Li1 , Anji Liu2 and Yitao Liang1
+                                        1 Peking University, 2 National University of Singapore, All authors are affiliated with Team CraftJarvis
+
+
+
+
+                                        The paradigm of agentic AI is shifting from engineered complex workflows to post-training native
+                                        models. However, existing agents are typically confined to static, predefined action spaces—such as
+                                        exclusively using APIs, GUI events, or robotic commands. This rigidity limits their adaptability in
+                                        dynamic environments where the optimal granularity of interaction varies contextually. To bridge
+                                        this gap, we propose CrossHA, a unified agentic model that masters heterogeneous action spaces
+
+
+
+
+arXiv:2512.09706v2 [cs.LG] 4 Jun 2026
+                                        and autonomously selects the most effective interface for each step of a trajectory. We introduce a
+                                        comprehensive training pipeline that integrates cold-start supervised fine-tuning with a Multi-Turn Group
+                                        Relative Policy Optimization (GRPO) algorithm. This approach enables the agent to learn adaptive action
+                                        switching—balancing high-level efficiency with low-level precision—without human-specified rules.
+                                        Extensive experiments on over 800 tasks in the open-world Minecraft environment demonstrate that
+                                        CrossHA achieves state-of-the-art performance. By dynamically leveraging the strengths of diverse action
+                                        spaces, our model significantly outperforms fixed-action baselines, exhibiting superior generalization
+                                        and efficiency in long-horizon reasoning. All code and models are available at https://github.com/
+                                        CraftJarvis/OpenHA.
+
+
+                                        1. Introduction                                                          User: kill a sheep.
+                                                                                                                                       Tokenizer    System Prompts        Instruction
+                                                                                                                                                                                                    padding
+                                                                                                                                                                                                     tokens
+
+
+
+                                                                                                                  Observation
+
+                                        The field of agentic AI is undergoing a paradigm                                                                        Causal Transformer
+                                                                                                                                         ViT
+
+                                        shift, moving from engineering complex work-
+                                        flows around pre-trained Large Language Models                                                                                                  Vision-Language Model
+
+
+                                        (LLMs) (Anthropic, 2025; OpenAI, 2023; Tou-                                                                                        Router
+
+                                        vron et al., 2023; Yang et al., 2025) or Vision-                          Simulator            Raw Action
+                                                                                                                                                         𝐴1          𝐴2      𝐴3          …        Raw
+                                        Language Models (VLMs) (Achiam et al., 2023;
+                                        Guo et al., 2025a; Team et al., 2023; Wang et al.,                                                                                   Mixture of Action Spaces
+
+
+                                        2024a) toward developing native agentic mod-                            Figure 1 | The CrossHA Framework. Unlike prior
+                                        els through post-training. Contemporary native                          methods that confine the agent to a fixed action
+                                        agents are typically characterized by the specific                      space (e.g., atomic movements) throughout a trajec-
+                                                                                                                tory, CrossHA dynamically switches across different
+                                        action spaces they master: GUI agents interact
+                                                                                                                action spaces to adapt to the context.
+                                        via mouse and keyboard events (openai, 2025;
+                                        Qin et al., 2025), Deep Research agents utilize
+                                        API calls (Huang et al., 2025; OpenAI, 2025b),                          as implementing MCP servers (Anthropic, 2024)
+                                        Tool-Calling agents integrate with Model Con-                           for function calls or training learning-based poli-
+                                        text Protocol (MCP) services (Feng et al., 2025),                       cies for embodied control (Belkhale et al., 2024a).
+                                        and Vision-Language-Action (VLA) models exe-
+                                                                                                                  However, relying on statically defined action
+                                        cute embodied robotic commands (Belkhale et al.,
+                                                                                                                spaces presents two fundamental challenges.
+                                        2024b; Brohan et al., 2022, 2023b). However,
+                                                                                                                First, specific action policies or translation lay-
+                                        prior research typically necessitated distinct ac-
+                                                                                                                ers are often brittle; for instance, an API-based
+                                        tion space designs for different tasks, often requir-
+                                                                                                                read_url function may be blocked by CAPTCHA
+                                        ing manual selection and definition. To enable in-
+                                                                                                                verifications, or a robotic policy may fail to exe-
+                                        teraction within these spaces, researchers had to
+                                                                                                                cute a command with perfect precision, thereby
+                                        design specific action translation methods—such
+                                                                                                                capping the agent’s success rate (Belkhale et al.,
+
+
+                                        Corresponding author(s): Yitao Liang<yitaol@pku.edu.cn>
+                                        Kaichen He<hkc4623@gmail.com>, Zihao Wang<zhwang@stu.pku.edu.cn>, Muyao Li<2200017405@stu.pku.edu.cn>, Anji
+                                        Liu<anjiliu@comp.nus.edu.sg>
+                  Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+
+2024a; Driess et al., 2023). Second, the manual              tonomously selects optimal action spaces, signifi-
+assignment of action spaces to tasks restricts the           cantly outperforming baselines confined to fixed
+agent’s flexibility, preventing it from effectively          action spaces. Furthermore, the agent exhibits
+handling complex scenarios that require multi-               emergent behavior by optimizing not only for task
+modal interactions. Recent works have begun                  success but also for trajectory efficiency, demon-
+to address this by bridging disjoint spaces to en-           strating robust capabilities for long-horizon rea-
+hance generalization (Team, 2025). Specific ap-              soning.
+proaches include integrating GUI and API-based
+                                                               Our main contributions are summarized as fol-
+actions into unified models (OpenAI, 2025a) or
+                                                             lows: 1) We propose CrossHA, a unified agentic
+merging heterogeneous trajectories during train-
+                                                             model capable of mastering heterogeneous action
+ing.
+                                                             spaces and autonomously selecting the context-
+   Crucially, we observe that the optimal action             appropriate interface without relying on human-
+space often varies not only across tasks but also            defined heuristics. 2) We introduce a compre-
+within a single task at the step level. Consider a           hensive RL training pipeline utilizing Multi-Turn
+Deep Research agent: while the majority of infor-            GRPO, enabling the agent to learn adaptive action
+mation gathering is efficiently handled via search           switching within a single trajectory to maximize
+APIs, navigating a specific CAPTCHA-protected                both task success and execution efficiency. 3) We
+webpage may require precise GUI-level manipu-                achieve state-of-the-art performance on over 800
+lation (OpenAI, 2025b). Consequently, a truly                tasks in the Minecraft environment, demonstrat-
+generalist agent must possess the ability to dy-             ing that adaptive action-space selection yields su-
+namically switch between action spaces, ranging              perior generalization and robustness compared
+from high-level APIs to low-level primitives, to             to static baselines.
+maximize both success rates and efficiency.
+   To address these limitations, we introduce                2. Related Works
+CrossHA, a native agentic model trained to mas-
+ter multiple heterogeneous action spaces. Unlike             2.1. Agentic Models with Different Actions
+traditional approaches that rely on static, human-
+specified rules, CrossHA autonomously selects the            The deployment of VLM and LLM-based agents
+most appropriate action space for each step of a             has expanded rapidly across various domains,
+trajectory. We propose a comprehensive training              ranging from physical environments to digital
+pipeline comprising three stages: cold-start su-             workspaces, each necessitating distinct inter-
+pervised fine-tuning, Single-Turn Reinforcement              action paradigms. In embodied settings, ap-
+Learning (RL), and Multi-Turn RL. By leveraging              proaches such as OpenX (O’Neill et al., 2023),
+a Multi-Step Group Relative Policy Optimization              RT-H (Belkhale et al., 2024b), and OpenVLA (Kim
+(GRPO) (Guo et al., 2025b; Shao et al., 2024) al-            et al., 2024) focus on mapping high-level in-
+gorithm, the agent learns to optimize its choices            structions directly to physical control policies,
+at the step level without explicit human interven-           effectively grounding language into continuous
+tion. This capability enables the agent to balance           robot trajectories or joint angles (Brohan et al.,
+trade-offs dynamically; for example, prioritizing            2023a; Driess et al., 2023). Transitioning to
+high-level actions for efficiency when applicable,           the digital domain, research on GUI and Web
+while employing fine-grained atomic actions for              agents, such as Mind2Web and OS-World, cen-
+precise control when necessary.                              ters on visual grounding, where agents learn to
+                                                             manipulate specific UI elements or generate low-
+   We validate our approach in the open-world                level mouse and keyboard events to navigate dy-
+Minecraft environment (Fan et al., 2022) (see Ap-            namic screens (Deng et al., 2023; Li et al., 2025a;
+pendix A for environment details). Experimental              Team, 2025; Xu et al., 2024). In parallel, for
+results demonstrate that CrossHA, despite being              logic-intensive tasks such as software engineer-
+trained on only 30 tasks, successfully general-              ing, agents like Claude and SWE-agent operate
+izes to over 800 tasks (Lin et al., 2023). It au-            within discrete symbolic spaces, leveraging shell
+
+
+                                                                                                              2
+                  Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+
+commands or standardized protocols like MCP                  3. Method
+to seamlessly integrate with external tools and
+APIs (Anthropic, 2024, 2025; Feng et al., 2025;              In this section, we introduce our approach for
+Wang et al., 2024d; Yang et al., 2024). Similarly,           building an agent capable of autonomously select-
+many VLM-based game agents interact with video               ing the most appropriate action space based on
+games directly via mouse and keyboard com-                   the task context.
+mands (Li et al., 2025b; Wang et al., 2025a,b).                 We first formulate the problem. Consider an
+                                                             embodied control task modeled as a Markov De-
+                                                             cision Process (MDP) with a state space S and a
+                                                             composite action space:
+2.2. Generalist Agent with Multi-Action Space
+                                                                                           𝑁
+The static design of action spaces creates limita-
+                                                                                           Ø
+                                                                                     A=           A𝑥 .
+tions when facing dynamic environments (Wang                                               𝑥 =1
+et al., 2025a). A common solution is to lever-
+age the powerful in-context learning capabilities            Each subspace A 𝑥 corresponds to a distinct class
+of foundation models (Anthropic, 2025; OpenAI,               of actions, ranging from low-level motor controls
+2023; Team et al., 2023) to orchestrate workflows            to high-level motion primitives. Each subspace is
+that specify transitions between action spaces for           associated with a specific interface or controller
+specific scenarios. For example, some computer-              𝐶 𝑥 that executes the abstract action 𝑎𝑡 ∈ A 𝑥
+use agents (openai, 2025; Song et al., 2025) in-             within the environment.
+tegrate tool usage (OpenAI, 2025b) with GUI                    At each timestep, the agent must determine
+actions to perform complex tasks: utilizing GUI              both the optimal action space and the specific
+actions for frontend interface validation while              action content, balancing the immediate reward
+employing MCP when information retrieval is re-              with execution efficiency. This leads to the follow-
+quired. However, this approach often necessitates            ing objective:
+the design of complex, brittle pipelines.                                    "                          #
+                                                                               ∑︁
+   A more unified approach involves fine-tuning                        𝐽 =𝔼       ( 𝑟𝑡 − 𝜆 𝑥 cost( 𝑎𝑡 )) ,
+agents across multiple action spaces to create a                                    𝑡
+single generalist model. Prior explorations have
+demonstrated promising results in various do-                where the term 𝜆 𝑥 cost( 𝑎𝑡 ) penalizes the compu-
+mains, such as embodied agents (Bu et al., 2025;             tational or operational cost associated with dif-
+Lin et al., 2025), game agents (Wang et al., 2024b,          ferent action granularities (e.g., token length or
+2025a,b), and computer use (Team, 2025). Ex-                 execution time).
+periments have demonstrated (Jia et al., 2025;                  The central challenge lies in the fact that dif-
+Yan et al., 2025) that agents mastering distinct             ferent tasks, and even different phases within the
+action spaces exhibit strong generalization capa-            same task, naturally favor different action spaces.
+bilities and enhanced performance within specific            Naive training on a unified space often fails to de-
+domains.                                                     velop reliable, context-aware selection behavior.
+  However, previous efforts have often over-                 To address this, we introduce a phased training
+looked the potential of learning from experi-                curriculum that progressively builds this capabil-
+ence to optimize these transitions. Our approach             ity. Beginning with supervised initialization, pro-
+builds on prior work by advancing this paradigm,             ceeding to strengthen local preferences through
+leveraging reinforcement learning to enable the              single-turn optimization, and culminating in long-
+model to autonomously adapt to the most appro-               horizon reasoning via multi-turn reinforcement
+priate action space at any given step.                       learning, our framework equips the model with
+                                                             robust, dynamic action-space selection capabili-
+                                                             ties.
+                                                                The overall training pipeline is illustrated in
+
+
+                                                                                                               3
+                    Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+
+
+Figure 2 | Overview of the CrossHA Training Pipeline. The pipeline comprises three distinct stages: Cold-Start
+Supervised Fine-Tuning (SFT), Single-Turn Reinforcement Learning (STRL), and Multi-Turn Reinforcement
+Learning (MTRL). In the first stage, the model learns to decode actions from a heterogeneous action space using
+a balanced dataset. During STRL, the model is fine-tuned to autonomously select the appropriate action space
+based on the immediate task context. Finally, in the MTRL stage, the policy is further optimized to balance task
+success rate with execution efficiency over long horizons. This progressive pipeline ensures CrossHA effectively
+adapts its action granularity across a wide range of tasks.
+
+
+Figure 2. We detail each stage in the following                3.2. Stage-2: Single-Turn RL
+subsections.
+                                                               In this stage, we empower the model to au-
+                                                               tonomously select the most appropriate action
+                                                               space using Single-Turn Reinforcement Learn-
+                                                               ing (STRL).
+3.1. Stage-1: Mixed-Space SFT                                  Warm-up: Diversity-Enhanced SFT.. Standard
+In the initial stage, we establish the model’s foun-           datasets typically lack explicit annotations indi-
+dational capability to execute actions across het-             cating which action space is optimal for a given
+erogeneous spaces. We employ Supervised Fine-                  context. To bridge this gap, we first perform a
+Tuning (SFT) on a balanced dataset comprising                  warm-up phase to expose the model to multiple vi-
+trajectories drawn from multiple action subspaces.             able paths. We construct prompts that encourage
+By unifying data from these diverse modalities,                the model to generate candidate actions across
+the model learns to decode and generate valid                  all available action spaces. These candidates are
+actions within a composite action space. The pri-              filtered via a rejection sampling approach: only
+mary objective of this stage is to construct a robust          actions that successfully execute the task (verified
+base model capable of grounding instructions into              by the environment or a parser) are retained as
+executable actions from diverse sources, prior to              ground-truth annotations. We then fine-tune the
+introducing complex decision-making tasks.                     model on this rebalanced, multi-space dataset.
+                                                               The resulting model, denoted as 𝑀𝑐𝑠1 , acquires
+   It is important to note that the resulting model,           the capability to generate valid actions in various
+denoted as 𝑀𝑚𝑖𝑥 , does not yet autonomously se-                formats. However, empirical observation reveals
+lect the optimal action space. Instead, it focuses             that while 𝑀𝑐𝑠1 can operate across spaces, its se-
+on learning the syntax and semantics of multiple               lection strategy remains stochastic rather than
+action types from the mixed data representation.               strategic—it does not yet deliberately optimize
+The key challenge addressed here is enabling the               the interface choice for task efficiency or robust-
+model to interpret and generate actions for differ-            ness.
+ent spaces without modal interference, thereby
+laying a solid foundation for the adaptive decision-           Optimization via GRPO.. To transition from
+making mechanisms introduced in subsequent                     stochastic capability to strategic selection, we
+stages.                                                        employ Group Relative Policy Optimization
+
+
+                                                                                                                 4
+                        Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+
+(GRPO) Shao et al. (2024), a reinforcement learn-                   Through this process, the model learns to ignore
+ing algorithm distinguished by its stability and                    prior biases and autonomously select whichever
+resource efficiency. Unlike traditional methods                     action space most reliably yields the correct raw
+like PPO that rely on a separate value function                     action for a given input. We denote the resulting
+network for advantage estimation, GRPO utilizes                     model as 𝑀𝑠𝑡𝑟𝑙 .
+the group statistics of multiple sampled outputs
+to estimate the baseline, thereby simplifying the
+                                                                    3.3. Stage-3: Multi-Turn RL
+optimization process.
+                                                                    Although 𝑀𝑠𝑡𝑟𝑙 achieves high accuracy in single-
+   Formally, for each query 𝑞, a group of outputs
+                                                                    step action prediction, its probability distribution
+{ 𝑜1 , 𝑜2 , . . . , 𝑜𝐺 } is sampled from the current pol-
+                                                                    tends to be excessively peaked around specific
+icy 𝜋old . The policy 𝜋𝜃 is then optimized via the
+                                                                    action spaces, which limits exploration and hin-
+following objective:
+                                                                    ders long-horizon task success. To explicitly cul-
+                                                                    tivate robust, trajectory-level action-space selec-
+                                         𝐺        |𝑜 |   𝑖         tion, we adopt Multi-Turn Reinforcement Learn-
+                                           1 ∑︁ 1 ∑︁
+𝐽GRPO ( 𝜃) =𝔼𝑞∼ 𝑃 ( 𝑄 ) , { 𝑜𝑖 } 𝐺 ∼𝜋old                            ing (MTRL). In this stage, the optimization signal
+                                 𝑖=1       𝐺
+                                             𝑖=1
+                                                 | 𝑜𝑖 | 𝑡=1         is derived from the episodic success rate, guiding
+                                                                    the model to refine its policy for maximizing over-
+                                                               
+            min 𝜌𝑖,𝑡 𝐴ˆ𝑖,𝑡 , clip 𝜌𝑖,𝑡 , 1 − 𝜖, 1 + 𝜖 𝐴ˆ𝑖,𝑡
+                                                            
+                                                                    all task completion rather than just immediate
+                                                                   correctness.
+            − 𝛽𝐷KL [ 𝜋𝜃 || 𝜋ref ]                             (1)
+                                                                    Initialization via Self-Training ( 𝑀𝑐𝑠2 ).. To ac-
+                                                                    celerate training, we first distill the action-space
+where 𝜌𝑖,𝑡 = 𝜋𝜋𝜃 ((𝑜𝑜𝑖 𝑖| 𝑞,𝑜 <𝑡 )
+                          | 𝑞,𝑜<𝑡 ) is the probability ratio.
+                  old                                               preferences of 𝑀𝑠𝑡𝑟𝑙 back into a supervised format.
+Crucially, 𝐴ˆ𝑖,𝑡 represents the advantage estimate,                 We perform inference over the initial dataset 𝐷
+which is calculated based on the relative perfor-                   using 𝑀𝑠𝑡𝑟𝑙 . For each example ( 𝑥, 𝑎★), let 𝑎ˆ denote
+mance of output 𝑜𝑖 compared to the group mean,                      the model’s prediction and let 𝑔 (·) map an action
+rather than a learned value function. This encour-                  string to its canonical raw representation. We con-
+ages the model to favor actions that outperform                     struct a relabeled dataset 𝐷𝑠𝑡𝑟𝑙 via the following
+their peers within the same sampled group.                          rule:
+   Since this stage focuses on immediate, one-step                                 (
+                                                                                     ˆ( 𝑥 ) , if 𝑔 (ˆ
+                                                                                     𝑎              𝑎 ( 𝑥 )) = 𝑔 ( 𝑎★ ( 𝑥 )) ,
+decision-making (viewing the task as a single-turn                      𝑎′ ( 𝑥 ) =                                             (4)
+problem to optimize action space selection), we                                      𝑎★ ( 𝑥 ) , otherwise.
+term it the STRL stage. To endow the cold-start
+                                                                    Essentially, if the predicted action is semantically
+model 𝑀𝑐𝑠1 with action-space autonomy, we cast
+                                                                    consistent with the ground truth (as verified by
+each example in the dataset 𝐷 as a one-step de-
+                                                                    𝑔 ), we replace the original label with the action
+cision problem. Let {A 𝑘 } 𝑘𝐾=1 denote the set of
+                                          Ð                         space chosen by 𝑀𝑠𝑡𝑟𝑙 ; otherwise, we retain the
+string-level action spaces and A = 𝑘 A 𝑘 . We
+                                                                    original label. This relabeling preserves the raw-
+utilize a deterministic parser 𝑔 : A → R that
+                                                                    action semantics while aligning the surface-level
+maps an action string to its canonical raw repre-
+                                                                    action space with the model’s learned preferences.
+sentation in R. The reward function is defined
+                                                                    We then fine-tune the base model on this rela-
+as:
+                                                                    beled dataset 𝐷𝑠𝑡𝑟𝑙 , following the same protocol
+               𝑎, 𝑎★) = 1 𝑔 (ˆ
+                         
+            𝑟 (ˆ             𝑎) = 𝑔 ( 𝑎★) ,    (2)
+                                                                    as the previous SFT stage. We denote the result-
+This reward is action-space agnostic: credit is                     ing model as 𝑀𝑐𝑠2 . Since the ground truth in 𝐷strl
+granted whenever the parsed raw action matches                      reflects the optimized choices of 𝑀strl , 𝑀cs2 ini-
+the ground truth, regardless of the surface form                    tializes the MTRL stage with a strong prior for
+(action space) used to generate 𝑎ˆ. The STRL ob-                    appropriate action-space selection.
+jective is to maximize the expected reward:
+                                                                  Trajectory Optimization.. We subsequently fine-
+                                                 𝑎, 𝑎★) .
+       𝐽 ( 𝜃) = 𝔼 ( 𝑥,𝑎★ )∼ 𝐷 𝔼𝑎ˆ∼𝜋𝜃 (· | 𝑥 ) 𝑟 (ˆ        (3)       tune 𝑀𝑐𝑠2 using multi-turn RL on a curated task
+
+
+                                                                                                                                5
+                        Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+
+set T . Given an instruction 𝑥 ∈ T , the policy                     ment (Guss et al., 2019). The agent’s observation
+𝜋𝜃 (· | 𝑥 ) interacts with the environment to gen-                  space consists exclusively of first-person RGB im-
+erate a trajectory 𝜏. We utilize a binary episodic                  ages with a resolution of 360×640×3. The action
+reward:                                                             space employs a discrete, human-like interface,
+                 𝑟 ( 𝜏) = 1{success( 𝜏)}       (5)                  comprising mouse movements, clicks, and key-
+The objective is to maximize the task success rate                  board commands. Further details regarding the
+while penalizing excessive generation costs:                        observation and action spaces are provided in
+                                                                    Appendix A.
+   𝐽 ( 𝜃) = 𝔼 𝑥 ∼T 𝔼 𝜏∼𝜋𝜃 (· | 𝑥 ) [ 𝑟 ( 𝜏) − 𝜆𝑙 𝜃 ( 𝜏) ] .   (6)
+                                                                       To assess our agent, we employ the OpenHA
+where 𝑙𝜃 ( 𝜏) denotes the total number of tokens                    benchmark suite (Wang et al., 2025a), which fea-
+produced by the model throughout the trajectory.                    tures over 800 tasks. All tasks are manually de-
+This penalty term encourages the model to pre-                      signed and verified, ensuring both richness and
+fer concise action spaces (e.g., high-level APIs)                   feasibility. We categorize these tasks into three
+over verbose ones (e.g., raw primitive commands)                    groups based on the primary skills required: 1)
+when both yield success. A detailed discussion of                   Mine Blocks: Tasks involving navigation and
+the specific GRPO implementation for this stage                     physical interaction within the environment (e.g.,
+is provided in Appendix C.                                          locating and chopping down a specific type of
+   By optimizing Equation 6, the model improves                     tree); 2) Craft Items: Tasks requiring complex
+its capacity for dynamic, context-aware action                      interactions with graphical user interfaces (GUIs),
+space adaptation over long horizons. We denote                      such as crafting at a table or smelting ores in a
+the final model as 𝑀mtrl , which serves as our final                furnace; 3) Kill Entities: Tasks focusing on sur-
+CrossHA.                                                            vival and combat, requiring the agent to engage
+                                                                    with dynamic mobs.
+
+4. Experiments                                                         In our evaluation protocol, we adopt two pri-
+                                                                    mary metrics: Finished Tasks (FT) and Average
+We present a comprehensive evaluation to vali-                      Success Rate (ASR). FT measures the propor-
+date our framework, focusing on how heteroge-                       tion of distinct tasks within a category for which
+neous action spaces affect performance in open-                     the agent achieves at least one successful com-
+ended environments. We describe the experi-                         pletion, reflecting the agent’s task coverage and
+mental setup, including training protocols, bench-                  generalization range. ASR quantifies the mean
+marks, and evaluation metrics, and address the                      success rate across all tasks in the category, cap-
+following questions:                                                turing reliability by accounting for the consis-
+                                                                    tency of the agent’s performance on each spe-
+  Q1: Action Space Sensitivity. How does the                        cific task. Training Setup.. 1) Model Initializa-
+choice of a fixed action space impact performance,                  tion. We initialize our training with Qwen2-VL-
+and does the optimal space vary across task cate-                   7B-Instruct (Wang et al., 2024a), a pre-trained
+gories?                                                             vision-language model demonstrating strong mul-
+  Q2: Benefits of Dynamic Switching. Does                           timodal understanding. We fine-tune this model
+dynamic action-space selection outperform static                    using diverse Minecraft-specific VQA and cap-
+baselines?                                                          tioning datasets (Li et al., 2025b), yielding the
+                                                                    base model 𝑀𝑏𝑎𝑠𝑒 . 2) Dataset Construction. We
+  Q3: Generalization and Robustness. Does                           generate grounding and motion ground-truth an-
+the model generalize to unseen tasks after multi-                   notations by integrating two systems: a SAM-
+turn RL fine-tuning on a limited set of tasks?                      based (Ravi et al., 2024) grounding pipeline and
+                                                                    a motion-generation module built upon a fine-
+4.1. Experimental Setup                                             tuned MineCLIP (Fan et al., 2022) model. These
+                                                                    systems annotate both VPT data and a subset
+Benchmark.. We utilize Minecraft (version                           of contractor-collected trajectories. Since suit-
+1.16.5) as our primary evaluation environ-
+
+
+                                                                                                                     6
+                           Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+Table 1 | The evaluation results of Minecraft agents across more than 800 tasks are presented.For each task
+category, we report three metrics: the success rate of a representative task (indicated by its icon), the percentage
+of tasks that the agent succeeds at least once (FT), and the average success rate across all tasks in the category
+(ASR) with standard deviation. Results highlighted in blue correspond to the second-best performances, while
+those in red represent the state-of-the-art performance for each metric across all agents.
+                                             Mine Blocks                 Kill Entities               Craft Items              All Tasks
+Method
+                                              FT ↑     ASR ↑              FT ↑      ASR ↑             FT ↑    ASR ↑      FT ↑      ASR ↑
+
+ Instruction-Conditioned Policies
+VPT (Baker et al., 2022)              20.0   30.7     6.0±11.4    10.0    24.6     3.6±7.7    0.0     6.7     0.8±3.3    20.7      3.5±8.4
+STEVE-I (Lifshitz et al., 2024)       50.0   29.4     8.0±17.0    0.0     14.7     3.9±12.0   0.0     16.4    3.2±8.4    20.2     5.0±12.4
+ROCKET-1 (Cai et al., 2024)           60.0   57.5    18.9±24.3    60.0    63.9    27.9±29.3   0.0     0.0     0.0±0.0    45.5     15.6±24.9
+JARVIS-VLA (Li et al., 2025b)         55.0   55.3    30.0±35.4    60.0    61.9    18.5±22.7   40.0    74.3   25.1±23.9   63.8     24.5±28.4
+
+ VLM-based Agents
+TextHA (Wang et al., 2025a)           60.0   36.3    27.2±38.2    0.0     19.2     8.7±23.7   50.0    43.9   26.0±35.2   33.1     20.6±34.0
+GroundingHA (Cai et al., 2024)        90.0   61.0    37.1±38.5    50.0    90.1    26.5±23.4   15.0    27.5   6.7±10.8    59.5     23.4±29.6
+UI-TARS-1.5 (Seed, 2025)                -      -     42.1±20.4     -        -     31.0±16.4    0       0     36.7±17.2    -         33.8
+MotionHA (Belkhale et al., 2024b)     70.0   51.0    27.4±35.2    20.0    29.5     4.3±10.8   0.0     0.0     0.0±0.0    29.8     10.6±24.4
+LanguageHA (Driess et al., 2023)      60.0   31.3    11.3±14.5    0.0     12.8     6.5±9.3    5.0     19.3    6.3±9.2    21.1     8.0±11.5
+LatentHA (Wang et al., 2024c)         70.0   54.2    24.4±31.1    50.0    24.6     8.5±17.9   0.0     19.1    3.0±7.5    32.6     12.0±23.0
+OpenHA (Wang et al., 2025a)           80.0   67.3    30.1±13.9    70.0    62.6     32.5±9.2   80.0    58.8   31.9±13.7   62.8     31.5±12.5
+Game-TARS (Wang et al., 2025b)          -      -     50.14±20.7    -        -     38.1±24.6    -        -    39.1±27.5    -         42.2
+
+ Ours
+CrossHA(w/o STRL stage)               63.6   35.1    39.0±46.5    28.6    43.9    27.7±43.9   57.1    55.7   58.0±48.4   44.9     41.6±47.9
+CrossHA                               94.7   45.2    40.0±48.3    66.6    58.1    45.1±43.5   83.3    72.7   78.8±41.0   58.7     54.6±47.6
+
+
+able grounding or motion annotations cannot be                           such as Jarvis-VLA (Li et al., 2025b), and hier-
+generated for every trajectory, the resulting ac-                        archical agents fine-tuned with SFT on fixed ac-
+tion space distribution is imbalanced. These an-                         tion spaces. In addition, we consider recent uni-
+notated data are integrated to form the mixed-                           fied agent frameworks such as OpenHA (Wang
+action-space dataset 𝐷𝑚𝑖𝑥 .                                              et al., 2025a), which integrate multiple action
+                                                                         spaces within a hierarchical agent architecture
+   We then process 𝑀𝑏𝑎𝑠𝑒 and 𝐷𝑚𝑖𝑥 through the
+                                                                         and enable flexible switching during execution.
+pipeline described in section 3. During the
+                                                                         However, such switching behavior is not explicitly
+MTRL stage, we select 10 tasks from each of the
+                                                                         optimized as a learnable decision variable, in con-
+three primary OpenHA categories: craft_item,
+                                                                         trast to CrossHA, which formulates action-space
+kill_entity, and mine_block. This results
+                                                                         selection as a policy learning problem and opti-
+in a total of 30 training tasks. For online RL,
+                                                                         mizes it via reinforcement learning. For broader
+we train using GRPO for over 80 iterations, with
+                                                                         context, we further compare against specialized
+each iteration involving over 6,400 environment
+                                                                         policies trained on the VPT dataset, including the
+interactions. This extensive training regime al-
+                                                                         original VPT (Baker et al., 2022), ROCKET-1 (Cai
+lows the model’s performance to converge to a
+                                                                         et al., 2024), and STEVE-1 (Lifshitz et al., 2024),
+stable, high-level policy. Baselines.. Our analysis
+                                                                         as well as Game-TARS (Wang et al., 2025b), a
+compares CrossHA against variants of the base
+                                                                         large-scale pretrained game agent that leverages
+model 𝑀𝑏𝑎𝑠𝑒 fine-tuned (via either SFT or RL) on
+                                                                         multimodal pretraining and hierarchical control
+datasets restricted to single-type action spaces.
+                                                                         for general gameplay.
+We categorize these baselines based on their ac-
+tion space formats: LanguageHA, GroundingHA,
+MotionHA, RawHA, and LatentHA. We also in-
+clude several representative LLM-based agents,
+
+
+                                                                                                                                           7
+                   Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+
+4.2. Main Results
+
+As presented in Table 1, CrossHA achieves state-
+of-the-art performance across all three major task
+categories, substantially outperforming existing
+instruction-conditioned policies and hierarchical
+agents. Our analysis highlights three key obser-
+vations:
+Clear Advantages Over Single-Action-Space
+Agents.. Agents confined to a single action space
+exhibit strong but narrow specialization, leading
+to pronounced performance asymmetries across
+task types. GroundingHA excels at Kill Entity
+tasks (FT: 90.1%), MotionHA performs better on
+Mine Block tasks, and RawHA shows advantages
+in Craft Item tasks due to fine-grained control.              Figure 3 | Performance Comparison Across Action
+However, none of the single-action-space base-                Spaces. The heterogeneous action space of CrossHA
+lines achieve uniformly strong results, underscor-            enables superior data efficiency and higher asymptotic
+ing the limitations of rigid action-space-specific            performance during multi-turn reinforcement learn-
+designs.                                                      ing, compared to single-space baselines.
+
+RL Facilitates Robust OOD Generalization..
+Comparing SFT-only agents with their RL-
+enhanced counterparts reveals consistent gains
+in both ASR and FT. Although RL fine-tuning is
+conducted on only 30 tasks, the improvements
+generalize to over 800 evaluation tasks, especially
+in fine-grained control domains such as Craft Item.
+This confirms the importance of RL on top of large
+pre-trained VLA models for scalable OOD gener-
+alization.
+CrossHA Achieves Balanced, Omni-Category
+Performance.. CrossHA achieves the best or
+second-best results in nearly every metric across
+all categories. It balances proficiency across Mine
+Blocks, Kill Entities, and Craft Items, while attain-
+ing high peak success rates such as 94.7% in Mine
+Blocks and 83.3% in Craft Items. These results
+strongly suggest that CrossHA learns to coordi-
+nate and select the most suitable action space
+based on task context.                                        Figure 4 | Effect of the Single-Turn RL (STRL) Stage.
+                                                              Training curves comparing CrossHA with and without
+                                                              the STRL phase. The inclusion of STRL significantly
+                                                              enhances training efficiency and accelerates conver-
+4.3. Ablation Studies                                         gence in the subsequent MTRL stage, despite its low
+                                                              computational cost.
+Impact of Mixed Action Spaces.. To evaluate the
+benefit of a unified heterogeneous action space,
+we compare CrossHA with single-space baselines,
+GroundingHA and MotionHA. These baselines ini-
+tialize MTRL with only the grounding-space or
+
+
+                                                                                                                  8
+                    Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+Table 2 | Evaluation results of RL agents on In-Distribution (ID) and Out-of-Distribution (OOD) tasks. We report
+the success rate and standard deviation. Red indicates the best performance, and Blue indicates the second
+best.
+                                 In-Distribution Evaluation                          Out-of-Distribution Evaluation
+Method              Mine Blocks    Kill Entities   Craft Items   All Tasks   Mine Blocks   Kill Entities   Craft Items   All Tasks
+RawHA-RL             65.2±32.1      41.6±21.8       96.2±3.8     70.1±33.6    28.9±44.2     28.4±32.3       69.8±44.4    42.4±45.1
+GroundingHA-RL       46.8±35.6      48.8±34.5       69.3±28.4    52.6±31.5    27.2±42.4     33.9±35.9       57.2±48.1    39.4±44.3
+MotionHA-RL          78.6±24.6      44.0±25.2       63.0±20.7    61.9±27.5    41.5±45.5     26.8±26.7       49.0±47.3    39.1±42.0
+CrossHA(w/o STRL)    63.3±28.9      24.0±26.4       76.1±27.2    54.5±35.3    39.0±46.5     22.2±42.6       58.0±48.4    39.7±48.1
+CrossHA              70.7±33.3      52.1±22.9       83.7±25.5    68.8±30.5    40.0±48.3     28.4±33.2       78.8±41.0    49.1±46.6
+
+
+
+motion-space subset of 𝐷𝑠𝑡𝑟𝑙 , while CrossHA uses                tion spaces.
+the full mixed dataset. All models undergo the
+                                                                 Analysis of the Generalization Gap (ID vs.
+same 200-step SFT cold start before MTRL.
+                                                                 OOD).. Baselines such as RawHA-RL and
+   As shown in Figure 3, CrossHA converges faster                MotionHA-RL achieve very high ID performance,
+and reaches higher asymptotic performance than                   e.g., 96.2% for RawHA-RL on Craft Items, but
+single-space baselines, indicating that dynamic                  drop sharply on OOD tasks. In contrast, CrossHA
+action-space selection provides greater flexibility              performs strongly on ID tasks, with 83.7% on
+and improves RL data efficiency.                                 Craft Items and 68.8% overall, while maintain-
+                                                                 ing a smaller generalization gap. This suggests
+Necessity of the STRL Stage.. We further study
+                                                                 that dynamic action-space selection helps miti-
+the role of STRL. For the variant without STRL,
+                                                                 gate overfitting and better transfers learned envi-
+we skip Stage 2 and initialize MTRL with the
+                                                                 ronment knowledge to unseen tasks.
+original balanced dataset 𝐷𝑏𝑎𝑙 instead of the STRL-
+relabeled dataset 𝐷𝑠𝑡𝑟𝑙 .                                          The benefits of RL fine-tuning, especially when
+                                                                 combined with heterogeneous action spaces, far
+   As shown in Figure 4, STRL improves both sam-
+                                                                 outweigh the risks of overfitting.
+ple efficiency and final performance by provid-
+ing an effective warm start for action-space selec-
+tion. Results in Table 1 further show that CrossHA               5. Conclusion
+with STRL achieves higher success rates across a
+broader range of tasks.                                          In this work, we present CrossHA, a unified agen-
+                                                                 tic model that integrates heterogeneous action
+4.4. Generalization Evaluation                                   spaces from high-level scripts to low-level atomic
+                                                                 commands within a single policy. Through Single-
+While Table 1 shows strong OOD results, we fur-                  and Multi-Turn GRPO, CrossHA learns to dynami-
+ther compare In-Distribution (ID) training tasks                 cally select the most suitable action space at each
+and OOD evaluation tasks in Table 2 to examine                   step.
+whether RL fine-tuning harms generalization.
+                                                                   Extensive evaluations on over 800 Minecraft
+Robust Performance on OOD Tasks.. CrossHA                        tasks demonstrate that CrossHA achieves state-of-
+achieves the best success rate on Craft Items                    the-art performance, significantly outperforming
+(78.8%) and strong performance on Mine Blocks                    baselines with fixed action spaces. These results
+(40.0%) and All Tasks (49.1%), outperforming                     highlight the importance of treating action-space
+other RL baselines. CrossHA (w/o STRL) remains                   selection as a learnable component for improving
+competitive but consistently underperforms the                   performance and generalization.
+full model, especially on Craft Items (58.0% vs.
+                                                                   Future work includes improving the efficiency
+78.8%) and All Tasks (39.7% vs. 49.1%), show-
+                                                                 of multi-turn RL and extending the framework
+ing that STRL improves generalization. In con-
+                                                                 to real-world robotics settings, where additional
+trast, single-space agents show larger variance
+                                                                 challenges such as safety and latency arise.
+and weaker transfer outside their specialized ac-
+
+
+                                                                                                                                9
+                 Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+
+References                                                     knowledge to robotic control. arXiv preprint
+                                                               arXiv:2307.15818, 2023b.
+J. Achiam, S. Adler, S. Agarwal, L. Ahmad,
+   I. Akkaya, F. L. Aleman, D. Almeida, J. Al-              Q. Bu, Y. Yang, J. Cai, S. Gao, G. Ren, M. Yao,
+   tenschmidt, S. Altman, S. Anadkat, et al.                  P. Luo, and H. Li. Univla: Learning to act any-
+  Gpt-4 technical report.      arXiv preprint                 where with task-centric latent actions. arXiv
+   arXiv:2303.08774, 2023.                                    preprint arXiv:2505.06111, May 2025.
+
+Anthropic. Introducing the model context proto- S. Cai, Z. Wang, K. Lian, Z. Mu, X. Ma, A. Liu, and
+  col, 2024. URL https://www.anthropic.             Y. Liang. Rocket-1: Mastering open-world inter-
+  com/news/model-context-protocol.                  action with visual-temporal context prompting.
+                                                    arXiv preprint arXiv:2410.17856, 2024.
+Anthropic. Introducing claude 4, 2025. URL
+  https://www.anthropic.com/news/                J. Deng, Z. Wang, S. Cai, A. Liu, and
+  claude-4.                                         Y. Liang. Open-world skill discovery from
+                                                    unsegmented demonstrations. arXiv preprint
+B. Baker, I. Akkaya, P. Zhokov, J. Huizinga,        arXiv:2503.10684, 2025.
+  J. Tang, A. Ecoffet, B. Houghton, R. Sampe-
+  dro, and J. Clune. Video pretraining (vpt): X. Deng, K. Guu, P. Pasupat, A. Akyürek,
+  Learning to act by watching unlabeled on-         S. Zhuang, W. Chen, T. Hashimoto, K. Guu,
+  line videos. Advances in Neural Information       and P. Liang. Mind2web: Towards a generalist
+  Processing Systems, 35:24639–24654, 2022.         agent for the web. In NeurIPS Datasets and
+                                                    Benchmarks, 2023. URL https://arxiv.
+S. Belkhale, T. Ding, T. Xiao, P. Sermanet,         org/abs/2306.06070.
+  Q. Vuong, J. Tompson, Y. Chebotar, D. Dwibedi,
+  and D. Sadigh. Rt-h: Action hierarchies using D. Driess, F. Xia, M. S. Sajjadi, C. Lynch,
+  language. arXiv preprint arXiv:2403.01823,        A. Chowdhery, B. Ichter, A. Wahid, J. Tompson,
+  2024a.                                            Q. Vuong, T. Yu, et al. Palm-e: An embodied
+                                                    multimodal language model. arXiv preprint
+S. Belkhale, T. Ding, T. Xiao, P. Sermanet,         arXiv:2303.03378, 2023.
+  Q. Vuong, J. Tompson, Y. Chebotar, D. Dwibedi,
+  and D. Sadigh. Rt-h: Action hierarchies using L. Fan, G. Wang, Y. Jiang, A. Mandlekar, Y. Yang,
+  language. arXiv preprint arXiv:2403.01823,        H. Zhu, A. Tang, D.-A. Huang, Y. Zhu, and
+  2024b.                                            A. Anandkumar. Minedojo: Building open-
+                                                    ended embodied agents with internet-scale
+A. Brohan, N. Brown, J. Carbajal, Y. Chebotar,      knowledge. Advances in Neural Information
+  J. Dabis, C. Finn, K. Gopalakrishnan, K. Haus-    Processing Systems Datasets and Benchmarks,
+  man, A. Herzog, J. Hsu, et al. Rt-1: Robotics     2022.
+  transformer for real-world control at scale.
+  arXiv preprint arXiv:2212.06817, 2022.         J. Feng, S. Huang, X. Qu, G. Zhang, Y. Qin,
+                                                    B. Zhong, C. Jiang, J. Chi, and W. Zhong. Re-
+A. Brohan, N. Brown, J. Carbajal, Y. Cheb-          tool: Reinforcement learning for strategic tool
+  otar, X. Chen, K. Choromanski, T. Ding,           use in llms. arXiv preprint arXiv:2504.11536,
+  D. Driess, A. Dubey, C. Finn, et al. Rt-2:        2025.
+  Vision-language-action models transfer web
+  knowledge to robotic control. arXiv preprint D. Guo, F. Wu, F. Zhu, F. Leng, G. Shi, H. Chen,
+  arXiv:2307.15818, 2023a.                          H. Fan, J. Wang, J. Jiang, J. Wang, et al.
+                                                    Seed1. 5-vl technical report. arXiv preprint
+A. Brohan, N. Brown, J. Carbajal, Y. Cheb-          arXiv:2505.07062, 2025a.
+  otar, X. Chen, K. Choromanski, T. Ding,
+  D. Driess, A. Dubey, C. Finn, et al. Rt-2: D. Guo, D. Yang, H. Zhang, J. Song, R. Zhang,
+  Vision-language-action models transfer web        R. Xu, Q. Zhu, S. Ma, P. Wang, X. Bi, et al.
+
+
+                                                                                                          10
+                   Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+
+  Deepseek-r1: Incentivizing reasoning capabil-                  model with adaptive reasoning. arXiv preprint
+  ity in llms via reinforcement learning. arXiv                  arXiv:2505.11917, 2025.
+  preprint arXiv:2501.12948, 2025b.
+                                                              H. Lin, Z. Wang, J. Ma, and Y. Liang. Mcu:
+W. H. Guss, B. Houghton, N. Topin, P. Wang,                     A task-centric framework for open-ended
+ C. Codel, M. Veloso, and R. Salakhutdinov. Min-                agent evaluation in minecraft. arXiv preprint
+ erl: A large-scale dataset of minecraft demon-                 arXiv:2310.08367, 2023.
+ strations. arXiv preprint arXiv:1907.13440,
+ 2019.                                                        A. O’Neill, A. Rehman, A. Gupta, A. Maddukuri,
+                                                                A. Gupta, A. Padalkar, A. Lee, A. Pooley,
+Y. Huang, Y. Chen, H. Zhang, K. Li, H. Zhou,
+                                                                A. Gupta, A. Mandlekar, et al. Open x-
+  M. Fang, L. Yang, X. Li, L. Shang, S. Xu,
+                                                                embodiment: Robotic learning datasets and
+  et al. Deep research agents: A systematic
+                                                                rt-x models. arXiv preprint arXiv:2310.08864,
+  examination and roadmap. arXiv preprint
+                                                                2023.
+  arXiv:2506.18096, 2025.
+
+H. Jia, J. Liao, X. Zhang, H. Xu, T. Xie,                     OpenAI. Chatgpt: Optimizing language models
+  C. Jiang, M. Yan, S. Liu, W. Ye, and F. Huang.               for dialogue, 2023. URL https://openai.
+  Osworld-mcp: Benchmarking mcp tool invo-                     com/blog/chatgpt/.
+  cation in computer-use agents. arXiv preprint
+                                                              OpenAI.      Introducing chatgpt agent:
+  arXiv:2510.24563, Nov. 2025.
+                                                               bridging research and action, 2025a.
+M. J. Kim, K. Pertsch, S. Karamcheti, T. Xiao,                 URL      https://openai.com/index/
+ A. Balakrishna, S. Nair, R. Rafailov, E. Foster,              introducing-chatgpt-agent.
+ G. Lam, P. Sanketi, et al. Openvla: An open-
+ source vision-language-action model. arXiv                   OpenAI. Introducing deep research, 2025b.
+ preprint arXiv:2406.09246, 2024.                              URL      https://openai.com/index/
+                                                               introducing-deep-research/.
+J. Lee, J. Duan, H. Fang, Y. Deng, S. Liu, B. Li,
+   B. Fang, J. Zhang, Y. R. Wang, S. Lee, et al. Mol-         openai. Operator, 2025. URL https://openai.
+   moact: Action reasoning models that can rea-                 com/index/introducing-operator/.
+   son in space. arXiv preprint arXiv:2508.07917,
+   2025.                                                      Y. Qin, Y. Ye, J. Fang, H. Wang, S. Liang, S. Tian,
+                                                                 J. Zhang, J. Li, Y. Li, S. Huang, et al. Ui-tars:
+K. Li, Z. Meng, H. Lin, Z. Luo, Y. Tian, J. Ma,                  Pioneering automated gui interaction with na-
+  Z. Huang, and T.-S. Chua. Screenspot-pro: Gui                  tive agents. arXiv preprint arXiv:2501.12326,
+  grounding for professional high-resolution com-                2025.
+  puter use. arXiv preprint arXiv:2504.07981,
+  2025a.                                                      N. Ravi, V. Gabeur, Y.-T. Hu, R. Hu, C. Ryali, T. Ma,
+                                                                H. Khedr, R. Rädle, C. Rolland, L. Gustafson,
+M. Li, Z. Wang, K. He, X. Ma, and Y. Liang. Jarvis-
+                                                                et al. Sam 2: Segment anything in images
+ vla: Post-training large-scale vision language
+                                                                and videos. arXiv preprint arXiv:2408.00714,
+  models to play visual games with keyboards
+                                                                2024.
+  and mouse. arXiv preprint arXiv:2503.16365,
+ 2025b.
+                                                              B. Seed. Ui-tars-1.5. https://seed-tars.
+S. Lifshitz, K. Paster, H. Chan, J. Ba, and S. McIl-            com/1.5, 2025.
+   raith. Steve-1: A generative model for text-
+   to-behavior in minecraft. Advances in Neural               N. M. Shafiullah, Z. Cui, A. A. Altanzaya, and
+   Information Processing Systems, 36, 2024.                    L. Pinto. Behavior transformers: Cloning 𝑘
+                                                                modes with one stone. Advances in neural
+F. Lin, R. Nai, Y. Hu, J. You, J. Zhao, and Y. Gao.             information processing systems, 35:22955–
+   Onetwovla: A unified vision-language-action                  22968, 2022.
+
+
+                                                                                                                11
+                   Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+
+Z. Shao, P. Wang, Q. Zhu, R. Xu, J. Song, X. Bi,              Z. Wang, S. Cai, Z. Mu, H. Lin, C. Zhang, X. Liu,
+  H. Zhang, M. Zhang, Y. Li, Y. Wu, et al.                      Q. Li, A. Liu, X. Ma, and Y. Liang. Om-
+  Deepseekmath: Pushing the limits of mathe-                     nijarvis: Unified vision-language-action tok-
+  matical reasoning in open language models.                     enization enables open-world instruction fol-
+  arXiv preprint arXiv:2402.03300, 2024.                         lowing agents. Advances in Neural Information
+                                                                 Processing Systems, 2024c.
+L. Song, Y. Dai, V. Prabhu, J. Zhang, T. Shi,
+  L. Li, J. Li, S. Savarese, Z. Chen, J. Zhao,                Z. Wang, A. Liu, H. Lin, J. Li, X. Ma, and
+  R. Xu, and C. Xiong. Coact-1: Computer-using                  Y. Liang. Rat: Retrieval augmented thoughts
+  agents with coding as actions. arXiv preprint                 elicit context-aware reasoning in long-horizon
+  arXiv:2508.03923, Aug. 2025.                                  generation. arXiv preprint arXiv:2403.05313,
+                                                                2024d.
+G. Team, R. Anil, S. Borgeaud, J.-B. Alayrac, J. Yu,
+  R. Soricut, J. Schalkwyk, A. M. Dai, A. Hauth,              Z. Wang, M. Li, K. He, X. Wang, Z. Mu, A. Liu,
+  K. Millican, et al. Gemini: a family of highly                and Y. Liang. Openha: A series of open-source
+  capable multimodal models. arXiv preprint                     hierarchical agentic models in minecraft. arXiv
+  arXiv:2312.11805, 2023.                                       preprint arXiv:2509.13347, 2025a.
+S. T. Team. Ui-tars-2 technical report: Advancing             Z. Wang, X. Li, Y. Ye, J. Fang, H. Wang, L. Liu,
+   gui agent with multi-turn reinforcement learn-               S. Liang, J. Lu, Z. Wu, J. Feng, et al. Game-tars:
+   ing. arXiv preprint arXiv: 2509.02544, 2025.                 Pretrained foundation models for scalable gen-
+H. Touvron, T. Lavril, G. Izacard, X. Martinet, M.-             eralist multimodal game agents. arXiv preprint
+  A. Lachaux, T. Lacroix, B. Rozière, N. Goyal,                 arXiv:2510.23691, 2025b.
+  E. Hambro, F. Azhar, et al. Llama: Open and
+                                                              Y. Xu, Z. Wang, J. Wang, D. Lu, T. Xie, A. Saha,
+  efficient foundation language models. arXiv
+                                                                 D. Sahoo, T. Yu, and C. Xiong. Aguvis: Unified
+  preprint arXiv:2302.13971, 2023.
+                                                                 pure vision agents for autonomous gui interac-
+A. Van Den Oord, O. Vinyals, et al. Neural discrete              tion. arXiv preprint arXiv:2412.04454, 2024.
+  representation learning. Advances in neural
+  information processing systems, 30, 2017.                   Y. Yan, S. Wang, J. Du, Y. Yang, Y. Shan, Q. Qiu,
+                                                                 X. Jia, X. Wang, X. Yuan, X. Han, M. Qin,
+P. Wang, S. Bai, S. Tan, S. Wang, Z. Fan, J. Bai,                Y. Chen, C. Peng, S. Wang, and M. Xu. Mcp-
+   K. Chen, X. Liu, J. Wang, W. Ge, et al. Qwen2-vl:             world: A unified benchmarking testbed for api,
+   Enhancing vision-language model’s perception                  gui, and hybrid computer use agents. arXiv
+   of the world at any resolution. arXiv preprint                preprint arXiv:2506.07672, 2025.
+   arXiv:2409.12191, 2024a.
+                                                              A. Yang, A. Li, B. Yang, B. Zhang, B. Hui,
+Z. Wang, S. Cai, G. Chen, A. Liu, X. Ma,                        B. Zheng, B. Yu, C. Gao, C. Huang, C. Lv,
+  Y. Liang, and T. CraftJarvis. Describe, ex-                   et al. Qwen3 technical report. arXiv preprint
+  plain, plan and select: interactive planning                  arXiv:2505.09388, 2025.
+  with large language models enables open-
+  world multi-task agents. In Proceedings of                  J. Yang, C. E. Jimenez, A. Wettig, K. Lieret,
+  the 37th International Conference on Neural                    S. Yao, K. Narasimhan, and O. Press. SWE-
+  Information Processing Systems, pages 34153–                   agent: Agent-computer interfaces enable au-
+  34189, 2023.                                                   tomated software engineering. arXiv preprint
+                                                                 arXiv:2405.15793, 2024.
+Z. Wang, S. Cai, A. Liu, Y. Jin, J. Hou, B. Zhang,
+   H. Lin, Z. He, Z. Zheng, Y. Yang, et al. Jarvis-           H. Yuan, Z. Mu, F. Xie, and Z. Lu.         Pre-
+  1: Open-world multi-task agents with memory-                  training goal-based models for sample-
+   augmented multimodal language models. IEEE                   efficient reinforcement learning.    In The
+   Transactions on Pattern Analysis and Machine                 Twelfth International Conference on Learning
+   Intelligence, 2024b.                                         Representations, 2024.
+
+
+                                                                                                               12
+                 Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+
+Y. Zhong, F. Bai, S. Cai, X. Huang, Z. Chen,
+  X. Zhang, Y. Wang, S. Guo, T. Guan, K. N. Lui,
+  et al. A survey on vision-language-action mod-
+  els: An action tokenization perspective. arXiv
+  preprint arXiv:2507.01925, 2025a.
+
+Y. Zhong, X. Huang, R. Li, C. Zhang, Y. Liang,
+  Y. Yang, and Y. Chen. Dexgraspvla: A vision-
+   language-action framework towards general
+   dexterous grasping, 2025b.
+
+
+
+
+                                                                                                       13
+                   Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+
+A. Environment Details                                        A.2. Raw Action Space
+
+In this work, we utilize Minecraft as the primary             The raw action space is designed to align with
+testbed for evaluating our agent’s capabilities in            human interfaces, utilizing the native mouse
+multi-task reinforcement learning following large-            and keyboard controls provided by MineRL v0.4
+scale pretraining. Minecraft provides a rich, dy-             (Minecraft version 1.16.5) (Guss et al., 2019). A
+namic environment that necessitates both em-                  summary of the action mapping is provided in
+bodied interactions (e.g., navigation, combat)                Table 3.
+and complex GUI-based operations (e.g., craft-                Mouse Control.. Mouse displacements are dis-
+ing, inventory management). This duality makes                cretized into 1800 bins, and their semantic mean-
+it an ideal benchmark for testing generalist agents           ing is context-dependent. In embodied mode,
+capable of mastering diverse, open-ended tasks                these displacements control the camera orienta-
+ranging from low-level motor control to high-level            tion via pitch (Δ 𝑦 ) and yaw (Δ𝑥 ) adjustments; in
+strategic planning.                                           GUI mode, they correspond to 2D cursor move-
+                                                              ments on the screen. Mouse clicks are encoded
+                                                              as dedicated tokens representing left, right, and
+                                                              middle button presses.
+                                                              Keyboard Control. Keyboard actions are treated
+A.1. Environment Configuration                                as unique tokens, covering alphabetic characters
+                                                              (e.g., ‘W’, ‘A’, ‘S’, ‘D’ for movement), numeric dig-
+Minecraft is an open-world sandbox game where                 its (for hotbar selection), and special keys (e.g.,
+players interact with and modify a procedurally               Shift, Space, Esc).
+generated 3D world. The game offers a vast ar-
+ray of tasks that resemble real-world challenges.
+Consequently, agents must navigate complex ter-               A.3. Challenges for Reinforcement Learning
+rains, manage sparse rewards, and engage in long-
+                                                              Minecraft presents several unique challenges that
+horizon planning. Additionally, the game’s popu-
+                                                              test the robustness and generalization capabilities
+larity provides a wealth of potential training data,
+                                                              of RL agents:
+including gameplay videos and textual tutorials,
+making it invaluable for research into large-scale            High Information Density. The environment
+learning from unstructured data.                              is visually complex, featuring diverse textures,
+                                                              lighting conditions, and objects. Agents must effi-
+   Our experimental setup follows the Variable
+                                                              ciently process high-dimensional sensory inputs
+Pretraining Task (VPT) protocol (Baker et al.,
+                                                              to identify relevant cues while filtering out ir-
+2022), where agents interact with the game in
+                                                              relevant background noise. Specific challenges
+a manner identical to human players. Specifi-
+                                                              include distinguishing block types for crafting or
+cally, the observation space consists exclusively
+                                                              spotting hostile mobs in low-light conditions. This
+of raw RGB screenshots as visual input, with a
+                                                              requires strong visual representation learning and
+resolution of 640 × 360, at a frequency of 20
+                                                              attention mechanisms.
+Hz. No high-level or privileged state information
+(such as voxel grids or coordinate data) is pro-              Task Variety and Generalization. The open-
+vided during evaluation. Regarding interaction                ended nature of Minecraft offers a vast spectrum
+modes, the environment presents a dual chal-                  of tasks, ranging from primitive resource gather-
+lenge: while most observations consist of embod-              ing to complex architectural construction. Agents
+ied first-person views, tasks such as crafting and            must learn to generalize skills across these tasks.
+smelting require the agent to operate within dis-             For instance, the motor skills required to chop a
+tinct GUI interfaces. As illustrated in Figure 5, the         tree can be adapted to combat, while the logic
+agent must seamlessly switch between handling                 used for crafting a wooden pickaxe serves as
+continuous embodied interactions and discrete                 a foundational step for crafting diamond tools.
+GUI-based operations.                                         This variety forces the agent to acquire adaptable,
+
+
+                                                                                                                14
+                             Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+
+
+Figure 5 | Representative observations in Minecraft, consisting of 640 × 360 RGB images. The agent must
+handle diverse visual contexts, including embodied first-person views (left) and GUI-based interfaces (right)
+for tasks like crafting and inventory management.
+
+
+transferable strategies rather than memorizing                                   B. Action Spaces
+fixed sequences.
+                                                                                 In the context of Hierarchical Agents (HA), the
+Reward Sparsity. Unlike arcade games with fre-                                   design of the action space is pivotal, effectively
+quent score updates, Minecraft rewards are of-                                   dictating the agent’s granularity of interaction
+ten extremely sparse and delayed. For example,                                   with the environment. Existing approaches uti-
+crafting a high-level item (e.g., a diamond sword)                               lize varying levels of abstraction, spanning from
+requires a long sequence of prerequisite actions:                                atomic environmental controls to high-level se-
+mining wood, crafting a crafting table, mining                                   mantic planning. The controllers associated with
+stone, smelting iron, and finding diamonds. The                                  these spaces range in complexity from simple
+agent typically receives no feedback until the fi-                               heuristic scripts to sophisticated Large Language
+nal goal is achieved. This necessitates efficient                                Models (LLMs). Typically, as the level of ab-
+exploration strategies and the ability to reason                                 straction increases, the reliability of execution
+over long horizons.                                                              becomes harder to guarantee, necessitating more
+Dynamic Environment. The game features a                                         robust decoders to bridge the gap between intent
+dynamic world with day-night cycles, changing                                    and execution.
+weather, and autonomous entities (mobs). An
+agent must adapt its decision-making to these                                    Raw Actions represent the lowest level of the
+variables—for example, seeking shelter at night                                  hierarchy. They directly link the agent to the
+to avoid monsters or navigating slippery terrain                                 environment’s native interface by mimicking basic
+during rain. This dynamic nature ensures that                                    input devices, such as keyboards and mice (Kim
+agents are tested on their ability to adapt to non-                              et al., 2024; Zhong et al., 2025a).
+stationary environments.
+                                                                                 Language Skills operate at a high level of ab-
+Table 3 | Summary of the human-aligned raw action                                straction, where the action space comprises goal-
+space used by our agent. The agent interacts via stan-                           oriented commands expressed in natural lan-
+dard keyboard and mouse inputs, identical to a human                             guage. These semantic instructions are inter-
+player.                                                                          preted by the agent’s policy, which decodes them
+Action Type    Human Input     Description                                       into sequences of lower-level primitives condi-
+                    W          Move forward.                                     tioned on the current visual observation (Driess
+                    S          Move backward.
+                    A          Strafe left.                                      et al., 2023; Wang et al., 2023).
+ Movement           D          Strafe right.
+                 Space         Jump / Swim up.
+                Left Shift     Sneak (prevents falling off edges).               Motion Actions serve as an intermediate abstrac-
+                Left Ctrl      Sprint (increases movement speed).                tion, focusing on temporally extended, object-
+ Interaction
+                Left Mouse     Break blocks (hold) / Attack entities (click).    agnostic movement primitives. By encapsulating
+               Right Mouse     Place blocks / Interact with items / Open GUIs.
+ Inventory       Keys 1–9      Select corresponding hotbar slot.
+                                                                                 complex navigational or manipulation behaviors
+                 Mouse X       Yaw: Horizontal rotation (−180◦ to 180◦ ).        without binding them to specific object instances,
+  Camera
+                 Mouse Y       Pitch: Vertical rotation (−180◦ to 180◦ ).        they offer a more flexible representation com-
+
+
+
+                                                                                                                                15
+                   Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+
+pared to step-by-step atomic actions (Belkhale                a critic network:
+et al., 2024b; Lifshitz et al., 2024).                                               𝑟𝑖 − mean({𝑟1 , . . . , 𝑟𝐺 })
+                                                                             𝐴ˆ𝑖 =                                              (7)
+                                                                                       std({𝑟1 , . . . , 𝑟𝐺 }) + 𝛿
+Grounding Actions further enhance abstraction
+by explicitly incorporating spatial constraints.              where 𝑟𝑖 is the reward for the 𝑖-th output, and 𝛿
+This paradigm enables the agent to target specific            (e.g., 10−8 ) is a small constant added for numeri-
+objects based on their coordinates in visual space.           cal stability.
+By decoupling the semantic intent of an action
+                                                                The inclusion of the KL-divergence penalty
+from its spatial execution parameters, ground-
+                                                              term 𝛽𝐷 𝐾𝐿 acts as a regularizer, ensuring the up-
+ing actions significantly improve generalization
+                                                              dated policy does not deviate significantly from
+across diverse visual scenarios (Cai et al., 2024;
+                                                              the reference model, thereby preventing reward
+Lee et al., 2025; Zhong et al., 2025b).
+                                                              hacking and maintaining linguistic coherence.
+Latent Actions are derived via self-supervised
+learning rather than manual definition. Typically             C.2. Multi-Turn GRPO
+encoded into continuous embeddings and sub-
+sequently discretized into tokens, these actions              In the multi-turn setting, we adapt the single-
+allow the agent to operate within a learned ab-               turn formulation to handle sequential interac-
+stract space. This approach eliminates the need               tions. We decompose each trajectory 𝜏 into a
+for human-engineered heuristics, facilitating the             set of state–response pairs and assign the final
+acquisition of complex policies directly from large-          trajectory-level reward 𝑟 ( 𝜏) to all intermediate
+scale offline data (Deng et al., 2025; Shafiullah             responses.
+et al., 2022; Van Den Oord et al., 2017; Yuan                   Let T denote the trajectory space. The Multi-
+et al., 2024).                                                Turn GRPO objective is defined as:
+   Collectively, these diverse action spaces con-                                           ( 𝐺             𝐿𝑖           | 𝑜𝑖, 𝑗 | "
+tribute to the hierarchical structure of modern                                               1 ∑︁ 1 ∑︁           1 ∑︁
+                                                                𝐽MT ( 𝜃) = 𝔼 { 𝜏𝑖 } 𝐺 ∼𝜋old
+agents, providing a scalable and flexible frame-                                    𝑖=1       𝐺
+                                                                                                 𝑖=1
+                                                                                                      𝐿𝑖
+                                                                                                           𝑗=1
+                                                                                                               | 𝑜𝑖, 𝑗 | 𝑡=1
+work for managing tasks of increasing complexity.                                                                          
+                                                                                                                                    !
+                                                                         min 𝜌𝑖, 𝑗,𝑡 𝐴ˆ𝑖 , clip 𝜌𝑖, 𝑗,𝑡 , 1 − 𝜖, 1 + 𝜖 𝐴ˆ𝑖
+                                                                                                                         #)
+C. RL Algorithms                                                           − 𝛽𝐷KL [ 𝜋𝜃 (·| 𝑠𝑖, 𝑗 )|| 𝜋ref (·| 𝑠𝑖, 𝑗 )]          (8)
+
+As detailed in section 3, our training frame-                 where 𝐿𝑖 is the number of turns in trajectory 𝑖, and
+work incorporates two reinforcement learning                  the advantage 𝐴ˆ𝑖 is computed using the group-
+phases: Single-Turn RL (STRL) and Multi-Turn                  relative statistics of the trajectory rewards 𝑟 ( 𝜏𝑖 ).
+RL (MTRL). Both phases utilize Group Relative                 This allows the sparse, episodic reward to guide
+Policy Optimization (GRPO) as the underlying                  the optimization of every step in the trajectory.
+optimization algorithm.
+
+                                                              D. Training Details
+C.1. Single-Turn GRPO
+                                                              D.1. Base Model
+Standard GRPO optimizes the policy by leverag-
+                                                              To enable robust multi-modal reasoning and high-
+ing group-level statistics. The optimization objec-
+                                                              level planning, our system is built upon a pre-
+tive follows the formulation defined in Equation 1
+                                                              trained Vision-Language Model (VLM). Specif-
+in section 3.
+                                                              ically, we initialize our system with the open-
+  Unlike PPO, GRPO calculates the advantage 𝐴ˆ𝑖               source OpenHA model Wang et al. (2025a),
+directly from the sampled group outputs without               which is derived from Qwen2-VL-7B Wang et al.
+
+
+                                                                                                                                 16
+                      Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+Table 4 | Hyperparameter settings across different                 Probability Density of Action Spaces
+training stages.                                                     Kill Sheep
+
+Hyperparameter                 SFT         STRL         MTRL
+Total Training Tokens         0.07B        0.14B        1.41B
+Training Samples (Images)      12K          24K          1.3M                 Navigation
+
+Trainable Components           Full         Full          Full
+                                                                                                Approaching       Interaction
+Global Batch Size              512          1272          128
+Optimizer                    AdamW        AdamW        AdamW
+LR Warmup Steps                 15            0            0
+Maximum Learning Rate       8.0 × 10−6   1.0 × 10−6   5.0 × 10−6
+Minimum Learning Rate       1.0 × 10−6   1.0 × 10−6   5.0 × 10−6
+Group Size (𝐺 )                  -            4            4
+KL Coefficient ( 𝛽 )             -          0.01         0.01
+                                                                     Chop Tree
+Clipping Parameter (𝜖)           -           0.2          0.2
+
+
+
+(2024a). We selected this model for its demon-                             Navigation       Approaching
+
+strated proficiency in Minecraft-specific visual                                                                Interaction
+grounding and its strong instruction-following
+capabilities within the domain.
+
+
+D.2. Training Implementation
+
+As detailed in section 3, our training pipeline                      Craft Enchanting Table
+comprises three progressive stages: Cold-Start
+Supervised Fine-Tuning (SFT), Single-Turn Re-
+inforcement Learning (STRL), and Multi-Turn                                 Fixed
+Reinforcement Learning (MTRL). To ensure ex-                                Preprocessing
+                                                                                                                     Item
+perimental consistency and reproducibility, all                                                     Item             Placement
+                                                                                                    Selection
+models were trained on a cluster of 8 NVIDIA
+A800-SXM4-80GB GPUs, using Python 3.10 and
+CUDA 12.6.
+  The specific hyperparameter configurations for
+each stage are summarized in Table 4. We main-                                Task Completion Progress (0-1)
+tain consistent hyperparameter settings for the                    Figure 6 | Case Study: Action distribution dur-
+SFT process across both the initial Stage 1 and the                ing the Kill Sheep, Chop Tree and Craft
+cold-start phases to isolate the impact of training                Enchanting task. The density curves of each tasks,
+data and objectives                                                aggregated over 20 episodes, of different action spaces
+                                                                   (Motion, Grounding, Raw) across different task phases.
+                                                                   The dynamic shifts in distribution demonstrate the
+                                                                   model’s in-context adaptive strategy.
+E. Case Studies
+To qualitatively demonstrate the efficacy of
+                                                                   of different action spaces selected by CrossAgent
+dynamic action space selection, we analyze
+                                                                   with respect to task completion progress.
+CrossAgent’s behavior across three representa-
+tive tasks: Kill Sheep (Kill Entities), Chop                       Kill Sheep. As illustrated in the Kill Sheep
+Tree (Mine Blocks), and Craft Enchanting                           task proceeds through three distinct stages: 1)
+Table (Craft Items). These cases illustrate how                    Navigation: Rotating the camera and travers-
+the agent adapts its interface strategy to meet the                ing the terrain to locate a target. 2) Approach-
+distinct demands of different task phases. Fig-                    ing: Locking focus on the sheep and closing
+ure 7 illustrates the probability density curves                   the distance. 3) Interaction: Executing attacks
+
+
+                                                                                                                                 17
+                   Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+   Kill Sheep
+
+
+
+
+   Motion:move forward         Grounding:Approach              Action: move(0, 0)                   Motion: no_ op
+                               sheep(780,661)                  and press() and
+                                                               click( left) "
+
+   Chop Tree
+
+
+
+
+   Action: move(-2, 4)         Grounding: Attack               Action: move(0, 0)               Action: move(0, 0)
+   and press() and             oak_log(938,581)                and press(w) and                 and press(w) and
+   click( left)                                                click( left) "                   click( left)
+
+   Craft Enchanting Table
+
+
+
+
+   Action: move(-16, -9)       Motion: cursor move             Grounding: move_camera     Motion: cursor move
+   and press()                 left and down                   enchanting_ table(338,464) down
+Figure 7 | Example Rollouts of Kill Sheep, Chop Tree, and Craft Enchanting. The prefixes “Mo-
+tion:”, “Grounding:”, and “Action:” denote actions from the Motion Space, Grounding Space, and Raw Space,
+respectively.
+
+
+to deal damage. During the Navigation Stage,                  typically spawns in forested areas where targets
+CrossAgent predominantly employs the coarse yet               are abundant. Consequently, the task requires
+efficient Motion Action Space to scan large areas             less precise tracking than hunting moving enti-
+rapidly. Once the sheep enters the field of view,             ties. Motion Actions dominate the navigation and
+the agent transitions to the Approaching Stage,               approaching phases. Unlike the Kill Sheep
+characterized by a balanced mix of action spaces:             task, where the agent must constantly adjust its
+Motion Actions facilitate fast movement, Ground-              bearing to chase a target, the static nature of
+ing Actions provide continuous visual tracking                trees allows the agent to rely heavily on the sim-
+cues, and Raw Actions enable fine-grained ad-                 ple ‘Walk Forward’ primitive within the Motion
+justments to navigate around obstacles. Finally,              Space. In the interaction phase, Grounding Ac-
+in the Interaction Stage, sustained Grounding                 tions are engaged to accurately target the specific
+Actions ensure precise targeting of the moving en-            wood block, ensuring successful harvesting.
+tity, while Raw Actions are leveraged to execute
+                                                              Craft Enchanting Table. Crafting tasks involve
+high-frequency attack commands efficiently. This
+                                                              complex, multi-step GUI interactions. We cate-
+progression demonstrates CrossAgent’s ability to
+                                                              gorize the workflow into three phases: 1) Fixed
+switch contextually: prioritizing search efficiency
+                                                              Preprocess: Opening the recipe book and tog-
+initially, then blending modalities for pursuit, and
+                                                              gling the ‘Only Show Craftable Items’ filter. Since
+finally optimizing for targeting precision.
+                                                              these steps are invariant across tasks, Raw Actions
+Chop Tree.        The Chop Tree task shares                   dominate this phase, leveraging their precision
+the Navigation-Approaching-Interaction structure              and stability to execute rote "muscle memory"
+with Kill Sheep but exhibits distinct charac-                 sequences efficiently. 2) Item Selection: Locat-
+teristics. Trees are static targets, and the agent            ing and selecting the target item within the grid.
+
+
+
+                                                                                                                     18
+                  Training One Model to Master Cross-Level Agentic Actions via Reinforcement Learning
+
+
+
+Here, the identification capability of the Ground-
+ing Space becomes crucial for visually recogniz-
+ing the correct icon. Simultaneously, the Motion
+Space aids in smooth cursor traversal. 3) Item
+Placement: Retrieving the crafted item from the
+result slot. The Grounding Space is again piv-
+otal, helping the model accurately coordinate the
+cursor between the result slot and the inventory,
+mitigating the risk of mis-clicks.
+   Figure 6 further illustrates some key
+frames and corresponding outputs from
+the CrossAgent rollout. These examples demon-
+strate CrossAgent’s ability to adaptively select
+the suitable action space in context, leading to
+more precise and efficient task execution.
+   The qualitative rollouts corroborate our statis-
+tical findings, offering a concrete window into
+the agent’s decision-making process. The gener-
+ated trajectories reveal that CrossAgent’s switch-
+ing mechanism is semantically coherent rather
+than stochastic. For instance, the seamless tran-
+sition from high-level Motion primitives for ef-
+ficient exploration to precise Grounding or Raw
+commands for interaction closely mirrors human
+behavioral patterns. This qualitative evidence,
+combined with the quantitative performance met-
+rics, strongly validates that CrossAgent has suc-
+cessfully internalized a hierarchical understand-
+ing of open-world tasks. It demonstrates that the
+model does not merely memorize trajectories but
+learns to autonomously decompose complex ob-
+jectives into optimal sequences of heterogeneous
+actions, thereby achieving both robustness and
+efficiency.
+
+
+
+
+                                                                                                        19
+

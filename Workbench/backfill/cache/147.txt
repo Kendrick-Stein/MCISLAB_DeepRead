@@ -1,0 +1,741 @@
+                        This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                     Except for this watermark, it is identical to the accepted version;
+                               the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+    PV-Ground: Text-Guided Point-Voxel Interaction for 3D Visual Grounding
+
+   Junpeng Shang1,2∗                  Feifei Shao2,3∗        Jun Xiao2         Lin Li4       Hongwei Wang3           Dongfang Ma1†
+     1                                                                              2
+         State Key Lab of Ocean Sensing&Ocean College, Zhejiang University              State Key Lab of CAD&CG, Zhejiang University
+                         3
+                             Zhejiang University-University of Illinois Urbana-Champaign Institute, Zhejiang University
+                  4
+                      AI Chip Center for Emerging Smart Systems, The Hong Kong University of Science and Technology
+                                                  {jpshang, sff, mdf2004}@zju.edu.cn
+                         junx@cs.zju.edu.cn, lllidy@ust.hk, hongweiwang@intl.zju.edu.cn
+
+
+
+                                Abstract                                     ing a free-form natural language description [2, 22]. This
+                                                                             task is fundamental as it involves fine-grained multi-modal
+3D visual grounding (VG) aims to localize target objects                     perception and understanding of real-world environments,
+in 3D scenes based on free-form textual descriptions. Exist-                 bridging the gap between complex spatial relationships and
+ing 3D VG models predominantly employ point-based back-                      human semantic reasoning [19, 20, 55]. Consequently, 3D
+bones for point cloud feature extraction. Such methods re-                   VG holds significant value for various high-level applica-
+quire aggressive downsampling of the input point cloud,                      tions such as embodied intelligence [69], autonomous nav-
+which sacrifices the fine-grained spatial details crucial for                igation [3, 56], and augmented reality [2, 9].
+precise localization. This paper proposes PV-Ground, a                           In recent years, driven by the continuous advancement
+novel 3D VG architecture based on effective text-guided                      of 3D perception [13, 26, 36] and natural language mod-
+point-voxel feature interaction. Our method leverages the                    els [7, 23, 33] , research in 3D VG has achieved substantial
+complementary strengths of both voxels and keypoints: it                     progress in model design and performance. Typically, a 3D
+employs a voxel-based feature extraction backbone to pre-                    VG model comprises several key components: a 3D scene
+serve high-resolution spatial details, while utilizing com-                  feature encoder, a text feature encoder, a multi-modal in-
+pact keypoints to aggregate these features for efficient, deep               teraction module, and a grounding head [22]. The majority
+interaction with the textual query. Furthermore, we propose                  of existing work has concentrated on the deep interaction
+a text-guided keypoint sampling module to adaptively con-                    module between text and point clouds, developing com-
+centrate the keypoint distribution around the text-described                 plex attention mechanisms [15, 54], graph neural networks
+object, enabling task-specific feature aggregation and sig-                  [48], and multi-task learning strategies [32] to enhance the
+nificantly boosting model performance. Extensive qualita-                    model’s multi-modal perception capabilities.
+tive and quantitative experiments demonstrate the superi-                        However, this intense focus on high-level multi-modal
+ority of our proposed method. PV-Ground achieves a per-                      interaction has left the foundational task of scene feature
+formance improvement of 5.1% on the ScanRefer dataset                        representation underexplored in 3D VG. At present, the vast
+and 5.6% on the ReferIt3D dataset, while also achieving                      majority of 3D visual grounding methods [15, 32, 48, 54]
+over 4% improvement in the segmentation task. The code is                    still rely on conventional point-based visual backbones,
+available at https://github.com/AaNnWwTt/PV-Ground.                          e.g., PointNet++ [28, 29], to encode the scene. As pre-
+                                                                             sented in Figure 1 (a), this approach needs to aggressively
+                                                                             downsample the raw point cloud into a compact set of key-
+1. Introduction                                                              points, e.g., directly downsampling from 50,000 to 2,048
+                                                                             points. While this sparse representation is computationally
+The rapid advancement of multi-modal learning [21, 55,
+                                                                             necessary for the complex, multi-layer attention modules
+57, 63, 65], particularly in joint 3D vision and natural lan-
+                                                                             that follow, it inevitably creates a severe information bottle-
+guage processing [5, 36, 46, 58, 66], has highlighted the
+                                                                             neck. This loss of fine-grained geometric details is particu-
+critical need for systems that can deeply understand and in-
+                                                                             larly detrimental to the grounding precision [12], especially
+teract with our physical world. This has propelled 3D vi-
+                                                                             for those small or partially occluded objects.
+sual grounding (3D VG) to the forefront of research. 3D
+VG aims to localize a specific object within a 3D scene us-                      In contrast, sparse voxel convolution [6, 10, 59], widely
+                                                                             adopted for 3D detection and segmentation, offers a com-
+  * Equal contribution. † Corresponding author.                              pelling alternative. It excels at preserving high-resolution
+
+
+
+                                                                       38657
+             256                                        206 voxels                                             789 voxels
+            points
+                                                      SpConv                     FU                          SpConv
+            SA              FP
+                                                        789 voxels              2469 voxels
+                                                                                                              2952 voxels
+             512              512                     SpConv                     FU
+            points           points                                                                          SpConv                     1024
+                                                                                                                             VSA
+                                                        2952 voxels             23266 voxels                                            points
+            SA              FP
+                                                      SpConv                                                  10356 voxels
+                                                                                                                                              TGS
+            1024             1024                                                                            SpConv
+            points           points                    10356 voxels                                                                      256
+            SA                                        SpConv                                                  26891 voxels            keypoints
+
+            2048                                       26891 voxels                                          SpConv
+            points                                    SpConv
+                                                                                                              43282 voxels
+            SA                                         43282 voxels
+        X
+                          Set Abstraction                                      Sparse Convolution          SpConv                   Sparse Convolution
+                          Feature Propagation        SpConv                    Feature Upsampling                                   Voxel Set Abstraction
+                 Y                                                                                                                    Text-Guided Sampling
+
+
+
+                     Z
+                                                                      48908                                                 48908
+                                                                      voxels                                                voxels
+         50000 points
+
+      (a) point-based backbone                   (b) voxel-based backbone                             (c) the proposed voxel-point interaction backbone
+
+Figure 1. (a) The mainstream point-based 3D VG backbone. The point cloud needs to be downsampled aggressively from the original
+50,000 points directly to 2,048 points. (b) The voxel-based backbone TSP3D-B [12]. The voxels can be progressively downsampled but the
+number of voxels grows almost exponentially in the upsampling stage, which hinders efficient interaction with the textual semantics. (c)
+The proposed PV-Ground combines the advantages from both sides. It maintains the integrity of scene representation through progressive
+sparse voxel convolution, while is also efficient to interact with textual queries through a small amount of compact keypoint features.
+
+
+spatial details and offers superior inference efficiency [12].                        cient, text-aware interaction capabilities of keypoints, en-
+However, it is non-trivial to apply this architecture in 3D                           abling precise and robust multi-modal grounding.
+VG tasks. As illustrated in Figure 1, the number of voxels in                            Our main contributions can be summarized as follows:
+a standard upsampling decoder grows almost exponentially                              • We propose PV-Ground, a novel 3D VG architecture
+[12, 60]. This dense, high-resolution feature map makes                                 based on voxel-keypoint interaction. This framework
+the complex attention-based interactions with text features                             combines the high-resolution scene feature representa-
+computationally infeasible, severely limiting the adoption                              tion of voxels with the efficient multi-modal interaction
+of voxel-based networks for 3D VG.                                                      of keypoints. To the best of our knowledge, this is the
+   To resolve this dilemma, we propose PV-Ground, a novel                               first 3D VG model based on a point-voxel framework.
+3D VG framework built on text-guided point-voxel interac-                             • We introduce a text-guided keypoint sampling module,
+tion. Our framework is designed to unite the complemen-                                 which adaptively concentrates keypoints on text-relevant
+tary strengths of both representations. First, it addresses the                         object candidates, enabling task-specific feature aggrega-
+point-based bottleneck by employing the sparse voxel con-                               tion and improving robustness to distractors.
+volution backbone for fine-grained, high-resolution scene                             • Extensive quantitative and qualitative experiments dem-
+feature extraction. Second, to overcome the voxel-based                                 onstrate the superiority of PV-Ground. The results val-
+computational limitation, we strategically aggregate the rich                           idate that the proposed point-voxel framework and its
+voxel feature pyramid into a compact set of keypoints,                                  components can bring substantial performance improve-
+which can then efficiently undergo deep multi-modal inter-                              ments to existing 3D VG networks.
+action with the text. Furthermore, we argue that the stan-
+dard, spatially-uniform sampling of these keypoints is task-                          2. Related Works
+agnostic and thus suboptimal for a text-conditioned task like
+3D VG. It inefficiently allocates too much representational
+                                                                                      2.1. 3D Visual Grounding
+capacity to irrelevant distractors rather than focusing on se-                        Existing 3D VG methods can be broadly categorized into
+mantically salient regions indicated by the text. We there-                           single-stage (proposal-free) and two-stage (proposal-based)
+fore introduce the Text-Guided Keypoint Sampling (TGS)                                approaches [22]. Single-stage methods perform direct lo-
+module, which dynamically concentrates keypoints on text-                             calization by densely fusing visual and linguistic features
+relevant regions before the final interaction and decoding.                           without an explicit proposal generation step. In contrast,
+This task-specific sampling actively filters distractors and                          two-stage methods [15] first employ a pretrained 3D ob-
+enables more effective aggregation of salient and pertinent                           ject detector [24, 30] to generate class-agnostic object can-
+features. In summary, our framework uniquely integrates                               didates, which are then fed into a multi-modal fusion mod-
+the fine-grained perceptual power of voxels with the effi-                            ule to be scored and reasoned with the textual query. De-
+
+
+
+                                                                               38658
+spite the architectural differences, both paradigms share            To address this challenge, this paper proposes a point-
+a fundamental reliance on two core phases: initial scene          voxel interaction framework that achieves more accurate
+feature extraction and subsequent multi-modal interaction.        3D VG by synergizing the advantages of both representa-
+Historically, a significant body of research across both          tions. At the feature extraction stage, our model employs
+pipelines has disproportionately focused on the latter, de-       sparse voxel convolution to encode the point cloud, thus
+signing sophisticated multi-modal interaction modules. For        avoiding the negative impacts of aggressive downsampling.
+instance, BUTD-DETR [15] introduced multi-layer self-             Critically, before the multi-modal interaction, we introduce
+attention and cross-attention to fuse text, object proposals,     a keypoint-based aggregation mechanism to distill features
+and global scene context, establishing a mechanism that           from the large-scale voxel pyramid into a compact keypoint
+has been widely adopted. Subsequent works have further            representation. This strategy mitigates the risk of informa-
+refined this framework, exploring explicit textual-visual         tion loss while simultaneously avoiding the inefficient fea-
+alignment [54], modeling fine-grained geometric and se-           ture interaction between large-scale voxels and text .
+mantic relationships [48], and leveraging multi-task frame-
+works to jointly optimize for grounding and segmentation          2.3. Keypoint-based Scene Feature Aggregation
+[32]. However, this intense focus on high-level multi-modal
+                                                                  When representing 3D scenes with point-based features,
+interaction has left the foundational scene feature represen-
+                                                                  conventional frameworks for tasks such as object detection
+tation as a critical yet underexplored bottleneck in 3D VG.
+                                                                  [15, 17, 24, 42, 43] typically favor a spatially uniform distri-
+                                                                  bution of keypoint encodings, e.g., via Farthest Point Sam-
+2.2. Existing Backbones for 3D VG                                 pling (FPS). This approach ensures comprehensive scene
+A typical 3D VG model consists of a 3D scene feature en-          coverage, preserving information and detail to facilitate the
+coder, a text feature encoder, a vision-language multi-modal      detection for all potential objects. However, the 3D VG task
+interaction module, and a grounding head [22]. While the          is fundamentally different, as it is conditioned on a natural
+scene encoder is a foundational component for any 3D VG           language description. The textual input obviates the need to
+model, its design has received little attention compared to       “blindly” process the entire scene; instead, it can selectively
+the fusion module. The PointNet++ [29] backbone has been          focus on description-relevant regions. Concentrating key-
+a well-accepted standard in previous works. This choice           points around text-relevant objects is a more efficient strat-
+is pragmatic: it encodes a large-scale point cloud into a         egy, potentially reducing computational overhead and filter-
+sparse set of keypoints, which is computationally tractable       ing out irrelevant distractors. Consequently, recent 3D VG
+for the complex, multi-layer attention-based interaction that     methods have explored semantically-aware keypoint distri-
+follows. However, this scene representation introduces a          butions guided by the text prompt. For instance, 3D-SPS
+severe information bottleneck. The initial aggressive down-       [25] introduced a method for progressively selecting key-
+sampling discards fine-grained scene details, which is par-       points under textual guidance. Similarly, EDA [54] employs
+ticularly detrimental for localizing small objects or distin-     a Top-K selection on text-interacted visual features, retain-
+guishing between similar instances based on subtle cues.          ing only the most salient keypoints for target regression.
+    In parallel, sparse voxel-based representation has be-            However, these “hard selection” strategies may exhibit
+come dominant in other 3D perception tasks like detection         suboptimal performance because they irrevocably discard
+[4, 17, 26, 35, 60] and segmentation [27, 68]. They excel at      features outside the selected set, and gradients can only
+preserving high-resolution spatial information and demon-         backpropagate through the chosen points. This may impede
+strate high inference efficiency. However, their direct appli-    the model’s ability to learn a comprehensive understand-
+cation to 3D VG is computationally prohibitive, as a stan-        ing of all potentially relevant scene regions. More recently,
+dard upsampling decoder produces an exponentially large           learnable task-adaptive keypoint sampling strategies have
+number of voxels [60], making dense feature interaction           garnered significant attention [8, 18, 38, 40, 50, 51, 61].
+with the text query infeasible. Recently, a few works have        Recent methods such as MICAS [40] reframe discrete sam-
+attempted to bridge this gap. TSP3D [12], proposed a text-        pling as a differentiable soft assignment task. This allows
+guided pruning strategy for the voxel-based network, retain-      the model to actively learn the task-relevance of every point
+ing only a small subset of voxels deemed relevant to the text     and its weighted contribution to the final keypoint represen-
+for subsequent interaction. While this strategy improves ef-      tation guided by the downstream task.
+ficiency, this hard-pruning mechanism carries an inherent             Our work introduces a 3D VG-specific adaptation of this
+risk of erroneously discarding relevant voxels, leading to        approach. We employ text-guided, differentiable soft sam-
+information loss. Thus, at the current stage, an efficient ar-    pling, enabling the model to leverage all potential scene
+chitecture that harnesses the high-fidelity representation of     features to focus on semantically relevant key regions.
+voxels without incurring prohibitive computational costs for      This “soft” focusing mechanism effectively enhances the
+multi-modal fusion remains an open challenge.                     model’s overall learning ability to capture the target object.
+
+
+
+                                                             38659
+                                  3D Voxel Convolution
+         point cloud P
+                                                                                      The vending machine is in
+    X
+                                                                                      the back right of the room to
+               Y   voxelization                                                       the left of a lamp.
+                                                           to
+                                                          BEV
+                      Z                                                                          RoBERTa               Referring    Referring
+                FPS                                                                                                      Box         Mask
+
+     X                                                                              𝑇 256×288
+
+                                                                   Text-guided
+                                                                                             …
+               Y                                                                                         Multi-modal        Grounding \
+                                                                                                           Feature         Segmentation
+                                              …
+                                                                  Soft Sampling              …           Interaction           Head
+                      Z
+     keypoints sampling                        ×1024 keypoints                      𝑉𝑘256×288
+
+Figure 2. An illustration of PV-Ground. The raw point cloud is voxelized and fed into multi-layer sparse convolutions to form a voxel
+feature pyramid. We designed a text-guided keypoint sampling module to obtain target-relevant keypoints from the scene. Each keypoint
+aggregates multi-scale features from the neighbor voxel feature pyramid, thereby converting the large voxel features into a compact keypoint
+feature representation. The grounding/segmentation results is predicted by interacting these keypoints with the text.
+
+
+3. Method                                                                         ture set that is both information-rich and computationally
+                                                                                  tractable, bridging the representation gap. The design is de-
+3.1. Overview of the Proposed Framework                                           tailed as follows.
+The proposed PV-Ground framework uniquely integrates a                            Voxel Convolution. Sparse voxel convolution can offer
+voxel-based backbone with a keypoint-based aggregation                            higher resolution and provide more detailed 3D scene data
+and interaction mechanism. The core objective is to lever-                        while maintaining high inference speed, making it highly
+age the high-resolution, fine-grained features from sparse                        efficient and accurate for 3D scene feature extraction. The
+voxel convolutions while retaining the computational con-                         model input is P ∈ RN ×6 , representing a point cloud of N
+venience of keypoint-based multi-modal fusion.                                    points, where each point has six-dimensional features (XYZ
+    The overall architecture is illustrated in Figure 2. The                      and RGB). First, we voxelize the input point cloud into a
+raw input point cloud is first voxelized and then processed                       Lv × Wv × Hv voxel grid representation. The voxel fea-
+by sparse voxel convolutions to generate a multi-scale voxel                      tures are then fed into a sparse voxel convolution network
+feature pyramid. This preserves rich geometric and contex-                        as shown in Figure 2. Each convolutional block downsam-
+tual details that are often lost in point-based downsampling.                     ples the voxel feature maps with a stride of 2, ultimately
+Next, a voxel-to-keypoint feature aggregation mechanism                           forming a voxel feature pyramid. To supplement the con-
+is designed to distill the large-scale voxel feature pyramid                      volutional features, the 8× downsampled feature maps are
+into compact, target-aware keypoints. This compact repre-                         stacked along the Z-axis to form a BEV (Bird’s Eye View)
+sentation, which is both high-fidelity (derived from voxels)                      feature map, completing the multi-scale voxel feature pyra-
+and text-focused (guided by TGS), is then fed into a multi-                       mid. This voxel-based representation provides a rich, hier-
+modal interaction module for deep interaction with the text                       archical representation of the scene, from fine-grained local
+embeddings encoded by the pre-trained RoBERTa [23]. Fi-                           details to high-level contextual semantics.
+nally, a task head performs object localization and segmen-                       Voxel-to-Keypoint Feature Interaction. Directly using
+tation based on the fused multi-modal features.                                   the dense voxel pyramid Fvox for multi-modal cross-
+                                                                                  attention is computationally infeasible. To condense the
+3.2. Efficient Point-Voxel Interaction for Grounding
+                                                                                  large voxel feature pyramid into more compact keypoint
+This section introduces our core mechanism for bridging                           feature representation, we use FPS to obtain a set of N key-
+the high-resolution voxel representation with the computa-                        points P ′ ∈ RN ×3 from the original point cloud to act as
+tionally tractable keypoint-based fusion module. We first                         aggregation anchors. We adapt the Voxel Set Abstraction
+employ a 3D sparse convolution to generate a voxel feature                        (VSA) module [43, 44] to aggregate the feature pyramid.
+pyramid. Then we introduce a Voxel-to-Keypoint aggre-                             For each keypoint kpi , we define a spherical query region
+gation mechanism [43, 44], which uses a set of keypoints                          with radius rl at each pyramid level l. All voxel features
+as aggregation anchors to query the pyramid and distill the                       {vjl } within this radius are gathered. For each layer of the
+scene information. This results in a compact point fea-                           voxel convolution pyramid, a keypoint aggregates its sur-
+
+
+
+                                                                  38660
+                                                                                                                                                                                                                                                                                                                   sampling weights
+rounding features as follows:
+                                                                                                                                                                                                                                                                               𝑇 256×288
+
+    S_i^l=\left \{\left [fvox_j^l ; v_j^l-k p_i\right ]^T \left \lvert \, \begin {array}{c} \left \|v_j^l-kp_i\right \|^2<r_l, \\ \forall v_j^l \in \mathcal {V}^l, \\ \forall fvox_j^l \in \mathcal {F}^l \end {array}\right .\right \}, \label {eq1}                                      …                    self                      gumbel
+                                                                                                                                                                                                                                                                                                                 attention                 softmax
+
+                                                             (1)
+where V l = {v1l , . . . , vN
+                            l
+                              } represents the set of voxel co-
+ordinates in the pyramid, and F l = {f voxl1 , . . . , f voxlN }                                                                                                                                                                                                                 text-guided
+represents the corresponding set of the voxel features. We                                                                                                                                                                                                                      cross encoder                                            …
+                                                                                                                                                                                                                                                                      …                                        …
+further process these features through a PointNet module to                                                                                                                                                                                                                                                           target-aware
+                                                                                                                                                                                                                                                                                                                      soft sampling
+produce a fixed-dimensional feature vector fil for that key-
+point at that level:                                                                                                                                                                                                                                              𝑉 1024×288                           𝑉𝑡1024×288                     𝑉𝑘256×288
+
+                                                       f_i^l = \text {maxpool}(\text {MLP}(\mathcal {M}(S_i^l))),                                                                                                                                   (2)        Figure 3. Architecture of our proposed TGS module. Visual
+                                                                                                                                                                                                                                                               features are first enhanced via cross-encoder with text semantics.
+where M(·) denotes a random sampling operation on                                                                                                                                                                                                              The semantically relevant features generate the sampling weights
+neighboring voxel features. We concatenate the features                                                                                                                                                                                                        through self-attention. We use Gumbel-Softmax to map the point
+                                                                                                                                                                                                                                                               features into a compact, target-aware keypoint representation. The
+from each layer of the voxel pyramid to form point-voxel
+                                                                                                                                                                                                                                                               resulting keypoints are distributed around semantically relevant
+features fipv . These features, along with the features from                                                                                                                                                                                                   objects, which is highly beneficial for target regression.
+the raw point cloud firaw and the BEV map fibev , are
+concatenated and fused via an MLP to form the final,                                                                                                                                                                                                          effectively facilitating subsequent relational reasoning and
+information-rich keypoint feature fig :                                                                                                                                                                                                                       grounding. The structure of TGS is depicted in Figure 3.
+                                                                                                                                                                                                                                                                 First, the initial point features V ∈ RN ×C from the
+                                                      f_i^{kp} = \text {concat}(f_i^{pv}, f_i^{raw}, f_i^{bev}),                                                                                                                                    (3)       VSA module interact with the text features T through cross-
+                                                                                                                                                                                                                                                              attention to obtain text-enhanced visual features Vt :
+
+                                                                                       f_i^g = \text {MLP}(f_i^{kp}).                                                                                                                               (4)                           V_{t} = \text {CrossAtt}(V, \text {SelfAtt}(T)).                (5)
+   Through the aforementioned operations, the original                                                                                                                                                                                                         This initial interaction allows each keypoint to assess its
+large-scale, multi-resolution voxel feature pyramid Fvox is                                                                                                                                                                                                    relevance to the textual query. These enhanced features
+effectively transformed into a much smaller, compact set of                                                                                                                                                                                                    are then processed by a self-attention layer to allow in-
+keypoint feature representations V = {fig }N   i=1 ∈ R
+                                                        N ×C
+                                                             ,                                                                                                                                                                                                 formation sharing between keypoints, followed by a Fully
+which can more efficiently undergo subsequent deep cross-                                                                                                                                                                                                      Connected (FC) layer to predict the text-guided sampling
+modal interaction and fusion with text features, significantly                                                                                                                                                                                                 weights SW ∈ RN ×n for each keypoint, where n is the
+facilitating precise and efficient visual grounding.                                                                                                                                                                                                           target number of text-guided keypoints:
+
+3.3. Text-Guided Keypoint Sampling and Feature                                                                                                                                                                                                                                        SW = \text {FC}(\text {SelfAtt}(V_{t})).                    (6)
+      Aggregation
+                                                                                                                                                                                                                                                               Subsequently, we normalize the sampling weights SW us-
+The keypoints sampled via FPS are uniformly distributed                                                                                                                                                                                                        ing the Gumbel-Softmax [16] reparameterization technique.
+across the scene. They are spatially comprehensive and                                                                                                                                                                                                         This process provides a smooth, differentiable approxima-
+ideal for general tasks like object detection as they man-                                                                                                                                                                                                     tion for discrete sampling, enabling end-to-end training.
+age to capture all potential scene information. However,                                                                                                                                                                                                       Given Gumbel noise g ∈ RN ×n , where each element
+we argue that it is a suboptimal feature aggregation strat-                                                                                                                                                                                                    gij is independently drawn from a Gumbel (0, 1) distri-
+egy for 3D VG. For instance, when the target description                                                                                                                                                                                                       bution, the soft sampling weights (or assignment matrix)
+is “the white refrigerator next to the table,” most uniformly                                                                                                                                                                                                  SWgs ∈ RN ×n are calculated as:
+sampled points that do not belong to a table or a refriger-
+ator essentially become distractors. A more effective ap-                                                                                                                                                                                                                    SW_{gs} = \text {softmax} ((\log (SW) + g)/\tau ).                   (7)
+proach would be to focus the keypoints around all instances                                                                                                                                                                                                    where τ is the annealing temperature and the softmax func-
+of “tables” and “refrigerators” in the scene, preventing the                                                                                                                                                                                                   tion is applied along the keypoint dimension.
+target from being entangled with co-occurring background                                                                                                                                                                                                          Finally, we use these differentiable weights to perform
+contexts [37, 39, 41]. This benefits downstream reason-                                                                                                                                                                                                        a weighted soft sampling of the original N keypoints and
+ing of spatial relationships and semantic alignment. To                                                                                                                                                                                                        their features, producing a final set of n (where n ≪ N )
+this end, we propose the Text-Guided Keypoint Sampling                                                                                                                                                                                                         compact, target-aware keypoints Pk and their features Vk :
+(TGS) module, which uses textual guidance to focus the
+keypoint distribution around text-relevant candidate objects,                                                                                                                                                                                                                            P_k = (SW_{gs})^T \times P',                             (8)
+
+
+
+                                                                                                                                                                                                                                                          38661
+Table 1. The 3D visual grounding results on ScanRefer. Accuracy evaluated by IoU 0.25 and IoU 0.5. The best results are highlighted
+in bold and the second best are underlined. We primarily compare our method with the baseline† and mark the performance gains in the
+parentheses. PV-Ground outperforms the baseline model by over 5% and over 2% in the single-stage and two-stage pipelines, respectively.
+                                                                      Unique (∼19%)       Multiple (∼81%)             Overall
+                  Method                Venue            Modality
+                                                                    Acc@0.25 Acc@0.5    Acc@0.25 Acc@0.5        Acc@0.25 Acc@0.5
+  Two-Stage Model
+           ScanRefer [2]         ECCV’20                 3D+2D       76.33      53.51      32.73       21.11      41.19           27.40
+      InstanceRefer [64]          ICCV’21                  3D        77.45      66.83      31.27       24.77      40.23           32.93
+  3DVG-Transformer [67]           ICCV’21                3D+2D       81.93      60.64      39.30       28.42      47.57           34.67
+            3D-SPS [25]          CVPR’22                 3D+2D       84.12      66.72      40.32       29.82      48.82           36.98
+      BUTD-DETR [15]             ECCV’22                   3D        82.88      64.98      44.73       33.97      50.42           38.60
+               EDA[54]           CVPR’23                   3D        85.76      68.57      49.13       37.64      54.59           42.26
+      CORE-3DVG [62]            NeurIPS’23                 3D        84.00      67.09      51.82       39.76      56.77           43.83
+           VPP-Net [45]          CVPR’24                   3D        86.05      67.09      50.32       39.03      55.65           43.29
+           † MCLN [32]           ECCV’24                   3D        86.89      72.73      51.96       40.76      57.17           45.53
+      DDPA-3DVG [11]              IJCAI’25                 3D        86.80      70.20      49.80       38.40      55.30           43.30
+          AugRefer [47]           AAAI’25                  3D        86.21      70.75      49.96       39.06      55.68           44.03
+             PV-Ground                Ours                 3D        87.67      72.94      54.99       43.11    59.87 (+2.7%)   47.56 (+2.0%)
+
+  Single-Stage Model
+           3D-SPS [25]             CVPR’22               3D+2D       81.63      64.77      39.48       29.61      47.65           36.43
+       BUTD-DETR [15]              ECCV’22                 3D        81.47      61.24      44.20       32.81      49.76           37.05
+              EDA[54]              CVPR’23                 3D        86.40      69.42      48.11       36.82      53.83           41.70
+          † MCLN [32]              ECCV’24                 3D        84.43      68.36      49.72       38.41      54.30           42.64
+       DDPA-3DVG [11]              IJCAI’25                3D        86.50      60.90      48.60       37.40      54.30           42.20
+            TSP3D [12]             CVPR’25                 3D        87.25      71.41      51.04       42.37      56.45           46.71
+            PV-Ground                 Ours                 3D        86.11      72.45      54.61       43.44    59.31 (+5.0%)   47.77 (+5.1%)
+
+
+                                                                             design. To demonstrate the effectiveness and versatility of
+                      V_{k} = (SW_{gs})^T \times V_t.                 (9)    our proposed framework, we also conducted experiments by
+                                                                             feeding our keypoint features into other decoders [15, 54].
+The resulting keypoints and features are guided by the text
+                                                                             More results are presented in the Supplementary Material.
+query and are concentrated around semantically relevant
+objects. This allows for a more comprehensive and effec-
+tive aggregation of most potential scene features, providing                 4. Experiments
+a much more focused and compact representation for the
+                                                                             4.1. Experiments Settings
+subsequent reasoning and target regression steps.
+                                                                             Datasets. We evaluated the performance of our model on
+3.4. Target Regression and Prediction                                        the ScanRefer [2] dataset and the ReferIt3D [1] dataset,
+The keypoint features Vk obtained by our proposed TGS                        which are consistent with previous works [12, 32, 48, 54].
+module can be seamlessly integrated into existing point-                     Both datasets are built upon the point clouds from the Scan-
+based frameworks [32, 54] for decoding and final target re-                  Net dataset. ScanRefer contains 51,583 manually anno-
+gression and prediction. In this work, we adopt the decoder                  tated descriptions of objects in 3D scenes. This dataset
+and prediction head from MCLN [32] as our primary archi-                     features two distinct configurations: About 19% is in the
+tecture. We chose this framework due to its superior perfor-                 “unique” setting, where the target object referenced by the
+mance and its multi-task design, which simultaneously pre-                   language is the sole instance of its category within the
+dicts both a bounding box and a segmentation mask. This                      scene. The other 81% is in the more challenging “multi-
+multi-task structure allows for a more comprehensive eval-                   ple” setting, where the scene contains multiple distractor
+uation of our method’s capabilities across multiple down-                    candidates in the same category as the target object. We
+stream tasks in existing standard metrics. We strongly en-                   use Acc@0.25IoU and Acc@0.5IoU as the primary evalua-
+courage readers to refer to MCLN [32] for further details                    tion metrics. ReferIt3D is split into two subsets: Nr3D and
+about the multi-task prediction head and its loss function                   Sr3D. Nr3D contains 41,503 manually annotated text de-
+
+
+
+                                                                        38662
+Table 2. Quantitative comparisons on ReferIt3D. PV-Ground ex-               Table 3. The 3D referring expression segmentation results on
+hibits significant superiority. Compared to the existing point-based        ScanRefer. Our method outperforms existing point-based base-
+baseline†, it leads by 2.3% and 0.5% on Nr3D and Sr3D respec-               line methods by a substantial margin. Notably, it achieves over
+tively in the two-stage pipeline, while also achieving remarkable           4% increase in the overall accuracy and over 3% in mean IOU.
+improvements of 5.6% and 3.1% in the single-stage pipeline.
+                                                                                                   Unique     Multiple          Overall
+                                                                                      Method
+                                                     Accuracy                                    0.25 0.5    0.25 0.5    0.25    0.5 mIOU
+             Method      Venue        Pipeline
+                                                   Nr3D    Sr3D                     TGNN [14]      -    -      -     -   37.5   31.4 27.8
+                                                                               X-RefSeg3D [31]     -    -      -     -   40.3   33.8 29.9
+   InstanceRefer [64]   ICCV’21      Two-stage      38.8    48.0
+                                                                                3D-STMN [53]     89.3 84.0   46.2 29.2   54.6   39.8 39.5
+  LanguageRefer [34]    CoRL’22      Two-stage      43.9    56.0
+                                                                                  RG-SAN [52]    89.2 69.8   51.6 41.9   57.0   46.1 40.8
+         3D-SPS [25]    CVPR’22      Two-stage      51.5    62.6
+                                                                                   MCLN [32]     89.6 78.2   53.3 45.9   58.7   50.7 44.7
+   BUTD-DETR [15]       ECCV’22      Two-stage      54.6    67.0
+                                                                                   PV-Ground     90.3 79.2   57.3 50.6   62.2   54.8 47.9
+           EDA [54]     CVPR’23      Two-stage      52.1    68.1
+        VPP-Net [45]    CVPR’24      Two-stage      56.9    68.7
+        † MCLN [32]     ECCV’24      Two-stage      59.8    68.4            work can be seamlessly integrated into other point-based 3D
+          PV-Ground       Ours       Two-stage      62.1    68.9            VG methods, yielding similar performance benefits. These
+                                                                            results will be detailed in the Supplementary Material.
+       3D-SPS [25]      CVPR’22     Single-stage    39.2    47.1
+   BUTD-DETR [15]       ECCV’22     Single-stage    38.7    50.1            Grounding. Table 1 presents the quantitative results of the
+          EDA [54]      CVPR’23     Single-stage    40.0    49.7            proposed PV-Ground framework on the ScanRefer bench-
+      † MCLN [32]       ECCV’24     Single-stage    45.7    53.4            mark, highlighting its significant superiority over the point-
+        TSP3D [12]      CVPR’25     Single-stage    48.7    57.1            based baseline. This improvement is particularly evident in
+        PV-Ground        Ours       Single-stage    51.3    56.5            the single-stage pipeline and the more challenging “multi-
+                                                                            ple” setting. Specifically, in the single-stage pipeline (which
+scriptions, while Sr3D contains 83,572 machine-generated                    operates without prior object proposals), PV-Ground excels
+scene text descriptions. It provides candidate boxes for all                by adaptively concentrating keypoints on text-relevant re-
+potential objects, and the evaluation metric is the accuracy                gions. This strategy leads to significant accuracy gains of
+of correctly selecting and classifying the target object’s can-             5.0% in Acc@0.25IoU and 5.1% in Acc@0.5IoU over the
+didate box.                                                                 baseline, respectively. These results underscore the substan-
+Implementation Details. Our model is trained and eval-                      tial advantages of our text-guided voxel-to-keypoint frame-
+uated on a NVIDIA GeForce RTX 4090 GPU with a batch                         work for the 3D VG task.
+size of 10. We clamp the XYZ coordinates of the input point                     In Table 2, we demonstrate the performance of PV-
+cloud within the range of [-8m, -8m, -0.2m] to [8m, 8m,                     Ground on the ReferIt3D dataset. As shown, our method
+3.8m], and voxelize the scene with a resolution of 0.02m.                   achieves substantial improvements over the baseline in both
+During the keypoint extraction and voxel feature aggrega-                   single-stage and two-stage pipelines. Particularly, on the
+tion process, we first employ FPS to select N = 1024 points                 Nr3D subset, we achieve a 5.6% performance increase com-
+that are uniformly distributed in the scene. For the feature                pared to MCLN in the single-stage setting, establishing a
+aggregation of the voxel pyramid in Equation (1), we gather                 new state-of-the-art. We also record a 2.3% gain in the two-
+the voxel features around the keypoints using radii of rl =                 stage pipeline.
+[0.2m, 0.4m, 0.8m, 1.6m], respectively. We then utilize our                 Segmentation. PV-Ground is able to obtain the segmen-
+TGS module to aggregate n = 256 target-aware keypoints.                     tation mask of the target through the multi-task prediction
+The temperature τ in Gumbel sampling is set to 1.0 to en-                   head. Therefore, we also evaluate the segmentation perfor-
+courage early exploration for potentially relevant regions.                 mance of PV-Ground on the ScanRefer dataset. As shown
+                                                                            in Table 3, the proposed method achieves consistent perfor-
+4.2. Quantitative Comparisons                                               mance gains across most segmentation metrics. We observe
+In this section, we provide a quantitative comparison of our                an improvement of 4.1% in Acc@0.5IoU and a 3.2% in-
+method against existing state-of-the-art approaches. As our                 crease in the mean IoU score for segmentation.
+method adopts the multi-modal interaction module and pre-                       In summary, across both grounding and segmentation
+diction head from MCLN [32] for multi-task learning (see                    tasks, PV-Ground consistently and significantly outper-
+Sec 3.4), PV-Ground is able to simultaneously output results                forms the baseline and establishes a new state-of-the-
+for both 3D visual grounding and segmentation. We will                      art. The results comprehensively validate the superior-
+present the performance for both tasks, with a particular fo-               ity of our proposed approach and confirm that the task-
+cus on using MCLN as our primary baseline to highlight the                  specific keypoint-based scene representation extracted by
+performance gains attributable to our framework. It should                  our framework is more effective for the subsequent rela-
+be noted that the keypoint features generated by our frame-                 tional reasoning and target prediction in 3D VG.
+
+
+
+                                                                       38663
+  Description                      Ground Truth             PV-Ground                 Seed Points (green)    Text-guided Keypoints (red)
+
+(a) this is a small black sofa.
+it is sitting in front of a gray
+bookcase. the bookcase is
+placed in a corner to the left
+of the door to the room.
+
+
+
+
+(b) the wall sink. the sink is
+on the right of the toilet.
+
+
+
+
+(c) there are several chairs
+along the wall. specifically
+the black one that is in bet-
+ween another black chair
+and black sofa.
+
+
+
+Figure 4. Visualization of PV-Ground’s results. The initial seed points from FPS are spatially uniform, covering many text-irrelevant areas.
+In contrast, our Text-Guided Keypoint Sampling (TGS) module adaptively focuses the keypoints on text-relevant objects (e.g., sofa, door,
+sink and toilet), leading to precise localization and segmentation.
+                                                                         Table 4. Ablation on the proposed point-voxel interaction 3D VG
+4.3. Ablation Study                                                      framework and the TGS module. Evaluated on ScanRefer.
+To demonstrate the effectiveness of our proposed frame-                                            Grounding           Segmentation
+work, we perform an ablation study as presented in Ta-                    ID    PVI     TGS
+                                                                                                  0.25    0.5      0.25     0.5     mIoU
+ble 4. The experiments are conducted using the single-stage               (a)                    54.30   42.64     56.78   49.28    43.49
+model on the ScanRefer dataset. The typical point-based                   (b)            ✓       56.33   45.19     58.50   50.57    44.75
+architecture [32] is selected as the baseline. We incremen-               (c)    ✓               58.15   47.23     60.07   53.34    46.72
+tally add our Point-Voxel Interaction (PVI) module and our                (d)    ✓       ✓       59.31   47.77     62.06   54.52    47.73
+Text-Guided Keypoint Sampling (TGS) module to isolate
+the contribution of each component. When the PVI module                  while preserving the overall scene structure, are uniformly
+is disabled, we use a standard PointNet++ backbone to ex-                distributed and cover extensive text-irrelevant regions. This
+tract scene features from the input point cloud. When the                introduces significant distractors for the subsequent multi-
+TGS module is disabled, we use a Top-K selection strategy                modal interaction and target regression. In contrast, the key-
+[54] on the uniformly sampled points from FPS as a substi-               points generated by our TGS module are precisely focused
+tute for our query generation.                                           on the vicinity of the text-described objects. This visual-
+    As shown in Table 4, our proposed PVI framework sig-                 ization clearly illustrates how our TGS module effectively
+nificantly improves both grounding and segmentation per-                 filters irrelevant regions and concentrates on semantically
+formance over the baseline, and our keypoint focusing mod-               salient areas, thereby significantly enhancing PV-Ground’s
+ule provides a substantial additional performance boost on               performance in both grounding and segmentation tasks.
+top of the PVI framework. These results effectively vali-
+date the superiority of the proposed modules. Moreover, the              5. Conclusion
+task-specific keypoint features generated by the PV-Ground
+                                                                         In this paper, we propose PV-Ground, a novel 3D VG
+framework can also be seamlessly integrated into other ex-
+                                                                         paradigm based on text-guided point-voxel feature interac-
+isting point-based 3D VG frameworks, replacing their na-
+                                                                         tion. PV-Ground addresses the representation bottleneck of
+tive query features to achieve similar performance enhance-
+                                                                         existing 3D VG methods by unifying the fine-grained repre-
+ments. Ablation results on more datasets and backbones
+                                                                         sentational details of voxels with the efficient multi-modal
+will be presented in the Supplementary Material.
+                                                                         deep interaction of keypoints. Furthermore, it employs text-
+                                                                         guidance to achieve task-specific point sampling, concen-
+4.4. Qualitative Results
+                                                                         trating keypoints around semantically relevant regions to ef-
+In Figure 4, we qualitatively demonstrate the grounding and              fectively boost 3D VG performance. Extensive experiments
+segmentation performance of PV-Ground. We also visual-                   demonstrate that PV-Ground achieves state-of-the-art accu-
+ize and compare the initial “seed points” sampled by FPS                 racy, and the resulting keypoint representations yield signif-
+against the final target-aware keypoints generated by our                icant improvements for both grounding and segmentation
+TGS module. As shown, the FPS-sampled seed points,                       tasks over existing 3D VG baselines.
+
+
+
+                                                                  38664
+Acknowledgments This research is supported by the Na-                   [13] Yulan Guo, Hanyun Wang, Qingyong Hu, Hao Liu, Li Liu,
+tional Key Research and Development Program of China                         and Mohammed Bennamoun. Deep learning for 3d point
+under Grant 2023YFB4302600 and the National Natural                          clouds: A survey. IEEE Transactions on Pattern Analysis
+Science Foundation of China under Grant 52172334, Grant                      and Machine Intelligence, 43(12):4338–4364, 2021. 1
+52131202 and Grant 62506333. This work is also supported                [14] Pin-Hao Huang, Han-Hung Lee, Hwann-Tzong Chen, and
+                                                                             Tyng-Luh Liu. Text-guided graph neural networks for refer-
+by the Zhejiang Provincial Natural Science Foundation of
+                                                                             ring 3d instance segmentation. In AAAI, pages 1610–1618,
+China (LD25F020001), the Fundamental Research Funds
+                                                                             2021. 7
+for the Central Universities (226-2025-00057), the Postdoc-             [15] Ayush Jain, Nikolaos Gkanatsios, Ishita Mediratta, and Kate-
+toral Fellowship Program of CPSF (GZC20251077) and the                       rina Fragkiadaki. Bottom up top down detection transform-
+China Postdoctoral Science Foundation (2025M781525).                         ers for language grounding in images and point clouds. In
+                                                                             ECCV, pages 417–433, 2022. 1, 2, 3, 6, 7
+References                                                              [16] Eric Jang, Shixiang Gu, and Ben Poole. Categorical repa-
+                                                                             rameterization with gumbel-softmax. In ICLR, 2016. 5
+ [1] Panos Achlioptas, Ahmed Abdelreheem, Fei Xia, Mohamed
+                                                                        [17] Maksim Kolodiazhnyi, Anna Vorontsova, Matvey Skripkin,
+     Elhoseiny, and Leonidas Guibas. Referit3d: Neural listeners
+                                                                             Danila Rukhovich, and Anton Konushin. Unidet3d: Multi-
+     for fine-grained 3d object identification in real-world scenes.
+                                                                             dataset indoor 3d object detection. In AAAI, pages 4365–
+     In ECCV, pages 422–440, 2020. 6
+                                                                             4373, 2025. 3
+ [2] Dave Zhenyu Chen, Angel X Chang, and Matthias Nießner.
+                                                                        [18] Itai Lang, Asaf Manor, and Shai Avidan. Samplenet: Differ-
+     Scanrefer: 3d object localization in rgb-d scans using natural
+                                                                             entiable point cloud sampling. In CVPR, pages 7578–7588,
+     language. In ECCV, pages 202–221, 2020. 1, 6
+                                                                             2020. 3
+ [3] Shizhe Chen, Pierre-Louis Guhur, Makarand Tapaswi,
+                                                                        [19] Lin Li, Jun Xiao, Guikun Chen, Jian Shao, Yueting Zhuang,
+     Cordelia Schmid, and Ivan Laptev. Think global, act local:
+                                                                             and Long Chen. Zero-shot visual relation detection via com-
+     Dual-scale graph transformer for vision-and-language navi-
+                                                                             posite visual cues from large language models. In NeurIPS,
+     gation. In CVPR, 2022. 1
+                                                                             pages 50105–50116, 2023. 1
+ [4] Yukang Chen, Jianhui Liu, Xiangyu Zhang, Xiaojuan Qi, and          [20] Lin Li, Wei Chen, Jiahui Li, Kwang-Ting Cheng, and Long
+     Jiaya Jia. Voxelnext: Fully sparse voxelnet for 3d object               Chen. Relation-r1: Progressively cognitive chain-of-thought
+     detection and tracking. In CVPR, pages 21674–21683, 2023.               guided reinforcement learning for unified relation compre-
+     3                                                                       hension. In AAAI, 2026. 1
+ [5] Zhe Chen, Jiannan Wu, Wenhai Wang, Weijie Su, Guo Chen,            [21] Wenbing Li, Hang Zhou, Junqing Yu, Zikai Song, and Wei
+     Sen Xing, Muyan Zhong, Qinglong Zhang, Xizhou Zhu,                      Yang. Coupled mamba: Enhanced multimodal fusion with
+     Lewei Lu, et al. Internvl: Scaling up vision foundation mod-            coupled state space model. In NeurIPS, pages 59808–59832,
+     els and aligning for generic visual-linguistic tasks. In CVPR,          2024. 1
+     pages 24185–24198, 2024. 1                                         [22] Daizong Liu, Yang Liu, Wencan Huang, and Wei Hu. A
+ [6] Christopher Choy, JunYoung Gwak, and Silvio Savarese. 4d                survey on text-guided 3d visual grounding: Elements, recent
+     spatio-temporal convnets: Minkowski convolutional neural                advances, and future directions. IEEE Transactions on Neu-
+     networks. In CVPR, pages 3075–3084, 2019. 1                             ral Networks and Learning Systems, 2025. 1, 2, 3
+ [7] Jacob Devlin. Bert: Pre-training of deep bidirectional             [23] Yinhan Liu. Roberta: A robustly optimized bert pretraining
+     transformers for language understanding. arXiv preprint                 approach. arXiv preprint arXiv:1907.11692, 2019. 1, 4
+     arXiv:1810.04805, 2018. 1                                          [24] Ze Liu, Zheng Zhang, Yue Cao, Han Hu, and Xin Tong.
+ [8] Oren Dovrat, Itai Lang, and Shai Avidan. Learning to sam-               Group-free 3d object detection via transformers. In ICCV,
+     ple. In CVPR, pages 2760–2769, 2019. 3                                  pages 2949–2958, 2021. 2, 3
+ [9] Yalda Ghasemi, Heejin Jeong, Sung Ho Choi, Kyeong-Beom             [25] Junyu Luo, Jiahui Fu, Xianghao Kong, Chen Gao, Haibing
+     Park, and Jae Yeol Lee. Deep learning-based object detection            Ren, Hao Shen, Huaxia Xia, and Si Liu. 3d-sps: Single-stage
+     in augmented reality: A systematic review. Computers in                 3d visual grounding via referred point progressive selection.
+     Industry, 139:103661, 2022. 1                                           In CVPR, pages 16454–16463, 2022. 3, 6, 7
+[10] Benjamin Graham, Martin Engelcke, and Laurens Van                  [26] Jiageng Mao, Shaoshuai Shi, Xiaogang Wang, and Hong-
+     Der Maaten. 3d semantic segmentation with submanifold                   sheng Li. 3d object detection for autonomous driving: A
+     sparse convolutional networks. In CVPR, pages 9224–9232,                comprehensive survey. International Journal of Computer
+     2018. 1                                                                 Vision, 131(8):1909–1963, 2023. 1, 3
+[11] Hongjie Gu, Jinlong Fan, Liang Zheng, Jing Zhang,                  [27] Bohao Peng, Xiaoyang Wu, Li Jiang, Yukang Chen, Heng-
+     and Yuxiang Yang. Ddpa-3dvg: vision-language dual-                      shuang Zhao, Zhuotao Tian, and Jiaya Jia. Oa-cnns: Omni-
+     decoupling and progressive alignment for 3d visual ground-              adaptive sparse cnns for 3d semantic segmentation. In CVPR,
+     ing. In IJCAI, pages 1044–1052, 2025. 6                                 pages 21305–21315, 2024. 3
+[12] Wenxuan Guo, Xiuwei Xu, Ziwei Wang, Jianjiang Feng, Jie            [28] Charles Ruizhongtai Qi, Hao Su, Kaichun Mo, and
+     Zhou, and Jiwen Lu. Text-guided sparse voxel pruning for                Leonidas J Guibas. Pointnet: Deep learning on point sets
+     efficient 3d visual grounding. In CVPR, pages 3666–3675,                for 3d classification and segmentation. In CVPR, pages 652–
+     2025. 1, 2, 3, 6, 7                                                     660, 2017. 1
+
+
+
+
+                                                                   38665
+[29] Charles Ruizhongtai Qi, Li Yi, Hao Su, and Leonidas J                representation for 3d object detection. International Journal
+     Guibas. Pointnet++: Deep hierarchical feature learning on            of Computer Vision, 131(2):531–551, 2023. 4
+     point sets in a metric space. In NeurIPS, 2017. 1, 3            [45] Xiangxi Shi, Zhonghua Wu, and Stefan Lee. Aware vi-
+[30] Charles Ruizhongtai Qi, Or Litany, Kaiming He, and                   sual grounding in 3d scenes. In CVPR, pages 14056–14065,
+     Leonidas J Guibas. Deep hough voting for 3d object de-               2024. 6, 7
+     tection in point clouds. In ICCV, pages 9277–9286, 2019.        [46] Zikai Song, Ying Tang, Run Luo, Lintao Ma, Junqing Yu,
+     2                                                                    Yi-Ping Phoebe Chen, and Wei Yang. Autogenic language
+[31] Zhipeng Qian, Yiwei Ma, Jiayi Ji, and Xiaoshuai Sun. X-              embedding for coherent point tracking. In ACM MM, pages
+     refseg3d: Enhancing referring 3d instance segmentation via           2021–2030, 2024. 1
+     structured cross-modal graph neural networks. In AAAI,          [47] Xinyi Wang, Na Zhao, Zhiyuan Han, Dan Guo, and Xun
+     pages 4551–4559, 2024. 7                                             Yang. Augrefer: Advancing 3d visual grounding via cross-
+[32] Zhipeng Qian, Yiwei Ma, Zhekai Lin, Jiayi Ji, Xiawu Zheng,           modal augmentation and spatial relation-based referring. In
+     Xiaoshuai Sun, and Rongrong Ji. Multi-branch collaborative           AAAI, pages 8006–8014, 2025. 6
+     learning network for 3d visual grounding. In ECCV, pages        [48] Yuan Wang, Yali Li, and Shengjin Wang. Gˆ3-lq: Marrying
+     381–398, 2024. 1, 3, 6, 7, 8, 2                                      hyperbolic alignment with explicit semantic-geometric mod-
+[33] Alec Radford, Karthik Narasimhan, Tim Salimans, Ilya                 eling for 3d visual grounding. In CVPR, pages 13917–13926,
+     Sutskever, et al. Improving language understanding by gen-           2024. 1, 3, 6
+     erative pre-training. OpenAI, 2018. 1                           [49] Yuan Wang, Ya-Li Li, WU Eastman ZY, and Shengjin Wang.
+[34] Junha Roh, Karthik Desingh, Ali Farhadi, and Dieter                  Liba: Language instructed multi-granularity bridge assistant
+     Fox. Languagerefer: Spatial-language model for 3d visual             for 3d visual grounding. In AAAI, pages 8114–8122, 2025. 2
+     grounding. In CoRL, pages 1046–1056, 2022. 7
+                                                                     [50] Cheng Wen, Baosheng Yu, and Dacheng Tao. Learnable
+[35] Danila Rukhovich, Anna Vorontsova, and Anton Konushin.
+                                                                          skeleton-aware 3d point cloud sampling. In CVPR, pages
+     Fcaf3d: Fully convolutional anchor-free 3d object detection.
+                                                                          17671–17681, 2023. 3
+     In ECCV, pages 477–493, 2022. 3
+                                                                     [51] Chengzhi Wu, Junwei Zheng, Julius Pfrommer, and Jürgen
+[36] Ranjan Sapkota, Konstantinos I Roumeliotis, Rahul Harsha
+                                                                          Beyerer. Attention-based point cloud edge sampling. In
+     Cheppally, Marco Flores Calero, and Manoj Karkee. A re-
+                                                                          CVPR, pages 5333–5343, 2023. 3
+     view of 3d object detection with vision-language models.
+     arXiv preprint arXiv:2504.18738, 2025. 1                        [52] Changli Wu, Jiayi Ji, Haowei Wang, Yiwei Ma, You Huang,
+                                                                          Gen Luo, Hao Fei, Xiaoshuai Sun, Rongrong Ji, et al. Rg-
+[37] Feifei Shao, Yawei Luo, Li Zhang, Lu Ye, Siliang Tang, Yi
+                                                                          san: Rule-guided spatial awareness network for end-to-end
+     Yang, and Jun Xiao. Improving weakly supervised object lo-
+                                                                          3d referring expression segmentation. In NeurIPS, pages
+     calization via causal intervention. In ACM MM, pages 3321–
+                                                                          110972–110999, 2024. 7
+     3329, 2021. 5
+[38] Feifei Shao, Yawei Luo, Ping Liu, Jie Chen, Yi Yang, Yulei      [53] Changli Wu, Yiwei Ma, Qi Chen, Haowei Wang, Gen Luo,
+     Lu, and Jun Xiao. Active learning for point cloud semantic           Jiayi Ji, and Xiaoshuai Sun. 3d-stmn: Dependency-driven
+     segmentation via spatial-structural diversity reasoning. In          superpoint-text matching network for end-to-end 3d refer-
+     ACM MM, page 2575–2585, 2022. 3                                      ring expression segmentation. In AAAI, pages 5940–5948,
+[39] Feifei Shao, Yawei Luo, Fei Gao, Yi Yang, and Jun                    2024. 7
+     Xiao. Knowledge-guided causal intervention for weakly-          [54] Yanmin Wu, Xinhua Cheng, Renrui Zhang, Zesen Cheng,
+     supervised object localization. IEEE Transactions on Knowl-          and Jian Zhang. Eda: Explicit text-decoupling and dense
+     edge and Data Engineering, 36(11):6477–6489, 2024. 5                 alignment for 3d visual grounding. In CVPR, pages 19231–
+[40] Feifei Shao, Ping Liu, Zhao Wang, Yawei Luo, Hongwei                 19242, 2023. 1, 3, 6, 7, 8, 2
+     Wang, and Jun Xiao. Micas: Multi-grained in-context adap-       [55] Linhui Xiao, Xiaoshan Yang, Xiangyuan Lan, Yaowei Wang,
+     tive sampling for 3d point cloud processing. In CVPR, pages          and Changsheng Xu. Towards visual grounding: A survey.
+     6616–6626, 2025. 3                                                   IEEE Transactions on Pattern Analysis and Machine Intelli-
+[41] Feifei Shao, Yawei Luo, Lei Chen, Ping Liu, Wei Yang, Yi             gence, pages 1–20, 2025. 1
+     Yang, and Jun Xiao. Counterfactual co-occurring learning        [56] Linhai Xie, Yishu Miao, Sen Wang, Phil Blunsom, Zhi-
+     for bias mitigation in weakly-supervised object localization.        hua Wang, Changhao Chen, Andrew Markham, and Niki
+     IEEE Transactions on Multimedia, 2026. 5                             Trigoni. Learning with stochastic guidance for robot naviga-
+[42] Shaoshuai Shi, Xiaogang Wang, and Hongsheng Li. Pointr-              tion. IEEE transactions on Neural Networks and Learning
+     cnn: 3d object proposal generation and detection from point          Systems, 32(1):166–176, 2020. 1
+     cloud. In CVPR, pages 770–779, 2019. 3                          [57] Peng Xu, Xiatian Zhu, and David A Clifton. Multimodal
+[43] Shaoshuai Shi, Chaoxu Guo, Li Jiang, Zhe Wang, Jianping              learning with transformers: A survey. IEEE Transactions on
+     Shi, Xiaogang Wang, and Hongsheng Li. Pv-rcnn: Point-                Pattern Analysis and Machine Intelligence, 45(10):12113–
+     voxel feature set abstraction for 3d object detection. In            12132, 2023. 1
+     CVPR, pages 10529–10538, 2020. 3, 4                             [58] Runsen Xu, Xiaolong Wang, Tai Wang, Yilun Chen, Jiang-
+[44] Shaoshuai Shi, Li Jiang, Jiajun Deng, Zhe Wang, Chaoxu               miao Pang, and Dahua Lin. Pointllm: Empowering large lan-
+     Guo, Jianping Shi, Xiaogang Wang, and Hongsheng Li. Pv-              guage models to understand point clouds. In ECCV, pages
+     rcnn++: Point-voxel feature set abstraction with local vector        131–147, 2024. 1
+
+
+
+
+                                                                 38666
+[59] Xiuwei Xu, Ziwei Wang, Jie Zhou, and Jiwen Lu. Binariz-
+     ing sparse convolutional networks for efficient point cloud
+     analysis. In CVPR, pages 5313–5322, 2023. 1
+[60] Xiuwei Xu, Zhihao Sun, Ziwei Wang, Hongmin Liu, Jie
+     Zhou, and Jiwen Lu. Dspdet3d: 3d small object detection
+     with dynamic spatial pruning. In ECCV, pages 355–373,
+     2024. 2, 3
+[61] Xu Yan, Chaoda Zheng, Zhen Li, Sheng Wang, and
+     Shuguang Cui. Pointasnl: Robust point clouds processing
+     using nonlocal neural networks with adaptive sampling. In
+     CVPR, pages 5589–5598, 2020. 3
+[62] Li Yang, Ziqi Zhang, Zhongang Qi, Yan Xu, Wei Liu, Ying
+     Shan, Bing Li, Weiping Yang, Peng Li, Yan Wang, et al.
+     Exploiting contextual objects and relations for 3d visual
+     grounding. In NeurIPS, pages 49542–49554, 2023. 6
+[63] Yuan Yuan, Zhaojian Li, and Bin Zhao. A survey of mul-
+     timodal learning: Methods, applications, and future. ACM
+     Computing Surveys, 57(7):1–34, 2025. 1
+[64] Zhihao Yuan, Xu Yan, Yinghong Liao, Ruimao Zhang,
+     Sheng Wang, Zhen Li, and Shuguang Cui. Instancerefer:
+     Cooperative holistic understanding for visual grounding on
+     point clouds through instance multi-level contextual refer-
+     ring. In ICCV, pages 1791–1800, 2021. 6, 7
+[65] Jingyi Zhang, Jiaxing Huang, Sheng Jin, and Shijian Lu.
+     Vision-language models for vision tasks: A survey. IEEE
+     transactions on Pattern Analysis and Machine Intelligence,
+     46(8):5625–5644, 2024. 1
+[66] Taolin Zhang, Sunan He, Tao Dai, Zhi Wang, Bin Chen, and
+     Shu-Tao Xia. Vision-language pre-training with object con-
+     trastive learning for 3d scene understanding. In AAAI, pages
+     7296–7304, 2024. 1
+[67] Lichen Zhao, Daigang Cai, Lu Sheng, and Dong Xu. 3dvg-
+     transformer: Relation modeling for visual grounding on
+     point clouds. In ICCV, pages 2928–2937, 2021. 6
+[68] Haoyi Zhu, Honghui Yang, Xiaoyang Wu, Di Huang, Sha
+     Zhang, Xianglong He, Hengshuang Zhao, Chunhua Shen, Yu
+     Qiao, Tong He, et al. Ponderv2: Improved 3d representation
+     with a universal pre-training paradigm. IEEE Transactions
+     on Pattern Analysis and Machine Intelligence, 2025. 3
+[69] Ziyu Zhu, Xilin Wang, Yixuan Li, Zhuofan Zhang, Xiaojian
+     Ma, Yixin Chen, Baoxiong Jia, Wei Liang, Qian Yu, Zhi-
+     dong Deng, et al. Move to understand a 3d scene: Bridging
+     visual grounding and exploration for efficient and versatile
+     embodied navigation. In ICCV, pages 8120–8132, 2025. 1
+
+
+
+
+                                                                38667
+

@@ -1,0 +1,888 @@
+                                                       Rethinking Token Reduction for Large Vision-Language Models
+
+                                                          Yi Wang1∗ , Haofei Zhang2,3∗ , Qihan Huang1 , Anda Cao1 , Gongfan Fang5 ,
+                                                            Wei Wang6 , Xuan Jin6 , Jie Song4 , Mingli Song1,2,3,4 , Xinchao Wang5†
+                                                                 1
+                                                               College of Computer Science and Technology, Zhejiang University
+                                                           2
+                                                           State Key Laboratory of Blockchain and Data Security, Zhejiang University
+                                                        3
+                                                          Hangzhou High-Tech Zone (Binjiang) Institute of Blockchain and Data Security
+                                                                     4
+
+
+
+
+arXiv:2603.21701v1 [cs.CV] 23 Mar 2026
+                                                                       School of Software Technology, Zhejiang University
+                                                                     5
+                                                                       National University of Singapore 6 Alibaba Group
+
+                                                                     Abstract                                     visual modalities into tokens jointly processed by a unified
+                                                                                                                  Large Language Model (LLM). Recent works [37, 70] fur-
+                                             Large Vision-Language Models (LVLMs) excel in visual
+                                                                                                                  ther extend LVLMs toward multi-scale visual inputs that
+                                         understanding and reasoning, but the excessive visual tokens
+                                                                                                                  integrate both global and local tokens to enhance visual
+                                         lead to high inference costs. Although recent token reduction            understanding. However, visual tokens greatly increase
+                                         methods mitigate this issue, they mainly target single-turn              computation and memory costs, as token numbers grow by
+                                         Visual Question Answering (VQA), leaving the more practi-                thousands and attention scales quadratically with sequence
+                                         cal multi-turn VQA (MT-VQA) scenario largely unexplored.                 length [13, 30], making low-latency or resource-constrained
+                                         MT-VQA introduces additional challenges, as subsequent
+                                                                                                                  deployment challenging [64].
+                                         questions are unknown beforehand and may refer to arbi-
+                                                                                                                      Although numerous token reduction techniques [9, 49,
+                                         trary image regions, making existing reduction strategies
+                                                                                                                  65] have been proposed and have achieved considerable
+                                         ineffective. Specifically, current approaches fall into two
+                                                                                                                  success, they are primarily developed for single-turn VQA.
+                                         categories: prompt-dependent methods, which bias toward
+                                                                                                                  Meanwhile, the more realistic MT-VQA setting, which in-
+                                         the initial text prompt and discard information useful for
+                                                                                                                  volves multi-round conversational question answering, re-
+                                         subsequent turns; prompt-agnostic ones, which, though tech-
+                                                                                                                  mains largely underexplored thus far. Compared to single-
+                                         nically applicable to multi-turn settings, rely on heuristic re-
+                                                                                                                  turn VQA, which focuses on answering one-shot questions
+                                         duction metrics such as attention scores, leading to subopti-
+                                                                                                                  and can greedily discard image tokens irrelevant to the cur-
+                                         mal performance. In this paper, we propose a learning-based
+                                                                                                                  rent query, MT-VQA poses additional challenges due to its
+                                         prompt-agnostic method, termed MetaCompress, overcom-
+                                                                                                                  open-ended nature. In MT-VQA, future questions are en-
+                                         ing the limitations of heuristic designs. We begin by formu-
+                                                                                                                  tirely unpredictable, and their relevant regions may arise
+                                         lating token reduction as a learnable compression mapping,
+                                                                                                                  anywhere in the image, making existing token reduction
+                                         unifying existing formats such as pruning and merging into
+                                                                                                                  methods difficult to apply directly.
+                                         a single learning objective. Upon this formulation, we intro-
+                                                                                                                      Existing token reduction methods can be broadly cat-
+                                         duce a data-efficient training paradigm capable of learning
+                                                                                                                  egorized into prompt-dependent and prompt-agnostic ap-
+                                         optimal compression mappings with limited computational
+                                                                                                                  proaches. Prompt-dependent methods, such as FastV [9],
+                                         costs. Extensive experiments on MT-VQA benchmarks and
+                                                                                                                  retain tokens that are highly relevant to only the first-turn
+                                         across multiple LVLM architectures demonstrate that Meta-
+                                                                                                                  question prompt. This strategy may inadvertently discard
+                                         Compress achieves superior efficiency–accuracy trade-offs
+                                                                                                                  visual information that could be crucial for answering sub-
+                                         while maintaining strong generalization across dialogue
+                                                                                                                  sequent questions; for example, the first question might
+                                         turns. Our code is available at https://github.com/
+                                                                                                                  focus on the foreground while later questions may reference
+                                         MArSha1147/MetaCompress.
+                                                                                                                  the background. In contrast, prompt-agnostic approaches
+                                         1. Introduction                                                          like PruMerge [49] reduce tokens solely based on attention
+                                                                                                                  scores within the image sequence itself, which are tech-
+                                         LVLMs [1, 4, 35–37, 69, 70] have become powerful AI sys-                 nically applicable to multi-turn interactions. However, a
+                                         tems enabling natural human interaction with visual data                 critical limitation of existing prompt-agnostic methods lies
+                                         such as images and videos. They encode both textual and                  in their reliance on heuristic reduction criteria derived from
+                                            * Equal Contribution. Email: y w@zju.edu.cn, haofeizhang@zju.edu.cn   human priors, and the lack of theoretical guidance, often
+                                            † Corresponding Author. Email: xinchao@nus.edu.sg                     resulting in suboptimal performance.
+    In response to this, we propose a learning-based prompt-    training, enabling zero-shot visual understanding. Based
+agnostic token reduction approach, termed MetaCompress,         on this, LVLMs [2, 35–37, 58, 66, 70] integrate visual en-
+which overcomes the drawbacks of heuristic designs. To          coders with large language models to perform multimodal
+achieve this, a key question is how the learning objective      tasks such as captioning and VQA. LLaVA [35, 36] achieves
+should be defined. By analyzing the reduction formats of        image-to-text generation by feeding CLIP-encoded visual to-
+current approaches, including both pruning and merging, we      kens and language tokens into an LLM e.g., Llama [54, 55],
+find that they can be unified by formulating the visual token   but its fixed global resolution restricts fine-grained per-
+reduction task as an optimization problem. The goal is to       ception. Recent models such as LLaVA-NeXT [37] and
+identify an optimal compression mapping of the input visual     InternLM-XComposer-2.5 [70] enhance visual understand-
+tokens, under conditions such as language conditioning in       ing by incorporating multi-scale visual inputs that combine
+prompt-dependent approaches and image-only conditioning         global and local tokens, but this substantially increases token
+in prompt-agnostic approaches, so that the model’s responses    counts, leading to heavy memory and computation over-
+exhibit minimal discrepancy after token reduction.              head in multi-head attention and auto-regressive decoding,
+    Based on this formulation, we first simplify the problem    particularly on resource-constrained devices.
+by learning an optimal compression matrix for each image        Model Quantization. To deploy LVLMs to low-memory
+and conduct a preliminary investigation into the guiding role   devices such as mobile while preserving the model’s per-
+of attention information, as commonly employed in previous      formance, a natural approach is to quantize the model and
+methods. Surprisingly, our findings reveal that the tokens      inference process into 4/8-bit [15, 19, 67] or even 1-bit [42].
+retained by the learned matrix do not exhibit an obvious        Another line of work focuses on reducing the computational
+relationship with the heuristic attention cues commonly used    burden of MHA by employing efficient attention mech-
+in prior methods, such as [CLS] token attention and prompt-     anisms [10, 12, 13, 32] or sparse attention [11, 59, 60].
+token attention, further validating that heuristic reduction    However, quantization methods are limited by optional fine-
+criteria are suboptimal.                                        tuning and hardware support, and more importantly, they do
+    Furthermore, to fully implement MetaCompress, a prac-       not solve the overall computational inefficiency caused by
+tical challenge arises from the need to generate multiple       the increasing number of visual tokens.
+compression matrices, since actual image inputs can vary        Model Pruning. Model pruning [20, 40, 43, 71] and knowl-
+in resolution. And learning specific compression matrices       edge distillation [25, 48, 61] methods compress the given
+for every possible resolution is not an especially elegant or   model to arbitrary size by removing redundant parameters
+practical solution. To address this, we ultimately design       or transferring knowledge from a large model to a smaller
+to learn a compression matrix generator compatible with         one. These approaches are generally effective at reducing
+dynamic resolutions, trained in a data-efficient paradigm.      model size and inference cost, but often require careful hy-
+Extensive experiments on three MT-VQA benchmarks using          perparameter tuning and expensive retraining procedure.
+five LVLM architectures demonstrate that MetaCompress
+outperforms existing token reduction methods while achiev-      2.2. Visual Token Reduction
+ing high computational efficiency.
+                                                                Recent studies show that image representations contain sub-
+    The contributions of our paper are summarized as follows:   stantial redundancy [14, 24], enabling feature reduction with-
+• We first explore token reduction in the MT-VQA scenario,      out significant performance loss [5, 8, 29]. This observa-
+   revealing that heuristic methods relying on visual token     tion has motivated the development of token reduction tech-
+   attention scores are suboptimal.                             niques for LVLMs, which can be broadly categorized into
+• We propose MetaCompress, a novel learning-based and           prompt-dependent and prompt-agnostic approaches. Prompt-
+   prompt-agnostic token reduction method, overcoming the       dependent methods, such as FastV [9], identify redundant
+   reliance on suboptimal heuristic reduction criteria.         tokens by measuring their attention to language prompts
+• MetaCompress leverages a data-efficient training              and remove them at specific layers. FitPrune [65] identifies
+   paradigm to learn the optimal compression mapping for        redundant tokens by minimizing the divergence of atten-
+   visual sequences, demonstrating the effectiveness and        tion distributions before and after pruning. IVTP [27] and
+   efficiency through extensive experiments.                    TRIM [51] employ CLIP’s text encoder to guide token reduc-
+                                                                tion. However, these methods are less applicable to general
+2. Related Work                                                 scenarios such as MT-VQA, as they require re-compression
+                                                                for each question. In contrast, prompt-agnostic methods rely
+2.1. Efficient Large Vision-Language Models
+                                                                solely on image sequences and are technically applicable
+LVLMs. Transformers [57] have unified architectures across      to MT-VQA tasks. Nevertheless, existing approaches like
+language [6, 16, 46] and vision [7, 17, 23, 26, 53], then       LLaVA-PruMerge [49] overlook compatibility with mod-
+CLIP [45] bridges both modalities through contrastive pre-      ern LVLMs that incorporate multi-scale vision towers (e.g.,
+LLaVA-NeXT). More importantly, these methods rely heav-            3.2. Visual Token Reduction
+ily on heuristic reduction criteria derived from human priors,
+                                                                   However, the aforementioned cache mechanism is still in-
+which often lead to suboptimal performance. To address
+                                                                   sufficient to address the memory and computation overhead
+this, this paper introduces a novel learning-based, prompt-
+                                                                   caused by the large number of image tokens, resulting in an
+agnostic token reduction method that avoids heuristic de-
+                                                                   O(n2 ) cost for generating the first token and an O(nT ) cost
+signs (e.g., attention to [CLS] or other tokens as reduction
+                                                                   for producing T tokens during multi-turn dialogues.
+guidance, which will be shown suboptimal later in this paper)
+                                                                      To alleviate the issue, token reduction methods are pro-
+and can integrate seamlessly with modern LVLMs.
+                                                                   posed to compress the image sequence. For simplicity, we
+                                                                   only consider reducing image tokens right before feeding
+3. Preliminaries                                                   into the LLM, e.g., LLama [54], which can be formulated as
+In this section, we first give a brief review of the inference
+process of LVLMs, particularly in the context of multi-turn                     X̃IMG = Preduce (XIMG |IIMG , ITXT ),          (3)
+dialogue scenarios. We then introduce the problem definition
+of visual sequence compression mapping.                            where guiding information is extracted from the input image
+                                                                   IIMG and the language context ITXT . Depending on whether
+3.1. Large Vision-Language Models                                  to rely on the prompt ITXT , token reduction methods can
+Given an input image IIMG , LVLMs are required to gen-             be categorized into prompt-dependent and prompt-agnostic
+erate a series of responses (R1 , . . . , Rt ) to user’s prompts   methods. However, in real-world applications, LVLMs are
+(P1 , . . . , Pt ). The image and the language context are to-     often required to respond to multiple prompts. Prompt-
+kenized separately by a vision tower TIMG (·), e.g., vision        dependent methods, however, tend to bias toward the ini-
+Transformer (ViT) [17, 45] and a language tokenizer TTXT (·),      tial query and discard information beneficial for subsequent
+e.g., SentencePiece [31]. The tokenized image and language         turns, leading to suboptimal performance in multi-turn di-
+sequence are then embedded into a common space by a                alogue scenarios. Furthermore, many existing methods re-
+vision projector VIMG (·) and an embedding layer ETXT (·),         quires the intermediate attention matrices in MHA layers to
+producing XIMG and XTXT , respectively.                            guide token reduction, whereas modern LVLMs commonly
+    To fully capture detailed information, current prevalent       employ FlashAttention [12, 13] or Memory-Efficient Atten-
+LVLMs, such as LLaVA-NeXT and InternLM-XComposer-                  tion [32], which do not support returning them.
+2.5, employ a ViT to encode images from both global and                To further investigate the optimal token reduction strategy,
+local views, generating multi-scale visual sequences. Despite      we first unify the token pruning and merging methods by
+enhancing the model’s capability to capture the details of the     formulating the reduction process as a linear projection to
+image, such an approach significant increase the token num-        the input XIMG :
+ber, severely impairing the inference efficiency due to the                               X̃IMG = P XIMG ,                      (4)
+O(n2 ) computational and memory complexity of MHA [57].            where P ∈ Rm×n        (m ≪ n) is the sparse compression
+                                                                                   +
+    To increase LLMs’ inference efficiency, KV cache meth-         matrix. In Section 4, we set P as a learnable matrix for each
+ods [34, 62] are proposed for reusing intermediate attentions      image. By optimizing P in a data-driven manner, we first
+in the auto-regressive decoder. Specifically, for generating       explore the relationship between the retained tokens and the
+the i-th response token with query qi , the original computa-      attention weights employed by heuristics-designed methods.
+tion is to concatenate the previous queries for MHA layer          Then in Section 5, we present a novel token reduction method
+                                     
+                                         Qi K ⊤
+                                                                  that does not rely on the intermediate attention matrices,
+               MHA(Qi , Ki , Vi ) = σ √ i Vi ,               (1)   while can be seamlessly integrated with modern LVLMs.
+                                            dk
+where {Q, K, V }i = ({Q, K, V }i−1 |{q, k, v}i ) are the con-      4. Which Tokens to Keep?
+catenated inputs, and σ denotes the row-wise Softmax oper-
+                                                                   To objectively analyze the optimal token reduction scheme
+ation. To decrease the computation complexity, KV caches
+                                                                   without relying on hand-crafted designs, we start by looking
+store the intermediate key-value pairs {K, V }i−1 and only
+                                                                   at a simpler case: Given an input image IIMG and a conver-
+compute the attention for qi :
+                                                                   sation context ITXT , find the optimal compression matrix P ∗
+                           
+                            qi (Ki−1 |kn )⊤
+                                                                  as defined in Equation (4) so that the response discrepancy
+    MHA(qi , ki , vi ) = σ       √            (Vi−1 |vi ), (2)     between the LLM using the compressed and uncompressed
+                                   dk
+                                                                   visual sequence is minimized.
+which significantly reduce the computation burden. Such               To achieves this, let Praw ∈ Rm×n be the trainable re-
+techniques can be seamlessly integrated with the MT-VQA            duction parameters, with each element independently drawn
+                                                                                                         2
+setting, where the caches are reused across multiple turns.        from Gaussian distribution N (0, σraw    ). We normalize Praw
+                                                        Gradient Flow
+
+
+
+
+                     KV Cache                                                                             (b)
+  LLM
+ Decoder
+
+
+
+
+Compute
+ Loss
+
+
+                                  (a)                                                                     (c)
+
+Figure 1. (a) Overall pipeline of the compression projection training process. (b) Attention distribution over the [CLS] token for retained and
+all visual tokens. The image tokens are extracted from the last layer of the vision tower of LLaVA-1.5-13b running on VQA-v2 dataset. (c)
+Attention distribution over the prompt tokens for retained and all visual tokens. The attention scores are averaged to prompt tokens extracted
+from the first layer of the LLM decoder.
+
+with row-wise Softmax to obtain the compression matrix                    5. Method
+P = σ(Praw ). Let p(y|XIMG , XTXT ) denotes the original
+prediction distribution T tokens y = (y1 , . . . , yT ). Then             Results from Section 4 inspire us to construct the compres-
+we force the LLM to generate T tokens p(ỹ|X̃IMG , XTXT )                 sion matrix in a data-driven manner. To this end, we propose
+                                                                          MetaCompress, a lightweight module learning the compres-
+using the compressed visual sequence X̃IMG . Figure 1a il-
+lustrates the overall training pipeline, where Praw is trained            sion matrix P conditioned only on the input image for MT-
+to minimize the KL divergence between the two response                    VQA scenarios. Section 5.1 details the MetaCompress mod-
+distributions Lpred = P DKL (p(y)∥p(ỹ)) and the distribution             ule, Section 5.2 provides theoretical analysis, and Section 5.3
+entropy Lentropy = m 1    m                                               presents the optimization objective and training algorithm.
+                          i=0 H(Pi,: ).
+   The training objective is formulated as                                5.1. MetaCompress
+               P ∗ = arg min Lpred + αLentropy .                 (5)      Our goal is to learn a compression matrix generator Pmeta
+                         Praw
+                                                                          in a data-driven manner, so that the overall prediction dis-
+The training algorithm and detailed implementation are pro-                                                           (i)  (i)
+                                                                          crepancy on the given dataset D = {(IIMG , ITXT )}N    i=1 is
+vided in Section 8.                                                       minimized. To this end, we propose a lightweight meta
+   Figure 1b and 1c visualize the attention distribution over             generator Pmeta which computes a compression matrix P =
+the [CLS] and prompt tokens, respectively. Despite that                   Pmeta (XIMG ) for each input image IIMG , independent of the
+some tokens with high attention to the [CLS] token are re-                prompt. One major challenge is that Pmeta is required to
+tained (accounting for approximately 1.71% of the total                   generate the compression matrix P , whose shape can adapt
+retained tokens), the vast majority of the retained tokens are            to the varying length of XIMG , thereby accommodating mul-
+unrelated to their attention scores, especially with regards              tiple resolution scales for LVLMs such as LLaVA-NeXT and
+to the attention to the language prompts. More results are                InternLM-XComposer-2.5.
+in Section 6.6, drawing to the same conclusion. This ob-                      Figure 2 shows the overall architecture of Pmeta , which
+servation suggests that using attention scores as guidance                consists of a position embedding layer, a query down-sample
+for token reduction is suboptimal in the MT-VQA scenario,                 projection D̃q , a key projection Dk , and a weighted inner
+which explains the experimental results in Section 6.2, where             product layer. The core idea is to compute the inner product
+token pruning methods such as FastV perform worse than                    between the spatially down-sampled queries X̃q ∈ Rm×dc
+uniform or even random pruning. Therefore, it is essential to             and keys Xk ∈ Rn×dc to get the compression matrix P ∈
+explore a novel token reduction approach that does not rely               Rm×n . Here, queries
+on heuristic metrics such as attention scores, while being
+seamlessly compatible with modern LVLMs.                                    X̃q = D̃q (XIMG +Epos ) = Pool(XIMG +Epos |k, s)Wq (6)
+                                                                         Algorithm 1 Training algorithm for MetaCompress.
+                                                                         Require: ETXT (·): the language encoder; VIMG (·): the im-
+                                                                             age encoder; LLM(·, ·): the vision-language decoder;
+                                               Position                      Pmeta (·|Θ): the proposed MetaCompress module with
+                                              Embedding                      learnable parameters Θ.
+                                                                          1: for (IIMG , ITXT ) ∈ Dtrain do
+                                                                          2:    XTXT ← ETXT (ITXT )
+                                                                          3:    XIMG ← VIMG (IIMG )
+                                                                          4:    X̃IMG ← Pmeta (XIMG |Θ)             # with gradients
+                                                                          5:    y ← LLM(XTXT , XIMG )
+     LLM                                                                  6:    ỹ ← LLM(XTXT , X̃IMG )             # with gradients
+                                                                          7:    Compute the final loss and gradient ∇Θ w.r.t. Θ.
+                                                                          8:    Update Θ with SGD optimizer.
+                                                                          9: end for
+
+
+Figure 2. Illustration of our proposed MetaCompress, where mod-          the first learning-based token reduction framework, there are
+ule Pmeta generate the compression projection P solely according         currently few non-learning approaches available for direct
+to the image sequence XIMG .                                             comparison. Nevertheless, we further discuss the relation-
+                                                                         ship between our method and other data-driven approaches
+are down-sampled from the image sequence encoded with                    for efficient model inference in Section 12.
+absolute position embeddings Epos by average pooling                     5.2. Theoretical Analysis
+Pool(·|k, s) with kernel size k and stride s1 , and keys
+                                                                         Now we provide a theoretical analysis of MetaCompress
+       Xk = Dk (XIMG + Epos ) = (XIMG + Epos )Wk                  (7)    to explain the design motivation and further introduce the
+                                                                         optimization objectives and constraints. To begin with, we
+are linearly projected from XIMG for computational effi-                 expand Equation (8) as
+ciency (by setting dc ≪ d). Finally, the computation of
+                                                                                 Praw = Pool(X|k, s)Wq diag(ω)Wk⊤ X ⊤ .               (9)
+compression matrix P is formulated as:
+                                        !                                Further, suppose all elements in W are drawn independently
+                         X̃q diag(ω)Xk⊤                                  from a Gaussian distribution N (0, σc2 ) and with a specific
+               P =σ            √          ,         (8)                  initialization (i.e., Wq = Wk ), MetaCompress will initially
+                                 dc
+                                                                         behave as a weighted pooling of the input image sequence
+where diagonal matrix ω ∈ Rdc is learnable.                              (controlled by the kernel size k), as we prove in Section 9.
+   Regarding the module placement, following the setting                 Moreover, the meta generator will learn, in a data-driven
+of LLaVA-PruMerge [49], we apply our reduction module                    manner, how to select and merge the visual tokens to mini-
+only before the LLM decoder, although MetaCompress can                   mize the prediction discrepancy. Since we do not rely on any
+in principle be inserted at any layer. This placement re-                annotation for the compression matrix, the low-rank positive
+duces the additional MHA computation incurred in earlier                 semi-definite form presented in Equation (9) provides a good
+LLM layers compared with inserting it at intermediate lay-               starting point and facilities gradient decent optimization.
+ers, which is particularly beneficial for long visual inputs             5.3. Training MetaCompress
+such as videos. Moreover, our work focuses on developing
+                                                                            Similar to the training objective introduced in Sec-
+a learning-based reduction method rather than a full-stage
+                                                                         tion 4, we train MetaCompress by minimizing the predic-
+compression strategy across both the vision tower and the
+                                                                         tion discrepancy Lpred with additional sparsity regularization
+LLM, as explored in IVTP [27]. Such full-stage optimiza-
+                                                                         Lentropy . However, due to the lack of ground-truth compres-
+tion requires costly pretraining and instruction-tuning, which
+                                                                         sion matrix, the generated compression matrix P tends to
+we leave as future work under our lightweight framework.
+                                                                         collapse to trivial solutions where the compressed tokens all
+   For the module design, since our primary goal is to reduce
+                                                                         derive from the same input source. To avoid this,  Pmwe add
+the inference burden of LVLMs, we intentionally avoid con-
+                                                                         a collapse regularization term Lcollapse = maxj i=1 Pi,j .
+structing complex reduction modules, such as those required
+                                                                         Therefore, the final optimization objective is
+for auto-regressive generation, as they would significantly
+increase latency and reduce computational efficiency. As                     L = Lpred + αentropy Lentropy + αcollapse Lcollapse ,   (10)
+  1 Section 8.2 provides the detailed implementation for down-sampling   where αentropy and αcollapse are hyperparameters. Algorithm 1
+XIMG to arbitrary length m.                                              delineates the training procedure.
+Table 1. The comparison of visual token reduction methods on three MT-VQA benchmarks with the reduction rate of 90%. The best and the
+second-best results are highlighted in bold and underline, respectively.
+
+                                                   MT-VQA-v2                          MT-GQA                         ConvBench
+        Model             Method
+                                         Acc1     Acc2    Acc3      Avg    Acc1    Acc2    Acc3    Avg        S1      S2     S3     Avg
+                         Base           76.72 77.51 77.30 77.18            61.76   64.07   65.35   63.73     4.33     5.72   5.55   5.20
+                         Random         66.36 66.94 66.68 66.66            54.60   57.07   59.31   56.99     3.73     3.99   4.08   3.93
+                         Sample         67.11 67.52 67.63 67.42            55.06   57.89   59.74   57.56     3.64     4.85   3.81   4.10
+ LLaVA-1.5-7b
+                         FastV          45.98 48.56 49.65 48.06            40.98   46.71   49.30   45.66     1.56     1.39   3.12   2.02
+                         PruMerge       69.03 69.93 69.73 69.56            55.26   57.23   60.13   57.54     4.51     3.47   3.47   3.82
+                         Ours           70.27 70.31 71.36 70.65            55.95   58.71   60.64   58.43     4.33     3.99   4.16   4.16
+                         Base           78.35 79.47 78.92 78.91            62.47   65.21   67.22   64.97     4.33     7.11   5.72   5.72
+                         Random         67.26 68.05 67.63 67.65            54.63   57.87   60.23   57.58     3.56     5.55   4.42   4.51
+                         Sample         68.12 68.82 68.47 68.47            55.41   58.53   60.26   58.07     4.16     5.03   4.33   4.51
+ LLaVA-1.5-13b
+                         FastV          55.36 56.80 57.08 56.41            49.08   53.34   56.14   52.85     2.19     3.47   4.20   3.29
+                         PruMerge       70.18 71.16 70.70 70.68            55.70   57.94   60.70   58.11     4.51     3.99   5.55   4.68
+                         Ours           72.70 73.24 72.88 72.94            57.02   59.26   62.16   59.48     4.68     4.51   6.41   5.20
+                         Base           80.20 80.86 80.71 80.59            63.83   66.68   67.94   66.15     7.95 11.46 7.58        9.00
+                         Random         70.65 72.26 72.44 71.78            58.60   61.04   63.00   60.88     5.81 6.59 4.42         5.61
+ LLaVA-NeXT-7b           Sample         70.88 72.32 72.35 71.85            58.46   61.39   63.24   61.03     3.81 7.28 5.72         5.60
+                         FastV          57.09 59.00 59.27 58.45            46.42   50.55   53.95   50.31     0.00 1.85 1.85         1.23
+                         Ours           73.83 75.24 75.18 75.18            59.43   63.49   65.19   62.70     4.16 8.67 9.01         7.28
+                         Base           81.02 82.32 81.64 81.66            65.45   67.32   69.12   67.30    12.48 13.17      7.97 11.21
+                         Random         71.86 73.44 73.22 72.84            59.61   61.86   63.43   61.63     7.20 9.19       6.33  7.57
+ LLaVA-NeXT-13b          Sample         71.97 73.84 73.43 73.08            59.69   62.28   63.88   61.95     6.07 10.92      6.07  7.69
+                         FastV          57.07 59.09 59.14 58.43            47.23   51.34   53.36   50.64     5.17 5.17       1.72  4.02
+                         Ours           74.62 75.73 75.42 75.26            60.78   63.41   65.16   63.12     6.93 11.27      6.76  8.32
+                         Base           78.80    81.12 81.24 80.39         60.21   63.38   65.01   62.87    12.48     7.00   7.97   9.15
+                         Random         67.88    70.20 70.49 69.52         52.52   57.01   60.67   56.73    11.35     9.88   7.28   9.50
+ XComposer-2.5-7b        Sample         68.46    70.92 70.78 70.05         52.94   57.20   59.69   56.61    12.13     9.53   7.63   9.76
+                         FastV          72.65    75.02 75.02 74.23         54.84   57.33   58.83   57.00     4.17     4.17   0.00   2.78
+                         Ours           73.91    76.68 76.70 75.76         55.99   58.49   61.55   58.68    12.31     9.71   7.63   9.88
+
+
+6. Experiments                                                            LVLMs. To evaluate the generalizability of our method,
+                                                                          we choose five different LVLMs: LLaVA-1.5-7b/13b [35],
+6.1. Implementation                                                       LLaVA-NeXT-7b/13b [37], and InternLM-XComposer-2.5-
+Datasets. We evaluate our method on three MT-VQA bench-                   7b [70]. Of these models, LLaVA-1.5 employs a single-scale
+marks: MT-VQA-v2, MT-GQA, and ConvBench2 . MT-                            vision tower with a fixed visual sequence length, while the
+VQA-v2 is constructed based on the validation set of VQA-                 others adopt multi-scale perception, resulting in variable
+v2 [3, 68] with 25k three-turn image-dialogue pairs. Sim-                 visual sequence lengths, which brings further challenges to
+ilarly, MT-GQA is constructed from the testdev-balanced                   the token reduction method.
+set of GQA [28] with 4061 three-turn dialogues. Con-
+vBench [38] is a native multi-turn conversation evaluation                Training Details and Selection of Hyperparameters. We
+benchmark with 577 conversations that adopts a three-level                implement our method with PyTorch [44] and optimize the
+multimodal capability hierarchy. Instead of training on the               proposed MetaCompress with SGD [47] with a learning rate
+entire dataset, which is time-consuming, we only train Meta-              of 10−3 . Gradient clipping is adopted with a maximum value
+Compress on a small subset (about 20k items) drawn from                   of 10−2 . We train all the settings for 2 epochs with a batch
+the training-balanced split of MT-GQA and the training set                size of 36 on four commercial NVIDIA RTX A6000 GPUs.
+of MT-VQA-v2. We utilize the pre-trained weights on MT-                   The training of LLaVA-NeXT-7B with a 90% reduction rate
+VQA-v2 to evaluate on ConvBench.                                          takes approximately 30 GPU hours, which corresponds to
+                                                                          about only 9 hours on a 4-GPU machine. We initialize Wq =
+    2 As ConvBench relies on GPT-3.5-turbo’s commercial API for evalua-                                                            2
+tion, we replace it with the recently released open-source LVLM, Llama-   Wk and drawn from Gaussian distribution N (0, √1d ); ω is
+                                                                                                                                 c
+3.1-8B-Instruct [18].                                                     set to all ones; αentropy = αcollapse = 1 as the default setting.
+                     65.5                                                                       67.5
+                     62.9                                                                       65.0
+                     60.4                                                                       62.5
+
+
+   Average Acc (%)                                                            Average Acc (%)
+                     57.8                                                                       60.0
+                     55.2       Random                                                          57.5
+                     52.7       Sample                                                          55.0       Random
+                     50.1       FastV                                                           52.5       Sample
+                                PruMerge                                                                   FastV
+                     47.6       Ours                                                            50.0       Ours
+                     45.0                                                                       47.5
+                         0.50            0.70      0.80       0.90 0.95                             0.50              0.70      0.80               0.90 0.95
+                                     Reduction Rate (%)                                                           Reduction Rate (%)
+                                   (a) LLaVA-1.5-13b                                                           (b) LLaVA-NeXT-7b
+                                Figure 3. Comparison of average accuracy on MT-GQA with reduction rate from 50% to 95%.
+
+
+6.2. Comparison Results                                                       Table 2. Efficiency comparison of different token reduction meth-
+                                                                              ods. The time to first token (TTFT, ms), end-to-end generation
+We evaluate the proposed MetaCompress and comparison                          time (E2ET, ms), GPU memory usage (Mem. GB), and TFLOPs
+baselines with the following settings:                                        are reported on MT-GQA dataset with a reduction rate of 90%.
+• Base: The base LVLM evaluated directly on the MT-VQA                                           Model      Setting     TTFT         E2ET         Mem. TFLOPs
+  benchmarks without token reduction.
+                                                                                                           Base      232 (± 5.8)    676 (± 8.0)   26.9   71.4
+• Random: Randomly prune visual tokens before the first                                                    Random 98.2 (± 5.7)      487 (± 4.6)   26.2   13.3
+  layer of the LLM decoder. We report the average perfor-                                                  Sample   96.9 (± 5.8)    482 (± 4.9)   26.2   13.3
+                                                                                 LLaVA-1.5-7b
+  mance over 3 random seeds.                                                                               FastV    102 (± 4.52)    528 (± 6.0)   26.3   13.5
+• Sample: Perform equidistant down-sampling on the visual                                                  PruMerge 107 (± 5.23)    509 (± 4.5)   26.2   13.3
+                                                                                                           Ours     97.8 (± 5.41)   480 (± 5.1)   26.1   13.3
+  sequence before the LLM decoder.
+                                                                                               Base                   484 (± 4.7) 830 (± 13.5)    16.7   95.3
+• FastV: Our implementation of FastV [17] for multi-scale
+                                                                                               Random                 174 (± 3.4) 481 (± 4.5)     14.8   12.7
+  vision tower. The guidance attention weights are extracted                                   Sample                 176 (± 3.2) 484 (± 5.3)     14.8   12.7
+                                                                                 LLaVA-NeXT-7b
+  from the first layer of the LLM decoder and visual tokens                                    FastV                  219 (± 5.0) 529 (± 5.33)    19.2   12.9
+  are pruned at the second layer.                                                              Ours                   174 (± 6.1) 501 (± 4.8)     14.9   12.7
+• PruMerge: Perform LLaVA-PruMerge [35] only for
+  LLaVA-1.5, as it is not compatible with the multi-scale                         Figure 3 illustrates the performance curve of different
+  visual tower.                                                               methods with varying reduction rates from 50% to 95%. It is
+• Ours: Perform our proposed MetaCompress before the                          clear that our method consistently outperforms the baselines
+  LLM decoder.                                                                across different reduction rates, while FastV performers bet-
+                                                                              ter for low reduction rate and LLaVA-PruMerge performers
+    The comparison results with reduction rate 90% and 70%                    better for high reduction rate.
+are shown in Table 1 and Table 4, where we compare the
+accuracy of each turn conversation and the overall accuracy                   6.3. Efficiency Results
+on three MT-VQA benchmarks. It is noticeable that the pro-
+posed MetaCompress consistently outperforms the baseline                      Table 2 compares the inference efficiency of different token
+methods. While not trained on ConvBench, our method still                     reduction methods. As we can observe that our method
+surpasses the baseline methods by a large margin, demon-                      achieves compatible efficiency with the ‘Sample’ setting,
+strating the transferability of MetaCompress. For LLaVA-                      which is the most efficient baseline thanks to the explicit
+1.5, experimental results show that LLaVA-PruMerge which                      low-ranking mechanism as described in Equation (9).
+is designed specifically for it performs slightly better than
+                                                                              6.4. Transfer Results
+Sample, but still lags behind our approach. On the other
+hand, FastV performs significantly worse than both the Sam-                   Beyond the transfer results on ConvBench in Table 1, we
+ple and even the Random methods. This further supports                        further evaluate the transfer capability of MetaCompress
+our findings in Section 4, where we have revealed that using                  through comprehensive cross-dataset validation. Specifi-
+attention as guidance for compression results in a loss of crit-              cally, we perform transfer learning experiments between
+ical tokens. Although FastV shows some improvement for                        MT-GQA and MT-VQA-V2, with the results summarized
+XComposer-2.5-7b, it still performs poorly on ConvBench.                      in Table 7. This table reports the average accuracy under a
+Table 3. Ablation study of training MetaCompress for LLaVA-                             63.00
+NeXT-7b using different loss terms on MT-GQA. Gradient clipping
+is only applied for the ‘Lcollapse + Grad Clip’ setting.
+                                                                                        62.75
+
+
+                                                                      Average Acc (%)
+                      Settings                           MT-GQA
+ Lpred   Lentropy   Lcollapse    Lcollapse + Grad Clip    Avg
+                                                                                        62.50
+   ✓        ✗          ✗                  ✗               61.98
+   ✓        ✓          ✗                  ✗               62.42                         62.25                                              entropy
+   ✓        ✗          ✓                  ✗               56.34                                                                            collapse
+   ✓        ✗          ✗                  ✓               62.13                         62.00
+                                                                                            0.0               0.5         1.0             1.5
+   ✓        ✓          ✗                  ✓               62.70                                                     Loss Weight
+90% token reduction rate for both directions of transfer, from
+                                                                   Figure 4. Sensitivity analysis in training MetaCompress for LLaVA-
+MT-GQA to MT-VQA-V2 and vice versa. These results                  NeXT-7b with different weights αentropy and αcollapse on MT-GQA.
+indicate that MetaCompress is not heavily dependent on a
+specific training dataset, demonstrating robust generalization.            1.0
+We also conduct transfer experiments on the video question                                                                          All Tokens
+                                                                           0.8                                                      Retained Tokens
+answering task, as reported in Table 8 of Section 10.4.                    0.6
+6.5. Ablation Study                                                Density 0.4
+                                                                           0.2
+As delineated in Section 5.3, we utilize three optimization
+objectives to train the proposed method. To investigate the                0.0
+                                                                             0.00                      0.50           1.00         1.50               2.00
+effectiveness of each objective, we conduct an ablation study                                                   Token Importance
+                                                                                                                    (a)
+by removing one of the objectives at a time. The results
+                                                                            104
+in Table 3 (with additional results for various LVLMs in Ta-
+                                                                            103                                                     All Tokens
+ble 6) demonstrate that each objective contributes positively                                                                       Retained Tokens
+                                                                            102
+to the overall performance. In particular, training utilizing      Density  101
+the Lcollapse alone leads to divergence because of the rela-
+                                                                            100
+tively high penalty on the collapse objective, especially when
+                                                                           10 1
+the reduction rate is small (less than 70%). To tackle this, we                         0.0     5.0   10.0 15.0 20.0 25.0 30.0 35.0 40.0 45.0 50.0
+introduce gradient clipping to stabilize the training process.                                                 Attention Score (×10 4 )
+                                                                                                                    (b)
+    Besides, we also investigate the sensitivity of the hyperpa-
+rameters αentropy and αcollapse when training MetaCompress.        Figure 5. (a) Token importance distribution. (b) Attention distribu-
+Figure 4 shows the performance curves for different weight         tion over prompt tokens. Image tokens are extracted from the last
+settings, demonstrating that the performance remains rela-         layer of the vision tower of LLaVA-NeXT-7b on VQA-v2 dataset.
+tively stable (within a 0.5 percentage point variation).
+                                                                   mal, as a large number of retained tokens do not correspond
+6.6. Visualization                                                 to the highest attention scores. This motivates us to further
+Figure 5 visualizes the attention distribution for LLaVA-          explore the construction of an optimal compression mapping
+NeXT-7b, similar to Figure 1. As directly computing the            for the entire dataset. To achieve this, we propose Meta-
+attention to [CLS] token is not feasible for multi-scale vision    Compress, a meta generator conditioned solely on the visual
+towers, we compute FastV’s style image token importance            sequence, and optimized in a data-driven manner. Extensive
+instead. Nevertheless, we observe that only a small number         experiments demonstrate the efficiency and effectiveness
+of tokens with high attention are retained, which is consistent    of our method. In future work, we will explore the token
+with the conclusion in Section 4 and further demonstrates          reduction strategy for all LLM layers without a hand-crafted
+that using token attention to guide reduction is suboptimal.       design, and investigate the transferability of our method to
+                                                                   more challenging tasks, such as video understanding.
+7. Conclusion and Outlook
+                                                                   Acknowledgments
+This paper proposes a novel token reduction approach for
+multi-turn VQA scenarios. To this end, we first unify token        This work is funded by National Natural Science Foundation
+pruning and merging under the framework of compression             of China (62576305), the Alibaba Group through Alibaba
+projection to visual sequences and explore the optimal com-        Innovative Research Program, and the National Research
+pression mapping for a single image. Preliminary results           Foundation, Singapore, under its Medium Sized Center for
+reveal that existing methods guided by attention are subopti-      Advanced Robotics Technology Innovation.
+References                                                                 formers for language understanding. In NAACL, pages 4171–
+                                                                           4186, Minneapolis, Minnesota, 2019. 2
+ [1] Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ahmad,
+                                                                      [17] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov,
+     Ilge Akkaya, Florencia Leoni Aleman, Diogo Almeida, Janko
+                                                                           Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner,
+     Altenschmidt, Sam Altman, Shyamal Anadkat, et al. Gpt-4
+                                                                           Mostafa Dehghani, Matthias Minderer, Georg Heigold, Syl-
+     technical report. arXiv preprint arXiv:2303.08774, 2023. 1
+                                                                           vain Gelly, Jakob Uszkoreit, and Neil Houlsby. An image is
+ [2] Jean-Baptiste Alayrac, Jeff Donahue, Pauline Luc, Antoine
+                                                                           worth 16x16 words: Transformers for image recognition at
+     Miech, Iain Barr, et al. Flamingo: a visual language model
+                                                                           scale. In ICLR, 2021. 2, 3, 7
+     for few-shot learning. In NeurIPS, 2022. 2
+                                                                      [18] Abhimanyu Dubey, Abhinav Jauhri, Abhinav Pandey, Ab-
+ [3] Stanislaw Antol, Aishwarya Agrawal, Jiasen Lu, Margaret
+                                                                           hishek Kadian, Ahmad Al-Dahle, Aiesha Letman, Akhil
+     Mitchell, Dhruv Batra, C Lawrence Zitnick, and Devi Parikh.
+                                                                           Mathur, Alan Schelten, Amy Yang, Angela Fan, et al. The
+     Vqa: Visual question answering. In ICCV, pages 2425–2433,
+                                                                           llama 3 herd of models. arXiv preprint arXiv:2407.21783,
+     2015. 6
+                                                                           2024. 6
+ [4] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin
+                                                                      [19] Kazuki Egashira, Mark Vero, Robin Staab, Jingxuan He, and
+     Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun
+                                                                           Martin Vechev. Exploiting LLM quantization. arXiv preprint
+     Tang, et al. Qwen2. 5-vl technical report. arXiv preprint
+                                                                           arXiv:2405.18137, 2024. 2
+     arXiv:2502.13923, 2025. 1
+                                                                      [20] Gongfan Fang, Xinyin Ma, Mingli Song, Michael Bi Mi, and
+ [5] Daniel Bolya, Cheng-Yang Fu, Xiaoliang Dai, Peizhao Zhang,
+                                                                           Xinchao Wang. Depgraph: Towards any structural pruning.
+     Christoph Feichtenhofer, and Judy Hoffman. Token merging:
+                                                                           In CVPR, pages 16091–16101, 2023. 2
+     Your vit but faster. In ICLR, 2023. 2, 1
+ [6] Tom Brown, Benjamin Mann, Nick Ryder, Melanie Subbiah,           [21] Chaoyou Fu, Yuhan Dai, Yongdong Luo, Lei Li, Shuhuai
+     Jared D Kaplan, et al. Language models are few-shot learners.         Ren, Renrui Zhang, Zihan Wang, Chenyu Zhou, Yunhang
+     In NeurIPS, pages 1877–1901, 2020. 2                                  Shen, Mengdan Zhang, et al. Video-mme: The first-ever
+                                                                           comprehensive evaluation benchmark of multi-modal llms in
+ [7] Nicolas Carion, Francisco Massa, Gabriel Synnaeve, Nicolas
+                                                                           video analysis. In Proceedings of the Computer Vision and
+     Usunier, Alexander Kirillov, and Sergey Zagoruyko. End-
+                                                                           Pattern Recognition Conference, pages 24108–24118, 2025.
+     to-end object detection with transformers. In ECCV, pages
+                                                                           2
+     213–229. Springer, 2020. 2
+ [8] Kaixuan Chen, Jie Song, Shunyu Liu, Na Yu, Zunlei Feng,          [22] Benjamin Graham. Fractional max-pooling. arXiv preprint
+     and Mingli Song. Distribution knowledge embedding for                 arXiv:1412.6071, 2014. 1
+     graph pooling. IEEE Transactions on Knowledge and Data           [23] Le Han, Kaixuan Chen, Minchen Ye, and Nenggan Zheng.
+     Engineering, 35:7898–7908, 2021. 2                                    Hi-motion: Hierarchical intention guided conditional motion
+ [9] Liang Chen, Haozhe Zhao, Tianyu Liu, Shuai Bai, Jun-                  synthesis. In Proceedings of the 33rd ACM International
+     yang Lin, Chang Zhou, and Baobao Chang. An image is                   Conference on Multimedia, pages 9628–9637, 2025. 2
+     worth 1/2 tokens after layer 2: Plug-and-play inference ac-      [24] Kaiming He, Xinlei Chen, Saining Xie, Yanghao Li, Piotr
+     celeration for large vision-language models. arXiv preprint           Dollár, and Ross Girshick. Masked autoencoders are scalable
+     arXiv:2403.06764, 2024. 1, 2                                          vision learners. In CVPR, pages 16000–16009, 2022. 2
+[10] Zigeng Chen, Gongfan Fang, Xinyin Ma, Ruonan Yu, and             [25] Geoffrey E. Hinton, Oriol Vinyals, and Jeffrey Dean.
+     Xinchao Wang. dparallel: Learnable parallel decoding for              Distilling the knowledge in a neural network. ArXiv,
+     dllms. In International Conference on Learning Representa-            abs/1503.02531, 2015. 2
+     tions, 2026. 2                                                   [26] Chaoqun Hong, Liang Chen, Yuxin Liang, and Zhiqiang
+[11] Rewon Child, Scott Gray, Alec Radford, and Ilya Sutskever.            Zeng. Stacked capsule graph autoencoders for geometry-
+     Generating long sequences with sparse transformers. ArXiv,            aware 3d head pose estimation. Computer Vision and Image
+     abs/1904.10509, 2019. 2                                               Understanding, 208-209:103224, 2021. 2
+[12] Tri Dao. FlashAttention-2: Faster attention with better paral-   [27] Kai Huang, Hao Zou, Ye Xi, BoChen Wang, Zhen Xie, and
+     lelism and work partitioning. In ICLR, 2024. 2, 3                     Liang Yu. IVTP: Instruction-guided visual token pruning
+[13] Tri Dao, Dan Fu, Stefano Ermon, Atri Rudra, and Christopher           for large vision-language models. In ECCV, pages 214–230,
+     Ré. Flashattention: Fast and memory-efficient exact attention        Cham, 2025. Springer Nature Switzerland. 2, 5
+     with io-awareness. Advances in neural information processing     [28] Drew A Hudson and Christopher D Manning. Gqa: A new
+     systems, 35:16344–16359, 2022. 1, 2, 3                                dataset for real-world visual reasoning and compositional
+[14] Huiqi Deng, Qihan Ren, Hao Zhang, and Quanshi Zhang.                  question answering. In CVPR, pages 6700–6709, 2019. 6
+     Discovering and explaining the representation bottleneck of      [29] Cao Jianjian, Ye Peng, Li Shengze, Yu Chong, Tang Yan-
+     DNNs. In ICLR, 2022. 2                                                song, Lu Jiwen, and Chen Tao. MADTP: Multimodal
+[15] Tim Dettmers, Mike Lewis, Younes Belkada, and Luke Zettle-            alignment-guided dynamic token pruning for accelerating
+     moyer. GPT3.int8(): 8-bit matrix multiplication for trans-            vision-language transformer. CVPR, 2024. 2
+     formers at scale. In NeurIPS, pages 30318–30332, 2022.           [30] Angelos Katharopoulos, Apoorv Vyas, Nikolaos Pappas, and
+     2                                                                     François Fleuret. Transformers are rnns: Fast autoregressive
+[16] Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina                transformers with linear attention. In International conference
+     Toutanova. BERT: Pre-training of deep bidirectional trans-            on machine learning, pages 5156–5165. PMLR, 2020. 1
+[31] Taku Kudo and John Richardson. SentencePiece: A simple           [45] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+     and language independent subword tokenizer and detokenizer            Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+     for neural text processing. In EMNLP, pages 66–71, Brussels,          Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning
+     Belgium, 2018. Association for Computational Linguistics. 3           transferable visual models from natural language supervision.
+[32] Benjamin Lefaudeux, Francisco Massa, Diana Liskovich,                 In ICML, pages 8748–8763. PMLR, 2021. 2, 3
+     Wenhan Xiong, Vittorio Caggiano, Sean Naren, Min Xu, Jieru       [46] Colin Raffel, Noam Shazeer, Adam Roberts, Katherine Lee,
+     Hu, Marta Tintore, Susan Zhang, Patrick Labatut, Daniel Haz-          Sharan Narang, Michael Matena, Yanqi Zhou, Wei Li, and
+     iza, Luca Wehrstedt, Jeremy Reizenstein, and Grigory Sizov.           Peter J Liu. Exploring the limits of transfer learning with a
+     xFormers: A modular and hackable transformer modelling li-            unified text-to-text transformer. Journal of Machine Learning
+     brary. https://github.com/facebookresearch/                           Research, 21(140):1–67, 2020. 2
+     xformers, 2022. 2, 3                                             [47] Sebastian Ruder. An overview of gradient descent optimiza-
+[33] Wentong Li, Yuqian Yuan, Jian Liu, Dongqi Tang, Song                  tion algorithms. arXiv preprint arXiv:1609.04747, 2016. 6
+     Wang, Jie Qin, Jianke Zhu, and Lei Zhang. Tokenpacker:           [48] Victor Sanh, Lysandre Debut, Julien Chaumond, and Thomas
+     Efficient visual projector for multimodal llm. International          Wolf. DistilBERT, a distilled version of BERT: smaller, faster,
+     Journal of Computer Vision, pages 1–19, 2025. 3                       cheaper and lighter. ArXiv, abs/1910.01108, 2019. 2
+[34] Akide Liu, Jing Liu, Zizheng Pan, Yefei He, Gholamreza Haf-      [49] Yuzhang Shang, Mu Cai, Bingxin Xu, Yong Jae Lee, and Yan
+     fari, and Bohan Zhuang. MiniCache: KV cache compression               Yan. Llava-prumerge: Adaptive token reduction for efficient
+     in depth dimension for large language models. arXiv preprint          large multimodal models. arXiv preprint arXiv:2403.15388,
+     arXiv:2405.14366, 2024. 3                                             2024. 1, 2, 5
+[35] Haotian Liu, Chunyuan Li, Yuheng Li, and Yong Jae Lee.           [50] Zhuoran Shen, Mingyuan Zhang, Haiyu Zhao, Shuai Yi, and
+     Improved baselines with visual instruction tuning, 2023. 1, 2,        Hongsheng Li. Efficient attention: Attention with linear com-
+     6, 7                                                                  plexities. In Proceedings of the IEEE/CVF winter conference
+[36] Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee.              on applications of computer vision, pages 3531–3539, 2021.
+     Visual instruction tuning. In NeurIPS, 2023. 2                        3
+                                                                      [51] Dingjie Song, Wenjun Wang, Shunian Chen, Xidong Wang,
+[37] Haotian Liu, Chunyuan Li, Yuheng Li, Bo Li, Yuanhan Zhang,
+                                                                           Michael Guan, and Benyou Wang. Less is more: A simple
+     Sheng Shen, and Yong Jae Lee. LLaVA-NeXT: Improved
+                                                                           yet effective token reduction method for efficient multi-modal
+     reasoning, OCR, and world knowledge, 2024. 1, 2, 6
+                                                                           llms. arXiv preprint arXiv:2409.10994, 2024. 2
+[38] Shuo Liu, Kaining Ying, Hao Zhang, Yue Yang, Yuqi Lin,
+                                                                      [52] Mingjie Sun, Zhuang Liu, Anna Bair, and J Zico Kolter. A
+     Tianle Zhang, Chuanhao Li, Yu Qiao, Ping Luo, Wenqi Shao,
+                                                                           simple and effective pruning approach for large language
+     et al. Convbench: A multi-turn conversation evaluation bench-
+                                                                           models. arXiv preprint arXiv:2306.11695, 2023. 3
+     mark with hierarchical capability for large vision-language
+                                                                      [53] Hugo Touvron, Matthieu Cord, Matthijs Douze, Francisco
+     models. arXiv preprint arXiv:2403.20194, 2024. 6
+                                                                           Massa, Alexandre Sablayrolles, and Hervé Jégou. Training
+[39] Songhua Liu, Weihao Yu, Zhenxiong Tan, and Xinchao Wang.              data-efficient image transformers & distillation through atten-
+     Linfusion: 1 gpu, 1 minute, 16k image. arXiv preprint                 tion. In ICML, pages 10347–10357. PMLR, 2021. 2
+     arXiv:2409.02097, 2024. 3
+                                                                      [54] Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Mar-
+[40] Zechun Liu, Haoyuan Mu, Xiangyu Zhang, Zichao Guo, Xin                tinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste
+     Yang, K. Cheng, and Jian Sun. Metapruning: Meta learning              Rozière, Naman Goyal, Eric Hambro, Faisal Azhar, et al.
+     for automatic neural network channel pruning. ICCV, pages             Llama: Open and efficient foundation language models. arXiv
+     3295–3304, 2019. 2                                                    preprint arXiv:2302.13971, 2023. 2, 3
+[41] Zhijian Liu, Ligeng Zhu, Baifeng Shi, Zhuoyang Zhang, Yum-       [55] Hugo Touvron, Louis Martin, Kevin Stone, Peter Albert, Am-
+     ing Lou, Shang Yang, Haocheng Xi, Shiyi Cao, Yuxian Gu,               jad Almahairi, Yasmine Babaei, Nikolay Bashlykov, Soumya
+     Dacheng Li, et al. Nvila: Efficient frontier visual language          Batra, Prajjwal Bhargava, Shruti Bhosale, et al. Llama 2:
+     models. In Proceedings of the Computer Vision and Pattern             Open foundation and fine-tuned chat models. arXiv preprint
+     Recognition Conference, pages 4122–4134, 2025. 3                      arXiv:2307.09288, 2023. 2
+[42] Shuming Ma, Hongyu Wang, Lingxiao Ma, Lei Wang, Wen-             [56] Pavan Kumar Anasosalu Vasu, Fartash Faghri, Chun-Liang
+     hui Wang, Shaohan Huang, Li Dong, Ruiping Wang, Jilong                Li, Cem Koc, Nate True, Albert Antony, Gokula Santhanam,
+     Xue, and Furu Wei. The era of 1-bit llms: All large language          James Gabriel, Peter Grasch, Oncel Tuzel, et al. Fastvlm:
+     models are in 1.58 bits. arXiv preprint arXiv:2402.17764,             Efficient vision encoding for vision language models. In
+     2024. 2                                                               Proceedings of the Computer Vision and Pattern Recognition
+[43] Xinyin Ma, Gongfan Fang, and Xinchao Wang. LLM-pruner:                Conference, pages 19769–19780, 2025. 3
+     On the structural pruning of large language models. In           [57] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkor-
+     NeurIPS, 2023. 2, 3                                                   eit, Llion Jones, Aidan N Gomez, Ł ukasz Kaiser, and Illia
+[44] Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer,                  Polosukhin. Attention is all you need. In NeurIPS, 2017. 2, 3
+     James Bradbury, Gregory Chanan, Trevor Killeen, Zem-             [58] Jianfeng Wang, Zhengyuan Yang, Xiaowei Hu, Linjie Li,
+     ing Lin, Natalia Gimelshein, Luca Antiga, et al. Pytorch:             Kevin Lin, Zhe Gan, Zicheng Liu, Ce Liu, and Lijuan Wang.
+     An imperative style, high-performance deep learning library.          Git: A generative image-to-text transformer for vision and
+     NeurIPS, 32, 2019. 6                                                  language. arXiv preprint arXiv:2205.14100, 2022. 2
+[59] Zeqing Wang, Gongfan Fang, Xinyin Ma, Xingyi Yang, and
+     Xinchao Wang. Sparsed: Sparse attention for diffusion lan-
+     guage models. In International Conference on Learning
+     Representations, 2026. 2
+[60] Guangxuan Xiao, Yuandong Tian, Beidi Chen, Song Han,
+     and Mike Lewis. Efficient streaming language models with
+     attention sinks. In ICLR, 2024. 2
+[61] Chuanpeng Yang, Yao Zhu, Wang Lu, Yidong Wang, Qian
+     Chen, Chenlong Gao, Bingjie Yan, and Yiqiang Chen. Survey
+     on knowledge distillation for large language models: Meth-
+     ods, evaluation, and application. ACM Trans. Intell. Syst.
+     Technol., 2024. 2
+[62] Dongjie Yang, XiaoDong Han, Yan Gao, Yao Hu, Shilin
+     Zhang, and Hai Zhao. Pyramidinfer: Pyramid KV cache com-
+     pression for high-throughput llm inference. arXiv preprint
+     arXiv:2405.12532, 2024. 3
+[63] Senqiao Yang, Yukang Chen, Zhuotao Tian, Chengyao Wang,
+     Jingyao Li, Bei Yu, and Jiaya Jia. Visionzip: Longer is better
+     but not necessary in vision language models. 2025 IEEE/CVF
+     Conference on Computer Vision and Pattern Recognition
+     (CVPR), pages 19792–19802, 2024. 2
+[64] Yuan Yao, Tianyu Yu, Ao Zhang, Chongyi Wang, Junbo Cui,
+     Hongji Zhu, Tianchi Cai, Haoyu Li, Weilin Zhao, Zhihui He,
+     et al. Minicpm-v: A gpt-4v level mllm on your phone. arXiv
+     preprint arXiv:2408.01800, 2024. 1
+[65] Weihao Ye, Qiong Wu, Wenhao Lin, and Yiyi Zhou. Fit
+     and prune: Fast and training-free visual token pruning
+     for multi-modal large language models. arXiv preprint
+     arXiv:2409.10197, 2024. 1, 2
+[66] Jiahui Yu, Zirui Wang, Vijay Vasudevan, Legg Yeung, Mo-
+     jtaba Seyedhosseini, and Yonghui Wu. CoCa: Contrastive
+     captioners are image-text foundation models. Transactions
+     on Machine Learning Research, 2022. 2
+[67] Zhihang Yuan, Yuzhang Shang, and Zhen Dong. PB-LLM:
+     Partially binarized large language models. In ICLR, 2024. 2
+[68] Peng Zhang, Yash Goyal, Douglas Summers-Stay, Dhruv Ba-
+     tra, and Devi Parikh. Yin and yang: Balancing and answering
+     binary visual questions. In CVPR, pages 5014–5022, 2016. 6
+[69] Pan Zhang, Xiaoyi Dong, Bin Wang, Yuhang Cao, Chao Xu,
+     et al. InternLM-XComposer: A vision-language large model
+     for advanced text-image comprehension and composition.
+     arXiv preprint arXiv:2309.15112, 2023. 1
+[70] Pan Zhang, Xiaoyi Dong, Yuhang Zang, Yuhang Cao, Rui
+     Qian, et al. InternLM-XComposer-2.5: A versatile large
+     vision language model supporting long-contextual input and
+     output. arXiv preprint arXiv:2407.03320, 2024. 1, 2, 6
+[71] Mingjian Zhu, Kai Han, Yehui Tang, and Yunhe Wang. Visual
+     transformer pruning. ArXiv, abs/2104.08500, 2021. 2
+             Rethinking Token Reduction for Large Vision-Language Models
+                                                Supplementary Material
+8. Implementation Details                                           for x̃i = xj = x
+8.1. Fixed Compression Matrix                                           E[pi,j ] = E[xSx⊤ ] = E[xW diag(ω)W ⊤ x⊤ ].           (12)
+The training algorithm for Praw is shown in Algorithm 2,
+                                                                    Here, we notice that y = xW is still a random vector, with
+where compression projection matrix Praw is optimized to
+                                                                    all elements subject to N (0, dσc2 σw
+                                                                                                        2
+                                                                                                          ). Hence,
+minimize the objective as described in Equation (5).
+   There are several hyperparameters involved in the training                      E[y diag(ω)y ⊤ ] = ddc σc2 σw
+                                                                                                               2
+                                                                                                                 .            (13)
+of Praw , including α in Equation (5) and σraw in the initializa-
+tion of Praw . We set α = 1 and σraw = 0.1 in all experiments.         Considering that the embedding dimension of LVLMs is
+The learning rate is set to 10 and we train 500 epochs for          a large number (e.g., 4096 for LLaVA-1.5-7b), σ(Praw ) is
+each image-text pair.                                               close to the down-sampling projection to the input image
+                                                                    sequence controlled by the stride s.
+Algorithm 2 Training algorithm for MetaCompress.                       Further, when the kernel size k > 1, the expectation
+Require: (IIMG , ITXT ): the image-text pair; ETXT (·):             of pi,j is still zero when x̃i is not captured by the pooling
+    the language encoder; VIMG (·): the image encoder;              kernel located in xi . To sum up, the initialization to Equa-
+    LLM(·, ·): the vision-language decoder; Praw : the learn-       tion (9) converting MetaCompress to a interpretable pooling
+    able compression matrix with shape m × n.                       operation to the input image sequence.
+                                                       2
+ 1: Initialize Praw with Gaussian distribution N (0, σraw ).           However, as training progresses, Wq diverges from Wk ,
+ 2: XTXT ← ETXT (ITXT )                                             breaking the positive semi-definiteness of matrix S, enabling
+ 3: XIMG ← VIMG (IIMG )                                             MetaCompress to further explore more effective compres-
+ 4: y ← LLM(XTXT , XIMG )                                           sion strategies, ultimately enhancing performance. Besides,
+ 5: while not converged do                                          we choose the compression embedding dimension dc to be
+ 6:    X̃IMG ← σ(Praw )XIMG                 # with gradients        smaller than the original embedding dimension d to reduce
+ 7:    ỹ ← LLM(XTXT , X̃IMG )              # with gradients        the computational cost and number of parameters.
+ 8:    Compute the final loss and gradient ∇Praw w.r.t. Praw .         Essentially, Equation (9) is a specialized form of the
+                                                                                                     ⊤ ⊤
+ 9:    Update Praw with SGD optimizer.                              dot-product attention XWQ WK       X , making it easier to op-
+10: end while                                                       timize and less prone to over-fitting to the training dataset,
+                                                                    as we only adopt a few-shot subset for training efficiency.
+
+8.2. MetaCompress                                                   10. More Results
+To adapt to arbitrary compression rate, the stride k in the         10.1. Performance of Fixed Compression Matrix
+                                            n
+pooling operation is set to a float value m   , which can be        Because we train the compression matrix Praw for a single
+easily implemented by the fractional max pooling opera-             image on the training dataset, which is a straightforward opti-
+tion [22]. We set the kernel size s = 3 for all experiments.        mization problem, we do not compare it with other methods.
+                                                                    Here, we present the overall accuracy about compressing
+9. Properties of MetaCompress                                       LLaVA-Next-7b on the MT-VQA-v2 dataset for reference.
+Now, we analyze the properties of MetaCompress when                 The accuracy of the base setting is 82.44, and when reducing
+Wq = Wk = W and are drawn from N (0, σw        2
+                                                 ) in Equa-         90% of the image token the accuracy decreases to 80.89.
+tion (9).                                                           10.2. More comparison Results
+   We start by considering when kernel size k = 1, meaning
+that Pool(X) is a down-sampling operation to X, and we let          Table 4 presents the comparison results of different token
+X̃ denotes the down-sampled image sequence. In this case,           reduction method with the compression rate of 70%. Our
+Equation (9) can be simplified as                                   method achieves the best overall performance, the same as
+                                                                    the results in Table 1.
+                        P = X̃SX ⊤ ,                        (11)        As a supplement, Table 5 compares the effectiveness of
+                                                                    token reduction methods. Here, ‘Spatial’ represents applying
+where S is a positive semi-definite matrix. Therefore, the          spatial pooling to the image sequence (the kernel size k is set
+expectation E[pi,j ] = 0 for all positions that x̃i ̸= xj , and     to the same as the stride s). ‘ToMe’ [5] is a token merging
+Table 4. The comparison of visual token reduction methods on three MT-VQA benchmarks with the reduction rate of 70%. The best and the
+second-best results are highlighted in bold and underline, respectively.
+
+                                            MT-VQA-v2                         MT-GQA                          ConvBench
+       Model            Method
+                                    Acc1    Acc2    Acc3      Avg   Acc1     Acc2    Acc3    Avg      S1       S2      S3     Avg
+                       Base        76.72    77.51   77.30 77.18 61.76       64.07 65.35 63.73         4.33    5.72     5.55    5.20
+                       Random      72.72    73.57   73.11 73.13 57.79       61.07 63.09 60.65         4.17    4.73     5.51    4.80
+                       Sample      72.96    73.71   73.33 73.33 58.48       61.12 62.30 60.63         4.16    5.03     3.81    4.33
+ LLaVA-1.5-7b
+                       FastV       69.30    69.57   69.41 69.43 54.79       57.65 60.03 57.49         3.99    5.03     3.47    4.16
+                       PruMerge    72.79    73.90   73.42 73.37 57.89       59.54 61.81 59.75         3.64    4.68     4.68    4.33
+                       Ours        75.67    76.63   76.46 76.25 58.62       60.96 63.64 61.07         3.99    5.03     4.85    4.62
+                       Base        78.35    79.47   78.92     78.91 62.47   65.21    67.22 64.97      4.33    7.11     5.72    5.72
+                       Random      73.63    74.56   73.96     74.05 57.74   61.24    63.33 60.77      4.03    4.89     5.24    4.72
+                       Sample      73.81    74.79   74.51     74.37 58.51   61.29    62.82 60.87      3.64    5.03     5.37    4.68
+ LLaVA-1.5-13b
+                       FastV       73.85    75.18   74.58     74.54 57.99   60.75    63.51 60.75      4.37    6.92     5.10    5.46
+                       PruMerge    73.80    75.16   74.57     74.51 57.67   60.45    62.18 60.10      4.51    6.41     5.37    5.43
+                       Ours        74.03    76.98   76.31     75.77 59.48   61.91    65.25 62.21      4.33    6.93     5.37    5.55
+                       Base        80.20    80.86   80.71     80.59 63.83   66.68 67.94      66.15    7.95 11.46       7.58    9.00
+                       Random      76.18    77.43   77.64     77.08 61.96   63.95 66.29      64.07    7.97 9.19        6.93    8.03
+ LLaVA-NeXT-7b         Sample      76.60    77.93   77.96     77.50 62.28   64.61 66.17      64.35    7.63 8.32        4.33    6.76
+                       FastV       75.96    76.86   76.39     76.40 61.54   64.37 65.97      63.96    0.00 0.00        2.50    0.83
+                       Ours        77.75    78.06   78.54     78.12 63.38   64.69 67.59      65.22    7.63 9.88        7.45    8.32
+                       Base        81.02 82.32 81.64 81.66 65.45 67.32 69.12 67.30 12.48 13.17                         7.97 11.21
+                       Random      77.30 78.77 78.65 78.24 62.89 64.64 67.22 64.92 11.44 11.27                         8.15 10.29
+ LLaVA-NeXT-13b        Sample      77.51 79.15 79.03 78.56 63.95 64.54 67.20 65.23 10.40 14.04                         6.76 10.40
+                       FastV       75.78 77.16 76.66 76.53 62.10 64.37 65.06 63.84 20.00 5.00                          3.33 9.44
+                       Ours        78.14 80.98 80.21 79.78 64.86 65.89 67.59 66.11 10.92 13.86                         7.11 10.63
+                       Base        78.80    81.12   81.24     80.39 60.21   63.38 65.01      62.87   12.48 7.00       7.97 9.15
+                       Random      74.63    77.23   77.44     76.43 56.96   61.59 63.63      60.73   15.42 10.23      7.97 11.21
+ XComposer-2.5-7b      Sample      75.07    77.68   78.04     76.93 57.79   61.17 63.36      60.77   15.94 11.79      6.07 11.27
+                       FastV       77.93    80.18   80.05     79.39 58.95   61.34 62.67      60.99   12.50 4.17      12.50 9.72
+                       Ours        78.24    80.53   80.79     79.85 60.11   62.28 64.14      62.18   15.77 12.13      6.24 11.38
+
+
+Table 5. Comparison results of different token merging methods       10.3. More Ablation Results
+for LLaVA-1.5-7b.
+                                                                     The results in Table 6 provide additional ablation studies
+                                  MT-GQA                             across various LVLMs, further supporting the results in Ta-
+    Setting                                                          ble 3 and demonstrating that each objective contributes posi-
+                   Acc1        Acc2        Acc3        Avg
+                                                                     tively to the overall performance.
+   Base            61.76       64.07       65.35      63.73
+   Sample          54.60       57.07       59.31      56.99          10.4. More Transfer Results
+   Spatial         51.05       54.62       56.24      53.97
+   ToMe            53.64       56.91       57.62      56.06          Table 7 reports more transfer validation experiments across
+   VisionZip       55.08       57.82       59.89      57.60          LVLMs on MT-VQA-v2 and MT-GQA, showing that Meta-
+   Ours            55.95       58.71       60.64      58.43          Compress does not heavily depend on the specific training
+                                                                     dataset, thereby demonstrating robust generalization ability.
+method proposed for ViTs rather than LVLMs, and thus                 Furthermore, Table 8 reports transfer results on video ques-
+performs ineffectively in our setting. ‘VisionZip’ [63] is a         tion answering task. In detail, we transformed the video QA
+hybrid token compression method that integrates both token           dataset Video-MME [21] into a 3-turn dialogue version, re-
+pruning and merging, yet it does not take MT-VQA scenarios           ferred to as MT-Video-MME (including 500 dialogs for vali-
+into account and therefore also underperforms our method.            dation), and conducted comparative evaluations against base-
+                                                                     line methods at a 70% compression rate. Since XComposer-
+                                                                     2.5-7B natively supports video input, we directly use the
+Table 6. Additional ablation study of training MetaCompress for various LVLMs using different loss terms on MT-GQA. Gradient clipping
+is only applied for the ‘Lcollapse + Grad Clip’ setting.
+
+   Lpred      Lentropy      Lcollapse       Lcollapse + Grad Clip    LLaVA-1.5-7b       LLaVA-NeXT-7b         XComposer-2.5-7b
+    ✓           ✗                ✗                   ✗                  56.63                 61.98                  56.77
+    ✓           ✓                ✗                   ✗                  57.99                 62.42                  58.01
+    ✓           ✗                ✓                   ✗                  52.26                 56.34                  52.53
+    ✓           ✗                ✗                   ✓                  57.57                 62.13                  58.24
+    ✓           ✓                ✗                   ✓                  58.43                 62.70                  58.68
+
+Table 7. Transfer validation experiments. Average accuracy is reported for cross-dataset transfer between MT-VQA-V2 and MT-GQA, all
+under a 90% token reduction rate.
+
+           Settings              LLaVA-1.5-7b        LLaVA-1.5-13b    LLaVA-NeXT-7b       LLaVA-NeXT-13b        XComposer-2.5-7b
+ MT-VQA-v2                              70.65              72.94            75.18                75.26                 75.76
+ MT-GQA → MT-VQA-v2                     69.06              71.89            73.61                73.25                 74.41
+ MT-GQA                                 58.43              59.48            62.70                63.12                 58.68
+ MT-VQA-v2 → MT-GQA                     57.45              58.78            61.43                62.60                 58.06
+
+
+Table 8. Transfer results on MT-Video-MME. Average accuracy is          tention mechanisms [39, 50], and efficient model architec-
+reported across different methods.                                      tures [33, 41, 56], particularly in designing vision encoders
+                                                                        for stronger and more compact visual representations. How-
+ Metrics     Base        Random         Sample    FastV     Ours        ever, these methods typically require fine-tuning the entire
+ Acc1         44.3        26.8           25.5      26.2      28.5       model, resulting in substantial computational overhead. In
+ Acc2         46.7        25.3           26.4      27.3      27.3       contrast, our proposed MetaCompress trains only a small
+ Acc3         48.2        30.7           31.3      31.6      34.6       number of lightweight linear projection layers (Dq , Dk , and
+ Avg          46.4        27.6           27.7      28.4      30.1       w), yet it surpasses existing token reduction approaches. Ow-
+                                                                        ing to its efficiency, MetaCompress requires only a modest
+pre-trained weights obtained from training on the small com-            amount of training data (approximately 20k samples) while
+bined dataset of MT-VQA-v2 and MT-GQA (only around                      exhibiting strong transferability across datasets, as demon-
+20k samples in total as we mentioned) to evaluate on the                strated in our transfer experiments. This generalization ca-
+MT-Video-MME benchmark. As shown in the table, Meta-                    pability stems from the fact that MetaCompress is trained
+Compress outperforms baseline approaches even without any               to preserve as much general visual information as possible
+task-specific training on MT-Video-MME, further demon-                  for multi-turn dialogues rather than being specialized for
+strating its strong transferability.                                    specific image domains.
+
+11. More Visualizations
+Figures 6 and 7 show the visualization of the generated com-
+pression projection for LLaVA-1.5-7b and LLaVA-1.5-13b
+on MT-GQA with a compression rate of 90% (we randomly
+select two images as examples). The row and column in-
+dices in the figures represent the original and reduced token
+indices, respectively, with darker colors indicating higher
+retention weights. As observed, MetaCompress performs
+pruning and merging operations at different positions, but is
+primarily based on equidistant down-sampling, with specific
+adaptations for certain tokens.
+
+12. Discussions
+Most data-driven approaches for efficient model inference
+primarily focus on model pruning [43, 52], efficient at-
+Figure 6. Visualization of the compression projection for LLaVA-1.5-7b on MT-GQA with the compression rate of 90%.
+Figure 7. Visualization of the compression projection for LLaVA-1.5-13b on MT-GQA with the compression rate of 90%.
+

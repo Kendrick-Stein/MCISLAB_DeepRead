@@ -1,0 +1,1953 @@
+                                               AM US E: Audio-Visual Benchmark
+                                             and Alignment Framework for
+                                             Agentic Multi-Speaker
+                                             Understanding
+
+
+
+
+arXiv:2512.16250v1 [cs.AI] 18 Dec 2025
+                                              Sanjoy Chowdhury1,2,† Karren D. Yang2 Xudong Liu2 Fartash Faghri2 Pavan Kumar
+                                              Anasosalu Vasu2 Oncel Tuzel2 Dinesh Manocha1 Chun-Liang Li2 Raviteja
+                                              Vemulapalli2
+
+                                              1                                           2
+                                                  University of Maryland, College Park        Apple
+
+                                              Recent multimodal large language models (MLLMs) such as GPT-4o and Qwen3-Omni show strong
+                                              perception but struggle in multi-speaker, dialogue-centric settings that demand agentic reasoning
+                                              tracking who speaks, maintaining roles, and grounding events across time. These scenarios are
+                                              central to multimodal audio-video understanding, where models must jointly reason over audio and
+                                              visual streams in applications such as conversational video assistants and meeting analytics. We
+                                              introduce AM US E, a benchmark designed around tasks that are inherently agentic, requiring mod-
+                                              els to decompose complex audio-visual interactions into planning, grounding, and reflection steps.
+                                              It evaluates MLLMs across three modes zero-shot, guided, and agentic and six task families, includ-
+                                              ing spatio-temporal speaker grounding and multimodal dialogue summarization. Across all modes,
+                                              current models exhibit weak multi-speaker reasoning and inconsistent behavior under both non-
+                                              agentic and agentic evaluation. Motivated by the inherently agentic nature of these tasks and re-
+                                              cent advances in LLM agents, we propose RAFT, a data-efficient agentic alignment framework that
+                                              integrates reward optimization with intrinsic multimodal self-evaluation as reward and selective pa-
+                                              rameter adaptation for data and parameter efficient updates. Using RAFT, we achieve up to 39.52%
+                                              relative improvement in accuracy on our benchmark. Together, AM US E and RAFT provide a practi-
+                                              cal platform for examining agentic reasoning in multimodal models and improving their capabilities.
+
+                                              Correspondence: Sanjoy Chowdhury: sanjoyc@umd.edu; Raviteja Vemulapalli: r_vemulapalli@apple.com
+                                              Date: December 19, 2025
+
+
+
+
+                                         1        Introduction
+                                         Recent advances in multimodal large language models (MLLMs) such as GPT-4o, and Qwen3-Omni have achieved re-
+                                         markable progress in visual understanding, instruction following, and cross-modal reasoning. As these systems evolve
+                                         from passive perception to real-world agents: meeting assistants, collaborative companions, or dialogue moderators
+                                         they increasingly encounter multi-speaker, temporally grounded interactions. Understanding who speaks, maintaining
+                                         role continuity, and reasoning coherently across participants are essential for socially consistent communication. Yet,
+                                         such multi-speaker, role-aware understanding remains underexplored and largely unevaluated.
+                                         † Work done during an internship at Apple.
+
+
+
+
+                                                                                                      1
+Existing multimodal benchmarks such as MMBench Liu et al. (2023a), MME Fu et al. (2023), and MMMU Yue et al.
+(2024) primarily assess perception and single-turn reasoning, while dialogue-centric datasets such as M3Exam Zhang
+et al. (2023a) and Video-ChatGPT Maaz et al. (2023) focus on language quality without attributing reasoning to spe-
+cific speakers. Even long-horizon evaluations like MMRC Xue et al. (2025) and MMLU-Pro Wang et al. (2024d) as-
+sume a single narrator, overlooking inter-speaker transitions and shared context. Consequently, the ability of MLLMs
+to maintain speaker identity, resolve cross-turn dependencies, and perform structured reasoning in multi-speaker set-
+tings remains unknown.
+
+
+
+
+Figure 1 AM US E task definition. The benchmark includes six high-level audio-visual tasks in realistic multi-speaker settings.
+Each task requires integrating core skills involve spatial and temporal grounding, speaker identification, speech recognition, and
+summarization. denotes a textual description of the audio scene for reader clarity.
+
+Lately, the field is moving toward agentic multimodal systems models capable not only of understanding but also of
+planning, acting, and reflecting Shinn et al. (2024); Wang et al. (2024b); Liu et al. (2025). However, existing evalua-
+tions of “agency” are limited to tool use or environment control for web agents Ashraf et al. (2025), T2I generation
+Wang et al. (2025a) etc or text modality Deng et al. (2025) leaving open the question of how such autonomy translates
+to multi-party, audio-visual dialogue. Evaluating MLLMs in this setting requires decomposing high-level tasks into
+smaller perceptual and reasoning subgoals grounding, association, prediction, and summarization, thus demanding an
+explicitly agentic mode of evaluation.
+To address this gap, we present AM US E, a unified benchmark for assessing and improving multi-speaker agentic
+reasoning in MLLMs. It introduces three progressive modes of evaluation zero-shot, guided, and agentic (Fig. 2)
+spanning six tasks (Fig.1). These tasks are inherently agentic, requiring the model to plan, act, and reflect over multi-
+step interactions rather than rely on passive recognition. Our benchmark provides a structured testbed to analyze how
+autonomy, supervision, and reasoning granularity affect multimodal alignment and consistency. This evaluation ex-
+poses persistent weaknesses of existing models in multi-speaker agentic reasoning, highlighting the need for alignment
+strategies tailored to this regime.
+
+
+                                                                2
+                                           Unique                  Overlap                                        Reasoning Type                      Challenge Type
+              Benchmark                             Avg Spk/Clip             Audio-Visual #Agentic Tasks
+                                            Spk                      ≥2                                    Temporal   Causal   Identity   Grounding   Attribution   Summarization
+  AVA-ActiveSpeaker Roth et al. (2020)       430        2.5         0.12         ✗             ✗              ✗         ✗          ✗         ✓            ✗              ✗
+    VoxConverse Chung et al. (2020)         800+        1.5         0.10         ✗             ✗              ✗         ✗          ✓         ✓            ✓              ✗
+ AMI Meeting Corpus Kraaij et al. (2005)      30        4.0         0.22         ✗             ✗              ✓         ✗          ✓         ✓            ✗              ✗
+   Friends-MMC Wang et al. (2025c)            10        3.2         0.18         ✗             ✗              ✓         ✓          ✓         ✗            ✓              ✓
+  EgoSchema Mangalam et al. (2023a)         100+        1.8         0.12         ✗             ✗              ✓         ✓          ✗         ✗            ✗              ✗
+     Video-MME Fu et al. (2024a)             150        2.1         0.15         ✗             ✗              ✓         ✓          ✗         ✗            ✓              ✓
+           AM US E (Ours)                   350+        3.1         0.28         ✓             6              ✓         ✓          ✓         ✓            ✓              ✓
+
+
+Table 1 Comparison of multi-speaker audio-visual benchmarks. AM US E uniquely integrates temporal, causal, and identity-
+based reasoning within overlapping multi-speaker settings. Unlike prior datasets focused on perception-only tasks, AM US E aligns
+audio-visual perception with structured reasoning to benchmark agentic, human-like understanding of multi-party discourse.
+
+
+Motivated by the inherently agentic nature of these tasks, recent advances in LLM-based agents, and the gaps revealed
+by AM US E, we propose RAFT (Reasoning–Acting–Feedback Training), a data-efficient alignment strategy that en-
+hances agentic reasoning in MLLMs. RAFT integrates two key components: (i) Reflective Reward Optimization
+(RRO) an intrinsic reward mechanism that reinforces multimodal and temporal correctness through self-evaluation,
+and (ii) Selective Reasoning Adaptation (SRA) that focuses on updating cross-modal reasoning layers only for data ef-
+ficiency and interpretability. Together, these components improve performance on AM US E by a margin and establish
+a practical framework for improving structured reasoning in MLLMs that future work can readily build upon.
+Comprehensive experiments across both open- and closed-source MLLMs reveal two consistent findings: (a) current
+MLLMs perform poorly across both non-agentic and agentic evaluations, underscoring the difficulty of sustained multi-
+speaker reasoning; and (b) RAFT substantially mitigates these gaps, yielding significant improvements in grounding
+accuracy, temporal consistency, and dialogue coherence. Our key contributions are:
+(1) We present AM US E, a comprehensive benchmark for evaluating multi-speaker understanding by introducing six
+challenging tasks.
+(2) We perform a thorough evaluation under zero-shot, guided, and agentic modes of several open and closed source
+models. Our study reveals the limitations in the existing methods and provides a structured testbed for agentic multi-
+modal assessment.
+(3) We propose RAFT, a model-agnostic and data-efficient alignment framework integrating reward optimization
+(RRO) and data efficient update (SRA), yielding up to 39.52% relative gain in accuracy.
+
+
+2       Related Works
+Multimodal Large Language Models. The evolution of MLLMs has progressed from image-grounded models Liu
+et al. (2024b); Dai et al. (2023); Zhu et al. (2024); Zhang et al. (2023b); Lai et al. (2024); Liu et al. (2024a); Wang
+et al. (2024c) to architectures capable of handling audio-visual dialogues and conversational contexts Shu et al. (2023);
+Boqiang et al. (2025); Wu et al. (2024b); Li et al. (2025); Wu et al. (2024c); Abouelenin et al. (2025); Yan et al. (2024);
+Zhang et al. (2024, 2025); Guo et al. (2025a); Wang et al. (2025b); Zhu et al. (2025); Comanici et al. (2025). This
+transition is driven by two key advances: (1) long-range context modeling for extended multi-turn dialogues Li et al.
+(2024b); Song et al. (2024), and (2) multimodal fusion of speaker identity, vocal traits, visual presence, and linguistic
+reasoning Ren et al. (2024); Maaz et al. (2024); Yuan et al. (2025). However, existing MLLMs remain constrained to
+simplified single-speaker or turn-level settings, lacking robust handling of overlapping speech, dynamic multi-speaker
+grounding, and cross-speaker temporal dependencies, limiting their applicability to real-world conversations such as
+meetings and panel discussions.
+Video Benchmarks. A comprehensive benchmark is crucial for evaluating MLLMs, yet existing efforts largely em-
+phasize video understanding Lei et al. (2018); Li et al. (2020); Wu et al. (2024a); Xu et al. (2017); Jang et al. (2017);
+Yu et al. (2019); Mangalam et al. (2023b) or general instruction-following Chen et al. (2024); Liu et al. (2024c); Fu
+et al. (2025); Li et al. (2024c); Rawal et al. (2024); Wang et al. (2024a); Ghermi et al. (2024). While these frameworks
+advance visual and temporal comprehension, they overlook challenges central to conversational audio-visual reasoning
+such as overlapping speech, multi-party grounding, speaker reidentification, and temporal coordination Ataallah et al.
+(2024); He et al. (2024); Saravanan et al. (2025). Even long-context dialogue benchmarks Xiao et al. (2021); Li et al.
+(2024a); Ning et al. (2023); Xu et al. (2025c) often assume a single active speaker, limiting their capacity to assess
+multi-speaker role continuity. This absence of a dedicated benchmark hinders progress toward socially aware dialogue
+
+
+                                                                                     3
+                                                                                                                     Additional Metadata
+                                                                                                         Task
+                                                                                                                FC       VS      TR        LS
+
+                                                                                                         STG    ✓        ✗       ✗         ✓
+                                                                                                        AVDS    ✓        ✓       ✓         ✓
+                                                                                                        AVSA    ✓        ✓       ✗         ✗
+                                                                                                         NSP    ✗        ✗       ✓         ✓
+                                                                                                        SRID    ✓        ✗       ✗         ✓
+                                                                                                        CSNL    ✓        ✓       ✓         ✓
+
+
+
+                                                                                                         Table 2 Task-wise use
+                                                                                                         of additional cues: Face
+Figure 2 Evaluation Protocols. Zero-Shot, Guided, and Agentic where MLLMs reason over raw Crops (FC), Voice Seg-
+input, use auxiliary cues (e.g., faces, transcripts), or invoke external tools (e.g., Whisper, Pyannote, ments (VS), Transcripts
+InsightFace).                                                                                            (TS), and Lip Sync (LS).
+
+
+reasoning. To bridge this gap, we introduce AM US E, a unified framework for evaluating MLLMs in multi-speaker
+and agentic settings.
+Agentic Systems. Recent progress in LMM-based agents has shown reasoning and planning abilities approaching
+human-level autonomy. Beyond single-agent systems Achiam et al. (2023); Touvron et al. (2023), agentic frameworks
+leverage collective intelligence for complex tasks, from programming Li et al. (2023); Dong et al. (2024); Hong et al.
+to physical-world planning Dasgupta et al.; Song et al. (2023); Huang et al. (2023); Guo et al. (2024). Multi-agent
+setups further enhance generative capabilities Allioui et al. (2022); Gal et al. (2024); Wang et al. (2025d), exemplified
+by DreamFactory Xie et al. (2024) for video synthesis, Mora Yuan et al. (2024) for human-guided refinement, and
+SPAgent Tu et al. (2024) for tool orchestration. Unlike prior work, our approach introduces enhanced collaborative
+mechanisms for executing cross-modal reasoning tasks for speaker-specific settings.
+
+
+3     AM US E: Agentic Multi-speaker Understanding & Evaluation
+3.1 Task Definition
+Our benchmark systematically evaluates MLLMs in complex, multi-speaker, dialogue-rich environments. Unlike prior
+multimodal benchmarks that focus on perception or single-turn reasoning, AM US E targets multi-speaker reasoning,
+requiring models to identify speakers, maintain temporal and social context, and reason across conversational turns
+and scenes. We define six representative tasks (refer to Fig. 1) to capture these dimensions.
+Audio-Visual Dialogue Summarization (AVDS). AVDS evaluates a model’s ability to produce coherent summaries
+of multi-person conversations while retaining the correct speaker roles and content attribution. This task is crucial
+for assessing high-level comprehension, as summarization reflects whether a model can integrate linguistic, visual,
+and temporal cues into structured discourse understanding. Its difficulty arises from dense speaker interactions, over-
+lapping utterances, and role entanglement requiring models to attend selectively across modalities while preserving
+conversational flow.
+Audio-Visual Speaker Association (AVSA). AVSA maps each spoken utterance to its corresponding visible speaker
+an essential step for identity-aware dialogue understanding and higher-level reasoning such as attribution and summa-
+rization. The task is challenging as it requires fine-grained cross-modal disambiguation in natural conversations. For
+example, in a group game setting (Fig.1), several participants may talk or laugh simultaneously while one person inter-
+rupts another mid-sentence, requiring the model to detect who is actively speaking versus reacting. Success demands
+precise integration of phonetic cues, lip motion, gaze, and temporal interaction patterns to reliably associate voices
+with the correct individuals amid overlaps or occlusions.
+Next Speaker Prediction (NSP). This task anticipates the next active speaker in a conversation, reflecting a model’s
+ability to capture social and turn-taking dynamics. It is important for modeling interactive conversational flow and un-
+derstanding response patterns across individuals. The difficulty stems from the need for long-term temporal reasoning
+and social inference models must interpret subtle multimodal cues such as gaze shifts, pauses, and prosody to predict
+interaction intent.
+Speaker Re-identification (SRID). SRID evaluates a model’s ability to recognize and match speakers across non-
+
+
+                                                               4
+contiguous clips essential for long-context tracking and dialogue continuity. The task is challenging since identity
+cues vary with appearance, viewpoint, lighting, background, or emotion, requiring modality-invariant embeddings
+that maintain consistent speaker representation under such variations.
+Speaker Temporal Grounding (STG). This task requires locating the time span and identity of the active speaker
+within a scene. It is important because temporal alignment between speech and visual context forms the foundation
+of time-sensitive multimodal understanding, enabling models to localize when and who is speaking. The task is chal-
+lenging as it demands synchronizing acoustic cues, lip motion, and facial dynamics under overlapping or intermittent
+speech conditions, where multiple people may talk simultaneously and attention must dynamically shift across them.
+Cross-Scene Narrative Linking (CSNL). CSNL tests if models can connect events or utterances across distinct scenes
+to infer causal and temporal relationships. It is one of the most cognitively demanding tasks, as it requires reasoning
+beyond perceptual continuity to form coherent narratives spanning multiple contexts. The challenge lies in bridging
+long-range temporal gaps and integrating visual, auditory, and linguistic evidence to establish logical dependencies
+and narrative coherence across time.
+
+
+
+
+Figure 3 RAFT framework for agentic multimodal reasoning. Given a dialogue-rich video, the model uses perception tools
+to extract multimodal cues. RAFT integrates SRA and RRO within a Reason–Act–Feedback loop, using perceptual consistency to
+refine temporal and speaker-grounded responses. RAFT ( ) module operates only during training. Dotted arrow shows that RRO
+passively uses perceptual feedback for reward computation rather than active control of the tools.
+
+3.2 Evaluation Protocols
+Zero-Shot Evaluation. In this setting, each model is evaluated without external guidance or perceptual cues (Fig. 2).
+It receives only the raw video and the question as input. Zero-shot evaluation serves as the lower bound, reflecting the
+model’s intrinsic multimodal understanding from pretraining.
+Guided Evaluation. In this mode, the model receives auxiliary perceptual cues such as pre-computed face crops,
+active-speaker timestamps, or ASR transcripts, along with explicit guidance on their use (Tab. 2). Prompts include
+step-by-step instructions (e.g., “Use the transcript to identify who is speaking before summarizing the dialogue”). This
+setting tests how well models integrate structured cues and follow task decomposition in a controlled setup, simulating
+an assisted agent with external signals but limited autonomy.
+Agentic Evaluation. The most challenging regime removes all explicit hints about tool availability or intermediate
+steps. External modules (face detection, speaker localization, speech-to-text) remain accessible at runtime, but the
+model must discover and invoke them implicitly through its own reasoning (Fig. 2). This setting mirrors a fully
+autonomous agent operating in open environments, inferring actions directly from goals. Performance here reflects true
+agentic understanding of how well the model self-directs perception, reasoning, and reflection across multi-speaker
+interactions without human scaffolding.
+3.3 Sample Curation
+The dataset is constructed by curating examples from AVA Active Speaker Gu et al. (2018), VoxCeleb2 Chung et al.
+(2018), FriendsMMC Wang et al. (2025c), AMI Meetings Kraaij et al. (2005), and web-scraped sources. We focus on
+multi-person conversations such as talk shows, interviews, and podcasts etc. Each 10–50s clip contains 2 − 10 visually
+and audibly active speakers. A semi-automated construction pipeline combines metadata and rule-based matching
+
+
+                                                            5
+                                Zero-Shot                                  Guided                                  Agentic                               Agentic w/ RAFT
+Model
+                  BLEU↑ METEOR↑ CIDEr↑ GPT↑ BLEU↑ METEOR↑ CIDEr↑ GPT↑ BLEU↑ METEOR↑ CIDEr↑ GPT↑ BLEU↑ METEOR↑ CIDEr↑ GPT↑
+Human             86.04      8.36          92.03    9.52      –           –             –           –    –         –            –           –     –         –         –          –
+Random            21.88      2.14          30.74    2.23      –           –             –           –    –         –            –           –     –         –         –          –
+                                                                             Closed-source MLLMs
+REKA              39.14      3.19          38.72    3.27     41.03       4.46      42.55 4.56 38.07               3.21         30.03    3.05      –         –         –          –
+GPT-4o Mini       42.13      3.87          40.36      –      45.26       4.47      42.54    –    43.17            4.59         35.11      –       –         –         –          –
+GPT-4o            43.52      4.99          42.89      –      49.21       5.36      50.19    –    44.41            4.98         44.01     –        –         –         –          –
+                                                                                Open-source MLLMs
+Unified-IO2-5B    35.02      3.67          39.05    3.90     39.02       4.03        41.53 3.34 35.08             3.74         38.09    3.02    42.43      4.68     43.19       4.11
+CREMA             36.04      3.68          37.00    4.34     40.50       4.39        44.08 3.76 34.04             3.67         40.08    3.33    43.18      4.36     46.85       4.46
+Video-SALMONN     37.35      3.95          36.06    4.87     41.04       4.34        46.26 4.15 35.08             4.55         42.04    3.97    43.25      5.17     48.09       4.92
+VITA-8B           41.02      3.70          40.05    4.94     42.57       4.29        47.05 4.34 38.54             4.85         42.56    4.07    49.58      5.88     48.09       5.10
+Qwen2.5-Omni-7B   44.92      4.46          41.78    5.09     46.06       4.45        48.56 5.14 42.07             4.58         45.09    4.83    51.54      6.04     54.05       6.16
+Qwen3-Omni-7B     45.08      5.26          42.03    5.24     48.08       4.89        50.62 5.45 45.07             4.72         48.53    5.10    54.54      6.81     58.51       6.62
+
+
+Table 3 Audio-Visual Dialogue Summarization results. While closed-source models such as GPT-4o achieve strong zero-shot
+and guided performance, open-source MLLMs benefit substantially from RAFT training.
+
+                          AV Speaker Association (Acc.% ↑)                      Next Speaker Prediction (Acc.% ↑)                   Speaker Re-identification (Acc.% ↑)
+ Model
+                           ZS       Guided         Agentic     Agt w/R           ZS         Guided      Agentic    Agt w/R             ZS       Guided    Agentic     Agt w/R
+ Human                    91.02        –             –               –          95.03           –            –           –          89.06         –             –           –
+ Random                   25.40        –             –               –          25.64           –            –           –          25.79         –             –           –
+                                                                          Closed-source MLLMs
+ REKA                     42.76     45.80           41.54            –       41.89 44.52     41.50                       –          52.50       54.60      50.70            –
+ GPT-4o Mini              44.27     46.18           43.78            –       44.13 46.24     44.10                       –          53.27       56.97      53.33            –
+ GPT-4o                   47.18     48.98           47.00            –       49.18 50.24     46.58                       –          54.63       55.82      52.50            –
+                                                                          Open-source MLLMs
+ Unified-IO2-5B           34.68     37.92           33.83         43.12     35.09 38.46     35.78                      43.38        43.78       46.82      41.52          51.08
+ CREMA                    37.33     41.04           37.06         45.81     40.09 43.57     40.56                      44.09        47.34       50.36      47.88          52.73
+ Video-SALMONN            38.57     41.08           38.53         48.18     44.05 47.78     43.82                      52.89        48.59       51.34      48.46          53.25
+ VITA-8B                  40.74     42.51           40.01         43.72     44.57 42.59     41.60                      48.47        50.76       52.50      50.58          52.98
+ Qwen2.5-Omni-7B          45.65     48.89           44.46         48.89     50.81 48.11     43.54                      52.33        54.67       56.82      52.19          58.62
+ Qwen3-Omni-7B            47.74     49.55           46.98         54.22     48.38 49.27     45.02                      56.73        56.98       58.65      54.51          62.53
+
+Table 4 Performance comparison on AV Speaker Association, Next Speaker Prediction, and Speaker Re-identification
+tasks. Consistent performance gains for Qwen-based models after RAFT fine-tuning. Agt w/R: Agentic evaluation with RAFT
+finetuning.
+
+
+(more details in supplementary), followed by manual inspection for annotation sanity and consistency. The resulting
+dataset spans diverse acoustic conditions, speaking styles, and scene dynamics, capturing realistic conversational
+complexity.
+We employ diverse templates to form task questions, ensuring linguistic variation. QA pairs evaluate temporal ground-
+ing, audio-visual association, and related reasoning aspects. Further dataset details are provided in the supplementary
+material.
+
+3.4 Benchmark Statistics
+AM US E contains 2, 100 samples spanning six tasks: STG, AVDS, AVSA, NSP, and SRID (400 each), and CSNL
+(100 manually collected cross-scene instances). It features one of the highest average speaker counts per clip among
+existing benchmarks (Tab. 1), with an average clip length of 38.7s, covering over 23 hours of annotated multi-speaker
+content and 350+ unique identities. This balanced structure ensures diversity across modalities and reasoning levels,
+supporting both low-level perceptual evaluation and high-level discourse reasoning.
+
+
+4       Our Approach: Reasoning, Acting, and Feedback Training (RAFT)
+Motivated by the inherently agentic nature of our multi-speaker audio-visual tasks and advances in LLM agents,
+we introduce RAFT, a self-reflective alignment framework for multi-speaker audio-visual reasoning to allow future
+research to build upon. RAFT couples Reflective Reward Optimization for reward-driven generative correction with
+Selective Reasoning Adaptation for data and parameter efficient updates. Together, these modules enable fine-grained
+
+
+                                                                                            6
+                                    Speaker Temporal Grounding                                          Cross-Modal Narrative Linking
+                           Temporal IoU (↑)              Off-by-One Accuracy (↑)                  Accuracy (↑)           Human-Judged Coherence (↑)
+ Model
+                    ZS     Guided Agentic Ag w/R       ZS       Guided Agentic Ag w/R    ZS     Guided Agentic Ag w/R    ZS     Guided Agentic Ag w/R
+ Human             94.66     –       –          –     83.31       –       –       –     88.23     –       –       –        –      –      –       –
+ Random            30.87     –       –          –     29.47       –       –       –     21.18     –       –       –      2.56     –      –       –
+                                                                    Closed-source MLLMs
+ REKA              43.52   50.31   46.08        –     46.75     50.54    45.59     –    40.20   46.33   42.78     –      4.40    4.65   4.21     –
+ GPT-4o Mini       44.21   49.41   45.98        –     46.28     49.11    46.92     –    41.89   47.29   45.29     –      5.01    4.94   4.15     –
+ GPT-4o            48.72   52.03   49.17        –     49.28     52.11    47.44     –    43.16   49.26   43.23     –      5.22    6.02   5.63     –
+                                                                    Open-source MLLMs
+ Unified-IO2-5B    33.08   36.77   32.89      40.30   36.26     39.38   35.57   40.57 35.89     38.20   34.98    42.16   4.18    4.47   4.41    5.29
+ CREMA             34.26   35.58   28.93      37.27   38.65     41.53   32.57   41.04 39.48     39.59   33.11    42.82   4.93    4.75   4.38    5.42
+ Video-SALMONN     38.01   41.44   38.68      39.57   41.90     43.45   37.57   44.18 42.90     43.01   41.27    46.23   4.13    4.78   4.49    5.68
+ VITA-8B           41.18   46.27   42.29      49.22   44.47     48.67   41.11   50.48 43.27     44.83   41.26    45.50   4.56    4.60   4.05    4.81
+ Qwen2.5-Omni-7B   47.76   50.57   42.53      52.08   47.38     48.65   42.80   54.55 45.30     48.90   40.50    53.80   5.32    5.62   5.24    6.28
+ Qwen3-Omni-7B     48.56   51.02   45.59      54.04   49.51     51.50   43.29   56.33 46.07     49.76   41.04    57.26   5.66    6.27   5.02    7.11
+
+
+Table 5 Performance on Speaker Temporal Grounding and Cross-scene Narrative Linking tasks. Human-Judged Coherence
+is scaled between 0-10. RAFT yields substantial gains in temporal precision and narrative coherence, especially for open-source
+MLLMs such as Qwen3-Omni. Ag w/R: Agentic evaluation with RAFT finetuning.
+
+
+temporal grounding, adaptive speaker attribution, and stable low-resource alignment.
+4.1 Problem Setup
+
+
+Input: Multimodal streams x = {x(a) , x(v) , x(t) } representing audio, video, and text. Output: Structured response y =
+{p, a, r} denoting the Plan, Act, and Reflect phases.
+
+Given an input context x composed of multimodal streams {x(a) , x(v) , x(t) } and a desired structured response y =
+{p, a, r}, we model a conditional policy πθ (y|x) and seeks parameters θ′ that maximize both reward and alignment:
+                                              θ′ = arg max E(x,y)∼D [ R(x, y) − λ Lalign (x, y) ],                                               (4.1)
+                                                            θ
+
+where R measures agentic correctness and Lalign regularizes stepwise reasoning.
+4.2 Structured Reasoning Alignment
+
+
+Input: Reasoning phases {p, a, r} and their contextual dependencies Ck . Output: Temporally and semantically aligned reason-
+ing segments.
+
+For each step k, the model predicts a target segment y = k ∗ conditioned on the input x, where x denotes history of
+observed history, and the model additionally conditions on the reasoning it has generated so far, which we omit here
+for notation simplicity.
+The structured alignment objective is then written purely in terms of inputs x and labels y:
+
+                                                        Lalign (x, y) = − log πθ (y | x)                                                        (4.2)
+
+This encourages each phase to remain consistent with its contextual dependencies, enforcing coherent Plan-Act-Reflect
+reasoning.
+4.3 Reflective Reward Optimization (RRO)
+
+
+Input: Candidate generations {yi } for each multimodal sample x. Output: Reward-weighted gradient updates favoring percep-
+tually grounded and coherent responses.
+
+To concretize the reward signal R(xi , yi ) used in Eq. 4.4, we define a perceptual reward term that measures multimodal
+alignment between the model’s prediction and ground-truth sensory evidence:
+                                           ri = R(xi , yi ) = fperceptual (Sync, Face, Speech, Diarzation),                                      (4.3)
+
+
+
+                                                                              7
+where fperceptual aggregates consistency scores from four perceptual agents. This reflective reward ensures that feedback
+remains grounded in perceptual correctness rather than text-only similarity, stabilizing the RRO loop shown in Fig. 3.
+To align the model’s self-reflection with multimodal correctness, we introduce RRO, a lightweight generative reward.
+Instead of a separate critic, we compute sequence-level rewards ri = R(x, yi ) from the model’s own reflective feed-
+back and teacher-guided scores (e.g., grounding accuracy, speaker consistency, and textual coherence). For K sampled
+candidates {yi }, we consider reward weighted regression update Peters and Schaal (2007); Black et al. (2023):
+                                                         K
+                                                         X
+                                            ∇θ JRRO =          wi ∇θ log πθ (yi |x),
+                                                         i=1
+                                                                                                                       (4.4)
+                                                         exp β(ri − r̄)
+                                                   wi = P                ,
+                                                         j exp β(rj − r̄)
+
+where r̄ is the average reward. Compared with the popular GRPO Shao et al. (2024b), which employs a linear weight-
+ing update version, we found the softmax to be more stable to train empirically.
+
+
+
+
+Figure 4 Qualitative results. Comparison on multi-speaker reasoning tasks: Next-Speaker Prediction (left), Speaker Association
+(middle), and Temporal Grounding (right). UI: Unified-IO2, CR: CREMA, VS: VideoSALMONN, VI: VITA, Q2.5: Qwen2.5-Omni,
+and Q3: Qwen3-Omni under Zero-Shot, Agentic w/o RAFT, and Agentic w/ RAFT modes.
+
+To prevent drift across modalities during reasoning, we incorporate a multimodal temporal-coherence loss:
+                                               X
+                                                   ∥fa (t) − fv (t)∥22 + γ∥ft (t) − fr (t)∥22 ,
+                                                                                             
+                                     Ltemp =                                                                             (4.5)
+                                               t
+where fa , fv , ft , fr are audio, visual, textual, and reflective embeddings at timestep t. This regularizer enforces
+synchronous grounding across streams. The final RAFT objective integrates alignment, temporal coherence, and
+reflective reward:
+                                             LRAFT = Lalign + αLtemp − βJRRO .                                    (4.6)
+
+Selective Reasoning Adaptation (SRA). Due to limited data and to ensure parameter efficiency, we employs SRA
+a targeted adapter scheme applied only to multimodal reasoning layers. for multimodal reasoning. Unlike generic
+LoRA tuning, we restrict updates to cross-modal inference paths, improving interpretability and convergence while
+maintaining low computational cost.
+
+
+5     Experiments and Results
+Baselines. Our evaluation comprehensively assesses various MLLMs, including closed-source and open-source mod-
+els. We evaluate the following closed source models GPT-4o Hurst et al. (2024), GPT-4o-mini Hurst et al. (2024),
+REKA Team et al. (2024) and the open source models: Unified-IO2 Lu et al. (2024), CREMA Yu et al. (2024),
+VideoSALMONN Sun et al. (2024), VITA Fu et al. (2024b), Qwen2.5-Omni Xu et al. (2025a), Qwen3-Omni Xu et al.
+(2025b). We include human evaluation results to establish an upper bound for model performance, providing a subjec-
+tive reference for the achievable ceiling for each downstream task.
+
+
+                                                                8
+             Figure 5 Comparison of optimization methods. Agentic performance across models on STG task.
+
+
+5.1 Metrics
+For text generation quality, we report BLEU@4 Papineni et al. (2002), METEOR Banerjee and Lavie (2005), and
+CIDEr Vedantam et al. (2015). For discrete classification tasks, we use Top-1 Accuracy. Below, we describe the
+additional metrics used to capture temporal and reasoning-specific performance.
+GPT-as-a-Judge Evaluation. We adopt the GPT-as-a-Judge evaluation Xu et al. (2025a) to assess semantic correct-
+ness, factual grounding, and reasoning quality beyond lexical overlap. An LLM is given the task, ground truth, and
+model response, and outputs a normalized score s ∈ [0, 10] based on task-specific rubrics, offering a scalable and
+human-aligned measure of multimodal understanding.
+Temporal Intersection over Union (tIoU). For temporal grounding and localization tasks, we use tIoU to quantify
+alignment between predicted and ground-truth time intervals (t̂s , t̂e ) and (t∗s , t∗e ):
+
+                                                   min(t̂e , t∗e ) − max(t̂s , t∗s )
+                                          tIoU =                                     .                              (5.1)
+                                                   max(t̂e , t∗e ) − min(t̂s , t∗s )
+
+Higher tIoU values indicate better temporal precision and consistency in identifying speaker activity boundaries.
+Off-by-One Accuracy. We report Off-by-One Accuracy to capture tolerance to minor temporal deviations in sequen-
+tial labeling tasks. A prediction is considered correct if it falls within one step of the ground truth:
+                                                         N
+                                                      1 X 
+                                                            1 |ŷi − yi∗ | ≤ 1 .
+                                                                              
+                                         AccOBO =                                                                   (5.2)
+                                                      N i=1
+
+This metric accounts for small timing offsets that do not affect the temporal correctness of the prediction.
+Human-Judged Coherence. This is a subjective metric assessing how coherently a model links events or dialogues
+across scenes. Human evaluators rate the logical, temporal, and contextual consistency of responses on a 0–10 scale,
+with higher scores indicating stronger narrative flow and cross-scene understanding.
+
+5.2 Findings
+Performance declines with autonomy. Model accuracy and reasoning coherence consistently drop as autonomy
+increases from ZS to agentic evaluation (Tab. 3–5). Most MLLMs struggle to maintain speaker consistency and
+contextual grounding once explicit cues are removed, revealing a dependence on external structure rather than internal
+temporal modeling.
+Over-reliance on guided prompts. While models such as GPT-4o and Qwen3-Omni perform competitively in guided
+modes, their reasoning quality, turn attribution, and temporal flow degrade sharply without instructions. This indicates
+that prompt scaffolding currently substitutes for robust multimodal representations.
+
+
+                                                              9
+Figure 6 Ablation analysis of RAFT on AVDS. (a) Removing core objectives degrades performance across models (b) Highlights
+stage-wise gains.
+
+
+Task sensitivity to autonomy. Among all tasks, audio-visual summarization, speaker temporal grounding and cross-
+modal narrative linking exhibit the steepest performance decline from guided to autonomous modes, reflecting the
+compounded difficulty of multimodal fusion and long-range speaker tracking. In contrast, next-speaker prediction and
+speaker association remain more stable, suggesting that short-term conversational cues are easier for present MLLMs
+to capture.
+Effect of RAFT. Integrating RAFT consistently boosts performance across models and modes, yielding on average
++6.7 BLEU, +1.1 METEOR, and +6.8 CIDEr, with GPT-based human-alignment gains up to +1.5. The improve-
+ments are most pronounced in autonomous settings, where structured reasoning and self-reflection reduce temporal
+drift and speaker confusion. Qualitatively, RAFT-enhanced models display clearer stepwise reasoning, explicit plan-
+ning (e.g., identifying speaker order before summarization), and stronger factual consistency.
+Closed-source vs. Open-source Models. Closed-source MLLMs consistently maintain an edge over open-source
+counterparts in subjective and objective metrics under zero-shot and guided conditions. This advantage likely stems
+from larger-scale audio-visual pretraining and richer cross-modal alignment. After RAFT finetuning high-quality open-
+source models such as Qwen3-Omni demonstrate adaptability, suggesting that open-source models possess stronger
+generalization when allowed to self-direct reasoning.
+After RAFT fine-tuning, multiple open-source models close and often surpass the performance gap with closed-source
+ones on most metrics. This demonstrates RAFT as a model-agnostic enhancement recipe that unlocks agentic com-
+petence even in smaller, lightweight models. Its adaptability makes it practical and data-efficient, achieving scalable
+improvement without proprietary pipelines. Overall, structured agentic training enables open-source models to rival
+or exceed closed-source systems in multi-speaker reasoning, showing that agentic understanding is learnable, not
+inherent.
+
+5.3 Ablation Studies
+Effect of Optimization Strategy Fig. 5 compares PPO Schulman et al. (2017a), DPO Rafailov et al. (2023), GRPO
+Shao et al. (2024a), with RAFT on the Speaker Temporal Grounding task. RAFT achieves the highest agentic scores,
+showing stronger alignment of temporal and multimodal cues. While GRPO offers moderate gains, PPO and DPO lag
+due to weaker multimodal feedback. Notably, larger models (e.g., Qwen3-Omni) benefit most, though smaller ones
+like CREMA also improve highlighting RAFT ’s scalable and robust optimization.
+Insights from RAFT Ablations. Fig. 6 shows that RAFT ’s gains arise from the complementary roles of its components.
+Removing alignment, temporal grounding, or reflective optimization degrades performance, with the reflective term
+contributing most to resolving multi-speaker ambiguities. Stage-wise results confirm that improvements emerge after
+adding SRA and reflection, highlighting progressive specialization and self-correction over mere supervision.
+
+5.4 Qualitative Results
+Fig. 4 compares models across three multi-speaker tasks. Baselines like Unified-IO2, CREMA, and VideoSALMONN
+often fail under overlapping speech, while the agentic Qwen2.5-Omni and Qwen3-Omni models with RAFT yield
+more coherent and temporally grounded predictions. The reflective phase helps refine speaker and timing consistency
+
+
+
+                                                           10
+in complex dialogues.
+
+
+6    Conclusion and Future Work
+We introduced AM US E, a unified benchmark for evaluating and improving agentic multi-speaker understanding in
+MLLMs. It benchmarks models across zero-shot, guided, and autonomous settings, revealing their drawbacks. To
+address that, we proposed RAFT, a model-agnostic approach combining structured Plan–Act–Reflect supervision with
+GRPO-based reward alignment. RAFT improves reasoning consistency and speaker tracking with minimal labelled
+data and parameter updates. Together, they bridge evaluation and improvement, laying the foundation for more robust
+and socially aware multimodal agents.
+Future work can aim to generalize the reward-aligned optimization principles to broader multimodal reasoning tasks.
+By integrating temporal alignment with reflective feedback across vision–language and embodied environments, such
+extensions could enable a unified framework for improved grounding and cross-modal interaction.
+
+
+
+
+                                                        11
+Appendices
+
+A Supplementary Video                                                                                                  13
+
+B Additional Details About AM US E                                                                                     13
+    B.1 Dataset Construction . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .     13
+    B.2 Dataset Breakdown . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .      15
+    B.3 Quality Control . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .    16
+    B.4 Question Templates . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .     17
+
+C Post-Training Intuition                                                                                              17
+    C.1 Self-Reflective Rewarding . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .      17
+    C.2 Selective Reasoning Adaptation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .       17
+    C.3 Temporal Coherence Constraint. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .       18
+
+D Additional Experiments                                                                                               18
+    D.1 RAFT Ablations and Robustness . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .        18
+    D.2 Dataset-Centric Analyses . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .     19
+    D.3 Agentic Tool-Use and Cue Ablations . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .       20
+    D.4 Comparison to Other Alignment Objectives . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .         20
+
+E Additional Qualitative Results                                                                                       20
+
+F User Study                                                                                                           21
+
+G RAFT Pseudocode                                                                                                      21
+
+H Evaluations Details                                                                                                  22
+    H.1 Prompt Templates Across Evaluation Modes . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .         22
+    H.2 More Details on LLM-based Choice Extraction . . . . . . . . . . . . . . . . . . . . . . . . . . . . .          23
+
+I   More Related Works                                                                                                 24
+    I.1   Preference Optimization Algorithms . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .     24
+    I.2   Multi-modal Learning . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .   24
+
+
+
+
+                                                           12
+A      Supplementary Video
+In the supplementary video, we provide audio-visual examples for each task and compare the performance of different
+models across zero-shot, guided and agentic modes of evaluation. The video also explains how the perception tools
+are being leveraged at different instances to improve the overall model performance.
+
+
+B      Additional Details About AM US E
+
+
+
+
+Figure 7 AM US E taxonomy. Hierarchical taxonomy of 15 multi-speaker reasoning scenarios across 6 tasks highlighting the
+diversity and complexity of AM US E conversations.
+
+
+
+
+Figure 8 Dataset statistics. Distribution of multi-speaker overlap ratios (left) and number of visible speakers per clip (right) in
+AM US E. The benchmark contains substantial speaker overlap and diverse group sizes, reflecting realistic multi-party conversational
+settings.
+
+
+B.1     Dataset Construction
+AM US E is constructed through an automated pipeline by leveraging the metadata from the underlying datasets. The
+samples are derived from the ground-truth annotations available in the source datasets: AVA Active Speaker Gu et al.
+
+
+                                                                13
+(2018), VoxCeleb2 Chung et al. (2018), FriendsMMC Wang et al. (2025c), AMI Meetings Kraaij et al. (2005), and
+curated YouTube videos with manually verified metadata. Our pipeline defines explicit rules for (i) extracting valid
+temporal segments, (ii) mapping them to speakers or events, (iii) stitching or pairing segments across clips when
+required by the task, and (iv) generating template-based queries grounded in annotated timestamps, transcripts, and
+speaker identities. Below we describe the construction procedures for each task.
+
+B.1.1   Speaker Temporal Grounding
+For each video, we extract speech-active regions using the dataset-provided temporal annotations (e.g., AVA active-
+speaker labels, AMI speech segments etc). A valid grounding sample is formed by selecting a continuous utterance
+from a target speaker and preserving its exact start and end timestamps. The transcript for this interval is obtained by
+slicing the dataset transcript according to the same boundaries. All timestamps originate directly from annotation files.
+Questions are generated using templates that reference these grounded intervals, ensuring the textual prompt aligns
+perfectly with the annotated speech region.
+
+B.1.2   Audio-Visual Dialogue Summarization
+Dialogue summarization samples are built by selecting multi-turn segments from the annotated transcripts. Each
+clip is formed by choosing a fixed-length temporal window (e.g., upto 40 seconds) and bundling all utterances oc-
+curring within that window. Speaker identities and utterance order are inherited from the transcript metadata. The
+transcript snippet is created by concatenating the turn-by-turn dialog text exactly as annotated, without modification
+or re-alignment. Summaries are then generated through structured templates that reference only the content contained
+in the selected segment.
+
+B.1.3   AV Speaker Association
+To build association samples, we first identify all speech segments from a given video along with their corresponding
+annotated speaker IDs. For each speech interval, we pair the audio-driven transcript slice with the video frames in
+which the same speaker appears, using the dataset-provided face track or region-of-interest metadata (e.g., bounding
+box indices in AVA or FriendsMMC). The pipeline directly maps the annotated speaker ID to the associated temporal
+window; no cross-modal embedding or recognition is involved. For each question, the template either asks the model to
+identify which speaker produced a given utterance or to decide whether a specific person in the scene said a particular
+line.
+
+B.1.4   Next Speaker Prediction
+This task is constructed using dialogue ordering rules. For any multi-speaker segment, we inspect the transcript meta-
+data and detect the temporal boundary between two consecutive speakers. A training sample is created by selecting
+the preceding context (a sequence of utterances) and identifying the next annotated speaker as the prediction target.
+Only the transcript order and timestamps are used; no additional ASR or heuristic filtering is applied. If a segment con-
+tains overlapping or indistinguishable turns based on metadata alone, it is automatically discarded to maintain clean
+conversational structure.
+
+B.1.5   Speaker Re-identification
+Re-identification samples are constructed by pairing two segments of the same annotated speaker at different times
+within the same dataset. For each identity, we gather all timestamps where that speaker appears, select two non-
+overlapping intervals, and extract the corresponding transcript slices. Positive pairs reuse the same speaker ID; nega-
+tive pairs are formed by pairing intervals belonging to distinct IDs. All identity information is taken strictly from the
+dataset’s annotations (VoxCeleb2 IDs, FriendsMMC cast labels, AMI participant tags), with no external face verifica-
+tion. Only pairs with sufficient temporal separation or scene variation are retained to ensure meaningful samples.
+
+B.1.6   Cross-Scene Narrative Linking
+(i) Scene Selection and Grouping. We construct CSNL samples by identifying pairs or triplets of scenes from sitcoms,
+drama series, talk shows, and long-form conversational videos where the narrative in one segment depends on an
+
+
+                                                           14
+                     Task                            AVA   VoxCeleb2     FriendsMMC      AMI     YouTube
+                     Speaker Temporal Grounding      120        80             80          90       30
+                     AV Dialogue Summarization       100        70             90         110       30
+                     AV Speaker Association          130        90             70          80       30
+                     Next Speaker Prediction         110        80            100          80       30
+                     Speaker Re-identification        90       140             60          80       30
+                     Cross-Scene Narrative Linking    0          0             70          0        30
+                     Total                           550       460            470         440       180
+
+Table 6 Number of samples collected from each dataset for all six AM US E tasks. The first five tasks contain 400 samples each,
+while Cross-Scene Narrative Linking contains 100 samples. Counts reflect how clips were sourced from AVA Active Speaker,
+VoxCeleb2, FriendsMMC, AMI Meetings, and curated YouTube videos.
+
+
+event in another. Instead of using perceptual tools, we rely entirely on transcript metadata, speaker IDs, and annotated
+timestamps to detect recurring entities, callbacks, or references across non-contiguous segments. Scenes are grouped
+when (i) they share an annotated speaker or participant, (ii) the transcript explicitly references an earlier event, or (iii)
+later dialogue resolves or reacts to information introduced in a prior segment.
+(ii) Template-Based Prompt and Option Design. For each grouped set of scenes, annotators write a question that ex-
+plicitly requires linking the two temporally disjoint narrative events (e.g., “Why does the person in the red sweater
+react that way at the end of the video?”). All questions are grounded in the transcript segments extracted directly
+from timestamped annotations. Annotators then construct four answer choices (one correct, three distractors), ensur-
+ing that the correct answer can only be obtained by integrating information across scenes rather than relying on local,
+scene-specific cues. Distractors are crafted to be plausible based on individual scenes but incorrect when cross-scene
+reasoning is applied.
+(iii) Coherence and Difficulty Verification. An annotator evaluates each CSNL item for narrative coherence, cross-
+scene consistency, and difficulty using a Likert-scale rating. Items receiving low coherence scores, containing am-
+biguous distractors, or failing to require explicit cross-scene reasoning are removed. The final CSNL set therefore
+includes only those samples where the narrative link is unambiguous, grounded entirely in the annotated transcripts,
+and cannot be solved without integrating information across multiple scenes.
+Rule-Based Engineering Pipeline. Across all tasks, the pipeline is governed by deterministic rules: (i) segments are
+extracted strictly using timestamp metadata; (ii) transcripts are produced by slicing and concatenating ground-truth
+tokens; (iii) speaker IDs originate solely from dataset annotations; (iv) multi-segment samples are stitched by pairing
+annotated intervals without any perceptual inference; and (v) every query is produced by a template that references
+only validated events, speakers, and timestamps.
+Final Curation. We apply checks to ensure that the stitched intervals, paired speakers, and extracted transcripts are
+internally consistent (matching IDs, non-overlapping timestamps, correct temporal ordering). Ambiguous or border-
+line segments are pruned directly from the metadata rather than post-processed. This ensures AM US E remains a clean,
+annotation-driven benchmark that reflects the structure and reliability of its underlying source datasets.
+
+B.2     Dataset Breakdown
+AM US E integrates clips from AVA Active Speaker, VoxCeleb2, FriendsMMC, AMI Meetings, and curated YouTube
+videos to build six multimodal reasoning tasks. As summarized in Tab. 6, the first five tasks contain 400 samples
+each, while Cross-Scene Narrative Linking provides 100 multi-segment examples. Different datasets contribute com-
+plementary strengths AVA for active-speaker cues, VoxCeleb2 for identity-focused cases, FriendsMMC and AMI for
+rich multi-party dialogue, and YouTube for unconstrained scenarios. The dataset exhibits diverse speaker dynamics,
+with overlap ratios centered around 0.20 and clips containing 1–6 visible speakers (Fig. 8). The semantic wheel (Fig.
+7) further shows that each task targets a distinct reasoning challenge, spanning grounding, turn-taking, association,
+identity persistence, and narrative linkage.
+
+
+
+
+                                                              15
+B.3     Quality Control
+B.3.1   Speaker Temporal Grounding
+For each sample, we verify that the start and end timestamps fall strictly within valid speech-activity regions annotated
+in the source dataset. We also confirm that the speaker identity associated with the grounded span matches both
+the diarization labels and the face track present in the corresponding frames. Samples with boundary mismatches,
+off-by-one frame shifts, or incorrect speaker assignments are flagged and corrected by re-aligning timestamps using
+dataset-specific metadata (e.g., AVA Active Speaker Gu et al. (2018) labels or AMI Kraaij et al. (2005) segment
+boundaries).
+
+B.3.2   Audio-Visual Dialogue Summarization
+Each summary query is checked for semantic consistency with the transcript. We use a two-step validator: (i) template-
+level checks to ensure the summary references only events that occur within the clip, and (ii) LLM-based semantic
+alignment scoring to flag summaries that omit key events or hallucinate nonexistent content. Misaligned samples are
+regenerated by re-running the summarization template or corrected through constrained editing.
+
+B.3.3   AV Speaker Association
+We verify that the utterance-to-speaker mapping is consistent across modalities. Each audio segment is matched
+against the active face track using cross-modal similarity checks, which include active-speaker labels (AVA), speaker-
+ID metadata (VoxCeleb2 Chung et al. (2018)), and video-based face clustering. Mismatches, such as a voice segment
+mapped to the wrong face, are automatically flagged using speaker-consistency rules and reprocessed by reassigning
+the correct identity or discarding ambiguous segments.
+
+B.3.4   Next Speaker Prediction
+For next-speaker queries, we inspect the dialogue ordering by validating that the predicted “next” speaker is temporally
+the next annotated speaker in the transcript and visually present in the upcoming frames. We also verify that no
+overlap, interruption, or missing segment disrupts the dialogue sequence. Samples with inconsistent ordering or
+missing participants are corrected through timeline realignment or regenerated from cleaner clips.
+
+B.3.5   Speaker Re-identification
+To ensure identity consistency across disjoint segments, each query pair is validated by comparing speaker embed-
+dings from the original source dataset (e.g., VoxCeleb2 Chung et al. (2018) identity embeddings, FriendsMMC Wang
+et al. (2025c) cast labels, or AMI participant IDs). We confirm that the positive pairs indeed correspond to the same
+canonical identity, and that negative pairs have no shared speaker ID. Any identity drift (e.g., due to noisy face tracks
+or brief occlusions) is rectified by reassigning IDs or replacing the clip.
+
+B.3.6   Cross-Scene Narrative Linking
+Given the reasoning-heavy nature of this task, we perform additional checks to ensure narrative coherence between
+scenes. The validator ensures that the cross-scene question references entities or events that exist in both clips accord-
+ing to the annotated transcripts. We also use semantic matching to ensure that the link between scenes (e.g., shared
+speaker, consistent topic, or causal relation) is grounded in the metadata. Incorrect or weakly-connected samples are
+regenerated with stricter constraints on shared entities or topics.
+Final Sanity Checks. Across all tasks, we perform automated mismatch detection to identify: (i) incorrect speaker
+labels, (ii) misaligned timestamps, (iii) invalid temporal spans, (iv) hallucinated entities in template-generated ques-
+tions, and (v) multi-modal inconsistencies between audio, visual tracks, and transcripts. Detected issues are rectified
+either by re-extracting metadata from the raw sources, regenerating templates with stricter constraints, or manual in-
+spection for borderline cases. This ensures that every AM US E sample is temporally accurate, speaker-consistent, and
+semantically grounded.
+
+
+
+
+                                                           16
+ Tool                  Inputs                                Outputs                              Example API-style call
+
+ Whisper               Audio file (wav/mp3); optional lan-   Timestamped transcript; word seg-    asr = whisper.transcribe("clip.wav",
+                       guage tag.                            ments; confidence scores.            model="large")
+
+ Pyannote              Audio waveform;         diarization   List of (start, end, speaker_id);    dia         =          pipeline("speaker-
+                       pipeline instance.                    overlap flags.                       diarization")("clip.wav")
+
+ InsightFace           Video frames or mp4 file.             Face detections; embeddings; track   faces insightface.get_faces("clip.mp4")
+                                                             IDs; bounding boxes with times-
+                                                             tamps.
+ SyncNet               Video file and audio track.           AV sync offset; confidence score;    sync = syncnet.align(video="clip.mp4",
+                                                             mapping from speech segments to      audio="clip.wav")
+
+                                                             face tracks.
+
+Table 7 Inputs, outputs, and example API-style calls for the four perception tools used in AM US E: Whisper (ASR), PyAnnote
+(speaker diarization), InsightFace (face tracking/recognition), and SyncNet (audio–visual synchronization).
+
+
+B.4     Question Templates
+Here we add question template for each task in Tab. 22 - Tab. 27. Each task in AM US E is paired with a diverse
+set of carefully designed question templates that capture the core reasoning abilities required for that task. For exam-
+ple, Audio-Visual Dialogue Summarization includes prompts that ask annotators or models to restate, condense, or
+paraphrase a speaker’s message within a specified temporal segment. Similarly, the other five tasks Speaker Temporal
+Grounding, AV Speaker Association, Next Speaker Prediction, Speaker Re-identification, and Cross-Scene Narrative
+Linking each use their own bank of structured question variants tailored to highlight temporal localization, identity
+matching, conversational dynamics, or narrative inference. Across tasks, these templates ensure broad semantic cover-
+age, reduce prompt bias, and provide consistent evaluation signals while reflecting the natural variability of real-world
+multimodal queries.
+
+
+C       Post-Training Intuition
+While prior multimodal alignment methods rely on policy optimization (e.g., GRPO) or lightweight adapter tuning
+(e.g., LoRA), RAFT restructures post-training around three mathematically grounded components:
+
+C.1     Self-Reflective Rewarding
+For a multimodal input x = (x(a) , x(v) , x(t) ) and model output (ŷ, r) consisting of an answer and a reasoning trace,
+we define the intrinsic reward as
+                                            R(x, ŷ, r) = λtask stask (ŷ)
+                                                             + λalign salign (x, r)                                             (C.1)
+                                                             + λconf sconf (ŷ).
+Here, stask measures task-level correctness (e.g., answer accuracy or span IoU), salign captures cross-modal consistency
+between referenced speakers/timestamps and the underlying audio–visual evidence, and sconf penalizes unsupported
+over-confident predictions. All components are derived from the model’s internal probabilities and alignment scores
+no external reward model is used. Intuitively, the model is rewarded when its predictions and explanations agree with
+the multimodal input and penalized when they contradict themselves.
+
+C.2     Selective Reasoning Adaptation
+We decompose model parameters into θ = (θbase , θcross ), where θcross corresponds to explicitly interpretable cross-
+modal reasoning blocks. During training, we mask gradients such that only cross-modal parameters are updated:
+                                                  (
+                                                    ∇θi L, θi ∈ θcross ,
+                                          ˜θ L =
+                                          ∇                                                                    (C.2)
+                                            i
+                                                    0,       θi ∈ θbase .
+
+
+                                                              17
+                             STG                      Metric                    Value              Final IoU↑
+                             Whisper               WER ↓                            1.33
+                             Pyannote              DER ↓                            1.23                  51.02
+                             SyncNet             Sync Error ↓                       2.12
+                            Table 8 Tool-level metrics and final STG performance for Qwen3-Omni.
+
+
+                            AVS                        Metric                       Value          Final BLEU↑
+                            Whisper                  WER ↓                           1.15
+                            Pyannote                Turn Acc ↑                      89.29                   48.08
+                            InsightFace          ID Consistency ↑                   90.33
+
+                            Table 9 Tool-level metrics and final AVS performance for Qwen3-Omni.
+
+
+This focuses adaptation on the specific components responsible for audio–visual–text reasoning, improving compute
+and data efficiency while avoiding catastrophic forgetting.
+
+C.3     Temporal Coherence Constraint.
+      (a)     (v)     (t)
+Let ht , ht , and ht denote audio, visual, and text embeddings extracted at time index t. We impose a temporal
+coherence loss:
+
+                                             X           (a)         (v)            (v)         (t)
+                                                                                                        
+                                   Ltemp =            ∥ht       − ht ∥22 + ∥ht             − ht ∥22
+                                             t
+                                                                                                               2       (C.3)
+                                                                (a)         (a)           (v)         (v) 
+                                                 X
+                                             +        γ     ht+1 − ht               − ht+1 − ht                    .
+                                                                                                               2
+                                                  t
+
+The first two terms encourage cross-modal agreement at each timestep, while the final term enforces consistent evo-
+lution over time. Intuitively, this prevents identity jumps, speaker drift, or abrupt modality mismatches critical for
+multi-speaker tracking, next-speaker prediction, and narrative coherence.
+Together, these components provide a principled post-training paradigm in which RAFT optimizes a self-reflective
+reward, updates only interpretable cross-modal reasoning pathways, and maintains temporally coherent multimodal
+embeddings yielding efficient, stable, and grounded multimodal alignment.
+
+
+D       Additional Experiments
+D.1     RAFT Ablations and Robustness
+D.1.1       Effect of Temporal Regularization
+To isolate the contribution of the temporal regularizer Ltemp , we ablate it from the RAFT objective and retrain the
+models. Tab. 14 shows results on Speaker Temporal Grounding (STG) task; similar trends hold for other tasks.
+
+D.1.2       Softmax Temperature in RRO
+Fig. 9 illustrates the effect of the RRO temperature β on average AM US E performance. Extremely low or high values
+of β reduce stability by either under-emphasizing or overly sharpening the reward distribution. In contrast, a moderate
+range (β ∈ [0.3, 1.0]) consistently yields higher scores across Qwen3-Omni, Qwen2.5-Omni, and CREMA, indicating
+that RRO benefits from controlled softmax weighting that strengthens perceptual correctness without amplifying noise.
+
+
+                                                                       18
+                          AVSA                    Metric              Value     Final Acc↑
+                          Whisper          Utterance Match ↑          92.93
+                          Pyannote        Speaker-ID Match ↑          94.22
+                                                                                    46.98
+                          InsightFace      Face-ID Match ↑            90.37
+                          SyncNet              AV Sync ↑              94.10
+
+               Table 10 Tool-level metrics and final AV Speaker Association performance for Qwen3-Omni.
+
+
+                         NSP                      Metric               Value     Final Acc↑
+                         Whisper           Context Coverage ↑          91.03
+                         Pyannote            Turn Ordering ↑           92.89         45.02
+                         InsightFace     Visual ID Consistency ↑       93.20
+
+               Table 11 Tool-level metrics and final Next Speaker Prediction performance for Qwen3-Omni.
+
+
+D.1.3   Parameter Efficiency of SRA
+We compare RAFT with SRA to generic low-rank adaptation (LoRA) under different budgets of trainable parameters
+in Fig. 10. We measure the percentage of fine-tuned parameters relative to the backbone model.
+Tab. 15 compares LoRA and SRA under different trainable–parameter budgets. SRA achieves comparable or higher
+average scores while using an order of magnitude fewer parameters. Notably, SRA-0.5% attains the best performance
+(54.1) despite training far fewer parameters than LoRA-5%.
+
+D.2     Dataset-Centric Analyses
+D.2.1   Speaker Overlap Difficulty
+Fig. 11 shows how speaker overlap affects performance on AVSA and STG. As the proportion of time with two
+or more concurrent speakers increases, both tasks exhibit a clear performance drop, highlighting the difficulty of
+reasoning under dense multi-speaker interactions. Even with RAFT training, which improves grounding and temporal
+consistency, high-overlap scenarios remain challenging due to rapid turn-taking, overlapping utterances, and visual
+occlusions.
+
+D.2.2   Number of Visible Speakers
+Fig. 12 reports accuracy as a function of the number of visible speakers for AVSA and NSP. Both tasks show a
+consistent decline as scenes become more crowded, indicating the increased difficulty of tracking conversational roles
+and anticipating turn-taking when multiple participants are simultaneously visible. Even with RAFT, higher speaker
+density introduces more visual competition, overlapping cues, and ambiguous interaction patterns, which collectively
+reduce model accuracy.
+
+D.2.3   Clip Duration vs. Accuracy
+Tab.16 reports AM US E performance as a function of clip duration. We observe a gradual decrease in accuracy as
+clips become longer, with the highest scores on short segments (0–20s) and the lowest on clips exceeding 40s. This
+trend reflects the increased reasoning difficulty in longer interactions, where models must track more speaker turns,
+maintain cross-modal coherence, and handle greater temporal dependencies.
+
+
+
+
+                                                          19
+                          SRI                     Metric              Value     Final Acc↑
+                          Whisper           Utterance Match ↑         93.27
+                          Pyannote          Identity Stability ↑      91.04         58.65
+                          InsightFace      Embedding Match ↑          94.88
+
+                         Table 12 Tool-level metrics and final SRI performance for Qwen3-Omni.
+
+
+                          CSNL                    Metric              Value     Final Acc↑
+                          Whisper          Transcript Match ↑         89.37
+                          Pyannote        Speaker Attribution ↑       90.04         49.76
+                          InsightFace     Identity Continuity ↑       94.11
+
+                        Table 13 Tool-level metrics and final CSNL performance for Qwen3-Omni.
+
+
+D.3     Agentic Tool-Use and Cue Ablations
+D.3.1    Tool Invocation Behavior
+In agentic mode, the model decides when to call ASR (Whisper), speaker diarization (Pyannote), and face recognition
+(InsightFace). We report the performance of the tool call in Tab. 8 - Tab. 13 We report the fraction of examples in
+which the tool decisions match our oracle configuration in Tab. 17.
+
+D.3.2    Modality and Cue Ablations
+Fig. 13 and Tab. 18 present the effect of removing individual modalities and cues on average AM US E performance.
+Removing audio or video causes the largest degradation, confirming that multi-speaker reasoning is fundamentally
+audio-visual and cannot be solved from transcripts. Eliminating transcripts or face crops also reduces accuracy, though
+to a lesser extent, indicating that all modalities contribute complementary cues. Together, these results highlight the
+strongly multi-modal nature of AM US E and the importance of maintaining synchronized audio, visual, and textual
+information for robust reasoning.
+
+D.4     Comparison to Other Alignment Objectives
+Tab. 19 compares RAFT with standard RLHF approaches (PPO, DPO, and GRPO) across all six AM US E tasks on
+Qwen3-Omni. RAFT consistently achieves the highest performance in every task, with especially strong gains in
+AVDS, NSP, SRID, and CSNL. These improvements highlight RAFT ’s ability to provide more stable reward weight-
+ing, better multimodal grounding, and more coherent step-by-step reasoning than existing preference-optimization
+methods.
+
+
+E       Additional Qualitative Results
+Figures 14 and 15 illustrate qualitative comparisons across all six AM US E tasks under Zero-Shot, Agentic w/o RAFT,
+and Agentic w/ RAFT modes. We observe consistent improvements in multimodal grounding, speaker attribution, and
+temporal consistency when using RAFT.
+Fig. 14 (AVDS, AVSA, NSP). Zero-shot models frequently rely on textual priors and ignore speaker cues, leading to
+incorrect summaries, mismatched utterance–speaker assignments, and poor turn-taking prediction. Agentic inference
+without RAFT improves tool usage but remains unstable. In contrast, RAFT enables accurate identification of the
+correct speaker in AVDS, reliable association of utterances in AVSA, and context-aware prediction of the next speaker
+in NSP by enforcing structured reasoning and perceptual alignment.
+
+
+                                                          20
+                                                      Model            Full RAFT     w/o Ltemp         ∆
+                                                      Qwen3-Omni          56.3          51.5          −4.8
+                                                      Qwen2.5-Omni        54.6          48.2          −6.4
+                                                      CREMA               41.0          37.5          −3.5
+
+            Table 14 Ablation of the temporal regularizer Ltemp on STG. We report Temporal IoU (higher is better).
+
+
+                                                                     Effect of RRO temperature
+                                               55.0
+
+                                               52.5
+
+                                               50.0
+
+
+
+                         Average AMUSE score
+                                               47.5                                                    Qwen3-Omni
+                                                                                                       Qwen2.5-Omni
+                                                                                                       CREMA
+                                               45.0
+
+                                               42.5
+
+                                               40.0
+
+                                                       0.25   0.50    0.75    1.00    1.25     1.50        1.75   2.00
+                                                                         RRO temperature
+
+Figure 9 Effect of the RRO temperature β on average AM US E performance. Extremely low or high values hurt stability, whereas
+a moderate range β ∈ [0.3, 1.0] yields robust gains.
+
+
+Fig. 15 (SRID, STG, CSNL). For identity reasoning (SRID), non-RAFT agents confuse visually similar individuals,
+while RAFT reliably matches speakers across scenes. In STG, RAFT reduces temporal drift and accurately localizes
+when a specific person starts or stops speaking under heavy overlap. In CSNL, RAFT correctly links causally dependent
+events across disjoint scenes, avoiding shallow pattern matching. Overall, RAFT yields coherent, grounded, and stable
+multi-speaker reasoning, complementing the quantitative gains reported in the main paper.
+
+
+F     User Study
+Sample Curation Validity. Each dataset sample is manually reviewed by human annotators to ensure accuracy and
+clarity. Raters watch the full clip, verify transcripts, speaker identities, and temporal spans, and check that the question
+unambiguously matches the underlying audio–visual evidence. Samples with unclear boundaries, mismatched associ-
+ations, or ambiguous narratives are corrected or discarded, ensuring that all items used for evaluation are high-quality
+and reliable.
+Human Performance Estimation. To establish an upper bound on task difficulty, human raters also answer the
+evaluation questions themselves under the same conditions as the model. Annotators select answers for multiple-
+choice tasks or mark temporal segments for grounding tasks, providing a ceiling for achievable performance and
+helping distinguish true model errors from inherently ambiguous cases.
+
+
+G     RAFT Pseudocode
+Pseudocode. 1 summarizes the RAFT training procedure. The model first aligns its step-by-step reasoning to human
+supervision through the structured reasoning loss. It then samples multiple candidate responses and scores them with
+a perceptual reward to perform RRO, producing stable, reward-weighted updates. A temporal grounding regularizer
+
+
+                                                                            21
+                                                     Method       Trainable %      Avg. Score      Rel. ∆
+                                                     LoRA-1%           1.0            51.2           –
+                                                     LoRA-5%           5.0            53.5          +4.5
+                                                     SRA-0.2%          0.2            52.4          +2.3
+                                                     SRA-0.5%          0.5            54.1          +5.7
+
+Table 15 Performance vs. trainable parameter budget. SRA matches or exceeds LoRA with an order of magnitude fewer parame-
+ters.
+
+
+                                                                Parameter efficiency: LoRA vs SRA
+
+                                              50
+
+                                              40
+
+
+
+
+                        Average AMUSE score
+                                              30
+
+                                              20
+
+                                              10
+
+                                              0
+                                                       -1   %           -5%                  .2%                 .5%
+                                                   LoRA             LoRA              SRA-0                 SRA-0
+
+Figure 10 Average AM US E score vs. fraction of trainable parameters for LoRA and SRA on Qwen3-Omni. RAFT with SRA
+achieves higher performance at significantly lower parameter budgets.
+
+
+enforces cross-modal synchrony across audio, visual, and textual streams. Finally, only the SRA adapter parameters
+are updated using the combined RAFT objective, enabling efficient and well-grounded multimodal reasoning.
+
+
+H     Evaluations Details
+H.1    Prompt Templates Across Evaluation Modes
+We provide complete prompt templates for all three evaluation modes—zero-shot, guided, and agentic—including
+examples of how perception tools (ASR, diarization, face recognition, and AV sync) are incorporated. Zero-shot
+templates appear in the main paper; below we describe the guided and agentic settings. In the guided mode, all
+external tools (Whisper, PyAnnote, InsightFace, SyncNet) are executed offline and their outputs are inserted into the
+prompt as structured metadata, which the model must rely on without invoking tools itself. In the agentic mode, the
+model is instead given access to the full toolset and must autonomously decide when and how to call tools, integrate
+their outputs, and perform multi-step reasoning to solve each task.
+Guided Mode Prompt. In the guided mode, the model operates purely as a reasoning layer over precomputed struc-
+tured information (Tab. 20). The template below is instantiated separately for each of the six AM US E tasks.
+Agentic Mode Prompt. In the autonomous mode, the model acts as a multimodal agent. It must plan, call tools
+selectively, incorporate returned evidence, and synthesize a final answer. The tool calling details are reported in Tab.
+7 The same template is used across all AM US E tasks. The prompt used is explained in Tab. 21.
+
+
+
+
+                                                                              22
+                                                          Performance vs speaker overlap
+                                                                                                     AVSA Acc.
+                                     70                                                              STG tIoU
+
+                                     60
+
+                                     50
+
+
+                         Score (%)
+                                     40
+
+                                     30
+
+                                     20
+
+                                     10
+
+                                     0
+                                             0 0.1                0.1 0.2           0.2 0.3          >0.3
+
+Figure 11 Performance as a function of speaker overlap ratio. Multi-speaker overlap substantially challenges even RAFT-trained
+models.
+
+                                                     Duration        0–20s       20–40s   >40s
+                                                     Avg. Score       56.8        54.2        49.7
+
+                                     Table 16 Effect of clip duration on average AM US E performance.
+
+
+H.2     More Details on LLM-based Choice Extraction
+Choice extraction strategy. We adopt a two-stage procedure to robustly extract discrete choices from free-form
+AVLLM predictions. Although humans can easily infer the intended choice, rule-based matching is often brittle when
+faced with stylistic variation or incomplete responses. To ensure consistency across AVLLMs with diverse instruction-
+following abilities, we standardize the evaluation pipeline as follows:
+Step 1. Prediction matching: We first apply a lightweight heuristic matching strategy to directly detect the choice
+label (e.g., ‘A’, ‘B’, ‘C’, ‘D’) from the model’s output. If a valid label is found, it is used as the final prediction. If no
+reliable match is extracted, we proceed to the LLM-based extraction step.
+Step 2. GPT-4 processing: Following prior benchmarks such as Liu et al. (2023b), GPT-4 serves as a dependable
+choice extractor. When Step 1 fails, we provide GPT-4 with the question, the list of answer choices, and the model’s
+free-form response, and instruct it to align the response with the most semantically similar option. If no option aligns,
+GPT-4 outputs “No match found”. We additionally employ the CircularEval protocol Liu et al. (2023b) to ensure
+rigorous evaluation and to highlight performance differences among AVLLMs.
+Response matching. We treat an option as selected whenever it is referenced through its isolated label (e.g., ‘A’) or
+standard labeled formats such as ‘A) <response>’, ‘A. <response>’, ‘A, <response>’, or ‘(A) <response>’
+provided the <response> segment does not contain other option labels.
+Where does heuristic matching fail? Heuristic matching commonly fails in two situations: (i) when the AVLLM
+does not commit to an answer and instead asks for clarification (e.g., “Apologies, could you clarify...?”), and (ii) when
+the model outputs multiple option labels simultaneously. In such cases, we defer to GPT-4 for choice extraction, as
+shown below.
+
+
+
+
+                                                                            23
+                                                          Performance vs number of speakers
+                                       70                                                         AVSA Acc.
+                                                                                                  NSP Acc.
+                                       60
+
+                                       50
+
+
+
+                        Accuracy (%)
+                                       40
+
+                                       30
+
+                                       20
+
+                                       10
+
+                                       0
+                                                    23                   45                    6+
+
+Figure 12 Accuracy vs. number of visible speakers on AVSA and NSP. Performance drops as the scene becomes more crowded.
+
+                            Task              ASR Decision     Diarization Decision    Face-Track Decision
+                            AVDS                   92.1                88.4                    75.6
+                            AVSA                   89.3                94.7                    91.2
+                            NSP                    81.5                78.6                    69.4
+                            STG                    87.9                96.1                    93.2
+
+                                            Table 17 Tool selection correctness in RAFT agentic mode.
+
+
+I     More Related Works
+I.1   Preference Optimization Algorithms
+Early RLHF approaches Ouyang et al. (2022); Bai et al. (2022) optimized the RLHF objective using Proximal Pol-
+icy Optimization (PPO) Schulman et al. (2017b). To improve memory efficiency and stability, later works removed
+the critic, introducing REINFORCE Leave-One-Out (RLOO) Ahmadian et al. (2024) and Group Relative Policy Op-
+timization (GRPO) Shao et al., which were used in aligning models such as LLaMA3-Nemotron-70B-Instruct and
+DeepSeek-R1 Wang et al. (2024e); Guo et al. (2025b). Beyond online RL, Direct Preference Optimization (DPO)
+Rafailov et al. (2024) enables offline alignment by directly optimizing the policy via an implicit reward model, inspir-
+ing numerous variants including IPO, SimPO, KTO, DNO, and related extensions Mitchell (2023); Azar et al. (2024);
+Meng et al. (2024); Ethayarajh et al. (2024); Rosset et al. (2024). Recent methods further explore iterative and super-
+vised alignment Chen et al. or emphasize backward KL and offline training NVIDIA et al. (2024). Building on this
+line of work, we generalize RPO to multiple design choices, positioning it as a unifying framework bridging online
+and offline preference optimization.
+
+I.2   Multi-modal Learning
+Multimodal learning, beyond single-modality approaches Prasad et al. (2021); Wu et al. (2023), has seen rapid progress
+in cross-modal generation Chowdhury et al. (2023a, 2024b); Mei et al. (2024); Tang et al. (2024); Chowdhury et al.
+(2025b), audio-visual representation learning Chowdhury et al. (2021a,b); Gao et al. (2024); Sudarsanam et al. (2025);
+Chowdhury et al. (2025a), multimodal large language models Chowdhury et al. (2025c, 2024a, 2025d); Galougah et al.
+(2025), and cross-modal integration Chowdhury et al. (2023b); Mittal et al. (2024); Dorbala et al. (2024). Recent work
+leverages visual and linguistic context to synthesize coherent audio Chowdhury et al. (2023a, 2024b), while studies on
+active audio-visual separation and embodied agents highlight the role of motion and egocentric perception in learning
+
+
+                                                                       24
+                                                       Setting              Avg. Score    ∆ vs. Full
+                                                       Full (A+V+T+F)          55.4           –
+                                                       No Audio                42.7         −12.7
+                                                       No Video                39.1         −16.3
+                                                       No Transcript           48.5         −6.9
+                                                       No Face Crops           50.2         −5.2
+
+                                              Table 18 Cue ablation on AM US E (average score across tasks).
+
+
+                                                                 Modality / cue ablation on AMUSE
+
+                                         50
+
+                                         40
+
+
+
+                         Average score
+                                         30
+
+                                         20
+
+                                         10
+
+                                         0
+                                                     Full             dio          deo         nscri
+                                                                                                    pt         ces
+                                                                 No Au       No Vi       No Tr
+                                                                                              a          No Fa
+
+
+Figure 13 Effect of removing modalities and cues on average AM US E performance. Multi-speaker reasoning is strongly multi-
+modal.
+
+
+robust representations. These ideas extend naturally to audio-visual LLMs Dorbala et al. (2024); Chen et al. (2021),
+where perceptually grounded models interact with dynamic environments, underscoring the importance of alignment
+and embodied perception for versatile multimodal systems Chowdhury et al. (2023b).
+
+
+
+
+                                                                             25
+ Method         AVDS (B@4) ↑      AVSA (Acc%) ↑      NSP (Acc%) ↑      SRID (Acc%) ↑      STG (Acc%) ↑     CSNL (Acc%) ↑
+ PPO                 34.82              61.13             53.28             58.02             49.44              39.26
+ DPO                 35.47              60.73             54.57             59.10             50.11              40.05
+ GRPO                36.77              62.23             55.49             60.34             51.84              41.35
+ RAFT (ours)         54.54              54.22             56.73             62.53             56.33              57.26
+
+Table 19 Comparison of RAFT with PPO, DPO, and GRPO across AM US E tasks on Qwen3-Omni. We report task-specific
+metrics. B@4: BLEU score.
+
+
+
+
+Figure 14 Qualitative results 1. Comparison on multi-speaker reasoning tasks: Audio-Visual Dialogue Summarization (left),
+Speaker Association (middle), and Next Speaker Prediction (right). UI: Unified-IO2, CR: CREMA, VS: VideoSALMONN, VI: VITA,
+Q2.5: Qwen2.5-Omni, and Q3: Qwen3-Omni under Zero-Shot, Agentic w/o RAFT, and Agentic w/ RAFT modes. Results for AVDS
+is for Qwen3-Omni.
+
+
+
+
+Figure 15 Qualitative results 2. Comparison on multi-speaker reasoning tasks: Speaker Re-identification (left), Temporal
+Grounding (middle), and Cross Scene Narrative Linking (right). UI: Unified-IO2, CR: CREMA, VS: VideoSALMONN, VI: VITA,
+Q2.5: Qwen2.5-Omni, and Q3: Qwen3-Omni under Zero-Shot, Agentic w/o RAFT, and Agentic w/ RAFT modes.
+
+
+
+
+                                                           26
+               1 PyTorch-style pseudocode for RAFT (Reasoning, Acting, and Feedback Training)   
+    def RAFT_training():
+        ############################################################
+        # Reasoning, Acting, and Feedback Training (RAFT)
+        ############################################################
+
+       theta = initialize_model()
+       insert_SRA_adapters(theta)
+
+       while not converged:
+
+           batch = sample_minibatch(D)
+
+           ########################################################
+           # 1. Structured reasoning alignment
+           ########################################################
+           y_k = sample_reasoning_steps(pi_theta, batch)
+           L_align = -sum(log_prob(pi_theta, y_k))
+
+           ########################################################
+           # 2. Reflective Reward Optimization (RRO)
+           ########################################################
+           rewards = []
+           for x in batch:
+               y_samples = sample_K_outputs(pi_theta, x, K)
+               rewards.append([R(x, y) for y in y_samples])
+
+           r_bar = mean(rewards)
+           weights = softmax(beta * (rewards - r_bar))
+           J_RRO = sum(weights * log_prob(pi_theta, y_samples))
+
+           ########################################################
+           # 3. Temporal grounding regularization
+           ########################################################
+           f_a, f_v, f_s, f_r = extract_embeddings(batch)
+           L_temp = sum(
+               l2(f_a[t] - f_v[t]) +
+               gamma * l2(f_s[t] - f_r[t])
+               for t in time_steps
+           )
+
+           ########################################################
+           # 4. RAFT objective and update
+           ########################################################
+           L_RAFT = L_align + alpha * L_temp - beta * J_RRO
+           theta = gradient_step(theta, L_RAFT)
+
+       return theta
+                                                                                                
+
+
+
+
+                                                     27
+     Guided-mode prompt template
+     You are given a video clip along with structured information extracted using external audio-visual tools. All processing
+     has already been completed. Use only the information shown below to solve the task.
+     Video metadata: short description, dataset source, and duration.
+     ASR transcript: transcript text with timestamps.
+     Speaker diarization: list of speech segments with start time, end time, and speaker identifiers.
+     Face tracks: list of track identifiers, their visible time spans, and bounding-box intervals.
+     Audio-visual alignment: optional synchronization offsets or scores.
+     Task description: one of the six AM US E tasks (speaker temporal grounding, audio-visual dialogue summarization,
+     speaker association, next speaker prediction, speaker re-identification, or cross-scene narrative linking).
+     Instructions:
+     (1) Read the task description carefully and determine what must be predicted.
+     (2) Use transcript segments, diarization labels, face-track identifiers, and alignment information as explicit evidence.
+     (3) Do not infer speakers, timestamps, or events that are not present in the structured fields.
+     (4) When reasoning about speakers or faces, always refer back to the provided identifiers.
+     (5) Produce a concise final answer and a short justification that cites the relevant segments or identifiers.
+
+Table 20 Guided-mode prompt template. All external tools are executed before prompting, and their outputs are injected as
+structured text.
+
+
+
+
+     Autonomous (agentic) prompt template
+     You are an audio-visual reasoning agent. You can decide when and how to use the following tools in order to solve the
+     task:
+     Whisper: transcribes the audio into text.
+     PyAnnote: produces speaker diarization with time-stamped segments.
+     InsightFace: provides face tracks and identity features for visible people.
+     SyncNet: estimates audio-visual synchronization between speech and faces.
+     Task description: one of the six AM US E tasks (speaker temporal grounding, audio-visual dialogue summarization,
+     speaker association, next speaker prediction, speaker re-identification, or cross-scene narrative linking).
+     Instructions:
+     (1) First restate the task in your own words and outline what information you need.
+     (2) Decide which tools are necessary to obtain that information and why; avoid unnecessary tool calls.
+     (3) Invoke tools sequentially, update your plan after each result, and decide whether additional calls are required.
+     (4) Treat tool outputs as ground-truth metadata and base your reasoning strictly on these results.
+     (5) Do not hallucinate speakers, timestamps, or events that are not supported by tool outputs or the video description.
+     (6) Once you have gathered sufficient evidence, produce a final answer along with a brief justification that explicitly
+     cites the tool results and time segments you used.
+     Your response should therefore contain: (a) a short plan, (b) references to the tools you chose to use and their returned
+     outputs, and (c) a final answer with clear, evidence-based reasoning.
+
+Table 21 Autonomous-mode (agentic) prompt template. The model independently determines which tools to invoke and integrates
+their outputs.
+
+
+
+
+                                                                28
+Choice extraction prompt for GPT-4
+Can you help me match an answer with a set of options for a single-correct-answer question? I will provide a question, a set
+of options, and a model-generated response. Your task is to map the response to the most similar option. Output exactly one
+uppercase letter from {A, B, C, D, E}. If no option matches, respond with “No match found”. Please avoid subjectivity and do
+not use external knowledge.
+Example 1:
+Question: What color is the man’s shirt who is sitting left of the object making this sound?
+Options: A. Green B. Red C. Yellow D. Black
+Answer: The person sitting next to the record player is wearing a black shirt.
+Your output: D
+Example 2:
+Question: What does the audio-visual event constitute?
+Options: A. A dog barking at a cat B. A dog barking on being hit by a stick C. The dog is hungry D. The dog is chasing
+another dog
+Answer: It is a wolf.
+Your output: No match found
+
+
+
+
+     Prompt Variants for Audio-Visual Dialogue Summarization
+     1. Summarize what the person in the <descriptor> says between <time_token> and <time_token>.
+     2. What is the main idea expressed by the speaker wearing a red shirt at <time_token>? Please summarize
+     3. Briefly summarize the key point the woman on the left conveys during <time_token>.
+     4. What is the speaker in the blue jacket trying to communicate at <time_token>?
+     5. Summarize the statement made by the man in the center into one sentence.
+     6. What message is the person standing on the right conveying at <time_token>?
+     7. Describe what the highlighted individual talks about during the segment starting at <time_token>.
+     8. Provide a brief summary of the response given by the seated person at <time_token>.
+     9. Rephrase the speaker’s comment between <time_token> and <time_token> concisely.
+     10. What conclusion does the person in the black hoodie present during this segment?
+     11. In a few words, describe what the speaker with glasses emphasizes at <time_token>.
+     12. What information does the person in <outfit descriptor> share at <time_token>?
+     13. What does the dialogue turn from the woman on the right mainly focus on at <time_token>?
+     14. Summarize the viewpoint expressed by the man in the gray shirt in this part.
+     15. What does the person near the doorway explain during the segment starting at <time_token>?
+     16. Which topic does the speaker in the red dress address between <time_token> and <time_token>?
+     17. Summarize the line spoken by the person on the left couch at <time_token>.
+     18. What is the essence of the statement made by the speaker standing at the table?
+     19. Give a short paraphrase of what the person in the blue sweater says at <time_token>.
+     20. Summarize the main point communicated by the speaker facing the camera.
+
+
+                      Table 22 Prompt variants for the Audio-Visual Dialogue Summarization task.
+
+
+
+
+                                                            29
+Prompt Variants for Audio-Visual Speaker Association
+1. Who is speaking during the audio segment at <time_token>?
+2. Match the utterance at <time_token> to the correct person in the scene.
+3. Which individual is producing the speech at <time_token>?
+4. Identify who is talking using lip movement and voice cues at <time_token>.
+5. Who is talking while others remain silent at <time_token>?
+6. Which person corresponds to the audio clip starting at <time_token>?
+7. Who is the active speaker when the man in the red shirt moves his lips at <time_token>?
+8. Whose voice do we hear when the woman seated on the left is shown at <time_token>?
+9. Based on audio-visual cues, who is speaking while the man in the blue jacket appears at <time_token>?
+10. Which on-screen person is talking during the segment at <time_token>?
+11. Whose lip motion aligns with the spoken sentence at <time_token>?
+12. Identify the speaker when the right-side participant is visible at <time_token>.
+13. Which speaker’s voice corresponds to the utterance at <time_token>?
+14. Which person produces the spoken line heard at <time_token>?
+15. Who is responsible for the highlighted phrase at <time_token>?
+16. Who is delivering the dialogue while the person in the black jacket is centered at <time_token>?
+17. Which person should be attributed as the speaker of the sentence aligned with the lip motion at <time_-
+token>?
+18. Whose mouth movement matches the audio when the left side of the table is shown at <time_token>?
+19. Who is the speaker when the person in the white shirt appears at <time_token>?
+20. Who produces the spoken line associated with the audio segment at <time_token>?
+
+
+                   Table 23 Prompt variants for the Audio-Visual Speaker Association task.
+
+
+Prompt Variants for Next Speaker Prediction
+1. Based on the interaction up to <time_token>, who is most likely to speak next?
+2. Who seems prepared to reply following the segment ending at <time_token>?
+3. Which individual is most likely to take the next turn in the conversation?
+4. Predict the next speaker among the on-screen participants.
+5. Who appears ready to answer the question asked at <time_token>?
+6. Which person is positioned to speak next, given their posture and gaze?
+7. Whose body language suggests they are about to answer after <time_token>?
+8. Considering the conversation flow, who is expected to continue the dialogue?
+9. Who on the left side of the frame seems ready to speak next?
+10. Which person on the right side of the table will likely speak after the current turn?
+11. Who follows up the conversation after the speaker in the red shirt finishes at <time_token>?
+12. Using gaze direction and facial expressions at <time_token>, who is likely to speak next?
+13. Which person will likely contribute the next line following <time_token>?
+14. Which participant seated on the couch is expected to speak next?
+15. From the pattern of turn-taking up to <time_token>, who takes the next turn?
+16. Who seems about to interject when the camera shows the group at <time_token>?
+17. Which character is cueing up the next utterance, for example by leaning forward or opening their
+mouth?
+18. Whose gestures indicate that they are preparing to speak next?
+19. Who resumes the conversation after the short pause at <time_token>?
+20. Who logically continues the dialogue when the question is directed towards the person in the blue
+sweater at <time_token>?
+
+
+                       Table 24 Prompt variants for the Next Speaker Prediction task.
+
+
+
+                                                     30
+Prompt Variants for Speaker Temporal Grounding
+1. At what <time_token> does the person in <descriptor> begin speaking?
+2. When does the woman in the red dress start talking in the video?
+3. Identify the <time_token> at which the man on the left first begins to speak.
+4. Locate the moment the person in the blue shirt starts speaking.
+5. At which <time_token> does their speech initiation occur?
+6. Find the starting time of the speaker’s voice for the person near the doorway.
+7. When is the first audible word from the person sitting on the right side of the table?
+8. Mark the <time_token> at which the person in the black hoodie begins their utterance.
+9. What is the earliest <time_token> at which this person starts speaking?
+10. Between which <time_token> values does the speaker’s utterance begin?
+11. Give the <time_token> where the woman in the center first speaks.
+12. When does the speech associated with the man in the gray sweater start?
+13. Identify the first frame in time (as <time_token>) when the speaker on the left starts talking.
+14. At what <time_token> does the dialogue contribution of the person in the white shirt begin?
+15. At what time does this speaker enter the conversation for the first time?
+16. When is their first vocalization heard after they appear on screen?
+17. What exact <time_token> corresponds to the onset of the speaker’s voice?
+18. Find the <time_token> where this speaker’s sentence begins in the timeline.
+19. At which <time_token> does the person standing at the counter start speaking?
+20. Determine the onset <time_token> of the utterance produced by the speaker in <descriptor>.
+
+
+                     Table 25 Prompt variants for the Speaker Temporal Grounding task.
+
+
+
+
+                                                     31
+Prompt Variants for Speaker Re-identification
+1. Is the speaker at <time_token> the same person as the speaker at <time_token>?
+2. Does the voice in the segment at <time_token> match the voice at <time_token>?
+3. Are the speech segments at the two <time_token> values produced by the same individual?
+4. Is the person wearing a red shirt at <time_token> the same as the speaker at <time_token>?
+5. Compare the speaker at <time_token> with the speaker at <time_token>: are they the same person?
+6. Do the face and voice at <time_token> correspond to the same identity as at <time_token>?
+7. Are the appearances of the man on the left at the two <time_token> positions from the same person?
+8. Is the person in the blue jacket at <time_token> the same speaker who talks at <time_token>?
+9. Do the vocal patterns and facial cues at <time_token> and <time_token> indicate a single speaker
+identity?
+10. Is the speaker near the doorway at <time_token> the same as the speaker at <time_token>?
+11. Does the speaker at <time_token> match the person in the striped shirt speaking at <time_token>?
+12. Are the speakers across the segments at <time_token> and <time_token> the same individual?
+13. Is the woman on the right speaking at <time_token> the same woman speaking at <time_token>?
+14. Are the vocal characteristics of the person in the black hoodie at <time_token> consistent with those at
+<time_token>?
+15. Does the person speaking at the table at <time_token> correspond to the same identity speaking on the
+couch at <time_token>?
+16. Is the speaker shown in close-up at <time_token> the same as the one talking in the wide shot at <time_-
+token>?
+17. Does the voice of the person in the red dress at <time_token> match the voice at <time_token>?
+18. Do the face and audio cues of the man on the left at <time_token> indicate the same speaker identity as
+at <time_token>?
+19. Does the person shown near the window at <time_token> match the speaker filmed near the table at
+<time_token>?
+20. Are the dialogue segments at <time_token> and <time_token> delivered by the same speaker?
+
+
+                       Table 26 Prompt variants for the Speaker Re-identification task.
+
+
+
+
+                                                     32
+Prompt Variants for Cross-scene Narrative Linking
+1. How does the event at <time_token> connect to the reaction of the person in the red sweater at <time_-
+token>?
+2. What detail shown at <time_token> explains why the woman on the left reacts at <time_token>?
+3. Why does the man in the blue shirt react the way he does at <time_token>, given what happened at
+<time_token>?
+4. Which event at <time_token> provides context for the final scene at <time_token>?
+5. What narrative link exists between the segment at <time_token> and the segment at <time_token>?
+6. How does the phone call or object mention at <time_token> relate to the reaction of the person standing
+on the right at <time_token>?
+7. What realization does the woman in the black jacket have at <time_token> based on something shown at
+<time_token>?
+8. Explain what triggers the behavior of the person sitting on the couch at <time_token>, using clues from
+<time_token>.
+9. Which event witnessed by the man on the far left at <time_token> leads to his action at <time_token>?
+10. How does the interaction at <time_token> influence the character’s response at <time_token>?
+11. What causal link connects the scene at <time_token> with the outcome at <time_token>?
+12. Which visual clue shown at <time_token> helps explain the reaction of the woman in the red dress at
+<time_token>?
+13. How does the introduction of the <object> at <time_token> shape the character’s interpretation at
+<time_token>?
+14. Which detail noticed by the man on the right side of the frame at <time_token> sets up his reaction at
+<time_token>?
+15. How does the sequence at <time_token> prepare the narrative moment occurring at <time_token>?
+16. What information revealed at <time_token> does the woman in the blue sweater realize at <time_-
+token>?
+17. What continuity links the segment occurring at <time_token> with the one at <time_token>?
+18. How do the events at <time_token> and <time_token> form a complete narrative arc?
+19. What observation made by the person in the striped shirt at <time_token> is recalled at <time_token>?
+20. What chain of events starting from the scene at <time_token> leads to the reaction of the person near
+the doorway at <time_token>?
+
+
+                    Table 27 Prompt variants for the Cross-scene Narrative Linking task.
+
+
+
+
+                                                    33
+References
+Abdelrahman Abouelenin, Atabak Ashfaq, Adam Atkinson, Hany Awadalla, Nguyen Bach, Jianmin Bao, Alon Benhaim, Martin
+  Cai, Vishrav Chaudhary, Congcong Chen, et al. Phi-4-mini technical report: Compact yet powerful multimodal language models
+  via mixture-of-loras. arXiv preprint arXiv:2503.01743, 2025.
+Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ahmad, Ilge Akkaya, Florencia Leoni Aleman, Diogo Almeida, Janko
+  Altenschmidt, Sam Altman, Shyamal Anadkat, et al. Gpt-4 technical report. arXiv preprint arXiv:2303.08774, 2023.
+Arash Ahmadian, Chris Cremer, Matthias Gallé, Marzieh Fadaee, Julia Kreutzer, Ahmet Üstün, and Sara Hooker. Back to basics:
+  Revisiting reinforce style optimization for learning from human feedback in llms. arXiv preprint arXiv:2402.14740, 2024.
+Hanane Allioui, Mazin Abed Mohammed, Narjes Benameur, Belal Al-Khateeb, Karrar Hameed Abdulkareem, Begonya Garcia-
+  Zapirain, Robertas Damaševičius, and Rytis Maskeliūnas. A multi-agent deep reinforcement learning approach for enhancement
+  of covid-19 ct image segmentation. Journal of personalized medicine, 12(2):309, 2022.
+Tajamul Ashraf, Amal Saqib, Hanan Ghani, Muhra AlMahri, Yuhao Li, Noor Ahsan, Umair Nawaz, Jean Lahoud, Hisham
+  Cholakkal, Mubarak Shah, et al. Agent-x: Evaluating deep multimodal reasoning in vision-centric agentic tasks. arXiv preprint
+  arXiv:2505.24876, 2025.
+Kirolos Ataallah, Chenhui Gou, Eslam Abdelrahman, Khushbu Pahwa, Jian Ding, and Mohamed Elhoseiny. Infinibench: A com-
+  prehensive benchmark for large multimodal models in very long video understanding. arXiv preprint arXiv:2406.19875, 2024.
+Mohammad Gheshlaghi Azar, Zhaohan Daniel Guo, Bilal Piot, Remi Munos, Mark Rowland, Michal Valko, and Daniele Calan-
+ driello. A general theoretical paradigm to understand learning from human preferences. In International Conference on Artificial
+ Intelligence and Statistics, pages 4447–4455. PMLR, 2024.
+Yuntao Bai, Andy Jones, Kamal Ndousse, Amanda Askell, Anna Chen, Nova DasSarma, Dawn Drain, Stanislav Fort, Deep Ganguli,
+  Tom Henighan, et al. Training a helpful and harmless assistant with reinforcement learning from human feedback. arXiv preprint
+  arXiv:2204.05862, 2022.
+Satanjeev Banerjee and Alon Lavie. Meteor: An automatic metric for mt evaluation with improved correlation with human judg-
+  ments. In Proceedings of the acl workshop on intrinsic and extrinsic evaluation measures for machine translation and/or
+  summarization, pages 65–72, 2005.
+Kevin Black, Michael Janner, Yilun Du, Ilya Kostrikov, and Sergey Levine. Training diffusion models with reinforcement learning.
+  arXiv preprint arXiv:2305.13301, 2023.
+Zhang Boqiang, Li Kehan, Cheng Zesen, Hu Zhiqiang, Yuan Yuqian, Chen Guanzheng, Leng Sicong, Jiang Yuming, Zhang Hang,
+  Li Xin, Jin Peng, Zhang Wenqi, Wang Fan, Bing Lidong, and Zhao Deli. Videollama 3: Frontier multimodal foundation models
+  for image and video understanding. arXiv preprint arXiv:2501.13106, 2025.
+Changan Chen, Ziad Al-Halah, and Kristen Grauman. Semantic audio-visual navigation. In Proceedings of the IEEE/CVF Confer-
+  ence on Computer Vision and Pattern Recognition, pages 15516–15525, 2021.
+Xiuyuan Chen, Yuan Lin, Yuchen Zhang, and Weiran Huang. Autoeval-video: An automatic benchmark for assessing large
+  vision language models in open-ended video question answering. In European Conference on Computer Vision, pages 179–195.
+  Springer, 2024.
+Zixiang Chen, Yihe Deng, Huizhuo Yuan, Kaixuan Ji, and Quanquan Gu. Self-play fine-tuning converts weak language models to
+  strong language models. In Forty-first International Conference on Machine Learning.
+Sanjoy Chowdhury, Subhrajyoti Dasgupta, Sudip Das, and Ujjwal Bhattacharya. Listen to the pixels. In 2021 IEEE International
+  Conference on Image Processing (ICIP), pages 2568–2572. IEEE, 2021a.
+Sanjoy Chowdhury, Aditya Patra, Subhrajyoti Dasgupta, and Ujjwal Bhattacharya. Audvisum: Self-supervised deep reinforcement
+  learning for diverse audio-visual summary generation. In BMVC, page 315, 2021b.
+Sanjoy Chowdhury, Sreyan Ghosh, Subhrajyoti Dasgupta, Anton Ratnarajah, Utkarsh Tyagi, and Dinesh Manocha. Adverb: Vi-
+  sually guided audio dereverberation. In Proceedings of the IEEE/CVF International Conference on Computer Vision, pages
+  7884–7896, 2023a.
+Sanjoy Chowdhury, Sayan Nag, and Dinesh Manocha. Apollo: unified adapter and prompt learning for vision language models.
+  arXiv preprint arXiv:2312.01564, 2023b.
+
+
+
+
+                                                              34
+Sanjoy Chowdhury, Sayan Nag, Subhrajyoti Dasgupta, Jun Chen, Mohamed Elhoseiny, Ruohan Gao, and Dinesh Manocha.
+  Meerkat: Audio-visual large language model for grounding in space and time. In European Conference on Computer Vision,
+  pages 52–70. Springer, 2024a.
+Sanjoy Chowdhury, Sayan Nag, KJ Joseph, Balaji Vasan Srinivasan, and Dinesh Manocha. Melfusion: Synthesizing music from
+  image and language cues using diffusion models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern
+  Recognition, pages 26826–26835, 2024b.
+Sanjoy Chowdhury, Subrata Biswas, Sayan Nag, Tushar Nagarajan, Calvin Murdock, Ishwarya Ananthabhotla, Yijun Qian,
+  Vamsi Krishna Ithapu, Dinesh Manocha, and Ruohan Gao. Egoadapt: Adaptive multisensory distillation and policy learning
+  for efficient egocentric perception. arXiv preprint arXiv:2506.21080, 2025a.
+Sanjoy Chowdhury, Mohamed Elmoghany, Yohan Abeysinghe, Junjie Fei, Sayan Nag, Salman Khan, Mohamed Elhoseiny, and
+  Dinesh Manocha. Magnet: A multi-agent framework for finding audio-visual needles by reasoning over multi-video haystacks.
+  arXiv preprint arXiv:2506.07016, 2025b.
+Sanjoy Chowdhury, Hanan Gani, Nishit Anand, Sayan Nag, Ruohan Gao, Mohamed Elhoseiny, Salman Khan, and Dinesh Manocha.
+  Aurelia: Test-time reasoning distillation in audio-visual llms. arXiv preprint arXiv:2503.23219, 2025c.
+Sanjoy Chowdhury, Sayan Nag, Subhrajyoti Dasgupta, Yaoting Wang, Mohamed Elhoseiny, Ruohan Gao, and Dinesh Manocha.
+  Avtrustbench: Assessing and enhancing reliability and robustness in audio-visual llms. arXiv preprint arXiv:2501.02135, 2025d.
+Joon Son Chung, Arsha Nagrani, and Andrew Zisserman. Voxceleb2: Deep speaker recognition. arXiv preprint arXiv:1806.05622,
+  2018.
+Joon Son Chung, Jaesung Huh, Arsha Nagrani, Triantafyllos Afouras, and Andrew Zisserman. Spot the conversation: speaker
+  diarisation in the wild. arXiv preprint arXiv:2007.01216, 2020.
+Gheorghe Comanici, Eric Bieber, Mike Schaekermann, Ice Pasupat, Noveen Sachdeva, Inderjit Dhillon, Marcel Blistein, Ori Ram,
+  Dan Zhang, Evan Rosen, et al. Gemini 2.5: Pushing the frontier with advanced reasoning, multimodality, long context, and next
+  generation agentic capabilities. arXiv preprint arXiv:2507.06261, 2025.
+Wenliang Dai, Junnan Li, D Li, AMH Tiong, J Zhao, W Wang, B Li, P Fung, and S Hoi. Instructblip: Towards general-purpose
+  vision-language models with instruction tuning. arxiv 2023. arXiv preprint arXiv:2305.06500, 2, 2023.
+Ishita Dasgupta, Christine Kaeser-Chen, Kenneth Marino, Arun Ahuja, Sheila Babayan, Felix Hill, and Rob Fergus. Collaborating
+   with language models for embodied reasoning. In NeurIPS 2022 Foundation Models for Decision Making Workshop.
+Zheye Deng, Chunkit Chan, Tianshi Zheng, Wei Fan, Weiqi Wang, and Yangqiu Song. Structuring the unstructured: A systematic
+  review of text-to-structure generation for agentic ai with a universal evaluation framework. arXiv preprint arXiv:2508.12257,
+  2025.
+Yihong Dong, Xue Jiang, Zhi Jin, and Ge Li. Self-collaboration code generation via chatgpt. ACM Transactions on Software
+  Engineering and Methodology, 33(7):1–38, 2024.
+Vishnu Sashank Dorbala, Sanjoy Chowdhury, and Dinesh Manocha. Can llms generate human-like wayfinding instructions? to-
+  wards platform-agnostic embodied instruction synthesis. arXiv preprint arXiv:2403.11487, 2024.
+Kawin Ethayarajh, Winnie Xu, Niklas Muennighoff, Dan Jurafsky, and Douwe Kiela. Kto: Model alignment as prospect theoretic
+  optimization. arXiv preprint arXiv:2402.01306, 2024.
+Chaoyou Fu, Yuhan Dai, Yongdong Luo, Lei Li, Shuhuai Ren, Renrui Zhang, Zihan Wang, Chenyu Zhou, Yunhang Shen, Mengdan
+  Zhang, et al. Video-mme: The first-ever comprehensive evaluation benchmark of multi-modal llms in video analysis. arXiv
+  preprint arXiv:2405.21075, 2024a.
+Chaoyou Fu, Haojia Lin, Zuwei Long, Yunhang Shen, Meng Zhao, Yifan Zhang, Shaoqi Dong, Xiong Wang, Di Yin, Long Ma,
+  et al. Vita: Towards open-source interactive omni multimodal llm. arXiv preprint arXiv:2408.05211, 2024b.
+Chaoyou Fu, Yuhan Dai, Yongdong Luo, Lei Li, Shuhuai Ren, Renrui Zhang, Zihan Wang, Chenyu Zhou, Yunhang Shen, Mengdan
+  Zhang, et al. Video-mme: The first-ever comprehensive evaluation benchmark of multi-modal llms in video analysis. In
+  Proceedings of the Computer Vision and Pattern Recognition Conference, pages 24108–24118, 2025.
+Tianyu Fu et al. Mme: A comprehensive evaluation benchmark for multimodal large language models.                 arXiv preprint
+   arXiv:2306.13394, 2023.
+Rinon Gal, Adi Haviv, Yuval Alaluf, Amit H Bermano, Daniel Cohen-Or, and Gal Chechik. Comfygen: Prompt-adaptive workflows
+  for text-to-image generation. arXiv preprint arXiv:2410.01731, 2024.
+
+
+
+                                                              35
+Siminfar Samakoush Galougah, Rishie Raj, Sanjoy Chowdhury, Sayan Nag, and Ramani Duraiswami. Aura: A fine-grained
+  benchmark and decomposed metric for audio-visual reasoning. arXiv preprint arXiv:2508.07470, 2025.
+Junyu Gao, Hao Yang, Maoguo Gong, and Xuelong Li. Audio–visual representation learning for anomaly events detection in
+  crowds. Neurocomputing, 582:127489, 2024.
+Ridouane Ghermi, Xi Wang, Vicky Kalogeiton, and Ivan Laptev. Short film dataset (sfd): A benchmark for story-level video
+  understanding. arXiv e-prints, pages arXiv–2406, 2024.
+Chunhui Gu, Chen Sun, David A Ross, Carl Vondrick, Caroline Pantofaru, Yeqing Li, Sudheendra Vijayanarasimhan, George
+  Toderici, Susanna Ricco, Rahul Sukthankar, et al. Ava: A video dataset of spatio-temporally localized atomic visual actions. In
+  Proceedings of the IEEE conference on computer vision and pattern recognition, pages 6047–6056, 2018.
+Dong Guo, Faming Wu, Feida Zhu, Fuxing Leng, Guang Shi, Haobin Chen, Haoqi Fan, Jian Wang, Jianyu Jiang, Jiawei Wang,
+  et al. Seed1. 5-vl technical report. arXiv preprint arXiv:2505.07062, 2025a.
+Daya Guo, Dejian Yang, Haowei Zhang, Junxiao Song, Ruoyu Zhang, Runxin Xu, Qihao Zhu, Shirong Ma, Peiyi Wang, Xiao
+  Bi, et al. Deepseek-r1: Incentivizing reasoning capability in llms via reinforcement learning. arXiv preprint arXiv:2501.12948,
+  2025b.
+T Guo, X Chen, Y Wang, R Chang, S Pei, NV Chawla, O Wiest, and X Zhang. Large language model based multi-agents: A survey
+  of progress and challenges. In 33rd International Joint Conference on Artificial Intelligence (IJCAI 2024). IJCAI; Cornell arxiv,
+  2024.
+Xuehai He, Weixi Feng, Kaizhi Zheng, Yujie Lu, Wanrong Zhu, Jiachen Li, Yue Fan, Jianfeng Wang, Linjie Li, Zhengyuan Yang,
+  et al. Mmworld: Towards multi-discipline multi-faceted world model evaluation in videos. arXiv preprint arXiv:2406.08407,
+  2024.
+Sirui Hong, Mingchen Zhuge, Jonathan Chen, Xiawu Zheng, Yuheng Cheng, Jinlin Wang, Ceyao Zhang, Zili Wang, Steven
+   Ka Shing Yau, Zijuan Lin, et al. Metagpt: Meta programming for a multi-agent collaborative framework. In The Twelfth
+   International Conference on Learning Representations.
+Wenlong Huang, Fei Xia, Ted Xiao, Harris Chan, Jacky Liang, Pete Florence, Andy Zeng, Jonathan Tompson, Igor Mordatch,
+ Yevgen Chebotar, et al. Inner monologue: Embodied reasoning through planning with language models. In Conference on Robot
+ Learning, pages 1769–1782. PMLR, 2023.
+Aaron Hurst, Adam Lerer, Adam P Goucher, Adam Perelman, Aditya Ramesh, Aidan Clark, AJ Ostrow, Akila Welihinda, Alan
+  Hayes, Alec Radford, et al. Gpt-4o system card. arXiv preprint arXiv:2410.21276, 2024.
+Yunseok Jang, Yale Song, Youngjae Yu, Youngjin Kim, and Gunhee Kim. Tgif-qa: Toward spatio-temporal reasoning in visual
+  question answering. In Proceedings of the IEEE conference on computer vision and pattern recognition, pages 2758–2766, 2017.
+Wessel Kraaij, Thomas Hain, Mike Lincoln, and Wilfried Post. The ami meeting corpus. In Proc. International Conference on
+ Methods and Techniques in Behavioral Research, pages 1–4, 2005.
+Xin Lai, Zhuotao Tian, Yukang Chen, Yanwei Li, Yuhui Yuan, Shu Liu, and Jiaya Jia. Lisa: Reasoning segmentation via large
+  language model. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 9579–9589,
+  2024.
+Jie Lei, Licheng Yu, Mohit Bansal, and Tamara L Berg. Tvqa: Localized, compositional video question answering. arXiv preprint
+   arXiv:1809.01696, 2018.
+Bo Li, Yuanhan Zhang, Liangyu Chen, Jinghao Wang, Fanyi Pu, Joshua Adrian Cahyono, Jingkang Yang, Chunyuan Li, and Ziwei
+  Liu. Otter: A multi-modal model with in-context instruction tuning. IEEE Transactions on Pattern Analysis and Machine
+  Intelligence, 2025.
+Guohao Li, Hasan Hammoud, Hani Itani, Dmitrii Khizbullin, and Bernard Ghanem. Camel: Communicative agents for" mind"
+  exploration of large language model society. Advances in Neural Information Processing Systems, 36:51991–52008, 2023.
+Kunchang Li, Yali Wang, Yinan He, Yizhuo Li, Yi Wang, Yi Liu, Zun Wang, Jilan Xu, Guo Chen, Ping Luo, et al. Mvbench: A
+  comprehensive multi-modal video understanding benchmark. In Proceedings of the IEEE/CVF Conference on Computer Vision
+  and Pattern Recognition, pages 22195–22206, 2024a.
+Linjie Li, Yen-Chun Chen, Yu Cheng, Zhe Gan, Licheng Yu, and Jingjing Liu. Hero: Hierarchical encoder for video+ language
+  omni-representation pre-training. arXiv preprint arXiv:2005.00200, 2020.
+
+
+
+
+                                                               36
+Xinhao Li, Yi Wang, Jiashuo Yu, Xiangyu Zeng, Yuhan Zhu, Haian Huang, Jianfei Gao, Kunchang Li, Yinan He, Chenting Wang,
+  et al. Videochat-flash: Hierarchical compression for long-context video modeling. arXiv preprint arXiv:2501.00574, 2024b.
+Yunxin Li, Xinyu Chen, Baotian Hu, Longyue Wang, Haoyuan Shi, and Min Zhang. Videovista: A versatile benchmark for video
+  understanding and reasoning. arXiv preprint arXiv:2406.11303, 2024c.
+Haotian Liu, Xinyu Li, Y. Zhang, et al. Mmbench: Evaluating multimodal models on comprehensive multi-turn tasks. arXiv
+  preprint arXiv:2307.06290, 2023a.
+Haotian Liu, Chunyuan Li, Yuheng Li, and Yong Jae Lee. Improved baselines with visual instruction tuning. In Proceedings of the
+  IEEE/CVF conference on computer vision and pattern recognition, pages 26296–26306, 2024a.
+Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee. Visual instruction tuning. Advances in neural information processing
+  systems, 36, 2024b.
+Yuan Liu, Haodong Duan, Yuanhan Zhang, Bo Li, Songyang Zhang, Wangbo Zhao, Yike Yuan, Jiaqi Wang, Conghui He, Ziwei
+  Liu, et al. Mmbench: Is your multi-modal model an all-around player? arXiv preprint arXiv:2307.06281, 2023b.
+Yuanxin Liu, Shicheng Li, Yi Liu, Yuxiang Wang, Shuhuai Ren, Lei Li, Sishuo Chen, Xu Sun, and Lu Hou. Tempcompass: Do
+  video llms really understand videos? arXiv preprint arXiv:2403.00476, 2024c.
+Z. Liu et al. Agentboard: Towards unified evaluation of llm-based agents. arXiv preprint arXiv:2503.01960, 2025.
+Jiasen Lu, Christopher Clark, Sangho Lee, Zichen Zhang, Savya Khosla, Ryan Marten, Derek Hoiem, and Aniruddha Kembhavi.
+   Unified-io 2: Scaling autoregressive multimodal models with vision language audio and action. In Proceedings of the IEEE/CVF
+   Conference on Computer Vision and Pattern Recognition, pages 26439–26455, 2024.
+Muhammad Maaz, Hanoona Rasheed, Salman Khan, and Fahad Shahbaz Khan. Video-chatgpt: Towards detailed video understand-
+ ing via large vision and language models. arXiv preprint arXiv:2306.05424, 2023.
+Muhammad Maaz, Hanoona Rasheed, Salman Khan, and Fahad Khan. Videogpt+: Integrating image and video encoders for
+ enhanced video understanding. arXiv preprint arXiv:2406.09418, 2024.
+Karttikeya Mangalam, Raiymbek Akshulakov, and Jitendra Malik. Egoschema: A diagnostic benchmark for very long-form video
+  language understanding. Advances in Neural Information Processing Systems, 36:46212–46244, 2023a.
+Karttikeya Mangalam, Raiymbek Akshulakov, and Jitendra Malik. Egoschema: A diagnostic benchmark for very long-form video
+  language understanding. Advances in Neural Information Processing Systems, 36:46212–46244, 2023b.
+Xinhao Mei, Varun Nagaraja, Gael Le Lan, Zhaoheng Ni, Ernie Chang, Yangyang Shi, and Vikas Chandra. Foleygen: Visually-
+  guided audio generation. In 2024 IEEE 34th International Workshop on Machine Learning for Signal Processing (MLSP), pages
+  1–6. IEEE, 2024.
+Yu Meng, Mengzhou Xia, and Danqi Chen. Simpo: Simple preference optimization with a reference-free reward. arXiv preprint
+  arXiv:2405.14734, 2024.
+Eric Mitchell. A note on dpo with noisy preferences & relationship to ipo, 2023.
+Trisha Mittal, Sanjoy Chowdhury, Pooja Guhan, Snikitha Chelluri, and Dinesh Manocha. Towards determining perceived audience
+   intent for multimodal social media posts using the theory of reasoned action. Scientific Reports, 14(1):10606, 2024.
+Munan Ning, Bin Zhu, Yujia Xie, Bin Lin, Jiaxi Cui, Lu Yuan, Dongdong Chen, and Li Yuan. Video-bench: A comprehensive
+ benchmark and toolkit for evaluating video-based large language models. arXiv preprint arXiv:2311.16103, 2023.
+: NVIDIA, Bo Adler, Niket Agarwal, Ashwath Aithal, Dong H Anh, Pallab Bhattacharya, Annika Brundyn, Jared Casper, Bryan
+   Catanzaro, Sharon Clay, Jonathan Cohen, et al. Nemotron-4 340b technical report. arXiv preprint arXiv:2406.11704, 2024.
+Long Ouyang, Jeffrey Wu, Xu Jiang, Diogo Almeida, Carroll Wainwright, Pamela Mishkin, Chong Zhang, Sandhini Agarwal,
+  Katarina Slama, Alex Ray, et al. Training language models to follow instructions with human feedback. Advances in neural
+  information processing systems, 35:27730–27744, 2022.
+Kishore Papineni, Salim Roukos, Todd Ward, and Wei-Jing Zhu. Bleu: a method for automatic evaluation of machine translation.
+  In Proceedings of the 40th annual meeting of the Association for Computational Linguistics, pages 311–318, 2002.
+Jan Peters and Stefan Schaal. Reinforcement learning by reward-weighted regression for operational space control. In Proceedings
+   of the 24th international conference on Machine learning, pages 745–750, 2007.
+BH Prasad, Lokesh R Boregowda, Kaushik Mitra, Sanjoy Chowdhury, et al. V-desirr: Very fast deep embedded single image
+  reflection removal. In Proceedings of the IEEE/CVF International Conference on Computer Vision, pages 2390–2399, 2021.
+
+
+                                                               37
+Rafael Rafailov, Archit Sharma, Eric Mitchell, Christopher D Manning, Stefano Ermon, and Chelsea Finn. Direct preference
+  optimization: Your language model is secretly a reward model. Advances in neural information processing systems, 36:53728–
+  53741, 2023.
+Rafael Rafailov, Archit Sharma, Eric Mitchell, Christopher D Manning, Stefano Ermon, and Chelsea Finn. Direct preference
+  optimization: Your language model is secretly a reward model. Advances in Neural Information Processing Systems, 36, 2024.
+Ruchit Rawal, Khalid Saifullah, Miquel Farré, Ronen Basri, David Jacobs, Gowthami Somepalli, and Tom Goldstein. Cinepile: A
+  long video question answering dataset and benchmark. arXiv preprint arXiv:2405.08813, 2024.
+Shuhuai Ren, Linli Yao, Shicheng Li, Xu Sun, and Lu Hou. Timechat: A time-sensitive multimodal large language model for
+  long video understanding. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages
+  14313–14323, 2024.
+Corby Rosset, Ching-An Cheng, Arindam Mitra, Michael Santacroce, Ahmed Awadallah, and Tengyang Xie. Direct nash optimiza-
+  tion: Teaching language models to self-improve with general preferences. arXiv preprint arXiv:2404.03715, 2024.
+Joseph Roth, Sourish Chaudhuri, Ondrej Klejch, Radhika Marvin, Andrew Gallagher, Liat Kaver, Sharadh Ramaswamy, Arkadiusz
+   Stopczynski, Cordelia Schmid, Zhonghua Xi, et al. Ava active speaker: An audio-visual dataset for active speaker detection.
+   In ICASSP 2020-2020 IEEE international conference on acoustics, speech and signal processing (ICASSP), pages 4492–4496.
+   IEEE, 2020.
+Darshana Saravanan, Varun Gupta, Darshan Singh, Zeeshan Khan, Vineet Gandhi, and Makarand Tapaswi. Velociti: Benchmarking
+  video-language compositional reasoning with strict entailment. In Proceedings of the Computer Vision and Pattern Recognition
+  Conference, pages 18914–18924, 2025.
+John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. Proximal policy optimization algorithms. arXiv
+  preprint arXiv:1707.06347, 2017a.
+John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. Proximal policy optimization algorithms. arXiv
+  preprint arXiv:1707.06347, 2017b.
+Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, YK Li, Y
+  Wu, et al. Deepseekmath: Pushing the limits of mathematical reasoning in open language models, 2024. URL https://arxiv.
+  org/abs/2402.03300.
+Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, YK Li, Yang Wu,
+  et al. Deepseekmath: Pushing the limits of mathematical reasoning in open language models. arXiv preprint arXiv:2402.03300,
+  2024a.
+Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, YK Li, Y Wu,
+  et al. Deepseekmath: Pushing the limits of mathematical reasoning in open language models. arXiv preprint arXiv:2402.03300,
+  2024b.
+Noah Shinn et al. Reflexion: An autonomous agent with dynamic memory and self-reflection. arXiv preprint arXiv:2303.11366,
+  2024.
+Fangxun Shu, Lei Zhang, Hao Jiang, and Cihang Xie. Audio-visual llm for video understanding. arXiv preprint arXiv:2312.06720,
+  2023.
+Chan Hee Song, Jiaman Wu, Clayton Washington, Brian M Sadler, Wei-Lun Chao, and Yu Su. Llm-planner: Few-shot grounded
+  planning for embodied agents with large language models. In Proceedings of the IEEE/CVF International Conference on
+  Computer Vision, pages 2998–3009, 2023.
+Enxin Song, Wenhao Chai, Guanhong Wang, Yucheng Zhang, Haoyang Zhou, Feiyang Wu, Haozhe Chi, Xun Guo, Tian Ye,
+  Yanting Zhang, et al. Moviechat: From dense token to sparse memory for long video understanding. In Proceedings of the
+  IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 18221–18232, 2024.
+Parthasaarathy Sudarsanam, Irene Martín-Morató, and Tuomas Virtanen. Representation learning for semantic alignment of lan-
+  guage, audio, and visual modalities. arXiv preprint arXiv:2505.14562, 2025.
+Guangzhi Sun, Wenyi Yu, Changli Tang, Xianzhao Chen, Tian Tan, Wei Li, Lu Lu, Zejun Ma, Yuxuan Wang, and Chao Zhang.
+  video-salmonn: Speech-enhanced audio-visual large language models. arXiv preprint arXiv:2406.15704, 2024.
+Zineng Tang, Ziyi Yang, Mahmoud Khademi, Yang Liu, Chenguang Zhu, and Mohit Bansal. Codi-2: In-context interleaved and
+  interactive any-to-any generation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition,
+  pages 27425–27434, 2024.
+
+
+                                                             38
+Reka Team, Aitor Ormazabal, Che Zheng, Cyprien de Masson d’Autume, Dani Yogatama, Deyu Fu, Donovan Ong, Eric Chen,
+  Eugenie Lamprecht, Hai Pham, et al. Reka core, flash, and edge: A series of powerful multimodal language models. arXiv
+  preprint arXiv:2404.12387, 2024.
+Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Martinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste Rozière,
+  Naman Goyal, Eric Hambro, Faisal Azhar, et al. Llama: Open and efficient foundation language models. arXiv preprint
+  arXiv:2302.13971, 2023.
+Rong-Cheng Tu, Wenhao Sun, Zhao Jin, Jingyi Liao, Jiaxing Huang, and Dacheng Tao. Spagent: Adaptive task decomposition and
+  model selection for general video generation and editing. arXiv preprint arXiv:2411.18983, 2024.
+Ramakrishna Vedantam, C Lawrence Zitnick, and Devi Parikh. Cider: Consensus-based image description evaluation. In Proceed-
+  ings of the IEEE conference on computer vision and pattern recognition, pages 4566–4575, 2015.
+Andong Wang, Bo Wu, Sunli Chen, Zhenfang Chen, Haotian Guan, Wei-Ning Lee, Li Erran Li, and Chuang Gan. Sok-bench:
+  A situated video reasoning benchmark with aligned open-world knowledge. In Proceedings of the IEEE/CVF Conference on
+  Computer Vision and Pattern Recognition, pages 13384–13394, 2024a.
+Ben Wang et al. Agentbench: Evaluating llms as agents. arXiv preprint arXiv:2403.00510, 2024b.
+Chenyu Wang, Weixin Luo, Sixun Dong, Xiaohua Xuan, Zhengxin Li, Lin Ma, and Shenghua Gao. Mllm-tool: A multimodal large
+  language model for tool agent learning. In 2025 IEEE/CVF Winter Conference on Applications of Computer Vision (WACV),
+  pages 6678–6687. IEEE, 2025a.
+Peiyu Wang, Yichen Wei, Yi Peng, Xiaokun Wang, Weijie Qiu, Wei Shen, Tianyidan Xie, Jiangbo Pei, Jianhao Zhang, Yunzhuo
+  Hao, et al. Skywork r1v2: Multimodal hybrid reinforcement learning for reasoning. arXiv preprint arXiv:2504.16656, 2025b.
+Weihan Wang, Qingsong Lv, Wenmeng Yu, Wenyi Hong, Ji Qi, Yan Wang, Junhui Ji, Zhuoyi Yang, Lei Zhao, Song XiXuan, et al.
+  Cogvlm: Visual expert for pretrained language models. Advances in Neural Information Processing Systems, 37:121475–121499,
+  2024c.
+Yubo Wang, Xueguang Ma, Ge Zhang, Yuansheng Ni, Abhranil Chandra, Shiguang Guo, Weiming Ren, Aaran Arulraj, Xuan He,
+  Ziyan Jiang, et al. Mmlu-pro: A more robust and challenging multi-task language understanding benchmark. Advances in Neural
+  Information Processing Systems, 37:95266–95290, 2024d.
+Yueqian Wang, Xiaojun Meng, Yuxuan Wang, Jianxin Liang, Qun Liu, and Dongyan Zhao. Friends-mmc: A dataset for multi-modal
+  multi-party conversation understanding. In Proceedings of the AAAI Conference on Artificial Intelligence, pages 25425–25433,
+  2025c.
+Zhilin Wang, Alexander Bukharin, Olivier Delalleau, Daniel Egert, Gerald Shen, Jiaqi Zeng, Oleksii Kuchaiev, and Yi Dong.
+  Helpsteer2-preference: Complementing ratings with preferences. arXiv preprint arXiv:2410.01257, 2024e.
+Zhenyu Wang, Aoxue Li, Zhenguo Li, and Xihui Liu. Genartist: Multimodal llm as an agent for unified image generation and
+  editing. Advances in Neural Information Processing Systems, 37:128374–128395, 2025d.
+Bo Wu, Shoubin Yu, Zhenfang Chen, Joshua B Tenenbaum, and Chuang Gan. Star: A benchmark for situated reasoning in real-
+  world videos. arXiv preprint arXiv:2405.09711, 2024a.
+Jiaye Wu, Sanjoy Chowdhury, Hariharmano Shanmugaraja, David Jacobs, and Soumyadip Sengupta. Measured albedo in the wild:
+   Filling the gap in intrinsics evaluation. In 2023 IEEE International Conference on Computational Photography (ICCP), pages
+   1–12. IEEE, 2023.
+Shengqiong Wu, Hao Fei, Leigang Qu, Wei Ji, and Tat-Seng Chua. Next-gpt: Any-to-any multimodal llm. In Forty-first Interna-
+  tional Conference on Machine Learning, 2024b.
+Zhiyu Wu, Xiaokang Chen, Zizheng Pan, Xingchao Liu, Wen Liu, Damai Dai, Huazuo Gao, Yiyang Ma, Chengyue Wu, Bingxuan
+  Wang, et al. Deepseek-vl2: Mixture-of-experts vision-language models for advanced multimodal understanding. arXiv preprint
+  arXiv:2412.10302, 2024c.
+Junbin Xiao, Xindi Shang, Angela Yao, and Tat-Seng Chua. Next-qa: Next phase of question-answering to explaining temporal
+  actions. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition, pages 9777–9786, 2021.
+Zhifei Xie, Daniel Tang, Dingwei Tan, Jacques Klein, Tegawend F Bissyand, and Saad Ezzini. Dreamfactory: Pioneering multi-
+  scene long video generation with a multi-agent framework. arXiv preprint arXiv:2408.11788, 2024.
+
+
+
+
+                                                             39
+Dejing Xu, Zhou Zhao, Jun Xiao, Fei Wu, Hanwang Zhang, Xiangnan He, and Yueting Zhuang. Video question answering via
+  gradually refined attention over appearance and motion. In Proceedings of the 25th ACM international conference on Multimedia,
+  pages 1645–1653, 2017.
+Jin Xu, Zhifang Guo, Jinzheng He, Hangrui Hu, Ting He, Shuai Bai, Keqin Chen, Jialin Wang, Yang Fan, Kai Dang, Bin Zhang,
+   Xiong Wang, Yunfei Chu, and Junyang Lin. Qwen2.5-omni technical report, 2025a.
+Jin Xu, Zhifang Guo, Hangrui Hu, Yunfei Chu, Xiong Wang, Jinzheng He, Yuxuan Wang, Xian Shi, Ting He, Xinfa Zhu, et al.
+   Qwen3-omni technical report. arXiv preprint arXiv:2509.17765, 2025b.
+Lu Xu, Sijie Zhu, Chunyuan Li, Chia-Wen Kuo, Fan Chen, Xinyao Wang, Guang Chen, Dawei Du, Ye Yuan, and Longyin Wen.
+  Beyond raw videos: Understanding edited videos with large multimodal model. In Proceedings of the Computer Vision and
+  Pattern Recognition Conference, pages 503–512, 2025c.
+Haochen Xue, Feilong Tang, Ming Hu, Yexin Liu, Qidong Huang, Yulong Li, Chengzhi Liu, Zhongxing Xu, Chong Zhang, Chun-
+  Mei Feng, et al. Mmrc: A large-scale benchmark for understanding multimodal large language model in real-world conversation.
+  arXiv preprint arXiv:2502.11903, 2025.
+Cilin Yan, Haochen Wang, Shilin Yan, Xiaolong Jiang, Yao Hu, Guoliang Kang, Weidi Xie, and Efstratios Gavves. Visa: Reasoning
+   video object segmentation via large language models. In European Conference on Computer Vision, pages 98–115. Springer,
+   2024.
+Shoubin Yu, Jaehong Yoon, and Mohit Bansal. Crema: Generalizable and efficient video-language reasoning via multimodal
+  modular fusion. arXiv preprint arXiv:2402.05889, 2024.
+Zhou Yu, Dejing Xu, Jun Yu, Ting Yu, Zhou Zhao, Yueting Zhuang, and Dacheng Tao. Activitynet-qa: A dataset for understanding
+  complex web videos via question answering. In Proceedings of the AAAI Conference on Artificial Intelligence, pages 9127–9134,
+  2019.
+Haobo Yuan, Xiangtai Li, Tao Zhang, Zilong Huang, Shilin Xu, Shunping Ji, Yunhai Tong, Lu Qi, Jiashi Feng, and Ming-
+  Hsuan Yang. Sa2va: Marrying sam2 with llava for dense grounded understanding of images and videos. arXiv preprint
+  arXiv:2501.04001, 2025.
+Zhengqing Yuan, Ruoxi Chen, Zhaoxu Li, Haolong Jia, Lifang He, Chi Wang, and Lichao Sun. Mora: Enabling generalist video
+  generation via a multi-agent framework. arXiv preprint arXiv:2403.13248, 2024.
+Xiang Yue, Yuansheng Ni, Kai Zhang, Tianyu Zheng, Ruoqi Liu, Ge Zhang, Samuel Stevens, Dongfu Jiang, Weiming Ren, Yux-
+  uan Sun, et al. Mmmu: A massive multi-discipline multimodal understanding and reasoning benchmark for expert agi. In
+  Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 9556–9567, 2024.
+Wenxuan Zhang, Mahani Aljunied, Chang Gao, Yew Ken Chia, and Lidong Bing. M3exam: A multilingual, multimodal, multilevel
+  benchmark for examining large language models. Advances in Neural Information Processing Systems, 36:5484–5505, 2023a.
+Xiaoying Zhang, Da Peng, Yipeng Zhang, Zonghao Guo, Chengyue Wu, Chi Chen, Wei Ke, Helen Meng, and Maosong Sun.
+  Towards self-improving systematic cognition for next-generation foundation mllms. arXiv preprint arXiv:2503.12303, 2025.
+Yanzhe Zhang, Ruiyi Zhang, Jiuxiang Gu, Yufan Zhou, Nedim Lipka, Diyi Yang, and Tong Sun. Llavar: Enhanced visual instruction
+  tuning for text-rich image understanding. arXiv preprint arXiv:2306.17107, 2023b.
+Yipeng Zhang, Yifan Liu, Zonghao Guo, Yidan Zhang, Xuesong Yang, Chi Chen, Jun Song, Bo Zheng, Yuan Yao, Zhiyuan Liu,
+  et al. Llava-uhd v2: an mllm integrating high-resolution feature pyramid via hierarchical window transformer. arXiv preprint
+  arXiv:2412.13871, 2024.
+Deyao Zhu, Jun Chen, Xiaoqian Shen, Xiang Li, and Mohamed Elhoseiny. Minigpt-4: Enhancing vision-language understanding
+  with advanced large language models. In International Conference on Learning Representations (ICLR), 2024.
+Jinguo Zhu, Weiyun Wang, Zhe Chen, Zhaoyang Liu, Shenglong Ye, Lixin Gu, Hao Tian, Yuchen Duan, Weijie Su, Jie Shao,
+   et al. Internvl3: Exploring advanced training and test-time recipes for open-source multimodal models. arXiv preprint
+   arXiv:2504.10479, 2025.
+
+
+
+
+                                                              40
+

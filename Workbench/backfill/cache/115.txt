@@ -1,0 +1,716 @@
+                              This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                           Except for this watermark, it is identical to the accepted version;
+                                     the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+             An Interactive Navigation Method with Effect-oriented Affordance
+
+     Xiaohan Wang1,2 , Yuehu Liu1 , Xinhang Song2,3 , Yuyi Liu2,3 , Sixian Zhang2,3 , Shuqiang Jiang2,3
+                               1
+                                   Institute of Artificial Intelligence and Robotics, Xi’an Jiaotong University, Xi’an
+                  2
+                      Key Lab of Intelligent Information Processing Laboratory of the Chinese Academy of Sciences (CAS),
+                       Institute of Computing Technology, Beijing 3 University of Chinese Academy of Sciences, Beijing
+                                   wuhanwxh2016@stu.xjtu.edu.cn; liuyh@mail.xjtu.edu.cn
+                {xinhang.song, yuyi.liu, sixian.zhang}@vipl.ict.ac.cn; sqjiang@ict.ac.cn
+
+
+
+                              Abstract                                        igation (InterNav) [40, 45] aims to navigate more efficiently
+                                                                              to a target point with object interaction in cluttered, dy-
+   Visual navigation is to let the agent reach the target ac-                 namic environments, where the agent may get blocked by
+cording to the continuous visual input. In most previous                      multiple obstacles during the long-term navigation. Com-
+works, visual navigation is usually assumed to be done in                     pared to non-interactive navigation (e.g. ObjectNav, Point-
+a static and ideal environment: the target is always reach-                   Nav), the agent is challenged to plan not only long-term
+able with no need to alter the environment. However, the                      navigation but also interactions that benefit the navigation.
+“messy” environments are more general and practical in                           Prior work of InterNav [45] trains an RL-based policy to
+our daily lives, where the agent may get blocked by obsta-                    output the executable actions based on sensory egocentric
+cles. Thus Interactive Navigation (InterNav) is introduced                    observations and implicit episodic memories (from recur-
+to navigate to the objects in more realistic ”messy” envi-                    rent neural networks). This approach enables short-term in-
+ronments according to the object interaction. Prior work                      teraction with extensive trials (corresponding to the red ar-
+on InterNav learns short-term interaction through exten-                      row in Figure 1(b)). However, effective interaction does not
+sive trials with reinforcement learning. However, interac-                    guarantee an efficient tour. For example (see Figure 1(a)),
+tion does not guarantee efficient navigation, that is, plan-                  clearing the shortest path may cost more effort (or even fail-
+ning obstacle interactions that make shorter paths and con-                   ure when the obstacle gets stuck) than taking a detour at
+sume less effort is also crucial. In this paper, we introduce                 some point. Unlike other interactive tasks (e.g. grasp, re-
+an effect-oriented affordance map to enable long-term in-                     arrange), the purpose is not interaction itself but the effect
+teractive navigation, extending the existing map-based nav-                   that facilitates long-term navigation.
+igation framework to the domain of dynamic environment.                          Overall, research on visual navigation can be catego-
+We train a set of affordance functions predicting available                   rized into learning-based methods [8, 27, 38] (prior Inter-
+interactions and the time cost of removing obstacles, which                   Nav works belong to) and map-based methods [4, 5, 25].
+informatively support an interactive modular system to ad-                    The latter builds an explicit map of spatial or semantic in-
+dress interaction and long-term planning. Experiments on                      formation and plans long-term paths on the map, which can
+the ProcTHOR simulator demonstrate the capability of our                      be translated into action sequences. The stable map repre-
+affordance-driven system in long-term navigation in com-                      sentation of the environment enables long-term navigation
+plex dynamic environments.                                                    in unexplored scenes (corresponding to the red arrow in Fig-
+                                                                              ure 1(b)). However, the prerequisite for that to work is the
+                                                                              determined reachability of a location that the agent can not
+1. Introduction                                                               reach it when it’s occupied, otherwise it can. Therefore, the
+                                                                              shortest path can be planned in the reachable area. On the
+Autonomously navigating to a target in complex environ-
+                                                                              contrary, the reachability in InterNav is uncertain, since the
+ments is a core challenge for Embodied AI. Interactive Nav-
+                                                                              location occupied by or behind the obstacle may become
+     *Project page: https://github.com/polkalian/ADIN                         reachable through interaction. To plan long-term paths in
+     This work is supported by National Natural Science Foundation of         dynamic environments (towards the green node in Figure
+China (NSFC) under Grant 62350083. This work is in part by Beijing Nat-       1(b)), the agent needs to estimate whether an obstacle area
+ural Science Foundation under Grant JQ22012, and in part by the National
+Natural Science Foundation of China under Grant 62032022, 62125207,           can be reached, which depends on the interaction outcome.
+62272443 and U23B2012.                                                           As illustrated in Figure 1(b), there is a gap in front of
+
+
+
+                                                                           16446
+      Top view                                  Side view
+                                                 Plan path & interaction
+  three-room scene                                  with affordance         o pushable
+                                                                            o invalid pose
+                                                                                                                                    interactive
+                                                                            o expected to       dynamic interaction                 navigation
+                target                                                        take 3 pushes
+
+                                                                             pickable          Environment
+                                                                                                               Learn from
+                                                                                                                                                Learn
+                                                                             valid pose                                                     affordance
+
+                                                                                                 complexity       trials
+                                                              office         expected to
+                                                              chair           take 3 actions
+          Egocentric view          agent                                                                                    Plan a path on
+                                                                                                                               the map
+                                                                                                     static
+                                                                            o pushable                                                          navigation
+                                                   dogbed                                                      vanilla model
+                                                                            o invalid pose
+                                                                            o expected to                     short-term           long-term
+                                                                              take 10+ pushes                          Path planning
+                                                  sofa
+
+               (a) Illustration of InterNav driven by affordance                                        (b) Insight of introducing affordance
+
+Figure 1. (a) In the task of InterNav, the agent marked with the blue circle aims to reach the target point marked with the green star and
+is blocked by multiple obstacles marked by orange boxes. Squares on the path denote the object interactions. Aware of the affordance of
+obstacles, a more efficient path can be planned by choosing the appropriate obstacle to interact with. (b) Prior methods for InterNav and
+map-based methods for visual navigation are limited to learning either short-term interaction or long-term navigation. To plan long-term
+paths in dynamic environments, the agent needs to learn affordance.
+
+
+existing methods that they can’t learn both long-term nav-                     ping module geometrically projects the affordance on the
+igation and short-term interaction. We believe the ”miss-                      3D voxel from the depth image and updates the top-down
+ing puzzle” is affordance, which indicates the potential                       affordance map. The interactive policy produces a distance
+of agent-environment interaction[12]. First of all, the af-                    map that covers interaction costs according to the effect af-
+fordance of objects usually refers to the available interac-                   fordance and plans the most efficient path on the map. In
+tions on them, which indicates how the environment can be                      the end, the policy outputs the action sequence of naviga-
+changed unlike the static spatial or semantic information.                     tion or interaction given the agent location and the target
+However, knowing how does not indicate the potential ef-                       position. The affordance functions are trained with the out-
+fect on navigation. We want to further know whether inter-                     come of interactions that are conducted by the agent itself
+action with the obstacle can lead to reachable paths given                     in the simulator.
+the agent’s capability of interaction. Then the long-term                          We perform experiments on ProcTHOR simulator [9],
+paths can be planned on the expected reachable area fol-                       which provides various multi-room scenes and supports ob-
+lowing the map-based framework.                                                ject interactions. The proposed model outperforms existing
+                                                                               end-to-end RL methods and map-based baselines. We sys-
+    To help embodied agents plan and conduct interactions,
+                                                                               tematically study the effective boundary of our affordance
+we introduce three levels of affordance: (1) Object affor-
+                                                                               map on InterNav, verifying that our interactive modular
+dance: the object attributes (e.g. pushable, pickable) deter-
+                                                                               system maintains effectiveness facing different interaction
+mined by its shape, mass, etc. that are invariant to external
+                                                                               complexity.
+factors. (2) Pose affordance: whether the object is cur-
+rently interactive given the agent pose, which is dynamic
+during navigation. (3) Effect affordance: Whether the ob-                      2. Related Work
+stacle can be removed given agent’s capability and the sit-                    2.1. Interactive Navigation
+uation. As shown in Figure 1(a), the dogbed can be picked
+away within 3 actions while the sofa can hardly be removed                     Visual navigation, the cornerstone task of Embodied AI,
+with 10 pushes given its mass and the crowded space. In                        has been extensively studied in the past decade. Most
+this paper, we propose a modular approach to address In-                       approaches address PointGoal [4, 28, 38] and ObjGoal
+terNav based on a multi-level affordance map. Overall, the                     [2, 5, 39, 48, 49] navigation that work under the assump-
+model consists of a set of affordance functions, a mapping                     tion of static environment. Interactive navigation (InterNav)
+module, and an interactive policy. They are interfaced sim-                    [34, 40, 45] considers dynamic environments and can be re-
+ilarly to the map-based system that is widely applied in vi-                   garded as the downstream task of PointGoal navigation with
+sual navigation research [4, 5, 25]. First the egocentric seg-                 the additional component of object interaction. Zeng et al.
+mentations of multiple affordances are predicted with affor-                   [45] focus on learning interaction with an additional per-
+dance functions from the RGB observation. Then the map-                        ception module predicting the change of object keypoints
+
+
+
+                                                                           16447
+with end-to-end RL in iTHOR environment [17]. How-                   pt . The agent then decides and executes an action at ∈ A,
+ever, implicit memory of egocentric perception only enables          where A consists of 5 navigation actions (MoveAhead,
+the short-term ability of interaction. Other interactive tasks       RotateRight, RotatLeft, LookUp, LookDown), 6
+such as manipulation [10, 13] and rearrangement [37, 44]             interaction actions (DirectionalPush in 4 directions,
+also require the understanding of environmental dynamics.            PickUp, Drop), and Done. The agent is required to nav-
+InterNav is distinctive in that the agent aims to ”interact for      igate within the distance of a step (0.25m) of the target
+navigation” rather than to change the environment. Thus              and execute Done to claim a successful task episode. The
+it’s crucial to learn the interaction effect on navigable areas      episode ends when Done is taken or the number of steps
+and plan long-term navigation.                                       exceeds the maximum budget of T = 500.
+
+2.2. Map-based Navigation Methods                                    3.2. Method Overview
+Classical approaches have formed the navigation paradigm             We propose Affordance Driven Interactive Navigation
+of geometrical mapping and path planning [3, 16, 29]. Mo-            (ADIN), a modular system addressing long-term interac-
+tivated by the drawbacks of learning-based methods, Chap-            tive navigation (see Figure 2). The system consists of three
+lot et al. [4] proposed a hierarchical modular system that           components: The affordance functions predict multiple af-
+involves the learning procedure inside the modular to main-          fordances of the objects appearing in the current egocentric
+tain efficiency and robustness. On the foundation of that,           RGB observation. The mapping module builds and updates
+semantic information predicted from egocentric observa-              a global affordance map mt storing the spatial and affor-
+tions has been incorporated to construct semantic map for            dance information across the scene. The interactive policy
+ObjectGoal navigation [5, 19, 23, 35, 47, 50]. The addi-             plans a long-term path toward the target on the map and de-
+tional semantic memory supports the goal-oriented under-             cides the actions of navigation or interaction according to
+standing of the environment. Recent modular approaches               the current agent location. Each module is introduced in the
+[11, 25, 46] further reason and predict the uncertain infor-         following parts.
+mation of the environment like the target location and un-
+explored area. Our method learns effect-oriented affordance          3.3. Affordance Functions
+to obtain knowledge of interaction uncertainty and to fore-          The proposed affordance functions address interactive nav-
+see the interaction effect on navigation planning.                   igation by answering the questions of ”how to interact”,
+2.3. Affordance                                                      ”when to interact”, and ”whether to interact”. We first de-
+                                                                     fine three levels of affordances:
+The concept of Affordance has been widely applied in the             Object affordance. We consider two categories of object
+field of psychology, computer vision [7, 18, 20, 22, 32, 42,         affordances corresponding to the two ways of interactions
+43], and robotics concerning interaction pose[1, 13, 15, 33],        in InterNav: pushable and pickable indicate the attributes of
+agent abilities[6], action sequence[31], effect relations[26,        a large object available to be pushed aside or a small object
+41]. In the domain of embodied AI, several works have in-            available to be picked up. Pose affordance. An interaction
+troduced affordance to perform effective interactive tasks.          can be executed only if the agent is at a feasible pose where
+Nagarajan and Grauman [21] develop an embodied agent                 the object is in sight and within a certain distance. Thus we
+seeking new affordances actively through exploratory inter-          define an affordance of visible which indicates the interac-
+actions. However, the learned affordances are still symbol-          tion with the object is feasible given the current agent pose.
+ized (denoted as attributes like pickupable and toggleable),         Since visible is relative to the agent pose rather than a con-
+which makes them less informative for execution. The af-             stant attribute of the object itself, it provides more guidance
+fordance of navigation has been explored as interactive ar-          for the agent to decide when to interact.
+eas in language-guided interaction [14] and navigable ar-            Effect affordance. To decide whether to interact with an
+eas in visual navigation[24]. In this work, we explore com-          obstacle during navigation, the agent needs to estimate the
+posite affordances that address the interactions in InterNav         potential effect of interaction including the benefit and the
+from actions to poses and their effect on navigation.                cost of effort. Considering the objective of InterNav, the de-
+                                                                     sired effect of obstacle interaction is clearing the path effi-
+3. Method                                                            ciently. Therefore we quantize such criterion by measuring
+                                                                     ”the time cost of removing the obstacle from its current po-
+3.1. InterNav Formulation
+                                                                     sition”. A high time cost means a low probability of reach-
+The agent aims to navigate to a reachable target point in            ability which suggests the agent should give up interacting
+an unseen environment with multiple obstacles (e.g. chair,           with the obstacle. The limiting case is that it can not be
+box) spawned. At each step t, the agent receives egocentric          moved away and it’s a dead end (a heavy table stuck in the
+RGB it , depth dt images, and the relative target coordinate         corner). On the other side, the agent should consider a path
+
+
+
+                                                                  16448
+            Observations
+                                                      Affordance functions                       Interactive policy        Actions
+                RGB (it)                                      (Faf)                                     (π)                  (at)
+
+
+
+                                              Obj & Pose channel            Effect channel
+                                                                                                                      pushable
+
+                                                                                                 target                pickable
+                                                          pushable
+                                                          invisible                  high cost
+                                                                                                                         non-
+                                                                                                                      interactive
+               Depth (dt)                      pickable
+                                                visible                 low cost                                       visited
+
+
+
+                                                            Affordances                           Multi-level affordance map
+                                                                (aft)                                         (mt)
+                                                                            project                                 sum.
+          Target coordinate
+                                                          Mapping module                             3D multi-channel voxel
+                 (pt)
+
+
+Figure 2. Model overview. The proposed model ADIN consists of a mapping module, four affordance functions, and an interactive policy.
+The affordance functions predict four levels of affordance aft of objects from RGB observation. The mapper builds 3D voxel from the
+depth observation and obtains the top-down affordance map mt . The interactive policy plans paths on the map toward the target coordinates
+and outputs actions accordingly.
+
+
+interacting with a low time-cost obstacle when it’s more ef-                    it spends. We let the agent learn from the outcome of its
+ficient.                                                                        own experience to maintain a robust understanding of the
+    Formally, receiving an RGB observation it , we first ob-                    dynamic environment. The interaction strategy is identical
+tain the region of interest (RoI) as bounding box bnt of object                 to the interactive policy applied in our model (introduced
+n and its local feature ftn with RoI pooling on the global                      in section 3.5). Affordance functions are trained through
+feature map ft∗ . Then four affordance functions predict the                    supervised learning with a binary cross entropy loss for dis-
+multi-level affordances based on the features:                                  crete output and a mean squared error (MSE) loss for con-
+                                                                                tinuous output.
+    aftn = {aftpu , aftpi , aftv , afte }n = F af (ftn , ft∗ )        (1)           Essentially, the affordance functions provide the agent
+,where affordance aftn contains four affordances (respec-                       with a gateway to estimate the interaction uncertainty. The
+tive to the ones we define) of object n. Four affordance                        reliability of our approach lies in the proper understanding
+functions F af = {F pu , F pi , F v , F e } take the concatena-                 of agent’s capability relative to the interaction complexity.
+tion of local and global features as input. We implement                        Effective InterNav can be reached within our framework
+each function as the sequence of a two-layer MLP. While                         with both the mastery of interaction and matched estima-
+the values of aftpu , aftpi , aftv are set as binary, the time cost             tion.
+afte is normalized as a continuous value between 0 and 1
+                                                                                3.4. Mapping Module
+with min-max scaling.
+Learning. To train functions F af , we collect a static                         Overall, the affordance mapper is responsible for aggregat-
+dataset in various scenes containing the data of features                       ing the affordance and reachability information from ego-
+(ftn , ft∗ ) and labels. In particular, the agent is randomly                   centric depth frame dt and affordances aftn up to time t
+spawned around the obstacles and attempts to interact with                      into an allocentric map mt . We follow the standard map-
+DirectionalPush or Pick for multiple times. The la-                             ping procedure from visual navigation methods [5, 25]. The
+bels of pushable, pickable, visible are annotated according                     depth observation is used to compute a point cloud, where
+to the success or failure of the interaction. The ground truth                  each point is associated with the predicted object affor-
+time cost of removing an object is obtained by the agent                        dances. Then the point cloud is projected in 3D space us-
+running trials of interaction and calculating the time steps                    ing differentiable geometric computations to get the voxel
+
+
+
+                                                                             16449
+      Garbage
+        bag
+                   dogbed                 pushable              pickable           interactions               erased        time cost
+
+                  box
+
+
+                   dinning
+                    table
+
+
+
+                         target
+
+    agent
+
+
+
+
+            Top-down view                 (a) High confidence         (b) ADIN-discrete           (c) ADIN-continuous    (d) Low confidence
+
+
+Figure 3. Illustration of four map alterations of the interactive policy. Given the occupancy map mR          t , the agent plans the path based
+on its estimation of obstacles and its capability. (a) When the agent is confident, it erases all obstacles on the map and chooses the shortest
+path regardless of the interaction cost, which may end up less efficient. (d) When the agent is not confident, the target remains unreachable
+and no valid path can be planned. (b) ADIN-discrete erases obstacles selectively according to the effect affordance prediction, altering the
+map discretely. (c) ADIN-continuous operates on the continuous distance map, measuring the time cost of different obstacle interactions.
+The dashed areas denote the erasion of certain objects and the meshed areas denote the time cost calculated on the distance map.
+
+
+representation. The top-down maps of multi-level affor-                       interaction. Hence, assuming standard FMM obtains a dis-
+dances mA  t : 4 × M × M and reachability (occupancy                          tance map mdist  given mR  t , we compute a time-cost mea-
+map) mR  t : 1 × M × M are obtained by adding up the                          sured distance map by adding the equivalent distance of ef-
+voxel representation vertically. Each point in the map cor-                   fect affordance map to it:
+responds to a 5cm×5cm area in the physical world. There-                                            ∗
+                                                                                            mdis
+                                                                                             t   = mdis      e
+                                                                                                    t + α · mt · gridm                        (2)
+fore the current affordance map contains 8 channels: mt =
+              exp m m                               exp
+{mA      R
+    t , mt , mt pt , lt } : 8 × M × M , where mt         de-                  , where met : 1 × M × M is the effect affordance chan-
+                                  m m
+notes the map of explored area, pt , lt represent the target                  nel of mA                                              e
+                                                                                      t , α is the coefficient of time cost (given aft
+and agent location in the map coordinate system, and M is                     is normalized), and gridm is a constant denoting the dis-
+the map size.                                                                 tance of a step on the map. Thus α · met · gridm repre-
+                                                                              sents the distance the agent would travel if it spends the
+3.5. Interactive Policy                                                       time of clearing obstacles on navigation. The value of α
+Given the affordance map mt and the target pt , the inter-                    therefore is endowed with the meaning of the maximum
+active policy π plans short-term actions at in an analyti-                    time steps an interaction is expected to take. The shortest
+cal manner. It differs from the policy for visual navigation                  path planned on the new distance map now represents the
+[4, 5] that two modes of navigation and interaction cooper-                   path that costs the least expected time, namely the most ef-
+ate alternately, since in a short-term view the agent can ei-                 ficient path. For instance, blocked by a pushable chair,
+ther interact with obstacles or navigate somewhere. At each                   the agent may choose to bypass it when there’s a path aside,
+step the mode is determined according to the agent location:                  since the ”chair area” is assigned with additional distance.
+the agent is in the interactive mode when an interactable                     When there is no reachable path nearby, the agent will move
+(pushable or pickable) obstacle is visible and on                             toward the chair for interaction since it’s the only area with
+the shortest path toward the target point, otherwise it’s in the              the distance value lower than positive infinity. Therefore
+navigation mode. The affordance information stored on the                     through the continuous map alteration above, the model (re-
+map enables the agent to enter the interaction mode at feasi-                 ferred to as ADIN-continuous) plans more efficient paths
+ble positions and take feasible interactions, avoiding failed                 than merely the shortest paths. At each time step, the map
+and useless action execution.                                                 is updated according to the new observation and the shortest
+   For the navigation mode, we modify the distance com-                       path is replanned.
+putation of the Fast Marching Method (FMM) [30] for In-                           Besides modifying the distance map, we also perform
+terNav which analyzes the occupancy map mR        t and affor-                a variant (referred to as ADIN-discrete) making alterations
+dance map mA   t , and plans actions along the shortest path to               directly on the ocupancy map:
+the target. Since the reachability of an obstacle area is un-                                      ∗
+                                                                                             mR
+                                                                                              t = mR          e
+                                                                                                   t − round(mt − β)                          (3)
+certain, its approximate distance to the target should neither
+be positive infinity (non-interactive obstacles like walls) nor               where round(·) is the rounding operation and β is the
+standard distance (like floor) which ignores the time cost of                 threshold of met to determine whether the obstacle interac-
+
+
+
+                                                                           16450
+tion should be ruled out given agent’s estimation. The mi-          are valid when the object has the corresponding attributes
+nus sign denotes the element-wise difference between two            such as pickable and movable. The agent takes the END to
+binary arrays. Essentially, the map alteration represents the       indicate that it has completed an episode.
+’confidence’ level of agent being able to remove the obsta-             Evaluation metrics. We adopt Success Rate (SR), Final
+cle. By erasing an obstacle from the map or assigning a low         Distance to Target (FDT), Success weighted by Path Length
+time cost to it, the agent tends to ignore the obstacle during      (SPL), and Success weighted by Time Steps (STS). SR is
+path planning and is confident to handle it. We illustrate          the ratio of successful episodes in total episodes. FDT is
+four map alterations and the path planned corresponding to          the average geodesic distance between the agent and the
+them in Figure 3.                                                   goal
+                                                                       Pwhen     the episode is finished. SPL is calculated as
+                                                                     1    N                Ln
+    For the interaction mode, we let the agent interact with        N     n=1 Suc  n max(Pn ,Ln ) , where N is the total episodes
+the closest obstacle and pick the actions by analyzing the          number, Sucn is the successful indicator of n-th episode,
+layout of the surroundings and the expected path to nav-            Ln is the shortest path length, and Pn is the length of
+igate based on the map memory. The agent executes a                 the real path. STS is introduced to measure the time ef-
+series of interactions (i.e. series of DirectionalPush              ficiency of task completion, given that the time spent by
+for pushable obstacles, sequence of [PickUp, rotations,             interactions can not be measured by path length: ST S =
+                                                                     1
+                                                                       PN             Ln /grid
+Drop] for pickable obstacles) to place the obstacle out             N     n=1 Sucn T Sn , where T Sn is the timesteps the
+of the expected path at a vacant location. We refresh the           agent takes to complete the task, and grid = 0.25m is
+map with egocentric observation in the interaction mode             the unit distance of a step. STS can be regarded as a time-
+rather than update it by adding up the point cloud, so that         measurement variant of SPL and the score is higher when
+the displacement of obstacles can be captured immediately.          the agent accomplishes the task with less time.
+If the agent fails to move the obstacle out of the path af-
+ter several rounds of interaction, we add it to the occupancy       4.2. Implementation Details
+map mR  t so that FMM computes the infinity distance of that        Our method is implemented and evaluated with the Allen-
+obstacle area on mdis t , knowing it’s a dead end and would         Act [36] framework. The egocentric observation is set as
+choose another path toward the target.                              300*300 RGB and depth images. The size of affordance
+                                                                    map M is set as 400, the resolution is 0.05, thus a point on
+4. Experiments                                                      the map corresponds to a cell of 25cm2 and a step on the
+                                                                    map crosses gridm = 5 cells. A cell is determined as occu-
+4.1. Experiment Setup                                               pied with an obstacle when the sum of point clouds number
+Dataset settings. We evaluate InterNav in the simulator of          in this area exceeds 10. The hyper-parameters of ADIN α, β
+ProcTHOR [9], which supports various sensory signals and            are set as 5, 9 according to the ablation results. We obtain
+object interactions, and provides 12k flexible multi-room           the regions of interest bnt with a detection model Yolov7,
+scenes (1∼10+ rooms). In an episode, we randomly set the            which is COCO-pretrained and finetuned on 150k images
+starting and target points in different rooms and randomly          from our training set with 20 categories of obstacles (same
+spawn multiple obstacles across rooms. The dataset con-             as prior work [45]). The global feature ft∗ is the feature map
+sists of 450k training episodes (across 9k scenes), 5k valida-      extracted with the backbone of Yolov7 and the size of local
+tion episodes (across 100 scenes), and 100 testing episodes         feature ftn is set as 256×7×7. We avoid using the semantic
+(across 100 scenes). The static datasets for detection and af-      information from the detection results and train the affor-
+fordance prediction training are collected within the train-        dance functions with the experimental interaction results.
+ing set. To evaluate the ability of long-term planning and          The hidden size of the affordance functions is 256. All af-
+multiple interactions, we especially report the results on the      fordance functions are trained with the static dataset with
+hard split of the test set, which contains episodes collected       100k training samples for 20 epochs and we pick the model
+in the scenes with more than 4 rooms.                               based on the result on 10k validation samples. The model
+    Following the environmental setting of [45], we let             is trained with a batch size of 128 and the Adam optimizer
+MoveAhead move the agent ahead by grid = 0.25m,                     with a start learning rate of 1e-5.
+RotateRight and RotateLeft change the agent’s az-
+                                                                    4.3. Baselines
+imuth angle by ±90 degrees, LookUp and LookDown ro-
+tate the agent’s camera elevation angle by ±30 degrees. The         We compared our model with two learning-based models
+DirectionalPushs let the agent push (along ±z and ±x                (DD-PPO[38] and NIE[45]) and two map-based baselines.
+axis) the closest visible object with a constant force. The         Since InterNav has not been addressed with map-based
+Pick puts the object in an invisible pocket and is valid            method before, map-based baselines are set as several vari-
+when the pocket is empty. The Drop put the object in the            ants of our system and existing non-interactive model:
+pocket in front of the agent at a distance. The interactions        Map+RI: This model takes no affordance and tries random
+
+
+
+                                                                 16451
+                          all             hard
+Methods
+                  SR↑ FDT↓ SPL↑ STS↑ SR FDT SPL STS                                  PI
+                                                                                65
+
+DD-PPO [38]       38.3   5.31   23.0   13.1   21.3   8.68   11.3 6.35
+NIE [45]          50.0   4.50   29.1   14.4   37.3   7.38   20.5 8.72
+Map+RI            18.5   6.33   12.0   7.93   4.12   9.30   3.02 2.16                     NI
+ADIN+GP           41.2   5.18   21.8   13.1   25.9   8.22   13.1 6.42
+ADIN-discrete   54.3     3.85   27.3   14.2 40.2 6.29 20.4 9.04
+ADIN-continuous 59.0     3.46   31.3   16.6 46.1 5.52 23.6 11.3
+
+Table 1. Comparison with learning-based models and map-
+based baselines. We report the average performance of 3 tests.             Figure 4. Parameter ablations of TC, α, β. The SR perfor-
+                                                                           mances of PI (upper bound) and NI (upper bound) and the effective
+ Component ablation  all           hard                                    range between them are marked with the red gradient area.
+OA PA TC EA GT SR FDT SPL STS SR FDT SPL STS
+ ✓                   45.9   3.90   25.9 14.2 36.4    6.39   17.4 8.33      the ideal interaction situation under our system. The agent
+ ✓   ✓               49.0   3.78   27.4 14.9 35.9    6.08   18.9 8.17
+ ✓   ✓    ✓          55.0   3.40   30.1 15.7 42.0    5.49   20.4 9.19
+                                                                           removes the visible obstacle from the scene once it takes the
+ ✓   ✓    ✓   ✓      59.0   3.46   31.3 16.6 46.1    5.52   23.6 11.3      interaction. In this case, the planned paths are equivalent to
+ ✓   ✓    ✓   ✓   ✓ 61.2 3.37 32.3 17.2 48.3 5.40 27.7 12.1
+                                                                           the ones planned in open environments with few obstacles.
+                                                                           NI (lower bound): This model is equipped with no interac-
+Table 2. Model component ablations. OA: object affordance,                 tion capability that it regards all objects as non-interactive.
+PA: pose affordance, TC: time cost (k=5), EA: effect affordance            NI is different from Map+RI by removing the random in-
+(continuous variant), GT: ground truth object mask.                        teractions. In this case, the planned paths are equivalent to
+                                                                           the ones planned in cluttered environments with multiple
+interactions when getting stuck during navigation. The                     obstacles.
+policy plans paths seeing all objects on the map as non-                   ADIN w/k TC: This line of models quantize agent’s ”con-
+interactive and executes actions following the local policy                fidence” in interaction with k steps of time cost added to
+of [5].                                                                    the distance map mdis t . Instead of estimating the time cost
+ADIN+GP: Instead of directly setting the target point as                   on obstacles with effect affordance afte , the higher constant
+the goal of the policy, this model learns to plan subgoals                 value k uniformly increases the expected cost of interaction
+with a global policy like ObjectGoal navigation methods                    and reduces the interaction as a result.
+[5]. The global policy is trained with reinforcement learning
+(PPO) and the reward is set as the change of target distance.              4.5. Results Analysis
+The global policy is trained on the training set for 3 million             Comparison with baselines. As shown in Table 1,
+steps. We add the global policy to study whether the agent                 the proposed models gain the best performance on both
+can learn to plan which obstacles to interact with by setting              splits. ADIN-continuous outperforms the prior learning-
+subgoals.                                                                  based model NIE by 9.0% and 8.8% SR in the all and hard
+                                                                           split, respectively. The advantage on the hard split shows
+4.4. Ablations
+                                                                           that the explicit map memory helps long-term planning bet-
+We evaluate several variants of our model to study the fol-                ter compared to the implicit neural memory. Both variants
+lowing questions. First, we study the impact of model com-                 of ADIN outperform the map-based baseline Map+RI by
+ponents by ablating different affordance components (Table                 a large margin (+40.5%/+35.8% SR and +8.67%/+6.27%
+2) and hyper-parameters (Figure 4(b)(c)). Note that we ad-                 STS on the all split), showing the effectiveness of our mod-
+just the strategy of interaction policy accordingly since the              ular system that extends the map-based framework to the
+agent executes interactions based on the affordances. Sec-                 domain of interactive tasking. The gap between ADIN-
+ond, we alter agent’s interactive capability to study the per-             discrete and ADIN-continuous suggests that a fine estima-
+formance boundary of the modular system (PI, NI in Figure                  tion of interaction effect facilitates the path planning bet-
+4(a)), since the interaction may not bring the same outcome                ter. ADIN+GP gains poorer performance than ADIN, in-
+when transferring to the real world. Third, we also study                  dicating that planning interactions with subgoal is hard to
+the impact of agent’s ”confidence” in its capability (see Fig-             learn through RL and may result in ineffective navigation.
+ure 4(a)), namely how much obstacles affect path planning.                 ADIN’s advantage over RL-based methods on STS is less
+The more confident the agent is, the less likely it will take a            significant since they end the task actively before consum-
+longer path due to obstacles.                                              ing too much time.
+PI (upper bound): This model takes in the ground truth                     Ablation study. As shown in Table 2, each component
+affordances and performs perfect interactions, considering                 of the affordance map contributes to the efficacy of ADIN
+
+
+
+                                                                        16452
+                                    t=0                 t=15                   t=45               t=90                 t=105
+    Time line
+       Target
+
+
+
+    Visited paths                                                                                                                    ADIN
+
+
+
+                Egocentric view
+    Interactions
+
+
+
+
+                                                                                                                                     ADIN w\o EA
+    Pose & effect
+     affordance
+
+
+
+
+                                   t=25                 t=30                   t=75              t=100                 t=150
+
+
+Figure 5. Qualitative case of ADIN and ADIN without effect affordance. We present the RGB observation and the output affordance
+map of two models at several key steps (before or after interaction). For the above line, the pose and effect affordances are marked on the
+map, which affects agent’s path planning. The visited paths of agents are marked with lines on the map.
+
+
+    Methods                       ∆ BR    ISR    PuSR PiSR                is blocked initially and makes clear paths in the end. This
+                                                                          metric measures the effect of obstacle interaction on naviga-
+    DD-PPO [38]                   10.1    31.8   49.1    27.3             tion objective. (2) Overall (ISR) and separate (PuSR, PiSR)
+    NIE [45]                      19.3    47.9   51.1    47.4             success rates of interaction are the ratios of conducting valid
+    Map+RI                        6.7     12.6   14.7    6.52             interactions, which measure the accuracy of actions. The re-
+    Map+OA                        6.8     54.0   58.3    10.3             sults indicate that object affordance (line 4) and pose affor-
+    Map+OA+PA                     10.7    64.5   86.8    25.0             dance (line 5) effectively increase the interaction accuracy
+    ADIN-continuous               21.2    72.9   83.3    31.4             but benefit less for the navigation objective (i.e. clearing
+                                                                          the path) without the guidance of effect affordance (line 6).
+Table 3. Obstacle interaction results. ∆BR: decreased blocked             The performances of map-based models on PiSR are rela-
+ratio, ISR: interaction success rate, PuSR: push success rate, PiSR:
+                                                                          tively low since pickable objects are usually small and hard
+pick success rate
+                                                                          to recognize from a distance.
+                                                                          Case study. We visualize the paths and affordance maps
+progressively, including object affordance (how), pose af-                produced by ADIN with and without the help of effect af-
+fordance (when), time cost on the distance map, and effect                fordance in an episode (see Figure 5). Although ADIN w/o
+affordance (whether) concerning the process of interaction                EA may finally complete the task, it plans interactions with
+navigation. Note that the effect affordance is applied on top             over 5 obstacles and costs unnecessary effort, while ADIN
+of the time cost calculation on the distance map, and further             achieves a more efficient tour with 45 steps less and only 3
+considers the features of different obstacles.                            necessary interactions.
+    As shown in Figure 4(a), the performance of our inter-
+active modular system falls in the range between PI and NI                5. Conclusion
+(40%-65% SR) and it’s better when the ”confidence” TC                     We propose an effect-oriented affordance map for Inter-
+matches its real capability. Thus in our case, the agent’s ca-            active Navigation (InterNav). The insight is to model the
+pability is around TC=5, meaning it takes an average of 5                 interaction uncertainty with affordance and extend the
+steps to remove the obstacle off the path. The results of α, β            existing map-based framework into the domain of dynamic
+ablations (see Figure 4(b)(c)) indicates that a proper estima-            environments. We construct an interactive modular system
+tion of interaction effect leads to better path planning.                 consisting of a set of affordance functions, a mapping mod-
+Study of obstacle interaction. We evaluate the interac-                   ule, and an interactive policy. The system plans long-term
+tion outcome more directly with additional metrics in Table               paths considering the potential effect and effort of obstacle
+3, different from SR, SPL that assess the overall comple-                 interaction. Experiments in ProcTHOR verify the effec-
+tion of the task:(1) Ratio of episodes (∆BR) that the agent               tiveness of our approach in complex dynamic environments.
+
+
+
+                                                                       16453
+                                                                       navigation. In The Tenth International Conference on
+                                                                       Learning Representations, ICLR 2022, Virtual Event,
+References                                                             April 25-29, 2022. OpenReview.net, 2022. 3
+                                                                  [12] James J Gibson. The theory of affordances. Hilldale,
+ [1] Paola Ardón, Eric Pairet, Ronald PA Petrick, Subra-
+                                                                       USA, 1(2):67–82, 1977. 2
+     manian Ramamoorthy, and Katrin S Lohan. Learn-
+                                                                  [13] Wenlong Huang, Chen Wang, Ruohan Zhang, Yunzhu
+     ing grasp affordance reasoning through semantic rela-
+                                                                       Li, Jiajun Wu, and Li Fei-Fei. Voxposer: Composable
+     tions. IEEE Robotics and Automation Letters, 4(4):
+                                                                       3d value maps for robotic manipulation with language
+     4571–4578, 2019. 3
+                                                                       models. arXiv preprint arXiv:2307.05973, 2023. 3
+ [2] Dhruv Batra, Aaron Gokaslan, Aniruddha Kembhavi,
+                                                                  [14] Zhiwei Jia, Kaixiang Lin, Yizhou Zhao, Qiaozi Gao,
+     Oleksandr Maksymets, Roozbeh Mottaghi, Manolis
+                                                                       Govind Thattai, and Gaurav S Sukhatme. Learning
+     Savva, Alexander Toshev, and Erik Wijmans. Object-
+                                                                       to act with affordance-aware multimodal neural slam.
+     nav revisited: On evaluation of embodied agents nav-
+                                                                       In 2022 IEEE/RSJ International Conference on Intel-
+     igating to objects. arXiv preprint arXiv:2006.13171,
+                                                                       ligent Robots and Systems (IROS), pages 5877–5884.
+     2020. 2
+                                                                       IEEE, 2022. 3
+ [3] John Canny. The complexity of robot motion planning.         [15] Juntao Jian, Xiuping Liu, Manyi Li, Ruizhen Hu,
+     MIT press, 1988. 3                                                and Jian Liu. Affordpose: A large-scale dataset of
+ [4] Devendra Singh Chaplot, Dhiraj Gandhi, Saurabh                    hand-object interactions with affordance-driven hand
+     Gupta, Abhinav Gupta, and Ruslan Salakhutdinov.                   pose. In Proceedings of the IEEE/CVF International
+     Learning to explore using active neural slam. arXiv               Conference on Computer Vision, pages 14713–14724,
+     preprint arXiv:2004.05155, 2020. 1, 2, 3, 5                       2023. 3
+ [5] Devendra Singh Chaplot, Dhiraj Prakashchand                  [16] Lydia E Kavraki, Petr Svestka, J-C Latombe, and
+     Gandhi, Abhinav Gupta, and Russ R Salakhutdinov.                  Mark H Overmars. Probabilistic roadmaps for path
+     Object goal navigation using goal-oriented semantic               planning in high-dimensional configuration spaces.
+     exploration. Advances in Neural Information Pro-                  IEEE transactions on Robotics and Automation, 12
+     cessing Systems, 33:4247–4258, 2020. 1, 2, 3, 4, 5,               (4):566–580, 1996. 3
+     7                                                            [17] Eric Kolve, Roozbeh Mottaghi, Winson Han, Eli Van-
+ [6] Anthony Chemero. An outline of a theory of affor-                 derBilt, Luca Weihs, Alvaro Herrasti, Matt Deitke,
+     dances. In How Shall Affordances Be Refined?, pages               Kiana Ehsani, Daniel Gordon, Yuke Zhu, et al. Ai2-
+     181–195. Routledge, 2018. 3                                       thor: An interactive 3d environment for visual ai.
+ [7] Joya Chen, Difei Gao, Kevin Qinghong Lin, and                     arXiv preprint arXiv:1712.05474, 2017. 3
+     Mike Zheng Shou.         Affordance grounding from           [18] Yuanzhi Liang, Xiaohan Wang, Linchao Zhu, and Yi
+     demonstration video to target image. In Proceedings               Yang. Maal: Multimodality-aware autoencoder-based
+     of the IEEE/CVF Conference on Computer Vision and                 affordance learning for 3d articulated objects. In Pro-
+     Pattern Recognition, pages 6799–6808, 2023. 3                     ceedings of the IEEE/CVF International Conference
+ [8] Tao Chen, Saurabh Gupta, and Abhinav Gupta. Learn-                on Computer Vision, pages 217–227, 2023. 3
+     ing exploration policies for navigation. arXiv preprint      [19] Haokuan Luo, Albert Yue, Zhang-Wei Hong, and
+     arXiv:1903.01959, 2019. 1                                         Pulkit Agrawal. Stubborn: A strong baseline for in-
+ [9] Matt Deitke, Eli VanderBilt, Alvaro Herrasti, Luca                door object navigation. In IEEE/RSJ International
+     Weihs, Jordi Salvador, Kiana Ehsani, Winson Han,                  Conference on Intelligent Robots and Systems, IROS
+     Eric Kolve, Ali Farhadi, Aniruddha Kembhavi, et al.               2022, Kyoto, Japan, October 23-27, 2022, pages
+     Procthor: Large-scale embodied ai using procedural                3287–3293. IEEE, 2022. 3
+     generation. arXiv preprint arXiv:2206.06994, 2022.           [20] Lorenzo Mur-Labadia, Jose J Guerrero, and Ruben
+     2, 6                                                              Martinez-Cantin. Multi-label affordance mapping
+[10] Kiana Ehsani, Winson Han, Alvaro Herrasti, Eli Van-               from egocentric vision.       In Proceedings of the
+     derBilt, Luca Weihs, Eric Kolve, Aniruddha Kemb-                  IEEE/CVF International Conference on Computer Vi-
+     havi, and Roozbeh Mottaghi. Manipulathor: A frame-                sion, pages 5238–5249, 2023. 3
+     work for visual object manipulation. In Proceedings          [21] Tushar Nagarajan and Kristen Grauman. Learning af-
+     of the IEEE/CVF conference on computer vision and                 fordance landscapes for interaction exploration in 3d
+     pattern recognition, pages 4497–4506, 2021. 3                     environments. Advances in Neural Information Pro-
+[11] Georgios Georgakis, Bernadette Bucher, Karl                       cessing Systems, 33:2005–2015, 2020. 3
+     Schmeckpeper, Siddharth Singh, and Kostas Dani-              [22] Tushar Nagarajan, Christoph Feichtenhofer, and Kris-
+     ilidis. Learning to map for active semantic goal                  ten Grauman. Grounded human-object interaction
+
+
+
+                                                               16454
+     hotspots from video. In Proceedings of the IEEE/CVF               learning of action affordances as interaction modes.
+     International Conference on Computer Vision, pages                arXiv preprint arXiv:2305.17565, 2023. 3
+     8688–8697, 2019. 3                                           [34] Xiaohan Wang, Yuehu Liu, Xinhang Song, Beibei
+[23] Medhini Narasimhan, Erik Wijmans, Xinlei Chen,                    Wang, and Shuqiang Jiang. Camp: Causal multi-
+     Trevor Darrell, Dhruv Batra, Devi Parikh, and Aman-               policy planning for interactive navigation in multi-
+     preet Singh. Seeing the un-scene: Learning amodal se-             room scenes. Advances in Neural Information Pro-
+     mantic maps for room navigation. In Computer Vision               cessing Systems, 36, 2024. 2
+     - ECCV 2020 - 16th European Conference, Glasgow,             [35] Zihan Wang, Xiangyang Li, Jiahao Yang, Yeqi Liu,
+     UK, August 23-28, 2020, Proceedings, Part XVIII,                  and Shuqiang Jiang. Gridmm: Grid memory map for
+     pages 513–529. Springer, 2020. 3                                  vision-and-language navigation. In Proceedings of the
+[24] William Qi, Ravi Teja Mullapudi, Saurabh Gupta, and               IEEE/CVF International Conference on Computer Vi-
+     Deva Ramanan. Learning to move with affordance                    sion, pages 15625–15636, 2023. 3
+     maps. arXiv preprint arXiv:2001.02364, 2020. 3               [36] Luca Weihs, Jordi Salvador, Klemen Kotar, Unnat
+[25] Santhosh Kumar Ramakrishnan, Devendra Singh                       Jain, Kuo-Hao Zeng, Roozbeh Mottaghi, and Anirud-
+     Chaplot, Ziad Al-Halah, Jitendra Malik, and Kristen               dha Kembhavi. Allenact: A framework for embodied
+     Grauman. Poni: Potential functions for objectgoal                 ai research. arXiv preprint arXiv:2008.12760, 2020. 6
+     navigation with interaction-free learning. In Proceed-
+                                                                  [37] Luca Weihs, Matt Deitke, Aniruddha Kembhavi, and
+     ings of the IEEE/CVF Conference on Computer Vision
+                                                                       Roozbeh Mottaghi. Visual room rearrangement. In
+     and Pattern Recognition, pages 18890–18900, 2022.
+                                                                       Proceedings of the IEEE/CVF conference on com-
+     1, 2, 3, 4
+                                                                       puter vision and pattern recognition, pages 5922–
+[26] Erol Şahin, Maya Cakmak, Mehmet R Doğar, Emre
+                                                                       5931, 2021. 3
+     Uğur, and Göktürk Üçoluk. To afford or not to
+     afford: A new formalization of affordances toward            [38] Erik Wijmans, Abhishek Kadian, Ari Morcos, Ste-
+     affordance-based robot control. Adaptive Behavior,                fan Lee, Irfan Essa, Devi Parikh, Manolis Savva, and
+     15(4):447–472, 2007. 3                                            Dhruv Batra. Dd-ppo: Learning near-perfect point-
+                                                                       goal navigators from 2.5 billion frames. arXiv preprint
+[27] Nikolay Savinov, Anton Raichuk, Raphaël Marinier,
+                                                                       arXiv:1911.00357, 2019. 1, 2, 6, 7, 8
+     Damien Vincent, Marc Pollefeys, Timothy Lillicrap,
+     and Sylvain Gelly. Episodic curiosity through reacha-        [39] Mitchell Wortsman, Kiana Ehsani, Mohammad Raste-
+     bility. arXiv preprint arXiv:1810.02274, 2018. 1                  gari, Ali Farhadi, and Roozbeh Mottaghi. Learning to
+[28] Manolis Savva, Abhishek Kadian, Oleksandr                         learn how to learn: Self-adaptive visual navigation us-
+     Maksymets, Yili Zhao, Erik Wijmans, Bhavana Jain,                 ing meta-learning. In Proceedings of the IEEE/CVF
+     Julian Straub, Jia Liu, Vladlen Koltun, Jitendra Malik,           conference on computer vision and pattern recogni-
+     et al. Habitat: A platform for embodied ai research.              tion, pages 6750–6759, 2019. 2
+     In Proceedings of the IEEE/CVF International Con-            [40] Fei Xia, William B Shen, Chengshu Li, Priya Kasim-
+     ference on Computer Vision, pages 9339–9347, 2019.                beg, Micael Edmond Tchapmi, Alexander Toshev,
+     2                                                                 Roberto Martı́n-Martı́n, and Silvio Savarese. Interac-
+[29] James A Sethian. A fast marching level set method                 tive gibson benchmark: A benchmark for interactive
+     for monotonically advancing fronts. proceedings of                navigation in cluttered environments. IEEE Robotics
+     the National Academy of Sciences, 93(4):1591–1595,                and Automation Letters, 5(2):713–720, 2020. 1, 2
+     1996. 3                                                      [41] Danfei Xu, Ajay Mandlekar, Roberto Martı́n-Martı́n,
+[30] James A Sethian. Fast marching methods. SIAM re-                  Yuke Zhu, Silvio Savarese, and Li Fei-Fei. Deep affor-
+     view, 41(2):199–235, 1999. 5                                      dance foresight: Planning through what can be done in
+[31] Mark Steedman. Formalizing affordance. In Proceed-                the future. In 2021 IEEE International Conference on
+     ings of the Twenty-fourth Annual Conference of the                Robotics and Automation (ICRA), pages 6206–6213.
+     Cognitive Science Society, pages 834–839. Routledge,              IEEE, 2021. 3
+     2019. 3                                                      [42] Yuhang Yang, Wei Zhai, Hongchen Luo, Yang Cao,
+[32] Jiajin Tang, Ge Zheng, Jingyi Yu, and Sibei Yang.                 Jiebo Luo, and Zheng-Jun Zha. Grounding 3d ob-
+     Cotdet: Affordance knowledge prompting for task                   ject affordance from 2d interactions in images. arXiv
+     driven object detection.      In Proceedings of the               preprint arXiv:2303.10437, 2023. 3
+     IEEE/CVF International Conference on Computer Vi-            [43] Yufei Ye, Xueting Li, Abhinav Gupta, Shalini
+     sion, pages 3068–3078, 2023. 3                                    De Mello, Stan Birchfield, Jiaming Song, Shubham
+[33] Liquan Wang, Nikita Dvornik, Rafael Dubeau,                       Tulsiani, and Sifei Liu. Affordance diffusion: Synthe-
+     Mayank Mittal, and Animesh Garg. Self-supervised                  sizing hand-object interactions. In Proceedings of the
+
+
+
+                                                               16455
+     IEEE/CVF Conference on Computer Vision and Pat-
+     tern Recognition, pages 22479–22489, 2023. 3
+[44] Andy Zeng, Pete Florence, Jonathan Tompson, Stefan
+     Welker, Jonathan Chien, Maria Attarian, Travis Arm-
+     strong, Ivan Krasin, Dan Duong, Vikas Sindhwani,
+     et al. Transporter networks: Rearranging the visual
+     world for robotic manipulation. In Conference on
+     Robot Learning, pages 726–747. PMLR, 2021. 3
+[45] Kuo-Hao Zeng, Luca Weihs, Ali Farhadi, and
+     Roozbeh Mottaghi. Pushing it out of the way: In-
+     teractive visual navigation. In Proceedings of the
+     IEEE/CVF Conference on Computer Vision and Pat-
+     tern Recognition, pages 9868–9877, 2021. 1, 2, 6, 7,
+     8
+[46] Albert J. Zhai and Shenlong Wang. PEANUT: pre-
+     dicting and navigating to unseen targets. CoRR,
+     abs/2212.02497, 2022. 3
+[47] Jiazhao Zhang, Liu Dai, Fanpeng Meng, Qingnan Fan,
+     Xuelin Chen, Kai Xu, and He Wang. 3d-aware ob-
+     ject goal navigation via simultaneous exploration and
+     identification. In IEEE/CVF Conference on Computer
+     Vision and Pattern Recognition, CVPR 2023, Vancou-
+     ver, BC, Canada, June 17-24, 2023, pages 6672–6682.
+     IEEE, 2023. 3
+[48] Sixian Zhang, Weijie Li, Xinhang Song, Yubing Bai,
+     and Shuqiang Jiang. Generative meta-adversarial net-
+     work for unseen object navigation. In Computer Vi-
+     sion - ECCV 2022 - 17th European Conference, Tel
+     Aviv, Israel, October 23-27, 2022, Proceedings, Part
+     XXXIX, pages 301–320. 2
+[49] Sixian Zhang, Xinhang Song, Yubing Bai, Weijie
+     Li, Yakui Chu, and Shuqiang Jiang. Hierarchical
+     object-to-zone graph for object navigation. In 2021
+     IEEE/CVF International Conference on Computer Vi-
+     sion, ICCV 2021, Montreal, QC, Canada, October 10-
+     17, 2021, pages 15110–15120. IEEE, 2021. 2
+[50] Sixian Zhang, Xinhang Song, Weijie Li, Yubing Bai,
+     Xinyao Yu, and Shuqiang Jiang. Layout-based causal
+     inference for object navigation. In Proceedings of the
+     IEEE/CVF Conference on Computer Vision and Pat-
+     tern Recognition (CVPR), pages 10792–10802, 2023.
+     3
+
+
+
+
+                                                              16456
+

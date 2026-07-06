@@ -1,0 +1,792 @@
+                                                        QuantVLA: Scale-Calibrated Post-Training Quantization for
+                                                                               Vision-Language-Action Models
+
+                                                           Jingxuan Zhang1 ,* Yunta Hsieh2 ,* Zhongwei Wan1 , Haokun Lin3 ,
+                                                                    Xin Wang1 , Ziqi Wang1 , Yingtie Lei1 , Mi Zhang1†
+                                                   1
+                                                     The Ohio State University, 2 University of Michigan, 3 City University of Hong Kong
+                                                                                  mizhang.1@osu.edu
+
+
+
+
+arXiv:2602.20309v4 [cs.LG] 6 Apr 2026
+                                                                                 QuantVLA Homepage             Research Hub
+
+
+
+                                                                   Abstract                              1. Introduction
+                                        Vision-language-action (VLA) models unify perception, lan-           Vision-Language-Action (VLA) models [53] represent
+                                        guage, and control for embodied agents but face significant      an important step toward embodied multimodal intelli-
+                                                                                                         gence. They allow robots to parse visual observations to-
+                                        challenges in practical deployment due to rapidly increas-
+                                                                                                         gether with natural language instructions and to output ex-
+                                        ing compute and memory demands, especially as models
+                                        scale to longer horizons and larger backbones. To address        ecutable actions. Recent progress in large pretrained lan-
+                                        these bottlenecks, we introduce QuantVLA, a training-            guage models (LLMs) [36, 42], vision-language models
+                                        free post-training quantization (PTQ) framework that, to         (VLMs) [3, 15], and Diffusion Transformer (DiT) archi-
+                                        our knowledge, is the first PTQ approach for VLA sys-            tecture [22, 28] has turned VLA systems into a unified in-
+                                                                                                         terface that connects perception, high-level reasoning, and
+                                        tems and the first to successfully quantize a diffusion trans-
+                                                                                                         low-level control. Building on these backbones, systems
+                                        former (DiT) action head. QuantVLA incorporates three
+                                        scale-calibrated components: (1) a selective quantization        such as π0.5 [12], OpenVLA [14], and GR00T N1.5 [4]
+                                        layout that integerizes all linear layers in both the lan-       achieve strong performance in robotic manipulation and
+                                        guage backbone and the DiT while keeping attention pro-          reasoning tasks by integrating visual understanding, lan-
+                                                                                                         guage understanding, and action generation within a sin-
+                                        jections in floating point to preserve the original operator
+                                                                                                         gle policy. As embodied models grow toward foundation
+                                        schedule; (2) attention temperature matching, a lightweight
+                                        per-head scaling mechanism that stabilizes attention log-        scale, improving their computational efficiency becomes
+                                        its and is folded into the dequantization scales at infer-       critical for deployment on robotic platforms with limited
+                                        ence; and (3) output head balancing, a per-layer residual        compute and memory while operating under strict compute
+                                        interface calibration that mitigates post-projection energy      and memory constraints.
+                                                                                                             However, the large model size and complex cross-modal
+                                        drift. The framework requires no additional training, uses
+                                                                                                         dependencies in current VLA architectures introduce sig-
+                                        only a small unlabeled calibration buffer, and supports in-
+                                        teger kernels for low-bit weights and activations while leav-    nificant computational and memory overhead. Profiling
+                                        ing the architecture unchanged. Across representative VLA        studies reveal that a substantial portion of computational
+                                        models on LIBERO, QuantVLA exceeds the task success              overhead arises not from visual perception but from down-
+                                        rates of full-precision baselines, achieves about 70% rela-      stream reasoning and control [45], where the hidden states
+                                                                                                         exhibit high-dimensional structure and sequential decod-
+                                        tive memory savings on the quantized components, provid-
+                                                                                                         ing introduces substantial computational and memory over-
+                                        ing a practical pathway toward scalable low-bit embodied
+                                        intelligence under strict compute, memory, and power con-        head. This efficiency bottleneck hinders the broader adop-
+                                        straints.                                                        tion of pretrained VLA models in embedded and mobile-
+                                                                                                         robotic environments.
+                                                                                                             Existing work on improving the efficiency of VLA sys-
+                                                                                                         tems can be roughly grouped into two families: methods
+                                                                                                         that design more efficient VLA models [33, 38, 48] and
+                                                                                                         methods that build efficiency frameworks around existing
+                                          * Equal contribution
+                                          † Corresponding author                                         policies [41, 45]. However, these optimizations act pri-
+                               Language                               Action
+Method                                                                                                  Vision            Quantization   Training-Free
+                   Attention              MLP              Attention            MLP
+
+TinyVLA      Compact Transformer    Compact Transformer      Compact DP       Compact DP
+
+EfficientVLA Layer drop/pruning       Layer pruning         Feature cache    Feature cache      Token reuse + feature cache
+
+VLA-Cache                                                                                  KV reuse for static vision tokens
+
+MoLe-VLA         Dynamic routing     Dynamic routing
+
+QuantVLA         Full linear Attn    Full linear MLP      Full linear Attn   Full linear MLP      Keep vision frozen           PTQ
+
+
+
+
+Figure 1. Comparison of representative VLA efficiency frameworks. (1) TinyVLA focuses on compact multimodal transformers and lightweight
+diffusion-policy heads for architectural efficiency; (2) EfficientVLA accelerates inference by pruning redundant language layers and reusing intermediate
+representations; (3) VLA-Cache improves throughput through key–value reuse and static caching of vision tokens; (4) MoLe-VLA adopts mixture-of-layers
+routing to dynamically skip computation in the language module; and (5) QuantVLA introduces a training-free PTQ framework that low-bit quantizes both
+language and action modules without altering the model architecture.
+
+
+
+marily on the vision encoder and do not directly address                                                                                                 showing that quantization-induced scale drift changes the
+the efficiency or robustness of the language backbone and                                                                                                effective logits temperature and the residual stream energy,
+the diffusion-based policy head [7, 24]. In practice, the                                                                                                which explains its strong sensitivity to activation changes
+DiT action head is a major contributor to computation and                                                                                                and precision loss. Guided by this analysis, QuantVLA per-
+memory and is tightly coupled to the language backbone,                                                                                                  forms selective post-training quantization over the language
+so its behavior strongly affects performance. Yet existing                                                                                               and action pathways and introduces two lightweight calibra-
+efficiency frameworks typically leave this component un-                                                                                                 tion mechanisms that restore the key scales after quantiza-
+changed, in part because it is tightly coupled to upstream                                                                                               tion. The resulting design led QuantVLA to achieve about
+reasoning and difficult to modify without degrading stabil-                                                                                              70% relative memory savings on the quantized modules,
+ity, and instead focus on the visual front end, which means                                                                                              while even exceeding the LIBERO [23] task success rates
+that the main opportunities for reducing the cost of rea-                                                                                                of the full precision baseline as shown in the middle and
+soning and action generation remain underexploited. Be-                                                                                                  right panel of Fig. 1. In conclusion, our main contributions
+sides, post-training quantization (PTQ) [25] methods such                                                                                                are summarized as follows:
+as SmoothQuant [40] and DuQuant [18] demonstrate that                                                                                                    1. We provide the first systematic analysis of quantization
+careful precision allocation can reduce memory use and im-                                                                                                  sensitivity in VLA models with DiT action heads, iden-
+prove efficiency, but they are primarily developed for large                                                                                                tifying key failure modes that explain the breakdown of
+language or vision language models and do not capture the                                                                                                   PTQ.
+heterogeneous activation and precision behaviors of down-                                                                                                2. We propose QuantVLA, the first rotation-based,
+stream reasoning and action modules in VLA systems. To                                                                                                      training-free PTQ framework for VLA models, achiev-
+provide a clearer overview of these acceleration paradigms,                                                                                                 ing state-of-the-art performance under low-precision in-
+Fig. 1 summarizes representative VLA frameworks across                                                                                                      ference while enabling substantial memory savings un-
+language, action, and vision components.                                                                                                                    der low-precision deployment.
+    As shown in Fig. 1, most existing efficient VLA models
+or methods either redesign transformer and diffusion blocks                                                                                              2. Related Work
+or add routing and caching around an unchanged policy,
+while almost none operate directly on the DiT action head                                                                                                2.1. Vision-Language-Action Models
+or treat precision allocation as a primary design choice. In                                                                                                VLA models unify perception, reasoning, and control
+particular, current frameworks keep the policy head in full                                                                                              within a single multimodal policy. Existing systems can
+precision and focus on the visual front end. This leaves an                                                                                              be grouped into several categories described below. En-
+important opportunity unused: if one can apply PTQ to the                                                                                                coder–decoder approaches such as ALOHA and ACT [51],
+highly sensitive DiT head without degrading performance,                                                                                                 RT-1 [6], and HPT [37] train Transformer networks from
+PTQ becomes a powerful tool for VLA models, since it                                                                                                     scratch to map visual observations and robot states to ac-
+can substantially reduce memory and bandwidth without                                                                                                    tions, achieving high accuracy but limited generalization.
+retraining, which is especially valuable for large VLA poli-                                                                                             Pretrained language or vision language models such as RT-
+cies that couple a language backbone with a diffusion policy                                                                                             2 [56] and OpenVLA [14] represent actions as autoregres-
+head.                                                                                                                                                    sive tokens, which enables open vocabulary reasoning but
+    Therefore, to address these gaps, we introduce                                                                                                       weakens temporal smoothness. Diffusion-based policies
+QuantVLA, a scale-calibrated PTQ framework specifically                                                                                                  address this limitation by generating continuous trajectories
+designed for VLA models. We first analyze why the DiT-                                                                                                   through multimodal denoising. Diffusion Policy [7] intro-
+based action head is fragile under upstream quantization,                                                                                                duced this framework for smooth motion generation, and
+RDT-1B [24] scaled it to large diffusion transformers that     across frames and reusing cached key–value features dur-
+transfer across skills. Video-driven and inverse kinematics    ing rollouts. MoLe-VLA [48] further introduces mixture-
+models such as UniPi [9] and RoboDreamer [55] use predic-      of-layers routing to dynamically skip non-essential compu-
+tive imagination to guide control through simulated motion,    tation in the language backbone.
+which improves interpretability and scalability.                   These methods improve runtime efficiency through prun-
+    Besides, hybrid architectures that combine language rea-   ing, routing, or caching mechanisms while keeping numer-
+soning and diffusion-based control have recently become        ical precision unchanged. QuantVLA differs by directly
+dominant [13]. OPENPI π0 [5] and OPENPI π0.5 [12]              operating on numerical precision and post-training deploy-
+unify vision and language inputs within a single diffusion     ment efficiency, and by quantizing both the language back-
+transformer DiT [28], which tightly couples semantic rea-      bone and the diffusion-based action head without modify-
+soning and low level actuation, while GR00T N1.5 [4] ex-       ing execution order or introducing additional routing logic.
+tends this paradigm through a dual system design where a       Besides, recent work also explores efficient tokenization
+vision–language interpreter grounds semantics and a DiT        and action discretization for VLAs, such as FAST [29],
+trained with flow matching [22] objectives generates precise   BEAST [54], and OmniSAT [2], which reduce sequence
+humanoid motion. These hybrid language and diffusion-          length or improve token utilization. These approaches op-
+based architectures point toward scalable and semantically     erate at the representation level and are complementary to
+grounded embodied intelligence. As VLA models scale to         QuantVLA, which focuses on numerical precision and post-
+longer horizons and larger backbones, deployment becomes       training deployment efficiency.
+increasingly constrained by the downstream reasoning and
+action-generation stack, where the language backbone and       2.4. Post-Training Quantization
+diffusion-based policy head often dominate compute and
+memory.                                                            Post-training quantization (PTQ) has been extensively
+                                                               studied as an effective approach to reduce memory usage
+2.2. Efficient and Compact VLA Models                          for pre-trained models [19, 43, 44]. The basic RTN quan-
+                                                               tization formulation is summarized in Appendix A, from
+Recent work has explored efficient and compact vision-         Eq. 18 to Eq. 21. PTQ methods can be broadly cate-
+language-action (VLA) models that reduce deployment cost       gorized into weight-only quantization [8, 10, 21, 46] and
+by designing lightweight architectures, smaller backbones,     weight–activation quantization [20, 31, 39, 50]. Our work
+or specialized inference pipelines. TinyVLA [38] builds        focuses on the latter, specifically on exploring ultra low-bit
+compact multimodal transformers with lightweight diffu-        weight–activation quantization. For large language models
+sion policy heads to achieve faster inference and improved     (LLMs), SmoothQuant [40] performs channel-wise rescal-
+data efficiency. SmolVLA [33] targets affordable robotics      ing of activations and weights to smooth out outliers and
+by adopting a small VLA architecture together with an          stabilize low-bit inference in transformer layers. Rotation-
+asynchronous inference stack to keep control latency low.      based approaches [1, 11, 18, 35] further utilize orthogo-
+FLOWER [30] and X-VLA [52] further explore architec-           nal transformations to distribute outliers across activation
+tural simplification and alternative action formulations to    matrices. DuQuant [18] applies dual-path transformations
+improve efficiency at reduced model scales.                    that combine block-orthogonal rotations with per-channel
+   These approaches achieve efficiency primarily through       smoothing, effectively redistributing outliers and improv-
+new model designs and training pipelines. In contrast,         ing robustness under low-bit precision. For diffusion trans-
+QuantVLA is a post-training quantization framework that        formers (DiTs), SVDQuant [16] protects activation outliers
+preserves the original architecture and training procedure.    by introducing low-rank residual branches, while ViDiT-
+As a result, it is orthogonal to compact VLA design and,       Q [49] employs fine-grained grouping and dynamic quan-
+in principle, can be composed with both large foundation       tization to better adapt to activation statistics. However,
+VLAs and smaller efficient VLA variants as a post-training     directly applying these methods to VLA models remains
+deployment step.                                               challenging. VLA pipelines tightly couple multimodal rea-
+                                                               soning with diffusion-based action generation within a sin-
+2.3. Efficiency Frameworks for Pretrained VLAs                 gle policy network. Scale drift across modalities and along
+Another line of work improves the efficiency of pretrained     the diffusion rollout violates the assumptions underlying ex-
+VLA models by optimizing the inference framework with-         isting PTQ techniques. In particular, quantization-induced
+out redesigning the underlying policy. EfficientVLA [45]       scale mismatch can distort the effective attention-logits tem-
+accelerates inference by pruning redundant language lay-       perature and the residual-stream energy in diffusion-policy
+ers, selecting compact visual tokens, and reusing interme-     heads, which makes stable low-bit control substantially
+diate representations. VLA-Cache [41] reduces computa-         harder than unimodal transformers. A key open problem
+tional overhead by detecting unchanged visual observations     is how to design quantization schemes that remain stable
+under such tight multimodal–diffusion coupling while still          quantizing the upstream language backbone perturbs inter-
+achieving low-bit efficiency for VLA control.                       mediate representations that condition the DiT action pol-
+                                                                    icy, and the perturbation propagates downstream as input
+3. Method                                                           drift. Second, the DiT head must emit precise action to-
+                                                                    kens for real robots, which means small rounding and scale
+3.1. Preliminaries on Diffusion-based VLA Models                    mismatches will translate into control errors.
+    We study Vision–Language–Action (VLA) systems                       As clarified in Appendix C, dequantization scales control
+whose action head is a Diffusion Transformer (DiT) [28,             two deterministic factors in DiT, which are the effective log-
+32]. At each control step, a short history of RGB frames            its temperature through sq sk and the residual stream energy
+is embedded via a pretrained vision encoder, such as                through sv so . It explains how logits and energy transfer
+SigLIP2 [47] or DINOv2 [27], to produce image tokens.               from the language backbone to DiT when no perturbation
+Concurrently, the natural language instruction is tokenized         is present. Building on this baseline, we now analyze how
+and embedded by a pretrained language backbone. The vi-             quantization errors propagate and accumulate.
+sual and textual tokens are projected into a shared trans-              Building on the deterministic transfer in Appendix C, we
+former space, where attention merges perception with the            now develop a first-order analysis of error propagation to
+instruction context to form a task-conditioned representa-          show that the distribution reaching attention is perturbed
+tion FVL .                                                          when DuQuant is applied to the upstream language back-
+    The policy head, a Diffusion Transformer, is condi-             bone and the DiT feed-forward blocks. Let XT denote the
+tioned on FVL , on robot proprioception, and on a diffusion         teacher input and let XQ = XT + εup denote the input un-
+timestep t. It iteratively updates an action latent according       der quantization. Even if the attention weights remain in
+to:                                                                floating point, this perturbation propagates linearly.
+                   xt−1 = fθ xt , FVL , t .               (1)
+                                                                                  QQ = XQ Wq = QT + εup Wq ,
+After T refinement steps, the final latent x0 is decoded into                                                                 (2)
+                                                                                  KQ = XQ Wk = KT + εup Wk .
+the action. For tokenized policies, the output is a sequence
+of discrete action tokens. In this formulation, the diffu-          Define the pre-softmax logits L:
+sion transformer denotes the architecture of the policy head.                                                      ⊤
+                                                                                       QT KT⊤                 QQ KQ
+Flow matching [22] denotes the learning objective used to                      LT =     √ ,            LQ =    √ ,            (3)
+fit fθ and views the same iterative refinement as a condi-                                d                      d
+tional ordinary differential equation (ODE) [34] that trains        and let ∆L = LQ − LT . Keeping only first-order terms
+the network to predict a velocity field transporting xt toward      yields
+executable actions.
+                                                                             1                         
+                                                                     ∆L ≈ √ (εup Wq )KT⊤ + QT (εup Wk )⊤ + ∆Llocal , (4)
+3.2. Post-Training Quantization Setup and Emer-                               d
+      gent DiT Sensitivity                                          where ∆Llocal aggregates local rounding and scale mis-
+3.2.1. DuQuant Reparameterization.                                  match from the quantized activations that feed Q and K
+    Among PTQ variants, DuQuant [18] is empirically the             from the output projection. Let A = softmax(L) and let
+most stable under aggressive bit widths for transformer             Jsoftmax (·) denote its Jacobian. The attention update satis-
+stacks. It does so via an invertible reparameterization of          fies
+each linear layer that (i) applies per-channel smoothing with                       AQ ≈ AT + Jsoftmax (LT ) ∆L.             (5)
+a diagonal matrix Λ, (ii) performs block-orthogonal rota-           Now include the output head. Write the value path and the
+tions R̂(1) , R̂(2) , and (iii) inserts a zigzag channel permuta-   quantized output projection as
+tion to redistribute outliers, which preserves the original lin-
+ear map and makes activations and weights more amenable                         VQ = XQ Wv = VT + εup Wv .                    (6)
+to low-bit quantization. Inspired by these robustness and           The teacher and quantized outputs are
+outlier-redistribution properties, we adopt a similar repa-
+rameterization for linear layers in VLA models to improve              OT = AT VT Wo,T ,              OQ = AQ VQ Wo,Q .       (7)
+stability under quantization. Additional implementation de-
+                                                                    A first-order expansion around the teacher gives
+tails are provided in the Appendix B.
+3.2.2. Challenges in Implementing Quantization for VLA                         ∆O ≈ Jsoftmax ( LT )∆L VT Wo,T
+   While the reparameterization in the previous subsection                              + AT εup Wv Wo,T
+                                                                                                                              (8)
+improves low-bit robustness at the layer level, deploying it                            + AT VT δWo
+to tightly coupled VLM stacks exposes two issues. First,                                + ∆Olocal .
+                        Image:                                                                                                                                  Baseline(FP16)
+
+
+
+                                                                                                                                              Teacher Model
+ Multimodal Input
+                                                                                                                                                                      Attention                                             L=
+                                                                                                                                                                                                                                                                                                   Action Decoder
+                                                                                                                                                              Query    Key     Value    Output                             Y=softmax(L)·V                                                          AT0, AT1, ... ... ,ATN
+
+                                                                                                                                                                                                                           Z=Concat({Y})·W o
+                          Text:
+
+                    Open the drawer put                 Vision Tokens
+                     the bottle inside.
+                                              Vision Encoder
+                                                                                                                                      Std(logits_teacher)
+                                                                                                                                     Std(logits_Quantized) =             α RMS
+                                                                                                                                                                            RMS             (Z_teacher)
+                                                                                                                                                                                          (Z_Quantized)
+                                                                                                                                                                                                             =   β                                                                                      Move          Rotate
+
+
+                        Quant Full Linear Layers                                                                                                     Selective Quantization with ATM and OHB                                                                                                           Action
+        Grasp
+                        Attention                                        MLP                                                                                          Attention                                                                     MLP
+
+
+
+
+                                                                                                                   Quantized Model
+                                              Linear Layers(fc1)   Linear Layers(fc2)         Linear Layers(fcn)                                                                                                             Linear Layers(fc1)   Linear Layers(fc2)         Linear Layers(fcn)
+            Query                    Output                                                                                                                                                      Output           Output
+                                                                                                                                                                                                                                                                                                  0.             1.
+                             Value                                                                                                    Query                           Query            Value
+                                                                                        ...                                                                                                                                                                            ...
+                       Key                                                                                                                    Key             *α              Key                         *β
+                                                                                                                                                              Scale                                       Scale
+
+                                                                                                                                                                                                                                                                                                  2.             3.
+
+
+
+
+                       Large Language Model                                                                                                                                   DIT Action Head                                                                                                      Action Output
+
+Figure 2. Overview of QuantVLA for VLAs with a DiT-based action head. The framework is training-free and preserves the original
+architecture and operator schedule. It combines: (1) a selective quantization layout that integerizes all linear layers in the LLM and all
+MLP layers in the DiT while keeping the attention projections Q, K, V , O in floating point; (2) Attention Temperature Matching (ATM),
+a per-head scalar α that aligns teacher–student logits and is folded into dequantization scales; and (3) Output Head Balancing (OHB), a
+per-layer scalar β that matches post-projection energy at the residual interface.
+
+
+   According to Eq. 8, quantization in DiT introduces two                                                                                                                           ing point to avoid amplifying the two drifts identified in
+systematic drifts. First, variance changes in Q and K alter                                                                                                                         Sec. 3.2.2 since they are most sensitive to upstream dis-
+the scale of attention logits, which shifts the effective tem-                                                                                                                      tribution shifts and directly determine the stability of the
+perature of the softmax and moves attention entropy away                                                                                                                            softmax distribution and the residual injection. This lay-
+from the teacher distribution. This temperature bias does                                                                                                                           out mitigates the dominant sources of drift in DiT under
+not vanish within a single layer. It is carried forward by                                                                                                                          low bit widths. However, integerizing the upstream LLM
+the attention outputs and persists across layers. Second, af-                                                                                                                       can still bias the statistics that reach the DiT head. To
+ter multiple head concatenation and the output projection,                                                                                                                          compensate for this cross-module drift in VLA pipelines,
+the amplitude of the attention output exhibits a systematic                                                                                                                         we introduce two lightweight calibrations, Attention Tem-
+change. This modifies the residual injection gain and the                                                                                                                           perature Matching (ATM) and Output Head Balancing
+operating point of layer normalization. In deep DiT stacks,                                                                                                                         (OHB), as shown in Fig. 2. Both are estimated from an
+these two drifts accumulate through residual connections                                                                                                                            unlabeled calibration buffer and folded into the dequantiza-
+and normalization, which degrades stability and overall per-                                                                                                                        tion scales, so the operator schedule and integer GEMMs
+formance.                                                                                                                                                                           remain unchanged. In QuantVLA, ATM and OHB are in-
+                                                                                                                                                                                    stantiated specifically at the language–to–action interface of
+3.3. QuantVLA Framework                                                                                                                                                             VLA pipelines, where quantized language features condi-
+   In this section, we present QuantVLA, a training-free                                                                                                                            tion the DiT head and induce the strongest scale drift. ATM
+and deployment-oriented framework that preserves the orig-                                                                                                                          uses per-head temperature scalars to align the logits distri-
+inal model architecture and operator schedule while ad-                                                                                                                             bution through Q and K, preventing attention from becom-
+dressing the two dominant sensitivity factors identified in                                                                                                                         ing overly sharp or overly flat under upstream VLA quanti-
+Sec. 3.2.2. As shown in Fig. 2, QuantVLA integrates a                                                                                                                               zation. OHB uses per-layer output scalars to align the post-
+selective quantization layout with two lightweight calibra-                                                                                                                         projection energy through Wo , restoring the residual injec-
+tion mechanisms. As noted above, quantizing every linear                                                                                                                            tion gain and the operating point of layer normalization in
+layer in the LLM and the DiT head causes errors to accu-                                                                                                                            the DiT head.
+mulate along the attention and residual pathways. Guided                                                                                                                                Specifically, we calibrate ATM by matching the disper-
+by this analysis, we integerize all linear layers in the LLM                                                                                                                        sion of the teacher and quantized logits L defined in Eq. 3.
+and adopt a selective DiT quantization layout, while keep-                                                                                                                          We estimate a scalar α from a small unlabeled calibration
+ing the attention projections Wq , Wk , Wv , and Wo in float-                                                                                                                       buffer and apply it at inference time as follows
+                                                                  and folded into existing dequantization scales. They intro-
+                          Std(LT )                                duce no new operators or activations, require no additional
+                αraw =                 .                   (9)
+                       Std(LQ ) + 10−6                            buffers, preserve the original operator schedule and integer
+We then confine the correction to a safe range to avoid over-     GEMMs, and therefore incur no additional GEMM compu-
+cooling or over-heating the attention distribution                tation during inference. The only overhead is scalar folding
+                                                                  performed once during calibration. Based on these steps,
+                                                                  we stabilize the DiT action head under low bit widths with-
+                                             
+              α = clip αraw , αmin , αmax .              (10)
+                                                                  out retraining.
+Next, we apply a neutrality band ε to ignore negligible dif-
+ferences and reduce sensitivity to calibration noise              4. Experiment
+                 if log α < ε then α = 1.                 (11)    4.1. Experimental Settings
+                                                                  Model and Benchmark. We evaluate on two state-of-the-
+Therefore, the quantized logits become                            art VLA policies, OpenPI π0.5 [12] and GR00T N1.5 [4],
+                                 LT                               both employing a DiT-based action head that maps fused
+                        LQ =        .                     (12)    visual–language features to action sequences. The mod-
+                                 α
+                                                                  els span complementary regimes, where π0.5 prioritizes ef-
+We next match the post-projection energy at the residual          ficient inference and GR00T N1.5 offers higher capacity
+interface to stabilize the residual injection gain and the op-    and richer action modeling, and this breadth enables a ro-
+erating point of layer normalization. The activation of the       bust assessment across different coupling strengths between
+output head at the layer l is                                     perception and control. Evaluation uses the LIBERO [23]
+                                                                  simulator with four task suites that target distinct capabil-
+          Zl = Concat{Al,h Vl,h } Wo,l + bo,l .           (13)    ities: Spatial tests relational reasoning and precise place-
+                                                                  ment, Object focuses on object-centric grasping and manip-
+We measure per-layer energy using RMS for the teacher and         ulation, Goal measures instruction-to-goal alignment and
+the quantized, and directly form a teacher-to-student ratio       condition satisfaction, and Long examines temporal decom-
+                                                                 position and control of accumulated error. We report the
+                               RMS ZT,l
+             βraw (l) =                                (14)      success rate under the standard LIBERO protocol to ensure
+                          RMS ZQ,l + 10−6                         fair comparison and reproducibility.
+Similarly to ATM, we confine this factor to a safe range and
+apply a neutrality band                                           Implementation Details. We adopt our method with a
+                                                                 W4A8 setting. Scales are estimated from a small unlabeled
+            β(l) = clip βraw (l), βmin , βmax ,         (15)      calibration buffer and folded into dequantization at infer-
+                                                                  ence. For stability matching, the α of ATM and β of OHB
+              if log β(l) < ε then β(l) = 1.              (16)    are clipped to a safe range of ±0.4 before being folded into
+                                                                  the scales and using a neutrality band ε of 0.03. All experi-
+Finally, we rescale the activation of the output head that        ments are conducted on NVIDIA A100 GPUs. More details
+enters the residual path                                          are shown in Appendix D
+                                  Zl
+                        ZQ =          .                   (17)    4.2. Empirical Validation of the Selective Quantiza-
+                                 β(l)                                   tion Layout
+   Building on these techniques, QuantVLA combines a                 As established in Sec. 3.2.2, quantization errors intro-
+flexible selection of quantized linear layers to counter the      duced by the upstream language backbone perturb the at-
+sensitivities identified in Sec. 3.2.2. By integerizing all       tention temperature and the residual energy in the DiT ac-
+linear layers in the LLM and adopting a selective quanti-         tion head, which renders the attention projections and the
+zation layout in the DiT while keeping the attention pro-         residual interface particularly sensitive. To limit this cross-
+jections in floating point, we avoid compounding errors at        module drift, we compare several layer selection schemes
+the most fragile interfaces. Furthermore, ATM aligns the          that quantize the LLM only, the action head only, both
+teacher and student logits statistics to correct attention tem-   modules in full, or the LLM together with the DiT MLP.
+perature drift, whereas OHB restores the residual injection       We evaluate these alternatives on OpenPI π0.5 and GR00T
+gain by matching the output head energy. Crucially, ATM           N1.5 within LIBERO, and we isolate the effect of layer
+and OHB are realized as tiny per-head and per-layer scalars       choice by disabling ATM and OHB in this ablation so that
+that are estimated once from an unlabeled calibration buffer      we observe the pure quantization outcome. The results in
+                                                                                           LIBERO                           Memory (GB)
+  Model           Precision     Layer Selection      Layer Nums
+                                                                      Spatial     Object     Goal       Long      Avg.       (LLM+DiT)
+                    FP16        No Quantization            0           98.5%      99.0%      97.5%     93.5%      97.1%          4.27
+                    W4A8        LLM                       126          98.0%      98.5%      97.5%     92.0%      96.5%          1.58
+  π0.5              W4A8        DiT                       126          81.5%      94.5%      71.5%     39.0%      71.6%          3.85
+                    W4A8        LLM+DiT                   252          86.0%      97.5%      71.5%     50.0%      76.3%          1.17
+                    W4A8        LLM+DiT (MLP)             180          98.0%      97.0%      94.5%     92.0%      95.4%          1.28
+                    FP16        No Quantization             0          92.0%      92.0%      86.0%     76.0%      86.5%          2.02
+                    W4A8        LLM                        84          86.0%      92.0%      80.0%     80.0%      84.5%          1.25
+  GR00T N1.5        W4A8        DiT                        96          88.0%      80.0%      86.0%     78.0%      83.0%          1.49
+                    W4A8        LLM+DiT                   180          66.0%      70.0%      68.0%     76.0%      70.0%          0.74
+                    W4A8        LLM+DiT (MLP)             116          90.0%      86.0%      80.0%     74.0%      82.5%          0.91
+
+Table 1. Selective layer-quantization results under the QuantVLA architecture without ATM/OHB calibration for π0.5 and GR00T N1.5
+on LIBERO.
+
+
+
+
+Figure 3. ATM and OHB effects across attention blocks. (Left) shows logits standard deviation. (Right) shows attention output RMS
+after the output projection. The figure reports three configurations: the teacher model in floating point without quantization, the quantized
+baseline with LLM and DiT MLP integerized, and QuantVLA with ATM in the left panel or QuantVLA with OHB in the right panel,
+which are evaluated on the GR00T N1.5 model.
+
+
+Table 1 show a consistent pattern across models and suites,              quantization are corrected. In the right panel, OHB aligns
+as quantizing the entire action head or the full stack leads             the attention output RMS after the output projection with
+to the largest degradation, most notably in the long-horizon             the teacher, which mitigates residual-stream energy drift
+task, whereas quantizing the LLM together with the DiT                   and stabilizes the downstream residual path. Across blocks,
+MLP remains closest to the baseline while retaining the                  the calibrated curves consistently narrow the gap to the
+memory benefits of integer computation counted over the                  teacher, especially in deeper layers, confirming that ATM
+LLM and DiT components, which aligns with our theoret-                   corrects logits statistics and OHB corrects output energy.
+ical analysis in Sec. 3.2.2. Consequently, we fix the layer              We therefore include both components in all subsequent ex-
+selection to all linear layers in the LLM and the MLP blocks             periments.
+in the DiT while leaving Q, K, V , and O in floating point
+for all subsequent experiments.                                          4.4. QuantVLA Results in LIBERO Simulation
+                                                                         Main Results on LIBERO. Table 2 reports the perfor-
+4.3. Effect of ATM and OHB Calibration                                   mance of different quantization techniques on OpenPI π0.5
+   In this section, we empirically verify that ATM and OHB               and GR00T N1.5 within the LIBERO simulator. We com-
+restore logits statistics and output energy. Fig. 3 evalu-               pare two representative approaches: DuQuant and the pro-
+ates three configurations on GR00T N1.5: the floating-point              posed QuantVLA framework. DuQuant can be successfully
+teacher, QuantVLA without ATM and OHB calibration, and                   applied to both the LLM and the DiT, but its task accu-
+QuantVLA with ATM in the left panel or with OHB in                       racy drops significantly under this configuration, for exam-
+the right panel. In the left panel, ATM reduces the mis-                 ple, on π0.5 the average success rate falls to 76.3%, and
+match in logits Std and moves each attention block toward                on GR00T N1.5 it reaches 70%. These outcomes suggest
+the teacher, which shows that temperature shifts caused by               that methods designed for unimodal or loosely coupled set-
+                                                                  LIBERO                              Memory (GB)        Relative
+   Model                        Precision
+                                              Spatial    Object      Goal      Long        Avg.       (LLM+DiT)          Savings
+   π0.5                           FP16        98.5%      99.0%      97.5%      93.5%      97.1%           4.27             0.0%
+     +DuQuant(LLM+DiT)            W4A8        86.0%      97.5%      71.5%      50.0%      76.3%           1.17            72.6%
+     +QuantVLA(LLM)               W4A8        98.5%      99.0%      96.5%      96.5%      97.6%           1.58            63.0%
+     +QuantVLA                    W4A8        98.5%      98.0%      98.0%      96.0%      97.6%           1.28            70.0%
+   GR00T N1.5                     FP16        92.0%      92.0%      86.0%      76.0%      86.5%           2.02             0.0%
+     +DuQuant(LLM+DiT)            W4A8        66.0%      70.0%      68.0%      76.0%      70.0%           0.74            63.4%
+     +QuantVLA(LLM)               W4A8        96.0%      94.0%      92.0%      66.0%      87.0%           1.25            38.1%
+     +QuantVLA                    W4A8        96.0%      92.0%      90.0%      74.0%      88.0%           0.91            55.0%
+
+Table 2. Results on LIBERO for different QuantVLA variants on OpenPI π0.5 and GR00T N1.5. The table reports success rates (%) across
+four LIBERO tasks, memory (GB), and the relative memory savings versus each model’s baseline.
+
+
+tings do not transfer to highly coupled VLA systems. In
+contrast, QuantVLA is the first framework to achieve effec-
+tive PTQ on VLA models. By combining selective layer
+quantization with ATM and OHB calibration, QuantVLA
+not only maintains stable performance but also surpasses
+the baseline on several task suites. On π0.5, QuantVLA
+attains an average success rate of 97.6%, matching or ex-
+ceeding the baseline while reducing memory usage from
+4.27 GB to 1.28 GB. Similarly, on GR00T N1.5, QuantVLA
+achieves 88.0% average accuracy with memory reduced                 Figure 4. Memory saving of QuantVLA over the baseline on
+from 2.02 GB to 0.91 GB. These results demonstrate that             OpenPI π0.5 and GR00T N1.5.
+the proposed design effectively mitigates distribution drift
+caused by quantization in both the language backbone and                                                       LIBERO
+                                                                      Model       Precision
+especially in the DiT action head, which, to our knowledge,
+                                                                                              Spatial Object    Goal    Long   Avg.
+has not been quantized in prior VLA work, thereby deliv-
+                                                                      π0.5        FP16        98.5%   99.0%     97.5% 93.5%    97.1%
+ering state-of-the-art PTQ for VLA models without any
+retraining. Additional comparisons with SmoothQuant un-               π0.5      W4A8          98.5%   98.0%     98.0% 96.0%    97.6%
+der different quantization precision settings are provided            +QuantVLA W4A4          98.5%   98.5%     93.5% 90.5%    95.3%
+in Appendix E. Beyond LIBERO, we also further include
+an extended evaluation on the Simpler [17] manipulation             Table 3. LIBERO results on OpenPI π0.5 comparing FP16,
+                                                                    W4A8, and W4A4 precision.
+benchmark to assess cross-task robustness. Detailed results
+are provided in Appendix F.
+Efficiency of QuantVLA. QuantVLA achieves substan-                  effect of different quantization precisions on OpenPI π0.5,
+tial memory reduction as shown in Fig. 4. These re-                 comparing the configurations FP16, W4A8, and W4A4.
+sults confirm that the proposed selective quantization layout       The results show that QuantVLA maintains strong perfor-
+and lightweight calibration preserve accuracy while signif-         mance even at lower bit widths, achieving 95.3% average
+icantly reducing memory consumption. The reduced mem-               success rate at W4A4, which demonstrates stable behavior
+ory footprint makes QuantVLA particularly suitable for              under aggressive quantization. Table 4 evaluates GR00T
+long-horizon policy generation and deployment under tight           N1.5 with different denoising steps, where QuantVLA con-
+memory budgets. In practical scenarios, these gains allow           sistently matches or exceeds the baseline, reaching 88.0%
+the model to process longer temporal contexts, extend input         average success at 8 steps. These results indicate that
+horizons, or run multiple control policies in parallel within       QuantVLA preserves task accuracy across precision levels
+the same hardware budget, thereby enabling broader scala-           and noise conditions, confirming that the proposed calibra-
+bility in VLA applications.                                         tion and selective quantization design generalizes well to
+                                                                    various inference settings. We further evaluate QuantVLA
+                                                                    on OpenVLA in Appendix G, which adopts a non-DiT ac-
+Robustness and Generalization Analysis. We further                  tion head, to assess applicability beyond DiT-based VLA
+evaluate QuantVLA under two complementary settings to               models.
+assess robustness and generalization. Table 3 examines the
+              Denoising                      LIBERO                        Rt-1: Robotics transformer for real-world control at scale.
+ Model
+                Steps                                                      arXiv preprint arXiv:2212.06817, 2022. 2
+                          Spatial   Object    Goal    Long    Avg.
+                                                                       [7] Cheng Chi, Zhenjia Xu, Siyuan Feng, Eric Cousineau, Yilun
+ GR00T N1.5       8       92.0%     92.0%     86.0%   76.0%   86.5%
+                                                                           Du, Benjamin Burchfiel, Russ Tedrake, and Shuran Song.
+ GR00T N1.5       8       96.0%     92.0%     90.0% 74.0%     88.0%        Diffusion policy: Visuomotor policy learning via action dif-
+ +QuantVLA       16       96.0%     94.0%     84.0% 80.0%     88.5%        fusion. The International Journal of Robotics Research, 44
+                                                                           (10-11):1684–1704, 2025. 2
+Table 4. LIBERO results under different denoising steps on             [8] Peijie Dong, Lujun Li, Yuedong Zhong, Dayou Du, Ruibo
+GR00T N1.5.                                                                Fan, Yuhan Chen, Zhenheng Tang, Qiang Wang, Wei Xue,
+                                                                           Yike Guo, et al. Stbllm: Breaking the 1-bit barrier with struc-
+                                                                           tured binary llms. arXiv preprint arXiv:2408.01803, 2024. 3
+5. Conclusion                                                          [9] Yilun Du, Sherry Yang, Bo Dai, Hanjun Dai, Ofir Nachum,
+                                                                           Josh Tenenbaum, Dale Schuurmans, and Pieter Abbeel.
+   We present QuantVLA, the first PTQ framework for
+                                                                           Learning universal policies via text-guided video genera-
+VLA models that surpasses full precision baselines without                 tion. Advances in neural information processing systems,
+any additional training. Using a selective layout, it inte-                36:9156–9172, 2023. 3
+gerizes the language backbone and the feedforward blocks              [10] Elias Frantar, Saleh Ashkboos, Torsten Hoefler, and Dan
+of the diffusion transformer while attention projections re-               Alistarh.      Gptq: Accurate post-training quantization
+main in floating point. Two lightweight calibration scalars                for generative pre-trained transformers. arXiv preprint
+align the attention temperature and restore the output en-                 arXiv:2210.17323, 2022. 3
+ergy, thereby stabilizing low-bit inference. As a result,             [11] Xing Hu, Yuan Cheng, Dawei Yang, Zukang Xu, Zhihang
+QuantVLA reduces memory usage and improves accuracy.                       Yuan, Jiangyong Yu, Chen Xu, Zhe Jiang, and Sifan Zhou.
+Overall, QuantVLA is training-free, preserves the origi-                   Ostquant: Refining large language model quantization with
+nal architecture, and is robust across modalities, offering a              orthogonal and scaling transformations for better distribution
+practical path to low-bit deployment and laying the ground-                fitting. arXiv preprint arXiv:2501.13987, 2025. 3
+work for future advances, lower power budgets, and reliable           [12] Physical Intelligence, Kevin Black, Noah Brown, James
+long-horizon generation.                                                   Darpinian, Karan Dhabalia, Danny Driess, Adnan Esmail,
+                                                                           Michael Equi, Chelsea Finn, Niccolo Fusai, et al. π0.5: a
+                                                                           vision–language–action model with open-world generaliza-
+References                                                                 tion. arXiv preprint arXiv:2504.16054, 2025. 1, 3, 6
+ [1] Saleh Ashkboos, Amirkeivan Mohtashami, Maximilian L              [13] Kento Kawaharazuka, Jihoon Oh, Jun Yamada, Ingmar Pos-
+     Croci, Bo Li, Martin Jaggi, Dan Alistarh, Torsten Hoefler,            ner, and Yuke Zhu. Vision-language-action models for
+     and James Hensman. Quarot: Outlier-free 4-bit inference in            robotics: A review towards real-world applications. IEEE
+     rotated llms. arXiv preprint arXiv:2404.00456, 2024. 3                Access, 2025. 3
+ [2] Guillaume Astruc, Nicolas Gonthier, Clement Mallet, and          [14] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao,
+     Loic Landrieu. Omnisat: Self-supervised modality fusion               Ashwin Balakrishna, Suraj Nair, Rafael Rafailov, Ethan
+     for earth observation. In European Conference on Computer             Foster, Grace Lam, Pannag Sanketi, et al. Openvla: An
+     Vision, pages 409–427. Springer, 2024. 3                              open-source vision-language-action model. arXiv preprint
+ [3] Anas Awadalla, Irena Gao, Josh Gardner, Jack Hessel, Yusuf            arXiv:2406.09246, 2024. 1, 2
+     Hanafy, Wanrong Zhu, Kalyani Marathe, Yonatan Bitton,            [15] Junnan Li, Dongxu Li, Caiming Xiong, and Steven Hoi.
+     Samir Gadre, Shiori Sagawa, et al. Openflamingo: An open-             Blip: Bootstrapping language-image pre-training for unified
+     source framework for training large autoregressive vision-            vision-language understanding and generation. In Interna-
+     language models. arXiv preprint arXiv:2308.01390, 2023.               tional conference on machine learning, pages 12888–12900.
+     1                                                                     PMLR, 2022. 1
+ [4] Johan Bjorck, Fernando Castañeda, Nikita Cherniadev,            [16] Muyang Li, Yujun Lin, Zhekai Zhang, Tianle Cai, Xiuyu
+     Xingye Da, Runyu Ding, Linxi Fan, Yu Fang, Dieter Fox,                Li, Junxian Guo, Enze Xie, Chenlin Meng, Jun-Yan Zhu,
+     Fengyuan Hu, Spencer Huang, et al. Gr00t n1: An open                  and Song Han. Svdquant: Absorbing outliers by low-
+     foundation model for generalist humanoid robots. arXiv                rank components for 4-bit diffusion models. arXiv preprint
+     preprint arXiv:2503.14734, 2025. 1, 3, 6                              arXiv:2411.05007, 2024. 3
+ [5] Kevin Black, Noah Brown, Danny Driess, Adnan Esmail,             [17] Xuanlin Li, Kyle Hsu, Jiayuan Gu, Karl Pertsch, Oier Mees,
+     Michael Equi, Chelsea Finn, Niccolo Fusai, Lachy Groom,               Homer Rich Walke, Chuyuan Fu, Ishikaa Lunawat, Isabel
+     Karol Hausman, Brian Ichter, et al. pi 0: A vision-language-          Sieh, Sean Kirmani, Sergey Levine, Jiajun Wu, Chelsea
+     action flow model for general robot control. arXiv preprint           Finn, Hao Su, Quan Vuong, and Ted Xiao. Evaluating
+     arXiv:2410.24164, 2024. 3                                             real-world robot manipulation policies in simulation. arXiv
+ [6] Anthony Brohan, Noah Brown, Justice Carbajal, Yevgen                  preprint arXiv:2405.05941, 2024. 8
+     Chebotar, Joseph Dabis, Chelsea Finn, Keerthana Gopalakr-        [18] Haokun Lin, Haobo Xu, Yichen Wu, Jingzhi Cui, Yingtao
+     ishnan, Karol Hausman, Alex Herzog, Jasmine Hsu, et al.               Zhang, Linzhan Mou, Linqi Song, Zhenan Sun, and Ying
+     Wei. Duquant: Distributing outliers via dual transformation      [31] Wenqi Shao, Mengzhao Chen, Zhaoyang Zhang, Peng Xu,
+     makes stronger quantized llms. Advances in Neural Infor-              Lirui Zhao, Zhiqian Li, Kaipeng Zhang, Peng Gao, Yu Qiao,
+     mation Processing Systems, 37:87766–87800, 2024. 2, 3, 4              and Ping Luo. Omniquant: Omnidirectionally calibrated
+[19] Haokun Lin, Haobo Xu, Yichen Wu, Ziyu Guo, Renrui                     quantization for large language models. In The Twelfth In-
+     Zhang, Zhichao Lu, Ying Wei, Qingfu Zhang, and Zhenan                 ternational Conference on Learning Representations, 2023.
+     Sun. Quantization meets dllms: A systematic study of                  3
+     post-training quantization for diffusion llms. arXiv preprint    [32] Hui Shen, Jingxuan Zhang, Boning Xiong, Rui Hu, Shoufa
+     arXiv:2508.14896, 2025. 3                                             Chen, Zhongwei Wan, Xin Wang, Yu Zhang, Zixuan Gong,
+[20] Haokun Lin, Xinle Jia, Shaozhen Liu, Shujun Xia, Weitao               Guangyin Bao, et al. Efficient diffusion models: A survey.
+     Huang, Haobo Xu, Junyang Li, Yicheng Xiao, Xingrun                    arXiv preprint arXiv:2502.06805, 2025. 4
+     Xing, Ziyu Guo, et al. Efficient diffusion language models:      [33] Mustafa Shukor, Dana Aubakirova, Francesco Capuano,
+     A comprehensive survey. Authorea Preprints, 2026. 3                   Pepijn Kooijmans, Steven Palma, Adil Zouitine, Michel Ar-
+[21] Ji Lin, Jiaming Tang, Haotian Tang, Shang Yang, Wei-Ming              actingi, Caroline Pascal, Martino Russi, Andres Marafioti,
+     Chen, Wei-Chen Wang, Guangxuan Xiao, Xingyu Dang,                     et al. Smolvla: A vision-language-action model for afford-
+     Chuang Gan, and Song Han. Awq: Activation-aware weight                able and efficient robotics. arXiv preprint arXiv:2506.01844,
+     quantization for on-device llm compression and accelera-              2025. 1, 3
+     tion. Proceedings of machine learning and systems, 6:87–         [34] Yang Song, Jascha Sohl-Dickstein, Diederik P Kingma, Ab-
+     100, 2024. 3                                                          hishek Kumar, Stefano Ermon, and Ben Poole. Score-based
+[22] Yaron Lipman, Ricky TQ Chen, Heli Ben-Hamu, Maximil-                  generative modeling through stochastic differential equa-
+     ian Nickel, and Matt Le. Flow matching for generative mod-            tions. arXiv preprint arXiv:2011.13456, 2020. 4
+     eling. arXiv preprint arXiv:2210.02747, 2022. 1, 3, 4            [35] Yuxuan Sun, Ruikang Liu, Haoli Bai, Han Bao, Kang Zhao,
+[23] Bo Liu, Yifeng Zhu, Chongkai Gao, Yihao Feng, Qiang Liu,              Yuening Li, Jiaxin Hu, Xianzhi Yu, Lu Hou, Chun Yuan,
+     Yuke Zhu, and Peter Stone. Libero: Benchmarking knowl-                et al. Flatquant: Flatness matters for llm quantization. arXiv
+     edge transfer for lifelong robot learning. Advances in Neural         preprint arXiv:2410.09426, 2024. 3
+     Information Processing Systems, 36:44776–44791, 2023. 2,         [36] Hugo Touvron, Louis Martin, Kevin Stone, Peter Albert,
+     6                                                                     Amjad Almahairi, Yasmine Babaei, Nikolay Bashlykov,
+[24] Songming Liu, Lingxuan Wu, Bangguo Li, Hengkai Tan,                   Soumya Batra, Prajjwal Bhargava, Shruti Bhosale, et al.
+     Huayu Chen, Zhengyi Wang, Ke Xu, Hang Su, and Jun Zhu.                Llama 2: Open foundation and fine-tuned chat models. arXiv
+     Rdt-1b: a diffusion foundation model for bimanual manipu-             preprint arXiv:2307.09288, 2023. 1
+     lation. arXiv preprint arXiv:2410.07864, 2024. 2, 3              [37] Lirui Wang, Xinlei Chen, Jialiang Zhao, and Kaiming He.
+[25] Zhenhua Liu, Yunhe Wang, Kai Han, Wei Zhang, Siwei Ma,                Scaling proprioceptive-visual learning with heterogeneous
+     and Wen Gao. Post-training quantization for vision trans-             pre-trained transformers. Advances in neural information
+     former. Advances in Neural Information Processing Systems,            processing systems, 37:124420–124450, 2024. 2
+     34:28092–28103, 2021. 2                                          [38] Junjie Wen, Yichen Zhu, Jinming Li, Minjie Zhu, Zhibin
+[26] Markus Nagel, Rana Ali Amjad, Mart Van Baalen, Chris-                 Tang, Kun Wu, Zhiyuan Xu, Ning Liu, Ran Cheng, Chaomin
+     tos Louizos, and Tijmen Blankevoort. Up or down? adap-                Shen, et al. Tinyvla: Towards fast, data-efficient vision-
+     tive rounding for post-training quantization. In International        language-action models for robotic manipulation. IEEE
+     conference on machine learning, pages 7197–7206. PMLR,                Robotics and Automation Letters, 2025. 1, 3
+     2020. 12                                                         [39] Junyi Wu, Haoxuan Wang, Yuzhang Shang, Mubarak Shah,
+[27] Maxime Oquab, Timothée Darcet, Théo Moutakanni, Huy                 and Yan Yan. Ptq4dit: Post-training quantization for diffu-
+     Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez,                sion transformers. Advances in neural information process-
+     Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, et al.            ing systems, 37:62732–62755, 2024. 3, 12
+     Dinov2: Learning robust visual features without supervision.     [40] Guangxuan Xiao, Ji Lin, Mickael Seznec, Hao Wu, Julien
+     arXiv preprint arXiv:2304.07193, 2023. 4                              Demouth, and Song Han. Smoothquant: Accurate and effi-
+[28] William Peebles and Saining Xie. Scalable diffusion models            cient post-training quantization for large language models. In
+     with transformers. In Proceedings of the IEEE/CVF inter-              International conference on machine learning, pages 38087–
+     national conference on computer vision, pages 4195–4205,              38099. PMLR, 2023. 2, 3
+     2023. 1, 3, 4                                                    [41] Siyu Xu, Yunke Wang, Chenghao Xia, Dihao Zhu, Tao
+[29] Karl Pertsch, Kyle Stachowicz, Brian Ichter, Danny Driess,            Huang, and Chang Xu. Vla-cache: Towards efficient vision-
+     Suraj Nair, Quan Vuong, Oier Mees, Chelsea Finn, and                  language-action model via adaptive token caching in robotic
+     Sergey Levine. Fast: Efficient action tokenization for vision-        manipulation. arXiv preprint arXiv:2502.02175, 2025. 1, 3
+     language-action models. arXiv preprint arXiv:2501.09747,         [42] An Yang, Anfeng Li, Baosong Yang, Beichen Zhang,
+     2025. 3                                                               Binyuan Hui, Bo Zheng, Bowen Yu, Chang Gao, Chengen
+[30] Moritz Reuss, Hongyi Zhou, Marcel Rühle, Ömer Erdinç               Huang, Chenxu Lv, et al. Qwen3 technical report. arXiv
+     Yağmurlu, Fabian Otto, and Rudolf Lioutikov. Flower:                 preprint arXiv:2505.09388, 2025. 1
+     Democratizing generalist robot policies with efficient           [43] Lianwei Yang, Haisong Gong, Haokun Lin, Yichen
+     vision-language-action flow policies.         arXiv preprint          Wu, Zhenan Sun, and Qingyi Gu.                 Dopq-vit: To-
+     arXiv:2509.04996, 2025. 3                                             wards distribution-friendly and outlier-aware post-training
+     quantization for vision transformers.         arXiv preprint    [55] Siyuan Zhou, Yilun Du, Jiaben Chen, Yandong Li, Dit-Yan
+     arXiv:2408.03291, 2024. 3                                            Yeung, and Chuang Gan. Robodreamer: Learning compo-
+[44] Lianwei Yang, Haokun Lin, Tianchen Zhao, Yichen Wu,                  sitional world models for robot imagination. arXiv preprint
+     Hongyu Zhu, Ruiqi Xie, Zhenan Sun, Yu Wang, and Qingyi               arXiv:2404.12377, 2024. 3
+     Gu. Lrq-dit: Log-rotation post-training quantization of         [56] Brianna Zitkovich, Tianhe Yu, Sichun Xu, Peng Xu, Ted
+     diffusion transformers for text-to-image generation. arXiv           Xiao, Fei Xia, Jialin Wu, Paul Wohlhart, Stefan Welker,
+     preprint arXiv:2508.03485, 2025. 3                                   Ayzaan Wahid, et al. Rt-2: Vision-language-action models
+[45] Yantai Yang, Yuhao Wang, Zichen Wen, Luo Zhongwei,                   transfer web knowledge to robotic control. In Conference on
+     Chang Zou, Zhipeng Zhang, Chuan Wen, and Linfeng                     Robot Learning, pages 2165–2183. PMLR, 2023. 2
+     Zhang. Efficientvla: Training-free acceleration and com-
+     pression for vision-language-action models. arXiv preprint
+     arXiv:2506.10100, 2025. 1, 3
+[46] Zhihang Yuan, Lin Niu, Jiawei Liu, Wenyu Liu, Xinggang
+     Wang, Yuzhang Shang, Guangyu Sun, Qiang Wu, Jiaxiang
+     Wu, and Bingzhe Wu. Rptq: Reorder-based post-training
+     quantization for large language models. arXiv preprint
+     arXiv:2304.01089, 2023. 3
+[47] Xiaohua Zhai, Basil Mustafa, Alexander Kolesnikov, and
+     Lucas Beyer. Sigmoid loss for language image pre-training.
+     In Proceedings of the IEEE/CVF international conference on
+     computer vision, pages 11975–11986, 2023. 4
+[48] Rongyu Zhang, Menghang Dong, Yuan Zhang, Liang Heng,
+     Xiaowei Chi, Gaole Dai, Li Du, Yuan Du, and Shanghang
+     Zhang. Mole-vla: Dynamic layer-skipping vision language
+     action model via mixture-of-layers for efficient robot manip-
+     ulation. arXiv preprint arXiv:2503.20384, 2025. 1, 3
+[49] Tianchen Zhao, Tongcheng Fang, Haofeng Huang, Enshu
+     Liu, Rui Wan, Widyadewi Soedarmadji, Shiyao Li, Zinan
+     Lin, Guohao Dai, Shengen Yan, et al. Vidit-q: Efficient
+     and accurate quantization of diffusion transformers for im-
+     age and video generation. arXiv preprint arXiv:2406.02540,
+     2024. 3
+[50] Tianchen Zhao, Xuefei Ning, Tongcheng Fang, Enshu Liu,
+     Guyue Huang, Zinan Lin, Shengen Yan, Guohao Dai, and Yu
+     Wang. Mixdq: Memory-efficient few-step text-to-image dif-
+     fusion models with metric-decoupled mixed precision quan-
+     tization. In European Conference on Computer Vision, pages
+     285–302. Springer, 2024. 3, 12
+[51] Tony Z Zhao, Vikash Kumar, Sergey Levine, and Chelsea
+     Finn. Learning fine-grained bimanual manipulation with
+     low-cost hardware. arXiv preprint arXiv:2304.13705, 2023.
+     2
+[52] Jinliang Zheng, Jianxiong Li, Zhihao Wang, Dongxiu Liu,
+     Xirui Kang, Yuchun Feng, Yinan Zheng, Jiayin Zou, Yilun
+     Chen, Jia Zeng, et al. X-vla: Soft-prompted transformer
+     as scalable cross-embodiment vision-language-action model.
+     arXiv preprint arXiv:2510.10274, 2025. 3
+[53] Yifan Zhong, Fengshuo Bai, Shaofei Cai, Xuchuan Huang,
+     Zhang Chen, Xiaowei Zhang, Yuanfei Wang, Shaoyang Guo,
+     Tianrui Guan, Ka Nam Lui, et al. A survey on vision-
+     language-action models: An action tokenization perspective.
+     arXiv preprint arXiv:2507.01925, 2025. 1
+[54] Hongyi Zhou, Weiran Liao, Xi Huang, Yucheng Tang,
+     Fabian Otto, Xiaogang Jia, Xinkai Jiang, Simon Hilber,
+     Ge Li, Qian Wang, et al. Beast: Efficient tokenization of
+     b-splines encoded action sequences for imitation learning.
+     arXiv preprint arXiv:2506.06072, 2025. 3
+A. General Quantization Formulations                             Following DuQuant, we further factorize the layer with
+                                                                 block orthogonal rotations R̂(1) , R̂(2) and a permutation P :
+   Post-training quantization (PTQ) [26, 39, 50] reduces
+memory footprint and accelerates inference without addi-
+                                                                    Y = XW
+tional training. This subsection introduces a generic, bit-
+                                                                                                 P R̂(1) (Λ−1 W )
+                                                                                           ⊤ ⊤ ⊤               
+parameterized formulation. Here, we use tildes to denote              = (XΛ) R̂(1) P R̂(2) R̂(2)
+integer tensors and hats to denote their dequantized floating           |      {z         } |       {z           }
+                                                                                    G                         G−1
+approximations.
+                                                                                                                         (25)
+   Consider a linear layer Y = XW without bias. Let bX
+                                                                 All three matrices are orthogonal and therefore P −1 = P ⊤ .
+and bW be the activation and weight bit widths, respectively.
+                                                                 The left bracket G acts on activations before integerization
+Activations are quantized per token using an unsigned grid,
+                                                                 and the right bracket G−1 is folded into the weights to pre-
+and weights are quantized per output channel using a signed
+                                                                 serve equivalence. After this factorization, we can quantize
+grid. Therefore, the integer activations X̃ are obtained as:
+                                                                 G on the activation side and G−1 on the weight side at the
+                                                               chosen bit widths bX and bW respectively and then execute
+   X̃ = clip round(X/∆X ) + zX , 0, 2 bX − 1 , (18)
+                                                                 the integer matrix multiplication with the corresponding de-
+                                                                 quantization scales.
+with dequantization
+                                                                C. How logits transfer from the language back-
+                   X̂ = ∆X X̃ − zX .                     (19)
+                                                                     bone to DiT in a VLA
+Integer weights for output channel o are:                          These scales appear in DiT attention only through de-
+                                                                quantization. For a head of width d we set
+                                            (o) 
+            W̃ (o) = clip round W (o) /∆W ,
+                                                        (20)         Q̂ = sq Q̃,       K̂ = sk K̃,      V̂ = sv Ṽ .     (26)
+                        −2 bW −1 , 2 bW −1 − 1 .
+                                                                 The logits matrix that drives attention is
+with dequantization
+                                                                                    Q̂K̂ ⊤ sq sk
+                                                                                 L = √ = √ Q̃K̃ ⊤ ,                       (27)
+                                (o)
+                   Ŵ (o) = ∆W W̃ (o) .                  (21)                          d      d
+                                                                 and the attention matrix is
+Here, ∆X > 0 is the activation scale estimated from a small
+unlabeled calibration buffer, and zX ∈ {0, . . . , 2bX − 1} is                          A = softmax(L).                   (28)
+the integer zero point for the unsigned activation grid. Each
+                                                 (o)             The per-head output is
+output channel o uses a per-channel scale ∆W > 0 and
+a symmetric signed grid {−2bW −1 , . . . , 2bW −1 − 1}. De-
+                                                                                     Y = A V̂ = sv A Ṽ .                 (29)
+quantization multiplies stored integers by their correspond-
+ing scales to obtain floating-point approximations.              Let the output projection be dequantized as Ŵo = so W̃o .
+                                                                 The block output after concatenating heads and applying the
+B. DuQuant Implementation Details                                output projection is
+   With DuQuant design, we then instantiate the transform,
+                                                                      Z = Concat(Yh ) Ŵo = so Concat(Yh ) W̃o .          (30)
+beginning with the smoothing step. Specifically, to bal-
+ance the difficulty of quantizing activations and the relative   Therefore,   sq sk sets an effective temperature Teff =
+ease of quantizing weights, we apply per-channel smooth-         √
+                                                                   d/(sq sk ) that controls attention sharpness, and sv so pri-
+ing with a diagonal matrix Λ:                                    marily determines how much energy is injected into the
+                                                                 residual stream.
+             Y = (XΛ)(Λ−1 W ) = X ′ W ′ .                (22)
+                           α                                    D. QuantVLA Parameters
+                max |X:,j |
+         Λj =             1−α , α ∈ [0, 1].             (23)    Appendix: Quantization and calibration. GR00T N1.5
+               max |Wj,: |
+                                                                 and OPENPI π0.5 use the same DuQuant configuration and
+We then operate on the transformed pair                          the same statistical calibration. We set the weight bit width
+                                                                 to 4 and the activation bit width to 8, which reduces memory
+                (X ′ , W ′ ) = (XΛ, Λ−1 W ).             (24)    and bandwidth while keeping accuracy stable. The block
+size is 64 on both the input and the output, so that block                  bust in long-sequence scenarios. Therefore, it provides a
+orthogonal rotations and collected statistics share the same                more favorable accuracy–efficiency trade-off for low-bit in-
+granularity. For the LLM and DiT backbone, we enable                        ference in VLA models when deployment efficiency is a
+channel permutation to redistribute large channels and re-                  primary consideration.
+duce outliers. The row rotation modrestoredstore, which ap-
+plies a rotation before each linear map and the inverse after               F. Extended Benchmark Evaluation
+the map, so that the real-valued function is preserved while
+improving the suitability of the layer for quantization. Dur-               As shown in Table 6, we further evaluate QuantVLA on
+ing post-training calibration, we set the activation percentile             the Pick-and-Can manipulation benchmark. Under W4A8
+to 99.9 to determine the clipping range, we use 32 batches to               precision, SmoothQuant exhibits a noticeable drop in per-
+estimate scales, and we apply per-channel smoothing with                    formance compared to the FP16 baseline. In contrast,
+                                                                            QuantVLA substantially narrows the gap and maintains a
+a coefficient of 0.15 to prevent a few channels from domi-
+                                                                            higher success count under the same precision setting.
+nating a shared scale.
+    After integerization, both models use the same statistical
+matching. Attention temperature matching learns one scalar                           Method              Precision     PickCan
+α for each head and aligns the scale of the student logits                           GR00T                 FP16         31 / 50
+with the teacher so that the attention distribution is neither                       + SmoothQuant         W4A8         16 / 50
+overly sharp nor overly flat. Output head balancing learns                           + QuantVLA            W4A8         27 / 50
+one scalar β for each layer and restores the residual stream
+energy at the module output. In our runs the scope of β is                          Table 6. Quantization results on Pick-and-Can.
+limited to the diffusion transformer head. We fit α and β
+from a small unlabeled buffer using 128 steps with at most                  Although performance does not fully match the floating-
+5 trials for each task, we clamp log α and log β with a limit               point baseline, the results demonstrate that QuantVLA bet-
+of 0.30, and we keep a neutrality band ε of 0.03 so that both               ter preserves task performance under aggressive quantiza-
+scalars remain close to 1 when the estimate is uncertain. We                tion. This suggests that the proposed design mitigates the
+fold α into the dequantization scale for inference and apply                sensitivity of the action head to quantization noise in ma-
+β at the module output.                                                     nipulation scenarios.
+
+E. Comparison with other PTQ Method                                         G. Applicability Beyond DiT-Based VLA Mod-
+As shown in Table 5, SmoothQuant, a built-in PTQ method                         els
+in NVIDIA-OPT, performs reasonably at W8A8 precision.                       We evaluated OpenVLA, which uses a deeper 32-layer lan-
+In contrast, QuantVLA achieves comparable or slightly bet-                  guage backbone than the 18-layer backbones studied here
+ter results under the more aggressive W4A8 setting. When                    and a non-DiT action head, resulting in different language–
+SmoothQuant is extended to quantize both the LLM and the                    action coupling. Thus, the DiT-specific ATM and OHB
+DiT MLP, performance remains competitive under W8A8                         mechanisms are not directly applicable. Nevertheless,
+precision. However, QuantVLA operates at a lower bit-                       QuantVLA matches OpenVLA performance (Table 7).
+width while maintaining stable performance across all task
+suites. In particular, improvements are observed on the
+                                                                                       Model             Precision     Spatial
+long-horizon task, where low-precision inference typically
+accumulates greater drift over sequential generation. The                              OpenVLA             FP16        84.7%
+average success rate under W4A8 is also slightly higher                                + QuantVLA         W8A16        86.0%
+than the floating-point baseline.
+                                                                            Table 7. Quantization results on LIBERO-Spatial for OpenVLA.
+Method                           Spatial   Object    Goal    Long    Avg
+π0.5                             98.5%     99.0%    97.5%   93.5%   97.1%
++SmoothQuant (LLM)               97.5%     98.5%    98.0%   92.5%   96.6%
++SmoothQuant (LLM + DiT (MLP))   98.0%     99.0%    99.0%   92.0%   97.0%
++QuantVLA (LLM)                  98.5%     99.0%    96.5%   96.5%   97.6%
++QuantVLA                        98.5%     98.0%    98.0%   96.0%   97.6%
+
+Table 5. Additional quantization comparison on the LIBERO
+benchmark for OpenPI π0.5.
+
+These results indicate that QuantVLA sustains task perfor-
+mance under more aggressive quantization and remains ro-
+

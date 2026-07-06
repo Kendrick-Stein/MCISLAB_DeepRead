@@ -1,0 +1,1825 @@
+                                           LensWalk: Agentic Video Understanding by Planning How You See in Videos
+
+                                          Keliang Li1,4         Yansong Li3     Hongze Shen1,2,4        Mengdi Liu1,4      Hong Chang1,4 * Shiguang Shan1,4
+                                                            1
+                                                           Institute of Computing Technology, Chinese Academy of Sciences, China
+                                                                                 2
+                                                                                   Peng Cheng Laboratory, China
+                                                     3
+                                                       College of Computer Science and Electronic Engineering, Hunan University, China
+                                                                      4
+                                                                        University of Chinese Academy of Sciences, China
+
+
+
+
+arXiv:2603.24558v1 [cs.CV] 25 Mar 2026
+                                                         keliang.li@vipl.ict.ac.cn           liyansong@hnu.edu.cn            chonghong@ict.ac.cn
+
+
+
+                                                                     Abstract                             tive resources of any analytical agent, be it biological or
+                                                                                                          artificial, making uniform, exhaustive analysis intractable
+                                         The dense, temporal nature of video presents a profound          and inefficient [1, 5]. Powerful intelligence, like humans,
+                                         challenge for automated analysis. Despite the use of power-      cope through purposeful information seeking [1, 5, 34]: we
+                                         ful Vision-Language Models, prevailing methods for video         continually adapt—shifting from broad peripheral scans to
+                                         understanding are limited by the inherent disconnect be-         sharp foveal focus—and intermittently reflect and verify,
+                                         tween reasoning and perception: they rely on static, pre-        guided by continual reasoning that evolves both intent and
+                                         processed information and cannot actively seek raw evi-          observational priorities. We contend that this principle is
+                                         dence from video as their understanding evolves. To ad-          key to reliable, accurate video analysis: observation should
+                                         dress this, we introduce LensWalk, a flexible agentic frame-     be actively scheduled under limited capacity. However, re-
+                                         work that empowers a Large Language Model reasoner to            alizing such purpose-oriented video observation planning in
+                                         control its own visual observation actively. LensWalk es-        practice remains an open challenge.
+                                         tablishes a tight reason-plan-observe loop where the agent
+                                                                                                              While the progress of Vision-Language Models (VLMs)
+                                         dynamically specifies, at each step, the temporal scope and
+                                                                                                          [2, 18, 23] and test-time thinking [15, 29] has significantly
+                                         sampling density of the video it observes. Using a suite of
+                                                                                                          advanced the field, this principle is far from realized in cur-
+                                         versatile, Vision-Language Model based tools parameter-
+                                                                                                          rent video understanding pipelines. In typical setups, long
+                                         ized by these specifications, the agent can perform broad
+                                                                                                          videos are sampled within context windows and converted
+                                         scans for cues, focus on specific segments for fact extrac-
+                                                                                                          once into a single context; this uniform strategy often drops
+                                         tion, and stitch evidence from multiple moments for holistic
+                                                                                                          sparse but decisive events or drowns them in redundancy
+                                         verification. This design allows for progressive, on-demand
+                                                                                                          [24, 41, 49]. More recent efforts instead try heuristic frame
+                                         evidence gathering that directly serves the agent’s evolving
+                                                                                                          or token selection [24, 36, 47, 58] to preserve “key” infor-
+                                         chain of thought. Without requiring any model fine-tuning,
+                                                                                                          mation under a constrained context length, but these heuris-
+                                         LensWalk delivers substantial, plug-and-play performance
+                                                                                                          tics still rely on fixed, once sampling, cannot shift focus or
+                                         gains on multiple model recipes, boosting their accuracy
+                                                                                                          reallocate budget as intermediate hypotheses change, and
+                                         by over 5% on challenging long-video benchmarks like
+                                                                                                          thus struggle to support the stepwise resolution of complex
+                                         LVBench and Video-MME. Our analysis reveals that en-
+                                                                                                          questions.
+                                         abling an agent to control how it sees is key to unlocking
+                                         more accurate, robust, and interpretable video reasoning.            Beyond such single-model setups, many recent retrieval-
+                                                                                                          based and agentic frameworks [26, 32, 43] explicitly try
+                                                                                                          to expand information as reasoning unfolds. Reactive re-
+                                         1. Introduction                                                  trieval pipelines [28, 35, 69] let the model trigger tools to
+                                                                                                          fetch pre-processed artifacts such as ASR transcripts, OCR,
+                                         Video understanding is a core task in computer vision
+                                                                                                          or clip-level captions when new questions or intermediate
+                                         with profound challenges, given the multi-layered, high-
+                                                                                                          hypotheses arise; however, perception is still bound to a
+                                         density, and temporally unfolding nature of its information
+                                                                                                          largely fixed, hand-crafted workflow and a predetermined
+                                         [13, 45, 49]. This volume overwhelms the finite cogni-
+                                                                                                          menu of views on the video, with limited ability to decide
+                                           * Corresponding author.                                        granularity or revisit the raw video when ambiguity appears.
+                                     Video Clips                           Video Clips
+                                                                                                               Q                           Answer
+
+                   ⨂
+            Q
+                               ✅ ❌       ✅ ✅ ❌                  Vision-Languge Model                                Large Languge Model
+                                                                                                                                                 ×�
+                Image-Text
+                 Matching              Select                                                    Static Observation & Thinking         Action
+
+                                    Schedule by Shallow           Static Video Database                                   Retrievel Toolset
+                                      Understanding                    Captions+Indexs                             Search        Summary         ...
+                                                                                                                    Tool           Tool         Tool
+                      Vision-Languge Model
+                                                           Waste on Irrelevant Info
+                    (a) Model Single Forward                                           (b) Passive Retrievel Agent
+
+                                                              Q                            Answer
+
+                                                                   Large Languge Model                              Vision-Languge Model
+                                                                  Thinking            Action   ×�                            Sampled
+                                                                                                            Observation
+                                                                     Observation Toolset                                     Context
+                                                                   Scan        Segment         Stitch
+                                                                  Search        Focus          Verify                                Video
+
+
+                    (d) Accuracy vs Efficiency                                  (c) Ours: Active Observation Agent
+
+Figure 1. Comparison of video understanding paradigms: (a) Single Forward of model with one-off context selection. (b) Retrieval-Based
+Video Agent. (c) LensWalk, an agent framework that actively plans observations to fulfill subsequent reasoning, explores iteratively, and
+self-regulates its observation budget. (d) By actively planning observations only on video segments essential to its reasoning process,
+LensWalk simultaneously achieves high accuracy and exceptional efficiency.
+
+
+Video agents with tool flows [26, 43, 63], as well as those                  tains a round-updated global cast table as lightweight hot
+that let an LLM controller query over pre-computed video                     memory, tracking entities and their relations across rounds
+indexes, offer more flexible querying but still operate on                   without repeatedly re-reading long histories. By tying each
+static representations rather than scheduling fresh observa-                 observation to an explicit, parameterized plan, LensWalk
+tions from the source video, so observation and reasoning                    lets the agent schedule where to look and how densely to
+remain only loosely coupled and the overall budget remains                   sample the video directly from its evolving reasoning state,
+underplanned.                                                                reallocating its frame budget across regions and time scales
+                                                                             as hypotheses change.
+   To this end, we present LensWalk, an agentic frame-
+work that gives the LLM reasoner on-hand control over                            Our empirical results on long video understanding and
+where, and how dense to look at the video for active ob-                     video reasoning benchmarks reveal that this framework is
+servation. LensWalk organizes inference as a multi-round                     not only conceptually appealing but also practically effec-
+reason–plan–observe loop: at each round, the reasoner re-                    tive. As a plug-and-play agentic framework, LensWalk con-
+flects on the current question and accumulated evidence,                     sistently improves even strong Reasoner–Observer combi-
+then plans an observation action by selecting an observa-                    nations; when a single model serves as both to make self-
+tion tool and its parameters, which determine the visible                    scheduled observation, it effectively offers a “free lunch”,
+context—which temporal regions of the source video to in-                    yielding substantial gains—for example, the powerful o3
+spect and at what sampling level. This loop is instantiated                  model improves by over 11.5% and 6.7% accuracy on
+by a suite of complementary observation tools powered by                     challenging long-video benchmarks such as LVBench and
+a vision-language model that converts the prepared context                   VideoMME (long split). At the same time, LensWalk ex-
+into visual evidence: Scan Search supports parallel sweeps                   hibits an emergent ability to manage observational cost: it
+over broad, disjoint candidate ranges for cue discovery, Seg-                adaptively resolves easy queries with minimal turns, while
+ment Focus constructs compact, detail-oriented views for a                   allocating more budget only to genuinely uncertain cases,
+targeted interval, and Stitched Verify assembles custom sam-                 as in Figure 1(d), leading to total token usage far below
+ples from multiple key segments into a single context for                    that of retrieval agents that consume millions of tokens and
+global checking. Each tool is encouraged to return frame-                    only slightly above a single dense pass over long frame se-
+interleaved timestamps aligned with discovered key infor-                    quences. Analysis of its reasoning traces further reveals di-
+mation as anchors for subsequent rounds. As observations                     verse, human-like strategies—strategic reflection, progres-
+are acquired progressively from raw video, LensWalk main-                    sive zoom-in, and integrative verification—replacing the
+fixed workflows or degenerative action repetition common         context. A complementary line is agentic visual process-
+in prior agents, and confirming that the performance and ef-     ing [4, 19, 38, 39, 51, 54, 61, 66, 68, 70], which equips
+ficiency gains stem from its core principle of actively plan-    agents with tools that transform, compose, or generate
+ning observation guided by reasoning.                            images during problem solving. For video understand-
+                                                                 ing, recent tool-based methods usually interface with video
+2. Related Work                                                  through preprocessed surrogates: they convert videos into
+                                                                 databases of dense captions or clip embeddings, design in-
+Context Selection on Video Understanding The con-                dexing schemes, and then let the agent query these static
+strained context window of Multimodal Large Language             repositories with text-based tools [26, 43, 62]. In such sys-
+Models (MLLMs) has motivated a line of work on select-           tems, the agent can decide what to ask but has little control
+ing a compact yet informative video context. Existing ap-        over how the video is observed; the temporal coverage, sam-
+proaches typically either perform query-aware keyframe or        pling density, and composition of segments are largely fixed
+clip selection with temporal and semantic diversity, or learn    by the preprocessing pipeline or a small set of coarse tool
+task-specific alignment modules to pick task-relevant snip-      options.
+pets [3, 16, 24, 33, 41, 58, 60]. Another line focuses on
+information condensation by pruning redundancy at frame,
+clip, or model-layer granularity [36, 37, 47, 56, 65]. While     3. Method
+these strategies improve the utilization of the limited token
+budget, they still choose the visible context in a single shot   Despite recent great progress, most video understanding
+before reasoning, whereas our agent treats context selec-        pipelines still pair strong reasoners with a fixed observation
+tion itself as a step-wise, tool-mediated process driven by      stage, so the scope and granularity of visual evidence do
+its evolving hypotheses.                                         not adapt to the agent’s evolving thoughts. We instead view
+                                                                 video understanding as also a problem of deciding how to
+                                                                 observe, and LensWalk is designed precisely to let an agent
+Test-Time Scaling on Video Understanding Recent ad-              dynamically choose where to look and at what granularity.
+vances in Test-Time Scaling (TTS) for video understand-          see Appendix A for pseudocode and concrete prompts.
+ing allocate additional computation at inference time to
+improve performance. One line of work strengthens in-
+ternal reasoning by training models to support long, self-       3.1. Overview of the LensWalk Architecture
+corrective chains of thought with verifiable rewards or          LensWalk models video understanding as an active obser-
+preference-based objectives, as in Video-R1 and Vide-            vation process, driven by an agent that intelligently decides
+oRFT [12, 15, 48], but still operates on fixed visual in-        where to look, what to observe, and how densely to sam-
+puts. A complementary line wraps video models in agen-           ple the video timeline per reasoning step. At its core, an
+tic workflows, where LLMs control how to retrieve or ag-         LLM-based Reasoner (Mr ) analyzes the user’s query and
+gregate preprocessed clips and captions: building on early       accumulated evidence to formulate the next plan by calling
+pipeline-based systems that query clips, frames, and meta-       observe tools with controllable video scopes. These tools
+data [35, 40, 46, 69], recent works introduce reasoning-         belong to a versatile Observation Toolkit (O), which lever-
+based agents that schedule clip retrieval and caption aggre-     ages a core VLM as its Observer (Mo ) to extract informa-
+gation over long videos [26, 32, 43, 62]. In contrast to both    tion directly from a specific visible video context according
+paradigms, our framework scales test-time inference by let-      to the Reasoner’s arguments. To ensure coherence across
+ting the agent explicitly decide how to observe the video—       multiple turns, Timestamp Anchors and a global Subject
+choosing temporal ranges, sampling densities, and segment        Memory Table are designed as lightweight memory mecha-
+compositions—rather than only allocating more computa-           nisms that provide evidence grounding. This establishes an
+tion over a fixed observation stage.                             iterative reason-plan-observe cycle. In the following sub-
+                                                                 sections, we sequentially introduce how the agent schedules
+Multimodal Tool-Use Agents Tool use is a core capa-              visual observations during its multi-turn tool use, the design
+bility of agents, enabling models to proactively invoke ex-      of the observation toolkit, and the memory grounding mech-
+ternal tools and thereby extend their effective context be-      anisms that ensure multi-turn coherence. Figure 2 illustrates
+yond intrinsic parametric knowledge [11, 52, 62]. Recent         the LensWalk agent pipeline on a real video understanding
+work on multimodal tool-use agents largely follows this          instance. In the following subsections, we sequentially in-
+perspective, but instantiates it along several directions. One   troduce how the agent schedules visual observations during
+prominent line is agentic search [6, 20, 21, 25, 44, 50, 53],    its multi-turn tool use, the design of the observation toolkit,
+where agents actively query textual and visual sources to        and the evidence grounding mechanisms that ensure multi-
+retrieve evidence that augments their internal reasoning         turn coherence.
+                                                                                                                                                            Observation Toolset
+        Q: What color of clothes does the water vole wear                                Large Languge
+        when it first appears?(A) Blue (B) White (C) Red (D)                                 Model                               Scan Seach                              Segment Focus                 Stitch Verify
+        Green                                                                              (Reasoner)
+                                                                                                                                           Vision-Languge Model (Observer)
+
+
+        Turn 1                                                                             <Thinking>
+                                                                                                                                                                 Observe Context of Turn 1
+                                                                                                                Observer
+        <Thinking>: I should find when water vole.....
+        <Tool>: Scan Search(interval=[0, 4539], fps=0.2, slice_sec = 300, query =            <Tool>
+        “Identify the appearance of the water vole character and note the color...”)
+        <Observation>: “[0, 300]: The first appearance of the water vole character       <Observation>                      0s
+                                                                                                                                 0               300 ...
+                                                                                                                                                                                                                          4539s
+
+        is in [131.8s to 175.7s]...”
+                                                                                         <Subject Table>
+                                                                                                                                                            Observe Context of Turn 2
+
+                                                                                                                 Observer
+        Turn 2
+        <Thinking>: .....                                                                  <Thinking>                            130s-138s:
+
+                                                                                                            ⨁
+                                                                                                                                                                                                   138s-142s:
+        <Tool>: Segment Focus(interval=[130, 176], max_frame_num=32,
+        query=”Describe the character who appears to be the water vole. ...”)                <Tool>
+        <Observation>: “In the frames from [160s to 176s], the character who                                                0s                      Detailed Timestamp Anchor Interleaved in Frames                       4539s
+        appears to be the water vole is an animated animal wearing....”                  <Observation>                           130       176
+
+
+                                            ··· × �                                      <Subject Table>
+                                                                                                                                                                 Turn 2
+                        Subject Table at Turn N+1:                                           ··· × �                                   Turn 1                    <Observation>: “In the frames from [160s to 176s], the
+                                                                                                                                                                 character who appears to be the water vole is....”
+                        {“water vole_1”: {“Description”: [...,”A light blue shirt”..],
+                        “Interval”: [[160,176],.....]}                                                                                                             Merge by LLM
+                        {“water vole_2”: {“Description”: [...,”in white clothing”..],
+                        “Interval”: [[307,320]}                                          <Subject Table>
+                                                                                                                                                                             Turn 2
+                        .....
+                                                                                           <Thinking>                                                                         ··· × �
+        Trun N+1                                                                             <Tool>
+                                                                                                                                                                 Observe Context of Turn N+1
+
+                                                                                                                 Observer
+        <Thinking>: To resolve contradictory memories...
+        <Tool>: Stitch Verify(segments=[[160,176,2],[310,330,2]], ...query=”...Are
+                                                                                         <Observation>
+        these the same character or different? Highlight differences in appearance,                                         0s                                                                                        4539s
+        fur, and outfit to support your answer....”)                                                                                 160     176           310     330
+        <Observation>: “The animal at 175-180s is a mole.... The animal at 313-
+        325s is a water vole (...all-white outfit, slender build...).They are not the
+        same character.”                                                                  Answer: (B)
+
+
+Figure 2. Illustration of LensWalk’s reasoning-scheduled active observation on a real trace. The LLM reasoner alternates Scan Search and
+Segment Focus to seek question-relevant evidence, initially misclassifies a mole as the queried water vole and records conflicting memories
+in the subject table (red text), then invokes Stitch Verify to inspect key segments, resolve the contradiction, and arrive at the correct answer.
+
+3.2. Reason-Scheduled Video Observation                                                                 to track its own exploration progress, enabling it to target
+To flexibly acquire evidence, the LensWalk agent schedules                                              under-explored video sections in subsequent steps.
+its visual observation by parameterizing each tool call based
+                                                                                                        3.3. Multi-Granularity Observation Tool Suite
+on its ongoing reasoning. At each step t, the Reasoner
+(Mr ) integrates the user query Q, video metadata Vinfo (e.g.,                                          The Reasoner’s plan is executed by a compact observation
+duration, camera perspective), and the accumulated history                                              toolkit. Designed to enable diverse compositions of obser-
+of prior actions and observations Lt−1 to produce a fully                                               vation contexts, it offers a minimal yet expressive toolset:
+specified plan, at .                                                                                    Scan Search (broad localization), Segment Focus (fine-
+                                                                                                        grained inspection), and Stitched Verify (cross-segment in-
+                          at = Mr (Q, Vinfo , Lt−1 ).
+                                                                                                        tegration), plus a Finish action. This effectively supports the
+This plan at := (ot , qt , It , ρot ) is a tool call that precisely                                     reasoning-driven behaviors analyzed in Section 4.4. Figure
+decides the next observation’s scope and budget, as detailed                                            2 illustrates their arguments and examples.
+below:
+                                                                                                       Scan Search. This tool is designed for efficient, broad
+     ot ∈ O The observation tool to invoke
+                                                                                                        discovery across a specified temporal interval. In addition
+   
+   
+   qt         The guiding sub-question
+   
+   
+                                                                                                        to a guiding sub-question (qt ) and scope controls (It ), the
+     It        Scope and Budget controls (e.g., temporal
+                                                                                                        tool-specific settings (ρScan ) require a partitioning strategy,
+               interval(s), frame count/FPS)
+   
+   
+                                                                                                        defined by either the number of slices (ns ) or the duration
+   
+   
+     ρot       Tool-specific arguments
+   
+                                                                                                        of each slice (ds ). The tool partitions the given interval,
+Executing this plan samples the specified frames (accord-                                               sparsely samples frames from each slice, and queries the
+ing to It and ρot ) and, together with qt , feeds them to the                                           VLM on a slice-by-slice basis. It returns per-slice sum-
+Observer (Mo ), which returns evidence et as a new obser-                                               maries or relevance judgments that indicate the likely lo-
+vation. The plan-observation pair is then appended to the                                               cations of target events. As each slice is processed inde-
+history as a new conversation turn: Lt = [ Lt−1 , {at , et } ].                                         pendently, this operation is inherently parallelizable. This
+The explicit inclusion of controllable scope parameters It                                              makes it well-suited for an initial exploration of still unfa-
+in each action is critical. It transforms the history Lt into                                           miliar intervals or for detecting the presence of object or
+a structured document with precise temporal tags. Further-                                              event cues, as its parallel nature allows for efficient local-
+more, this history of parameterized calls allows the agent                                              ization of potentially relevant sections.
+Segment Focus. This tool executes a focused probe over a            from the new tool observation. It maintains outside the main
+single, continuous time interval, applying a dense sampling         reasoning history Lt , records persistent entities—such as
+strategy as defined by the scope controls (It ) to answer a         people or objects—along with summarized attributes and
+precise sub-question (qt ). It is designed to extract fine-         seen timestamps. Before each reasoning turn, it would be
+grained details, local dynamics, or small visual attributes         inserted into the context and overwrite the previous version.
+that a coarser observation might miss. This operator is             This evolving memory serves a dual purpose: it allows the
+therefore ideal for hypothesis verification, attribute reading,     Reasoner to use canonical identifiers for efficient, consis-
+or disambiguating similar actors and events. It also allows         tent entity reference, eliminating the need to repeatedly re-
+for re-examining the same interval with an even denser sam-         identify entities from the tool history in each reasoning cy-
+pling configuration to clarify previously indistinct observa-       cle. It also provides a clean, structured knowledge base that
+tions, a flexibility not easily available in methods reliant on     the Reasoner consults to strategically plan its subsequent
+pre-embedded video clips.                                           observations. This mechanism manages accumulating en-
+                                                                    tity information to maintain cross-round reference stability,
+Stitched Verify. This tool is designed to observe facts that
+                                                                    and avoids redundant context tokens from lengthy descrip-
+require integrating evidence from multiple, non-contiguous
+                                                                    tions, ensuring the understanding of subjects remains con-
+video segments, such as for before-and-after comparisons,
+                                                                    sistent as it progressively explores the video.
+tracking object transfers, or verifying causal narratives.
+                                                                        Maintaining consistent, reliable memory across multi-
+Its tool-specific settings, ρStitch , take a list of segments
+                                                                    ple reasoning turns is challenging in agentic video under-
+S = [(si , ei , ri ), . . . ], where each entry defines a segment
+                                                                    standing [26, 32, 62], and prior systems often resort to
+by its start time (si ), end time (ei ), and a specific sam-
+                                                                    heavy pre-scanning, summarization, or intricate bookkeep-
+pling rate for the segment (ri ). The operator consolidates
+                                                                    ing schemes [26, 43, 46, 62], which incur considerable com-
+frames from these distinct intervals into a single, coher-
+                                                                    putational and engineering overhead. Our evidence ground-
+ent batch for the VLM. This uniquely supports asymmetric
+                                                                    ing instead maintains a compact, structured state and, by
+sampling—allocating a higher frame rate to action-heavy
+                                                                    tying evidence to temporal scopes and entities in the his-
+segments while using a lower rate for transitional ones. This
+                                                                    tory, allows the agent to revisit ambiguous regions via re-
+enables the agent to verify a complex chain of events in a
+                                                                    observation, as illustrated in Figure 2. Although Observer
+single step, reasoning over a unified visual context rather
+                                                                    or memory-updating errors can still introduce inconsisten-
+than reconciling isolated observations solely in the language
+                                                                    cies, this lightweight combination of grounding and re-
+domain.
+                                                                    observation yields a scalable, self-corrective pipeline that
+3.4. Evidence Grounding for Long-Horizon Coher-                     fits into the reason–plan–observe loop and is supported by
+      ence                                                          the ablations in Section 4.3.
+Because LensWalk runs multiple observation turns at dif-
+                                                                    4. Experiments
+ferent scopes, it must reconcile potentially ambiguous evi-
+dence across them. We therefore introduce two lightweight           4.1. Setting
+grounding components—Timestamp Anchors and a Subject
+                                                                    Datasets. We conduct experiments on challenging long-
+Memory Table—that tie observations to precise temporal
+                                                                    video understanding benchmarks. Specifically, we evalu-
+ranges and globally consistent entity references.
+                                                                    ate LensWalk on LVBench [45] and LongVideoBench (long
+Timestamp Anchors within Tool Observation. During                   split of validation set) [49] for extended temporal com-
+each observation, as in Figure 2, detailed timestamp an-            prehension, and on 3060min split (long split) of Video-
+chors at a specified granularity would be inserted to Ob-           MME [13] for general long-video understanding. In addi-
+server its visual context(frame sequences). These anchors           tion, we report results on two well-established video reason-
+are inserted directly within the tool’s visible frames as text,     ing benchmarks, MMVU [67] and Video-MMMU [17], to
+prompting the Observer to ground its answers with ex-               assess how LensWalk helps on video QA tasks that require
+plicit temporal references (e.g., “at 01:15-01:40”). This           higher-level reasoning. We also include EgoSchema [27] to
+provides the Reasoner with fine-grained temporal cues, en-          cover egocentric video understanding.
+abling it to efficiently pinpoint evidence sources in subse-
+quent planning cycles, schedule re-observations over am-
+                                                                    Baselines. We compare against a broad set of methods for
+biguous ranges, and prune irrelevant sections for more pre-
+                                                                    video understanding: (1) VLM-based, including both pro-
+cise analysis.
+                                                                    prietary and open-source vision-language models such as
+Subject Memory Table for Entity Consistency. After                  o3 [29], GPT-4.1 [30], Gemini-2.5 Pro [9], and Qwen2.5-
+each observation, as in Figure 2, a global Subject Memory           VL-72B [2]. (3) Agentic Video Understanding methods,
+Table Subt is updated by an LLM with entity information             such as VideoAgent [46], VCA [57], MR.Video [32] and
+      Table 1. Comparison on long video benchmarks. For LensWalk, “(·/·)” denotes Rasoner/Observer; “(M )” means “(M /M )”.
+
+                  Methods                      LVBench LongVideoBench Video MME EgoSchema
+                  (Reasoner/Observer)           Overall   (Val) Long Long (w/o sub) Val
+                  Commercial VLMs
+                  Gemini-1.5-Pro [42]            33.1        58.6         67.4       -
+                  Gemini-2.0-Flash [14]          48.3        45.7         63.0      71.2
+                  GPT-4o [18]                    48.9        60.9         65.3      70.4
+                  GPT-4.1 [30]                   51.9        64.6         63.1      72.2
+                  o3 [29]                        57.1        60.6         64.7      63.2
+                  GPT-5 [31]                     59.8        61.8         68.4      73.8
+                  Open-Source VLMs
+                  LLaVA-Video-72B [64]           38.7          -          59.6      74.7
+                  InternVL2.5-78B [7]            43.6          -          62.6       -
+                  Qwen2.5-VL-72B [2]             47.7        54.2         63.1      75.4
+                  AdaReTaKe [47]                 53.3          -          65.0       -
+                  Video Agents and Others
+                  VideoAgent [46]                29.3          -           -        63.2
+                  VCA [57]                       41.3          -           -        73.6
+                  Ego-R1 [43]                     -            -          64.9      68.2
+                  MR. Video [32]                 60.8        61.6         61.8      73.0
+                  Deep Video Discovery [62]      74.2        68.6         67.3      76.6
+                  LensWalk (o3/GPT-4.1)          66.8        69.9         70.0      74.8
+                  LensWalk (o3/Qwen2.5-VL-72B)   59.4        67.3         66.7      77.2
+                  LensWalk (o3)                  68.6        70.6         71.4      74.8
+                  LensWalk (GPT-5)               66.9        68.8         69.2      74.6
+
+
+Deep Video Discovery [62]. Most reported results are from          Mr. Video and Deep Video Discovery, which necessitate a
+official leaderboards or published reports, while we repro-        vast number of extra captions to support their reasoning. On
+duce the results of GPT-4.1 and GPT-5 [31] via official API,       the reasoning-focused MMVU and Video-MMMU bench-
+with uniformly sampling 256 frames following [32, 62].             marks, our framework’s ability to schedule observations for
+More detailed configuration of baselines is in Appendix B.         the specialized o3 model boosts accuracy by an additional
+                                                                   2% and 3%. Beyond absolute gains, LensWalk also enables
+Implementation Details. As a plug-and-play framework,              complementary pairing: using o3 as Reasoner over GPT-
+LensWalk accommodates any combination of reasoning-                4.1 observations surpasses either model alone on MMVU,
+based language and vision-language models. To demon-               and a “self-play” configuration where a single multimodal
+strate its potential, we choose combinations of state-of-the-      reasoning model like o3 serves as both Reasoner and Ob-
+art models such as Qwen2.5-VL-72B, GPT-4.1, o3, and                server provides strong plug-and-play improvements without
+GPT-5(with minimal reasoning effort, both in baseline and          any fine-tuning. We report additional shared-model com-
+ours), with the Reasoner model also serving as the memory          parisons of other agents and a static extracted-frames base-
+updater by default. Proprietary models are queried via their       line in Appendix Table 6, 8.
+official APIs. We constrain the agent to a maximum of 20
+                                                                   4.3. Ablation and Analysis
+tool invocations, one per turn. The per-call frame budgets
+for Scan Search, Segment Focus, and Stitched Verify are            Applicability to Open-Source Models. As shown in Ta-
+set at 180, 32, and 128, respectively, allowing the agent to       ble 3, we validated the framework’s generality by substi-
+allocate its observation budget freely within these limits.        tuting various models as Reasoner and Observer. The
+                                                                   results indicate that LensWalk effectively boosts weaker
+4.2. Main Results                                                  Observers, such as Qwen2.5-VL-7B. Moreover, the open-
+As demonstrated in Table 1 and 2, LensWalk achieves                source Reasoner Qwen3-235B-A22B [55] demonstrates a
+strong performance across long video understanding and             positive impact, notably improving Qwen2.5-VL-7B by
+video reasoning benchmarks. The framework signif-                  4.3%. However, we observed this open-source Rea-
+icantly enhances powerful base models, outperforming               soner struggles to enhance stronger Observers like GPT-4.1
+all Observer baselines and multimodal Reasoners like               (+0.1%) and Qwen2.5-VL-72B (-0.6%), suggesting its gen-
+o3 and GPT-5 that reason directly over video frames.               erated observation plans are less effective than these mod-
+LensWalk consistently surpasses prior agentic methods, no-         els’ innate reasoning capabilities. This finding highlights
+tably achieving over 4% higher accuracy on the challenging         the decisive role of the Reasoner’s cognitive strength in
+VideoMME-Long benchmark than leading approaches like               guiding the acquisition of crucial visual evidence. See more
+Table 2. Comparison on video reasoning benchmarks. For LensWalk, “(·/·)”                   Table 3. Results on more Reasoner and Observer
+denotes Reasoner/Observer; “(M )” means “(M /M )”.                                         choices on VideoMME (long split).
+
+    Methods              MMVU           Video-MMMU                                          Observer         Reasoner       Acc. (%)
+    (Reasoner/Observer)   MC   Percep. Compreh. Adap. Overall                                                -                63.1
+    Gemini-1.5-Flash[42]  66.6  57.33    49.00  43.00 49.78                                 GPT-4.1          o3            70.0 (+6.9)
+    Gemini-1.5-Pro[42]    74.7  59.00    53.33  49.33 53.89                                                Qwen3-235B-A22B 63.2 (+0.1)
+    GPT-4o[18]            78.1  66.00    62.00  55.67 61.22                                                -                  59.4
+    GPT-4.1[30]           76.3  76.00    70.67  55.67 67.44                                 GPT-4.1-mini   o3              66.0 (+6.6)
+    o3[29]                78.9  79.33    75.67  71.33 75.44                                                Qwen3-235B-A22B 61.0 (+1.6)
+    Aria[22]              60.6  65.67    46.67  40.00 50.78                                                -                  63.1
+    InternVL2-8B[8]       49.1  47.33    33.33  31.67 37.44                                 Qwen2.5-VL-72B o3              66.7 (+3.6)
+    Qwen2.5-VL-7B[2]      60.6  58.33    44.33  39.67 47.44                                                Qwen3-235B-A22B 62.5 (-0.6)
+    Qwen-2.5-VL-72B[2]    69.3  69.33    61.00  50.33 60.22                                                -                  55.4
+    LensWalk (o3/GPT-4.1) 80.9  82.00    77.67  71.67 77.11                                 Qwen2.5-VL-7B o3               61.3 (+5.9)
+    LensWalk (o3)         79.2  81.33    81.33  72.33 78.33                                                Qwen3-235B-A22B 59.7 (+4.3)
+
+
+Table 4. Ablation on the Observation Tools and Reasoning coher-                      72                           video mme accuracy
+ence modules of ours(o3/GPT-4.1) on Video-MME (long split).                                                       peak token number
+                                                                                     70                           overall token number
+                                                                                                                                         106
+   Observation Tools Reasoning Coherence
+                                         VideoMME                                    68
+
+                                                                      Accuracy (%)                                                         Token Number
+  Scan Segment Stitch Timestamp Subject     Long
+ Search Focus Verify Anchor     Memory                                               66
+          ✓       ✓                         65.4                                                                                         105
+   ✓              ✓                         68.1                                     64
+   ✓      ✓                                 66.8
+   ✓      ✓       ✓      ✓                  69.7                                     62
+   ✓      ✓       ✓               ✓         69.4
+                                                                                     60                                                  104
+   ✓      ✓       ✓      ✓        ✓         70.0                                          DVo3 )               Ad o3
+                                                                                                                 are
+                                                                                       Eg D
+                                                                                     rs(  o-
+                                                                                      M3 R1                    Ge take
+                                                                             Ou         Ag
+                                                                                      MR ent
+                                                                                        .Vi de                   m
+                                                                                                             Ge -2.0
+                                                                                                               m- -f
+results on more open-source reasoner models in Appendix
+                                                                                               o                 1.5 -Pro
+                                                                    Figure 3. Comparison of video understanding methods on accu-
+Table 8
+                                                                    racy and token efficiency. Abbrev. of Gemini: Gem.
+
+Ablation on Components. We conducted an ablation                    and Ego-R1 that rely on pre-generating captions for an en-
+study to assess the contribution of each component on               tire video, much of which is irrelevant. Further compar-
+VideoMME(long split), with results shown in Table 4. The            isons in Appendix (Table 6) show that LensWalk achieves
+observation tools prove to be highly complementary. Re-             competitive accuracy with substantially fewer frames and
+moving Scan Search, which is critical for efficiently dis-          much less end-to-end inference time. Furthermore, while
+covering cues, leads to the largest accuracy drop of 4.6%.          consuming total tokens comparable to single-forward base-
+The absence of Stitch Verify, which impacts the ability to          lines, our framework’s reasoning-driven schedule strategi-
+connect disparate scenes for causal analysis, and Segment           cally observes across multiple turns. This approach not only
+Focus, for extracting fine-grained facts, also degrades per-        enhances performance but also significantly lowers the peak
+formance by 3.2% and 1.9%, respectively. Furthermore,               token count per turn, alleviating the severe memory pressure
+the reasoning coherence modules provide distinct bene-              and throughput bottlenecks of processing a massive, mono-
+fits. Adding the Timestamp Anchor boosts performance to             lithic context. In addition, as detailed in Appendix (Ta-
+69.7%, and incorporating the Subject Memory raises it to            ble 7), the framework adaptively allocates its observation
+the final 70.0%, underscoring the importance of both fine-          budget, converging quickly on simple queries while scaling
+grained temporal alignment and consistent entity tracking           computation for longer or reasoning-intensive cases.
+in video observation-reason loops.
+                                                                    4.4. Analysis on Tool-Call Behaviour
+Efficiency Analysis. To provide a fair comparison of ef-            Our design empowers the agent to control its observation
+ficiency independent of model deployment or network con-            scope, enabling it to devise diverse observational paths
+ditions, we mainly use two key metrics: total token cost            based on accumulated experience. To better analyze this,
+and peak per-turn context tokens. As in Figure 3, our               we examine the agent’s tool calls and identify distinct be-
+reasoning-driven framework avoids the substantial upfront           havioral patterns by considering the observation query, the
+cost of prior methods like Deep Video Discovery (DVD)               specific tool selected, and the observational scope at each
+                                                       Frame
+        Behavior Type                                                           DI                                  PZ                                    IV                                   SR                           SP                            RP
+        (Ratio)                                                        Direct Inquiry                    Progressive Zoom-in                     Integrative Verify                Strategic Reflection           Scope Partitioning                 Static Repetition
+        #Frames / Score                   Score
+
+                         SR (5.2%)
+                                        SP (2.1%)                                                         RP (2.4%)                                                             RP (1.3%)                                             RP (6.8%)
+                                        481.8 / 63.2                                         SP (7.3%)                                                           SP (7.9%)                                                            806.2 / 49.2
+                         505.7 / 46.8                                                        440.6 / 65.6 724.4 / 42.9                                           428.9 / 66.2
+                                                                                                                                                                                691.9 / 41.7                           SP (5.6%)                           DI (15.7%)
+                                                                                                                                                                                                                       556.1 / 62.0                        159.8 / 88.7
+                                                                                                                                  DI (24.7%)
+                                                                                                                                  159.3 / 88.0
+                                                                                                                                                                                                     DI (31.4%)
+       IV (19.1%)                                                                                                                                                                                    164.1 / 87.2
+       315.6 / 66.9                                                                                                                              SR (19.9%)
+                                                                       SR (21.7%)                                                                688.5 / 59.2
+                                                                       661.3 / 51.3
+                                                               DI (49.2%)
+                                                               169.7 / 78.3
+                                                                                                                                                                                                             SR (31.1%)
+                                                                                                                                                                                                             753.4 / 53.2
+                                                                                                                                                  IV (2.6%)
+                                                                              IV (3.6%)                                                           550.6 / 82.6
+                                                                              537.8 / 71.9                                                                                                                                                                         PZ (39.1%)
+                                                                                                                                                                                                                                                                   364.1 / 65.3
+          PZ (24.3%)
+          284.7 / 58.0                                                                                                                                                                                                       IV (1.8%)
+                                                                                                                         PZ (40.3%)
+                                                                                                                                                                                PZ (36.9%)                                   621.5 / 87.5
+                                                                                                                         336.2 / 70.9
+                                                                                                                                                                                315.5 / 66.0
+
+
+                                 𝑀! : GPT-5                                                           𝑀! : o3                                                                𝑀! : o3                                                 𝑀! : o3
+                                 𝑀" : GPT-5                                                        𝑀" : GPT-4.1                                                              𝑀" : o3                                          𝑀" : Qwen2.5-VL-72b
+                      #Frames / Score = 315.6 / 69.2                                 #Frames / Score = 387.1 / 70.0                                           #Frames / Score = 341.8 / 71.4                                 #Frames / Score = 498.4 / 66.7
+
+
+
+Figure 4. Tool-call behavior of LensWalk across model recipes, visualized following [63]. We group behaviour into six strategy types
+and show their ratio (sector angle), average frame cost (dashed polygon), and accuracy (noted as score; sector radius), revealing adaptive
+allocation of more frames to harder queries and diverse exploration under uncertainty.
+
+step. We categorize these patterns into six primary modes                                                                                                 gic Reflection or Integrative Verify to expand and consol-
+(in Figure 4, see Appendix C for details and examples.):                                                                                                  idate evidence. These recovery mechanisms yield more
+Direct Inquiry. Resolving a task in a single, confident step                                                                                              stable and higher accuracy than the rare looping failures
+without prior exploration, typically for high-level or tempo-                                                                                             that remain.
+rally anchored questions.                                                                                                                               • Observer quality shapes strategy and efficiency. For
+    Progressive Zoom-in. Starting from a broad scan to lo-                                                                                                a fixed Reasoner, the Observer’s capability is a critical
+cate candidate moments and then zooming into promising                                                                                                    performance driver. A strong Observer (e.g., o3) sup-
+segments for more detailed inspection.                                                                                                                    plies clear, decisive evidence that directly addresses the
+    Scope Partitioning. Partitioning the timeline into dis-                                                                                               query’s intent, enabling frequent, low-cost Direct Inquiry.
+tinct scopes, analyzing them independently, and integrating                                                                                               In contrast, weaker Observers (e.g., Qwen2.5-VL-72B)
+the resulting insights purely at the reasoning level to form a                                                                                            introduce ambiguity, pushing the agent into more com-
+conclusion.                                                                                                                                               plex and expensive observation plans such as retreating
+    Strategic Reflection. After a focused search hits a dead                                                                                              to broader scans or repeated verification. This gap high-
+end, pausing to reassess the approach and launching a new,                                                                                                lights that high-quality perception is paramount for cost-
+broader scan over alternative regions or hypotheses.                                                                                                      effective reasoning.
+    Integrative Verify. Verifying a complex hypothesis by
+jointly inspecting multiple key moments in a single stitched                                                                                            5. Conclusion
+observation, enabling holistic confirmation of the conclu-
+sion.                                                                                                                                                   In this work, we introduced LensWalk, an agentic frame-
+    Static Repetition. Falling into an unproductive cycle of                                                                                            work that actively scheduled video observation based on
+nearly identical observations over the same region with a                                                                                               reasoning in each iteration. By granting a language model
+static intent, showing little progress or change in strategy.                                                                                           the ability to dynamically control what to see, and at
+    Analysis of these patterns reveals several key findings:                                                                                            what granularity, LensWalk transforms video understand-
+• Difficulty-aware cost allocation. The agent intuitively                                                                                               ing from a static recognition task into an adaptive reason-
+   allocates more observational effort to challenging prob-                                                                                             plan-observe loop. This design not only yields substan-
+   lems. Hard questions with lower accuracy are associated                                                                                              tial, plug-and-play performance gains across diverse multi-
+   with longer, more costly observation traces, while sim-                                                                                              modal models and long-video benchmarks, but also uncov-
+   ple cases are often resolved efficiently with less frames or                                                                                         ers emergent cognitive behaviors such as progressive zoom-
+   even single-step inquiries. This indicates that LensWalk                                                                                             in, reflective replanning, and integrative verification. Our
+   adapts its observation depth based on the evolving uncer-                                                                                            findings highlight that scalable video intelligence lies not
+   tainty of each query.                                                                                                                                only in ever-larger frozen representations, but in scalable vi-
+• Emergent reflective strategies replace inefficient loops.                                                                                             sual cognition—where observation is actively orchestrated
+   Empowered by diverse choices in its observation plan, the                                                                                            by reasoning intent. We believe LensWalk provides a con-
+   agent largely avoids the “Static Repetition” behaviour re-                                                                                           crete step towards the next generation of self-directed mul-
+   ported in prior work[43, 62]. When faced with uncer-                                                                                                 timodal agents, capable of learning how to observe as they
+   tainty, it instead invokes reflective patterns such as Strate-                                                                                       think, and ultimately, how to think through seeing.
+Acknowlegment                                                        [12] Kaituo Feng, Kaixiong Gong, Bohao Li, Zonghao Guo,
+                                                                          Yibing Wang, Tianshuo Peng, Junfei Wu, Xiaoying Zhang,
+This work is supported by the National Natural Sci-                       Benyou Wang, and Xiangyu Yue. Video-R1: Reinforcing
+ence Foundation of China (Nos.62495084, 62376259).                        video reasoning in MLLMs. arXiv, 2025. 3
+                                                                     [13] Chaoyou Fu, Yuhan Dai, Yongdong Luo, Lei Li, Shuhuai
+                                                                          Ren, Renrui Zhang, Zihan Wang, Chenyu Zhou, Yunhang
+References                                                                Shen, Mengdan Zhang, et al. Video-MME: the first-ever
+                                                                          comprehensive evaluation benchmark of multimodal LLMs
+ [1] Jason McKenzie Alexander, Johannes Himmelreich, and                  in video analysis. In Proceedings of the IEEE/CVF Con-
+     Christopher Thompson. Epistemic landscapes, optimal                  ference on Computer Vision and Pattern Recognition, pages
+     search, and the division of cognitive labor. Philosophy of           24108–24118, 2025. 1, 5, 13
+     Science, 82(3):424–453, 2015. 1                                 [14] Google DeepMind. Introducing gemini 2.0: Our new AI
+ [2] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin              model for the agentic era, 2024. 6
+     Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun            [15] Daya Guo, Dejian Yang, Haowei Zhang, Junxiao Song,
+     Tang, et al. Qwen2.5-VL technical report. arXiv, 2025. 1, 5,         Ruoyu Zhang, Runxin Xu, Qihao Zhu, Shirong Ma, Peiyi
+     6, 7, 16                                                             Wang, Xiao Bi, et al. DeepSeek-R1: Incentivizing reasoning
+ [3] Shyamal Buch, Arsha Nagrani, Anurag Arnab, and Cordelia              capability in LLMs via reinforcement learning. arXiv, 2025.
+     Schmid. Flexible frame selection for efficient video reason-         Also known as DeepSeek-R1. 1, 3
+     ing. In Proceedings of the IEEE/CVF Conference on Com-          [16] Kai Hu, Feng Gao, Xiaohan Nie, Peng Zhou, Son Tran,
+     puter Vision and Pattern Recognition, pages 29071–29082,             Tal Neiman, Lingyun Wang, Mubarak Shah, Raffay Hamid,
+     2025. 3                                                              Bing Yin, et al. M-LLM-based video frame selection for effi-
+ [4] Meng Cao, Haoze Zhao, Can Zhang, Xiaojun Chang, Ian                  cient video understanding. In Proceedings of the IEEE/CVF
+     Reid, and Xiaodan Liang.         Ground-R1: Incentivizing            Conference on Computer Vision and Pattern Recognition,
+     grounded visual reasoning via reinforcement learning. arXiv,         pages 13702–13712, 2025. 3
+     2025. 3                                                         [17] Kairui Hu, Penghao Wu, Fanyi Pu, Wang Xiao, Yuanhan
+ [5] Sanjay Chandrasekharan and Terry Stewart. Reactive agents            Zhang, Xiang Yue, Bo Li, and Ziwei Liu. Video-MMMU:
+     learn to add epistemic structures to the world. In Proceed-          Evaluating knowledge acquisition from multi-discipline pro-
+     ings of the Annual Meeting of the Cognitive Science Society,         fessional videos. arXiv preprint arXiv:2501.13826, 2025. 5,
+     2004. 1                                                              13
+ [6] Zehui Chen, Kuikun Liu, Qiuchen Wang, Jiangning Liu,            [18] Aaron Hurst, Adam Lerer, Adam P Goucher, Adam Perel-
+     Wenwei Zhang, Kai Chen, and Feng Zhao. MindSearch:                   man, Aditya Ramesh, Aidan Clark, AJ Ostrow, Akila Weli-
+     Mimicking human minds elicits deep AI searcher. arXiv,               hinda, Alan Hayes, Alec Radford, et al. Gpt-4o system card.
+     2024. arXiv:2407.20183. 3                                            arXiv preprint arXiv:2410.21276, 2024. 1, 6, 7, 12
+                                                                     [19] Chaoya Jiang, Yongrui Heng, Wei Ye, Han Yang, Haiyang
+ [7] Zhe Chen, Weiyun Wang, Yue Cao, Yangzhou Liu, Zhang-
+                                                                          Xu, Ming Yan, Ji Zhang, Fei Huang, and Shikun Zhang.
+     wei Gao, Erfei Cui, Jinguo Zhu, Shenglong Ye, Hao Tian,
+                                                                          VLM-R3 : Region recognition, reasoning, and refinement for
+     Zhaoyang Liu, et al. Expanding performance boundaries of
+                                                                          enhanced multimodal chain-of-thought. arXiv, 2025. 3
+     open-source multimodal models with model, data, and test-
+                                                                     [20] Dongzhi Jiang, Renrui Zhang, Ziyu Guo, Yanmin Wu, Jiayi
+     time scaling. arXiv preprint arXiv:2412.05271, 2024. 6
+                                                                          Lei, Pengshuo Qiu, Pan Lu, Zehui Chen, Chaoyou Fu, Guan-
+ [8] Zhe Chen, Weiyun Wang, Hao Tian, Shenglong Ye, Zhang-                glu Song, et al. MMSearch: Benchmarking the potential of
+     wei Gao, Erfei Cui, Wenwen Tong, Kongzhi Hu, Jiapeng                 large models as multi-modal search engines. arXiv, 2024. 3
+     Luo, Zheng Ma, et al. How far are we to gpt-4v? closing         [21] Bowen Jin, Hansi Zeng, Zhenrui Yue, Jinsung Yoon, Sercan
+     the gap to commercial multimodal models with open-source             Arik, Dong Wang, Hamed Zamani, and Jiawei Han. Search-
+     suites. Science China Information Sciences, 67(12):220101,           r1: Training llms to reason and leverage search engines with
+     2024. 7                                                              reinforcement learning. arXiv preprint arXiv:2503.09516,
+ [9] Gheorghe Comanici, Eric Bieber, Mike Schaekermann, Ice               2025. 3
+     Pasupat, Noveen Sachdeva, Inderjit Dhillon, Marcel Blis-        [22] Dongxu Li, Yudong Liu, Haoning Wu, Yue Wang, Zhiqi
+     tein, Ori Ram, Dan Zhang, Evan Rosen, et al. Gemini 2.5:             Shen, Bowen Qu, Xinyao Niu, Fan Zhou, Chengen Huang,
+     Pushing the frontier with advanced reasoning, multimodality,         Yanpeng Li, et al. Aria: An open multimodal native mixture-
+     long context, and next generation agentic capabilities. arXiv        of-experts model. arXiv preprint arXiv:2410.05993, 2024. 7
+     preprint arXiv:2507.06261, 2025. 5                              [23] Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee.
+[10] DeepSeek-AI. DeepSeek-V3. https://github.com/                        Visual instruction tuning. Advances in Neural Information
+     deepseek-ai/DeepSeek-V3, 2025. Official GitHub                       Processing Systems, 36:34892–34916, 2023. 1
+     repository, accessed March 18, 2026. 16                         [24] Shuming Liu, Chen Zhao, Tianqi Xu, and Bernard Ghanem.
+[11] Jiazhan Feng, Shijue Huang, Xingwei Qu, Ge Zhang, Yu-                BOLT: Boost large vision-language model without train-
+     jia Qin, Baoquan Zhong, Chengquan Jiang, Jinxin Chi, and             ing for long-form video understanding. In Proceedings of
+     Wanjun Zhong. ReTool: Reinforcement learning for strate-             the IEEE/CVF Conference on Computer Vision and Pattern
+     gic tool use in LLMs. arXiv, 2025. arXiv:2504.11536. 3               Recognition, pages 3318–3327, 2025. 1, 3
+[25] Ziyu Liu, Yuhang Zang, Yushan Zou, Zijian Liang, Xiaoyi             Proceedings of the IEEE/CVF International Conference on
+     Dong, Yuhang Cao, Haodong Duan, Dahua Lin, and Jiaqi                Computer Vision, pages 11888–11898, 2023. 3
+     Wang. Visual agentic reinforcement fine-tuning. arXiv,         [41] Xi Tang, Jihao Qiu, Lingxi Xie, Yunjie Tian, Jianbin Jiao,
+     2025. 3                                                             and Qixiang Ye. Adaptive keyframe sampling for long video
+[26] Lin Long, Yichen He, Wentao Ye, Yiyuan Pan, Yuan Lin,               understanding. In Proceedings of the IEEE/CVF Conference
+     Hang Li, Junbo Zhao, and Wei Li. Seeing, listening, remem-          on Computer Vision and Pattern Recognition, pages 29118–
+     bering, and reasoning: A multimodal agent with long-term            29128, 2025. 1, 3
+     memory. arXiv, 2025. 1, 2, 3, 5                                [42] Gemini Team, Petko Georgiev, Ving Ian Lei, Ryan Burnell,
+[27] Karttikeya Mangalam, Raiymbek Akshulakov, and Jitendra              Libin Bai, Anmol Gulati, Garrett Tanzer, Damien Vincent,
+     Malik. EgoSchema: A diagnostic benchmark for very long-             Zhufeng Pan, Shibo Wang, et al. Gemini 1.5: Unlocking
+     form video language understanding. In Advances in Neural            multimodal understanding across millions of tokens of con-
+     Information Processing Systems, pages 46212–46244, 2023.            text. arXiv preprint arXiv:2403.05530, 2024. 6, 7
+     5, 13                                                          [43] Shulin Tian, Ruiqi Wang, Hongming Guo, Penghao Wu,
+[28] Jiahao Meng, Shuyang Sun, Yue Tan, Lu Qi, Yunhai Tong,              Yuhao Dong, Xiuying Wang, Jingkang Yang, Hao Zhang,
+     Xiangtai Li, and Longyin Wen. CyberV: Cybernetics for               Hongyuan Zhu, and Ziwei Liu. Ego-R1: Chain-of-Tool-
+     test-time scaling in video understanding. arXiv, 2025. 1            Thought for ultra-long egocentric video reasoning. arXiv,
+[29] OpenAI. Introducing OpenAI o3 and o4-mini. https://                 2025. 1, 2, 3, 5, 6, 8, 13
+     openai.com/index/introducing-o3-and-o4-                        [44] Qiuchen Wang, Ruixue Ding, Yu Zeng, Zehui Chen, Lin
+     mini/, 2025. 1, 5, 6, 7, 16                                         Chen, Shihang Wang, Pengjun Xie, Fei Huang, and Feng
+[30] OpenAI. Introducing GPT-4.1 in the API, 2025. 5, 6, 7, 16           Zhao. VRAG-RL: Empower vision-perception-based RAG
+[31] OpenAI. GPT-5 is here, 2025. 6, 16                                  for visually rich information understanding via iterative rea-
+[32] Ziqi Pang and Yu-Xiong Wang. Mr. Video: MapReduce is                soning with reinforcement learning. arXiv, 2025. 3
+     the principle for long video understanding. arXiv, 2025. 1,    [45] Weihan Wang, Zehai He, Wenyi Hong, Yean Cheng, Xiao-
+     3, 5, 6, 13                                                         han Zhang, Ji Qi, Ming Ding, Xiaotao Gu, Shiyu Huang, Bin
+[33] Jongwoo Park, Kanchana Ranasinghe, Kumara Kahatapitiya,             Xu, et al. LVBench: an extreme long video understanding
+     Wonjeong Ryu, Donghyun Kim, and Michael S. Ryoo. Too                benchmark. In Proceedings of the IEEE/CVF International
+     many frames, not all useful: Efficient strategies for long-         Conference on Computer Vision, pages 22958–22967, 2025.
+     form video QA. arXiv, 2024. 3                                       1, 5, 12
+[34] Thomas Parr and Karl J Friston. Uncertainty, epistemics and    [46] Xiaohan Wang, Yuhui Zhang, Orr Zohar, and Serena Yeung-
+     active inference. Journal of the Royal Society Interface, 14        Levy. VideoAgent: Long-form video understanding with
+     (136):20170376, 2017. 1                                             large language model as agent. In Proceedings of the
+[35] Xubin Ren, Lingrui Xu, Long Xia, Shuaiqiang Wang, Dawei             European Conference on Computer Vision, pages 58–76.
+     Yin, and Chao Huang. VideoRAG: Retrieval-augmented                  Springer, 2024. 3, 5, 6, 13
+     generation with extreme long-context videos. arXiv, 2025.      [47] Xiao Wang, Qingyi Si, Shiyu Zhu, Jianlong Wu, Li Cao, and
+     1, 3                                                                Liqiang Nie. AdaReTake: Adaptive redundancy reduction to
+[36] Xiaoqian Shen, Yunyang Xiong, Changsheng Zhao, Lemeng               perceive longer for video-language understanding. In Find-
+     Wu, Jun Chen, Chenchen Zhu, Zechun Liu, Fanyi Xiao, Bal-            ings of the Association for Computational Linguistics: ACL
+     akrishnan Varadarajan, Florian Bordes, et al. LongVU: Spa-          2025, pages 5417–5432, 2025. 1, 3, 6
+     tiotemporal adaptive compression for long video-language       [48] Ziyang Wang, Jaehong Yoon, Shoubin Yu, Md Mohaiminul
+     understanding. arXiv, 2024. 1, 3                                    Islam, Gedas Bertasius, and Mohit Bansal. Video-RTS: Re-
+[37] Enxin Song, Wenhao Chai, Guanhong Wang, Yucheng                     thinking reinforcement learning and test-time scaling for ef-
+     Zhang, Haoyang Zhou, Feiyang Wu, Haozhe Chi, Xun Guo,               ficient and enhanced video reasoning. In Proceedings of the
+     Tian Ye, Yanting Zhang, et al. Moviechat: From dense token          Conference on Empirical Methods in Natural Language Pro-
+     to sparse memory for long video understanding. In Proceed-          cessing, pages 28114–28128, 2025. 3
+     ings of the IEEE/CVF Conference on Computer Vision and         [49] Haoning Wu, Dongxu Li, Bei Chen, and Junnan Li.
+     Pattern Recognition, pages 18221–18232, 2024. 3                     LongVideoBench: a benchmark for long-context interleaved
+[38] Alex Su, Haozhe Wang, Weiming Ren, Fangzhen Lin, and                video-language understanding. Advances in Neural Informa-
+     Wenhu Chen. Pixel Reasoner: Incentivizing pixel-space rea-          tion Processing Systems, 37:28828–28857, 2024. 1, 5, 12
+     soning with curiosity-driven reinforcement learning. arXiv,    [50] Jinming Wu, Zihao Deng, Wei Li, Yiding Liu, Bo You, Bo
+     2025. 3                                                             Li, Zejun Ma, and Ziwei Liu. MMSearch-R1: Incentivizing
+[39] Zhaochen Su, Linjie Li, Mingyang Song, Yunzhuo Hao,                 LMMs to search. arXiv, 2025. 3
+     Zhengyuan Yang, Jun Zhang, Guanjie Chen, Jiawei Gu, Jun-       [51] Junfei Wu, Jian Guan, Kaituo Feng, Qiang Liu, Shu Wu,
+     tao Li, Xiaoye Qu, et al. OpenThinkIMG: Learning to think           Liang Wang, Wei Wu, and Tieniu Tan. Reinforcing spatial
+     with images via visual tool reinforcement learning. arXiv,          reasoning in vision-language models with interwoven think-
+     2025. 3                                                             ing and visual drawing. arXiv, 2025. 3
+[40] Dídac Surís, Sachit Menon, and Carl Vondrick. ViperGPT:        [52] Mingyuan Wu, Jingcheng Yang, Jize Jiang, Meitang Li,
+     Visual inference via Python execution for reasoning. In             Kaizhuo Yan, Hanchao Yu, Minjia Zhang, Chengxiang Zhai,
+     and Klara Nahrstedt. VTool-R1: VLMs learn to think with        [66] Yi-Fan Zhang, Xingyu Lu, Shukang Yin, Chaoyou Fu, Wei
+     images via reinforcement learning on multimodal tool use.           Chen, Xiao Hu, Bin Wen, Kaiyu Jiang, Changyi Liu, Tianke
+     arXiv, 2025. 3                                                      Zhang, et al. Thyme: Think beyond images. arXiv, 2025. 3
+[53] Zhiyou Xiao, Qinhan Yu, Binghui Li, Geng Chen, Chong           [67] Yilun Zhao, Haowei Zhang, Lujing Xie, Tongyan Hu, Guo
+     Chen, and Wentao Zhang. M2IO-R1: An efficient RL-                   Gan, Yitao Long, Zhiyuan Hu, Weiyuan Chen, Chuhan
+     enhanced reasoning framework for multimodal retrieval aug-          Li, Zhijian Xu, et al. MMVU: Measuring expert-level
+     mented multimodal generation. arXiv, 2025. 3                        multi-discipline video understanding. In Proceedings of
+[54] Yi Xu, Chengzu Li, Han Zhou, Xingchen Wan, Caiqi Zhang,             the IEEE/CVF Conference on Computer Vision and Pattern
+     Anna Korhonen, and Ivan Vulić. Visual Planning: Let’s think        Recognition, pages 8475–8489, 2025. 5, 13
+     only with images. arXiv, 2025. 3                               [68] Ziwei Zheng, Michael Yang, Jack Hong, Chenxiao Zhao,
+[55] An Yang, Anfeng Li, Baosong Yang, Beichen Zhang,                    Guohai Xu, Le Yang, Chao Shen, and Xing Yu. Deepeyes:
+     Binyuan Hui, Bo Zheng, Bowen Yu, Chang Gao, Chengen                 Incentivizing thinking with images via reinforcement learn-
+     Huang, Chenxu Lv, et al. Qwen3 technical report. arXiv              ing. arXiv, 2025. 3
+     preprint arXiv:2505.09388, 2025. 6, 16                         [69] Yiyang Zhou, Yangfan He, Yaofeng Su, Siwei Han, Joel
+[56] Chenyu Yang, Xuan Dong, Xizhou Zhu, Weijie Su, Jiahao               Jang, Gedas Bertasius, Mohit Bansal, and Huaxiu Yao.
+     Wang, Hao Tian, Zhe Chen, Wenhai Wang, Lewei Lu, and                ReAgent-V: A reward-driven multi-agent framework for
+     Jifeng Dai. PVC: Progressive visual token compression for           video understanding. arXiv, 2025. 1, 3
+     unified image and video processing in large vision-language    [70] Muzhi Zhu, Hao Zhong, Canyu Zhao, Zongze Du, Zheng
+     models. In Proceedings of the IEEE/CVF Conference on                Huang, Mingyu Liu, Hao Chen, Cheng Zou, Jingdong Chen,
+     Computer Vision and Pattern Recognition, pages 24939–               Ming Yang, et al. Active-O3: Empowering multimodal large
+     24949, 2025. 3                                                      language models with active perception via GRPO. arXiv,
+[57] Zeyuan Yang, Delin Chen, Xueyang Yu, Maohao Shen, and               2025. 3
+     Chuang Gan. VCA: Video curious agent for long video un-
+     derstanding. In Proceedings of the IEEE/CVF International
+     Conference on Computer Vision, pages 20168–20179, 2025.
+     5, 6
+[58] Sicheng Yu, Chengkai Jin, Huanyu Wang, Zhenghao Chen,
+     Sheng Jin, Zhongrong Zuo, Xiaolei Xu, Zhenbang Sun,
+     Bingni Zhang, Jiawei Wu, et al. Frame-Voyager: Learning
+     to query frames for video large language models. In Interna-
+     tional Conference on Learning Representations, Singapore,
+     2025. 1, 3
+[59] Z.ai. GLM-4.7: Advancing the Coding Capability. https:
+     //z.ai/blog/glm-4.7, 2025. Official blog post, ac-
+     cessed March 18, 2026. 16
+[60] Shaojie Zhang, Jiahui Yang, Jianqin Yin, Zhenbo Luo, and
+     Jian Luan. Q-frame: Query-aware frame selection and multi-
+     resolution adaptation for video-LLMs. arXiv, 2025. 3
+[61] Xintong Zhang, Zhi Gao, Bofei Zhang, Pengxiang Li, Xi-
+     aowen Zhang, Yang Liu, Tao Yuan, Yuwei Wu, Yunde Jia,
+     Song-Chun Zhu, et al. Chain-of-Focus: Adaptive visual
+     search and zooming for multimodal reasoning via rl. arXiv
+     preprint arXiv:2505.15436, 2025. 3
+[62] Xiaoyi Zhang, Zhaoyang Jia, Zongyu Guo, Jiahao Li, Bin
+     Li, Houqiang Li, and Yan Lu. DVD: Deep video discovery:
+     Agentic search with tool use for long-form video understand-
+     ing. arXiv, 2025. arXiv:2505.18079. 3, 5, 6, 8
+[63] Xiaoyi Zhang, Zhaoyang Jia, Zongyu Guo, Jiahao Li, Bin
+     Li, Houqiang Li, and Yan Lu. Deep Video Discovery: Agen-
+     tic search with tool use for long-form video understanding.
+     arXiv, 2025. 2, 8, 13
+[64] Yuanhan Zhang, Jinming Wu, Wei Li, Bo Li, Zejun MA,
+     Ziwei Liu, and Chunyuan Li. Video instruction tuning with
+     synthetic data, 2024. 6
+[65] Yunzhu Zhang, Yu Lu, Tianyi Wang, Fengyun Rao, Yi Yang,
+     and Linchao Zhu. FlexSelect: Flexible token selection for
+     efficient long video understanding. arXiv, 2025. 3
+  LensWalk: Agentic Video Understanding by Planning How You See in Videos
+                                               Supplementary Material
+A. Method Details                                                 Subject Memory Update Prompts. When subject-level
+                                                                  memory is enabled, the agent uses a dedicated memory-
+This appendix provides detailed designs of the LensWalk           update prompt to reconcile subject information from per-
+agent, including the overall reason–plan–observe algorithm        step observations with a global subject registry. The con-
+used in our framework, the concrete prompts for each mod-         crete memory-update prompt is described in Figure 10.
+ule, and tool schemas.
+                                                                  A.3. Tool Schema, Format, and Signatures
+A.1. Algotithm Demonstration                                      We next describe the tool schema exposed to the Reasoner.
+We present abstract pseudocode for the LensWalk                   Tool calls of Reasoner must follow the given JSON schema.
+reason–plan–observe loop in Algorithm 1.                   Us-    It is provided with a tool name, a short natural-language
+ing the notation of Section 3, it shows how each                  description, and an arguments object whose fields
+Reasoner plan at          =    (ot , qt , It , ρot ) over tools   include names, types, optionality, and brief semantic de-
+O = {Scan Search, Segment Focus, Stitched Verify, Finish}         scriptions. The full instantiation for the LensWalk tools is
+is translated into one or more VLM-visible context groups,        shown in Fig. 11.
+how the Observer Mo is queried on those groups, and how
+the resulting time-anchored evidence and subject table state      B. Evaluation Details
+Subt are threaded through the multi-turn loop.
+                                                                  B.1. Implementation Details
+A.2. Prompt Design                                                Models. Table 5 lists the models used as Reasoner/Ob-
+                                                                  server in our experiments in Section 4. “Releases” specifies
+We list the main prompts used by the planning Reasoner
+                                                                  the time of the first public API or open-weight announce-
+and the tool-specific Observer models. All prompts are
+                                                                  ment, and ”Version” column corresponds to the exact alias
+shown verbatim as they are instantiated in our implemen-
+                                                                  used in our experiments.
+tation.
+
+                                                                  LensWalk Agent settings. We restrict the dialogue to at
+Reasoner Prompt. The dedicated system prompt driv-                most 20 tool-calling turns. For the budgets of three obser-
+ing the multi-turn planning Reasoner is given in Fig. 5.          vation tools, Scan Search samples 30 frames per slice with
+It defines the THINK–PLAN–OBSERVE loop, the tool-                 a default sampling rate of 0.25 fps; Segment Focus defaults
+usage guidelines, and the requirement to terminate via the        to 1 fps with at most 32 frames for the requested interval;
+finish tool. We pair it with the user prompt used in our          Stitch Verify stitches plan-specified segments, defaulting to
+experiments, as in Fig. 6.                                        0.5 fps globally and 1 fps per segment with an overall cap
+                                                                  of 128 frames. Requested sampling in each tool call is first
+                                                                  converted from the provided (interval, fps) pairs to a frame
+Tool-Call Decision Output Schema. At each rea-
+                                                                  budget and then proportionally rescaled so the total does not
+soning turn, the Reasoner emits a tool call in the
+                                                                  exceed each tool’s max_total_frame.
+format natively defined by the OpenAI official
+SDK[18].        Concretely, its raw response contains
+a tool_calls list where each element has the                      Deployment and Service. Closed-source models (o3,
+standard    structure     { "type": "function",                   GPT-4.1/4.1-mini/5) and Qwen3-235B-A22B are queried
+"function": {"name": ‘name of the                                 through their official APIs. All other open-weight models,
+tool’, "arguments": ‘tool arguments’}                             including Qwen2.5-VL-72B/7B, are served with vLLM En-
+} . This format would be parsed the function.name                 gine on 4×NVIDIA H100 80 GB GPUs.
+and JSON-stringify function.arguments fields into a               B.2. Benchmark Datasets
+Python dictionary before dispatching to execute this tool.
+                                                                  We assess LensWalk on six long-form or reasoning-focused
+                                                                  benchmarks. LVBench[45] provides 1,549 multiple-choice
+Observer Prompts (per Tool). Each video-observation               questions drawn from 103 curated hour-long movies (mean
+tool is paired with its own Observer prompt. We show one          duration 67 min); transcripts are unavailable, so the agent
+figure of each tool, such as “Scan Search”, “Segment Fo-          relies on frames only. LongVideoBench-long[49] con-
+cus”, and “Stitch Verify”, in Figure 7, 8, 9, respectively.       tributes 564 MCQs sourced from 188 validation videos in
+ Algorithm 1: LensWalk Reason–Plan-Observe loop with Subject Table Memory update.
+  Input : Video V , query Q, metadata Vinfo , tool set O = {Scan Search, Segment Focus, Stitched Verify, Finish}, max
+             steps Tmax
+  Output: Answer to Q
+  Initialize history L0 ← {Q, Vinfo };
+  Initialize subject table Sub0 ← ∅;
+  for t = 1, 2, . . . , Tmax do
+       at = (ot , qt , It , ρot ) ← Mr (Q, Vinfo , Lt−1 , Subt−1 );
+       if ot = Finish then
+            return qt as final answer;
+       Gt ← BuildContextGroups(ot , It , ρot );            // Maps tool-level sampling arguments into
+        VLM-visible context groups
+                        (k)     (k)              (k)                                               (k)
+       // Gt = {(It , st )}K
+                           k=1 , where It
+                             t
+                                          is the k-th time interval and st collects
+          its sampling settings (e.g., fps, frame budget)
+       // Kt = 1 for Segment Focus and Stitched Verify; Kt > 1 (parallel slices) for
+          Scan Search
+                  (k)     (k)
+       for each (It , st ) ∈ Gt do
+             (k)                   (k) (k)                                             (k)
+           Ft ← SampleFrames(V, It , st );             // Extracts frames in It              from V according to
+                                    (k)
+           sampling config st
+           (k)            (k) (k)
+          yt ← Mo (qt , Ft , It );
+                         (k)
+       et ← Aggregate({yt }K k=1 );
+                              t
+                                         // Simple join: concatenate per-group replies in
+         temporal order into a single observation string
+       Lt ← Lt−1 ∪ {(at , et )};
+       if subject memory enabled then
+            Subt ← MemoryUpdate(Subt−1 , at , et );
+       else
+           Subt ← Subt−1 ;
+   return unknown;
+
+
+the 900–3,600 s bucket; this split is the only one where        only re-run GPT-4.1, GPT-5 on the considered bench-
+we feed automatic transcripts to the Reasoner, because the      marks, and Qwen2.5-VL-72B on LongVideoBench-long
+benchmark ships ASR JSON files. Video-MME long[13]              and EgoSchema-val. For GPT-5, we fix reasoning_effort
+is the long split of Video-MME covers 900 MCQs over 300         to minimal both inside our agent and in the baseline set-
+videos lasting 30–60 min (mean 41 min) across knowledge,        ting. Frame sampling budgets follow prior works: GPT-
+skill, and perception domains; we keep the official multiple-   4.1/5 consume 256 frames, while local Qwen2.5-VL-72B
+choice format and do not use subtitles for evaluation. For      is limited to 128 frames due to our limited computing re-
+MMVU[67], 625 multiple-choice questions from the vali-          sources, matching the max per-forward cap of the observer
+dation set spanning 40+ academic subjects are used. Video-      tool.
+MMMU[17] aggregates 900 MCQs evenly split across the
+Perception, Comprehension, and Adaptation subsets, each         C. More Results
+averaging 8.4-minute clips ranging from short 48 s labs to
+30+ minute lectures. EgoSchema[27] supplies the official        In this section, we provide additional qualitative results and
+validation set of 500 egocentric three-minute clips with 500    trajectory visualizations to complement the main experi-
+multiple-choice questions.                                      ments. All case studies are drawn from the long split of
+                                                                the Video-MME benchmark, and all trajectories are pro-
+B.3. Baseline Reproduction                                      duced by the same o3 model acting as both the Reasoner and
+Most baseline results are obtained from their official papers   the Observer. All visualizations follow a unified annotation
+or public leaderboards (e.g., Deep Video Discovery[63],         scheme. Within each reasoning trajectory, key pieces of
+Mr.    Video[32], VideoAgent[46], Ego-R1[43]).            We    evidence from visual observations that are crucial for driv-
+You are a helpful assistant designed to answer multi-step questions about video content by sequentially invoking tools for
+video observation. Your sole purpose is to reason and act to uncover the correct answer. Operate in a rigorous THINK → PLAN
+
+→ OBSERVE loop with at most MAX_CALL tool calls.
+
+THINK: Based on the user’s query and all previous observations, reason step by step about what is known, what is uncertain, and
+what to do next. Justify the next action by stating the goal, the best tool, chosen time ranges, and the sampling strategy (e.g., higher
+
+FPS for fast actions, lower for context).
+
+ACT: Call exactly one video observation tool with the decided parameters. Time ranges and sampling intensity should match the
+planned evidence needs, avoiding both information loss and redundancy.
+
+OBSERVE: Use the returned structured observation to update understanding and continue the next THINK cycle.
+
+Continue until you have sufficient evidence, then call finish with the final answer.
+
+Core directives: (1) Never guess; inspect the video when uncertain. (2) Plan within frame budget. (3) Iterate and refine. (4) Verify
+and synthesize after multiple related segments. (5) Ground arguments in evidence; do not invent timestamps.
+
+
+                                     Figure 5. System prompt used for the LensWalk Reasoner.
+
+
+Based on your observations and tool outputs, provide a concise answer that directly addresses the question. Only provide the
+option’s letter from the given choices as the final answer for multiple-choice questions.
+Total video length: VIDEO_LENGTH seconds.
+Question: QUESTION_PLACEHOLDER
+
+
+                                        Figure 6. User prompt used for LensWalk Reasoner.
+
+
+You are a highly focused visual understanding assistant. Your task is to analyze a short sequence of sparsely sampled video frames
+from a single segment and assess its relevance to the user’s query. You need to provide a concise summary of the visual content
+and explain why it is, or is not, related to the query.
+IMPORTANT: Your scope is strictly limited to the provided frames from this single segment. Your conclusion must be based only
+on what is visible here. Do not make any assumptions about the rest of the video or events outside these frames. Your response
+should be a brief, self-contained analysis of this segment’s relevance.
+
+
+                                       Figure 7. Prompt for the Observer in Scan Search tool.
+
+
+You are a meticulous and factual video analysis assistant. Your task is to analyze a set of sparsely sampled frames from a single,
+continuous time segment of a video. Provide a detailed and objective description that directly answers the user’s query.
+IMPORTANT: Base your entire analysis strictly on the visual information present in the frames provided. The frames are sampled
+uniformly. Do not infer or imagine events happening beyond the frames. Your output should be a concise and structured text
+focused solely on the evidence at hand.
+
+
+                                     Figure 8. Prompt for the Observer in Segment Focus tool.
+   You are an expert video analyst specializing in synthesizing information from multiple, distinct key moments. You will be shown a
+   “stitched” collection of frames sampled from various, potentially non-contiguous time intervals of a video. Your goal is to provide
+   a cohesive analysis that addresses the user’s query, drawing connections or noting changes between the different moments shown.
+   IMPORTANT: The frames represent a curated, sparse, and non-uniform selection. Do not assume what happens in the time gaps
+   between the provided segments. Base your entire analysis strictly on the visual evidence presented, treating each time-stamped
+   group as a distinct snapshot.
+
+
+                              Figure 9. Prompt for the Observer in Stitched Verify tool (stitched_observer).
+
+
+   Memory role. You are a specialized assistant responsible for maintaining a subject_registry for a video analysis agent.
+   You analyze the latest observation and its subjects, compare them against the existing registry, and produce a consolidated registry
+   only (no narrative summary).
+   Input provided.
+   • Current subject registry (master list so far).
+   • History: past tool calls and their results.
+   • Current turn: latest tool call, its raw output, and a [new observed subject registry] extracted from that call.
+   Update rules.
+   1. Merge by synthesis, not stacking. When updating a subject’s description list, synthesize concise, high-value descriptions
+      instead of appending redundant strings. Example: from “man in red shirt” and “man in red shirt, sitting at desk” produce “man
+
+      in red shirt” and “sitting at desk” (or “man in red shirt (was standing, now sitting at desk)”), not duplicated phrases.
+   2. Add new subjects when they cannot be merged.
+   3. Prune to the 15 most recently observed. After merge/add, keep at most 15 subjects prioritized by most recent appearance,
+      giving current-turn subjects highest priority.
+   4. No subjects ⇒ output an empty object {}.
+   Output format (single JSON object).
+   {
+       " updated_subject_registry ": {
+          "A u n i q u e and c o n s i s t e n t i d e n t i f i e r f o r a s u b j e c t " : {
+            " description ": [
+
+
+                 " Key a p p e a r a n c e / r o l e / s t a t e s t r i n g s ( e . g . ,   ' man i n r e d s h i r t ' ,   ' s i t t i n g at
+           desk ' , ' t a l k i n g t o S2 ' ) . "
+              ],
+              " appeared_intervals ": [
+                 "[ s t a r t _ s e c , end_sec ]"
+              ]
+           }
+       }
+   }
+
+
+
+
+                                  Figure 10. Subject Table Memory–Update prompt and required JSON output.
+
+
+ing the reasoner’s inference are highlighted in red. On the                         C.1. Additional Quantitative Analyses
+temporal axis, sampled contexts covered by different tools
+are indicated with colored intervals: green for ScanSearch,                         Shared-backbone comparison and end-to-end cost. Ta-
+blue for Segment Focus , and yellow for Stitched Verify                             ble 6 compares LensWalk with prior video agents on
+respectively.                                                                       LVBench under a shared o3 reasoner. LensWalk requires no
+                                                                                    offline captioning or index construction, so its end-to-end
+                                                                                    cost is substantially lower than retrieval-based agents once
+                                            Table 5. Models used in our experiments.
+
+                 Organization     Model                         Release                                  Version
+                                  GPT-4.1[30]                   2025-04          gpt-4.1-2025-04-14
+                                  GPT-4.1-mini[30]              2025-04     gpt-4.1-mini-2025-04-14
+                    OpenAI
+                                  o3[29]                        2025-04               o3-2025-04-16
+                                  GPT-5[31]                     2025-08            gpt-5-2025-08-07
+                                  Qwen3-235B-A22B[55]           2025-04 qwen3-235b-a22b-instruct
+                    Alibaba       Qwen2.5-VL-72B[2]             2025-02  qwen2.5-vl-72b-instruct
+                                  Qwen2.5-VL-7B[2]              2025-02   qwen2.5-vl-7b-instruct
+                      Z.ai        GLM-4.7[59]                   2025-08                               glm-4.7
+                   DeepSeek       DeepSeek-V3[10]               2025-03                DeepSeek-V3-0324
+
+
+preprocessing is counted. It also uses 14–32× fewer frames          As shown in Fig. 12, the agent only queries the ending in-
+per query while outperforming MR. Video and VideoAgent.             terval for a specific option and then finds that it is correct.
+Compared with DVD, LensWalk trades some accuracy for
+zero preprocessing and much lower total cost.
+
+                                                                    Progressive Zoom-in. The Progressive Zoom-in pattern
+Efficiency and adaptive budget allocation. Table 7                  begins with a coarse global scan and gradually narrows
+shows that LensWalk does not impose a fixed reasoning               the candidate segments. Using approximate information
+overhead. It typically converges in 2.6–2.8 steps on short          from earlier steps, the agent then conducts increasingly
+or simple benchmarks, but increases both interaction steps          fine-grained observations within a smaller temporal win-
+and frame usage as videos become longer or questions de-            dow. As illustrated in Fig. 13, the model first performs
+mand more reasoning. Together with Table 6, this indicates          a global ScanSearch to locate intervals containing key vi-
+that LensWalk improves efficiency not only by avoiding ex-          sual cues mentioned in the question (e.g., the German team
+pensive full-video preprocessing, but also by allocating ob-        and the diving scene), and then progressively restricts its
+servation budget only when additional evidence is needed.           focus around the queried “10m high platform diving com-
+                                                                    petition”, eventually arriving at the correct answer.
+Additional reasoners and a static extracted-frames base-
+line. Table 8 separates the benefit of active observation
+from simply reusing better frames. Feeding the union of             Integrative Verify. In the Integrative Verify pattern, af-
+frames visited by LensWalk to a single-pass VLM yields              ter several preliminary observations, the agent formulates
+only modest gains (+0.8 to +2.6 points), indicating that the        an explicit hypothesis and then tests it by jointly inspecting
+improvement does not come from frame selection alone.               multiple related segments. As illustrated in Fig. 14, given a
+The same table also shows that LensWalk remains effective           query such as “Is there any segment where they say an earth-
+with additional reasoners such as GLM-4.7 and DeepSeek-             quake occurred?”, the model systematically reviews each
+V3, indicating that the framework is not tied to a single           clip for mentions or visual evidence of an earthquake and,
+planner.                                                            upon finding none, concludes that no such event is reported.
+
+C.2. Behaviour Analysis
+Section 4.4 has introduced the taxonomy of tool-call be-
+                                                                    Strategic Reflection. Strategic Reflection is a higher-
+havior patterns; this section provides a detailed analysis of
+                                                                    level reasoning pattern in which the agent realizes that its
+representative instances for each behavior.
+                                                                    current observational strategy is failing, then backtracks
+                                                                    to explore broader temporal regions before refining again,
+Direct Inquiry. Direct Inquiry is the simplest tool-use             rather than over-focusing on an uninformative segment. As
+pattern, where the agent can answer with only one or two            illustrated in Fig. 15, once the model recognizes that the
+tool calls. It is mainly used for straightforward temporal-         subtitles in the initial interval do not explain the game rules,
+localization questions such as “What happens at the begin-          it strategically shifts to another part of the video, enabling it
+ning of the video?” or “What occurs between 10:21 and               to observe the optimal game strategy and ultimately obtain
+10:25?”, as well as questions about the overall video type.         the correct answer.
+Table 6. Shared-backbone comparison on LVBench using o3 as the reasoner. We report accuracy, online inference time, offline preprocess-
+ing time, and average frames consumed per query. Retrieval-based agents require dense pre-processing of the full video, while LensWalk
+does not.
+
+   Method            Acc. (%)        Online Inference (s)          Offline Preprocessing (s)           Avg. Frames / Query
+   o3                    57.1                  38.9                                0                               256
+   LensWalk              68.6                 190.35                             0                             290.3
+   DVD                   74.2                 153.3                            2180.4                       8202 (2 fps)
+   MR. Video             65.5                 326.2                            4135.2                      9227 (2.25 fps)
+   VideoAgent            64.1                  200.5                           1131.3                       4101 (1 fps)
+Source. Results for methods other than o3 and LensWalk are taken from DVD (https://openreview.net/forum?id=oQYq9L1NVT).
+
+
+Table 7. Adaptive scaling of LensWalk (o3/GPT-4.1) across benchmarks with different video lengths and reasoning demands. Gains are
+relative to the single-pass GPT-4.1 baseline.
+Benchmark  Split  Acc. (%) Gain Avg. Video Length (s) Reasoning-Intensive Avg. Steps Avg. Frames Used
+           Short    82.3   +1.7         80.7                  No             2.8           89.7
+Video-MME  Medium   79.9   +8.3         515.9                 No             4.2           233.0
+           Long     70.0   +6.9        2466.7                 No             6.8           387.1
+EgoSchema  —        74.8   +2.6         180.0                 No             2.6            89.7
+Video-MMMU —        77.1   +9.7         506.2                Yes             4.8           178.4
+MMVU       —        80.9   +2.0          51.4                Yes             3.1            58.5
+
+Table 8. Additional model recipes and a static extracted-frames baseline on Video-MME (long split). Each group header shows the
+corresponding single-pass observer baseline. Extracted Frames feeds the union of frames visited by LensWalk under the same 256-frame
+budget into a single-pass VLM.
+GPT-4.1 Observer (baseline: 63.1) GPT-4.1-mini Observer (baseline: 59.4) o3 Observer (baseline: 64.7)
+Reasoner            Acc. (%)      Reasoner              Acc. (%)         Reasoner          Acc. (%)
+GLM-4.7            68.3 (+5.2)    GLM-4.7              66.0 (+6.6)       o3               71.4 (+6.7)
+DeepSeek-V3        66.4 (+3.3)    DeepSeek-V3          63.3 (+3.9)       —                    —
+Extracted Frames   65.0 (+1.9)    Extracted Frames     62.0 (+2.6)       Extracted Frames 65.5 (+0.8)
+
+
+Scope Partitioning. Scope Partitioning adopts a divide-               the video.
+and-conquer strategy: the agent partitions the video into
+coarse segments and sequentially checks whether each re-              C.3. Failure Modes and Analysis
+gion contains clues worth closer inspection. As shown in
+                                                                      In this section, we illustrate a few failure modes observed
+Fig. 16, it first scans the intervals 0–600s, 600–1200s, and
+                                                                      during our evaluation. Analyzing these error patterns pro-
+1200–1800s to locate the position of the clue about the third
+                                                                      vides valuable insights into the limitations of current Large
+set, then identifies 1200–1800s as the most promising range,
+                                                                      Language Models (LLMs) acting as reasoning planners and
+performs more fine-grained observations there, and finally
+                                                                      highlights critical directions for future active video agent
+derives the correct answer.
+                                                                      design. We identify four primary failure patterns:
+                                                                      Premature Conclusion. The agent terminates the reason-
+Static Repetition. In contrast to Strategic Reflection,               ing loop too early (often within 1–2 turns) upon encounter-
+Static Repetition denotes a rigid mode in which the model             ing the most frequent cue “pyramid complex” in the initial
+becomes trapped in an unproductive strategy. Rather than              observation, as shown in Fig. 18. By failing to validate this
+exploring alternative temporal regions or adjusting its ob-           cue against potential distractors or cross-reference it with
+servation queries, it repeatedly issues nearly identical ob-          other video segments, the model exhibits unwarranted over-
+serve calls with the same intent on the same segment, even            confidence. This failure mode suggests that future agents
+after multiple failed attempts to find supporting evidence, as        require a stronger internal “critic” or verification mecha-
+shown in Fig. 17. This fixation on a single interval prevents         nism to balance token efficiency with rigorous hypothesis
+the model from discovering the correct answer elsewhere in            testing.
+Evidence Dilution. Conversely, excessive observation can
+degrade performance. We observe cases, as in Fig. 19,
+where the agent discovers strong, decisive evidence in early
+turns e.g. “STRENGTH UNDER PRESSURE” or “MEN-
+TAL ABILITY”, to the correct choice “Mental ability and
+vast experience”, but continues to explore irrelevant seg-
+ments. As the context window fills with “loose” or noisy
+information, the strong initial evidence gets diluted. The
+agent finally succumbs to recency bias or confusion, hal-
+lucinating an answer based on the latest weak observations.
+This underscores the importance of active memory manage-
+ment—agents must learn not just when to seek information,
+but when to prune irrelevant context to maintain reasoning
+clarity.
+Persistent Ambiguity. The agent may persistently search
+along an uninformative trajectory and never obtain decisive
+visual evidence, ultimately being forced to give an ambigu-
+ous, semantics-only guess rather than a visually grounded
+answer. As shown in Fig. 20, the agent keeps focusing
+on related subtitles instead of frame-wise visual changes,
+misses the key opening event, and therefore predicts incor-
+rectly.
+Static Repetition. Finally, as noted in the behavioral anal-
+ysis, the agent may fall into a degenerate loop, repeatedly
+issuing identical tool calls for the same timestamp without
+adjusting its parameters. This reflects a failure in the agent’s
+meta-cognition or state tracking; the planner fails to recog-
+nize that its current strategy is unproductive, highlighting
+the need for mechanisms that detect stagnation and trigger
+strategic shifts (e.g., from Segment Focus to Strategic Re-
+flection).
+    x
+[
+    {
+         " type ": " function " ,
+         " function ": {
+            " name " : " s e g m e n t _ o b s e r v e r " ,
+            " d e s c r i p t i o n " : " P r o b e one i n t e r v a l w i t h an MLLM u n d e r s p e c i f i e d
+        sampling . " ,
+            " parameters ": {
+               " type ": " object " ,
+               " properties ": {
+
+                    " interval ": {
+                        " type ": " object " ,
+                        " properties ": {
+                            " s t a r t _ s e c " : { " t y p e " : " number " , " minimum " : 0 } ,
+                            " end_sec " :           { " t y p e " : " number " , " e x c l u s i v e M i n i m u m " : 0 }
+                        },
+                        " r e q u i r e d " : [" s t a r t _ s e c " , " end_sec "]
+                    },
+                    " query " : { " type " : " s t r i n g " } ,
+                    " f p s " : { " t y p e " : " number " , " e x c l u s i v e M i n i m u m " : 0 , " d e f a u l t " : 1 } ,
+
+                    " m a x _ t o t a l _ f r a m e s " : { " t y p e " : " i n t e g e r " , " minimum " : 1 , " d e f a u l t " :
+        32 }
+                 },
+                 " r e q u i r e d " : [" i n t e r v a l " , " query "]
+             }
+         }
+    },
+    {
+         " type ": " function " ,
+         " function ": {
+
+           " name " : " s t i t c h e d _ o b s e r v e r " ,
+           " d e s c r i p t i o n " : " Probe m u l t i p l e segments , s t i t c h frames , then answer
+        one q u e s t i o n . " ,
+           " parameters ": {
+              " type ": " object " ,
+              " properties ": {
+                  " segments " : {
+                      " type ": " array " ,
+                      " minItems " : 1 ,
+                      " items ": {
+
+                     " type ": " object " ,
+                     " properties ": {
+                         " s t a r t _ s e c " : { " t y p e " : " number " , " minimum " : 0 } ,
+                         " end_sec " :           { " t y p e " : " number " , " e x c l u s i v e M i n i m u m " : 0 } ,
+                         " fps ":                { " t y p e " : " number " , " e x c l u s i v e M i n i m u m " : 0 ,
+        " default ": 1 }
+                     },
+                     " r e q u i r e d " : [" s t a r t _ s e c " , " end_sec "]
+                   }
+                },
+
+                    " query " : { " type " : " s t r i n g " } ,
+                    " global_interval ": {
+                       " type ": " object " ,
+                       " properties ": {
+
+
+
+                                Figure 11. JSON Tool Schema used for Reasoner of LensWalk (part 1).
+                           " s t a r t _ s e c " : { " t y p e " : " number " , " minimum " : 0 } ,
+                           " end_sec " :           { " t y p e " : " number " , " e x c l u s i v e M i n i m u m " : 0 }
+                       },
+                       " r e q u i r e d " : [" s t a r t _ s e c " , " end_sec "]
+                    },
+                    " f p s " : { " t y p e " : " number " , " e x c l u s i v e M i n i m u m " : 0 , " d e f a u l t " : 0 . 5 } ,
+                    " m a x _ t o t a l _ f r a m e s " : { " t y p e " : " i n t e g e r " , " minimum " : 1 , " d e f a u l t " :
+        128 }
+             },
+             " r e q u i r e d " : [" segments " , " query "]
+
+             }
+         }
+    },
+    {
+         " type ": " function " ,
+         " function ": {
+            " name " : " s c a n _ o b s e r v e r " ,
+            " d e s c r i p t i o n " : " Scan a g l o b a l i n t e r v a l by s l i c e s and s u m m a r i z e e a c h
+        slice ." ,
+            " parameters ": {
+
+                 " type ": " object " ,
+                 " properties ": {
+                    " global_interval ": {
+                       " type ": " object " ,
+                       " properties ": {
+                           " s t a r t _ s e c " : { " t y p e " : " number " , " minimum " : 0 } ,
+                           " end_sec " :           { " t y p e " : " number " , " e x c l u s i v e M i n i m u m " : 0 }
+                       },
+                       " r e q u i r e d " : [" s t a r t _ s e c " , " end_sec "]
+                    },
+
+                    " n u m _ s l i c e s " : { " t y p e " : " i n t e g e r " , " minimum " : 1 } ,
+                    " s l i c e _ d u r a t i o n _ s e c " : { " t y p e " : " number " , " e x c l u s i v e M i n i m u m " : 0 } ,
+                    " query " : { " type " : " s t r i n g " } ,
+                    " f p s " : { " t y p e " : " number " , " e x c l u s i v e M i n i m u m " : 0 , " d e f a u l t " : 0 . 2 5
+        },
+                 " m a x _ t o t a l _ f r a m e s " : { " t y p e " : " i n t e g e r " , " minimum " : 1 , " d e f a u l t " :
+        180 }
+             },
+             " r e q u i r e d " : [" g l o b a l _ i n t e r v a l " , " query "]
+           }
+
+         }
+    },
+    {
+         " type ": " function " ,
+         " function ": {
+            " name " : " f i n i s h " ,
+            " d e s c r i p t i o n " : " R e t u r n t h e f i n a l a n s w e r and end t h e d i a l o g . " ,
+            " parameters ": {
+               " type ": " object " ,
+               " properties ": {
+
+                     " answer " : { " type " : " s t r i n g " }
+                 },
+                 " r e q u i r e d " : [ " answer " ]
+             }
+         }
+    }
+]
+Behaviour Mode：“Direct Inquiry”
+
+
+
+
+           0.0                                                                                                                               2190.1
+
+                       Question: What does the video featuring?
+                       A. Chelsea winning the FA Cup after a decisive match.
+                       B. A regular season Premier League match between Chelsea and Liverpool.
+                       C. Liverpool winning the FA Cup against Chelsea in a penalty shootout.
+                       D. A pre-match analysis of the FA Cup final between Chelsea and Liverpool.
+
+                       Turn 1:
+                       <Tool>: Segment Focus, query = “What is seen happening? Are players lifting a trophy or are there pundits in studio?”
+                       <Observation>: “Throughout 2145-2175 s, football players wearing red kits stand on a stadium balcony emblazoned with ‘FA CUP
+<tool call args>:      WINNERS 2022’. Several of them successively raise a large silver cup with red-white ribbons while teammates cheer, pose and
+interval=[2145, 2190], pass the trophy along. No studio set or pundits are visible—only on-field victory celebrations followed by a plain red ‘CLICK TO
+fps=1                  SUBSCRIBE’ end-card (2175-2190 s).“
+
+                      0.0                                                                                                   2190.1
+                                                                                                              2145.0
+
+
+
+                                       The final answer should be “C”.
+
+
+
+
+                                           Figure 12. Example of Direct Inquiry behavior.
+Behaviour Mode：“Progressive Zoom-in”
+
+
+
+
+         0.0                                                                                                                                             2302.7
+
+                         Question: In the video, what is the problem with the German team's third jump in the women's
+                         synchronized 10m high platform diving competition?
+                         A. They were missing a turn in the air.
+                         B. They made big splashes compared to clean entries.
+                         C. They entered the water feet first.
+                         D. None of the above.
+
+                               Turn 1:
+<tool call args>:              <Tool>: Scan Search, query = “Find the segments with the women synchronized 10m platform diving, especially the German
+interval=[0, 2302.7],          team (Germany/GER flag or text). Identify the third dive of the German pair and any visible problem on that dive.”)
+fps=0.25,                      <Observation>: " ... [1320–1440s] GER pair on 10 m platform; overlay shows Round 3/5 (55.68) → confirms 3rd dive. Dive
+slice_duration_sec=120         1380–1400s (no entry seen), so fault like splash/feet-first not confirmed....
+
+                         0.0                                                                                                         2302.7
+                                             120.0              240.0               …                2160.0            2280.0
+                               Turn 2:
+<tool call args>:              <Tool>: Stitch Verify, query = “Analyze the German pair’s Round 3 dive. Did they miss a rotation/turn? Did they enter feet-first
+segments=                      or hands/head-first? How big were the entry splashes relative to typical clean entries?”)
+([1386, 1402], fps=3;          <Observation>: " ... Insufficient visual evidence: No frames show GER Round 3 dive or visible “GER Round 3/5” overlay.
+[1400,1410], fps=1)            Thus, rotation, entry orientation, and splash size cannot be determined. Need frames covering GER’s Round 3 approach,
+                               rotation, entry, and overlay for verification.....
+
+
+                         0.0                                                                                                         2302.7
+                                             120.0              240.0         1386.0      1400.0 1402.0 1410.0
+
+                               Turn 3:
+                               <Tool>: Segment Focus, query = “Find the German pair’s Round 3 dive in this window. Confirm GER and Round 3/5 via
+<tool call args>:              overlay, then describe their mid-air rotation and, crucially, the water entry: Was there a missed turn? Did they enter feet-first or
+interval=[1365, 1415],         hands/head-first? Were the splashes large compared to a clean entry?
+fps=2                          <Observation>: [1375–1415s] GER Round 3 dive: synchronized takeoff → tuck → head-first entry with big splash; overlay
+                               confirms Round 3/5 55.68 pts, no missed turn.
+
+
+                         0.0                                                                                                         2302.7
+                                                                         1365.0        1415.0
+
+
+
+                                         The final answer should be “B”.
+
+
+
+
+                                        Figure 13. Example of Progressive Zoom-in behavior.
+Behaviour Mode：“Integrative Verify”
+
+
+
+
+           0.0                                                                                                                                  2713.8
+
+                         Question: According to the video, which of the following news items did NOT appear in this news segment?
+                         A. An earthquake occurred in the United States.
+                         B. Potential community spread of measles in Canada.
+                         C. Fire destroys First Nation's only school.
+                         D. Josh Liendo swims into the history books.
+
+                          Turn 1:
+                          <Tool>: Scan Search, query = "Indicate if within this slice, the news covers: 1) US earthquake, 2) Measles community spread in
+<tool call args>:         Canada, 3) Fire destroys First Nation's only school, 4) Josh Liendo swimming record.”
+interval=[0, 2713.79],    <Observation>: “[0, 180.919]: Measles spread + brief Liendo; no earthquake or school fire.[180.919, 361.838]: Only measles
+fps=0.25,                 coverage……[2351.95, 2532.87]: Continued First Nation school-fire story.[2532.87, 2713.79]: Pet-psychic promo + police herding
+num_slices=15             goats.And the studio anchor providing narration. None of the four queried topics—US earthquake, measles spread in Canada,
+                          First Nation school fire, or Josh Liendo swimming record—are depicted or referenced in these frames.
+
+                         0.0                                                                                                  2713.8
+                                       180.9         361.8                     …                   2351.9        2532.8
+
+
+                           Turn 2:
+                           <Tool>: Scan Search, query = “For each slice, indicate if there is any coverage of an earthquake."
+                           <Observation>: “[0, 226.149]: Protest, measles, skating, vaccines, interviews; no earthquake coverage….[904.595, 1130.74]:
+<tool call args>:
+                           Snowstorm, wildfire intros, officials, factory fire; no earthquake coverage…..[2487.64, 2713.79]: Park scene, pedestrians, pet-
+interval=[0, 2713.79],
+                           psychic promo, goats, anchor narration; no earthquake coverage..“
+fps=0.2,
+num_slices=12
+                         0.0                                                                                                  2713.8
+                                         226.1            452.3                …                   2261.4        2487.6
+
+
+
+
+                                        The final answer should be “A”.
+
+
+
+                                         Figure 14. Example of Integrative Verify behavior.
+Behaviour Mode：“Strategic Reflection”
+
+
+
+
+            0.0                                                                                                                                       2794.8
+
+                         Question: In the first game of the video's early part, what is the key to winning this game of building the tallest tower?
+                         A. Contestants use their bodies to support the cans, achieving a taller tower.
+                         B. Contestants do not knock down the already stacked can tower and use this tower to achieve a greater height.
+                         C. Contestants knock down the already stacked can tower and use a new method to build a taller tower.
+                         D. Cannot be determined.
+
+
+                        Turn 1:
+                        <Tool>: Scan Search, query = " Describe what is happening, focusing on if contestants are building towers with cans and if they knock
+<tool call args>:       down or support with their bodies.”
+interval=[0, 800],      <Observation>: “... [700–750s, 750-800s] shows blind-folded contestants taking turns in a “tallest tower” game, repeatedly bumping
+fps=0.25,               and toppling a pyramid of cans, then trying to steady and restack it with their hands and bodies—confirming that they knock
+num_slices=16           down and physically support the tower.....”
+
+                        0.0                                                                                                     2794.8
+                                 50.0             …                  800.0
+
+                         Turn 2:
+                         <Tool>: Segment Focus, query = " What does the task card say about building the tallest tower with cans? Look at any visible text or
+<tool call args>:        listen to spoken reading. Specifically, what instructions or key rule is stated?”
+interval=[550, 565],     <Observation>: " Each contestant sits at the table, reads the white task card aloud and looks at the single tin can placed before them.
+fps=1                    Although the full text on the card is not readable in the frames, every reader reaches and reacts to the same highlighted instruction:
+                         the card’s clear rule is to “build the tallest tower with cans – the tallest tower wins."
+
+                        0.0                                                                                                     2794.8
+                                                  550.0   565.0
+                         Turn 3:
+                         <Tool>: Segment Focus, query = " What are they discussing about the tall object on screen? Any mention of how the winner
+<tool call args>:        achieved the tallest tower? Did they mention supporting with bodies or not knocking down?”
+interval=[418, 440],     <Observation>: " There is no visual clue (e.g., subtitles, sketches, reenactments, or body-stacking shots) that refers to how a
+fps=2                    winner built the tallest tower, nor any sign of people supporting it with their bodies or of preventing it from being knocked down. The
+                         frames provide no explicit evidence that such topics are mentioned.”
+
+                        0.0                                                                                                     2794.8
+                                        418.0   440.0
+
+                         Turn 4:
+                         <Tool>: Scan Search, query = " Describe what is happening, focusing on if contestants are building towers with cans and if they
+<tool call args>:        knock down or support with their bodies.”
+interval=[800, 1000],    <Observation>: :” ... [900–925s, 925-950s, 950-975] shows contestants in the task room carefully stacking metal cans into a tall
+fps=0.25,                pyramid. The tower remains upright through most of the segment, with only a few cans rolling away. The visible footage clearly
+num_slices=8             indicates that contestants successfully keep the tower standing and steady it with their hands, suggesting that maintaining
+                         tower stability—rather than body support or new methods—is the key observed behavior.....”
+
+                        0.0                                                                                                     2794.8
+                                                                   800.0         …      1000.0
+
+                         Turn 5:
+                         <Tool>: Stitch Verify, query = " Describe what is happening, focusing on if contestants are building towers with cans and if they knock
+<tool call args>:        down or support with their bodies.”
+segments=                <Observation>: " …he ‘left the massive one that was already there’... 1080-1200 s: Later players topple the pyramid and scramble
+([1050, 1100], … ,       on the floor trying to restack cans; their finished heaps reach only shin-height. 1150-1200 s studio chat confirms Sam’s untouched
+[1150, 1180]),           pyramid was, by far, the tallest. Key to winning was *not knocking the existing tower over*; no body-support trick was used –
+fps=1                    Sam simply treated the pre-built pyramid as his tower and walked away, leaving it standing.”
+
+                         0.0                                                                                                     2794.8
+                                                                                         1050.0    1180.0
+
+
+
+
+                                         The final answer should be “B”.
+
+
+
+
+                                          Figure 15. Example of Strategic Reflection behavior.
+Behaviour Mode：“Scope Partitioning”
+
+
+
+
+            0.0                                                                                                                                          2181.0
+
+
+                          Question: What sets apart the third set of stickers from the other two?
+                          A. The third set of stickers are animal prints.
+                          B. The third set of stickers is with botanical patterns.
+                          C. The third set of stickers has no color.
+                          D. The third set of stickers is Inexpensive.
+
+                           Turn 1:
+                           <Tool>: Scan Search, query = “Describe what items are shown, especially any sets of stickers and their appearance.”
+<tool call args>:          <Observation>: "[0, 60]: Only sticker-related items visible are two compartment …. [480, 540]: No sticker sheets appear; only clear-
+interval=[0, 600],         stamp and metal-die sets are displayed in this interval. [540, 600]: No sticker items are shown. The presenter continues displaying
+fps=0.25,                  stamp-and-die sets and embossing-folder kits.“
+num_slices=10
+                         0.0                                                                                                        2181.0
+                                  60.0       …       540.0     600.0
+                           Turn 2:
+                           <Tool>: Segment Focus, query = " Describe the three puffy sticker packs shown, note specific patterns of each, especially the third
+<tool call args>:          set, what makes it different.”
+interval=[380, 430],       <Observation>: " Between 380–430 s, three PUFFY STICKER packs appear: The first two are icon-based sets (stars, rainbows,
+fps=1                      shapes, small graphics). The third pack is text-based, filled mainly with words and phrases, which is what sets it apart. "
+
+                         0.0                                                                                                        2181.0
+                                           380.0   430.0
+                           Turn 3:
+<tool call args>:          <Tool>: Scan Search, query = " Look for any presentation of sticker sets; note differences among first, second, third sets”
+interval=[600, 1200],      <Observation>: “[660, 720]: The third set has a bubble-dot embossing texture and different floral/medallion stamps…[1080,
+fps=0.25,                  1140]: The third set is a 150+ piece camper-van/emoji pack, unlike the simpler first two.[1140, 1200]: The third set uses a yellow
+num_slices=10              cat and pink spiral motif, distinct from the others.”
+
+                         0.0                                                                                                        2181.0
+                                                             660.0 660.0    …       1140.0 1200.0
+                           Turn 4:
+<tool call args>:          <Tool>: Scan Search, query = "look for scenes with three sets of stickers where third is different; note what is unique about the third
+interval=[1200, 1800],     set.”
+fps=0.25,                  <Observation>: “[1200, 1260]: The third sheet contains alphabet letter stickers, unlike the two icon sheets.…[1560, 1620]: The
+num_slices=10              third sheet has a tropical theme (toucan, pineapple, flamingo), unlike the cactus/succulent sheets.…[1740, 1800]: The third cluster
+                           shows a different central icon (e.g., teacup, bouquet, butterflies), unlike the repeated motifs in the first two.”
+
+                         0.0                                                                                                        2181.0
+                                                                                         1200.0 1260.0      …       1740.0 1800.0
+
+<tool call args>:          Turn 5:
+segments=                  <Tool>: Stitch Verify (segments=([1800, 1860], [1860, 1920]…[2040, 2100], [2100, 2161]), fps=0.25, query = “Look for groups of
+([1800, 1860], … ,         three sticker sets and how the third differs from the first two.”)
+[2100, 2161])              <Observation>: “[1952, 2028]: The third cluster is always different in theme—the first two repeat the same illustration, while the
+fps=0.25                   third switches to a new one (e.g., “Outer Space” vs “Classic Air Race,” “Coffee Shop” vs “Grill BBQ,” “Old Beer” vs “Football”). [1388,
+                           1408]: The third sheet is foliage-only (leaves and sprigs), unlike the unicorn-themed first sheet and the floral second sheet.”
+
+                          0.0                                                                                                      2181.0
+                                                                                                                          1800.0 2161.0
+                               Turn 6:
+<tool call args>:              <Tool>: Segment Focus, query = " Describe the first two sticker sheets and the third; what motifs each has and colors.”
+interval=[1388, 1408],         <Observation>: “The third sheet is foliage-only (leaves and sprigs), unlike the unicorn-themed first sheet and the floral second
+fps=1                          sheet.”
+
+                          0.0                                                                                                        2181.0
+                                                                                                      1388.0    1408.0
+                               Turn 6:
+<tool call args>:              <Tool>: Segment Focus, query = " Does third sheet have any color?”
+interval=[1290, 1320],         <Observation>: “The third sheet is clear and colorless, unlike the first two opaque white sheets with grey grid lines.”
+fps=1
+                          0.0                                                                                                        2181.0
+                                                                                          1290.0   1320.0
+
+
+                                                                  The final answer should be “C”.
+
+
+
+                                             Figure 16. Example of Scope Partitioning behavior.
+                 Behaviour Mode：“Static Repetition”
+
+
+
+
+                             0.0                                                                                                                                      2378.2
+
+
+                                       Question: After #41 completed his free throws, how many points was the team the author was rooting for ahead
+                                       or behind the other team?
+                                       A. 6 points ahead of the other team.
+                                       B. Trailing the other team by 12 points.
+                                       C. 12 points ahead of the other team.
+                                       D. 12 points ahead of the other team.
+
+                                            Turn 1:
+                                            <Tool>: Scan Search, query = "Identify moments where the scoreboard is visible and shows the current score in the basketball
+                 <tool call args>:          game.”
+                 interval=[0, 2378],        <Observation>: “….[713.4, 951.2]: At the start of 856–903 s, the tabletop scoreboard is clearly visible. It shows game clock 15:40,
+                 fps=0.25,                  and the score is 32 (right team) to 27 (left team)….[951.2, 1189]: The large wall-mounted scoreboard is readable during several
+                 num_slices=10              shots: during loose-ball action near 951 s, half-court play around 1000 s, and a free-throw after 1046 s. A portable scoreboard is
+                                            also readable around 1094 s and again near 1189 s, each confirming the live running score.”
+
+                                          0.0                                                                                                   2378.2
+                                                          237.8         475.6                     …                  1902.6        2140.4
+                                            Turn 2:
+                                            <Tool>: Segment Focus, query = "Describe what happens, especially any free throws by player #41 and the scoreboard after they
+                 <tool call args>:          finish.”
+                 interval=[1270, 1340],     <Observation>: "At 1298-1312 s, orange-uniformed player #41 is shown standing at the free-throw line with the ball, dribbling
+                 fps=1                      and taking his shots while both teams are lined up along the lane. Immediately afterward play is readied to resume and the courtside
+                                            electronic scoreboard that comes into clear view (≈1308-1312 s) reads 30 for the team in the white jerseys and 32 for the team in
+                                            the orange jerseys, indicating his free throws were successful and have given the orange team a two-point lead."
+
+                                          0.0                                                                                                   2378.2
+                                                                                         1270.0    1340.0
+                                            Turn 3:
+                                            <Tool>: Segment Focus, query = "What are the scores displayed on the scoreboard before and after #41's free throws? Which side
+                                            corresponds to which team (colors)?”
+                <tool call args>:
+                                            <Observation>: "At 1298-1308 s, just before #41 (navy‐and-orange uniform) begins his trip to the line, the tabletop scoreboard on
+                interval=[1288, 1320],
+                                            the far right shows 37–32. The left side (37) belongs to the navy/orange team, while the right side (32) belongs to the white/blue
+                fps=2
+                                            team. \n• After #41 finishes shooting (frames 1308-1318 s), the same board now reads 38–32. Only the left total has risen, confirming
+                                            the point(s) were credited to #41’s navy/orange side.”
+                                          0.0                                                                                                   2378.2
+                                                                                          1288.0      1320.0
+                                            Turn 4:
+                <tool call args>:           <Tool>: Segment Focus, query = "What is the scoreboard score before #41 takes his free throws?”
+                interval=[1288, 1298],      <Observation>: "No frame in the supplied 1288-1298 s interval shows a readable view of the scoreboard; therefore, the score
+                fps=2                       immediately before #41 steps to the free-throw line cannot be determined from the provided images.”
+
+                                          0.0                                                                                                   2378.2
+                                                                                          1288.0 1298.0
+
+
+
+                                                                                       …Zoom in × 15…
+                                                Turn 20:
+                                                <Tool>: Segment Focus, query = "Look for scoreboard and read score before #41 free throws, between 1280-1295 seconds.”)
+                <tool call args>:
+                                                <Observation>: "Across all frames supplied from 1280 s to 1295 s, no image offers a clear, legible view of any scoreboard;
+                interval=[1280, 1295],
+                                                consequently, the score immediately before player #41’s free-throw attempts cannot be determined from the visual evidence
+                fps=2
+                                                provided.”
+                                           0.0                                                                                                   2378.2
+                                                                                            1280.0 1295.0
+
+
+
+
+                                                 Arrive the max tool call turns, there is no sufficient evidence to answer the question.
+
+
+
+
+Figure 17. Example of Static Repetition behavior. The notation “zoom in × n” indicates that several fine-grained but low-impact interme-
+diate inspections are omitted from the visualization for brevity.
+Failure Type：“Premature Conclusion”
+
+
+
+
+         0.0                                                                                                                                      2664.0
+
+                       Question: What specific evidence is presented to support the claim that the Maya in the Yucatan were
+                       more advanced than previously believed?
+                       A. The discovery of a massive, previously unknown pyramid complex.
+                       B. The intricate carvings on the vault stones found in the pyramid.
+                       C. The detailed analysis of dental plaque revealing a diverse diet.
+                       D. The construction of the "Stairway to Heaven" estate with its elaborate architecture.
+
+
+                             Turn 1:
+                             <Tool>: Segment Focus (interval=[0, 2664], fps=0.25, num_slice=20 query = "Identify if this slice shows evidence that the Maya in
+                             the Yucatan were more advanced than previously believed and what specific evidence is discussed (pyramid complex discovery,
+                             intricate carvings on vault stones, dental plaque analysis, or Stairway to Heaven estate)”)
+ <tool call args>:           <Observation>: “ [0, 133.2]: LiDAR + stepped pyramid → pyramid complex. [133.2, 266.4]: Pyramid excavation → pyramid
+ interval=[0, 2664],         complex….. [666, 799.2]: Chamber carvings → vault-stone carvings. [799.2, 932.4]: Terraced hillside → Stairway to Heaven
+ fps=0.25,                   estate. [932.4, 1065.6]: Carved fragments → vault-stone carvings. [1065.6, 1198.8]: Widespread temples → pyramid
+ num_slice=20                complexes. [1198.8, 1332]: Monumental stairway → Stairway to Heaven estate. ….[1864.8, 1998]: Pyramid-centered city →
+                             pyramid complex .[1998, 2131.2]: Courtyard + stepped buildings → pyramid complex. [2131.2, 2264.4]: Exterior masks/mosaics
+                             → vault-stone carvings. [2264.4, 2397.6]: Stone terraces + stairway → Stairway to Heaven estate. [2397.6, 2530.8]:
+                             Forest/interviews → no evidence. [2530.8, 2664]: Exterior geometric/figural carvings → vault-stone carvings.”
+
+
+                       0.0                                                                                                    2664.0
+                                        133.2         266.4                     …                  2397.6        2530.8
+
+
+
+
+                                      The final answer should be “A”.
+
+
+
+
+                                  Figure 18. Example of Failure mode: Premature Conclusion.
+                Failure Type：“Evidence Dilution”
+
+
+
+
+                             0.0                                                                                                                                   2866.0
+
+                                               Question: What underlies the main character's ability to make rapid decisions on the field, according to the video?
+                                               A. Mental ability and vast experience.
+                                               B. Extensive training and situational awareness.
+                                               C. Confidence and self-belief.
+                                               D. All of the above.
+
+                                         Turn 1:
+                                         <Tool>: Scan Search, query = " Look for scenes discussing the main character's decision-making ability, mentioning mental ability,
+                <tool call args>:        experience, training, situational awareness, or confidence.”
+                interval=[0, 2866],      <Observation>: “... [859.8–1003.1s], the video displays on-screen labels such as “MENTAL ABILITY” and “STRENGTH UNDER
+                fps=0.25,                PRESSURE,” …reinforce the connection between mental ability and performance under pressure. [1003.1–1146.4s], …introduce
+                num_slices=20            phrases like “visual awareness training” and “decision making in elite athletes,” [1146.4–1289.7s]: a series of match situations,
+                                         analyst discussions depict the main character making quick in-game choices, providing evidence of decision-making and situational
+                                         awareness even without explicit on-screen text.”
+                                         0.0                                                                                                       2866.0
+                                                    143.3   286.6                                    …                          2579.4   2722.7
+                                         Turn 2:
+                <tool call args>:        <Tool>: Segment Focus, query = What attributes listed or discussed regarding main character's ability to make rapid decisions? Look
+                interval=[850, 905],     for text or spoken quotes in graphics.”
+                fps=1                    <Observation>: " 872 – 883 s a black-background digital graphic lists four performance categories:
+                                         “BODY STRENGTH”, “MENTAL ABILITY”, “TECHNIQUE”, and “SKILL”. The text “MENTAL ABILITY” glows while the others remain
+                                         plain. Later… a large caption reads “STRENGTH UNDER PRESSURE”.
+
+                                         0.0                                                                                                       2866.0
+                                                                     850.0     905.0
+                                       Turn 3:
+                                       <Tool>: Segment Focus, query = " Show text on title card or interview about what enables Ronaldo to make decisions quickly.”
+                <tool call args>:      <Observation>: “Between 1014s and 1018s, a red-grid title card for sports psychologist Zoe Wimshurst appears. Green on-screen text
+                interval=[1000, 1033],
+                                       lists her “special interests: visual awareness training” followed immediately by “decision making in elite athletes.”.”
+                fps=1
+                                         0.0                                                                                                       2866.0
+                                                                                   1000.0   1033.0
+
+
+                                                                                       …Zoom in × 2…
+                                       Turn 6:
+                <tool call args>:      <Tool>: Scan Search, query = " Look for any text or commentary referencing confidence or self-belief.”
+                interval=[800, 1100], <Observation>: : ... “no on-screen text … mentioning ‘confidence’ or ‘self-belief’.”
+                fps=0.5,
+                num_slices=6          0.0                                                                                                  2866.0
+                                                                    800.0    850.0 900.0     …        1000.0 1050.01100.0
+
+                                                                                       …Zoom in × 1…
+                <tool call args>:      Turn 8:
+                interval=[1200, 1300], <Tool>: Scan Search, query = " Look for keywords confidence, experience, situational awareness, training”
+                fps=0.5,               <Observation>: : ... “none of the specified keywords appear.”
+                num_slices=5
+                                         0.0                                                                                                        2866.0
+                                                                                       1200.0                                1300.0
+                                          Turn 9:
+                 <tool call args>:        <Tool>: Stitch Verify, query = “Look for any on-screen text or visible words: 'confidence' or 'self-belief.”
+                 interval=[0, 2866],      <Observation>: “Across all examined frames covering 0–2866s, neither the word “confidence” nor “self-belief” appears.”
+                 fps=0.2
+                                          0.0                                                                                                       2866.0
+                                          Turn 10:
+                 <tool call args>:        <Tool>: Stitch Verify, query = “Look for any on-screen text or visible words: 'confidence' or 'self-belief.”
+                 interval=[800, 1300],    <Observation>: “The words 'experience' or 'extensive' do not appear in any on-screen text or captions.”
+                 fps=0.5
+                                          0.0                                                                                                       2866.0
+                                                                     800.0                           1300.0
+                                          Turn 11:
+                <tool call args>:         <Tool>: Stitch Verify, query = “Check for on-screen text: 'training'.”)
+                interval=[0, 2866],       <Observation>: “After reviewing all provided frames, no on-screen text containing the word 'training' is present.”
+                fps=0.25
+                                          0.0                                                                                                       2866.0
+
+
+
+
+                                                       The final answer should be “B”.
+
+
+
+
+Figure 19. Example of Failure mode: Evidence Dilution. The notation “zoom in × n” indicates that several fine-grained but low-impact
+intermediate inspections are omitted from the visualization for brevity.
+Failure Type：“Persistent Ambiguity”
+
+
+
+
+            0.0                                                                                                                                          3474.9
+
+                              Question: Why is Rakija introduced at the beginning of the video?
+                              A. Rakaji's boss is the sponsor of the documentary.
+                              B. To map Serbian basketball culture.
+                              C. Rakaji is the national drink of Serbia.
+                              D. Serbs like to drink alcohol while playing basketball.
+
+                        Turn 1:
+<tool call args>:       <Tool>: Segment Focus, query = “What is being said or shown about rakija in this segment? Why is rakija introduced?”
+interval=[0, 60],       <Observation>: “No mention or appearance of rakija. Only early-Serbian-basketball historical visuals (flag mural, 1923 hoop, vintage
+fps=0.5,                photos). No bottles, no drinking scenes, no explanatory text.”
+
+                        0.0                                                                                                       3474.9
+                                   60.0
+
+                        Turn 2:
+<tool call args>:       <Tool>: Scan Search, query = “Does the segment discuss or show rakija, why it is introduced, or mention Serbia's national drink,
+interval=[0, 240],      alcoholic beverage?.”
+fps=0.2,                <Observation>: “ Across all four slices (0–240s), no rakija or alcohol references. Only basketball history, archival photos, travel shots,
+num_slices=4            and a single beer bottle. No indication of why rakija is introduced.”
+
+                        0.0                                                                                                       3474.9
+                                   60.0   120.0     180.0 240.0
+
+                        Turn 3:
+<tool call args>:       <Tool>: Scan Search, query = “Does the segment discuss or show rakija, why it is introduced, or mention Serbia's national drink,
+interval=[240, 600],    alcoholic beverage?”
+fps=0.2,                <Observation>: “Rakija-related scenes appear (small flasks, “KAJSIJA” bottle, distillery expert, group toasts), but no subtitles or
+num_slices=6            on-screen text explain why rakija is introduced. Visuals show serving and tasting but not the purpose behind it.”
+
+                        0.0                                                                                                       3474.9
+                                            240.0                         …                600.0
+
+                        Turn 4:
+<tool call args>:       <Tool>: Segment Focus, query = “transcribe dialogue about rakija: Why they are introducing rakija? What does speaker say about
+interval=[390, 420],    rakija?”
+fps=1                   <Observation>: “Speaker is visible but has no subtitles, so his explanation cannot be read. Rakija bottles and glasses appear, but no
+                        text states why it is being introduced.”
+                        0.0                                                                                                       3474.9
+                                          390.0     420.0
+                        Turn 5:
+<tool call args>:       <Tool>: Segment Focus, query = “Any on-screen text or captions describing rakija as the national drink or explaining reason for
+interval=[444, 468],    introduction?”
+fps=1                   <Observation>: “Only lower-third “STEFAN KOKANOVIĆ – Kokanović Distillery.” No captions describing rakija as the national
+                        drink or explaining its introduction.”
+                         0.0                                                                                                      3474.9
+                                                     444.0   468.0
+                        Turn 6:
+ <tool call args>:      <Tool>: Segment Focus, query = “Any opening statement about Rakija or reason for introduction? On screen text or captions
+ interval=[360, 396],   explaining?”
+ fps=1                  <Observation>: “No text or imagery referencing rakija at all. Only signage like “HONOR,” bank logo, and “ambar.””
+
+
+                         0.0                                                                                                       3474.9
+                                  360.0   396.0
+
+                         Turn 7:
+ <tool call args>:       <Tool>: Segment Focus, query = “Look for captions or text about national drink or reason for introducing rakija.”
+ interval=[480, 516],    <Observation>: “Bottle labels “ambar Balkan cuisine” and “KAJSIJA – Hubert1924” are visible, but no caption indicates ‘national
+ fps=1                   drink’ or explains why rakija is introduced.”
+
+
+                         0.0                                                                                                       3474.9
+                                                                  480.0       516.0
+
+
+
+
+                                      The final answer should be “C”.
+
+
+
+
+                                     Figure 20. Example of Failure mode: Persistent Ambiguity.
+

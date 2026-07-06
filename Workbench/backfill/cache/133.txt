@@ -1,0 +1,863 @@
+                    This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                 Except for this watermark, it is identical to the accepted version;
+                           the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+              OpenVoxel: Training-Free Grouping and Captioning Voxels for
+                      Open-Vocabulary 3D Scene Understanding
+
+                 Sheng-Yu Huang1,2,† , Jaesung Choe1 , Yu-Chiang Frank Wang1,2 , Cheng Sun1
+                                 1
+                                   NVIDIA, 2 National Taiwan University
+
+
+                          Abstract                                             A soft white sheep plush sitting
+                                                                                on a chair next to the table.
+                                                                                                                       Bert embedding       A sitting stuffed bear with dark
+                                                                                                                                              fur and a light beige nose.
+
+                                                                                                                       ReferSplat
+                                                                                                                        > 1 hour
+We propose OpenVoxel, a training-free algorithm for                                                                    2D masks +
+                                                                                                                  human annotated caption
+grouping and captioning sparse voxels for the open-
+                                                                                                   OpenVoxel (ours), Training-Free, ~ 3min
+vocabulary 3D scene understanding tasks. Given the sparse                          Group Field Construction
+                                                                                                                                                              A soft white
+voxel rasterization (SVR) model obtained from multi-view                                                               der
+                                                                                                                                              Captioning       sheep plush
+                                                                                                                    Ren                                    sitting on a chair
+images of a 3D scene, our OpenVoxel is able to pro-                                                                                                        next to the table.
+
+duce meaningful groups that describe different objects in                                                          Ren                                     A sitting stuffed
+                                                                                                                      der                     Captioning
+                                                                                                                                                           bear with dark
+the scene. Also, by leveraging powerful Vision Language                                Only 2D masks                                                       fur and a light
+                                                                                                                                                             beige nose.
+Models (VLMs) and Multi-modal Large Language Mod-
+els (MLLMs), our OpenVoxel successfully build an infor-              Figure 1. Comparison of lifting language into 3D representa-
+mative scene map by captioning each group, enabling fur-             tions between ReferSplat [15] and OpenVoxel. Note that Refer-
+ther 3D scene understanding tasks such as open-vocabulary            Splat additionally requires manual text annotations for training
+segmentation (OVS) or referring expression segmentation              3DGS to equipped with Bert embeddings, while ours is totally
+(RES). Unlike previous methods, our method is training-              training-free and do not need any additional annotations.
+free and does not introduce embeddings from a CLIP/BERT
+text encoder. Instead, we directly proceed with text-to-text         tures that are trained to store language attributes derived
+search using MLLMs. Through extensive experiments, our               from the 2D foundation model, CLIP [51]. The succes-
+method demonstrates superior performance compared to                 sive studies [19, 47, 71, 74, 78] try to improve the trainable
+recent studies, particularly in complex referring expression         Gaussian features by either introducing contrastive learning
+segmentation (RES) tasks. The code will be open.                     between different objects in the scene, or training an object-
+                                                                     aware 3DGS model from scratch. However, these methods
+                                                                     are limited by learning short words or tags, which hinders
+1. Introduction                                                      advanced 3D scene understanding with complex sentence
+With the recent advancement of the neural rendering algo-            queries such as the referring segmentation task, as men-
+rithm [3, 5, 10, 11, 21, 27, 34, 38, 39, 43, 53, 56, 57, 60, 75],    tioned in [15]. More recently, ReferSplat [15] proposes
+several primitives have been introduced to represent the             to cope with segmentation from complex queries, and fo-
+3D scenes. 3D Gaussian Splatting (3DGS) [24] and sev-                cus on the 3D referring segmentation task (RES) by pro-
+eral extensions [6, 12, 69, 76] have recently emerged as             viding human-annotated observable objects’ masks and cor-
+a groundbreaking technique for novel view synthesis, of-             responding detailed natural language sentence descriptions
+fering an exceptional balance of visual fidelity and real-           for training. However, all the aforementioned approaches
+time performance. Concurrently, Sparse Voxel Rasteriza-              tend to leverage learned embeddings as language fields
+tion (SVR) [29, 58] enables a sparse voxel representation to         from visual-language aligned embeddings such as CLIP or
+perform the novel-view synthesis task.                               DINO, limiting the capability of dealing with arbitrary tex-
+    Recent studies [14, 15, 18–20, 22, 25, 28, 31, 33, 37,           tual queries [23]. Also, obtaining detailed human annota-
+46, 47, 49, 59, 68, 70, 71, 73, 74, 78] leverage the series of       tion for training requires labor-intensive pre-processing for
+novel 3D primitives for open-vocabulary 3D understanding             each scene, and training additional language fields for 3D
+tasks, such as semantic segmentation, 3D open-vocabulary             representation is also time-consuming (more than one hour
+segmentation (OVS). LangSplat [49] is one of the pio-                for each scene).
+neering papers that introduces 3D Gaussians for this pur-                To address these issues, we propose OpenVoxel, a novel
+pose by optimizing 3DGS first and adopts Gaussian fea-               training-free framework that bypasses the speed and ac-
+
+
+
+                                                                16734
+curacy limitations of learning text embedding space. In-         3D Gaussian Splatting (3DGS) [24] and following exten-
+stead of training 3D features to align with a fixed em-          sions [6, 12, 69, 76] represent scenes using anisotropic
+bedding manifold, our OpenVoxel directly populates the           Gaussians that can be rendered in real time, significantly
+3D scene with rich, human-readable text captions and pro-        improving efficiency while preserving fidelity. More recent
+ceeds with text-to-text retrieval for open-vocabulary 3D         work on Sparse Voxel Rasterization (SVR) [58] introduces a
+scene understanding, including open-vocabulary segmenta-         discrete, sparse voxel representation that supports efficient
+tion (OVS) and referring expression segmentation (RES).          rasterization-based rendering. These representations (i.e.,
+Given a Sparse Voxel Rasterization (SVR) model opti-             NeRF, 3DGS, and SVR) collectively form the foundation
+mized from multi-view images of a 3D scene, we in-               for modern neural scene reconstruction and are increasingly
+troduce a training-free algorithm of Training-Free Sparse        adopted for downstream 3D understanding tasks.
+Voxel Grouping to cluster all voxels into object-level groups
+by lifting and matching per-frame 2D segmentation maps           Language-aligned 3D scene representation. A growing
+obtained from SAM2 [52]. This aggregation is crucial             line of research [14, 15, 18–20, 22, 25, 28, 31, 33, 46, 47,
+for moving from a per-voxel representation to a seman-           49, 59, 68, 71, 74, 78] aims to equip 3D scene representa-
+tically coherent, object-level understanding and ensuring        tions with open-vocabulary or language-aware capabilities
+view-consistency. To further bridge voxels with textual          so that further downstream tasks [7, 8, 13, 16, 17, 32, 35,
+description, we also introduce the strategy of Canonical         40–42, 61, 63–66, 72] such as 3D scene editing or inpaint-
+Scene Map Construction to locate language attributes on          ing are applicable. LangSplat [49] introduces language-
+top of this sparse voxel representation via Vision Language      aligned features into 3D Gaussians by distilling CLIP em-
+Models (VLMs) and Multi-modal Large Language Models              beddings and multi-scale SAM [26] masks from multi-
+(MLLMs), obtaining a full description of the entire scene.       view images, enabling open-vocabulary 3D segmentation.
+Finally, to answer an open-vocabulary query (e.g., a simple      OpenGaussian [68] and Dr.Splat [22] further enhance this
+word or a complex sentence), we utilize MLLMs to per-            pipeline by improving the quality of language features in
+form Referring Query Inference via direct text-to-text re-       Gaussian primitives through codebooks. ReferSplat [15]
+trieval. The MLLM compares the user’s query against the          tackles the challenging 3D referring expression segmenta-
+constructed scene map, enabling a flexible and powerful re-      tion (RES) task, aligning Gaussian features with sentence-
+trieval process that is not constrained by embedding prox-       level embeddings and predicting object masks conditioned
+imity. In summary, the contributions of our methods are          on natural-language sentence queries. Despite promising
+listed below:                                                    results, these methods rely heavily on text-encoder embed-
+• A training-free framework for open-vocabulary 3D scene         ding spaces and additional human annotation of “sentence-
+   understanding : We introduce OpenVoxel, a novel               object mask” pairs on the training images, which limit their
+   pipeline that removes the need for learning 3D language       practicability on new scenes and ability to interpret nuanced
+   embeddings and instead performs text-to-text reasoning        or arbitrarily phrased queries.
+   using LLMs on top of the sparse voxel representation.
+• Group (object)-level captioning and scene map construc-           In contrast, our method avoids the requirements of
+   tion : We propose an unsupervised method that clusters        human-annotated description-mask pairs or embedding
+   sparse voxels into instance-level 3D masks and gener-         alignment entirely. Instead of training 3D features to
+   ates rich, descriptive captions for each instance using an    match a fixed latent space, we generate rich captions for
+   MLLM, forming an informative scene map.                       3D instances and perform direct text-to-text retrieval using
+• Superior performance in both complex and simple lan-           MLLMs, enabling more flexible reasoning over complex
+   guage queries for 3D scene understanding task : By            queries.
+   combining instance captions with LLM-based reasoning,
+   OpenVoxel outperforms previous studies on both open-
+   vocabulary semantic segmentation (OVS) and referring
+   expression segmentation (RES) tasks.                          3. Preliminary
+
+2. Related Works                                                 We start by reconstructing scenes from multi-view input
+                                                                 images. To this end, we employ the recently emerged
+3D scene representation with different primitives. Neu-          SVR [58], which reconstructs scenes as sparse voxel fields
+ral radiance fields (NeRF) [3, 5, 10, 11, 21, 27, 34, 38, 39,    and achieves high-quality reconstruction and real-time ren-
+43, 53, 56, 57, 60, 75] have established a powerful paradigm     dering. The reconstructed voxels are also suitable for ef-
+for representing scenes as continuous volumetric fields, en-     ficiently assigning attributes to certain 3D locations, which
+abling high-quality novel view synthesis but suffering from      our algorithm exploits. Their rendering follows the classical
+slow training and rendering. To address these limitations,       volume rendering equation, which is also the one employed
+
+
+
+                                                            16735
+     Pre-Trained
+  Sparse Voxel Model               Training-Free Sparse Voxel Grouping                         Canonical Scene Map Construction
+
+        𝑰𝟏:𝑲   Views: 𝝃𝟏:𝑲                                                                     Group Masks                                          𝑆
+                                                                                                    +                                       Scene Map
+                                 𝑴𝟏:𝑲                                                            Images
+                                                                                                                              Apple,
+                               SAM masks                                                                                      light green   {"id": 1,
+                                                                                                                 Canonical                  "position": [
+                                                 ℱ!:#
+                                                                                                                              with fluffy
+                                                                                         der                     captioning                 -0.399, 2.06,
+                                                                                      Ren                                     material …
+                                                                                                                              , on table    -1.34],
+                                                                                                                                            "caption": “ Apple,
+                                                                                                                                            light green with fluffy
+                                                                                                                                            material and a prominent,
+                                                                                                                                            dark green leaf attached
+                                                                                                                                            to its stem, placed on
+                                                                                                                                            table"},
+                                                                                                                                            {"id": 2,
+                                                                                      Ren
+                                                                                         der                                  Toy Dog,      "position": [
+                                                                                                                 Canonical    yellow with   0.387, 1.88, -0.534],
+                                                                                                                 captioning   cartoonish    "caption": ”toy dog,
+                                                                                                                              looking, …    yellow with cartoonish
+                                                                                                                                            looking, smooth plastic
+            𝑽𝟏:𝑵                                                                                                                            surface …
+
+
+
+
+      Referring    A funny toy with spindly
+                      legs that looks very                                            Toy,
+        Query           interesting in the                                            Yellow,                    ID: {2}         Render
+                            sunlight.                                                 Slim legs
+      Inference                                                            Query                  Text-to-text
+                                                                                                                                             Object Mask
+                                   𝐷                   Query Image
+                                                                         Refinement               Retrieving
+                                                                                                                                            in Query View
+                           Query Description
+
+
+Figure 2. Overview of OpenVoxel. Taking a sparse voxel model V1:N pre-trained from multi-view images I1:K and their corresponding
+camera pose ξ1:K , we aim to build a voxel group field F1:N from segmentation masks M1:K obtained from SAM2. With F1:N we render
+images and masks for all groups to obtain canonical captions and construct a Scene Map S recoding their position and captions. In the
+Referring Query Inference stage we take a query description and image to find the ideal target group that matches the description by query
+refinement and text-to-text retrieving from S, enabling complex segmentation tasks such as referring expression segmentation (RES).
+
+by NeRF [39] and 3DGS [24]:                                              three main components: (1) Training-Free Sparse Voxel
+       X                                   Y                             Grouping that groups voxels into coherent 3D instances
+C(r) =     wi (r) · ci , wi (r) = αi (r) ·   (1 − αj (r)) ,              (Sec. 4.1), (2) Canonical Scene Map Construction that
+         i<N                                   j<i                       stores the detailed captions and 3D spatial information for
+                                                              (1)        all voxel groups (Sec. 4.2), and (3) Referring Query In-
+where C(r) is the rendering result for ray r, i goes through             ference to support querying and reasoning with natural lan-
+an ordered list of N voxels in front of the ray, ci is the voxel         guage input from users (Sec. 4.3).
+attribute (usually color) to render, αi (r) is the opacity of the
+ray passing through the voxel, and finally wi (r) is the con-
+tributing weight from the voxel to the rendered ray, which
+is also used in our algorithm during grouping.                           4.1. Training-Free Sparse Voxel Grouping
+
+4. Methodology                                                           Drawing inspiration from deep hough voting [48] and spa-
+                                                                         tial embedding [44], our key insight is that voxels belong-
+We first define the notation and problem statement of our                ing to the same object instance should cluster around a
+framework. As shown in Fig. 2, given a 3D scene re-                      common 3D center position. With this motivation, we en-
+constructed as N sparse voxels {Vi }N   i=1 from a set of K              code group membership of voxels as 3D spatial coordinates
+multi-view images {Ii ∈ RH×W ×3 }K     i=1 with their camera             pointing to their instance centroids. These spatial embed-
+poses {ξi ∈ SE(3)}K   i=1 , our goal is to assign descriptive            ding, termed as group feature, is progressively updated by
+language information to these voxels to construct a scene                readily available 2D segmentation masks from foundation
+map S and enable open-vocabulary reasoning from a natu-                  models like SAM2 [52]. Our update is efficiently done
+ral language description D, which can be a vocabulary as in              in one training-free pass through all K views without the
+3D-OVS [33] or a referring expression as in 3D-RES [15].                 lengthy gradient descent. In contrast, existing methods like
+We target gradient-descent-free and latent-dimension-free                Gaussian Grouping [71] rely on gradient descent to up-
+approaches to save space and time.                                       date per-primitive high-dimensional features with sequen-
+    To this end, we present OpenVoxel, which consists of                 tial training processes.
+
+
+
+                                                                     16736
+                                                                     𝒑𝒓𝒐𝒋
+                 View1 SAM mask 𝑴𝟏                              𝑀𝟐                           View2 Raw SAM mask 𝑴𝟐
+                                                                                                                                           voxel renderer [58] to perform the update in one rendering
+                                                                                 Compare &
+
+                                                                                 Match/Merge
+                                                                                                                                           pass. The update equation follows Dr.Splat [22], while we
+                                2D-t
+                                    o-3
+                                        D
+                                                                                                                                           do not need the top-k sampling as our group feature is only
+                                            pro                         Render to View2
+                                               jecti
+                                                    on                                                         Assign & Merge
+                                                                                                                 Exist ID &
+                                                                                                                Find New ID
+                                                                                                                                           3-dimensional.
+
+                                                                                                                                          Start condition. At view ξ1 , the voxel group feature F 1
+                                        Update
+                                                                                            View2 Matched SAM mask 𝑴′𝟐
+                                                                                                                                          and weight W 1 are directly assigned by the information
+                                𝟎                  𝟏      𝟏
+       Initialized Group Field ℱ𝟏:𝑵
+                                    𝟎
+      Initialized Feature Weight 𝑊𝟏:𝑵
+                                                  ℱ𝟏:𝑵 , 𝑊𝟏:𝑵 , 𝐺&
+                                                                        Update
+                                                                                                 pro
+                                                                                                    jec
+                                                                                                        tion                              lifted from the view. The group dictionary is set to the m
+                                                                                             D
+                                                                                         o-3
+            Group Dictionary 𝐺 %                                                     2D-t
+                                                                                                                                          instance IDs and their corresponding centroids f center .
+
+                                                                                  Repeat                                                  Progressively Matching and Merging Segmentation
+                                                   𝟐
+                                                  ℱ𝟏:𝑵    𝟐
+                                                       , 𝑊𝟏:𝑵 , 𝐺(
+                                                                                                                        𝑲
+                                                                                             Final Group Field ℱ&:) = ℱ𝟏:𝑵
+                                                                                                                                          Masks. When we move on to view t + 1, we need to first
+                                                                                                                         𝑲
+                                                                                           Final Feature Weight 𝑊&:) = 𝑊𝟏:𝑵
+                                                                                            Final Group Dictionary       +
+                                                                                                                        𝐺=𝐺               match the mask IDs in M t+1 with the existing voxel group-
+Figure 3. Detail of the grouping process. Taking the pre-trained                                                                          ing (F t , W t , Gt ). To this end, we render our group field
+                                                     0                                                                                                            proj
+voxel model V1:K , we initialize the Group Field F1:N    , Feature                                                                        into view t + 1 as Mt+1      and match existing instances with
+          0
+weight W1:N as empty tensors, and Group Dictionary G0 as empty                                                                                        t+1
+                                                                                                                                          those in M . The matched instance IDs are replaced with
+dictionary. Then start from ξ1 , we project the SAM masks M1 to                                                                           the existing IDs, while the remaining are added as new in-
+3D voxel and update F1:N , W1:N , and G. By match and merge
+                                                                                                                                          stances. Specifically, we first determine the instance ID of
+masks from the other views repeating this process, the final F1:N ,
+W1:N , and G is able to represent the group information of V1:N .
+                                                                                                                                          each voxel i in the current iteration by:
+
+                                                                                                                                                                             Fit
+Group Representations. As depicted in Fig. 3, given                                                                                                        IDti = argminj        − Gtj   ,            (4)
+                                                                                                                                                                             Wit
+a reconstructed scene of N voxels, we extend voxel at-                                                                                                                                 2
+
+tributes by a group feature F1:N ∈ RN ×3 , which denotes                                                                                   where the first term is the normalized voxel voting and the
+the instance centroid the voxels belonging to, and a feature                                                                               second term is the centroid of each instance. We then cast
+weights W1:N ∈ RN indicating the confidence about the                                                                                      rays from the processing view to retrieve the instance ID of
+current feature. We also use a Group Dictionary G to record                                                                                the hit voxel, which forms a instance mask M proj reflect-
+the spatial centroid of each unique instance. The group fea-                                                                               ing the existing segmentation. Then, we conduct match-
+tures, weights, and dictionary are iteratively updated by the                                                                              ing by finding the highest IoU mask in M t+1 for each in-
+instance information from each frame.                                                                                                      stance in M proj . We also prompt the SAM2 model again
+                                                                                                                                           using M proj and merge the instance masks that are largely
+Lifting 2D Segmentation Maps to 3D Group Field. We                                                                                         overlapped to reduce noise and prevent the same instance
+first introduce our method to lift a 2D instances mask into                                                                                from being incorrectly separated as two different IDs. As
+3D voxels. Let M be the mask with m unique instances ID,                                                                                   for the masks in M t+1 that are neither matched nor over-
+and f pts ∈ RHW ×3 be the rendered point map of the view,                                                                                  lapped with the existing ones, we assign a new unique ID
+which indicates the expected ray-hit position in the world                                                                                 and add them to the group dictionary. Finally, we use the
+space. The centroid fkcenter ∈ R3 of each instance k is then                                                                               updated mask from M t+1 to update the voxel group fea-
+determined by performing masked average reduction on the                                                                                   ture into (F t+1 , W t+1 ) by Eq. (3). After processing all the
+point map:                                                                                                                                 K views, we use the IDK from Eq. (4) as the final voxel
+                                                                                                                                           instance grouping.
+                                                               1(Mj = k) · fjpts
+                                              P
+                                                     j∈HW                                                                                     It is worth noting that, with our Group Field construc-
+                fkcenter =                                                       .                                              (2)
+                                                            j∈HW 1(Mj = k)
+                                                                                                                                           tion strategy, even if the voxels are assigned to an incorrect
+                                                         P
+                                                                                                                                           group in some view, the accumulated F1:N and W1:N still
+We then accumulate the instance centroids information into                                                                                 force the voxel to “vote” the most confident group it be-
+each voxel i by:                                                                                                                           longs, reducing the possible miss-grouping.
+
+                                                                                                                                              4.2. Canonical Scene Map Construction
+                            X
+              Fit+1 = Fit +            center
+                                  wij fM j
+                                              ,
+                                                                     j∈HW                                                                     Once voxel groups are obtained, our next goal is to con-
+                                                                                                                                (3)
+                                                                                                                                              struct a canonical scene map S that records the position of
+                                                                            X
+                       Wit+1 = Wit +                                                   wij ,
+                                                                      j∈HW                                                                    each group and describes each group with a rich, human-
+                                                                                                                                              readable caption, enabling open-vocabulary understanding
+where wij is the blending weight (Eq. (1)) the voxel i con-                                                                                   of the entire scene (Fig. 2). Instead of training 3D fea-
+tributing to the pixel j. In practice, we customize the sparse                                                                                tures to align with language embeddings, we bypass this
+
+
+
+                                                                                                                                      16737
+                        Include Visual Prompt (Red Dot)
+                                                                                                           ject can be used for cutting paper?”)—and an optional query
+        Group Masks
+             +
+                                                                    Please look at                         image of the target view, our goal is to identify the best-
+                                                                    the region
+          Images
+                                                                    high-lighted by
+                                                          red dot and consider the      Apple,
+                                                                                                           matching 3D instance in the scene map S, obtain its ID(s),
+                                   Green                                                light green
+                                   round
+                                                          given caption.
+                                                                                        with fluffy        and render the corresponding binary mask in the target
+                                                          Refine the caption in the     material …
+                                   object, …
+                      Captioning
+                                                          template of <category>,       , on table         view. Rather than mapping the query and all captions into a
+                                                          <appearance details>,
+                                                          <function>, <placement>                          learned embedding space, we perform direct retrieval over
+                                                                                                           S with a multimodal LLM (MLLM). This design avoids
+                                   Yellow                          Refine the caption   Toy Dog,
+                                   figurines,                      in the template of   yellow with
+                                                                                        cartoonish
+                                                                                                           any additional training or calibration for our 3D setting,
+                      Captioning   four slim              <category>, <appearance
+                                   legs …                 details>, <function>,
+                                                          <placement>
+                                                                                        looking, …
+                                                                                                           maintains robustness to free-form phrasing that includes at-
+                                                                                                           tributes, affordances, or light reasoning, and yields inter-
+                        Include Visual Prompt (Red Dot)
+                                                                                                           pretable evidence because the selection is made over the
+Figure 4. Detail of the Canonical Captioning. Given the group                                              canonical captions stored in S.
+masks rendered of a specific group (taking the green apple as ex-
+ample) from our group field and their corresponding images, we                                             Query Refinement. To make matching deterministic and
+leverage the Describe Anything Model (DAM) to first obtain a de-                                           stable, we first canonicalize the query. Following the same
+tailed caption. Then a Qwen3-VL model is conducted to canoni-
+                                                                                                           procedure as in our captioning stage, the MLLM rewrites
+calize the caption into a fixed form, benefiting further usage.
+                                                                                                           D (with or without the query image) into our fixed tem-
+                                                                                                           plate <category noun>, <appearance details> <func-
+bottleneck by leveraging Multimodal Large Language Mod-                                                    tion/affordance or part-of> <placement/relation>. For in-
+els (MLLMs) to obtain detailed and accurate canonical cap-                                                 stance, the free-form description “A funny toy with spindly
+tions for each group. We now detail the canonical caption-                                                 legs that looks very interesting in the sunlight” becomes
+ing process.                                                                                               “Toy, yellow, slim legs.” The refined query now matches
+    As depicted in Fig. 2 and Fig. 4, taking the green apple                                               the format of entries in S, so the retrieval process reduces to
+as an example, we render the binary masks of the corre-                                                    selecting the caption(s) in S that best satisfy the refined de-
+sponding group in views ξ1:K and use them as mask in-                                                      scription and returning their associated ID (In practice, we
+puts together with the original images I1:K for the Describe                                               input the entire S for the MLLM, so even if the query im-
+Anything Model (DAM) [30]. DAM produces a detailed                                                         plies spatial relations (e.g., “left of the apple”), the MLLM
+description of the content inside each mask; however, its                                                  can still possibly verify them using the stored group centers
+output is a free-form sentence and, in some cases, uses the                                                in S before finalizing the selection.
+generic word “object” as the subject (e.g., “A green round
+object, possibly an apple, . . . ”). To stabilize and standardize
+                                                                                                           Text-to-text Retrieving of Target Group. Finally, given
+the captions across groups, we further use an MLLM (e.g.,
+                                                                                                           the selected ID(s), we render the referred object by rasteriz-
+Qwen3-VL) to refine these free-form captions into a fixed-
+                                                                                                           ing only the corresponding group(s) under the target view,
+form caption while considering (i) the DAM sentence, and
+                                                                                                           producing a binary mask and the linked canonical caption
+(ii) the original masked images.
+                                                                                                           from S. This inference procedure is fully training-free, ap-
+    Because general MLLMs are not specifically trained for
+                                                                                                           plies uniformly to both OVS (category-only queries) and
+mask-image captioning, we design the visual prompting
+                                                                                                           RES (attribute/affordance/relation queries), and empirically
+strategy inspired by [67]: we darken the regions outside
+                                                                                                           provides stable matches across scenes and phrasing styles
+the mask and highlight the object with a small red dot to
+                                                                                                           while remaining simple to implement.
+focus the model’s attention. We then instruct the MLLM
+to rewrite the caption into the canonical template <cate-
+                                                                                                           5. Experiments
+gory noun>, <appearance details> <function/affordance
+or part-of> <placement/relation>. This converts each                                                       5.1. Settings
+group’s description into a consistent, structured form. The
+                                                                                                           Datasets. Following prior state-of-the-art works [15, 25,
+resulting entry for a group in S stores its ID, 3D position
+                                                                                                           49], we evaluate the open-vocabulary segmentation (OVS)
+(center), and the canonical caption. In practice, the canon-
+                                                                                                           and referring expression segmentation (RES) performance
+icalization significantly reduces subject ambiguity (e.g., re-
+                                                                                                           of our OpenVoxel primarily on subsets of the iPhone
+placing “object” with “apple”) and yields stable, compara-
+                                                                                                           Polycam-captured LeRF dataset [25]. For the OVS task, we
+ble descriptions across views.
+                                                                                                           follow the evaluation protocols in [71, 78] using the LeRF-
+                                                                                                           Mask subset, which contains three scenes (ramen, figurines,
+4.3. Referring Query Inference
+                                                                                                           and teatime) with 6, 7, and 10 queryable objects, respec-
+Given a user query D—from a single category token (e.g.,                                                   tively. We further conduct experiments on the LeRF-OVS
+“chair”) to a detailed referring expression (e.g., “what ob-                                               subset [49], with the same three scenes with 13, 17, and
+
+
+
+                                                                                                      16738
+Table 1. Quantitative evaluation on the Ref-LeRF subset in terms of referring expression segmentation (RES) mIoU. ReferSplat*
+denotes the best results we reproduced from the official implementation. Note that only ReferSplat requires ground truth annotation of
+description-mask pair for training. “Ours*” indicates all scenes share the same hyperparameters (from the “kitchen” scene), and “Ours” is
+our original results.
+
+        Method                          Requires GT Annotation         ramen      figurines      teatime      kitchen     avg.
+        Grounded SAM [54]                                   -              14.1      16.0          16.9         16.2      15.8
+        LangSplat [49]                                      -              12.0      17.9           7.6         17.9      13.9
+        SPIn-NeRF [41]                                      -               7.3       9.7          11.7         10.3       9.8
+        GS-Grouping [71]                                    -              27.9       8.6          14.8          6.3      14.4
+        GOI [50]                                            -              27.1      16.5          22.9         15.7      20.5
+        ReferSplat* [15]                                    ✓              31.0      20.0          25.4         21.4      24.5
+        ReferSplat [15]                                     ✓              35.2      25.7          31.3         24.4      29.2
+        OpenVoxel (Ours*)                                   -              48.2      42.5          48.1         25.1      41.0
+        OpenVoxel (Ours)                                    -              52.5      43.5          48.4         25.1      42.4
+
+Table 2. Quantitative evaluation on the LeRF-OVS subset in              ReferSplat [15], do not cover all four scenes, we reproduce
+terms of mIoU.                                                          its results following the original implementation and con-
+                                                                        figurations, denoted as ReferSplat*. As shown in Table 1,
+          Method              ramen   figurines   teatime   avg.
+                                                                        despite OpenVoxel not requiring any description–mask an-
+          Feature-3DGS [77]   43.7      58.8       40.5     47.7
+          LEGaussians [55]    46.0      60.3       40.8     49.0        notations during grouping or scene map construction, it
+          LangSplat [49]      51.2      65.1       44.7     53.7        achieves a notable improvement of 13.2% over the result
+          GS-Grouping [71]    45.5      60.9       40.0     48.8
+          GOI [50]            52.6      63.7       44.5     53.6        reported in the original ReferSplat paper, and an even larger
+          3DVLGS [46]         61.4      73.5       58.1     64.3
+          ReferSplat [15]     55.1      67.5       50.1     57.6
+                                                                        margin of 17.9% compared to our reproduced version. Dur-
+          CCL-LGS [59]        62.3      61.2       71.8     65.1        ing reproduction, we observe that ReferSplat’s strategy of
+          OpenVoxel (Ours)    62.5      60.7       75.4     66.2        learning sentence-level embeddings for 3D representations
+                                                                        tends to overfit the seen descriptions, resulting in unstable
+12 annotated objects, respectively. For the RES task, we                evaluation performance. In contrast, our OpenVoxel con-
+use the Ref-LeRF subset [15], which consists of four scenes             sistently achieves higher accuracy, and the superior perfor-
+(ramen, figurines, teatime, and kitchen) containing 13, 17,             mance of our text-level retrieval mechanism supports its ef-
+12, and 11 objects, respectively, each paired with sentence-            fectiveness and robustness compared to learned embedding
+level natural language referring expressions.                           approaches.
+
+Implementation details. We conduct our OpenVoxel
+with PyTorch [45] libraries, where our code base is built               LeRF-OVS and LeRF-Mask. Tables 2 and 3 summarize
+on top of SVR [58]. For the foundation models, we use                   the OVS results on the LeRF-OVS and LeRF-Mask subsets,
+SAM2 [52] to obtain the per-view segmentation map sep-                  respectively. For LeRF-OVS, we report mean Intersection-
+arately and also prompt SAM2 to conduct the mask merg-                  over-Union (mIoU) between predicted and ground-truth
+ing operation during the Training-Free Sparse Voxel Group-              masks, following [15, 49]. For LeRF-Mask, we additionally
+ing, as described in Sect. 4.1. On the other hand, the De-              evaluate mean Balanced IoU (mBIoU), following [71, 78].
+scribe Anything Model(DAM) [30] is used as our caption-                 As shown in Table 2, the OVS task involves relatively sim-
+ing model. As for the MLLM used to refine the obtained                  pler queries, leading to higher overall performance across
+captions/query and conduct the target retrieving, we use                methods—even when evaluated on the same target objects
+Qwen3-VL-8B-Instruct [1, 2, 62]. Please refer to our sup-               as in Ref-LeRF. For LeRF-Mask, where the queries are
+plementary material for more implementation details, in-                fewer and less ambiguous, all current state-of-the-art meth-
+cluding engineering tricks and the system prompt we use.                ods (including ours) achieve over 70% mIoU. Although our
+                                                                        design primarily targets the RES setting, by slightly change
+5.2. Quantitative Evaluations                                           the prompt to OVS oriented version that emphasizes class
+Ref-LeRF. We first present the RES results on the Ref-                  name and appearance and verifies each group against the
+LeRF subset in Table 1, as this task best demonstrates the              query, OpenVoxel still outperforms on both OVS bench-
+advantages of our design. Since the official pre-trained                marks, demonstrating its flexibility and robustness across
+models and data of the current state-of-the-art method,                 varying query complexities.
+
+
+
+                                                                   16739
+                         “A minimalist style toy with natural      “A compact black and white         “A funny toy with spindly legs that   “An item printed with Pikachu and      “A fun doll placed on top of the
+                            grooves next to a red apple.”        photographic device with a lens         looks very interesting in the      other decorative motifs on a smooth   Rubik's Cube and in the center of
+                                                                protruding slightly from the body.”               sunlight.”                             surface.”                   the table, quiet and nice.”
+
+
+
+
+      ReferSplat
+
+
+
+
+      OpenVoxel (Ours)
+
+
+
+
+      Ground Truth
+
+
+
+                                                                Figure 5. Qualitative results of RES task on the Figurines scene.
+
+Table 3. Quantitative evaluation on the LeRF-mask subset in terms of IoU and BIoU. Note that BIoU indicates the boundary IoU of
+predicted mask and ground-truth mask. Best results are in bold text, and second best results are underlined.
+
+                                                                     figurines                                ramen                                teatime                                  Avg.
+             Model
+                                                                mIoU             mBIoU                mIoU             mBIoU                mIoU             mBIoU                mIoU            mBIoU
+             DEVA [9]                                           46.2                45.1              56.8                51.1              54.3                52.2              52.4                49.5
+             LERF [25]                                          33.5                30.6              28.3                14.7              49.7                42.6              37.1                29.3
+             SA3D [4]                                           24.9                23.8               7.4                 7.0              42.5                39.2              24.9                23.3
+             LangSplat [49]                                     52.8                50.5              50.4                44.7              69.5                65.6              61.2                56.1
+             GS Grouping [71]                                   69.7                67.9              77.0                68.7              71.7                66.1              72.8                67.6
+             Gaga [36]                                          90.7                89.0              64.1                61.6              69.3                66.0              78.5                74.2
+             ObjectGS [78]                                      88.2                85.2              88.0                79.9              88.9                88.6              88.3                84.4
+             OpenVoxel (Ours)                                   92.5                90.0              87.7                83.6              89.0                86.9              89.7                86.8
+
+5.3. Qualitative Results                                                                                                 claim of using explicit captions to build a scene map and
+                                                                                                                         perform text-level retrieval, which benefits the RES tasks.
+We show the qualitative results of “figurines” and “ramen”
+                                                                                                                         5.4. Further Analysis
+scene in Ref-LeRF subset in Fig. 5 and Fig. 6, respectively.
+In both scenes, ReferSplat often identifies only partial re-                                                             Ablation Study. Table 4 shows the ablation studies of our
+gions of the target object. For example, in Fig 5, when we                                                               OpenVoxel on the Ref-LeRF subset. Start from the baseline
+input the query “A minimalist style toy with natural grooves                                                             A where we do not merge overlapping small masks as de-
+next to a red apple”, ReferSplat focuses on the region near                                                              scribed in Sect. 4.1 during the voxel grouping, and also do
+the apple (the apple is at the left of the image), without lo-                                                           not canonicalize both the caption and the query. We can
+calizing the correct object. In contrast, OpenVoxel retrieves                                                            see that even with the explicit captioning and text-to-text
+the toy pumpkin properly and render a smooth mask. As for                                                                retrieval, it is still hard to retrieve the correct target due to
+the query “A drinking utensils with a smooth surface near                                                                noisy small groups and misalignment of language format.
+a sake bottle” in Fig. 6, ReferSplat only focus on the term                                                              After that, we include the mask merging strategy in model
+“drinking utensils” and incorrectly segments both the glass                                                              B, showing a slight improvement of 3.7% mIoU due to less
+of water and the sake bottle, while our OpenVoxel locates                                                                noisy groups. Then, in model C, we introduce the canoni-
+the sake cup correctly. These results further support our                                                                cal captioning for each group while constructing the scene
+
+
+
+                                                                                                              16740
+                              “Slender strips of food in the center of   “An object containing noodles and   “Smooth slices with a delicate spiral   “A pair of utensils for holding food         “A drinking utensils with a smooth
+                                 the bowl, mixed with toppings”           various toppings on a table with    pattern featuring a swirl pattern.”         next to a yellow bowl.”                    surface near a sake bottle”
+                                                                                  sloping edges.”
+
+
+
+
+       ReferSplat
+
+
+
+
+       OpenVoxel (Ours)
+
+
+
+
+       Ground Truth
+
+
+
+                                                                         Figure 6. Qualitative results of RES task on the Ramen scene.
+
+Table 4. Ablation study of our OpenVoxel on Ref-LeRF subset.                                                                     Table 5. Run time comparison with current SOTAs. For the
+We integrative evaluate the effectiveness of several components of                                                               term “Requires Training”, it is to indicate if a method needs
+our OpenVoxel.                                                                                                                   gradient-based training to obtain the semantic or language field.
+                                                                                                                                 All methods are reproduced on a single RTX 5090 GPU.
+                          Method      Mask Merging      Canonical Caption     Canonical Query    mIoU
+                          A                  -                   -                    -           24.3
+                          B                  ✓                   -                    -           28.0                                               Method                    Requires Training               Run Time
+                          C                  ✓                   ✓                    -           36.4
+                                                                                                                                                     ReferSplat [15]                        yes                  >1 hr
+                          Ours               ✓                   ✓                   ✓            42.4
+                                                                                                                                                     ObjectGS [78]                          yes                 ∼ 40 min
+                                                                                                                                                     OpenVoxel (Ours)                       no                  ∼ 3 min
+map, showing a large improvement of 8.4% mIoU because
+of more specific captioning (i.e., standard template for each                                                                    struction, which is at least 10 × faster than other SOTAs,
+caption and reducing the word “object” as subject noun).                                                                         and the inference time per query is less than 1 sec.
+Lastly, our full model canonicalizes the input text query into
+the same form as the canonical caption, introducing more
+precise alignment and less ambiguity, and showing the best                                                                       6. Conclusion
+performance. The above ablation study verifies the neces-                                                                        In this paper, we propose OpenVoxel, a training-free frame-
+sity of each of our designs.                                                                                                     work for grouping and captioning sparse voxel rasterization
+                                                                                                                                 (SVR) models. In our Training-Free Voxel Grouping pro-
+Runtime Estimation. We show the comparison of run                                                                                cess, we curate a group field for a pre-trained SVR model
+time between our OpenVoxel and current SOTAs on OVS                                                                              by matching and merging per-view SAM2 masks. As for
+and RES tasks in Table 5 on a single RTX 5090 GPU. The                                                                           the Canonical Scene Map Construction we leverage VLMs
+term “Requires Training” here indicates if a method needs                                                                        and MLLMs to obtain a fix form of caption for each con-
+training to obtain its feature/language field. Although Ob-                                                                      structed group and then collect positions and captions of all
+jectGS [78] combines the training process of 3DGS and the                                                                        groups as the scene map. And finally, we conduct a Re-
+per-Gaussian object feature (similar to Gaussian Grouping),                                                                      ferring Query Inference to retrieve target objects from our
+we note that running a vanilla 3DGS on RTX 5090 only                                                                             scene map with an input descriptive query. Through quanti-
+takes about 10 minutes, indicating ObjectGS needs an addi-                                                                       tative and qualitative experiments, we verify the efficiency
+tional 30 minutes to obtain the object feature. On the other                                                                     and capability of OpenVoxel.
+hand, although ReferSplat reports that it only takes 58 min-                                                                     Acknowledgment This work is supported in part by
+utes to train on an A6000 GPU, in all our reproductions, we                                                                      the National Science and Technology Council via grants
+find that following the official implementation configuration                                                                    NSTC 114-2634-F-002-006 and NSTC 114-2221-E-002-
+takes at least 2 hours per scene to obtain the best results. In                                                                  056-MY2. We also thank the National Center for High-
+contrast, our OpenVoxel requires only about 3 minutes to                                                                         performance Computing (NCHC) for providing computa-
+complete the voxel grouping and canonical scene map con-                                                                         tional and storage resources.
+
+
+
+                                                                                                                       16741
+References                                                                 point cloud relighting with brdf decomposition and ray trac-
+                                                                           ing. Proceedings of the European Conference on Computer
+ [1] Jinze Bai, Shuai Bai, Shusheng Yang, Shijie Wang, Sinan               Vision (ECCV), 2024. 1, 2
+     Tan, Peng Wang, Junyang Lin, Chang Zhou, and Jingren             [13] Ayaan Haque, Matthew Tancik, Alexei A Efros, Aleksander
+     Zhou. Qwen-vl: A versatile vision-language model for un-              Holynski, and Angjoo Kanazawa. Instruct-nerf2nerf: Edit-
+     derstanding, localization, text reading, and beyond. arXiv            ing 3d scenes with instructions. In Proceedings of the IEEE
+     preprint arXiv:2308.12966, 2023. 6                                    International Conference on Computer Vision (ICCV), 2023.
+ [2] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin               2
+     Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun             [14] Qingdong He, Jinlong Peng, Zhengkai Jiang, Xiaobin Hu,
+     Tang, Humen Zhong, Yuanzhi Zhu, Mingkun Yang, Zhao-                   and Jiangning Zhang. Pointseg: A training-free paradigm
+     hai Li, Jianqiang Wan, Pengfei Wang, Wei Ding, Zheren                 for 3d scene segmentation via foundation models. In Pro-
+     Fu, Yiheng Xu, Jiabo Ye, Xi Zhang, Tianbao Xie, Zesen                 ceedings of the IEEE International Conference on Computer
+     Cheng, Hang Zhang, Zhibo Yang, Haiyang Xu, and Jun-                   Vision Workshops (ICCV Workshops), 2025. 1, 2
+     yang Lin. Qwen2.5-vl technical report. arXiv preprint            [15] Shuting He, Guangquan Jie, Changshuo Wang, Yun Zhou,
+     arXiv:2502.13923, 2025. 6                                             Shuming Hu, Guanbin Li, and Henghui Ding. Refersplat:
+ [3] Jonathan T Barron, Ben Mildenhall, Matthew Tancik, Peter              Referring segmentation in 3d gaussian splatting. Proceed-
+     Hedman, Ricardo Martin-Brualla, and Pratul P Srinivasan.              ings of the International Conference on Machine Learning
+     Mip-nerf: A multiscale representation for anti-aliasing neu-          (ICML), 2025. 1, 2, 3, 5, 6, 8
+     ral radiance fields. In Proceedings of the IEEE International    [16] Dongting Hu, Huan Fu, Jiaxian Guo, Liuhua Peng, Tingjin
+     Conference on Computer Vision (ICCV), 2021. 1, 2                      Chu, Feng Liu, Tongliang Liu, and Mingming Gong. In-
+ [4] Jiazhong Cen, Zanwei Zhou, Jiemin Fang, Wei Shen, Lingxi              n-out: Lifting 2d diffusion prior for 3d object removal via
+     Xie, Dongsheng Jiang, Xiaopeng Zhang, Qi Tian, et al. Seg-            tuning-free latents alignment. Advances in Neural Informa-
+     ment anything in 3d with nerfs. Advances in Neural Infor-             tion Processing Systems, 37:45737–45766, 2024. 2
+     mation Processing Systems (NeurIPS), 2023. 7                     [17] Sheng-Yu Huang, Zi-Ting Chou, and Yu-Chiang Frank
+ [5] Anpei Chen, Zexiang Xu, Andreas Geiger, Jingyi Yu, and                Wang. 3d gaussian inpainting with depth-guided cross-view
+     Hao Su. Tensorf: Tensorial radiance fields. In Proceedings            consistency. In Proceedings of the IEEE Conference on
+     of the European Conference on Computer Vision (ECCV),                 Computer Vision and Pattern Recognition (CVPR), 2025. 2
+     2022. 1, 2                                                       [18] Tianyu Huang, Runnan Chen, Dongting Hu, Fengming
+ [6] Guikun Chen and Wenguan Wang. A survey on 3d gaussian                 Huang, Mingming Gong, and Tongliang Liu. Openinsgaus-
+     splatting. arXiv preprint arXiv:2401.03890, 2024. 1, 2                sian: Open-vocabulary instance gaussian segmentation with
+ [7] Honghua Chen, Chen Change Loy, and Xingang Pan. Mvip-                 context-aware cross-view fusion. In Proceedings of the IEEE
+     nerf: Multi-view 3d inpainting on nerf scenes via diffusion           International Conference on Computer Vision Workshops
+     prior. In Proceedings of the IEEE Conference on Computer              (ICCV Workshops), 2025. 1, 2
+     Vision and Pattern Recognition (CVPR), 2024. 2                   [19] SungMin Jang and Wonjun Kim. Identity-aware language
+                                                                           gaussian splatting for open-vocabulary 3d semantic segmen-
+ [8] Yiwen Chen, Zilong Chen, Chi Zhang, Feng Wang, Xiaofeng
+                                                                           tation. In Proceedings of the IEEE International Conference
+     Yang, Yikai Wang, Zhongang Cai, Lei Yang, Huaping Liu,
+                                                                           on Computer Vision (ICCV), 2025. 1
+     and Guosheng Lin. Gaussianeditor: Swift and controllable
+                                                                      [20] Yuzhou Ji, He Zhu, Junshu Tang, Wuyi Liu, Zhizhong
+     3d editing with gaussian splatting. In Proceedings of the
+                                                                           Zhang, Xin Tan, and Yuan Xie. Fastlgs: Speeding up lan-
+     IEEE Conference on Computer Vision and Pattern Recog-
+                                                                           guage embedded gaussians with feature grid mapping. In
+     nition (CVPR), 2024. 2
+                                                                           Proceedings of the AAAI Conference on Artificial Intelli-
+ [9] Ho Kei Cheng, Seoung Wug Oh, Brian Price, Alexander                   gence (AAAI), 2025. 1, 2
+     Schwing, and Joon-Young Lee. Tracking anything with de-          [21] Mohammad Mahdi Johari, Yann Lepoittevin, and François
+     coupled video segmentation. In Proceedings of the IEEE                Fleuret. Geonerf: Generalizing nerf with geometry priors.
+     International Conference on Computer Vision (ICCV), 2023.             In Proceedings of the IEEE Conference on Computer Vision
+     7                                                                     and Pattern Recognition (CVPR), 2022. 1, 2
+[10] Zi-Ting Chou, Sheng-Yu Huang, I Liu, Yu-Chiang Frank             [22] Kim Jun-Seong, GeonU Kim, Kim Yu-Ji, Yu-Chiang Frank
+     Wang, et al. Gsnerf: Generalizable semantic neural radi-              Wang, Jaesung Choe, and Tae-Hyun Oh. Dr. splat: Directly
+     ance fields with enhanced 3d scene understanding. In Pro-             referring 3d gaussian splatting via direct language embed-
+     ceedings of the IEEE Conference on Computer Vision and                ding registration. In Proceedings of the IEEE Conference on
+     Pattern Recognition (CVPR), 2024. 1, 2                                Computer Vision and Pattern Recognition (CVPR), 2025. 1,
+[11] Sara Fridovich-Keil, Alex Yu, Matthew Tancik, Qinhong                 2, 4
+     Chen, Benjamin Recht, and Angjoo Kanazawa. Plenoxels:            [23] Amita Kamath, Cheng-Yu Hsieh, Kai-Wei Chang, and Ran-
+     Radiance fields without neural networks. In Proceedings               jay Krishna. The hard positive truth about vision-language
+     of the IEEE Conference on Computer Vision and Pattern                 compositionality. In Proceedings of the European Confer-
+     Recognition (CVPR), 2022. 1, 2                                        ence on Computer Vision (ECCV). Springer, 2024. 1
+[12] Jian Gao, Chun Gu, Youtian Lin, Hao Zhu, Xun Cao, Li             [24] Bernhard Kerbl, Georgios Kopanas, Thomas Leimkühler,
+     Zhang, and Yao Yao. Relightable 3d gaussian: Real-time                and George Drettakis. 3d gaussian splatting for real-time
+
+
+
+
+                                                                 16742
+     radiance field rendering. ACM Transactions on Graphics                  Ming-Hsuan Yang. Gaga: Group any gaussians via 3d-aware
+     (TOG), 2023. 1, 2, 3                                                    memory bank. arXiv preprint arXiv:2404.07977, 2024. 7
+[25] Justin Kerr, Chung Min Kim, Ken Goldberg, Angjoo                   [37] Juliette Marrie, Romain Ménégaux, Michael Arbel, Diane
+     Kanazawa, and Matthew Tancik. Lerf: Language embedded                   Larlus, and Julien Mairal. Ludvig: Learning-free uplifting
+     radiance fields. In Proceedings of the IEEE International               of 2d visual features to gaussian splatting scenes. In Pro-
+     Conference on Computer Vision (ICCV), 2023. 1, 2, 5, 7                  ceedings of the IEEE International Conference on Computer
+[26] Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao,               Vision (ICCV), 2025. 1
+     Chloe Rolland, Laura Gustafson, Tete Xiao, Spencer White-          [38] Ricardo Martin-Brualla, Noha Radwan, Mehdi SM Sajjadi,
+     head, Alexander C Berg, Wan-Yen Lo, et al. Segment any-                 Jonathan T Barron, Alexey Dosovitskiy, and Daniel Duck-
+     thing. In Proceedings of the IEEE International Conference              worth. Nerf in the wild: Neural radiance fields for un-
+     on Computer Vision (ICCV), 2023. 2                                      constrained photo collections. In Proceedings of the IEEE
+[27] Abhijit Kundu, Kyle Genova, Xiaoqi Yin, Alireza Fathi, Car-             Conference on Computer Vision and Pattern Recognition
+     oline Pantofaru, Leonidas J Guibas, Andrea Tagliasacchi,                (CVPR), 2021. 1, 2
+     Frank Dellaert, and Thomas Funkhouser. Panoptic neural             [39] Ben Mildenhall, Pratul P Srinivasan, Matthew Tancik,
+     fields: A semantic object-aware neural scene representation.            Jonathan T Barron, Ravi Ramamoorthi, and Ren Ng. Nerf:
+     In Proceedings of the IEEE Conference on Computer Vision                Representing scenes as neural radiance fields for view syn-
+     and Pattern Recognition (CVPR), 2022. 1, 2                              thesis. Communications of the ACM, 65(1):99–106, 2021. 1,
+[28] Junha Lee, Chunghyun Park, Jaesung Choe, Yu-                            2, 3
+     Chiang Frank Wang, Jan Kautz, Minsu Cho, and Chris                 [40] Ashkan Mirzaei, Tristan Aumentado-Armstrong, Marcus A
+     Choy. Mosaic3d: Foundation dataset and model for open-                  Brubaker, Jonathan Kelly, Alex Levinshtein, Konstantinos G
+     vocabulary 3d segmentation. In Proceedings of the IEEE                  Derpanis, and Igor Gilitschenski. Reference-guided control-
+     Conference on Computer Vision and Pattern Recognition                   lable inpainting of neural radiance fields. In Proceedings
+     (CVPR), 2025. 1, 2                                                      of the IEEE International Conference on Computer Vision
+[29] Jiahe Li, Jiawei Zhang, Youmin Zhang, Xiao Bai, Jin Zheng,              (ICCV), 2023. 2
+     Xiaohan Yu, and Lin Gu. Geosvr: Taming sparse vox-                 [41] Ashkan Mirzaei, Tristan Aumentado-Armstrong, Konstanti-
+     els for geometrically accurate surface reconstruction. arXiv            nos G Derpanis, Jonathan Kelly, Marcus A Brubaker, Igor
+     preprint arXiv:2509.18090, 2025. 1                                      Gilitschenski, and Alex Levinshtein. Spin-nerf: Multiview
+[30] Long Lian, Yifan Ding, Yunhao Ge, Sifei Liu, Hanzi Mao,                 segmentation and perceptual inpainting with neural radiance
+     Boyi Li, Marco Pavone, Ming-Yu Liu, Trevor Darrell, Adam                fields. In Proceedings of the IEEE Conference on Computer
+     Yala, et al. Describe anything: Detailed localized image and            Vision and Pattern Recognition (CVPR), 2023. 6
+     video captioning. arXiv preprint arXiv:2504.16072, 2025. 5,        [42] Ashkan Mirzaei, Riccardo De Lutio, Seung Wook Kim,
+     6                                                                       David Acuna, Jonathan Kelly, Sanja Fidler, Igor Gilitschen-
+[31] Liwei Liao, Xufeng Li, Xiaoyun Zheng, Boning Liu, Feng                  ski, and Zan Gojcic. Reffusion: Reference adapted dif-
+     Gao, and Ronggang Wang.            Zero-shot visual ground-             fusion models for 3d scene inpainting. arXiv preprint
+     ing in 3d gaussians via view retrieval. arXiv preprint                  arXiv:2404.10765, 2024. 2
+     arXiv:2509.15871, 2025. 1, 2                                       [43] Thomas Müller, Alex Evans, Christoph Schied, and Alexan-
+[32] Chieh Hubert Lin, Changil Kim, Jia-Bin Huang, Qinbo Li,                 der Keller. Instant neural graphics primitives with a mul-
+     Chih-Yao Ma, Johannes Kopf, Ming-Hsuan Yang, and Hung-                  tiresolution hash encoding. ACM Transactions on Graphics
+     Yu Tseng. Taming latent diffusion model for neural radiance             (ToG), 41(4):1–15, 2022. 1, 2
+     field inpainting. Proceedings of the European Conference on        [44] Davy Neven, Bert De Brabandere, Marc Proesmans, and
+     Computer Vision (ECCV), 2024. 2                                         Luc Van Gool. Instance segmentation by jointly optimizing
+[33] Kunhao Liu, Fangneng Zhan, Jiahui Zhang, Muyu Xu,                       spatial embeddings and clustering bandwidth. In Proceed-
+     Yingchen Yu, Abdulmotaleb El Saddik, Christian Theobalt,                ings of the IEEE Conference on Computer Vision and Pattern
+     Eric Xing, and Shijian Lu. Weakly supervised 3d open-                   Recognition (CVPR), 2019. 3
+     vocabulary segmentation. Advances in Neural Information            [45] Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer,
+     Processing Systems (NeurIPS), 2023. 1, 2, 3                             James Bradbury, Gregory Chanan, Trevor Killeen, Zeming
+[34] Yuan Liu, Sida Peng, Lingjie Liu, Qianqian Wang, Peng                   Lin, Natalia Gimelshein, Luca Antiga, et al. Pytorch: An im-
+     Wang, Christian Theobalt, Xiaowei Zhou, and Wenping                     perative style, high-performance deep learning library. Ad-
+     Wang. Neural rays for occlusion-aware image-based render-               vances in Neural Information Processing Systems (NeurIPS),
+     ing. In Proceedings of the IEEE Conference on Computer                  2019. 6
+     Vision and Pattern Recognition (CVPR), 2022. 1, 2                  [46] Qucheng Peng, Benjamin Planche, Zhongpai Gao, Meng
+[35] Zhiheng Liu, Hao Ouyang, Qiuyu Wang, Ka Leong Cheng,                    Zheng, Anwesa Choudhuri, Terrence Chen, Chen Chen, and
+     Jie Xiao, Kai Zhu, Nan Xue, Yu Liu, Yujun Shen, and                     Ziyan Wu. 3d vision-language gaussian splatting. Proceed-
+     Yang Cao. Infusion: Inpainting 3d gaussians via learn-                  ings of the International Conference on Learning Represen-
+     ing depth completion from diffusion prior. arXiv preprint               tations (ICLR), 2025. 1, 2, 6
+     arXiv:2404.11613, 2024. 2                                          [47] Jens Piekenbrinck, Christian Schmidt, Alexander Hermans,
+[36] Weijie Lyu, Xueting Li, Abhijit Kundu, Yi-Hsuan Tsai, and               Narunas Vaskevicius, Timm Linder, and Bastian Leibe.
+
+
+
+
+                                                                16743
+     Opensplat3d: Open-vocabulary 3d instance segmentation us-       [59] Lei Tian, Xiaomin Li, Liqian Ma, Hao Yin, Zirui Zheng,
+     ing gaussian splatting. In Proceedings of the IEEE Con-              Hefei Huang, Taiqing Li, Huchuan Lu, and Xu Jia. Ccl-
+     ference on Computer Vision and Pattern Recognition Work-             lgs: Contrastive codebook learning for 3d language gaussian
+     shops (CVPR Workshops), 2025. 1, 2                                   splatting. In Proceedings of the IEEE International Confer-
+[48] Charles R. Qi, Or Litany, Kaiming He, and Leonidas J.                ence on Computer Vision (ICCV), 2025. 1, 2, 6
+     Guibas. Deep hough voting for 3d object detection in point      [60] Suhani Vora, Noha Radwan, Klaus Greff, Henning Meyer,
+     clouds. In Proceedings of the IEEE International Conference          Kyle Genova, Mehdi SM Sajjadi, Etienne Pot, Andrea
+     on Computer Vision (ICCV), 2019. 3                                   Tagliasacchi, and Daniel Duckworth. Nesf: Neural semantic
+[49] Minghan Qin, Wanhua Li, Jiawei Zhou, Haoqian Wang, and               fields for generalizable semantic segmentation of 3d scenes.
+     Hanspeter Pfister. Langsplat: 3d language gaussian splatting.        arXiv preprint arXiv:2111.13260, 2021. 1, 2
+     In Proceedings of the IEEE Conference on Computer Vision        [61] Dongqing Wang, Tong Zhang, Alaa Abboud, and Sabine
+     and Pattern Recognition (CVPR), 2024. 1, 2, 5, 6, 7                  Süsstrunk. Innerf360: Text-guided 3d-consistent object in-
+[50] Yansong Qu, Shaohui Dai, Xinyang Li, Jianghang Lin, Liu-             painting on 360-degree neural radiance fields. In Proceed-
+     juan Cao, Shengchuan Zhang, and Rongrong Ji. Goi: Find               ings of the IEEE Conference on Computer Vision and Pattern
+     3d gaussians of interest with an optimizable open-vocabulary         Recognition (CVPR), 2024. 2
+     semantic-space hyperplane. In Proceedings of the 32nd ACM       [62] Peng Wang, Shuai Bai, Sinan Tan, Shijie Wang, Zhihao Fan,
+     international conference on multimedia, pages 5328–5337,             Jinze Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin
+     2024. 6                                                              Ge, Yang Fan, Kai Dang, Mengfei Du, Xuancheng Ren, Rui
+[51] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya                   Men, Dayiheng Liu, Chang Zhou, Jingren Zhou, and Jun-
+     Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,                yang Lin. Qwen2-vl: Enhancing vision-language model’s
+     Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning           perception of the world at any resolution. arXiv preprint
+     transferable visual models from natural language supervi-            arXiv:2409.12191, 2024. 6
+     sion. In International conference on machine learning, pages
+                                                                     [63] Yuxin Wang, Qianyi Wu, Guofeng Zhang, and Dan Xu.
+     8748–8763. PmLR, 2021. 1
+                                                                          Gscream: Learning 3d geometry and feature consistent gaus-
+[52] Nikhila Ravi, Valentin Gabeur, Yuan-Ting Hu, Ronghang                sian splatting for object removal. Proceedings of the Euro-
+     Hu, Chaitanya Ryali, Tengyu Ma, Haitham Khedr, Roman                 pean Conference on Computer Vision (ECCV), 2024. 2
+     Rädle, Chloe Rolland, Laura Gustafson, et al. Sam 2:
+                                                                     [64] Ethan Weber, Aleksander Holynski, Varun Jampani, Saurabh
+     Segment anything in images and videos. arXiv preprint
+                                                                          Saxena, Noah Snavely, Abhishek Kar, and Angjoo
+     arXiv:2408.00714, 2024. 2, 3, 6
+                                                                          Kanazawa. Nerfiller: Completing scenes via generative 3d
+[53] Christian Reiser, Songyou Peng, Yiyi Liao, and Andreas
+                                                                          inpainting. In Proceedings of the IEEE Conference on Com-
+     Geiger. Kilonerf: Speeding up neural radiance fields with
+                                                                          puter Vision and Pattern Recognition (CVPR), pages 20731–
+     thousands of tiny mlps. In Proceedings of the IEEE Inter-
+                                                                          20741, 2024.
+     national Conference on Computer Vision (ICCV), 2021. 1,
+     2                                                               [65] Silvan Weder, Guillermo Garcia-Hernando, Aron Monsz-
+                                                                          part, Marc Pollefeys, Gabriel J Brostow, Michael Firman,
+[54] Tianhe Ren, Shilong Liu, Ailing Zeng, Jing Lin, Kunchang
+                                                                          and Sara Vicente. Removing objects from neural radiance
+     Li, He Cao, Jiayu Chen, Xinyu Huang, Yukang Chen, Feng
+                                                                          fields. In Proceedings of the IEEE Conference on Computer
+     Yan, et al. Grounded sam: Assembling open-world models
+                                                                          Vision and Pattern Recognition (CVPR), 2023.
+     for diverse visual tasks. arXiv preprint arXiv:2401.14159,
+     2024. 6                                                         [66] Chung-Ho Wu, Yang-Jung Chen, Ying-Huan Chen, Jie-Ying
+[55] Jin-Chuan Shi, Miao Wang, Hao-Bin Duan, and Shao-                    Lee, Bo-Hsu Ke, Chun-Wei Tuan Mu, Yi-Chuan Huang,
+     Hua Guan. Language embedded 3d gaussians for open-                   Chin-Yang Lin, Min-Hung Chen, Yen-Yu Lin, et al. Aurafu-
+     vocabulary scene understanding. In Proceedings of the IEEE           sion360: Augmented unseen region alignment for reference-
+     Conference on Computer Vision and Pattern Recognition                based 360deg unbounded scene inpainting. In Proceedings
+     (CVPR), 2024. 6                                                      of the IEEE Conference on Computer Vision and Pattern
+[56] Mohammed Suhail, Carlos Esteves, Leonid Sigal, and                   Recognition (CVPR), 2025. 2
+     Ameesh Makadia. Generalizable patch-based neural render-        [67] Junda Wu, Zhehao Zhang, Yu Xia, Xintong Li, Zhaoyang
+     ing. In Proceedings of the European Conference on Com-               Xia, Aaron Chang, Tong Yu, Sungchul Kim, Ryan A
+     puter Vision (ECCV), 2022. 1, 2                                      Rossi, Ruiyi Zhang, et al. Visual prompting in multi-
+[57] Cheng Sun, Min Sun, and Hwann-Tzong Chen. Direct voxel               modal large language models: A survey. arXiv preprint
+     grid optimization: Super-fast convergence for radiance fields        arXiv:2409.15310, 2024. 5
+     reconstruction. In Proceedings of the IEEE Conference on        [68] Yanmin Wu, Jiarui Meng, Haijie Li, Chenming Wu, Yahao
+     Computer Vision and Pattern Recognition (CVPR), 2022. 1,             Shi, Xinhua Cheng, Chen Zhao, Haocheng Feng, Errui Ding,
+     2                                                                    Jingdong Wang, et al. Opengaussian: Towards point-level 3d
+[58] Cheng Sun, Jaesung Choe, Charles Loop, Wei-Chiu Ma, and              gaussian-based open vocabulary understanding. Advances in
+     Yu-Chiang Frank Wang. Sparse voxels rasterization: Real-             Neural Information Processing Systems (NeurIPS), 2024. 1,
+     time high-fidelity radiance field rendering. In Proceedings          2
+     of the IEEE Conference on Computer Vision and Pattern           [69] Haofei Xu, Songyou Peng, Fangjinhua Wang, Hermann
+     Recognition (CVPR), 2025. 1, 2, 4, 6                                 Blum, Daniel Barath, Andreas Geiger, and Marc Pollefeys.
+
+
+
+
+                                                                 16744
+     Depthsplat: Connecting gaussian splatting and depth. In Pro-
+     ceedings of the IEEE Conference on Computer Vision and
+     Pattern Recognition (CVPR), 2025. 1, 2
+[70] Mutian Xu, Xingyilang Yin, Lingteng Qiu, Yang Liu, Xin
+     Tong, and Xiaoguang Han. Sampro3d: Locating sam
+     prompts in 3d for zero-shot instance segmentation. In 2025
+     International Conference on 3D Vision (3DV). IEEE, 2025.
+     1
+[71] Mingqiao Ye, Martin Danelljan, Fisher Yu, and Lei Ke.
+     Gaussian grouping: Segment and edit anything in 3d scenes.
+     Proceedings of the European Conference on Computer Vi-
+     sion (ECCV), 2024. 1, 2, 3, 5, 6, 7
+[72] Youtan Yin, Zhoujie Fu, Fan Yang, and Guosheng Lin. Or-
+     nerf: Object removing from 3d scenes guided by multiview
+     segmentation with neural radiance fields. arXiv preprint
+     arXiv:2305.10503, 2023. 2
+[73] Yingda Yin, Yuzheng Liu, Yang Xiao, Daniel Cohen-Or,
+     Jingwei Huang, and Baoquan Chen. Sai3d: Segment any
+     instance in 3d scenes. In Proceedings of the IEEE Confer-
+     ence on Computer Vision and Pattern Recognition (CVPR),
+     2024. 1
+[74] Haiyang Ying, Yixuan Yin, Jinzhi Zhang, Fan Wang, Tao
+     Yu, Ruqi Huang, and Lu Fang. Omniseg3d: Omniversal 3d
+     segmentation via hierarchical contrastive learning. In Pro-
+     ceedings of the IEEE Conference on Computer Vision and
+     Pattern Recognition (CVPR), 2024. 1, 2
+[75] Alex Yu, Ruilong Li, Matthew Tancik, Hao Li, Ren Ng, and
+     Angjoo Kanazawa. Plenoctrees for real-time rendering of
+     neural radiance fields. In Proceedings of the IEEE Interna-
+     tional Conference on Computer Vision (ICCV), 2021. 1, 2
+[76] Zehao Yu, Anpei Chen, Binbin Huang, Torsten Sattler, and
+     Andreas Geiger. Mip-splatting: Alias-free 3d gaussian splat-
+     ting. In Proceedings of the IEEE Conference on Computer
+     Vision and Pattern Recognition (CVPR), 2024. 1, 2
+[77] Shijie Zhou, Haoran Chang, Sicheng Jiang, Zhiwen Fan, Ze-
+     hao Zhu, Dejia Xu, Pradyumna Chari, Suya You, Zhangyang
+     Wang, and Achuta Kadambi. Feature 3dgs: Supercharging
+     3d gaussian splatting to enable distilled feature fields. In Pro-
+     ceedings of the IEEE Conference on Computer Vision and
+     Pattern Recognition (CVPR), 2024. 6
+[78] Ruijie Zhu, Mulin Yu, Linning Xu, Lihan Jiang, Yixuan Li,
+     Tianzhu Zhang, Jiangmiao Pang, and Bo Dai. Objectgs:
+     Object-aware scene reconstruction and scene understanding
+     via gaussian splatting. In Proceedings of the IEEE Interna-
+     tional Conference on Computer Vision (ICCV), 2025. 1, 2,
+     5, 6, 7, 8
+
+
+
+
+                                                                     16745
+

@@ -1,0 +1,806 @@
+                                              N ERFIFY: A Multi-Agent Framework for Turning NeRF Papers into Code
+
+                                                         Seemandhar Jain          Keshav Gupta Kunal Gupta Manmohan Chandraker
+                                                                                  University of California, San Diego
+                                                                       {sejain, keg019, k5gupta, mkchandraker}@ucsd.edu
+
+
+
+                                                                  Abstract
+
+
+
+
+arXiv:2603.00805v1 [cs.CV] 28 Feb 2026
+                                             The proliferation of neural radiance field (NeRF) re-
+                                                                                                                                                                                                                                              AutoP2C
+                                         search requires significant efforts to reimplement papers                Days gone in
+                                                                                                                                                                                                                                                                                                         Existing
+                                                                                                                  implementing                                                                                                           Baselines                                             Images
+                                         before building upon them. We introduce N ERFIFY, a multi-               NeRF paper
+
+                                         agent framework that reliably converts NeRF research pa-
+                                         pers into trainable Nerfstudio plugins, in contrast to generic
+                                         paper-to-code methods and frontier models like GPT-5 that                                                                                                                                                                    model.py   pipeline.py
+
+
+                                         usually fail to produce runnable code. N ERFIFY achieves                                                                                                                                                 Graph of Thought
+                                                                                                                                                                                                                                                  Code Generation
+                                                                                                                                                                                                                                                                      data.py      field.py
+
+
+
+                                         domain-specific executability through six key innovations:                                                                                                                              Critique Agent
+                                                                                                                                                                                                                                                   Compositional
+                                                                                                                                                                                                                                                  Citation Recovery
+
+                                                                                                                                                                                                                                           NERFIFY                                                      Ours
+                                         (1) Context-free grammar (CFG): LLM synthesis is con-
+                                         strained by Nerfstudio formalized as a CFG, ensuring gen-            Figure 1. Overview. Manual NeRF implementation requires weeks
+                                         erated code satisfies architectural invariants. (2) Graph-of-        of specialized effort (left). Existing paper-to-code systems fail to
+                                                                                                              produce trainable code. N ERFIFY automates this process through
+                                         Thought code synthesis: Specialized multi-file-agents gener-
+                                                                                                              grammar-constrained synthesis and compositional citation recovery,
+                                         ate repositories in topological dependency order, validating         generating fully trainable Nerfstudio plugins in minutes (right).
+                                         contracts and errors at each node. (3) Compositional cita-
+
+
+
+
+                                                                                                                                          ....................................................................................
+                                         tion recovery: Agents automatically retrieve and integrate           While the issue exists in broader machine learning research
+                                         components (samplers, encoders, proposal networks) from              [41], effective NeRF implementations present unique chal-
+                                         citation graphs of references. (4) Visual feedback: Arti-            lenges. We consider the question of devising a large language
+                                         facts are diagnosed through PSNR-minima ROI analysis,                model (LLM) agent to automatically produce trainable, per-
+                                         cross-view geometric validation, and VLM-guided patching             formant and standardized NeRFs from their papers.
+                                         to iteratively improve quality. (5) Knowledge enhancement:
+                                                                                                              NeRF implementations are uniquely challenging, with
+                                         Beyond reproduction, methods can be improved with novel
+                                                                                                              expertise required across volumetric rendering, computer vi-
+                                         optimizations. (6) Benchmarking: An evaluation framework
+                                                                                                              sion and neural optimization. A single misplaced activation
+                                         is designed for NeRF paper-to-code synthesis across 30 di-
+                                                                                                              or incorrect ray-sphere intersection produces failures ranging
+                                         verse papers. On papers without public implementations,
+                                                                                                              from the catastrophic (NaN gradients) to the subtle (degener-
+                                         N ERFIFY achieves visual quality matching expert human
+                                                                                                              ate solutions). Debugging requires understanding whether
+                                         code (±0.5 dB PSNR, ±0.2 SSIM) while reducing implemen-
+                                                                                                              failures stem from code bugs, scene geometry, hyperparame-
+                                         tation time from weeks to minutes. N ERFIFY demonstrates
+                                                                                                              ters, or the paper’s own ambiguities, with computationally
+                                         that a domain-aware design enables code translation for
+                                                                                                              demanding cycles (the original NeRF requires 100k-300k
+                                         complex vision papers, potentiating accelerated and democ-
+                                                                                                              iterations taking 24-48 hours on high-end GPUs [32]).
+                                         ratized reproducible research. Code, data and implementa-
+                                         tions will be publicly released.                                     Generic paper-to-code approaches do not suffice, given
+                                                                                                              that the current best-performing system, O1, achieves only
+                                                                                                              26.6% accuracy on complex papers compared to 41.4% for
+                                         1. Introduction                                                      human experts [44]. The challenge is exacerbated for NeRFs,
+                                                                                                              where the strong domain coupling needed for its unique com-
+                                         Since its publication in 2020, the Neural Radiance Fields            bination of rendering mathematics and neural architectures
+                                         (NeRF) paper [32] has spawned over 1,000 follow-ups. Yet,            leads to execution failures and large performance gaps. As
+                                         unavailability of code or standardized implementations for           discussed in Section 2 and exhaustively shown in the Supple-
+                                         most of them [50] means each subsequent work requires                mentary, recent advances like Paper2Code [42] and AutoP2C
+                                         a significant effort to reimplement existing NeRF papers.            [25] – despite progress on general machine learning tasks –
+
+
+                                                                                                          1
+usually do not produce executable code or trainable NeRFs,            2. Related Work
+with issues ranging from incorrect implementations (such
+as K-Planes with regular MLPs instead of planar factoriza-            Generic Paper-to-Code Systems. Paper2Code [42] em-
+tion), or catastrophic failures (producing only dataset loading       ploys a three-stage pipeline (planning, analysis, generation),
+code). Another key challenge is that modern NeRF papers               but its generic design lacks neural field architectures for
+build upon chains of dependencies that generic systems can-           NeRF implementation. AutoP2C [25] advances multimodal
+not resolve, for example, see Figure 3 for K-Planes [10].             understanding with high executability on recent papers, but
+A single phrase such as “we adopt the distortion loss from            generates non trainable repositories with just placeholders
+[3]” requires navigating to that paper, locating the correct          for NeRFs. AutoReproduce [64] introduces paper lineage-
+equation, translating to executable code and implementing             extracting domain knowledge from citations. On Paper-
+stop-gradient operations critical for stable training.                Bench [37], Claude 3.5 Sonnet achieves only 21% accuracy
+                                                                      versus 41.4% for human researchers on ICML papers, mo-
+We introduce N ERFIFY, a multi-agent framework that                   tivating our domain-specific approach. RPG [26] employs
+reliably converts NeRF research papers into code that trains,         test-driven development with repository planning graphs
+converges and matches the visual quality of expert implemen-          but cannot effectively parse papers or extract mathematical
+tations (Figure 1). Its success is based on five key technical        formulations. Paper2Agent [31] converts papers into con-
+innovations. 1) Use of Nerfstudio [47] architecture as a              versational interfaces rather than trainable implementations.
+context-free grammar (CFG) that encodes domain-aware                  Recent works [11, 65] explore fine-grained verification and
+module compositions and interface contracts, leading to               dynamic planning, but remain domain-agnostic.
+LLM synthesis of architecturally correct code by construc-            Multi-Agent Code Generation has emerged as a key field
+tion. 2) Graph-of-thought code generation to coordinate               for complex code synthesis [17, 18, 40, 56], with recent
+specialized agents that generate multi-file repositories in           systems proposing repository-level code generation [7, 16,
+topological order, validating type signatures, tensor shapes          51, 52, 57, 61]. However, general software systems lack
+and circular dependencies at each dependency before pro-              the mathematical understanding and architectural constraints
+ceeding. 3) A compositional citation recovery that traverses          required for successful synthesis of research code.
+reference graphs to retrieve implicit dependencies (such as
+proposal networks from Mip-NeRF 360 [3], hash encoders                Domain-Specific Code Synthesis outperforms generic ap-
+from Instant-NGP [33]). 4) A critique agent that provides             proaches by encoding specialized knowledge. Scene Lan-
+feedback by analyzing training runs to diagnose visual ar-            guage [63] uses CFG to structure visual program synthesis,
+tifacts through PSNR-minima analysis and cross-view geo-              CODEP [49] employs Pushdown Automaton and TSL+LLM
+metric validation, using vision-language models (VLMs) to             [30] combines Temporal Stream Logic to act as CFG.
+guide targeted fixes. 5) Besides reproduction, an option to           Feedback and Planning Approaches like Graph of
+improve with optimizations where applicable.                          Thoughts (GoT) [4] generalize reasoning into directed
+                                                                      graphs enabling aggregation, refinement loops, and back-
+We extensively evaluate with N ERFIFY-B ENCH, a novel
+                                                                      tracking, while Tree of Thoughts [58] and Tree-of-Code [35]
+benchmark with 30 diverse papers stratified across code
+                                                                      explore over reasoning trees. Self-Debugging [6], Reflexion
+status and implementation complexity. N ERFIFY achieves
+                                                                      [43], Self-Refine [29], Clover [45] and xKG [27] introduce
+full executability and rendering quality within 0.5 dB PSNR
+                                                                      refinement and consistency checks, but either require refer-
+of expert implementations, while generic baselines fail to
+                                                                      ence databases or lack domain-specific constraints.
+produce trainable code in 95% of cases.
+N ERFIFY will accelerate reproducible research, allow-                3. Method
+ing researchers to reproduce complex NeRF papers in hours
+rather than weeks, rapidly prototype techniques and make              3.1. Problem Statement
+accessible to the community papers that would otherwise re-           Given a NeRF research paper P, our objective is to synthe-
+main purely theoretical. As the NeRF community continues              size an executable repository C that faithfully implements
+its growth, N ERFIFY ensures that every paper’s contributions         the described method within the Nerfstudio framework. We
+become available to all researchers, democratizing access             formalize this paper-to-code synthesis problem as follows.
+to cutting-edge techniques and enabling the compositional             Repository Definition. A repository C consists of a set of
+research that drives the field forward. With our demonstra-           files and their dependency structure:
+tion that depth and specialization in a multi-agent framework
+unlocks transformative capabilities for NeRFs, we believe fu-                    C = (F, G),     F = {f1 , f2 , . . . , fn }    (1)
+ture work will achieve similar transformations for other com-
+munities too. Code and data for N ERFIFY, N ERFIFY-B ENCH             where G = BuildRepoDAG(F ) is a directed acyclic graph
+and generated implementations will be publicly released.              with vertices V (G) = F representing files and edges
+
+
+                                                                  2
+                          Stage 1: CFG Formalization and In- Context Learning                                                                                                        Stage 4 : Visual- Driven Feedback
+                                     "Understanding the Paper and What It Builds Upon"                                                                               "Making It Actually Work Through Closed- Loop Refinement"
+   In Context Examples
+                                                                                    Markdow n                                                                                                                                                                       Master Agent
+                                                                                     Cleaner                                                         {
+                                                                                                         Ref ined                                        " det ect " : " ghost i ng@vi ew12[ x: . . , y: . . ]
+                                                                  Text                                                                               ? PSNR. . . " ,
+                                                                                                        Markdow n                                        " di agnose" : " pose_dr i f t : . . . ,
+  Paper 1 Paper 2         Paper p                                                                                                                    cr oss_vi ew_i nconsi st ent . . . " ,
+                                                                                                                                                         " r ecover " : " Mi ssi ng: HashEncoder . . ,
+                                                                                                                                                     Pr oposal Net . . ,                                                                                            Orchestrated
+                                                                Equations                          - Text hygiene: de-hyphenate,
+                                                                                                                                                         " pat ch" : " conf i g. py: +pose_r ef i ne. . . |                                                            Agents
+                                                                                                     normalize...
+                                                                                                                                                     f i el d. py: sampl es: . . . ,
+                                                                                                   - Remove tables and figures...
+                                                                                                                                                         " act i on" : " ACCEPT( conf i dence: 0. 83) "
+                                                                                                   - Strip raw HTML (<td>, ...)                      }
+                                                                                                   - Citations: removing unnecssary
+                                                                 Images
+                                                                                                     citations...
+                                                                                                   - Summaries: replace big paragraphs....
+                                                                                                   - Validate: clean heading tree....                                     Metric Branch- PSNR minima
+                                                                                                                                                                                guided patch ref.
+                                                                 Tables                                                                                                                                                                                           Paper Summarizer
+                                                                                                                                                                           Geometry Branch - ghostly                                                                    Agent
+
+                                                                                                                                                                           artifacts, floaters or flawed
+                                                                                                                                                Critique
+                                                         MinerU                                                                                                                      geometry
+                                                                                                                                                 Agent
+                                                                                                                                                                              Semantics Branch- VLM
+  Paper 1   Paper 2        Paper p
+                                                                                                                                                                             gounded artifacts parsing
+                                                                                                                                                                                                                                                                     Web Search
+
+
+  Code 1    Code 2         Code p                                                               Paper Summarizer Agent
+                                                                                                                                                Adjust thenumber of samples while rendering...
+                                                                                                                                                                                                 User driven feedback (Optional)
+
+
+                                 Stage 2: Compositional Dependency Resolution                                                                                    Stage 3: Grammar- Guided Repository Generation                                                        GitHub
+
+                                         "Recovering What the Paper Doesn't Tell You"                                                                                                    "Building Code That's Correct by Construction"
+                                                                                            Compositional Citation Recovery
+
+
+
+                                                                                                          NeRF
+                      Paper 1             Paper 1
+                                                                                                                                                                                                                                                                   Knowledge DB
+
+
+                                                                                                                                             Target Paper
+                                          Paper 2                                                                      Mip- NeRF
+                      Paper 2                                                            TensoRF       Instant- NGP
+
+
+
+
+                                                                                                                                                                                                                                         Checks for missing            Terminal
+                                                       GitHub                                                                                                               Graph- of-Thought (GoT) Multi- Agent Code                  novelties and repository
+                                                                                        Mip- NeRF                      Plenoxels                                                           Sy nthesis                                         generation
+                                          Paper K                                          360
+                      Paper K                          Craw ls the code w ith the
+                                                                 paper
+
+                                                                                                                                                                                Sy ntax and Execution
+                                                                                                          K- Planes                                                                     Errors
+                                     Selects Related
+                                                                                                                                                                                                                                                                   Code repository
+                       Paper N           papers                                                                                                                                                                                    Compile and
+                      Paper Extractor Agent                                                                                                                                                                                          Execute
+
+
+
+
+Figure 2. N ERFIFY converts NeRF papers into code through four stages: (1) Agent parses and summarizes PDFs into simple markdown,
+CFG from Nerfstudio and curated paper-code pairs as In-Context examples are saved in K (2) Compositional dependency resolution traverses
+citation graphs to retrieve missing components from referenced papers, (3) GoT code synthesis generates repository files through specialized
+agents operating in topological order (4) Visual refinement iteratively patches artifacts until achieving expert-level quality.
+
+
+E(G) ⊆ F × F encoding import and dataflow dependen-                                                                                          tectural patterns, common implementation strategies, and
+cies. The acyclic constraint ensures compilability: (fi , fj ) ∈                                                                             framework conventions (CFG) accumulated from analyzing
+E(G) =⇒ no path exists from fj to fi .                                                                                                       existing implementations. Web resources W enable dynamic
+Paper Representation We extract structured information                                                                                       retrieval of cited papers, missing components, and implemen-
+from paper P through a comprehensive parsing pipeline:                                                                                       tation details referenced but not fully specified in the target
+                                                                                                                                             paper. Finally, the repository X provides code templates and
+  E(P) = ⟨T (P), I(P), Q(P), B(P)⟩,                                                                                       (2)                reference implementations (in-context examples) that serve
+                   np         na
+  T (P) = ⟨H, {pi }i=1 , {aℓ }ℓ=1 , {ck }nk=1
+                                           c
+                                              , {rm }nm=1
+                                                       r
+                                                          ⟩.                                                              (3)                as bases for synthesis.
+The textual component T (P) encompasses section headings                                                                                     3.2. Proposed Multi-Stage Framework
+H, paragraphs {pi }, algorithm blocks {aℓ }, figure captions
+{ck }, and references {rm }. Visual content I(P) includes                                                                                    N ERFIFY has four stages that transform research papers into
+architectural diagrams, figures, and result visualizations that                                                                              executable code. Each stage addresses specific challenges in
+often contain crucial implementation details not present in                                                                                  automated code synthesis for complex vision systems, from
+the text. The mathematical component Q(P) captures equa-                                                                                     paper understanding through visual quality refinement.
+tions and formulas that define the core algorithms, while
+bibliographic metadata B(P) provides citation information                                                                                    Stage 1: CFG Formalization and In-Context Learning
+essential for compositional recovery.                                                                                                        A foundation of N ERFIFY is constructing the domain knowl-
+Agent Formulation Let A be a multi-agent system that                                                                                         edge base K by formalizing Nerfstudio’s architectural pat-
+maps paper representations to executable code using aux-                                                                                     terns as a context-free grammar (CFG) that constrains code
+iliary resources: A : (E(P); R) 7→ C. The resource tuple                                                                                     generation. We curate pairs {(Pi , Ci )}m
+                                                                                                                                                                                     i=1 of NeRF papers
+R = (K, W, X ) comprises three essential components. The                                                                                     and their corresponding implementations, which populate
+domain knowledge base K encodes NeRF-specific archi-                                                                                         K and serve as in-context examples X for our synthesis
+
+
+                                                                                                                                      3
+pipeline. The extraction function E(·) employs MinerU [36],
+                                                                                                 NeRF
+a state-of-the-art PDF-to-markdown conversion tool.
+    As shown in Figure 2, the paper summarization agent
+processes each document through multiple refinement stages.
+First, MinerU converts the PDF into a structured markdown                  PlenOctrees    DyNeRF        Mip- NeRF    Instant- NGP
+representation preserving equations, tables, figures, refer-
+ences and implementation details. A subsequent cleaning
+agent then distills this raw conversion by removing irrelevant
+                                                                        TensoRF      NeRF-W        DONeRF           NeRV       EG3D
+sections such as extended introductions, related work discus-
+sions and redundant references. This agent operates under
+strict preservation constraints: all equations, implementation                                          Mip- NeRF
+pseudocode, architectural diagrams, and citation relation-                        Plenoxels
+                                                                                                          360
+ships must remain intact. The agent validates completeness
+by ensuring that key technical components identified in the                                   K- Planes
+abstract appear in the refined document. Each processed
+paper and its corresponding Nerfstudio implementation are             Figure 3. NeRF citation dependency graphs. Implementing
+then stored as structured examples in our knowledge base,             K-Planes requires retrieving components from 7 direct dependen-
+forming the grammatical foundation that guides subsequent             cies (Plenoxels, TensoRF, Instant-NGP, Mip-NeRF 360, DyNeRF,
+synthesis. Full details of the CFG formalization are provided         EG3D, NeRF-W) and 12 total papers with transitive dependencies.
+in the supplementary material.                                        Our compositional citation recovery automatically traverses such
+                                                                      graphs to identify and retrieve all necessary components.
+Stage 2: Compositional Dependency Resolution
+NeRF papers are inherently compositional – for instance,
+ZipNeRF implementation requires the proposal network                      Figure 3 illustrates this process through K-Planes, which
+from Mip-NeRF 360, hash encoding from Instant-NGP, and                depends on 7 different papers. Our agent:
+anti-aliasing techniques that span three papers. Naı̈ve ap-           1. Identifies direct citations: Plenoxels (optimization), Ten-
+proaches that retrieve only the target paper fail because crit-       soRF (factorization), Instant-NGP (hash grids), Mip-NeRF
+ical implementation details reside in dependencies. Our               360 (proposal networks), DyNeRF (temporal sampling),
+paper extractor agent constructs a citation dependency graph          EG3D (triplanes), NeRF-W (appearance codes).
+G′ = (V ′ , E ′ ) of all referenced papers and their transitive       2. Recursively retrieves dependencies: Mip-NeRF 360 re-
+dependencies, with nodes v ∈ V ′ representing papers and              quires Mip-NeRF, DONeRF, and NeRV; Plenoxels requires
+edges (u, v) ∈ E ′ indicating that v depends on technical             PlenOctrees; each ultimately traces back to NeRF.
+components from u. Given a target paper Ptarget , our agent           3. Extracts components: proposal network and distortion
+performs iterative multi-hop retrieval through four steps:            loss from Mip-NeRF 360, hash encoder from Instant-NGP
+1. Dependency discovery: Parse Ptarget to extract cited pa-           and VM decomposition from TensoRF.
+pers C = {c1 , . . . , cn } and identify which components are         4. Terminates: when all papers are Q processed and K-Planes’
+borrowed (e.g., “we use the proposal network from [3]”).              planar factorization f (q) =         c∈C f (q)c can be imple-
+                                                                      mented using the retrieved components.
+2. Recursive resolution: For each ci ∈ C, retrieve:
+                                 [                                    Stage 3: Grammar-Guided Repository Generation
+  Dependencies(ci ) = {ci } ∪          Dependencies(d),               The master synthesis agent orchestrates code generation
+                               d∈cited(ci )                           through a Graph-of-Thought (GoT) approach that ensures
+                                                                      trainable code through syntax and execution feedback loops.
+where the recursion terminates when all components re-
+                                                                      It captures the tight inter-file couplings inherent in NeRF
+quired to implement the target paper have been located.
+                                                                      pipelines, where configurations flow to data managers, which
+3. Component extraction: For each paper in the transitive             feed fields, models, and ultimately the training pipeline.
+closure, extract specific components mentioned in Ptarget or              As illustrated in Figure 4, the GoT code synthesis pro-
+required by intermediate dependencies. Specialized LLM                ceeds in four phases. During DAG construction, the parsed
+agents identify (a) architectural modules: e.g., “hash encod-         paper is mapped to a dependency graph over core Nerfstu-
+ing”, (b) loss functions: e.g., “distortion loss”, (c) training       dio components. Interface freezing follows, where agents
+protocols: e.g., “proposal sampling with stop-gradient”.              establish minimal public APIs in topological order. The
+4. Termination criterion: Stop when the agent has retrieved           implementation phase sees each node synthesize executable
+all components needed to satisfy the interface contracts of           code validated through local contracts. Integration testing
+Ptarget and no unresolved dependencies remain in the graph.           completes the cycle with end-to-end smoke tests that trigger
+
+
+                                                                  4
+                  I will query Model, for getting                                                                                                                                                                                                                                                  I implement a two- layer mapping
+                                                                  I will go first as the upstream                                                                         I define Field() and the API,                                      I will now call the functions
+                                                                                                                       I import Model and expose                                                                                                                                                   from direction and latent
+                  the outputs and loss for a                      module, and my role is to map ray                                                                       get_outputs(ray_samples) returns a
+                                                                                                                       build(cfg:Config).                                                                                                    defined in Model and                                  encoding from density to rgb. I
+                  specific batch, and then                        samples to {density, rgb}.                                                                              dictionary ? {"density"," rgb", ...}
+                                                                                                                                                                                                                                             backpropagate the loss                                keep it as per the equation
+                  backpropagate.
+                                                                                                                                                                                                                                                                                                   defined in the paper provided.
+
+        1 # pi pel i ne. py                              1 # f i el d. py                                    1 f r om . model i mpor t Model                     1 cl ass Fi el d:                                                 1 def bui l d( cf g) :                                 1 cl ass Fi el d:
+        2 # r ol e: bui l d( Conf i g) ? ( Fi el d,      2 # r ol e: map r ay_sampl es ? { densi t y,        2 def bui l d( cf g: Conf i g) : . . .              2    def __i ni t __( sel f , hi dden_di m: i nt ) :              2    dm = Dat aManager ( cf g) ; f =                   2     def __i ni t __( sel f , hi dden_di m: i nt ) :
+          Model )                                          r gb}                                             3                                                     ...                                                               Fi el d( cf g. hi dden_di m) ; m = Model ( f ,         ...
+        3                                                3                                                                                                       3    def get _out put s( sel f , r ay_sampl es)                     cf g. n_sampl es)                                    3     def get _out put s( sel f , r ay_sampl es,
+                                                                                                                                                                   - > di ct : . . .                                               3    r et ur n dm, f , m                                 emb) :
+                                                                                                                                                                 4                                                                 4 def t r ai n_st ep( cf g) :                          4        z = Li near ( ReLU( Li near
+                                                                                                                                                                                                                                   5    dm, f , m = bui l d( cf g) ; b =                    ( t or ch. cat ( [ r ay_sampl es[ " di r s" ] ,
+                                                                                                                                                                                                                                     dm. next _bat ch( )                                    emb] , - 1) ) ) )       # [ B, 3]
+                                                                                                                                                                                                                                   6    out = m. get _out put s( b) ; L =                 5        r et ur n { " r gb" : z}
+                                                                                                                                                                                                                                     m. l oss( out , b)                                   6
+                                                                                                                                                                                                                                   7 updat e_par amet er s( m, L)
+
+
+
+                         pipeline.py                                         field.py                                         pipeline.py                                              field.py                                                     pipeline.py                                                  field.py
+
+
+
+
+                  I?ll query Field and compute the                For now I leave the file with
+                                                                  hyperparamers...
+                                                                                                                       Now that Field exists, I import
+                                                                                                                       it, declare other params like
+                                                                                                                                                                          I publish a dataclass with params
+                                                                                                                                                                          like n_samples, hidden_dim, that
+                                                                                                                                                                                                                        ...                 I query Field once and compute a
+                                                                                                                                                                                                                                            minimal rgb MSE, returning a loss
+                                                                                                                                                                                                                                                                                                   Reads lr, n_samples, and
+                                                                                                                                                                                                                                                                                                   hidden_dim. Adding more
+                  losses once the Master unblocks
+                                                                                                                       n_samples, expose get_outputs                      files depending on me have                                        dict. Following the paper, I will                      hyperparameter details, and other
+                  the interfaces.                                 No imports, no defaults...
+                                                                                                                       and get_loss function.                             defined.                                                          make the final code.                                   relevant configs.
+
+        1 # model . py                                   1 # conf i g. py                                    1 f r om . f i el d i mpor t Fi el d                1 f r om dat acl asses i mpor t dat acl ass                        1 f r om . f i el d i mpor t Fi el d                  1 f r om dat acl asses i mpor t dat acl ass
+        2 # r ol e: quer y Fi el d; comput e l osses     2 # r ol e: st or e hyper par amet er s and         2 cl ass Model :                                    2 @dat acl ass                                                     2 cl ass Model :                                      2 @dat acl ass
+        3                                                  t oggl es                                         3     def __i ni t __( sel f , f i el d: Fi el d,   3 cl ass Conf i g:                                                 3     def __i ni t __( sel f , f i el d: Fi el d,     3 cl ass Conf i g: l r : f l oat =1e- 3;
+                                                         3                                                     n_sampl es: i nt ) : . . .                        4     l r : f l oat = 1e- 3                                          n_sampl es: i nt ) : . . .                            n_sampl es: i nt =64; hi dden_di m:
+                                                                                                             4     def get _out put s ( sel f , r ay_bundl e)    5     n_sampl es: i nt = 64                                        4     def get _out put s ( sel f , r ay_bundl e)        i nt =128
+                                                                                                               - > di ct : . . .                                 6     hi dden_di m: i nt = 128                                       - > di ct :                                         4 max_num_i t er at i ons=. . .
+                                                                                                             5     def l oss( sel f , out put s: di ct ,         7                                                                  5     out put s = sel f . f i el d( r ay_bundl e)     5 opt i mi zer s={ . . .
+                                                                                                               bat ch: di ct ) - > di ct : . . .                                                                                    6     wei ght s =                                     6 vi ewer =Vi ewer Conf i g. . .
+                                                                                                             6                                                                                                                        r ay_bundl e. get _w( out put s[ ' densi t y' ] )   7
+                                                                                                                                                                                                                                    7     r gb = sel f . r ender er ( wei ght s,
+                                                                                                                                                                                                                                      out put s[ ' r gb' ] )
+                                                                                                                                                                                                                                    8     r et ur n { " r gb" : r gb . . . }
+                                                                                                                                                                                                                                    9     ...
+                                                                                                                                                                                                                                   10
+                         model.py                                          config.py                                          model.py                                               config.py                                                      model.py                                                  config.py
+
+
+
+
+  I read the paper and sketched the repo DAG: f ield ? model, { model, pipeline} ? conf ig,             I broadcast the dependency contracts and ask each agent to expose only its public                                     I walk the DAG in topological order and ask each agent to implement its interface. After
+  and { model} ? pipeline. This becomes the frozen build plan. I ask each file agent to                 surface, class names, constructors, and method signatures, with no executable code. We                                each file lands, I run local checks, imports resolve, required keys exist, tensors match,
+  create import- free stubs with a one- line intent. I start from the frontier (f ield.py ) since it    align names, shapes, and keys across all DAG edges so teams can code in parallel                                      loss is finite. Then I run a multi- step smoke train through pipeline.train_step. If anything
+  has in- degree 0. Exit criteria: four files exist, import cleanly as empty modules, and no            without collisions. Exit criteria: imports resolve strictly along the DAG, and all signatures                         breaks, I issue a targeted patch on the offending node. Exit criteria: an end- to- end
+  dependencies are wired yet.                                                                           are consistent and minimal.                                                                                           training step completes with a finite loss.
+
+
+
+
+Figure 4. Graph-of-Thought (GoT) Multi-Agent Code Synthesis. The master agent orchestrates specialized file-agents that progressively
+build a NeRF repository over k steps. Each step shows files being created or modified through four stages: (1) DAG Construction maps
+papers to Nerfstudio component dependencies, (2) Interface Freeze establishes API contracts in topological order, (3) Implementation
+generates validated code with shape/gradient checks, (4) Integration Testing runs smoke tests with automated repair. Files evolve from
+minimal interfaces to complete implementations as agents coordinate through the dependency graph, producing runnable NeRF plugins.
+
+
+automated critique and repair loops when failures occur.                                                                                                                 critique agent produces no further feedback, (2) the maxi-
+   The syntax and execution feedback loop iteratively re-                                                                                                                mum iteration count is reached, or (3) the implementation
+fines code until all contracts pass, ensuring every generated                                                                                                            achieves the PSNR targets reported in the original paper.
+repository can successfully train. This graph-native approach                                                                                                            This visual-driven approach consistently converges to within
+enables component-level fault localization, yielding faster                                                                                                              0.5 dB PSNR and 0.2 SSIM of expert implementations.
+convergence compared to monolithic code generation.
+                                                                                                                                                                         4. Experiments
+Stage 4: Visual-Driven Feedback
+                                                                                                                                                                         This section evaluates N ERFIFY through comprehensive ex-
+The final stage employs visual feedback to iteratively im-                                                                                                               periments on N ERFIFY-B ENCH our specialized benchmark
+prove implementation quality beyond mere executability.                                                                                                                  for NeRF paper-to-code synthesis. We first introduce the
+After synthesis produces trainable code, we perform smoke                                                                                                                benchmark composition and baseline systems, then present
+training for 3k iterations (as used in our experiments). The                                                                                                             detailed evaluations of synthesis quality, novelty preserva-
+system renders images from multiple camera viewpoints and                                                                                                                tion, and component contributions.
+dispatches them to our critique agent for analysis on three
+branches. The metric branch constructs dense error fields by                                                                                                             4.1. N ERFIFY-B ENCH
+computing local-window PSNR and SSIM maps, identifying                                                                                                                   To comprehensively evaluate our N ERFIFY framework, we
+regions of highest error through morphological operations.                                                                                                               introduce N ERFIFY-B ENCH the first specialized benchmark
+The geometry branch implements Cross-View Artifact Con-                                                                                                                  for assessing paper-to-code systems that synthesize train-
+sensus, highlighting view-inconsistent structures indicative                                                                                                             able NeRF code directly from research papers. While ex-
+of floaters and ghosting. The semantics branch leverages                                                                                                                 isting benchmarks such as Paper2CodeBench, RexBench,
+Qwen3 VLM to analyze artifact triplets, to output structured                                                                                                             PaperBench, and Code-Dev evaluate general paper-to-code
+diagnoses with candidate patches.                                                                                                                                        generation, they lack the domain-specific evaluation criteria
+   These three feedback mechanisms converge through the                                                                                                                  necessary for NeRF implementations.
+master agent, which applies patches within designated re-
+gions while maintaining revertability. The framework op-                                                                                                                 4.1.1. Benchmark Composition
+tionally allows user-driven feedback for domain experts to                                                                                                               N ERFIFY-B ENCH comprises 30 carefully selected papers,
+guide refinement (not used in our experiments for fair evalu-                                                                                                            classified across four evaluation categories to ensure com-
+ations). The refinement loop continues until either: (1) the                                                                                                             prehensive coverage of different implementation challenges:
+
+
+                                                                                                                                                                 5
+                                                                        Paper                       Reported               Human Impl.             N ERFIFY (Ours)
+Set 1. 10 Never-Implemented Papers: Papers without any                                     PSNR↑     SSIM↑ LPIPS↓   PSNR↑ SSIM↑ LPIPS↓        PSNR↑ SSIM↑ LPIPS↓
+                                                                        KeyNeRF [38]        25.65     0.89   0.11    25.70    0.89     0.12    26.12    0.90     0.09
+publicly available source code, with expert-created reference           mi-MLP NerF [66]    24.70     0.89   0.09    22.64    0.87     0.15    22.85    0.87     0.15
+                                                                        ERS [46]            27.85     0.94   0.06    26.87    0.90     0.12    27.02    0.90     0.12
+implementations for evaluation. These papers are specif-                TVNeRF [62]         27.44     0.93   0.08    26.81    0.92     0.12    27.30    0.92     0.10
+
+ically chosen to avoid LLM training data contamination,                Table 1. Comparison of N ERFIFY with paper and human imple-
+since no public implementations exist, the LLMs used in our            mentations. We evaluate NeRF papers from the N ERFIFY-B ENCH
+agents could not have seen corresponding code during pre-              set whose code is not publicly available, using SSIM, PSNR, and
+training, enabling unbiased evaluation of purely paper-driven          LPIPS metrics. Note. Other baselines like Paper2Code, AutoP2C,
+synthesis capabilities.[1, 8, 19, 38, 46, 53, 54, 60, 62, 66].         GPT-5 and R1 failed to generate trainable code.
+Set 2. 5 Non-Nerfstudio Papers: Papers with existing pub-
+lic implementations but not integrated into the Nerfstudio,
+allowing direct comparison between generated code and                  This comprehensive framework reveals that domain-specific
+original author implementations. [12, 20, 24, 28, 34]                  specialization in N ERFIFY dramatically improves both ex-
+Set 3. 5 Nerfstudio-Integrated Papers: Papers already in-              ecutability (100% vs 5% for baselines) and algorithmic fi-
+tegrated into Nerfstudio, serving as gold-standard references          delity compared to generic approaches.
+for evaluating synthesis quality. [23, 32, 33, 47, 55]
+Set 4. 10 Novelty-Coverage Papers: Papers specifically                 4.3. Comparison to Expert Implementations
+selected for their distinct technical contributions (novel loss
+functions, architectural innovations, or training strategies) to       Evaluation Metrics. We evaluate visual quality using three
+evaluate how well our system captures and implements key               metrics: PSNR measures pixel-level reconstruction accuracy,
+research innovations. [2, 5, 9, 13, 14, 21, 22, 39, 48, 59]            SSIM captures perceptual similarity, and LPIPS quantifies
+                                                                       perceptual distance using deep features. We report results
+4.2. Baseline Systems and Evaluation Setup                             on standardized test views from paper-specified datasets.
+
+Baseline Systems. We evaluate N ERFIFY against multi-                  4.3.1. Set 1: Never-Implemented Papers
+ple baseline categories spanning generic to specialized ap-
+proaches. Paper2Code and AutoP2C represent generic paper-              We first compare against expert implementations for NeRF
+to-code systems that prioritize breadth across all ML do-              papers without public code, where no code contamination is
+mains over domain-specific accuracy. For LLM-based ap-                 possible within the LLM’s pretrained knowledge, ensuring
+proaches, GPT-5 (current SOTA) employs single-shot code                unbiased assessment of true paper-to-code synthesis capa-
+generation, lacking iterative planning or repairs, while R1            bilities. Expert developers required 1-2 weeks per paper to
+employs retrieval-augmented in-context learning. We also               create reference implementations, while N ERFIFY generates
+compare against general multi-agent coding frameworks in-              comparable code in minutes. A detailed cost analysis is
+cluding MetaGPT, ChatDev, and DeepCode, which operate                  provided in the supplementary material.
+as software development agents without NeRF-specific ar-               Quantitative Results. Table 1 presents quantitative com-
+chitectural understanding or planning. As our gold standard,           parisons for representative papers in Set 1. Each paper
+we include Expert implementation by researchers with NeRF              is evaluated following its paper experiments: KeyNeRF
+expertise. Against these baselines, Nerfify employs the com-           and mi-MLP NeRF report averaged metrics across eight
+plete multi-agent pipeline with Graph-of-Thought synthesis,            Synthetic-NeRF scenes, ERS uses the DTU dataset, while
+compositional citation recovery, and closed-loop refinement            TVNeRF provides results for a single scene of Synthetic-
+specifically designed for NeRF implementations.                        NeRF(hotdog). N ERFIFY achieves visual quality matching
+Computational Setup. All experiments are conducted on                  expert implementations within 0.5 dB PSNR and 0.02 SSIM
+NVIDIA A6000 GPUs with 48GB memory under consistent                    on average. Complete results are in the supplementary.
+configurations. We train scenes for 100k iterations across                In contrast, all baselines often fail to produce executable
+standard benchmarks including Blender and DTU datasets.                code as shown in Table 2. These failures occur because
+Evaluation Overview. Our evaluation examines N ERFIFY                  generic systems cannot recover implicit dependencies from
+from multiple complementary perspectives. Section 4.3                  citations or properly structure multi-file architecture. While
+compares generated code against expert implementations                 baselines may generate syntactically valid Python, they lack
+for papers without public code, measuring visual quality               the domain knowledge to wire components correctly or im-
+(PSNR, SSIM, LPIPS) vs what they have mentioned in the                 plement precise mathematical formulations.
+paper. Section 4.4 evaluates novelty preservation by ana-              Qualitative Comparison. Figure 5 shows qualitative com-
+lyzing whether systems correctly implement paper-specific              parisons on novel viewpoints. N ERFIFY reproduces fine
+innovations including novel equations, loss terms, and ar-             details including specular highlights, geometric edges, and
+chitectural components. Section 4.5 systematically ablates             texture patterns, validating that it captures the visual quality
+each system component to quantify individual contributions.            and improvements described in papers.
+
+
+                                                                   6
+ Metric                       Paper2Code      AutoP2C     GPT-5        R1    Nerfify
+ Imports Resolve                  ✓               ×            ✓        ✓      ✓
+ Compiles/Trainable               ×               ×            ×        ×      ✓
+ Training Stability               ×               ×            ×        ×      ✓
+ Converges to Paper Results       ×               ×            ×        ×      ✓
+
+Table 2. Comparison of N ERFIFY with baselines in terms of
+executable code. We evaluate ability to produce functional, train-
+able implementations. All baselines fail to generate trainable code
+despite some producing syntactically valid Python.
+
+                        Original Repository                        Nerfify
+ Method
+                     PSNR ↑   SSIM ↑   LPIPS ↓        PSNR ↑       SSIM ↑    LPIPS ↓
+ Vanilla NeRF [32]   31.36      0.95       0.04       31.36         0.95      0.04
+ Nerfacto [47]       20.36      0.82       0.22       20.36         0.82      0.22
+ ℓ0 Sampler [24]     29.21        -        0.04       30.13         0.97      0.03
+ InfoNeRF [20]       18.27      0.81       0.23       17.87         0.69      0.44
+
+Table 3. Comparison with existing implementations. Evaluation
+of N ERFIFY against original author repositories or gold-standard
+implementations (ℓ0 Sampler doesn’t report SSIM).
+
+
+4.3.2. Sets 2, 3: Papers with Existing Implementations
+Table 3 shows comparisons between N ERFIFY and exist-
+ing implementations for four papers from Sets 2 and 3
+with public code – either gold-standard Nerfstudio reposi-
+tories [32, 47] or original author-provided implementations
+[20, 24]. N ERFIFY achieves comparable performance to offi-
+cial implementations with automated Nerfstudio integration.
+We note that for these papers, LLMs may have encoun-
+tered their codebases during pretraining. Thereby, N ERFIFY
+yields exactly the same code as the Nerfstudio repositories
+for [32, 47]. For papers with non-standard author-provided
+implementations [20, 24], N ERFIFY results in standardized
+                                                                                           Figure 5. Visual Comparison of N ERFIFY and Human Imple-
+Nerfstudio-compatible code that yields comparable perfor-
+                                                                                           mentation. Left: Ground Truth Image, Middle: Expert Implemen-
+mance. Additional results are shown in supplementary.                                      tation, Right: Agent Implementation.
+4.4. Novelty Coverage Analysis
+We evaluate whether N ERFIFY and baseline methods faith-                                   ploy an LLM-based    scoreP that assesses implementation fi-
+                                                                                                      Pn                 n
+fully implement paper-specific innovations across 10 com-                                  delity as ( i=1 wi · si ) / i=1 wi , where wi ∈ [0, 1] rep-
+plex NeRF papers from Set 4 of N ERFIFY-B ENCHḞor each                                    resents the importance of novelty i extracted from paper,
+paper, we identify all novelty items including equations, loss                             and si ∈ {0, 0.2, 0.4, 0.6, 0.8, 1.0} indicates implementa-
+terms, architectural blocks, training schedules, etc.                                      tion completeness on a 6-level scale ranging from unim-
+Evaluation. Let N denote the set of novel components                                       plemented to fully correct (details in supplementary). The
+identified in paper P . We compute four complementary met-                                 LLM score analyzes both mathematical formulations and
+rics: C measures the fraction of components with correct                                   algorithmic logic, recognizing equivalent implementations
+implementation, I captures incomplete but partially correct                                and scoring each novelty component and its weight.
+implementations, M for missing unimplemented compo-                                        Results. As shown in Table 4, N ERFIFY consistently
+nents, and W = |{n ∈ N : |θn − θ̂n | < 0.1|θn |}|/|N |                                     achieves higher correct implementation rates across all eval-
+evaluates fidelity of weights where θn and θ̂n represent                                   uated papers compared to baselines. N ERFIFY achieves
+paper-specified and implemented values, respectively. Note                                 perfect or near-perfect scores (C=1.00, M=0.00) across all
+that N ERFIFY can adaptively modify θ̂n through its Visual-                                papers, while generic baselines show significant component
+Driven Feedback to achieve better training dynamics than                                   omissions and lower implementation fidelity. We note that
+the original paper specifications, distinguishing it from base-                            achieving competent code generation from baseline LLM-
+lines that attempt only exact reproduction. To capture se-                                 based systems typically requires expert-level prompt engi-
+mantic understanding beyond structural metrics, we em-                                     neering, which N ERFIFY does not require. Complete paper-
+
+
+                                                                                       7
+     Paper                       Paper2Code                           AutoP2C                                 R1                                 GPT-5                              Nerfify
+                    C↑     I↓      M↓     W↑   Score↑    C↑     I↓     M↓    W↑     Score↑    C↑     I↓     M↓     W↑     Score↑    C↑     I↓    M↓    W↑    Score↑    C↑     I↓    M↓      W↑   Score↑
+ Mip-NeRF [2]      0.83   0.17     0.00 0.83   0.85     0.17   0.17    0.66 0.25    0.20     0.67   0.17    0.16   0.67   0.58     0.50   0.30   0.20 0.60   0.58     1.00   0.00   0.00 1.00    1.00
+ BioNeRF [39]      0.30   0.40     0.30 0.40   0.35     0.10   0.30    0.60 0.10    0.15     0.70   0.20    0.10   0.70   0.75     0.80   0.10   0.10 0.80   0.82     1.00   0.00   0.00 1.00    1.00
+ PyNeRF [48]       0.50   0.30     0.20 0.60   0.58     0.00   0.10    0.90 0.10    0.03     0.30   0.60    0.10   0.70   0.68     0.40   0.30   0.30 0.80   0.52     1.00   0.00   0.00 0.90    0.97
+ TensoRF [5]       0.20   0.30     0.50 0.30   0.12     0.10   0.20    0.70 0.15    0.28     0.60   0.20    0.20   0.70   0.65     0.70   0.10   0.20 0.75   0.72     1.00   0.00   0.00 0.95    0.98
+ Tetra-NeRF [22]   0.13   0.25     0.63 0.20   0.22     0.00   0.13    0.88 0.00    0.08     0.63   0.25    0.13   0.70   0.72     0.50   0.25   0.25 0.60   0.58     1.00   0.00   0.00 1.00    1.00
+ E-NeRF [21]       0.38   0.25     0.38 0.60   0.48     0.00   0.13    0.88 0.00    0.05     0.63   0.25    0.13   0.80   0.72     0.50   0.25   0.25 0.75   0.60     1.00   0.00   0.00 0.95    1.00
+ StyleNeRF [13]    0.30   0.40     0.30 0.46   0.28     0.00   0.10    0.90 0.00    0.00     0.50   0.30    0.20   0.64   0.62     0.40   0.30   0.30 0.55   0.52     1.00   0.00   0.00 1.00    0.98
+ iNeRF [59]        0.70   0.20     0.10 0.80   0.75     0.00   0.10    0.90 0.00    0.05     0.60   0.30    0.10   0.70   0.68     0.50   0.30   0.20 0.60   0.58     1.00   0.00   0.00 1.00    0.97
+ SigNeRF [9]       0.38   0.38     0.24 0.50   0.52     0.00   0.13    0.87 0.00    0.08     0.63   0.25    0.12   0.75   0.72     0.50   0.25   0.25 0.63   0.58     1.00   0.00   0.00 1.00    1.00
+ MCNeRF [14]       0.00   0.13     0.88 0.20   0.15     0.00   0.25    0.75 0.10    0.08     0.50   0.38    0.13   0.80   0.74     0.75   0.25   0.00 0.85   0.95     1.00   0.00   0.00 1.00    0.95
+
+Table 4. Novelty coverage analysis across N ERFIFY-B ENCH papers. For each baseline system, we report: C (Correct implementation
+rate), I (Incorrect/partial implementation rate), M (Missing component rate), W (Hyperparameter weight match accuracy), and ScoreLLM
+(overall semantic implementation score on 0-1 scale). N ERFIFY achieves perfect or near-perfect scores (C=1.00, M=0.00) across all papers,
+while generic baselines show significant component omissions (M=0.12-0.90 for most methods) and lower implementation fidelity. Metrics
+are computed over all novel components identified in each paper, with weights derived from paper emphasis and experimental validation.
+
+
+ Configuration                                 Score     Trainable       Correct Novelties                 drops to 60% and correct novelty implementation falls to
+                                                           (%)              Impl. (C)
+                                                                                                           0.85 as interface mismatches accumulate during generation.
+ N ERFIFY (Full)                                0.98           100                 1.00
+                                                                                                           VLM-guided feedback maintains perfect implementation
+ Knowledge Sources:
+   w/o In-context Examples (Stage 1)            0.71           90                  1.00                    (C=1.00) but slightly reduces semantic score from 0.99 to
+   w/o citation recovery (Stage 2)              0.68           100                 0.65                    0.98, reflecting hyperparameter adjustments that prioritize
+   w/o Both                                     0.58           90                  0.65
+                                                                                                           practical convergence over strict paper fidelity.
+ Validation & Feedback:
+   w/o Smoke Tests (Stage 3)                    0.69           60                  0.85
+                                                                                                           Planning Strategy. GoT synthesis substantially improves
+   w/o VLM Feedback (Stage 4)                   0.99           100                 1.00                    code quality over one-shot generation. While one-shot main-
+ Planning Strategy:                                                                                        tains perfect novelty implementation (C=1.00) and 70%
+   One-Shot (no GoT) (Stage 3)                  0.45           70                  1.00
+                                                                                                           trainability, its semantic score collapses to 0.45, indicat-
+Table 5. Component ablation study. We evaluate the impact                                                  ing failures in establishing proper module boundaries and
+of each system component on synthesis quality and efficiency.                                              abstractions despite correct equation implementation.
+Numbers are averaged over 10 papers from N ERFIFY-B ENCH.
+                                                                                                           5. Conclusion
+to-code snippet comparisons for all identified novelties and                                               We presented N ERFIFY, a multi-agent framework that en-
+additional comparison with code-generation tools like Chat-                                                ables paper-to-code synthesis for fully trainable NeRF imple-
+Dev [40], MetaGPT [17], and DeepCode [15] are provided                                                     mentations through domain-aware reasoning and structured
+in the supplementary material.                                                                             code generation. By formalizing Nerfstudio as a context-
+                                                                                                           free grammar and orchestrating code generation through
+4.5. Ablation Study                                                                                        graph-of-thought planning, the framework ensures archi-
+In Table 5, we selectively disable key elements of N ERFIFY                                                tectural correctness and full executability across complex
+(other metrics like PSNR are in supplementary). The results                                                NeRF pipelines. Its compositional citation recovery and
+validate our multi-agent architecture, demonstrating the im-                                               visual-driven feedback enable agents to reconstruct and re-
+portance of domain knowledge, compositional reasoning,                                                     fine hidden dependencies, achieving expert-level visual qual-
+iterative validation, and visual refinement.                                                               ity within 0.5 dB PSNR while reducing development time
+Knowledge Sources. Removing in-context examples drops                                                      from weeks to minutes. Beyond accelerating NeRF research,
+score from 0.98 to 0.71 while trainability falls to 90%,                                                   N ERFIFY highlights how depth of specialization, rather than
+though novelty implementation remains perfect (C=1.00).                                                    model scale alone, enables reliable translation of scientific
+This indicates agents can interpret equations correctly but                                                ideas into working code. This insight suggests a template
+struggle with architectural integration. Citation dependen-                                                where domain-specific grammars and agentic reasoning can
+cies proves equally critical: without it, the system maintains                                             transform research reproducibility in other communities too.
+trainability but fails to implement 35% of novel techniques                                                Future work will extend N ERFIFY to further NeRF variants
+(C=0.65). Disabling both reduces semantic score to 0.58                                                    and NeRF-based methods, other areas of computer vision
+while trainability remains at 90%, confirming that code qual-                                              research and broader paper-to-experiment frameworks.
+ity degradation stems primarily from improper architectural
+patterns rather than runtime failures. Ablation on |K| in the                                              References
+supplementary material.                                                                                     [1] Relja Arandjelović and Andrew Zisserman. Nerf in de-
+Validation and Feedback. Smoke tests significantly im-                                                          tail: Learning to sample for view synthesis. arXiv preprint
+pact trainability. Without incremental validation, trainability                                                 arXiv:2106.05264, 2021. 6
+
+
+                                                                                                    8
+ [2] Jonathan T Barron, Ben Mildenhall, Matthew Tancik, Peter             [15] HKUDS. Deepcode: Open agentic coding. https://
+     Hedman, Ricardo Martin-Brualla, and Pratul P Srinivasan.                  github.com/HKUDS/DeepCode, 2025. GitHub reposi-
+     Mip-nerf: A multiscale representation for anti-aliasing neural            tory. 8
+     radiance fields. In Proceedings of the IEEE/CVF international        [16] Samuel Holt, Max Ruiz Luyten, and Mihaela van der Schaar.
+     conference on computer vision, pages 5855–5864, 2021. 6, 8                L2mac: Large language model automatic computer for exten-
+ [3] Jonathan T. Barron, Ben Mildenhall, Dor Verbin, Pratul P.                 sive code generation. arXiv preprint arXiv:2310.02003, 2023.
+     Srinivasan, and Peter Hedman. Mip-nerf 360: Unbounded                     2
+     anti-aliased neural radiance fields. In IEEE/CVF Conference          [17] Sirui Hong, Mingchen Zhuge, Jonathan Chen, Xiawu Zheng,
+     on Computer Vision and Pattern Recognition (CVPR), pages                  Yuheng Cheng, Jinlin Wang, Ceyao Zhang, Zili Wang, Steven
+     5470–5479, 2022. 2, 4                                                     Ka Shing Yau, Zijuan Lin, et al. Metagpt: Meta programming
+ [4] Maciej Besta, Nils Blach, Ales Kubicek, Robert Gersten-                   for a multi-agent collaborative framework. In The Twelfth
+     berger, Lukas Gianinazzi, Joanna Gajda, et al. Graph of                   International Conference on Learning Representations, 2023.
+     thoughts: Solving elaborate problems with large language                  2, 8
+     models. Proceedings of the AAAI Conference on Artificial             [18] Dong Huang, Qingwen Bu, Jie Zhang, Michael Xie, et al.
+     Intelligence, 38:17682–17690, 2024. 2                                     Agentcoder: Multi-agent code generation with effective test-
+ [5] Anpei Chen, Zexiang Xu, Andreas Geiger, Jingyi Yu, and                    ing and self-optimisation. arXiv preprint arXiv:2312.13010,
+     Hao Su. Tensorf: Tensorial radiance fields. In European                   2024. 2
+     Conference on Computer Vision, pages 333–350, 2022. 6, 8             [19] Byeongin Joung, Byeong-Uk Lee, Jaesung Choe, Ukcheol
+ [6] Xinyun Chen, Maxwell Lin, Nathanael Schärli, and Denny                   Shin, Minjun Kang, Taeyeop Lee, In So Kweon, and Kuk-Jin
+     Zhou. Teaching large language models to self-debug. In                    Yoon. Stable surface regularization for fast few-shot nerf,
+     International Conference on Learning Representations, 2024.               2024. 6
+     2                                                                    [20] Mijeong Kim, Seonguk Seo, and Bohyung Han. Infonerf: Ray
+ [7] Cognition Labs.         Devin: The first ai software en-                  entropy minimization for few-shot neural volume rendering.
+     gineer. https : / / www . cognition - labs . com /                        In Proceedings of the IEEE/CVF Conference on Computer
+     introducing-devin, 2024. 2                                                Vision and Pattern Recognition, pages 12912–12921, 2022.
+ [8] Congyue Deng, Jiawei Yang, Leonidas Guibas, and Yue Wang.                 6, 7
+     Rethinking directional integration in neural radiance fields.        [21] Simon Klenk, Lukas Koestler, Davide Scaramuzza, and
+     arXiv preprint arXiv:2311.16504, 2023. 6                                  Daniel Cremers. E-nerf: Neural radiance fields from a mov-
+ [9] Jan-Niklas Dihlmann, Andreas Engelhardt, and Hendrik                      ing event camera. IEEE Robotics and Automation Letters, 8
+     Lensch. Signerf: Scene integrated generation for neural radi-             (3):1587–1594, 2023. 6, 8
+     ance fields. In Proceedings of the IEEE/CVF conference on            [22] Jonas Kulhanek and Torsten Sattler. Tetra-nerf: Representing
+     computer vision and pattern recognition, pages 6679–6688,                 neural radiance fields using tetrahedra. In Proceedings of
+     2024. 6, 8                                                                the IEEE/CVF international conference on computer vision,
+[10] Sara Fridovich-Keil, Giacomo Meanti, Frederik Rahbæk War-                 pages 18458–18469, 2023. 6, 8
+     burg, Benjamin Recht, and Angjoo Kanazawa. K-planes:                 [23] Deborah Levy, Amit Peleg, Naama Pearl, Dan Rosenbaum,
+     Explicit radiance fields in space, time, and appearance. In               Derya Akkaynak, Simon Korman, and Tali Treibitz. Seathru-
+     Proceedings of the IEEE/CVF Conference on Computer Vi-                    nerf: Neural radiance fields in scattering media. In Proceed-
+     sion and Pattern Recognition, pages 12479–12488, 2023. 2                  ings of the IEEE/CVF conference on computer vision and
+[11] Shubham Gandhi, Dhruv Shah, Manasi Patwardhan,                            pattern recognition, pages 56–65, 2023. 6
+     Lovekesh Vig, and Gautam Shroff. Researchcodeagent: An               [24] Liangchen Li and Juyong Zhang. L0-sampler: An l0 model
+     llm multi-agent system for automated codification of research             guided volume sampling for nerf. In Proceedings of the
+     methodologies. In International Workshop on AI for Trans-                 IEEE/CVF Conference on Computer Vision and Pattern
+     portation, pages 3–37. Springer, 2025. 2                                  Recognition, pages 21390–21400, 2024. 6, 7
+[12] Stephan J Garbin, Marek Kowalski, Matthew Johnson, Jamie             [25] Zijie Lin, Yiqing Shen, Qilin Cai, He Sun, Jinrui Zhou, and
+     Shotton, and Julien Valentin. Fastnerf: High-fidelity neural              Mingjun Xiao. Autop2c: An llm-based agent framework
+     rendering at 200fps. In Proceedings of the IEEE/CVF inter-                for code repository generation from multimodal content in
+     national conference on computer vision, pages 14346–14355,                academic papers. arXiv preprint arXiv:2504.20115, 2025. 1,
+     2021. 6                                                                   2
+[13] Jiatao Gu, Lingjie Liu, Peng Wang, and Christian Theobalt.           [26] Jane Luo, Xin Zhang, Steven Liu, Jie Wu, Jianfeng Liu, Yim-
+     Stylenerf: A style-based 3d-aware generator for high-                     ing Huang, Yangyu Huang, Chengyu Yin, Ying Xin, Yuefeng
+     resolution image synthesis. arXiv preprint arXiv:2110.08985,              Zhan, Hao Sun, Qi Chen, Scarlett Li, and Mao Yang. Rpg: A
+     2021. 6, 8                                                                repository planning graph for unified and scalable codebase
+[14] Kunal Gupta, Milos Hasan, Zexiang Xu, Fujun Luan, Kalyan                  generation. arXiv preprint arXiv:2509.16198, 2025. 2
+     Sunkavalli, Xin Sun, Manmohan Chandraker, and Sai Bi.                [27] Yujie Luo, Zhuoyun Yu, Xuehai Wang, Yuqi Zhu, Ningyu
+     Mcnerf: Monte carlo rendering and denoising for real-time                 Zhang, Lanning Wei, Lun Du, Da Zheng, and Huajun Chen.
+     nerfs. In SIGGRAPH Asia 2023 Conference Papers, pages                     Executable knowledge graphs for replicating ai research.
+     1–11, 2023. 6, 8                                                          arXiv preprint arXiv:2510.17795, 2025. 2
+
+
+                                                                      9
+[28] Li Ma, Xiaoyu Li, Jing Liao, Qi Zhang, Xuan Wang, Jue                  [42] Minju Seo, Jinheon Baek, Seongyun Lee, and Sung Ju Hwang.
+     Wang, and Pedro V Sander. Deblur-nerf: Neural radiance                      Paper2code: Automating code generation from scientific pa-
+     fields from blurry images. In Proceedings of the IEEE/CVF                   pers in machine learning. arXiv preprint arXiv:2504.17192,
+     conference on computer vision and pattern recognition, pages                2025. 1, 2
+     12861–12870, 2022. 6                                                   [43] Noah Shinn, Federico Cassano, Ashwin Gopinath, Karthik
+[29] Aman Madaan, Niket Tandon, Prakhar Gupta, Skyler Halli-                     Narasimhan, and Shunyu Yao. Reflexion: Language agents
+     nan, Luyu Gao, Sarah Wiegreffe, et al. Self-refine: Iterative               with verbal reinforcement learning. Advances in Neural In-
+     refinement with self-feedback. Advances in Neural Informa-                  formation Processing Systems, 36, 2023. 2
+     tion Processing Systems, 36, 2023. 2                                   [44] Giulio Starace, Oliver Jaffe, Dane Sherburn, James Aung,
+[30] Angelos Mavrogiannis, Joseph Krebs, Yifan Chen, et al. Com-                 Jun Shern Chan, Leon Maksin, Rachel Dias, Evan Mays,
+     bining llm code generation with formal specifications and                   Benjamin Kinsella, Wyatt Thompson, et al. Paperbench:
+     reactive program synthesis. arXiv preprint arXiv:2410.19736,                Evaluating ai’s ability to replicate ai research. arXiv preprint
+     2024. 2                                                                     arXiv:2504.01848, 2025. 1
+[31] Jiacheng Miao, Joe R Davis, Yaohui Zhang, Jonathan K                   [45] Hongqiu Sun, Yuhao Li, Jiachen Jia, Haoye Zhou, and Zheng-
+     Pritchard, and James Zou. Paper2agent: Reimagining re-                      wei Liu. Clover: Closed-loop verifiable code generation.
+     search papers as interactive and reliable ai agents. arXiv                  arXiv preprint arXiv:2310.17807, 2024. 2
+     preprint arXiv:2509.06917, 2025. 2                                     [46] Shilei Sun, Ming Liu, Zhongyi Fan, Qingliang Jiao, Yuxue
+[32] Ben Mildenhall, Pratul P. Srinivasan, Matthew Tancik,                       Liu, Liquan Dong, and Lingqin Kong. Efficient ray sampling
+     Jonathan T. Barron, Ravi Ramamoorthi, and Ren Ng. Nerf:                     for radiance fields reconstruction. Computers & Graphics,
+     Representing scenes as neural radiance fields for view syn-                 118:48–59, 2024. 6
+     thesis. In European Conference on Computer Vision (ECCV),              [47] Matthew Tancik, Ethan Weber, Evonne Ng, Ruilong Li, Brent
+     pages 405–421, 2020. 1, 6, 7                                                Yi, Terrance Wang, Alexander Kristoffersen, Jake Austin,
+[33] Thomas Müller, Alex Evans, Christoph Schied, and Alexan-                   Kamyar Salahi, Abhik Ahuja, et al. Nerfstudio: A modular
+     der Keller. Instant neural graphics primitives with a multires-             framework for neural radiance field development. In ACM
+     olution hash encoding. ACM Transactions on Graphics, 41                     SIGGRAPH Conference Proceedings, 2023. 2, 6, 7
+     (4):1–15, 2022. 2, 6                                                   [48] Haithem Turki, Michael Zollhöfer, Christian Richardt, and
+[34] Thomas Neff, Pascal Stadlbauer, Mathias Parger, Andreas                     Deva Ramanan. Pynerf: Pyramidal neural radiance fields.
+     Kurz, Joerg H Mueller, Chakravarty R Alla Chaitanya, Anton                  Advances in neural information processing systems, 36:37670–
+     Kaplanyan, and Markus Steinberger. Donerf: Towards real-                    37681, 2023. 6, 8
+     time rendering of compact neural radiance fields using depth           [49] Ce Wang, Bei Chen, Yuxuan Zhang, and Xiaodong Xie.
+     oracle networks. In Computer Graphics Forum, pages 45–59.                   Codep: Grammatical seq2seq model for general-purpose code
+     Wiley Online Library, 2021. 6                                               generation. In Proceedings of the ACM SIGSOFT Interna-
+[35] Ziyi Ni, Yifan Li, Ning Yang, Dou Shen, Pin Lv, and Daxiang                 tional Symposium on Software Testing and Analysis, pages
+     Dong. Tree-of-code: A tree-structured exploring framework                   456–468, 2023. 2
+     for end-to-end code generation and execution in complex task           [50] Qian Wang. nerf-arxiv-daily. https://github.com/
+     handling. arXiv preprint arXiv:2412.15305, 2024. 2                          wangqiannudt/nerf-arxiv-daily, 2025. GitHub
+[36] Junbo Niu, Zheng Liu, Zhuangcheng Gu, Bin Wang, Linke                       repository; accessed 2025-11-08. 1
+     Ouyang, Zhiyuan Zhao, Tao Chu, Tianyao He, Fan Wu, Qin-                [51] Xingyao Wang, Yangyi Chen, Lifan Yuan, Yizhe Zhang, Yun-
+     tong Zhang, et al. Mineru2.5: A decoupled vision-language                   zhu Li, Hao Peng, and Heng Ji. Executable code actions elicit
+     model for efficient high-resolution document parsing. arXiv                 better llm agents. arXiv preprint arXiv:2402.01030, 2024. 2
+     preprint arXiv:2509.22186, 2025. 4                                     [52] Xingyao Wang, Boxuan Hou, Yiming Fang, Fangwei Wu,
+[37] OpenAI Team. Paperbench: Evaluating ai’s ability to replicate               Tianyi Wu, Qian Chen, Yanxin Li, Haoyu Qin, and Heng Ji.
+     ai research. In OpenReview, 2025. 2                                         Opendevin: An open platform for ai software developers as
+[38] Marco Orsingher, Anthony Dell’Eva, Paolo Zani, Paolo                        generalist agents. arXiv preprint arXiv:2407.16741, 2024. 2
+     Medici, and Massimo Bertozzi. Informative rays selec-                  [53] Yifan Wang, Jun Xu, Y Zeng, and Y Gong. Anisotropic neu-
+     tion for few-shot neural radiance fields. arXiv preprint                    ral representation learning for high-quality neural rendering.
+     arXiv:2312.17561, 2023. 6                                                   arXiv preprint arXiv:2311.18311, 2023. 6
+[39] Leandro Aparecido Passos, Danilo Samuel Jodas, Ahsan                   [54] Yifan Wang, Yi Gong, and Yuan Zeng. Hyb-nerf: A multires-
+     Adeel, João P Papa, Douglas Rodrigues, and Kelton Augusto                  olution hybrid encoding for neural radiance fields. In 2024
+     Pontara da Costa. Bionerf: Biologically plausible neural radi-              IEEE/CVF Winter Conference on Applications of Computer
+     ance fields for view synthesis. Available at SSRN 5384186,                  Vision (WACV), pages 3677–3686. IEEE, 2024. 6
+     2024. 6, 8                                                             [55] Frederik Warburg, Ethan Weber, Matthew Tancik, Aleksander
+[40] Chen Qian, Xin Cai, Cheng Liu, Yang Liu, Juyuan Dang, Lin                   Holynski, and Angjoo Kanazawa. Nerfbusters: Removing
+     Wang, et al. Chatdev: Communicative agents for software                     ghostly artifacts from casually captured nerfs. In Proceed-
+     development. arXiv preprint arXiv:2307.07924, 2023. 2, 8                    ings of the IEEE/CVF International Conference on Computer
+[41] Edward Raff. A step toward quantifying independently repro-                 Vision, pages 18120–18130, 2023. 6
+     ducible machine learning research. In Advances in Neural               [56] Qingyun Wu, Gagan Bansal, Jieyu Zhang, Yiran Wu, Beibin
+     Information Processing Systems, 2019. 1                                     Li, Erkang Zhu, Li Jiang, Xiaoyun Zhang, Shaokun Zhang,
+
+
+                                                                       10
+     Jiale Liu, et al. Autogen: Enabling next-gen llm applica-
+     tions via multi-agent conversations. In First Conference on
+     Language Modeling, 2024. 2
+[57] John Yang, Carlos E Jimenez, Alexander Wettig, Kilian Lieret,
+     Shunyu Yao, Karthik Narasimhan, and Ofir Press. Swe-agent:
+     Agent-computer interfaces enable automated software engi-
+     neering. Advances in Neural Information Processing Systems,
+     37:50528–50652, 2024. 2
+[58] Shunyu Yao, Dian Yu, Jeffrey Zhao, Izhak Shafran, Tom L
+     Griffiths, Yuan Cao, and Karthik Narasimhan. Tree of
+     thoughts: Deliberate problem solving with large language
+     models. Advances in Neural Information Processing Systems,
+     36, 2023. 2
+[59] Lin Yen-Chen, Pete Florence, Jonathan T Barron, Alberto
+     Rodriguez, Phillip Isola, and Tsung-Yi Lin. inerf: Inverting
+     neural radiance fields for pose estimation. In 2021 IEEE/RSJ
+     International Conference on Intelligent Robots and Systems
+     (IROS), pages 1323–1330. IEEE, 2021. 6, 8
+[60] Hye Bin Yoo, Hyun Min Han, Sung Soo Hwang, and Il Yong
+     Chun. Improving neural radiance fields using near-surface
+     sampling with point cloud generation. Neural Processing
+     Letters, 56(4):214, 2024. 6
+[61] Yuntong Zhang, Haifeng Ruan, Zhiyu Fan, and Abhik Roy-
+     choudhury. Autocoderover: Autonomous program improve-
+     ment. arXiv preprint arXiv:2404.05427, 2024. 2
+[62] Yao Zhang, Jiangshu Wei, Bei Zhou, Fang Li, Yuxin Xie,
+     and Jiajun Liu. Tvnerf: Improving few-view neural volume
+     rendering with total variation maximization. Knowledge-
+     Based Systems, 301:112273, 2024. 6
+[63] Yunzhi Zhang, Zizhang Li, Matt Zhou, Shangzhe Wu, and
+     Jiajun Wu. The scene language: Representing scenes with
+     programs, words, and embeddings. In Proceedings of the
+     Computer Vision and Pattern Recognition Conference, pages
+     24625–24634, 2025. 2
+[64] Xuanle Zhao, Zilin Sang, Yuxuan Li, Qi Shi, Shuo Wang,
+     Duzhen Zhang, Xu Han, Zhiyuan Liu, and Maosong Sun.
+     Autoreproduce: Automatic ai experiment reproduction with
+     paper lineage. arXiv preprint arXiv:2505.20662, 2025. 2
+[65] Mingyang Zhou, Quanming Yao, Lun Du, Lanning Wei, and
+     Da Zheng. Reflective paper-to-code reproduction enabled by
+     fine-grained verification. arXiv preprint arXiv:2508.16671,
+     2025. 2
+[66] Hanxin Zhu, Tianyu He, Xin Li, Bingchen Li, and Zhibo
+     Chen. Is vanilla mlp in neural radiance field enough for
+     few-shot view synthesis? In Proceedings of the IEEE/CVF
+     Conference on Computer Vision and Pattern Recognition,
+     pages 20288–20298, 2024. 6
+
+
+
+
+                                                                     11
+

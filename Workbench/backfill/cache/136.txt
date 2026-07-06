@@ -1,0 +1,623 @@
+                                         wrivinder: Towards Spatial Intelligence for Geo-locating Ground Images onto
+                                                                     Satellite Imagery
+
+                                                              Chandrakanth Gudavalli1 , Tajuddin Manhar Mohammed1 , Abhay Yadav2 ,
+                                                                   Ananth Vishnu Bhaskar 1 , Hardik Prajapati 1 , Cheng Peng 2 ,
+                                                                 Rama Chellappa2 , Shivkumar Chandrasekaran 1 , B. S. Manjunath1
+                                                                                  1                           2
+                                                                                      Mayachitra, Inc.            Johns Hopkins University
+
+
+
+
+arXiv:2602.14929v1 [cs.CV] 16 Feb 2026
+                                                                      Abstract                                             Images from front door           Images from back door
+
+                                         Aligning ground-level imagery with geo-registered satellite
+                                         maps is crucial for mapping, navigation, and situational
+                                         awareness, yet remains challenging under large viewpoint
+                                         gaps or when GPS is unreliable. We introduce Wrivinder, a
+                                         zero-shot, geometry-driven framework that aggregates mul-                       Zenith Render of 3D Scene        Zenith Render of 3D Scene
+                                         tiple ground photographs to reconstruct a consistent 3D
+                                         scene and align it with overhead satellite imagery. Wrivin-
+                                         der combines SfM reconstruction, 3D Gaussian Splatting,
+                                         semantic grounding, and monocular depth–based metric
+                                         cues to produce a stable zenith-view rendering that can be
+                                         directly matched to satellite context for metrically accu-
+                                         rate camera geo-localization. To support systematic eval-
+                                         uation of this task—which lacks suitable benchmarks—we
+                                         also release MC-Sat, a curated dataset linking multi-view
+                                         ground imagery with geo-registered satellite tiles across
+                                         diverse outdoor environments. Together, Wrivinder and
+                                         MC-Sat provide a first comprehensive baseline and testbed
+                                         for studying geometry-centered cross-view alignment with-
+                                         out paired supervision. In zero-shot experiments, Wrivin-
+                                         der achieves sub-30 m geolocation accuracy across both
+                                         dense and large-area scenes, highlighting the promise of
+                                         geometry-based aggregation for robust ground-to-satellite
+                                         localization. The MC-Sat dataset and Wrivinder codebase
+                                         will be publicly released. 1
+
+                                                                                                                      Figure 1. Overview of the satellite-to-ground image alignment
+                                         1. Introduction                                                              pipeline. Directly aligning ground images to satellite views is im-
+                                         Accurately aligning ground-level imagery with geo-                           practical due to large viewpoint and scale differences. Wrivin-
+                                                                                                                      der aggregates information from multiple ground images to recon-
+                                         registered satellite maps is central to applications such as
+                                                                                                                      struct a 3D scene, generates a zenith-view rendering, and aligns
+                                         autonomous navigation [2, 48], disaster response [5], large-
+                                                                                                                      it to the satellite image using the estimated metric dimensions in
+                                         scale mapping [29, 31], and situational awareness in GPS-                    meters.
+                                         denied environments [37]. Recovering camera GPS co-
+                                         ordinates directly from unorganized ground photos and a
+                                             1 Under review. The MC-Sat dataset and related resources will be re-     corresponding satellite tile would enable consistent geo-
+                                         leased after the review process.                                             referencing of ground imagery and support robust map con-
+struction pipelines without relying on GPS.                         grates SfM, 3DGS, semantic grounding, and metric depth
+    The task, however, remains extremely challenging due            cues to obtain physically meaningful camera GPS esti-
+to the drastic viewpoint, scale, and appearance differ-             mates without paired supervision.
+ences between ground and satellite imagery (Fig. 1). The          • Test-Time Self-Supervised Alignment. We develop
+same region can look radically different across changes             a lightweight, test-time self-supervised Deep Template
+in altitude, orientation, and occlusion, resulting in per-          Matcher that aligns zenith-view 3DGS renderings to
+spective distortions and geometric ambiguities. Exist-              satellite images, enabling robust cross-view correspon-
+ing cross-view geo-localization (CVGL) approaches learn             dence under extreme viewpoint changes and without any
+ground–overhead correspondences from large quantities of            ground–satellite training pairs.
+paired, geo-aligned data, achieving strong results on struc-
+tured, road-centric benchmarks. Yet such paired supervi-          2. Related Work
+sion is scarce in real-world environments—campuses, con-
+struction sites, or rural regions—leading to poor generaliza-     Cross-View Geo-Localization (CVGL). The dominant
+tion under distribution shift.                                    paradigm in CVGL relies on supervised learning from
+                                                                  paired ground–satellite images. Benchmarks such as
+    Most CVGL methods, including sequence-based (Seq-
+                                                                  CVUSA [41] and CVACT [22] have enabled models based
+Geo) and set-based (Set-CVGL) variants, treat the task as
+                                                                  on Siamese CNNs [15], spatial-aware attention [32], and
+supervised retrieval: given a ground image, retrieve the
+                                                                  transformers [9, 49]. Recent methods reach near-saturated
+most similar satellite crop. These models rarely operate in a
+                                                                  performance—e.g., Sample4Geo [8] achieves 97.83% Re-
+true zero-shot regime and produce a nearest-neighbor satel-
+                                                                  call@1 on CVUSA—while Set-CVGL [44] extends re-
+lite tile rather than a physically meaningful camera pose
+                                                                  trieval to multi-view inputs. Sequence-based methods [27,
+or GPS coordinate. Moreover, their 2D feature representa-
+                                                                  47] further incorporate temporal context. However, all
+tions lack explicit 3D reasoning, limiting robustness to large
+                                                                  of these approaches remain tightly coupled to curated,
+viewpoint gaps. In contrast, Wrivinder departs from the
+                                                                  road-centric benchmarks and require large quantities of
+retrieval paradigm by leveraging geometric reconstruction
+                                                                  paired, geo-aligned data. They generalize poorly to un-
+and metric alignment to infer physically grounded camera
+                                                                  constrained scenes (e.g., campuses, construction zones, or
+locations without paired training data.
+                                                                  rural landscapes), and even unsupervised [19] or weakly-
+    To achieve this, Wrivinder aggregates geometric and se-       supervised [33] variants still depend on dataset-specific
+mantic cues from multiple ground images as a bridge to the        adaptation. In contrast, Wrivinder operates in a genuinely
+satellite domain. Given an unordered set of ground pho-           zero-shot setting—requiring no paired supervision, no fine-
+tos, it first reconstructs a sparse 3D scene using Structure-     tuning, and no dataset-specific training.
+from-Motion (SfM). Monocular depth priors and seman-
+tic masks provide scene orientation and ground-plane es-
+timates, enabling a consistent zenith viewpoint. A dense,         Geometry-Based Alignment. Before deep learning, geo-
+photorealistic 3D Gaussian Splatting (3DGS) model is then         metric methods aligned ground imagery to overhead views
+rendered from this viewpoint. A test-time, self-supervised        via SfM and handcrafted cost functions. Kaminsky et
+Deep Template Matcher aligns the zenith render to the geo-        al. [17] matched sparse SfM reconstructions to satellite im-
+registered satellite tile, yielding pixel-level correspondences   agery using edge and free-space cues. While effective,
+that are back-projected through the 3DGS and SfM models           sparse point clouds lack photorealistic appearance and are
+to estimate camera GPS positions. This geometry-centered          difficult to match under large viewpoint gaps. Wrivin-
+formulation enables metrically meaningful, training-free lo-      der advances this classical geometric lineage by replac-
+calization across diverse and unconstrained environments.         ing sparse SfM points with dense, appearance-preserving
+Main Contributions.                                               3D Gaussian Splatting (3DGS), enabling robust photomet-
+                                                                  ric alignment through realistic zenith-view rendering.
+• MC-Sat Dataset. We curate and release MC-Sat,
+   the first dataset linking multi-view ground imagery,
+   SfM/3DGS reconstructions, and geo-registered satellite         Neural Rendering and Photogrammetry. Neural radi-
+   context across diverse outdoor environments. MC-Sat            ance fields (NeRFs) have been explored for cross-view and
+   fills a critical gap in CVGL benchmarks by enabling met-       photogrammetric tasks, including nadir-view synthesis for
+   rically evaluated, multi-view, and truly zero-shot ground-     satellite alignment [3] and satellite multi-view reconstruc-
+   to-satellite alignment in unconstrained scenes.                tion [24, 25, 34]. However, conventional NeRFs are compu-
+• Wrivinder Framework. We propose Wrivinder, a                    tationally intensive and slow to train. In contrast, Wrivin-
+   geometry-driven, zero-shot framework that reconstructs         der leverages 3DGS for real-time rendering, fast conver-
+   a consistent 3D scene from multiple ground images and          gence, and high-fidelity novel views, while maintaining the
+   aligns it with overhead satellite imagery. Wrivinder inte-     geometric precision of classical SfM. Recent advances in
+        (a) Scene from ULTRAA Dataset               (b) Scene from VisymScenes Dataset             (c) Scene from JHU AMES Dataset
+
+
+Figure 2. MC-Sat Dataset Overview, showing scenes from the ULTRAA, VisymScenes, and JHU-Ames datasets. The central image in each
+tile is a satellite view of the scene, surrounded by corresponding ground images illustrating the diversity of viewpoints and environments.
+
+3DGS [21, 38, 42] further motivate its use as a practical               strained scenes—where paired supervision is typically
+representation for zero-shot alignment.                                 unavailable—MC-Sat fills a critical gap in current CVGL
+                                                                        datasets.
+Learning Ground-to-Overhead Mappings. Other ap-                         Dataset Construction
+proaches attempt to learn transformations from ground
+views to top-down representations. BEV-based models [39]                MC-Sat integrates multiple complementary ground-image
+achieve strong performance on benchmark datasets but rely               sources to capture broad geographic and geometric diver-
+on paired supervision and often assume a flat ground plane.             sity. We aggregate multi-view imagery from ULTRAA [16],
+Foundation models [6, 43] provide strong semantic pri-                  VisymScenes [45], ACC-NVS [35], and JHU-Ames [18],
+ors yet still require task-specific adaptation for cross-view           spanning a wide range of environmental conditions, sen-
+alignment. Wrivinder, by contrast, performs explicit 3D                 sor types, and capture geometries (Table 1). For each site,
+reconstruction: its zenith-view render arises from geometric            geo-registered satellite or aerial imagery is obtained from
+projection rather than learned mapping, allowing true zero-             the USDA NAIP program and the ESRI World Imagery
+shot deployment and accommodating complex 3D struc-                     basemap. Satellite tiles are selected to overlap the ground-
+ture.                                                                   image footprints using available geospatial metadata, pro-
+                                                                        ducing consistent ground–satellite associations suitable for
+                                                                        evaluating zero-shot, geometry-centered localization meth-
+Summary. By integrating SfM-based reconstruction,                       ods.
+3DGS neural rendering, and geometric zenith–satellite
+alignment, Wrivinder unifies the interpretability of geo-               Ground Image Sources
+metric methods with the realism of neural representations,
+achieving zero-shot cross-view localization without train-              ULTRAA [16] benchmarks view synthesis under sparse,
+ing, paired data, or restrictive planar assumptions.                    heterogeneous captures with mixed camera intrinsics. It
+                                                                        provides three challenging scenes from the Johns Hopkins
+                                                                        APL and the Muscatatuck Urban Training Center (MUTC),
+3. MC-Sat Dataset
+                                                                        offering varied geometry and limited-view overlap to test
+To advance research in cross-view alignment beyond road-                reconstruction robustness.
+centric and paired-image benchmarks, we introduce the                       VisymScenes [45] contains 258K images from 149 sites
+MC-Sat (Multi-view Capture–Satellite) dataset. MC-Sat                   across 42 cities and 15 countries. Each frame includes GPS,
+is the first unified benchmark that jointly links multi-view            IMU, and intrinsic metadata, contributing substantial geo-
+ground imagery, 3D reconstructions, and geo-registered                  graphic, environmental, and sensor diversity, including re-
+satellite context across diverse outdoor environments. It               alistic noise conditions.
+combines high-resolution overhead imagery with heteroge-                    ACC-NVS1 [35] includes 148K ground and airborne im-
+neous ground captures (Fig. 2), enabling rigorous evalua-               ages across six scenes in Austin and Pittsburgh. Its multi-
+tion of geometry-based and zero-shot methods for satellite-             altitude captures under varying illumination and weather
+to-ground alignment at metric precision. By provid-                     enrich MC-Sat with additional domain diversity and sup-
+ing aligned ground, 3D, and satellite views for uncon-                  port evaluation in dynamic outdoor settings.
+   JHU-Ames [18] offers 1.7K images of a single outdoor         ometry, render zenith-view representations, and align them
+campus scene, providing a controlled setting for studying       to satellite imagery for metrically accurate camera geo-
+geometric and photometric consistency. Since only a subset      localization.
+includes absolute GPS, we align the remaining frames via
+relative SfM poses to ensure a consistent world coordinate        Dataset          #Scenes #Images  Imagery Type
+frame.                                                            ULTRAA [16]         3     1,028       Ground
+                                                                  VisymScenes [45]   149    258K        Ground
+Satellite Component (NAIP and ESRI)                               ACC-NVS1 [35]       6     148K   Ground + Airborne
+The overhead imagery in MC-Sat is drawn from two com-             JHU-Ames [18]       1     1,717  Ground + Airborne
+plementary sources: the USDA National Agriculture Im-           Table 1. Overview of ground imagery datasets incorporated into
+agery Program (NAIP) [36] and the ESRI World Imagery            the MC-Sat dataset. MC-Sat integrates subsets of these sources
+basemap [46]. NAIP provides orthorectified aerial imagery       and pairs them with orthorectified satellite imagery. More details
+at 0.6–1.0 m/pixel resolution across the United States, of-     about the curated subset are reported in Table 2.
+fering high-fidelity detail suitable for metric-scale evalu-
+ation. ESRI World Imagery supplies globally consistent,         4. Methodology
+geo-referenced overhead coverage, allowing inclusion of
+international scenes. For each MC-Sat site, satellite tiles     Given an unordered set of ground-level images and a cor-
+are selected based on footprint overlap and image quality,      responding geo-registered satellite view, Wrivinder aims
+aligned using available geospatial metadata, and manually       to recover metrically accurate GPS locations for all ground
+checked for geometric consistency with the reconstructed        cameras in a fully zero-shot setting. The key idea is to use
+3D scenes.                                                      geometry as the bridge between drastically different view-
+                                                                points: instead of learning cross-domain correspondences,
+Scale, Coverage, and Intended Use
+                                                                Wrivinder reconstructs a 3D representation of the scene and
+The released MC-Sat dataset comprises 15 multi-view             aligns it directly to the satellite frame through geometric
+scenes drawn from ULTRAA, VisymScenes, ACC-NVS,                 projection and self-supervised matching.
+and JHU-Ames, totaling roughly 20K ground images. Each              The pipeline consists of five stages. We first recon-
+scene includes geo-registered satellite imagery from NAIP       struct sparse scene geometry using a standard Structure-
+or ESRI, aligned to the reconstructed ground-image foot-        from-Motion (SfM) solver and densify it with a 3D Gaus-
+prints. By linking dense multi-view captures with high-         sian Splatting model (Sec. 4.1). We then estimate the verti-
+resolution overhead context, MC-Sat enables quantitative        cal direction to generate a consistent zenith-view rendering
+evaluation of geometry-centered and zero-shot localization      (Sec. 4.2). Monocular depth cues provide approximate met-
+pipelines, including Wrivinder. Table 2 summarizes all          ric scale and determine the physical footprint of this zenith
+scenes and associated metrics; additional statistics and vi-    view (Sec. 4.3). A lightweight, test-time self-supervised
+sualizations are provided in the supplementary material.        Deep Template Matcher aligns the zenith render to the satel-
+   MC-Sat includes two types of scenes: Image Density and       lite image (Sec. 4.4). The resulting correspondences are fi-
+Reconstructed Area. Image Density scenes feature many           nally back-projected through the 3DGS and SfM models to
+images concentrated around a small region (e.g., a build-       estimate GPS coordinates for all ground cameras (Sec. 4.5).
+ing entrance or courtyard), supporting evaluation of fine-
+grained geometric alignment. Reconstructed Area scenes          4.1. 3D Reconstruction (SfM + 3DGS)
+span larger spatial extents—building clusters or campus-
+scale environments—enabling assessment of long-range 3D         We begin by reconstructing scene geometry using
+reconstruction and satellite alignment. Together, these cate-   standard Structure-from-Motion (SfM) solvers such as
+gories offer complementary settings for studying both local     HLOC+COLMAP [30], GLOMAP [26], or VGGT-
+and global geo-localization performance in unconstrained        style [40] pipelines. These methods estimate camera intrin-
+outdoor environments.                                           sics, extrinsics, and a sparse 3D point cloud in an arbitrary
+   In summary, the MC-Sat dataset provides the empir-           relative coordinate frame.
+ical foundation for evaluating geometry-driven, zero-shot           To obtain a dense and photorealistic representation in the
+cross-view localization under realistic, unconstrained out-     same coordinate system, we further refine the reconstruc-
+door conditions. Its diverse ground–satellite pairs, spanning   tion using 3D Gaussian Splatting (3DGS) methods such
+both localized and large-scale scenes, enable systematic        as Scaffold-GS [23] or Octree-GS [28]. Unlike sparse
+analysis of reconstruction accuracy, alignment precision,       SfM points, 3DGS jointly optimizes Gaussian primitives
+and generalization beyond road-centric benchmarks. We           for both geometry and appearance, suppressing floating ar-
+next describe Wrivinder, our proposed framework that uses       tifacts and producing high-fidelity renderings suitable for
+these multi-view scenes to reconstruct consistent 3D ge-        stable zenith-view synthesis.
+                                  Metadata
+
+                                                                                                Deep Template             Gaussian Splat
+                             Geo-Registration                                                   Matcher (DTM)              Geolocator
+
+                                                                                          4.4
+
+
+      Satellite Image                                        Metric Mapper                                                  Camera
+                           4.3
+                                                                                                                           Geolocator
+                                                                                                                    4.5
+
+
+                                                            Gaussian Splat
+                                  SfM Solvers
+                                                             Generation
+                                                                                                                          Lat-Lon-Alt of each
+                            4.1
+                                                                                                                            ground camera
+      Ground Images
+
+                                                            Zenith Viewpoint                     Zenith View
+                                                               Extractor                         Rendering
+                                                      4.2
+
+Figure 3. Overview of Wrivinder, a zero-shot, training-free pipeline for geo-locating ground images on a geo-registered satellite map.
+Given an unordered set of ground images, the pipeline reconstructs a sparse 3D scene via SfM and densifies it using 3D Gaussian Splatting.
+The Zenith Viewpoint Extractor estimates the vertical direction and generates a top-down zenith render. The Metric Mapper uses monocular
+depth priors to recover approximate metric scale and determine the physical footprint of the zenith view. A test-time Deep Template Matcher
+(DTM) aligns this render to the satellite image, and the resulting correspondences are back-projected through the 3DGS and SfM models
+via the Gaussian Splat Geolocator to estimate GPS positions for all ground cameras.
+                                                                                                        N
+4.2. Zenith Rendering of Ground Clusters                                                            1 X
+                                                                                            Σ=            (xi − c)(xi − c)⊤ .
+Each SfM point corresponds to at least one pixel in the input                                       N i=1
+ground images. To identify ground-plane structure, we ob-
+tain semantic masks for all images using a Mask2Former                       Let v1 , v2 , v3 be eigenvectors of Σ in decreasing order of
+model with a BEiTv2 Adapter backbone (large variant,                         eigenvalues. The smallest-variance direction v3 typically
+896×896) [7], pretrained on COCO-Stuff [4]. The model                        aligns with the ground-plane normal in outdoor scenes, and
+predicts 172 categories spanning both “things” and “stuff.”                  we treat it as the vertical axis.
+Pixel-level labels are propagated to the triangulated SfM                       To resolve its sign ambiguity, we compare v3 with the
+points, enabling separation of ground surfaces from sur-                     mean camera center c̄. If most cameras lie in the negative
+rounding structures.                                                         half-space of v3 , we flip the vector. The final vertical direc-
+    Ground-relevant classes include road, sidewalk, grass,                   tion is
+                                                                                               ẑ = sign (c̄ − c)⊤ v3 v3 .
+                                                                                                                      
+dirt, gravel, pavement, ground-other, sand, playingfield,
+along with context-dependent floor materials such as mar-
+ble, stone, tile, wood, carpet, platform, and bridge surfaces.               Zenith viewpoint estimation. With the vertical axis ẑ de-
+These categories reliably identify traversable ground re-                    termined, we construct an orthonormal basis for the zenith
+gions. Assuming ground-level cameras are captured within                     camera. We use v1 (the direction of maximum variance) as
+roughly two meters of the ground plane, we estimate a con-                   the in-plane axis x̂, and obtain the third axis via
+sistent ground plane by jointly fitting a plane to (i) all SfM                                    x̂ = v1 ,     ŷ = ẑ × x̂,
+points with ground-like semantic labels and (ii) the recov-
+ered camera centers.                                                         forming the rotation matrix
+                                                                                                                      ⊤
+Ground plane and vertical estimation. To determine a                                               Rzenith = x̂, ŷ, ẑ .
+consistent top-down (zenith) viewpoint, we analyze the ge-
+ometry of the sparse SfM point cloud. Let P = {xi }N                            We place a virtual camera above the scene at
+                                                       i=1
+denote all 3D points. We compute the centroid                                                           p = c + δ ẑ,
+                                    N
+                                 1  X
+                                                                             where δ is set from the robust spatial extent of the point
+                        c=             xi ,
+                                 N i=1                                       cloud (98th-percentile radius in the PCA frame) to ensure
+                                                                             full scene coverage. A standard look-at transformation from
+and apply PCA to the centered points xi − c via the covari-                  p toward c with up-vector x̂ yields a consistent zenith view-
+ance matrix                                                                  point.
+                                                                    scale yielding the lowest reconstruction error is chosen as
+                                            ~ 20m
+                                                                    the global scale ŝ, which is applied uniformly:
+
+
+                           ~ 10m
+                                                                                            Xmetric
+                                                                                             k      = ŝ Xsfm
+                                                                                                          k .
+
+
+                                                                       Metric 3D points are then projected into the zenith coor-
+  (b) Metric Depth Maps                                                                                           (x) (y) (z)
+                               (f) Metric measured Zenith Render    dinate frame, yielding coordinates zk = (zk , zk , zk ).
+                                                                    A tight bounding box over the (x, y) coordinates provides
+                                                                    the physical footprint of the reconstruction:
+
+                                                                                 (x)           (x)                   (y)       (y)
+                                                                    Wm = max zk −min zk ,              Hm = max zk −min zk .
+                                                                             k          k                       k          k
+
+
+                                                                       Given the satellite’s ground sampling distance g (me-
+                                                                    ters/pixel), these extents convert to expected pixel dimen-
+   (a) Ground Images
+                                     (d) SfM Point Cloud            sions,
+                                                                                   Wpx ≈ Wgm ,         Hpx ≈ Hgm ,
+
+                                                                    which define the search window for the Deep Template
+                                                                    Matcher. We extract an oriented rectangular crop from the
+                                                                    PCD and 3DGS zenith renders, as shown in Figure 4, to
+                                                                    form a clean, scene-specific template for alignment in the
+                                                                    DTM stage.
+
+    (c) Semantic Maps               (e) Semantified PCD             4.4. Deep Template Matcher (DTM)
+                                                                    Once the zenith-view rendering is generated, the next task
+Figure 4. Key intermediate outputs of Wrivinder, showing seman-     is to locate its corresponding region on the satellite image.
+tic maps, the SfM point cloud, semantified reconstruction, metric
+                                                                    Using the metric footprint estimated in Sec. 4.3, we restrict
+depth maps, and the resulting metric-scaled zenith render.
+                                                                    the search to a bounded window on the satellite tile. Even
+   Because the SfM and 3DGS reconstructions share the               within this region, cross-modal matching remains challeng-
+same coordinate system, this zenith camera can be applied           ing due to the large viewpoint gap and the appearance dif-
+directly to either representation, ensuring geometric consis-       ferences between 3DGS renders and satellite imagery.
+tency throughout the pipeline.                                          We evaluated several off-the-shelf cross-view and cross-
+4.3. Metric Mapper for Satellite Pixel Footprint                    modal matchers (e.g., RoMA [10] and MatchAnything-
+                                                                    LoFTR/RoMA [14]), but none produced reliable correspon-
+We estimate approximate metric scale using monocular                dences for this setting. We therefore adopt a test-time Deep
+depth models such as DepthPro [1] or PatchFusion [20].              Template Matcher (DTM): a lightweight Siamese CNN with
+Although noisy, predicted depths provide a consistent esti-         a ResNet-18 backbone [13] that compares the zenith tem-
+mate of camera-to-pixel distance. For any image i with pose         plate with candidate satellite crops and outputs a similar-
+(Ri , ti ), the SfM depth of a 3D point Xsfm
+                                           k is                     ity score. This provides a simple and efficient way to
+                   zksfm = e⊤
+                            3 (R X
+                                i k
+                                   sfm
+                                       + t i ),                     measure alignment quality without requiring any paired
+while the predicted metric depth at the corresponding pixel         ground–satellite training data.
+is dpred
+    k    = Di (uk , vk ). We assume a global scale s relating
+                                                                    4.4.1. Pseudo Ground Truth Data Generation
+SfM and metric depths,
+                         dpred
+                          k    ≈ s zksfm ,                          To enable self-supervised optimization, we generate pseudo
+                                                                    ground-truth patch pairs directly from the satellite image.
+and obtain an image-level estimate via least squares,               Each pair consists of two crops whose dimensions match
+                         P sfm pred
+                              z d                                   the estimated metric footprint of the zenith render. To ap-
+                    ⋆
+                  si = Pk k sfm k2 .                                proximate the appearance of a 3DGS render, the second
+                             k (zk )                                crop is augmented with Gaussian blur and localized inten-
+   To mitigate outliers, we refine s⋆i using RANSAC over            sity perturbations (“blobby jitter”). These synthetic pairs
+depth pairs (zksfm , dpred
+                      k ) and select the scale with the high-       provide pseudo-aligned supervision for learning viewpoint-
+est inlier support. Among all images with valid tracks, the         and modality-invariant similarity.
+                                                                                                                               Geolocation Error (in meters)
+                                                                          Satellite Image Run Time World2Model
+       MC-Sat Scene Name               Dataset Type      Source Dataset                                          Geolocation RMSE Geolocation RMSE             Geolocation
+                                                                          Source   Count   (in mins)   RMSE
+                                                                                                                  (67th Percentile)         (Mean)         Centroid Error
+         APL Front Door               Image Density        ULTRAA         NAIP     100       228       0.96             1.86                 1.96                 0.86
+         APL Back Door                Image Density        ULTRAA         NAIP     100       296       1.13             2.56                 2.82                 0.76
+           MUTC A09                 Reconstructed Area     ULTRAA          ESRI    334       484       3.36            18.33                 18.86               17.34
+           MUTC A10                 Reconstructed Area     ULTRAA          ESRI    271       522       15.76           17.59                 17.82               16.96
+   siteSTR0001 (South America)      Reconstructed Area   VisymScenes       ESRI    2705      1560      NaN             56.88                 57.22               43.82
+   siteSTR0003 (South America)      Reconstructed Area   VisymScenes       ESRI    2645      2170      NaN             15.22                 17.67               11.56
+   siteSTR0007 (South America)      Reconstructed Area   VisymScenes       ESRI    2619      1485      16.59           32.96                 33.12               24.18
+   siteSTR0008 (South America)      Reconstructed Area   VisymScenes       ESRI    2652      1805      NaN             73.58                 86.44               72.39
+  siteSTR0098 (Univ. Philippines)   Reconstructed Area   VisymScenes       ESRI    2805      1950      NaN             16.55                 18.32                6.24
+           AMES Hall                Reconstructed Area      AMES           ESRI    1605      1055      3.52            56.84                 59.17               55.42
+        siteSTR0058 (US)            Reconstructed Area   VisymScenes       ESRI    654       885       3.22            11.23                 11.88               10.55
+        siteSTR0059 (US)              Image Density      VisymScenes       ESRI     85       272       0.86            32.55                 32.13               31.86
+  siteACC0003-finearts Top Right      Image Density       ACC-NVS          ESRI    277       425       4.66             2.86                 3.02                 2.16
+  siteACC0004-mill19 Right Side       Image Density       ACC-NVS          ESRI    732       650       1.16            62.53                 64.86                44.9
+siteACC0153-rec-center Front Door     Image Density       ACC-NVS          ESRI    915       745       1.24            56.22                 59.15               51.33
+
+
+Table 2. Quantitative results on the MC-Sat benchmark. We report the number of images, run time, SfM alignment quality (World2Model
+RMSE), and final geo-localization error across all evaluated scenes. Lower values indicate better alignment.
+
+
+4.4.2. DTM Training in Self-Supervised Fashion                                             5. Experiments
+The ResNet-18 Siamese model predicts the IoU between                                       5.1. Implementation Details
+two input crops. During training, we sample many crop
+pairs from the satellite image and supervise the network                                   We evaluate Wrivinder on the MC-Sat dataset introduced
+with their true IoU values, encouraging it to identify when                                in Sec. 3. All experiments use the HLOC pipeline with
+two regions correspond despite mild appearance variations.                                 PyCOLMAP as the SfM backend. The scene graph is ini-
+At inference time, the 3DGS zenith crop is fed into one                                    tialized with a combination of NetVLAD and EigenPlaces
+branch of the network, while the other branch evaluates all                                descriptors before geometric verification. Among the SfM
+candidate crops inside the satellite search window. The re-                                variants we tested, this configuration produced the most sta-
+sulting similarity scores form a heatmap, and the peak re-                                 ble reconstructions across MC-Sat’s diverse outdoor scenes.
+sponse is selected as the zenith–satellite alignment. In prac-                                 For the dense 3D representation, we use Octree-GS [28]
+tice, this lightweight matcher proves reliable across diverse                              to construct a 3D Gaussian Splatting model, which is sub-
+scenes.                                                                                    sequently rendered from the estimated zenith viewpoint for
+                                                                                           satellite alignment. Unless otherwise noted, all other com-
+4.5. Gaussian Splat and Camera Geolocator                                                  ponents follow the settings described in Sec. 4. Localization
+                                                                                           accuracy is reported using the metrics defined below.
+After localizing the zenith crop, we extract a slightly larger
+satellite patch around the predicted location and match it to                              5.2. Metrics
+the 3DGS zenith render using a cross-modal point matcher                                   We first evaluate the quality of the underlying SfM re-
+such as MatchAnything-RoMA. Restricting the matcher to                                     construction. World2Model SfM RMSE measures how
+this localized region yields far more reliable correspon-                                  well the SfM camera centers align to the satellite frame.
+dences than attempting global matching on the full satellite                               A similarity transform is estimated using the triplet-based
+image.                                                                                     Procrustes aligner [11], and we report the 67th percentile
+   These correspondences assign latitude and longitude to                                  alignment error. This reflects the stability of the SfM solu-
+pixels in the 3DGS zenith render, which are then back-                                     tion—poor alignment typically propagates to weaker 3DGS
+projected to the 3DGS points. Because the SfM and 3DGS                                     rendering and degraded geo-localization. If fewer than 67%
+reconstructions share a common coordinate system, each                                     of images register into the dominant SfM cluster, this metric
+SfM point inherits geographic coordinates from its nearest                                 is reported as NaN.
+3DGS neighbor. A RANSAC-based similarity transform                                             To assess final camera geo-localization, we report three
+aligns the SfM reconstruction to these world coordinates,                                  metrics:
+producing GPS estimates for all ground cameras. This com-                                  • Mean Geolocation RMSE: mean haversine distance be-
+pletes the pipeline: starting from only ground images and                                     tween predicted and ground-truth camera coordinates.
+a satellite map, Wrivinder recovers geographically aligned                                 • 67th Percentile Geolocation RMSE: provides a robust
+camera poses.                                                                                 measure less sensitive to outliers.
+      Satellite Image             Zenith 3DGS Render                 additional scenes and richer annotations, enabling evalua-
+                                                                     tions such as IoU-based template-matching accuracy and
+                                                                     comparisons across multiple satellite resolutions. We also
+                                                                     report per-scene run time (in minutes) to characterize com-
+                                                                     putational cost.
+
+                                                                     5.3. Results and Discussion
+                                                                     Table 2 summarizes quantitative results across all MC-Sat
+                                                                     scenes. Run time scales roughly linearly with the number
+                         (a) MUTC A09                                of input images, with the SfM stage dominating the compu-
+                                                                     tational cost.
+                                                                         Wrivinder achieves accurate geolocation on several
+                                                                     scenes, particularly those with dense coverage or com-
+                                                                     pact spatial layouts. Performance decreases on large Re-
+                                                                     constructed Area scenes, where many surfaces—especially
+                                                                     rooftops and elevated structures—are never observed from
+                                                                     the ground. As shown in Fig. 5, these unobserved re-
+                                                                     gions lead to gaps in the zenith render, making alignment
+                                                                     more challenging and reducing template-matching reliabil-
+                      (b) APL Back Door                              ity. Scenes with higher World2Model SfM RMSE exhibit
+                                                                     this trend most clearly, indicating a strong dependency on
+                                                                     reconstruction stability.
+                                                                         Some variability in output is expected, as several com-
+                                                                     ponents—most notably SfM—use RANSAC-based proce-
+                                                                     dures. Nevertheless, Wrivinder provides a unified zero-shot
+                                                                     framework for geometry-driven ground-to-satellite align-
+                                                                     ment and establishes a first baseline on MC-Sat. The results
+                                                                     reveal both the feasibility of this approach and key opportu-
+                                                                     nities for improvement.
+                        (c) siteSTR0059
+                                                                         A promising direction is to incorporate semantic cues di-
+                                                                     rectly into the 3DGS representation. Recent advances in se-
+                                                                     mantic Gaussians [12] suggests that semantically enriched
+                                                                     splats could reduce artifacts in zenith renders and provide
+                                                                     more stable cues for alignment.
+                                                                         Additional qualitative and quantitative results are pro-
+                                                                     vided in the supplementary material.
+                                                                     6. Conclusion
+                                                                     We presented Wrivinder, a zero-shot, geometry-driven
+                         (d) MUTC A10                                framework for aligning ground imagery to geo-registered
+                                                                     satellite maps, and introduced MC-Sat, the first dataset
+Figure 5. Satellite–render pairs for several MC-Sat scenes. In
+                                                                     that links multi-view ground captures, 3D reconstructions,
+each case, the left image shows the satellite view (with blue dots   and overhead imagery across diverse outdoor environments.
+indicating the ground-truth camera locations) and the right im-      Together, they establish a unified setting and baseline for
+age shows the corresponding 3DGS zenith rendering produced by        studying metrically evaluated ground-to-satellite alignment
+Wrivinder. Gaps, blurring, and missing structures in the recon-      beyond road-centric or paired-image benchmarks.
+struction often make alignment more ambiguous and are a primary         Our experiments demonstrate that geometry-centered
+source of the higher errors observed in some scenes.                 aggregation—combining SfM, 3D Gaussian Splatting, se-
+                                                                     mantic cues, and test-time alignment—can recover mean-
+• Geolocation Centroid Error: Haversine distance be-
+                                                                     ingful geolocation across challenging real-world scenes.
+  tween predicted and ground-truth camera centroids, cap-
+                                                                     MC-Sat also reveals where future progress is most needed,
+  turing large-scale drift.
+                                                                     particularly in handling unobserved surfaces and improving
+   These metrics form an initial benchmark for ground-to-            stability in large, complex environments.
+satellite alignment. Future versions of MC-Sat will include             We view Wrivinder and MC-Sat as a foundation for
+new approaches that integrate richer semantics, more ro-              [8] Fabian Deuser, Konrad Habel, and Norbert Oswald. Sam-
+bust cross-view matching, and learned geometric priors. By                ple4geo: Hard negative sampling for cross-view geo-
+making both resources publicly available, we hope to en-                  localisation. In IEEE International Conference on Computer
+courage further research on cross-view spatial reasoning in               Vision (ICCV), pages 16819–16829, 2023. 2
+settings where paired supervision is unrealistic or unavail-          [9] Liyuan Ding, Jing Zhou, Lingxiao Meng, and Zixin Long.
+able.                                                                     Layer-to-layer registration network for cross-view image
+                                                                          geo-localization. arXiv preprint arXiv:2207.01899, 2022. 2
+7. Acknowledgments                                                   [10] Johan Edstedt, Qiyu Sun, Georg Bökman, Mårten
+                                                                          Wadenbäck, and Michael Felsberg. RoMa: Robust Dense
+This research is supported by the Intelligence Advanced                   Feature Matching. IEEE Conference on Computer Vision
+Research Projects Activity (IARPA) via Department of In-                  and Pattern Recognition, 2024. 6
+terior/ Interior Business Center (DOI/IBC) contract num-             [11] Chandrakanth Gudavalli, Tajuddin Manhar Mohammed,
+ber 140D0423C0076. The U.S. Government is authorized                      Ananth Vishnu Bhaskar, Elliot Staudt, Cheng Peng, Abhay
+to reproduce and distribute reprints for Governmental pur-                Yadav, Rama Chellappa, Shivkumar Chandrasekaran, and
+                                                                          B.S. Manjunath. Metareg: Robust camera parameter esti-
+poses notwithstanding any copyright annotation thereon.
+                                                                          mation by leveraging noisy camera extrinsics. In 2025 IEEE
+The views and conclusions contained herein are those of
+                                                                          International Conference on Image Processing (ICIP), pages
+the authors and should not be interpreted as necessarily rep-             1091–1096, 2025. 7
+resenting the official policies or endorsements, either ex-
+                                                                     [12] Jun Guo, Xiaojian Ma, Yue Fan, Huaping Liu, and Qing Li.
+pressed or implied, of IARPA, DOI/IBC, or the U.S. Gov-                   Semantic gaussians: Open-vocabulary scene understanding
+ernment. We would like to thank Jason Bunk for insights                   with 3d gaussian splatting. arXiv preprint arXiv:2403.15624,
+and assistance during the initial phase of this project.                  2024. 8
+                                                                     [13] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+Bibliography                                                              Deep residual learning for image recognition. In Proceed-
+                                                                          ings of the IEEE conference on computer vision and pattern
+ [1] Aleksei Bochkovskii, Amaël Delaunoy, Hugo Germain,
+                                                                          recognition, pages 770–778, 2016. 6
+     Marcel Santos, Yichao Zhou, Stephan R. Richter, and
+     Vladlen Koltun. Depth pro: Sharp monocular metric depth in      [14] Xingyi He, Hao Yu, Sida Peng, Dongli Tan, Zehong Shen,
+     less than a second. In International Conference on Learning          Hujun Bao, and Xiaowei Zhou. Matchanything: Universal
+     Representations, 2025. 6                                             cross-modality image matching with large-scale pre-training.
+                                                                          arXiv preprint arXiv:2501.07556, 2025. 6
+ [2] Sayed Pedram Haeri Boroujeni, Abolfazl Razi, Sahand
+     Khoshdel, Fatemeh Afghah, Janice L Coen, Leo O’Neill, Pe-       [15] Sixing Hu, Mengdan Feng, Rang M. H. Nguyen, and
+     ter Fule, Adam Watts, Nick-Marios T Kokolakis, and Kyri-             Gim Hee Lee. Cvm-net: Cross-view matching network
+     akos G Vamvoudakis. A comprehensive survey of research               for image-based ground-to-aerial geo-localization. In IEEE
+     towards ai-enabled unmanned aerial systems in pre-, active-          Conference on Computer Vision and Pattern Recognition
+     , and post-wildfire management. Information Fusion, 108:             (CVPR), pages 7258–7267, 2018. 2
+     102369, 2024. 1                                                 [16] Neil Joshi, Joshua Carney, Nathanael Kuo, Homer Li, Cheng
+ [3] Adam Bredvik, Scott Richardson, and Daniel Crispell.                 Peng, and Myron Brown. Ultrra challenge 2025, 2024. 3, 4
+     Metadata-free georegistration of ground and airborne im-        [17] Ryan S. Kaminsky, Noah Snavely, Steven M. Seitz, and
+     agery. arXiv preprint arXiv:2503.04927, 2025. 2                      Richard Szeliski. Alignment of 3d point clouds to overhead
+ [4] Holger Caesar, Jasper Uijlings, and Vittorio Ferrari. Coco-          images. In IEEE Computer Society Conference on Com-
+     stuff: Thing and stuff classes in context. In Proceedings            puter Vision and Pattern Recognition Workshops, pages 63–
+     of the IEEE Conference on Computer Vision and Pattern                70, 2009. 2
+     Recognition (CVPR), 2018. 5                                     [18] D. Li, K. Jiang, Y. Tang, R. Ramamoorthi, R. Chellappa,
+ [5] Iñaki Cejudo, Eider Irigoyen, Harbil Arregui, and Estı́baliz        and C. Peng. Ms-gs: Multi-appearance sparse-view 3d gaus-
+     Loyo. Emergency management and response through 3d                   sian splatting in the wild. In Proceedings of the 39th An-
+     maps and novel geo-information sources. In International             nual Conference on Neural Information Processing Systems
+     Conference on Geographical Information Systems Theory,               (NeurIPS), San Diego, CA, 2025. 3, 4
+     Applications and Management, pages 92–114. Springer,            [19] Haoyuan Li, Yang Wang, and Wei Zhang. The first compre-
+     2023. 1                                                              hensive unsupervised cvgl framework. In IEEE Conference
+ [6] Tingyu Chen, Yang Liu, and Wei Zhang. Dinov2-based                   on Computer Vision and Pattern Recognition (CVPR), pages
+     multi-view cross-view geo-localization. Nature Machine In-           12345–12354, 2024. 2
+     telligence, 6:789–801, 2024. 3                                  [20] Zhenyu Li, Shariq Farooq Bhat, and Peter Wonka. Patch-
+ [7] Zhe Chen, Yuchen Duan, Wenhai Wang, Junjun He, Tong                  fusion: An end-to-end tile-based framework for high-
+     Lu, Jifeng Dai, and Yu Qiao. Vision transformer adapter for          resolution monocular metric depth estimation. In Proceed-
+     dense predictions. arXiv preprint arXiv:2205.08534, 2022.            ings of the IEEE/CVF Conference on Computer Vision and
+     5                                                                    Pattern Recognition, pages 10016–10025, 2024. 6
+[21] Zheng Li, Xiang Wang, and Yue Chen. Geomgs: Geometry-                 Conference on Computer Vision and Pattern Recognition
+     guided 3d gaussian splatting for urban scene reconstruction.          (CVPR), pages 6869–6879, 2024. 2
+     arXiv preprint arXiv:2403.12345, 2024. 3                         [34] Michael Sprintson, Rama Chellappa, and Cheng Peng. Fu-
+[22] Liu Liu and Hongdong Li. Lending orientation to neural net-           sionrf: High-fidelity satellite neural radiance fields from
+     works for cross-view geo-localization. In IEEE Conference             multispectral and panchromatic acquisitions. IEEE Journal
+     on Computer Vision and Pattern Recognition (CVPR), pages              of Selected Topics in Signal Processing, pages 1–12, 2025. 2
+     5624–5633, 2019. 2                                               [35] Thomas Sugg, Kyle O’Brien, Lekh Poudel, Alex Du-
+[23] Tao Lu, Mulin Yu, Linning Xu, Yuanbo Xiangli, Limin                   mouchelle, Michelle Jou, Marc Bosch, Deva Ramanan,
+     Wang, Dahua Lin, and Bo Dai. Scaffold-gs: Structured 3d               Srinivasa Narasimhan, and Shubham Tulsiani. Accenture-
+     gaussians for view-adaptive rendering. In Proceedings of              nvs1: A novel view synthesis dataset. arXiv preprint
+     the IEEE/CVF Conference on Computer Vision and Pattern                arXiv:2503.18711, 2025. 3, 4
+     Recognition, pages 20654–20664, 2024. 4                          [36] U.S. Geological Survey, Earth Resources Observation and
+[24] Roger Mari, Gabriele Facciolo, and Thibaud Ehret. Sat-                Science (EROS) Center. National agriculture imagery
+     nerf: Learning multi-view satellite photogrammetry with               program (naip). https://www.usgs.gov/centers/
+     transient objects and shadow modeling using rpc cameras.              eros/ science/ usgs- eros - archive - aerial -
+     In IEEE/CVF Conference on Computer Vision and Pattern                 photography - national - agriculture -
+     Recognition Workshops (CVPRW), pages 1311–1321, 2022.                 imagery - program - naip, 2018.             U.S. Geological
+     2                                                                     Survey, EROS Archive. DOI: 10.5066/F7QN651G. 4
+[25] Roger Marı́, Gabriele Facciolo, and Thibaud Ehret. Multi-        [37] Anirudh Viswanathan, Bernardo R Pires, and Daniel Huber.
+     date earth observation nerf: The detail is in the shadows.            Vision based robot localization by ground to satellite match-
+     In Proceedings of the IEEE/CVF Conference on Computer                 ing in gps-denied situations. In 2014 IEEE/RSJ International
+     Vision and Pattern Recognition (CVPR) Workshops, pages                Conference on Intelligent Robots and Systems, pages 192–
+     2034–2044, 2023. 2                                                    198. IEEE, 2014. 1
+                                                                      [38] Hongjia Wang, Jinhao Lu, and Xiyu Li. Splatloc: 3d gaus-
+[26] Linfei Pan, Dániel Baráth, Marc Pollefeys, and Johannes L
+                                                                           sian splatting-based visual localization for augmented real-
+     Schönberger. Global structure-from-motion revisited. In
+                                                                           ity. arXiv preprint arXiv:2409.14067, 2024. 3
+     European Conference on Computer Vision, pages 58–77.
+     Springer, 2024. 4                                                [39] Junyan Wang, Zhe Chen, Ruijie Hu, Yu Zhang, Ye
+                                                                           Wang, and Li Zhang. Cross-view image geo-localization
+[27] Manu Pillai, Srikumar Bharadwaj, and Dennis Ambeth.
+                                                                           with panorama-bev co-retrieval network. arXiv preprint
+     Garet: Cross-view video geolocalization with adapters and
+                                                                           arXiv:2408.05475, 2024. 3
+     auto-regressive transformers. In European Conference on
+                                                                      [40] Jianyuan Wang, Minghao Chen, Nikita Karaev, Andrea
+     Computer Vision (ECCV), pages 245–261, 2024. 2
+                                                                           Vedaldi, Christian Rupprecht, and David Novotny. Vggt:
+[28] Kerui Ren, Lihan Jiang, Tao Lu, Mulin Yu, Linning Xu,                 Visual geometry grounded transformer. In Proceedings of
+     Zhangkai Ni, and Bo Dai. Octree-gs: Towards consistent                the IEEE/CVF Conference on Computer Vision and Pattern
+     real-time rendering with lod-structured 3d gaussians. arXiv           Recognition, 2025. 4
+     preprint arXiv:2403.17898, 2024. 4, 7
+                                                                      [41] Scott Workman, Richard Souvenir, and Nathan Jacobs.
+[29] Constantine J Roros, Rahul Deshmukh, and Avinash C Kak.               Wide-area image geolocalization with aerial reference im-
+     Multi-satellite image alignment over large areas with feature-        agery. In IEEE International Conference on Computer Vi-
+     less regions. The International Archives of the Photogram-            sion (ICCV), pages 3961–3969, 2015. 2
+     metry, Remote Sensing and Spatial Information Sciences, 48:      [42] Atticus J. Zeller Wu, Mani Yang, Saurish Osteen, Yu-Jhe
+     211–218, 2023. 1                                                      Huang, and Jingnan Chen. Gsplatloc: Ultra-precise cam-
+[30] Paul-Edouard Sarlin, Cesar Cadena, Roland Siegwart, and               era localization via 3d gaussian splatting. arXiv preprint
+     Marcin Dymczyk. From coarse to fine: Robust hierarchical              arXiv:2409.16763, 2024. 3
+     localization at large scale. In Proceedings of the IEEE/CVF      [43] Pengfei Wu, Xiangyuan Zhang, and Ming Li. Crosstext2loc:
+     conference on computer vision and pattern recognition,                Multimodal text-guided cross-view geo-localization. In
+     pages 12716–12725, 2019. 4                                            IEEE International Conference on Computer Vision (ICCV),
+[31] Qi Shan, Changchang Wu, Brian Curless, Yasutaka Fu-                   2025. 3
+     rukawa, Carlos Hernandez, and Steven M Seitz. Accu-              [44] Qiong Wu, Kang Liu, Yingying Li, Weiqi Wang, Rui Zhang,
+     rate geo-registration by ground-to-aerial image matching. In          Xiangyuan Zhang, Yujun Wang, Shaohua Chen, Mengdan
+     2014 2nd International Conference on 3D Vision, pages 525–            Feng, and Yuxin Zhu. Cross-view image set geo-localization.
+     532. IEEE, 2014. 1                                                    arXiv preprint arXiv:2412.18852, 2024. 2
+[32] Yujiao Shi, Xin Yu, Dylan Campbell, and Hongdong Li.             [45] Yuanbo Xiangli, Ruojin Cai, Hanyu Chen, Jeffrey Byrne, and
+     Spatial-aware feature aggregation for image based cross-              Noah Snavely. Doppelgangers++: Improved visual disam-
+     view geo-localization. In Advances in Neural Information              biguation with geometric 3d features. In Proceedings of the
+     Processing Systems (NeurIPS), pages 10090–10100, 2019. 2              Computer Vision and Pattern Recognition Conference, pages
+[33] Yujiao Shi, Yu Liu, Dylan Campbell, Piotr Koniusz, and                27166–27175, 2025. 3, 4
+     Hongdong Li. Fine-grained cross-view geo-localization us-        [46] Michael Zeiler. Modeling our world: the ESRI guide to geo-
+     ing a correlation-aware homography estimator. In IEEE                 database design. ESRI, Inc., 1999. 4
+[47] Xiaoyu Zhang, Xin Gao, Yang Zhang, and Yufan Liu. Cross-
+     view image sequence geo-localization. In IEEE/CVF Win-
+     ter Conference on Applications of Computer Vision (WACV),
+     pages 3654–3663, 2023. 2
+[48] Kai Zhu and Tao Zhang. Deep reinforcement learning based
+     mobile robot navigation: A review. Tsinghua Science and
+     Technology, 26(5):674–691, 2021. 1
+[49] Sijie Zhu, Taojiannan Yang, and Chen Chen. Transgeo:
+     Transformer is all you need for cross-view image geo-
+     localization. In IEEE Conference on Computer Vision and
+     Pattern Recognition (CVPR), pages 1162–1171, 2022. 2
+

@@ -1,0 +1,1153 @@
+                                              CGL: Advancing Continual GUI Learning via Reinforcement Fine-Tuning
+
+                                                                      *                          *                                                                                   *
+                                               Zhenquan Yao1 , Zitong Huang1 , Yihan Zeng2† , Jianhua Han2 , Hang Xu2 , Chun-Mei Feng3
+                                                                                       *                     *
+                                                                         Jianwei Ma1,4 , Wangmeng Zuo1 *
+                                                 1                                                    2                                       3
+                                                     Harbin Institute of Technology                       Huawei Noah’s Ark Lab                   University College Dublin
+                                                                                                          4
+                                                                                                            Peking University
+                                                                           25s012039@stu.hit.edu.cn, zitonghuang99@gmail.com
+
+
+
+
+arXiv:2603.02951v2 [cs.LG] 7 Mar 2026
+                                                                      Abstract
+                                        Graphical User Interface (GUI) Agents, benefiting from
+                                        recent advances in multimodal large language models
+                                        (MLLM), have achieved significant development. However,
+                                        due to the frequent updates of GUI applications, adapt-
+                                        ing to new tasks without forgetting old tasks in GUI con-
+                                        tinual learning remains an open problem. In this work,
+                                        we reveal that while Supervised Fine-Tuning (SFT) facili-
+                                        tates fast adaptation, it often triggers knowledge overwrit-
+                                        ing, whereas Reinforcement Learning (RL) demonstrates an
+                                        inherent resilience that shields prior interaction logic from
+                                        erasure. Based on this insight, we propose a Continual
+                                        GUI Learning (CGL) framework that dynamically balances
+                                        adaptation efficiency and skill retention by enhancing the
+                                        synergy between SFT and RL. Specifically, we introduce an
+                                        SFT proportion adjustment mechanism guided by policy en-
+                                        tropy to dynamically control the weight allocation between
+                                        the SFT and RL training phases. To resolve explicit gradi-
+                                        ent interference, we further develop a specialized gradient                      Figure 1. Overview of Continual GUI Learning (CGL). (a) GUI
+                                        surgery strategy. By projecting exploratory SFT gradients                        environments evolve as new app categories emerge, causing static
+                                        onto GRPO-based anchor gradients, our method explicitly                          GUI agents to misalign with the real world. (b) Existing paradigms
+                                        clips the components of SFT gradients that conflict with                         struggle to balance stability in legacy tasks and plasticity in novel
+                                        GRPO. On top of that, we establish an AndroidControl-CL                          task accuracy. (c) Our CGL framework achieves balanced adapta-
+                                        benchmark, which divides GUI applications into distinct                          tion and retention.
+                                        task groups to effectively simulate and evaluate the per-
+                                        formance of continual GUI learning. Experimental results                         have demonstrated significant potential in automating com-
+                                        demonstrate the effectiveness of our proposed CGL frame-                         plex interactions within software ecosystems [2, 9, 26, 28,
+                                        work across continual learning scenarios. The benchmark,                         29, 33]. By interpreting visual semantics and executing
+                                        code, and model will be made publicly available.                                 hierarchical action sequences, these agents bridge the gap
+                                                                                                                         between high-level user intent and low-level interface exe-
+                                                                                                                         cution. However, the prevailing training paradigm remains
+                                        1. Introduction                                                                  largely static, standing in stark contrast to the highly dy-
+                                                                                                                         namic evolution of real-world GUI environments [6, 22, 33,
+                                        Graphical User Interface (GUI) agents, powered by Multi-                         39].
+                                        modal Large Language Models (MLLMs) [3, 5, 18, 38, 48],
+                                                                                                                             Driven by frequent UI updates and functional iterations,
+                                           * * These authors contributed equally to this work.       Corresponding       GUI agents must possess Continual Learning (CL) capa-
+                                        authors. † Project leader.                                                       bilities, the ability to adapt to novel interfaces and tasks
+
+
+                                                                                                                     1
+without compromising proficiency in previously mastered               • We reveal that while SFT triggers knowledge overwriting,
+domains [13, 31, 37, 49]. However, CL in the GUI do-                    RL demonstrates inherent resilience in preserving prior
+main presents unique challenges distinct from traditional               GUI interaction logic.
+vision or natural language processing [13, 37, 49]. GUI               • We propose the CGL framework with entropy-guided
+tasks involve exceptionally long-horizon action dependen-               SFT balancing and gradient surgery to achieve an effec-
+cies, where the integrity of an entire sequence hinges on               tive trade-off between stability and plasticity.
+precise intermediate executions. As shown in Fig.1, expos-            • We introduce AndroidControl-CL, providing a standard-
+ing an agent to a sequence of evolving applications often               ized platform for evaluating agent evolution under realis-
+results in a precipitous decline in performance on ancestral            tic distribution shifts.
+tasks. Even minor perturbations, such as a subtle shift in            • Extensive experiments demonstrate that CGL signif-
+login layout or menu hierarchy, can render established in-              icantly outperforms state-of-the-art baselines in both
+teraction policies entirely obsolete.                                   cross-domain adaptation speed and the mitigation of
+    Existing methods typically employ either Supervised                 catastrophic forgetting.
+Fine-Tuning (SFT) or Reinforcement Learning (RL), i.e.,
+GRPO [8], to adapt agents to novel tasks [2, 9, 26, 28, 29,           2. Related Work
+33]. However, our investigation reveals a divergence be-
+tween these two optimization paths. As shown in Fig. 2,               2.1. Continual Learning
+the aggressive gradient updates in SFT forcibly pull the              Traditional continual learning methods are mainly catego-
+model parameters toward the manifold of the new task,                 rized into three types [25]: Regularization-based methods
+thereby distorting the structural integrity of previously ac-         [1, 21, 43] constrain critical parameter updates via impor-
+quired knowledge. In contrast, GRPO [8] exhibits a dis-               tance quantification, such as adding regularization terms to
+tinct inherent resilience. It preserves broader behavioral di-        protect old-task parameters; they are lightweight but face
+versity, allowing the agent to optimize for rewards without           challenges in importance measurement and loss weight bal-
+entirely erasing the underlying interaction logic. Neverthe-          ancing. Dynamic Architecture methods [34, 41] freeze old
+less, this stability is attained at the expense of high sample        parameters and add task-specific sub-networks, which the-
+complexity, resulting in protracted adaptation speeds in un-          oretically avoid forgetting but lead to linear model size ex-
+familiar environments that fail to meet real-world efficiency         pansion with increasing tasks. Rehearsal methods [15, 24]
+requirements.                                                         use memory buffers to mix old and new task data during
+    Motivated by these insights, we propose the Contin-               training, and their key challenge lies in balancing buffer
+ual GUI Learning (CGL) framework, which establishes a                 size. For Vision-Language Models (VLMs), continual
+synergistic mechanism encompassing conflict quantifica-               learning faces unique challenges like maintaining cross-
+tion and gradient rectification to reconcile the trade-off be-        modal alignment. Core solutions include Multi-Modal Re-
+tween adaptation efficiency and skill retention. Specifi-             play (MMRE) [4, 12, 17, 30, 44]: it adopts explicit or im-
+cally, we first introduce Error-Aware Routing to dynami-              plicit replay, where explicit replay stores old image-text
+cally trigger supervised corrective updates when reinforce-           pairs in a buffer and implicit replay generates pseudo pairs,
+ment exploration fails. To synchronize knowledge acqui-               with limitations of storage consumption and dependence on
+sition with retention, we develop Entropy-Regulated Tun-              pseudo-data quality respectively. Cross-Modal Regulariza-
+ing, which modulates the weight of the supervised objective           tion (CREG) [11, 42, 46] adds constraint terms to retain
+based on real-time policy uncertainty. Furthermore, we im-            old cross-modal associations, and its key issue is balancing
+plement Gradient Surgery to project exploratory SFT gradi-            constraint intensity. Parameter-Efficient Adaptation (PEA)
+ents onto a conflict-free subspace defined by GRPO-based              [7, 10, 14, 19] uses lightweight modules without modifying
+anchor gradients, effectively resolving parameter-level in-           core parameters to preserve zero-shot capability, but may
+terference between the two objectives. This projection pro-           struggle with complex tasks due to limited adjustable pa-
+cess enables selective filtering of update directions, preserv-       rameters. Recent work [16] proposes a rollout-based In-
+ing only constructive components that are either orthogo-             stance Filtering method (RIF-RFT) to enhance the stability
+nal or aligned with established functional logic. Conse-              and efficiency of continual post-training in VLMs.
+quently, CGL empowers the agent with superior exploration
+efficiency and evolutionary robustness without encroaching            2.2. GUI Agents for Interactive Control
+upon the “logical redline” of previously acquired skills.             GUI Agents automate human-like interactions with GUI
+    To rigorously benchmark GUI-CL, we establish                      systems by perceiving UI elements and executing target ac-
+AndroidControl-CL, a dataset that partitions GUI tasks into           tions, with existing works primarily falling into two tech-
+sequential groups to simulate realistic software versioning.          nical paradigms. SFT serves as a dominant data-driven
+Our contributions are summarized as follows:                          paradigm, where specialized multimodal models are fine-
+
+
+                                                                  2
+                                                                              Within each application ak,m ∈ Ak , the agent interacts
+                                                                          through trajectories. A trajectory τ = (I, {vt , at }Tt=1 ) con-
+                                                                          sists of:
+                                                                          • a natural language instruction I specifying the target goal,
+                                                                          • a sequence of visual observations vt ∈ RH×W ×C repre-
+                                                                            senting GUI screenshots at timestep t,
+                                                                          • a corresponding sequence of actions at ∈ AGUI executed
+                                                                            by the agent, where AGUI denotes the unified action space
+                                                                            (e.g. coordinate-based taps, swipes, and text inputs).
+                                                                          For task Tk , we define a training set Dktrain and a test set Dktest ,
+                                                                          both composed of trajectories sampled from applications in
+                                                                          Ak .
+Figure 2. Preliminary comparison of SFT and GRPO on the
+LLaVA-OneVision-0.5B model. (a) Adaptation performance on a
+newly introduced task: SFT demonstrates fast plasticity, whereas          Continual Learning Protocol The learning process fol-
+GRPO exhibits slower adaptation. (b) Forgetting of the initial task       lows a sequential paradigm where model parameters θ are
+after sequential training: SFT undergoes substantial degradation,         updated iteratively across T . At stage k, the agent ini-
+while GRPO maintains higher retention.                                    tializes with weights θk−1 learned from preceding tasks
+                                                                          (θ0 denotes the initial pre-trained state), then trains exclu-
+tuned on large-scale labeled GUI corpora [6, 22, 39] to                   sively on Dktrain without any access to historical training data
+map UI states to actions, as exemplified by UI-TARS [33]                  {D1train , . . . , Dk−1
+                                                                                              train
+                                                                                                    }. The optimization aims to obtain up-
+which achieves strong benchmark performance but faces                     dated parameters θk that minimize the current task loss:
+generalization limitations. RL-based GUI Agents, inspired
+by DeepSeek-R1 [8], have gained traction: UI-R1[28]                                          θk = arg min L(θ; Dktrain ),                   (1)
+                                                                                                          θ
+and GUI-G1 [47] explores R1-zero-like visual grounding,
+while GUI-G2 [36] introduces Gaussian Reward Model-                       while simultaneously preserving proficiency on all previ-
+ing and CRAFT-GUI [32] proposes a curriculum-reinforced                   ously encountered tasks. After training on Tk , the agent
+approach to enhance training stability and accuracy. This                 must generalize to trajectories from all applications encoun-
+work [40] dynamically schedules policy entropy to first in-               tered
+                                                                          Sk sotestfar, i.e. it is evaluated on the cumulative test set
+crease and then decrease during training, enhancing the ro-                 i=1 Di . This parameter inheritance mechanism under
+bustness of GUI agents against environmental noise. No-                   strict data isolation constraints embodies the core challenge
+tably, existing research focuses on static task scenarios                 of CGL: accumulating new interaction skills without catas-
+without addressing the practical need for continuous adap-                trophically forgetting established GUI capabilities.
+tation to interface and task changes, while our method
+specifically targets to fill this gap. Meanwhile, existing ap-            Metric. We adopt the following three metrics to evaluate
+proaches merely rely on either SFT or RL for optimization,                the agent’s capabilities.
+overlooking both their respective strengths and the poten-                • Step-wise Accuracy: For each task, measures the per-
+tial of integrating [23]. To the best of our knowledge, our                 step accuracy, i.e. the proportion of correctly executed
+work presents the first analysis of how SFT, RL, and their                  steps across all steps taken.
+integration influence model capabilities within the dynamic               • Average Step-wise Accuracy: The mean value of step-
+setting of continual learning for GUI agent.                                wise accuracy across all evaluated tasks.
+                                                                          • Trajectory-wise Accuracy: For each task, measures the
+3. Task Definition                                                          proportion of test trajectories in which every step is ex-
+                                                                            ecuted correctly, i.e. the ratio of fully correct execution
+We formulate Continual GUI Learning (CGL) as a sequence                     sequences to the total number of trajectories.
+of tasks where a multimodal agent must sequentially master                • Average Trajectory-wise Accuracy: The mean value of
+interaction skills across disjoint application domains while                trajectory-wise accuracy across all evaluated tasks.
+preserving previously acquired capabilities. Formally, let                • Forgetting Measure (FM): Quantifies the performance
+T = {T1 , T2 , . . . , TN } denote a sequence of N tasks arriv-             drop on previous tasks after learning new ones. Let An,k
+ing chronologically. Each task Tk comprises a set of mo-                    denote the accuracy on task Tk after training on task Tn
+bile applications Ak = {ak,1 , ak,2 , . . . , ak,Mk }, where ap-            (where n ≥ k):
+plications across distinct tasks are strictly non-overlapping:                                                N −1
+Ai ∩ Aj = ∅ for all i ̸= j. This ensures that each task                                              1 X
+                                                                                         FM =            (AN,k − Ak,k )                     (2)
+introduces a novel application domain unseen in previous                                           N −1
+                                                                                                              k=1
+tasks.
+
+
+                                                                      3
+Figure 3. Overview of the proposed CGL framework. (Left) Error-Aware Routing pipeline:It dynamically routes data based on
+prediction feedback, where erroneous actions trigger SFT knowledge injection to facilitate correction. (Top Right) Gradient Surgery:
+Resolves directional conflicts between GRPO and SFT gradients through projection to maintain optimization stability. (Bottom Right)
+Entropy-Regulated Tuning: A dynamic strategy that manages the exploration-exploitation trade-off by adjusting the SFT weight λ. The
+bottom bar charts illustrate the model’s action probability distribution p, where the yellow shaded area denotes the ground truth (gt) action
+range.
+
+Table 1. Distribution of AndroidControl-CL. Abbreviations: SP
+(Shopping), PO (Productivity and Office), CO (Communication),              app identities from open app parameters; (2) identifying
+TT (Travel and Transportation), ST (System Tools), ES (Education           direct app references in natural-language instructions; and
+and Science), LE (Life and Entertainment).                                 (3) performing screenshot-based app recognition when tex-
+                                                                           tual cues are insufficient. This yields clear, instance-level
+ Categories        SP      PO      CO     TT      ST     ES      LE        app identity labels.
+ Apps              15      15       8      10    13     11       17
+ Trajectories     1140    1240     617    686    771    559     1030       Functional Super-Class Based Task Splits. Building
+                                                                           upon the per-trajectory app annotations, we structure
+4. AndroidControl-CL Benchmark                                             AndroidControl-CL into a sequence of learning tasks based
+                                                                           on app-level semantic categories. Specifically, we group
+Continual learning for GUI agents is essential in the face
+                                                                           apps into seven functional super-classes that reflect com-
+of rapidly emerging mobile applications and frequent soft-
+                                                                           mon mobile application domains: Shopping (SP), Produc-
+ware updates, yet existing datasets lack dedicated bench-
+                                                                           tivity and Office (PO), Communication (CO), Travel and
+marks tailored to dynamic GUI environments. To address
+                                                                           Transportation (TT), System Tools (ST), Education and Sci-
+this gap, we propose the AndroidControl-CL benchmark,
+                                                                           ence (ES), and Life and Entertainment (LE). This design
+an extension of AndroidControl [20] with additional anno-
+                                                                           is motivated by the observation that apps within the same
+tations and structured task splits. This benchmark is specif-
+                                                                           super-class tend to exhibit similar task logic, UI layouts,
+ically designed for the systematic evaluation of Continual
+                                                                           and interaction patterns, whereas those from different super-
+GUI Learning (CGL).
+                                                                           classes often present substantial distributional and func-
+                                                                           tional gaps. In each task, we split the training and test sets
+Explicit, Multi-Source App Identity Annotation. The                        at the trajectory level with an 8:2 ratio. By organizing tasks
+original dataset only includes sparse app identifiers inferred             along these super-class boundaries, we establish a realis-
+from occasional open app actions. AndroidControl-CL                        tic and challenging continual learning setting that evaluates
+introduces a compact and robust attribution pipeline that in-              an agent’s ability to incrementally acquire and generalize
+tegrates three complementary cues: (1) extracting explicit                 knowledge across distinct app domains.
+
+
+                                                                       4
+Balanced Task Distribution. After task partitioning, we                 To capitalize on these distinct advantages, we propose
+observed data imbalance across two dimensions: (1) imbal-            a joint training framework that integrates SFT with Group
+ance numbers of apps across tasks, and (2) imbalance num-            Relative Policy Optimization (GRPO) [8] illustrated in
+bers of trajectory across apps. To ensure a fair evaluation          Fig. 3. Our approach is structured around three core mod-
+setup, we perform targeted data filtering to balance both the        ules designed to stabilize the training process and enhance
+number of apps per task and the number of trajectories per           the agent’s adaptability. Specifically, Error-Aware Rout-
+app. The resulting balanced task distribution is shown in            ing addresses the reward sparsity problem by dynamically
+Tab. 1.                                                              invoking SFT demonstrations when RL exploration fails.
+                                                                     Entropy-Regulated Tuning modulates the trade-off be-
+                                                                     tween exploration and exploitation by adjusting the weight-
+Fine-Grained Bounding Box Annotation for Click Ac-                   ing factor λ based on policy uncertainty. Finally, Gradi-
+tions. In the original AndroidControl dataset, click ac-             ent Surgery resolves directional conflicts between the ex-
+tions are annotated only as single-point coordinates. This           ploratory SFT updates and the stabilizing GRPO updates
+fails to capture the realistic nature of GUI interactions,           to ensure long-term knowledge retention. The global op-
+where a user typically targets a UI element (e.g., a button or       timization objective of our framework is formulated as a
+icon) that occupies a spatial region rather than an infinites-       weighted combination of the two losses:
+imal point. To better reflect this, we enhance the annota-
+tion by assigning each click action a bounding box that de-                          L = LGRPO + λ(H, step) · LSFT ,                      (3)
+lineates the corresponding interactive UI element. This is
+achieved through a designed three-stage pipeline: (1) auto-          where λ is a function determined by policy entropy H and
+matic UI element parsing using OmniParser [27] to extract            training step.
+candidate bounding boxes from screenshots; (2) matching
+the original annotated click coordinate to the nearest parsed        5.1. Error-Aware Routing
+UI element to obtain an initial bounding box assignment;             To achieve anti-forgetting in continual GUI learning, we
+and (3) manual verification and correction to resolve align-         adopt GRPO [8] as the RL algorithm, leveraging its group-
+ment errors or ambiguous cases. The resulting region-level           based relative advantage calculation and constrained pol-
+annotations provide more semantically meaningful supervi-            icy update. For each GUI query q (screenshot,task instruc-
+sion, enabling GUI agents to learn grounded, element-aware           tion,and historical actions), we sample G trajectories from
+action policies with higher fidelity.                                the old policy πθold , computingnormalized advantages for
+                                                                     each trajectory as:Ai,t = rσir−µ
+                                                                                                    +ϵ , where µr and σr are the
+                                                                                                      r
+
+
+5. Method                                                            mean and standard deviation of rewards across the trajec-
+                                                                     tory group, respectively. The details of the reward function
+Following the established paradigm for GUI agents, our               are presented in Sup.9. GRPO optimizes a constrained ob-
+CGL framework is built upon Multimodal Large Lan-                    jective to stabilize policy updates:
+guage Models (MLLMs), such as LLaVA [18] or Qwen-
+VL [3, 38]. In this setting, the agent functions as a policy
+                                                                     LGRPO (θ) = −E q ∼ P (Q), {oi }G
+                                                                                                                                  
+network πθ that operates over a sequential decision-making                                                  i=1 ∼ πθold (O|q)
+process. At each time step t, the model perceives a visual                      
+                                                                                        G        |oi |      
+input consisting of the current screenshot vt and a global                      1
+                                                                                      X      1 X                 πθ (oi,t |q, oi,<t )
+                                                                                                       min                              Ai,t ,
+human instruction I in natural language. The agent then                            G i=1 |oi | t=1              πθold (oi,t |q, oi,<t )
+processes these multimodal inputs to predict the next ac-                                                                              
+tion at in a text-based format, which is subsequently parsed                             πθ (oi,t |q, oi,<t )
+                                                                                 clip                           , 1 − ϵ, 1 + ϵ Ai,t
+into executable GUI commands. This formulation allows                                   πθold (oi,t |q, oi,<t )
+the agent to leverage the strong cross-modal capabilities of                        −β · KL(πθ ∥ πref )]
+pre-trained MLLMs for interface navigation. In prelimi-                                                                                   (4)
+nary experiments illustrated in Fig. 2, we identified comple-
+mentary strengths between two training paradigms for GUI                However, relying solely on GRPO for GUI agent train-
+agents. Supervised Fine-Tuning (SFT) facilitates the ef-             ing faces a critical limitation: when the policy has not yet
+ficient acquisition of new knowledge but remains suscepti-           acquired knowledge about a novel interaction pattern, all
+ble to the catastrophic forgetting of established tasks. Con-        rollouts for a given instruction remain incorrect through-
+versely, Reinforcement Learning (RL) demonstrates su-                out execution. Since none of these trajectories achieve
+perior retention of legacy knowledge but frequently fails            the full reward, the relative advantage estimation degener-
+to converge on new interaction patterns when rewards are             ates—providing no discriminative signal to guide the policy
+sparse.                                                              toward correct behaviors. Consequently, the agent becomes
+
+
+                                                                 5
+trapped in unproductive exploration, severely hindering its            positive update to the low-probability target a∗ and nega-
+ability to acquire new GUI skills.                                     tive updates to the high-probability erroneous actions. This
+    To break this deadlock, we introduce an Error-Aware                creates a strong negative covariance, acting as an entropy
+Routing mechanism that dynamically injects supervised                  injector (∆HSFT > 0). This process ”heats up” the dis-
+guidance when RL signals become ineffective. Specifi-                  tribution, breaking local minima and forcing the agent to
+cally, for each instruction I, we examine the rewards of               explore the ground-truth space.
+all K sampled rollouts {τk }K   k=1 . If the maximum reward                Phase 2: Entropy Decay (Convergence). Once basic
+falls short of the ideal full score (i.e., maxk r(τk ) < rmax ),       task competency is established, we trigger a decay phase
+we interpret this as evidence that the policy cannot au-               where λ follows an exponential function of H:
+tonomously discover the correct solution. In such cases, we
+                                                                            λ(H) = (λmax − λmin ) min 1, keγH + λmin .
+                                                                                                                  
+route the update to a supervised fine-tuning (SFT) step us-                                                                     (7)
+                                                           ∗
+ing the ground-truth demonstration τ ∗ = (I, {vt∗ , a∗t }Tt=1 ),
+                                                                       In this phase, GRPO updates (∆zaGRPO ∝ πθ (a|s)A(s, a))
+optimizing the likelihood:
+                                                                       dominate the optimization. Due to the Matthew Effect (see
+                            ∗
+                       |o |                                            Sup.8.2), GRPO reinforces actions that already possess high
+                   1 X
+          LSFT = − ∗        log πθ (o∗t | s, o∗<t ) .       (5)        probabilities and positive advantages. This induces a posi-
+                  |o | t=1                                             tive covariance that drives entropy down (∆HGRPO < 0).
+                                                                       By decaying λ as H drops, we ensure that the SFT compo-
+Particularlly, for spatial actions, we employ an augmented
+                                                                       nent does not interfere with GRPO’s precise convergence,
+SFT loss by sampling G valid points within the target
+                                                                       allowing the model to solidify its knowledge for long-term
+bounding box to enhance spatial generalization. This rout-
+                                                                       retention.
+ing strategy ensures that the model only utilizes SFT to rec-
+tify ”pathological” biases where GRPO exploration fails to             5.3. Conditional Gradient Surgery for Conflict Res-
+find a successful path.                                                      olution
+5.2. Entropy-Regulated Tuning                                          During collaborative training of Supervised Fine-Tuning
+                                                                       (SFT) and GRPO (a reinforcement learning-based objec-
+To manage the transition from exploration to exploitation
+                                                                       tive), gradient conflicts between the two losses can desta-
+across sequential tasks, we introduce a dynamic weight-
+                                                                       bilize optimization and impair knowledge preservation. To
+ing factor λ(H, step) to modulate the contribution of SFT.
+                                                                       address this, we introduce a conditional gradient surgery
+The policy entropy, which measures the uncertainty of the
+                                                                       strategy: the SFT gradient is modified only when it conflicts
+   P action distribution, is defined as H(πθ (·|s)) =
+agent’s
+                                                                       with the GRPO gradient’s anti-forgetting direction; other-
+− a∈A πθ (a|s) log πθ (a|s),where A is the action space of
+                                                                       wise, it remains unchanged.
+the GUI agent.
+   The mechanics of our collaborative tuning are rooted in
+the first-order dynamics of this entropy. Let z denote the             Conflict Detection Criterion We define a conflict as oc-
+policy logits such that πθ (a|s) = softmax(za ). An opti-              curring when the cosine similarity between the two gradi-
+mization step induces a logit update ∆za = η∇za L, where               ents is negative (i.e., the angle exceeds 90◦ ):
+η is the learning rate. As derived in our theoretical analysis                              ∇θ LSFT · ∇θ LGRPO
+(see Sup.8), the resulting change in entropy ∆H can be ap-                      cos α =                            < 0.          (8)
+                                                                                          ∥∇θ LSFT ∥2 ∥∇θ LGRPO ∥2
+proximated by the negative covariance between the current
+log-probabilities and the logit updates:                               If cos α ≥ 0, the gradients are deemed compatible, and the
+                                                                       original SFT gradient is used directly.
+          ∆H ≈ −Cova∼πθ (log πθ (a|s), ∆za ) .              (6)
+
+Eq. (6) suggests that an update ∆za positively correlated              Orthogonal Projection under Conflict When a conflict
+with the current distribution reinforces confident actions             is detected (cos α < 0), we surgically remove the compo-
+and reduces entropy; conversely, an update that opposes the            nent of the SFT gradient that opposes the GRPO direction.
+current bias injects entropy into the policy. Our strategy op-         Specifically, we retain only the part of ∇θ LSFT orthogonal
+erates in two distinct phases based on this principle:                 to ∇θ LGRPO :
+    Phase 1: Entropy Injection (Warmup). During the
+initial stepw , we linearly increase λ to its maximum. In                              ∇θ LSFT∗ = ∇θ LSFT − ∇∥ ,                (9)
+this stage, the model typically suffers from a pathological            where the conflicting parallel component is:
+bias toward incorrect actions, where the probability of the
+ground-truth action a∗ vanishes (π(a∗ ) → 0). The SFT
+                                                                                                           
+                                                                                         ∇θ LSFT · ∇θ LGRPO
+update, ∆zaSFT ∝ (I[a = a∗ ] − πθ (a|s)), assigns a large                      ∇∥ =                           ∇θ LGRPO .       (10)
+                                                                                            ∥∇θ LGRPO ∥22
+
+                                                                   6
+This projection eliminates the adversarial update direction            experiments using two vision-language models as back-
+while preserving all SFT information orthogonal to GRPO’s              bones: lightweight LLaVA-OneVision-0.5b [18] and large-
+objective. The final update gradient for SFT is thus:                  scale QwenVL2.5-3b-Instruct [3], with five baselines cov-
+                (                                                      ering diverse technical paradigms:
+                  ∇θ LSFT∗ , if cos α < 0 (conflict),                  • SFT: Standard supervised fine-tuning
+    ∇θ Lfinal
+         SFT =
+                  ∇θ LSFT , otherwise (no conflict).                   • SFT+KL: SFT augmented with KL-divergence con-
+                                                                         straints which is same as grpo;
+6. Experiment                                                          • SFT+Replay: SFT augmented with 5% historical data re-
+6.1. Experimental Setup                                                  play for each new task;
+                                                                       • RIF-RFT [16]: A recently proposed data-efficient contin-
+Models We adopt two MLLMs with different scales as
+                                                                         ual post-training framework;
+our base models: QwenVL2.5-3b-Instruct [3] and LLaVA-
+                                                                       • GRPO [8]: Constrained reinforcement learning for se-
+OneVision-0.5b [18]. These models are selected to validate
+                                                                         quential policy updates.
+the generality of our method across models with varying
+capacities.                                                            6.2.1. Performance under Task Order 1
+Dataset The dataset used in our experiments is the self-               Tab.2 and Tab.3 present results under Task Order 1. Con-
+proposed Android-CL dataset, which is partitioned into 7               sistent conclusions across model scales validate CGL’s su-
+app-related tasks. The task categories include Shopping,               periority in accuracy and anti-forgetting:
+Communication, Productivity, Travel, System Tools, Edu-                • State-of-the-Art Accuracy: CGL achieves the highest
+cation And Science, and Life And Entertainment. To ensure                average Step-Acc. and Trajectory-Acc. for both models:
+fair and reliable continual-learning evaluation, we define               – QwenVL2.5-3b-Instruct: 82.33% Step-Acc.             and
+three training orders representing diverse sequential task                  38.03% Trajectory-Acc.,          outperforming SFT
+permutations:                                                               (76.90%), SFT+KL (80.84%), SFT+Replay (79.80%),
+1. Order 1: SP → PO → CO → TT → ST → ES → LE                                GRPO (81.53%), and RIF-RFT (80.44%);
+2. Order 2: SP → LE → ES → ST → TT → CO → PO                             – LLaVA-OV-One-Vision-0.5b: 77.84% Step-Acc. and
+3. Order 3: ES → LE → TT → SP → CO → PO → ST                                24.77% Trajectory-Acc., surpassing all baselines by
+Implementation Details For fair comparison, all meth-                       1.27–5.18 percentage points (pp) in Step-Acc.
+ods begin with SFT on the initial task to establish a shared           • Optimal Anti-Forgetting (Minimal FM): CGL main-
+baseline. Subsequent tasks are learned sequentially under                tains the smallest FM for both backbones:
+their respective continual-learning strategies. Evaluation on            – QwenVL2.5-3b-Instruct: Near-zero FM (-0.02), reduc-
+the full test sets of all seven tasks assesses both adaptation              ing forgetting by 0.99 pp (vs. SFT+KL: -1.01) and 0.60
+and forgetting. This design is consistent with existing GUI-                pp (vs. GRPO: -0.62), with negligible old-task knowl-
+agent training pipelines, where many approaches either use                  edge loss;
+SFT alone or apply RL after SFT [2, 9, 26, 28, 29, 33].                  – LLaVA-OV-One-Vision-0.5b: FM (-0.52), significantly
+All experiments are conducted with PyTorch on 8×Ascend                      lower than baselines (SFT: -6.81, GRPO: -0.93, etc.).
+910B NPUs. For SFT and SFT with replay of histrocal data
+experiments, we adopt the ms-swift framework [45] with a               6.2.2. Robustness Across Multiple Task Orders
+batch size of 16 and a learning rate of 10−5 . For GRPO                To evaluate the robustness of our method to task sequence
+[8], our proposed CGL method, and RIF-RFT [16], all are                variations, Tab. 4 presents results across three distinct task
+implemented based on the verl framework [35] with a batch              orders.
+size of 16, rollout batch size of 512, a learning rate of 10−6 ,       • CGL consistently leads in average Step Accuracy
+a KL-divergence coefficient of 0.01, and a sampling group                (≥ 82.33%) and average Trajectory Accuracy (≥
+size of 8. For our CGL method, the hyperparameters are set               38.03%) across all orders. It outperforms naive SFT
+as: λmax = 1, λmin = 0, Hmax = 0.45, stepw = 5, γ = 20                   (76.87–77.21%) by 5.40–5.55 percentage points in Step
+and k = e−10                                                             Accuracy and surpasses GRPO (81.44–81.75%) by 0.80-
+                                                                         0.86 percentage points, confirming its strong generaliz-
+6.2. Main Results                                                        ability to diverse task sequences.
+In the Method section, we propose the CGL method, which                • Notably, CGL achieves a positive FM (+0.13) in Task
+synergistically integrates SFT and GRPO to balance new-                  Order 2 — a rare outcome in continual learning, as it in-
+task adaptability and old-task anti-forgetting — a critical              dicates not only no forgetting of old tasks but also slight
+challenge for GUI agents that remains underexplored in                   performance enhancement. In stark contrast, SFT ex-
+existing literature. And RIF-RFT [16] is a recently pro-                 hibits severe forgetting with FMs ranging from -5.33 to
+posed framework relevant to large-model continual post-                  -6.03 across all orders, while GRPO (FM = -0.33 to -
+training. To comprehensively validate CGL, we conduct                    0.62) also suffers from unavoidable performance degra-
+
+
+                                                                   7
+  Table 2. Performance comparison of LLava-onsevision-0.5b under Task Order 1. All accuracy values are reported as percentages (%).
+ Method               Shopping   Productivity   Communication   Travel   Tools   Education   Entertainment   Avg. Step-Acc.   Avg. Trajectory Acc.   Avg. FM
+ SFT                   65.64        74.73           74.66       72.00    77.39     64.12         80.08           72.66               14.61            -6.81
+ SFT+KL                74.16        75.23           76.89       75.49    82.06     66.01         79.29           75.59               22.39            -1.78
+ SFT+Replay            70.88        76.43           77.23       74.19    78.21     64.37         80.63           74.56               20.07            -4.69
+ GRPO[8]               75.44        78.86           78.01       76.41    81.57     67.93         77.80           76.57               23.85            -0.93
+ RIF-RFT[16]           76.53        74.19           75.99       73.55    81.40     65.91         75.34           74.40               22.17            -0.88
+ Ours                  75.55        81.32           80.73       76.88    83.41     68.90         78.13           77.84               24.77            -0.52
+ SFT-Joint-Training    77.83        84.46           83.24       78.41    84.76     69.73         79.58           79.69               28.63              -
+ Zero-Shot               -            -               -           -        -         -             -               -                   -                -
+
+      Table 3. Performance comparison of QwenVL2.5-3b under Task Order 1. All accuracy values are reported as percentages (%).
+ Method               Shopping   Productivity   Communication   Travel   Tools   Education   Entertainment   Avg. Step Acc.   Avg. Trajectory Acc.   Avg.FM
+ SFT                   70.54        79.52           78.90       76.41    83.24     69.24         80.42            76.90               23.53           -5.73
+ SFT+KL                79.30        83.85           82.32       79.84    85.83     74.08         80.71            80.84               34.69           -1.01
+ SFT+Replay            74.61        83.35           81.66       79.02    85.61     72.26         82.08            79.80               30.19           -3.11
+ GRPO[8]               79.63        84.74           83.43       81.34    85.74     74.08         81.73            81.53               36.78           -0.62
+ RIF-RFT[16]           79.53        83.35           80.77       80.25    85.94     73.00         80.25            80.44               32.91           -0.58
+ Ours                  80.32        85.46           81.99       82.03    88.17     75.81         82.53            82.33               38.03           -0.02
+ SFT-Joint-Training    81.73        86.74           85.75       82.24    88.17     77.00         82.76            83.48               41.66             -
+ Zero-Shot             48.02        57.71           49.50       52.81    55.87     42.33         48.86            50.73                1.86             -
+
+  dation on previously learned tasks. This highlights CGL’s                       duces FM to -0.05. This module mitigates gradient conflicts
+  unique advantage in balancing new-task adaptation and                           between sequential tasks, preventing performance degrada-
+  old-task preservation.                                                          tion of previously learned knowledge during new task train-
+                                                                                  ing. Combining D-λ and Grad-Surg elevates Step-Acc to
+6.2.3. Ablation Study of Module Contributions
+                                                                                  82.33% and Traj-Acc to 38.03%, as the two modules com-
+Analysis of Key Components. To quantify the individ-                              plement each other in weight adjustment and gradient sta-
+ual and synergistic contributions of each component in , we                       bilization. When all modules are integrated (the full CGL
+conduct ablation experiments on QwenVL2.5-3b-Instruct                             framework), we achieve the optimal performance: 82.33%
+under Task Order 1, with results presented in Tab. 5. The                         Step-Acc, 38.03% Traj-Acc, and an FM of -0.02. This result
+evaluated modules include SFT, GRPO, KL divergence con-                           confirms that each module contributes complementary im-
+straint, dynamic SFT (D-SFT), dynamic SFT weight (D-λ),                           provements, and their synergistic integration enables CGL
+and gradient surgery (G-Surg).                                                    to balance new-task accuracy and old-task anti-forgetting
+    We first start with the naive SFT baseline, which                             effectively.
+achieves 76.90% Step-Acc, 23.53% Traj-Acc, and an FM
+of -5.73. Introducing the KL divergence constraint to SFT                         Analysis of λ As the core of the D-λ module, λ regu-
+improves Step-Acc by 3.94 percentage points (to 80.84%)                           lates the injection intensity of SFT error samples, and its
+and reduces FM to -1.01, verifying the basic anti-forgetting                      dynamic adjustment coupled with policy entropy is key to
+effect of KL constraints. Notably, all three metrics of                           CGL’s performance.
+SFT+KL are still inferior to those of GRPO, demonstrat-                               Trend Correlation (Fig. 4) depicts the co-variation of pol-
+ing that GRPO’s superior continual learning capability does                       icy entropy (top) and λ (bottom) across training steps. At
+not solely stem from its KL divergence constraint.                                task-switching points (vertical dashed lines), λ rises lin-
+    The GRPO module requires the KL divergence con-                               early in the warmup phase to boost entropy introducing new
+straint to operate stably: without KL, GRPO collapses and                         behaviors via error-sample injection, then decays exponen-
+performance metrics are unavailable. Combining GRPO                               tially in the decay phase to stabilize entropy. This “entropy
+with KL elevates Step-Acc to 81.53% and Traj-Acc to                               rise-then-decay” pattern balances new-task adaptability and
+36.78%, with FM reduced to -0.62. This demonstrates that                          old-task retention.
+constrained reinforcement learning enhances both accuracy                             Mechanism Advantage: The isentrope diagram (Fig. 5)
+and anti-forgetting capability.                                                   illustrates that GRPO is confined to existing isentropic re-
+    We then incrementally integrate additional modules into                       gions, while our entropy-regulated tuning (driven by dy-
+the SFT+GRPO baseline: Integrating static full-SFT into                           namic λ) enables crossing isentropes—jumping from low-
+GRPO boosts Step-Acc to 81.68%. Replacing it with D-                              entropy local optima to more favorable regions, thus avoid-
+SFT further improves Step-Acc to 81.90%, targeting pol-                           ing suboptimal policy stagnation.
+icy weak points to avoid redundant knowledge interfer-                                Performance Validation (Tab. 6) and entropy trends (Fig.
+ence. Incorporating D-λ based on the D-SFT framework                              6): We compare fixed-λ settings with our dynamic λ (ours):
+further raises Step-Acc to 82.23% and Traj-Acc to 37.62%.                         λ = 1 :excessive error-sample injection leads to overly high
+This module adjusts SFT’s weight via policy entropy and                           entropy. λ = 0.01 insufficient injection maintains low en-
+training timesteps, refining the balance between adapting                         tropy, trapping the model in local optima. Our D-λ (dy-
+to new tasks and preserving knowledge of old ones. In-                            namic λ) balances injection intensity across tasks, achiev-
+troducing Grad-Surg boosts Step-Acc to 82.10% and re-                             ing the highest average score (82.33).
+
+
+                                                                             8
+                                     Table 4. Model performance comparison across different task orders.
+ Model                         Task Order 1                                     Task Order 2                                   Task Order 3
+               Step Acc. (%)    Trajectory Acc. (%)     FM      Step Acc. (%)    Trajectory Acc. (%)    FM     Step Acc. (%)    Trajectory Acc. (%)   FM
+ SFT              76.90               23.53            -5.73       77.21               23.46           -5.33      76.87               23.69           -6.03
+ SFT+KL           80.84               34.69            -1.01       80.77               34.33           -0.96      80.69               34.13           -1.13
+ SFT+Replay       79.80               27.19            -3.11       80.53               28.06           -2.70      80.39               27.34           -3.29
+ GRPO[8]          81.53               36.78            -0.62       81.75               36.60           -0.33      81.44               36.72           -0.52
+ RIF-RFT[16]      80.44               32.91            -0.58       80.50               33.02           -0.46      80.35               31.88           -0.55
+ Ours             82.33               38.03            -0.02       82.61               38.66           +0.13      82.40               38.57           -0.06
+
+
+
+
+      Figure 4. Trends of policy entropy (top) and SFT loss weight λ (bottom) across training steps for Entropy-Regulated Tuning.
+
+               Table 5. Ablation study of modules.
+                 Modules                              Metrics
+  SFT GRPO KL D-SFT D-λ G-Surg Step-Acc Traj-Acc FM
+  √
+  √        √                     76.90   23.53   -5.73
+       √   √                     80.84   34.69   -1.01
+       √                         81.53   36.78   -0.62
+  √    √   √                       –       –       –
+  √    √   √    √                81.68   36.79   -0.57
+  √    √   √    √         √      81.90   37.12   -0.33
+  √    √   √    √    √           82.10   37.57   -0.05
+  √    √   √    √    √    √      82.23   37.62   -0.07
+                                 82.33   38.03   -0.02
+                                                                                       Figure 6. Entropy trends with different hyperparameters
+
+                                                                                  Table 6. Performance comparison under different λ settings for
+                                                                                  QwenVL2.5.
+
+                                                                                                       QwenVL2.5      Avg.Step-Acc.
+                                                                                                       λ=1                 81.62
+                                                                                                       λ = 0.2             81.58
+                                                                                                       λ = 0.01            81.90
+                                                                                                       ours                82.33
+
+
+                                                                                  subsets of comparable scale, filling the gap of unified
+Figure 5. High-accuracy region comparison of GRPO and our
+                                                                                  evaluation in this field. To alleviate the stability–plasticity
+CGL in continual GUI learning.
+                                                                                  trade-off between existing methods, we designed two key
+7. Conclusion                                                                     mechanisms, Entropy-Regulated Tuning and Gradient
+                                                                                  Surgery for the SFT-RL framework, which balances prior
+In this paper, we studied the Continual GUI Learning                              knowledge retention and new skill acquisition. Extensive
+(CGL) problem, and proposed a standardized bench-                                 experiments under three evaluation protocols show that
+mark and a collaborative SFT-RL framework to address it.                          our approach outperforms pure GRPO, pure SFT, and
+Specifically, we constructed a CGL benchmark by partition-                        RIF-RFT, demonstrating its effectiveness in the CGL task.
+ing the AndroidControl dataset into 7 app-category-specific
+
+
+                                                                            9
+References                                                                     and Wangmeng Zuo. Class balance matters to active class-
+                                                                               incremental learning. In Proceedings of the 32nd ACM In-
+ [1] Rahaf Aljundi, Francesca Babiloni, Mohamed Elhoseiny,                     ternational Conference on Multimedia, pages 9445–9454,
+     Marcus Rohrbach, and Tinne Tuytelaars. Memory aware                       2024. 2
+     synapses: Learning what (not) to forget. In Proceedings of
+                                                                          [14] Robert A Jacobs, Michael I Jordan, Steven J Nowlan, and
+     the European conference on computer vision (ECCV), pages
+                                                                               Geoffrey E Hinton. Adaptive mixtures of local experts. Neu-
+     139–154, 2018. 2
+                                                                               ral computation, 3(1):79–87, 1991. 2
+ [2] Hao Bai, Yifei Zhou, Jiayi Pan, Mert Cemri, Alane Suhr,
+                                                                          [15] Zhong Ji, Zhishen Hou, Xiyao Liu, Yanwei Pang, and Xue-
+     Sergey Levine, and Aviral Kumar. Digirl: Training in-the-
+                                                                               long Li. Memorizing complementation network for few-
+     wild device-control agents with autonomous reinforcement
+                                                                               shot class-incremental learning. IEEE Transactions on Im-
+     learning. Advances in Neural Information Processing Sys-
+                                                                               age Processing, 32:937–948, 2023. 2
+     tems, 37:12461–12495, 2024. 1, 2, 7
+                                                                          [16] Song Lai, Haohan Zhao, Rong Feng, Changyi Ma, Wen-
+ [3] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin
+                                                                               zhuo Liu, Hongbo Zhao, Xi Lin, Dong Yi, Min Xie, Qingfu
+     Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun
+                                                                               Zhang, et al. Reinforcement fine-tuning naturally miti-
+     Tang, et al. Qwen2.5-vl technical report. arXiv preprint
+                                                                               gates forgetting in continual post-training. arXiv preprint
+     arXiv:2502.13923, 2025. 1, 5, 7
+                                                                               arXiv:2507.05386, 2025. 2, 7, 8, 9
+ [4] Xiang Chen, Jintian Zhang, Xiaohan Wang, Ningyu Zhang,
+     Tongtong Wu, Yuxiang Wang, Yongheng Wang, and Huajun                 [17] Stan Weixian Lei, Difei Gao, Jay Zhangjie Wu, Yuxuan
+     Chen. Continual multimodal knowledge graph construction.                  Wang, Wei Liu, Mengmi Zhang, and Mike Zheng Shou.
+     arXiv preprint arXiv:2305.08698, 2023. 2                                  Symbolic replay: Scene graph as prompt for continual learn-
+                                                                               ing on vqa task. In Proceedings of the AAAI Conference on
+ [5] Zhe Chen, Weiyun Wang, Yue Cao, Yangzhou Liu, Zhang-
+                                                                               Artificial Intelligence, pages 1250–1259, 2023. 2
+     wei Gao, Erfei Cui, Jinguo Zhu, Shenglong Ye, Hao Tian,
+     Zhaoyang Liu, et al. Expanding performance boundaries of             [18] Bo Li, Yuanhan Zhang, Dong Guo, Renrui Zhang, Feng Li,
+     open-source multimodal models with model, data, and test-                 Hao Zhang, Kaichen Zhang, Peiyuan Zhang, Yanwei Li, Zi-
+     time scaling. arXiv preprint arXiv:2412.05271, 2024. 1                    wei Liu, et al. Llava-onevision: Easy visual task transfer.
+ [6] Kanzhi Cheng, Qiushi Sun, Yougang Chu, Fangzhi Xu, Yan-                   arXiv preprint arXiv:2408.03326, 2024. 1, 5, 7
+     tao Li, Jianbing Zhang, and Zhiyong Wu. Seeclick: Har-               [19] Hong Li, Zhiquan Tan, Xingyu Li, and Weiran Huang. Atlas:
+     nessing gui grounding for advanced visual gui agents. arXiv               Adapter-based multi-modal continual learning with a two-
+     preprint arXiv:2401.10935, 2024. 1, 3                                     stage learning strategy. arXiv preprint arXiv:2410.10923,
+ [7] Bowen Dong, Zitong Huang, Guanglei Yang, Lei Zhang, and                   2024. 2
+     Wangmeng Zuo. Mr-gdino: efficient open-world continual               [20] Wei Li, William E Bishop, Alice Li, Christopher Rawles,
+     object detection. arXiv preprint arXiv:2412.15979, 2024. 2                Folawiyo Campbell-Ajala, Divya Tyamagundlu, and Oriana
+ [8] Daya Guo, Dejian Yang, Haowei Zhang, Junxiao Song,                        Riva. On the effects of data scale on ui control agents.
+     Ruoyu Zhang, Runxin Xu, Qihao Zhu, Shirong Ma, Peiyi                      Advances in Neural Information Processing Systems, 37:
+     Wang, Xiao Bi, et al. Deepseek-r1: Incentivizing reasoning                92130–92154, 2024. 4
+     capability in llms via reinforcement learning. arXiv preprint        [21] Zhizhong Li and Derek Hoiem. Learning without forgetting.
+     arXiv:2501.12948, 2025. 2, 3, 5, 7, 8, 9                                  IEEE transactions on pattern analysis and machine intelli-
+ [9] Wenyi Hong, Weihan Wang, Qingsong Lv, Jing Liu, Yujie                     gence, 40(12):2935–2947, 2017. 2
+     Wang, Han Zhang, Zhen Wang, and Qi Tian. Cogagent: A                 [22] Kevin Qinghong Lin, Linjie Li, Difei Gao, Zhengyuan Yang,
+     visual language model for gui agents. In 2024 IEEE/CVF                    Shiwei Wu, Zechen Bai, Stan Weixian Lei, Lijuan Wang,
+     Conference on Computer Vision and Pattern Recognition                     and Mike Zheng Shou. Showui: One vision-language-action
+     (CVPR), pages 14281–14290. IEEE, 2024. 1, 2, 7                            model for gui visual agent. In Proceedings of the Computer
+[10] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-                   Vision and Pattern Recognition Conference, pages 19498–
+     Zhu, Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen, et al.                 19508, 2025. 1, 3
+     Lora: Low-rank adaptation of large language models. ICLR,            [23] Weiting Liu, Han Wu, Yufei Kuang, Xiongwei Han, Tao
+     1(2):3, 2022. 2                                                           Zhong, Jianfeng Feng, and Wenlian Lu. Automated opti-
+[11] Linlan Huang, Xusheng Cao, Haori Lu, and Xialei Liu.                      mization modeling via a localizable error-driven perspective.
+     Class-incremental learning with clip: Adaptive representa-                arXiv preprint arXiv:2602.11164, 2026. 3
+     tion adjustment and parameter fusion. In European Confer-            [24] Yuyang Liu, Yang Cong, Dipam Goswami, Xialei Liu, and
+     ence on Computer Vision, pages 214–231. Springer, 2024.                   Joost Van De Weijer. Augmented box replay: Overcoming
+     2                                                                         foreground shift for incremental object detection. In Pro-
+[12] Zitong Huang, Ze Chen, Zhixing Chen, Erjin Zhou, Xinx-                    ceedings of the IEEE/CVF international conference on com-
+     ing Xu, Rick Siow Mong Goh, Yong Liu, Wangmeng Zuo,                       puter vision, pages 11367–11377, 2023. 2
+     and Chunmei Feng. Learning prompt with distribution-based            [25] Yuyang Liu, Qiuhe Hong, Linlan Huang, Alexandra Gomez-
+     feature replay for few-shot class-incremental learning. arXiv             Villa, Dipam Goswami, Xialei Liu, Joost van de Wei-
+     preprint arXiv:2401.01598, 2024. 2                                        jer, and Yonghong Tian. Continual learning for vlms: A
+[13] Zitong Huang, Ze Chen, Yuanze Li, Bowen Dong, Erjin                       survey and taxonomy beyond forgetting. arXiv preprint
+     Zhou, Yong Liu, Rick Siow Mong Goh, Chun-Mei Feng,                        arXiv:2508.04227, 2025. 2
+
+
+                                                                     10
+[26] Yuhang Liu, Pengxiang Li, Zishu Wei, Congkai Xie, Xueyu               [39] Zhiyong Wu, Zhenyu Wu, Fangzhi Xu, Yian Wang, Qiushi
+     Hu, Xinchen Xu, Shengyu Zhang, Xiaotian Han, Hongxia                       Sun, Chengyou Jia, Kanzhi Cheng, Zichen Ding, Liheng
+     Yang, and Fei Wu. Infiguiagent: A multimodal generalist                    Chen, Paul Pu Liang, and Yu Qiao. Os-atlas: A founda-
+     gui agent with native reasoning and reflection. arXiv preprint             tion action model for generalist gui agents. arXiv preprint
+     arXiv:2501.04575, 2025. 1, 2, 7                                            arXiv:2410.23218, 2024. 1, 3
+[27] Yadong Lu, Jianwei Yang, Yelong Shen, and Ahmed                       [40] Donglai Xu, Hongzheng Yang, Yuzhi Zhao, Pingping Zhang,
+     Awadallah. Omniparser for pure vision based gui agent.                     Jinpeng Chen, Wenao Ma, Zhijian Hou, Mengyang Wu, Xi-
+     arXiv preprint arXiv:2408.00203, 2024. 5                                   aolei Li, Senkang Hu, et al. From exploration to exploitation:
+[28] Zhengxi Lu, Yuxiang Chai, Yaxuan Guo, Xi Yin, Liang Liu,                   A two-stage entropy rlvr approach for noise-tolerant mllm
+     Hao Wang, Han Xiao, Shuai Ren, Guanjing Xiong, and                         training. arXiv preprint arXiv:2511.07738, 2025. 3
+     Hongsheng Li. Ui-r1: Enhancing efficient action predic-               [41] Jaehong Yoon, Eunho Yang, Jeongtae Lee, and Sung Ju
+     tion of gui agents by reinforcement learning. arXiv preprint               Hwang. Lifelong learning with dynamically expandable net-
+     arXiv:2503.21620, 2025. 1, 2, 3, 7                                         works. arXiv preprint arXiv:1708.01547, 2017. 2
+[29] Run Luo, Lu Wang, Wanwei He, Longze Chen, Jiaming                     [42] Yu-Chu Yu, Chi-Pin Huang, Jr-Jen Chen, Kai-Po Chang,
+     Li, and Xiaobo Xia. Gui-r1: A generalist r1-style vision-                  Yung-Hsuan Lai, Fu-En Yang, and Yu-Chiang Frank Wang.
+     language action model for gui agents. arXiv preprint                       Select and distill: Selective dual-teacher knowledge trans-
+     arXiv:2504.10458, 2025. 1, 2, 7                                            fer for continual learning on vision-language models. In
+[30] Imad Eddine Marouf, Enzo Tartaglione, Stéphane Lath-                      European Conference on Computer Vision, pages 219–236.
+     uiliere, and Joost van de Weijer. No images, no problem:                   Springer, 2024. 2
+     Retaining knowledge in continual vqa with questions-only              [43] Friedemann Zenke, Ben Poole, and Surya Ganguli. Contin-
+     memory. arXiv preprint arXiv:2502.04469, 2025. 2                           ual learning through synaptic intelligence. In International
+[31] Yuan Meng, Zhenshan Bing, Xiangtong Yao, Kejia Chen,                       conference on machine learning, pages 3987–3995. PMLR,
+     Kai Huang, Yang Gao, Fuchun Sun, and Alois Knoll. Pre-                     2017. 2
+     serving and combining knowledge in robotic lifelong rein-             [44] Xi Zhang, Feifei Zhang, and Changsheng Xu. Vqacl: A
+     forcement learning. Nature Machine Intelligence, pages 1–                  novel visual question answering continual learning setting.
+     14, 2025. 2                                                                In Proceedings of the IEEE/CVF Conference on Computer
+[32] Songqin Nong, Jingxuan Xu, Sheng Zhou, Jianfeng Chen,                      Vision and Pattern Recognition, pages 19102–19112, 2023.
+     Xiaoxuan Tang, Tao Jiang, and Wenhao Xu. Craft-gui:                        2
+     Curriculum-reinforced agent for gui tasks. arXiv preprint             [45] Yuze Zhao, Jintao Huang, Jinghan Hu, Xingjun Wang, Yun-
+     arXiv:2508.11360, 2025. 3                                                  lin Mao, Daoze Zhang, Hong Zhang, Zeyinzi Jiang, Zhikai
+[33] Yujia Qin, Yining Ye, Junjie Fang, Haoming Wang, Shihao                    Wu, Baole Ai, Ang Wang, Wenmeng Zhou, and Yingda
+     Liang, Shizuo Tian, Junda Zhang, Jiahao Li, Yunxin Li, Shi-                Chen. Swift: A scalable lightweight infrastructure for fine-
+     jue Huang, et al. Ui-tars: Pioneering automated gui inter-                 tuning, 2025. 7
+     action with native agents. arXiv preprint arXiv:2501.12326,           [46] Da-Wei Zhou, Yuanhan Zhang, Yan Wang, Jingyi Ning,
+     2025. 1, 2, 3, 7                                                           Han-Jia Ye, De-Chuan Zhan, and Ziwei Liu. Learning with-
+[34] Andrei A Rusu, Neil C Rabinowitz, Guillaume Desjardins,                    out forgetting for vision-language models. IEEE Transac-
+     Hubert Soyer, James Kirkpatrick, Koray Kavukcuoglu, Raz-                   tions on Pattern Analysis and Machine Intelligence, 2025. 2
+     van Pascanu, and Raia Hadsell. Progressive neural networks.
+                                                                           [47] Yuqi Zhou, Sunhao Dai, Shuai Wang, Kaiwen Zhou, Qinglin
+     arXiv preprint arXiv:1606.04671, 2016. 2
+                                                                                Jia, and Jun Xu. Gui-g1: Understanding r1-zero-like train-
+[35] Guangming Sheng, Chi Zhang, Zilingfeng Ye, Xibin Wu,
+                                                                                ing for visual grounding in gui agents. arXiv preprint
+     Wang Zhang, Ru Zhang, Yanghua Peng, Haibin Lin, and
+                                                                                arXiv:2505.15810, 2025. 3
+     Chuan Wu. Hybridflow: A flexible and efficient rlhf frame-
+                                                                           [48] Jinguo Zhu, Weiyun Wang, Zhe Chen, Zhaoyang Liu, Shen-
+     work. In Proceedings of the Twentieth European Conference
+                                                                                glong Ye, Lixin Gu, Hao Tian, Yuchen Duan, Weijie Su,
+     on Computer Systems, page 1279–1297. ACM, 2025. 7
+                                                                                Jie Shao, et al. Internvl3: Exploring advanced training and
+[36] Fei Tang, Zhangxuan Gu, Zhengxi Lu, Xuyang Liu,
+                                                                                test-time recipes for open-source multimodal models. arXiv
+     Shuheng Shen, Changhua Meng, Wen Wang, Wenqi Zhang,
+                                                                                preprint arXiv:2504.10479, 2025. 1
+     Yongliang Shen, Weiming Lu, et al. Gui-g2 : Gaus-
+                                                                           [49] Zhen Zhu, Yiming Gong, and Derek Hoiem. Anytime con-
+     sian reward modeling for gui grounding. arXiv preprint
+                                                                                tinual learning for open vocabulary classification. In Eu-
+     arXiv:2507.15846, 2025. 3
+                                                                                ropean Conference on Computer Vision, pages 269–285.
+[37] Mingyang Wang, Heike Adel, Lukas Lange, Jannik Strötgen,
+                                                                                Springer, 2024. 2
+     and Hinrich Schütze. Learn it or leave it: module com-
+     position and pruning for continual learning. arXiv preprint
+     arXiv:2406.18708, 2024. 2
+[38] Peng Wang, Shuai Bai, Sinan Tan, Shijie Wang, Zhihao Fan,
+     Jinze Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin
+     Ge, et al. Qwen2-vl: Enhancing vision-language model’s
+     perception of the world at any resolution. arXiv preprint
+     arXiv:2409.12191, 2024. 1, 5
+
+
+                                                                      11
+       CGL: Advancing Continual GUI Learning via Reinforcement Fine-Tuning
+                                                      Supplementary Material
+8. Theoretical Analysis of Entropy Dynamics                               assuming the mean advantage baseline is handled implic-
+                                                                          itly.
+To provide a rigorous theoretical grounding for our
+Entropy-Regulated Tuning strategy, we analyze the first-                  Proof. The gradient of the GRPO objective J                      =
+order dynamics of policy entropy H(πθ ) under the joint in-               Ea∼π [A(s, a)] with respect to logit zs,a is:
+fluence of GRPO and SFT. Let zs,a denote the logits such
+that the policy is defined as πθ (a|s) = softmax(zs,a ) =                    ∂J
+                                                                                           
+                                                                                             ∂ log π(a′ |s)
+                                                                                                                      
+P exp(zs,a )    .                                                                 = Ea′ ∼π                  A(s, a′ )
+  a ′ exp(z  ′)
+           s,a
+                                                                            ∂zs,a                ∂zs,a
+                                                                                    X
+8.1. Entropy Sensitivity and Separability                                         =     π(a |s)(I[a = a′ ] − π(a|s))A(s, a′ )
+                                                                                            ′
+                                                                                                                                         (14)
+                                                                                       a′
+We first establish the relationship between logit updates and                                                                        !
+entropy variations.
+                                                                                                           X
+                                                                                   = π(a|s) A(s, a) −            π(a′ |s)A(s, a′ )
+Lemma 1 (Entropy-Covariance Relationship). The first-                                                       a′
+
+order approximation of the change in policy entropy ∆H
+                                                                          In
+                                                                          P GRPO, advantages are normalized group-wise such that
+induced by a logit update vector ∆zs is determined by the
+                                                                              πA ≈ 0. Thus, the update simplifies to ∆zs,a =
+negative covariance between the log-probabilities and the
+                                                                          η ∂z∂Js,a ≈ ηπ(a|s)A(s, a).
+update values:
+
+      ∆H = H(πθk+1 |s) − H(πθk |s)                                            Analysis (The Matthew Effect): Eq. (13) reveals a self-
+                                                               (11)
+                           log πθk (a|s), ∆zs,a                           reinforcing mechanism. Actions with initially high proba-
+                                                  
+          = −Cova∼πθk                                 + o(η)
+                                                                          bility π(a|s) and positive advantage A(s, a) > 0 receive the
+where η is the learning rate.                                             largest positive updates.
+                                                                          • High π(a|s) implies high log π(a|s).
+Proof. The gradient of entropy with respect to logits is
+                                                                          • High π(a|s) leads to large positive ∆zs,a .
+∇zs,a H = −πθ (a|s)(log πθ (a|s)−H).      The first-order Tay-
+lor expansion gives ∆H ≈
+                               P                                          This creates a positive correlation between the distribution
+                                  a ∇zs,a H · ∆zs,a . Substi-
+tuting the gradient, we get ∆H ≈ −Ea [log πθ (a)∆zs,a ] +                 and the update: Cov(log π, ∆z GRP O ) > 0. According to
+HEa [∆zs,a ]. This simplifies to the negative covariance def-             Lemma 1, this results in ∆HGRP O < 0. This mathemati-
+inition −E[(log π −E[log π])(∆z −E[∆z])], assuming cen-                   cally explains the ”Stage 3” behavior where the model con-
+tered updates or simplified via the softmax invariance.                   verges sharply to a low-entropy state.
+
+   Under our hybrid objective L = LGRP O + λLSF T , the                   8.3. Entropy Injection via Error-Driven SFT
+total update decomposes linearly: ∆ztotal = ∆z GRP O +                    When the model exhibits pathological bias (i.e., conver-
+λ∆z SF T . Due to the linearity of the covariance operator,               gence to a wrong action), we activate SFT on the ground
+the entropy dynamics are separable:                                       truth a∗ .
+                 ∆Htotal ≈ ∆HGRP O + λ∆HSF T                   (12)
+                                                                          8.4. Entropy Injection via Error-Driven SFT
+This property allows us to analyze the impact of GRPO and
+                                                                          When the model suffers from pathological bias (Stage 1),
+SFT independently.
+                                                                          we activate SFT on the ground-truth action a∗ .
+8.2. Entropy Decay in GRPO: The Matthew Effect
+                                                                          Lemma 3 (SFT Entropy Injection). Let the SFT update fol-
+The GRPO algorithm optimizes the expected relative ad-                    low the gradient of the target probability likelihood. The
+vantage. We show that this naturally leads to entropy re-                 logit update ∆z SF T satisfies the zero-sum property and in-
+duction.                                                                  duces entropy injection by creating a negative covariance
+Lemma 2 (GRPO Update Dynamics). The logit update un-                      with the current distribution.
+                           GRP O
+der GRPO, denoted as ∆zs,a       , is proportional to the
+probability-weighted advantage:                                           Proof. Consider the optimization of the probability mass
+                                                                          πθ (a∗ |s) directly. Utilizing the derivative property of the
+                   GRP O
+                 ∆zs,a   = η · πθ (a|s) · A(s, a)              (13)       Softmax function, ∂π ∂zj = πi (δij − πj ), the update for logit
+                                                                                                 i
+
+
+
+
+                                                                      1
+zs,a is derived as:                                             27. Unlike previous datasets that often rely on homoge-
+                                                                nous patterns, our benchmark is designed to capture the
+         SF T        ∂πθ (a∗ |s)                                heterogeneity of real-world mobile interactions.
+     ∆zs,a = η ·
+                        ∂zs,a                              (15)     Specifically, for each of the 7 functional task categories
+                          ∗             ∗
+              = η · πθ (a |s) · (I[a = a ] − πθ (a|s))          (Shopping,    Productivity, Communication, Travel, Tools,
+                                                                Education, and Entertainment), we showcase three distinct
+We verify the zero-sum property of this update:                 episodes sourced from different applications. These visu-
+                                                            !   alizations highlight several key characteristics of the bench-
+X                              X                X               mark:
+         SF T
+     ∆zs,a    = ηπθ (a∗ |s)        I[a = a∗ ] −    πθ (a|s) = 0 • Cross-App Diversity: Even within the same category
+ a                               a               a                 (e.g. Shopping), different apps (Amazon, eBay, Flipkart)
+                                                           (16)
+                                                                   exhibit unique UI layouts, search logic, and interaction
+This confirms the update purely redistributes probability
+                                                                   flows (see Figs. 7–9).
+mass. We then analyze the correlation structure in the er-
+                ∗                                               • Task Complexity: The examples range from simple in-
+ror state (πθ (a |s) → 0):
+                                                                   formation retrieval (e.g. checking weather in Fig. 20) to
+1. For the target a = a∗ : The current log-probability
+                                                                   complex, multi-step workflows (e.g. booking a flight with
+    log πθ is minimal (negative), while the update compo-
+                                                                   specific constraints in Fig. 17).
+    nent (I − πθ ) > 0 is positive.
+                                                                •  Action Granularity: The visualizations demonstrate the
+2. For erroneous actions a ̸= a∗ : The current log-
+                                                                   precise coordinate-based actions and text inputs required,
+    probability log πθ is high (confident error), while the up-
+                                                                   validating the necessity for fine-grained control in GUI
+    date component (0 − πθ ) < 0 is negative.
+                                                                   agents.
+Despite the scaling factor πθ (a∗ |s), the direction of             For quantitative details regarding the dataset compo-
+∆z is strictly opposite to the bias of πθ .               Thus, sition,  please refer to Tab 7. The balanced distribu-
+Cov(log πθ , ∆z SF T ) < 0.                                     tion—ranging from 559 episodes in Education to 1240
+                                                                in Productivity—ensures that the evaluation of continual
+   Analysis: According to Lemma 1, the negative covari-         learning performance is not biased toward dominant appli-
+ance implies ∆HSF T > 0. By increasing the weight λ             cation domains.
+in Stage 2, the framework amplifies this corrective update.
+Even if the magnitude is initially dampened by the small        11. Additional Experimental Results
+πθ (a∗ |s), the directional alignment forces the ”heating up”
+of the distribution, breaking the local minima of the initial   This section provides further empirical evidence supporting
+error.                                                          the effectiveness of the CGL framework compared to base-
+                                                                lines (GRPO, SFT). We analyze performance across models
+9. Reward Function For Gui Agent                                of varying parameter scales and contrast sequential learning
+                                                                with multi-task joint training. Unless otherwise stated, Task
+To guide effective policy learning, we categorize UI actions    Order 1 is adopted as the evaluation protocol.
+into three classes with tailored reward rules.
+• Navigation and State Actions: Include Home(),
+                                                                    11.1. CGL Performance Across Models of Varying
+  BACK(), WAIT(), Finish().Reward: +1 for exact
+                                                                           Scales
+  action type match with ground truth (GT); 0 otherwise.            To validate the scalability and generality of the CGL frame-
+• Parameterized Actions: Include INPUT TEXT(str),                   work, we conducted experiments on two multimodal mod-
+  SCROLL(direction),OPEN APP(app name).Reward:                      els with distinct parameter sizes: the lightweight LLaVA-
+  +1 for type match (Stage 1),+ 1 for exact parameter match         OneVision-0.5b and the large-scale Qwen2.5-VL-3b.
+  (Stage 2), total maximum +2.                                      Performance on Lightweight Model (0.5B): Tab. 8
+• Spatial Interaction Actions: Include CLICK([x,y]),                presents the step-wise accuracy evolution for LLaVA-
+  LONG PRESS([x,y]).Reward: +1 for type match                       OneVision-0.5b. Despite the limited model capacity, CGL
+  (Stage 1) + 1 if predicted coordinates fall within GT ele-        maintains remarkable stability. For instance, after the initial
+  ment’s bounding box (Stage 2), total maximum +2.                  training on the Shopping task, the model preserves high per-
+                                                                    formance on subsequent evaluations even as it adapts to new
+10. Details of Benchmark                                            domains (e.g. retaining ∼76% on Shopping after learning
+                                                                    Education), demonstrating effective mitigation of forgetting
+To facilitate a deeper understanding of the                         in resource-constrained settings.
+AndroidControl-CL benchmark, we provide a com-                      Performance on Large-scale Model (3B): As shown in
+prehensive gallery of episode trajectories in Figs. 7 through       Tab. 9, CGL demonstrates superior capability on Qwen2.5-
+
+
+                                                                2
+                                        Table 7. App Category Statistics for Training Dataset
+
+                Category        Number of Apps         Number of Episodes         App Examples
+                Shopping                 15                     1140              amazon, ebay, alibaba.com
+               Productivity              15                     1240              Drive, WPS Office, Word
+             Communication                8                     617               Gmail, Outlook, Skype
+                  Travel                 10                      686              Maps, booking.com, Expedia
+                  Tools                  13                      771              Clock, Recorder, Settings
+                Education                11                     559               Leafsnap, Arts & Culture, Duolingo
+              Entertainment              17                     1030              YouTube, Vimeo, Pinterest
+
+Table 8. Evolution of Task-Specific Performance (LLaVA-OneVision-0.5b, Task Order 1). Columns represent the sequence of training
+tasks (left to right); rows represent the evaluation performance on specific test sets after each training stage.
+
+        Training Stage → Shopping Productivity Communication Travel Tools Education Entertainment
+        Test on:
+        Shopping                77.63         75.63             75.58           76.58    76.12     76.49           75.55
+        Productivity              -           80.80             80.80           78.39    80.97     81.30           81.32
+        Communication             -             -               80.88           77.90    80.77     80.33           80.73
+        Travel                    -             -                 -             77.78    77.09     76.27           76.88
+        Tools                     -             -                 -               -      84.14     84.09           83.41
+        Education                 -             -                 -               -        -       69.11           68.90
+        Entertainment             -             -                 -               -        -         -             78.13
+
+Table 9. Evolution of Task-Specific Performance (CGL on Qwen2.5-VL-3b, Task Order 1). CGL demonstrates stability and positive
+transfer (e.g., Tools accuracy improves over time).
+
+        Training Stage → Shopping Productivity Communication Travel Tools Education Entertainment
+        Test on:
+        Shopping                79.77         80.67             81.33           81.77    80.53     81.72           80.32
+        Productivity              -           85.41             85.18           84.13    85.46     85.29           85.46
+        Communication             -             -               84.23           83.98    82.98     83.20           81.99
+        Travel                    -             -                 -             83.06    83.13     82.51           82.03
+        Tools                     -             -                 -               -      86.42     87.88           88.17
+        Education                 -             -                 -               -        -       75.05           75.81
+        Entertainment             -             -                 -               -        -         -             82.53
+
+
+VL-3b, achieving not only retention but also positive back-            tasks, a phenomenon rarely observed in standard continual
+ward transfer. Key tasks such as Shopping, Tools, and                  learning baselines.
+Productivity exhibit performance maintenance or improve-
+ment as new tasks are introduced. Specifically, the accuracy
+                                                                       11.2. Baseline Analysis: GRPO and SFT
+on Tools increases from 86.42% to 88.17%, and Produc-                  To contextualize the performance of CGL, we analyze the
+tivity improves marginally from 85.29% to 85.46%. This                 behavior of baseline methods on Qwen2.5-VL-3b:
+suggests that the synergy between SFT and GRPO in CGL                  • GRPO (Tab. 11): While GRPO demonstrates strong sta-
+enables the consolidation of generalizable GUI interaction               bility and resistance to catastrophic forgetting, it lacks the
+logic.                                                                   rapid adaptation capabilities observed in CGL, serving
+    Quantitatively, CGL achieves a near-zero Forgetting                  primarily as a stability anchor.
+Measure (FM = -0.02) under Task Order 1. Notably, un-                  • SFT (Tab. 12): Standard Supervised Fine-Tuning ex-
+der Task Order 2 (Tab. 10), CGL achieves a positive FM                   hibits severe plasticity-stability trade-offs. For instance,
+(+0.13). This indicates that the learning of subsequent tasks            after adapting to the Entertainment task, performance on
+actively reinforces the representations of previously learned            early tasks such as Shopping drops significantly (79.77%
+
+
+                                                                 3
+  → 70.54%), confirming that SFT prioritizes new task ac-
+  quisition at the expense of catastrophic forgetting.
+11.3. Comparison with Multi-Task Joint Training
+We further compare our sequential learning approach
+against the theoretical upper bound of Multi-Task Joint
+Training (Tab. 13). Joint training assumes simultaneous ac-
+cess to all datasets, which is typically impractical for dy-
+namic, real-world GUI agents.
+    Remarkably, CGL significantly narrows the gap be-
+tween sequential learning and joint training. As illus-
+trated in Tab. 13:
+• The average trajectory accuracy of CGL across three dif-
+   ferent task orders is 82.33% (Order 1), 82.61% (Order
+   2), and 82.40% (Order 3).
+• These results are highly competitive with the GRPO-
+   Joint-Training baseline, which achieves 82.41%. No-
+   tably, our method under Task Order 2 even slightly out-
+   performs the GRPO joint training baseline.
+• While SFT-Joint-Training reaches the highest abso-
+   lute accuracy (83.48%), it requires full data accessibil-
+   ity. CGL achieves comparable performance to the RL-
+   based joint training upper bound while strictly adhering to
+   the sequential learning constraint, validating the efficacy
+   of our Entropy-Regulated Tuning and Gradient Surgery
+   mechanisms in maintaining policy optimality over time.
+
+
+
+
+                                                                 4
+Table 10. Evolution of Task-Specific Performance (CGL on Qwen2.5-VL-3b, Task Order 2). The distinct task order further validates
+the robustness of CGL.
+
+        Training Stage → Shopping Entertainment Education Tools Travel Communication Productivity
+        Test on:
+        Shopping                  79.77            79.96           80.53         80.72    80.58        80.25             79.63
+        Entertainment               -              81.55           81.45         81.05    80.71        81.45             82.08
+        Education                   -                -             76.67         75.81    76.03        75.27             75.81
+        Tools                       -                -               -           86.52    86.23        86.61             87.29
+        Travel                      -                -               -             -      81.96        82.10             82.85
+        Communication               -                -               -             -        -          84.75             84.42
+        Productivity                -                -               -             -        -            -               86.18
+
+
+Table 11. Baseline Performance: GRPO (Qwen2.5-VL-3b, Task Order 1). GRPO shows high stability but lower plasticity compared to
+CGL.
+
+        Training Stage → Shopping Productivity Communication Travel Tools Education Entertainment
+        Test on:
+        Shopping                  79.77        81.39               80.30            80.34     79.72     80.34           79.63
+        Productivity                -          85.22               84.18            83.63     84.13     84.46           84.74
+        Communication               -            -                 84.20            82.65     83.20     82.87           83.43
+        Travel                      -            -                   -              81.98     80.59     80.79           81.34
+        Tools                       -            -                   -                -       86.71     85.35           85.74
+        Education                   -            -                   -                -         -       75.05           74.08
+        Entertainment               -            -                   -                -         -         -             81.73
+
+
+Table 12. Baseline Performance: SFT (Qwen2.5-VL-3b, Task Order 1). SFT suffers from significant forgetting (e.g., Shopping drops
+from 79.77% to 70.54%).
+
+        Training Stage → Shopping Productivity Communication Travel Tools Education Entertainment
+        Test on:
+        Shopping                  79.77        75.62               73.59            73.34     71.57     70.89           70.54
+        Productivity                -          86.49               82.97            81.92     80.89     80.12           79.52
+        Communication               -            -                 85.30            81.80     80.23     79.67           78.90
+        Travel                      -            -                   -              82.06     79.78     78.45           76.41
+        Tools                       -            -                   -                -       87.81     85.01           83.24
+        Education                   -            -                   -                -         -       74.89           69.24
+        Entertainment               -            -                   -                -         -         -             80.42
+
+
+Table 13. Comparison with Multi-Task Joint Training (Qwen2.5-VL-3b). Joint training represents the theoretical upper bound where
+all data is available simultaneously. CGL (Ours) achieves performance comparable to GRPO-Joint-Training across all task orders.
+
+ Training Method       Shopping     Productivity    Communication       Travel    Tools    Education   Entertainment   Avg. Trajectory Acc.
+ Ours-Order1             80.32         85.46               81.99        82.03     88.17      75.81        82.53                 82.33
+ Ours-Order2             79.63         86.18               84.42        82.85     87.29      75.81        82.08                 82.61
+ Ours-Order3             80.39         86.17               84.91        81.81     87.87      74.16        81.50                 82.40
+ SFT-Joint-Training      81.73         86.74               85.75        82.24     88.17      77.00        82.76                 83.48
+ GRPO-Joint-Training     80.58         85.97               84.53        82.65     87.49      74.73        80.94                 82.41
+
+
+
+
+                                                                    5
+Figure 7. Trajectory Visualization: Search for New Nike Shoes on Amazon. The agent executes the task through the following action
+sequence: (1) Launch the application via Open(Amazon); (2) Focus on the search field via Click(0.507, 0.089); (3) Input the
+product query via Input text(‘‘Nike shoes’’); (4) Select the target suggestion via Click(0.444, 0.210); (5) Browse the
+product list via Scroll(down); (6) Terminate the episode via Finish(). Coordinates indicate the relative (x, y) position on the screen
+interface.
+
+
+
+
+Figure 8. Trajectory Visualization: Product Search on eBay. The agent locates specific sporting goods via the following sequence:
+(1) Launch the application via Open(eBay); (2) Activate the search interface via Click(0.382, 0.162); (3) Input the product
+category via Input text(‘‘football gloves’’); (4) Select the top suggestion via Click(0.490, 0.152); (5) Terminate
+the task via Finish().
+
+
+
+
+Figure 9. Trajectory Visualization: Search for Mens Running Shoes on Flipkart. The agent successfully navigates the interface through
+the following action sequence: (1) Launch the application via Open(Flipkart); (2) Activate the search field via Click(0.562,
+0.139); (3) Enter the search query via Input text(‘‘Mens Running Shoes’’); (4) Select the target product from the results
+via Click(0.318, 0.154); (5) Complete the task via Finish(). Coordinates (x, y) represent the normalized relative position on
+the screen.
+
+
+                                                                  6
+Figure 10. Trajectory Visualization: File Retrieval on Google Drive. The agent retrieves a specific historical document: (1)
+Launch the application via Open(Drive); (2) Focus on the search bar via Click(0.500, 0.091); (3) Enter the file query via
+Input text(‘‘Year 1964 finance’’); (4) Access the target file from results via Click(0.495, 0.159); (5) Terminate the
+task via Finish().
+
+
+
+
+Figure 11. Trajectory Visualization: Currency Exchange Tracking on Xe. The agent navigates to the financial charting interface:
+(1) Launch the application via Open(Xe); (2) Synchronize with the interface via Wait(); (3) Execute a secondary Wait() for data
+loading; (4) Navigate to the charts section via Click(0.300, 0.937); (5) Terminate the task via Finish().
+
+
+
+
+Figure 12. Trajectory Visualization: Document Creation on WPS Office. The agent initializes a new document: (1) Launch the
+application via Open(WPS Office); (2) Wait() for initialization; (3) Input the document title via Input text(‘‘New car’’);
+(4) Wait() for processing; (5) Confirm the creation via Click(0.079, 0.080); (6) Terminate the task via Finish().
+
+
+
+                                                              7
+Figure 13. Trajectory Visualization: Email Search on Gmail. The agent filters inbox contents for specific events: (1)
+Launch the application via Open(Gmail); (2) Focus on the search field via Click(0.287, 0.084); (3) Enter the query
+via Input text(‘‘upcoming events’’); (4) Execute the search via Click(0.920, 0.904); (5) Terminate the task via
+Finish().
+
+
+
+
+Figure 14. Trajectory Visualization: Messaging on Skype. The agent sends a greeting to a specific contact: (1) Launch the application via
+Open(Skype); (2) Select the contact via Click(0.500, 0.435); (3) Activate the text input area via Click(0.378, 0.942);
+(4) Type the message via Input text(‘‘Hello Amelia’’); (5) Send the message via Click(0.934, 0.574); (6) Terminate
+the task via Finish().
+
+
+
+
+Figure 15. Trajectory Visualization: Account Management on Outlook. The agent navigates settings to manage accounts: (1)
+Launch the application via Open(Outlook); (2) Open the side menu via Click(0.078, 0.080); (3) Select the target account
+via Click(0.244, 0.285); (4) Confirm the action via Click(0.862, 0.387); (5) Terminate the task via Finish().
+
+
+
+                                                                   8
+Figure 16. Trajectory Visualization: Hotel Search on Booking.com. The agent searches for accommodation in a specific location:
+(1) Launch the application via Open(Booking.com); (2) Activate search via Click(0.500, 0.239); (3) Input the destination
+via Input text(‘‘Berlin’’); (4) Select the suggestion via Click(0.578, 0.181); (5) View results via Click(0.500,
+0.422); (6) Terminate the task via Finish().
+
+
+
+
+Figure 17. Trajectory Visualization: Flight Details on Expedia. The agent retrieves specific flight information: (1) Launch the applica-
+tion via Open(Expedia); (2) Select flights via Click(0.808, 0.203); (3) Access recent searches via Click(0.309, 0.586);
+(4) Wait() for data retrieval; (5) Browse results via Scroll(down); (6) Select the airline via Click(0.500, 0.196); (7) View
+detailed itinerary via Click(0.137, 0.188); (8) Terminate the task via Finish().
+
+
+
+
+Figure 18. Trajectory Visualization: Hotel Inquiry on MakeMyTrip. The agent initiates a hotel search process: (1) Launch the
+application via Open(MakeMyTrip); (2) Wait() for the interface to load; (3) Select the hotel category via Click(0.383, 0.252);
+(4) Initiate the search via Click(0.500, 0.518); (5) Terminate the task via Finish().
+
+
+
+                                                                   9
+Figure 19. Trajectory Visualization: Alarm Adjustment on Clock. The agent modifies an existing alarm setting: (1) Launch the appli-
+cation via Open(Clock); (2) Select the target alarm via Click(0.233, 0.226); (3) Adjust the hour setting via Click(0.379,
+0.660); (4) Confirm the modification via Click(0.801, 0.760); (5) Terminate the task via Finish().
+
+
+
+
+Figure 20. Trajectory Visualization: Forecast Retrieval on Weather. The agent navigates to the extended forecast view: (1) Launch the
+application via Open(Weather); (2) Wait() for data synchronization; (3) Expand the forecast view via Click(0.905, 0.858);
+(4) Browse the weekly data via Scroll(down); (5) Continue browsing via Scroll(down); (6) Terminate the task via Finish().
+
+
+
+
+Figure 21. Trajectory Visualization: Document Retrieval on Google Files. The agent locates a specific file: (1) Launch the application
+via Open(files); (2) Activate the search bar via Click(0.902, 0.083); (3) Input the filename via Input text(‘‘Venice
+tour’’); (4) Open the file via Click(0.524, 0.154); (5) Terminate the task via Finish().
+
+
+
+                                                                 10
+Figure 22. Trajectory Visualization: Book Search on Google Play Books. The agent searches for and selects a specific title: (1) Launch
+the application via Open(google play books); (2) Focus on the search bar via Click(0.324, 0.091); (3) Enter the book title
+via Input text(‘‘WOMEN IN ISLAM by...’’); (4) Execute search via Click(0.920, 0.899); (5) Select the first result via
+Click(0.500, 0.288); (6) Terminate the task via Finish().
+
+
+
+
+Figure 23. Trajectory Visualization: Plant Identification on Blossom. The agent searches for botanical information: (1) Launch
+the application via Open(Blossom); (2) Activate the search bar via Click(0.500, 0.398); (3) Input the plant name via
+Input text(‘‘ihi’’); (4) Select the entry via Click(0.225, 0.177); (5) Terminate the task via Finish().
+
+
+
+
+Figure 24. Trajectory Visualization: Artwork Search on Arts & Culture. The agent retrieves specific artist works: (1) Launch
+the application via Open(Arts & Culture); (2) Click the search icon via Click(0.067, 0.083); (3) Input the query via
+Input text(‘‘Emily Carr artwork’’); (4) Confirm the search via Click(0.920, 0.904); (5) Terminate the task via
+Finish().
+
+
+                                                                 11
+Figure 25. Trajectory Visualization: Audio Playback on Insight Timer. The agent navigates to and plays specific sleep content: (1)
+Navigate back via Back(); (2) Open the Sleep tab via Click(0.499, 0.258); (3) Select the music category via Click(0.172,
+0.297); (4) Select the track “Deep sleep” via Click(0.500, 0.412); (5) Activate playback via Click(0.499, 0.489); (6)
+Terminate the task via Finish().
+
+
+
+
+Figure 26. Trajectory Visualization: Content Discovery on Pinterest. The agent searches for a specific art category: (1) Launch the
+application via Open(Pinterest); (2) Navigate to the search tab via Click(0.344, 0.947); (3) Activate the search bar via
+Click(0.494, 0.092); (4) Input the query via Input text(‘‘Sculpture art’’); (5) Execute search via Click(0.920,
+0.899); (6) Terminate the task via Finish().
+
+
+
+
+Figure 27. Trajectory Visualization: Guided Meditation on Insight Timer. The agent selects a morning ritual: (1) Launch the ap-
+plication via Open(Insight Timer); (2) Browse content via Scroll(down); (3) Select the “Morning Affirmation” podcast via
+Click(0.499, 0.603); (4) Initiate playback via Click(0.500, 0.203); (5) Terminate the task via Finish().
+
+
+                                                                12
+

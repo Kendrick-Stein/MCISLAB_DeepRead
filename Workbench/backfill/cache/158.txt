@@ -1,0 +1,698 @@
+                                          RE-VLM: Event-Augmented Vision-Language Model for Scene Understanding
+
+                                                Hanqing Liu1 ,* Mingjie Liu1 ,* Luoping Cui1 , Endian Lin1 , Donghong Jiang1 , Chuang Zhu1,2†
+                                          1
+                                            School of Artificial Intelligence, Beijing University of Posts and Telecommunications, Beijing, China
+                                                      2
+                                                        State Key Laboratory of General Artificial Intelligence, BIGAI, Beijing, China
+                                            {hanqingliu, LMJ, lpcui, ledgogo7, donghongjiang, czhu}@bupt.edu.cn
+
+
+
+
+arXiv:2605.19329v2 [cs.CV] 21 May 2026
+                                                                     Abstract
+                                                                                                                                     Describe in detail what happened in the scene.
+
+                                         Conventional vision-language models (VLMs) struggle to                                       QwenVL (RGB-based VLM)              Key cues covered
+                                                                                                                                       The scene is dark, with only a      Pedestrians
+                                         interpret scenes captured under adverse conditions (e.g., low                                   few distant lights visible,
+                                                                                                                t0                     including a green traffic light
+                                                                                                                                                                            Crossing
+                                                                                                                                                                            Vehicles
+                                         light, high dynamic range, or fast motion) because standard                                  and some other indistinct lights       ahead
+                                                                                                                                      that appear to be from vehicles
+                                         RGB images degrade in such environments. Event cameras                                               or street lamps.
+                                                                                                                                                                           Street Signs
+
+                                         provide a complementary modality: they asynchronously                                        EventGPT (Event-based VLM)
+                                         record per-pixel brightness changes with high temporal res-                                      The scene shows a street
+                                                                                                                                                                           Green signal
+                                                                                                                                       intersection with a pedestrian
+                                         olution and wide dynamic range, preserving motion cues                                         crossing. A person is crossing     Pedestrians
+                                                                                                                                          the street, and there are         Crossing
+                                         where frames fail. We propose RE-VLM, the first dual-stream                                     traffic lights and road signs          ...
+                                                                                                                                           indicating directions for
+                                         vision-language model that jointly leverages RGB images                                                    vehicles                Nighttime
+
+                                         and event streams for robust scene understanding across                                      Our RE-VLM (RGB+Event)
+                                                                                                                                       The scene shows a car driving
+                                         both normal and challenging conditions. RE-VLM employs                                        on a road at night, approaching
+                                                                                                                                                                           Green signal
+                                                                                                                                        an intersection. The traffic       Pedestrians
+                                         parallel RGB and event encoders together with a progressive                                    light is green, and there are       Crossing
+                                                                                                                                        other vehicles visible in the       Vehicles
+                                         training strategy that aligns heterogeneous visual features                                   distance. Two pedestrians are         ahead
+
+                                         with language. To address the scarcity of RGB-Event-Text                                       crossing the road, and there       Street Signs
+
+                                         supervision, we further propose a graph-driven pipeline                t                     are street signs and trees lining
+                                                                                                                                            the sides of the road.          Nighttime
+
+
+                                         that converts synchronized RGB-Event streams into verifi-
+                                         able scene graphs, from which we synthesize captions and            Figure 1. Illustration of RGB-Event complementarity in a challeng-
+                                         question–answer (QA) pairs. To develop and evaluate RE-             ing low-light scene. RGB-only VLM: Struggles with low dynamic
+                                         VLM, we construct two datasets: PEOD-Chat, targeting                range, missing the pedestrian and crosswalk. Event-only VLM:
+                                         illumination-challenged scenes, and RGBE-Chat, covering             Captures the scene structure and the pedestrian’s motion but lacks
+                                                                                                             color and texture, failing to determine the traffic light’s state. Our
+                                         diverse scenarios. On captioning and VQA benchmarks, RE-
+                                                                                                             RE-VLM: Provides a complete description, correctly identifying
+                                         VLM consistently outperforms state-of-the-art RGB-only and          the green light, the pedestrian, the crosswalk, and other vehicles.
+                                         event-only models with comparable parameter counts, with
+                                         particularly large gains under challenging conditions. These
+                                         results demonstrate the effectiveness of event-augmented            struggle under adverse conditions such as extreme low light
+                                         VLMs in achieving robust vision-language understanding              or fast motion. In low-light scenes, overexposed or under-
+                                         across a wide range of real-world environments.                     exposed frames, or high-speed scenarios with significant
+                                                                                                             motion blur, even state-of-the-art RGB-only VLMs often fail
+                                                                                                             to produce accurate and meaningful descriptions. This limita-
+                                         1. Introduction                                                     tion significantly constrains their applicability in real-world
+                                                                                                             dynamic environments.
+                                         Vision-language models (VLMs) have made remarkable
+                                         progress on tasks such as image captioning and visual ques-            In contrast to standard frame-based cameras, event cam-
+                                         tion answering (VQA), demonstrating a strong ability to             eras provide a complementary modality. Instead of cap-
+                                         interpret and describe visual scenes [1, 4, 21]. However,           turing full image frames at fixed rates, an event camera
+                                         most existing VLMs rely on high-quality RGB images and              asynchronously records per-pixel brightness changes with
+                                                                                                             microsecond-level latency and high dynamic range [9]. This
+                                           * Equal contribution.                                             unique mechanism preserves fast motion cues while avoid-
+                                           † Corresponding author.                                           ing saturation and motion blur, enabling the capture of subtle
+
+
+                                                                                                         1
+scene changes even in low-light or high-contrast scenar-              2. Related Work
+ios [28]. These properties make event data especially useful
+in conditions that plague conventional cameras. Recent mul-           Vision-Language Models on RGB Images. Large vision-
+timodal vision-language efforts based on event streams (e.g.,         language models (VLMs) have driven rapid progress in im-
+EventGPT [19]) have begun to leverage this modality; how-             age understanding and multimodal reasoning. In academia
+ever, event streams alone lack rich appearance information            and the open-source community, models like LLaVA [16],
+(e.g., color and fine texture) [35] essential for comprehensive       InternVL [4], DeepSeek-VL [21], and Qwen2.5-VL [1]
+scene understanding. As illustrated in Fig. 1, the inherent           integrate powerful vision encoders with large language
+complementarity between RGB frames and event streams                  models, achieving state-of-the-art results on diverse visual-
+motivates a unified RGB-Event vision-language framework               linguistic tasks (e.g., image captioning and VQA). Mean-
+that can capitalize on the strengths of both.                         while, industry-scale systems such as GPT-4V [13] and Gem-
+                                                                      ini [27] advance the frontier with unprecedented multimodal
+    To address these limitations, we present RE-VLM, the              capabilities, demonstrating the power of coupling visual in-
+first VLM to fuse static RGB appearance cues (texture/color)          puts with LLMs. These models share a common limitation:
+with dynamic event-based cues (motion/high dynamic range).            they rely on static RGB images and remain vulnerable under
+RE-VLM is a dual-stream model that also supports single-              adverse imaging conditions, where RGB-only models can
+modality inputs and is designed for robust scene understand-          fail to produce accurate or reliable predictions.
+ing under both standard and adverse conditions. A key chal-           Event-based vision and Event-Language alignment. In
+lenge in developing such a model is the scarcity of RGB-              contrast to standard cameras, event cameras offer a fun-
+Event-Text training data. We tackle this data bottleneck with         damentally different sensing modality that is well suited
+a graph-driven data generation pipeline: synchronized RGB-            for challenging conditions [10]. A rich body of work has
+Event streams are converted into an explicit RGB-Event                explored event-based vision for recognition, tracking, and
+knowledge graph capturing verifiable scene facts, and from            SLAM [9]. Researchers have developed methods for low-
+this graph we automatically synthesize high-quality image             level perception (feature detection, optical flow) [11, 24] and
+captions and VQA pairs at scale. Fig. 2 provides an overview          high-level tasks like object recognition and 3D reconstruc-
+of our approach. The left panel illustrates the graph-driven          tion using events [14, 18, 26]. These works demonstrate that
+pipeline that converts synchronized RGB-Event streams into            event streams can effectively complement or substitute RGB
+an explicit knowledge graph and provides human-verified               inputs in scenarios with fast dynamics or HDR lighting [28].
+captions and VQA annotations, yielding two new datasets:                  Integrating event data into vision-language frameworks
+PEOD-Chat (focusing on challenging illumination scenar-               has emerged as a promising research direction. Initial efforts
+ios) and RGBE-Chat (covering general scenes). The right               (e.g. EventCLIP [29]) adapt pre-trained image–text mod-
+panel depicts the RE-VLM architecture, which employs a                els to the event domain, enabling zero-shot and few-shot
+dual visual encoder (RGB and event) with an LLM-aware                 recognition on event data by capitalizing on CLIP’s vision–
+fusion module. We detail the data pipeline in Sec. 3 and the          text alignment. Similarly, EventBind [34] extends CLIP [25]
+model in Sec. 4. Our main contributions are as follows:               with a dedicated event encoder to embed events, images, and
+• A robust RGB-Event dual-stream VLM. We propose                      text in one space, supporting cross-modal retrieval and open-
+   RE-VLM, the first VLM to fuse static RGB cues (tex-                set classification under limited supervision. However, both
+   ture/appearance) with dynamic event cues (motion/HDR).             EventCLIP [29] and EventBind [34] lack a large language
+   We introduce a progressive training regimen to effectively         model and cannot leverage the vast world knowledge and
+   align these modalities, significantly improving robustness         linguistic context that an LLM provides. This limits their
+   in low light, HDR transitions, and fast motion.                    capacity for higher-level scene understanding, free-form de-
+• Graph-driven data pipeline and new RGB-Event-Text                   scription, or dialogue about event data.
+   datasets. To address the lack of RGB-Event-Text training           Vision-Language Models with Events. Very recent studies
+   data, we develop a graph-driven data generation pipeline.          integrate event data directly into multimodal LLMs. Event-
+   This pipeline synthesizes verifiable scene descriptions and        GPT [19] is the first VLM specifically tailored for event
+   QA pairs from synchronized RGB-Event inputs. Using this            streams and shows strong performance under extreme mo-
+   approach, we construct two datasets: PEOD-Chat (with               tion and lighting extremes. Nonetheless, event-only VLMs
+   challenging illumination conditions) and RGBE-Chat (cov-           inevitably inherit the fundamental limitation of the event
+   ering general scenarios).                                          modality: because events only capture changes, they contain
+• Impressive performance in RGB-Event understanding.                  no explicit color information and only sparse details about
+   RE-VLM outperforms strong RGB-only and event-only                  static scene context [9]. In practice, such models can describe
+   baselines, including models with comparable or even 2×             motion and high-contrast structure, but cannot recognize fine
+   more parameters, yielding notable gains in caption fidelity        appearance attributes (e.g., object colors and textures) that
+   and situational understanding under adverse conditions.            are readily apparent in RGB images. This lack of rich appear-
+
+
+                                                                  2
+                                                  PEOD-Chat Dataset                                      Describe in detail what
+                                                                                                         happened in the scene.
+                                                                            ...
+
+                                                  Caption: A white sedan drives out of a tunnel... a
+                                                  multi-lane urban roadway, ...while several
+   RGB Graph Generator   Event Graph
+                                   x Generator    vehicles and buildings appear ahead.
+
+                                                  Q: Are there other vehicles ... background?
+                                                  A: Yes, there are several other vehicles...             Event Encoder
+
+                                                  RGBE-Chat Dataset                                            STAM                     RGB Encoder
+                                                                          ...
+                                                                                                          Event Adapter                 RGB Adapter
+               LLM-Aware Fusion
+                                                  Caption: This scene shows an angler ... beside a
+                                                  landing net and holding a fish with both hands,                   Large Language Model
+                          Training & Test
+                                                  trees ... in the background.
+                               Data
+                                                  Q: What on the ground holds the fish?
+                           Manual Check           A: A landing net is lying on the ground...           The scene shows a sedan driving along a city road ...
+
+
+
+Figure 2. Construction of RE-VLM: data generation pipeline and model. Left: A graph-driven pipeline converts synchronized RGB
+frames and event streams into a graph, extracts verifiable scene facts, and synthesizes reliable caption and QA supervision. Center:
+Representative examples from the datasets yielded by the pipeline: PEOD-Chat (illumination-challenged scenes) and RGBE-Chat (general
+scenarios). Right: The RE-VLM model fuses static RGB appearance features with dynamic cues from events and is trained with a progressive
+strategy for robust captioning and VQA under low-light, high-dynamic-range, and fast-motion conditions.
+
+
+ance cues constrains the breadth of semantic understanding                        cues to guide modality weighting. The pipeline converts
+such models can provide. Meanwhile, the complementary                             synchronized RGB and event streams into graph-structured
+strengths of frames and events suggest that a hybrid approach                     scene facts and then synthesizes caption and VQA supervi-
+could unlock robust vision-language understanding across                          sion under degraded conditions.
+all conditions [10]. Indeed, prior works in low-level vision
+have shown that fusing event streams with standard frames
+                                                                                  3.1. Graph Generation
+yields superior performance in object detection and tracking                      Event Graph Generation. To ensure temporal consis-
+under difficult conditions [8, 20, 32, 35]; overall, research                     tency with the image modality, we first locate each RGB
+on event cameras is shifting from event-only modeling to-                         keyframe and select an N × 33 ms event window, where
+ward RGB-Event fusion and from low-level vision toward                            N = 4, centered on its timestamp. We reconstruct this event
+higher-level scene understanding.                                                 segment into a sequence of N grayscale frames using a state-
+                                                                                  of-the-art event reconstruction network (e.g., NER-Net [17]).
+3. RGB-Event-Text Data Generation                                                 Stacking the reconstructed frames in temporal order yields a
+                                                                                  “video-like” event tensor that serves as input to a captioning
+RGB image datasets have been extensively explored in com-                         VLM.
+puter vision. However, large-scale RGB-Event-Text cor-                                Following the “Captioning” step in Fig. 3, we generate a
+pora suitable for training multimodal large language models                       structured description constrained to observable facts. The
+(MLLMs) remain scarce, especially for adverse conditions                          description follows a subject–motion–place–relation schema,
+where a single modality degrades (e.g., low light, HDR tran-                      maintains consistent coreference, and explicitly marks dy-
+sitions, or fast motion). Prior work has shown that large                         namic and temporal cues. Entity qualifiers (e.g., relative po-
+models (e.g., GPT-family) can synthesize supervision for                          sition, appearance) are kept concrete and stable to facilitate
+multimodal applications. Yet, current pipelines that generate                     downstream parsing.
+Event-Text data from RGB alone struggle precisely when                                In the subsequent “Graph Parsing” stage, we use an LLM
+RGB deteriorates, because RGB-trained VLMs cannot reli-                           to convert the caption into an event graph. Each node is la-
+ably infer content under severe degradation. To address this                      beled with a minimal argument tuple (subject, motion, place,
+gap, we introduce a graph-driven degradation-adaptive                             attributes); for example, Move(subject = car, motion =
+data generation pipeline. A graph serves as a verifiable inter-                   forward, place = lane center). Standardized naming en-
+mediate representation and explicitly encodes degradation                         sures graph coreference consistency. The resulting graph is a
+
+
+                                                                        3
+         RGB Frame                                                       RGB Graph                ʔAware                                     Fusion Graph
+                             ʒ RGB Graph Generation                        S                       Fusion
+                                                               White           Move                                                      S                     H
+                                                                Car                                                          White           Move                        Follow
+                                           RGB                         T        P
+                                                                                        P                 LLM                 Car
+                                                                                                                                                          P
+                             VLM                    LLM                                                  Aware                       D         P                         S
+                                          Caption              facing
+                                                                exit           Lane     Tunnel
+                                                                                                         Fusion          Toward              Roadway       Tunnel          Two
+                                                                                                                                                                         Vehicles
+                                                                    A               A
+                                                                Over-
+                                                                               Center
+                                                                                                                                T                   A                        E
+                                                               exposed
+                                                                                                                             Exit            Center
+                                                                                                                                                               R+E
+                                                                                                                                              ʕ QA
+        Event Stream         Reconstructed Frames   ʓEvent Graph Generation                               Event Graph                         Generator              LLM
+                                                                                                           S             H
+                                                                                                  Car          Move           Follow               Captions &
+                                                               Event                                       D        P          S
+                                                                                                                                Two                VQA List
+                                                    VLM                             LLM          Toward        Roadway        Vehicles
+                                                              Caption                               T               A
+                                                                                                                                                   S:subject   P:place   D:direction
+                                    ...                                                           Exit         Center
+                                                                                                                                              H:hierarchical T:target     A:attribute
+
+
+
+
+Figure 3. Data generation pipeline overview. From reconstructed event frames and RGB images, two modality-specific graphs are
+constructed. A degradation-aware fusion then merges them into a single RGB-event graph (nodes: entities, edges: relations). Finally, captions
+and VQA items are synthesized from the fused graph. (S: subject, P: place, D: direction, T: target; H: hierarchical relation; A: attribute.)
+
+
+concise, auditable intermediate representation that supports                    cally equivalent events are merged, annotated with source
+degradation-aware fusion and subsequent QA generation.                          ∈ {Ge , Gr , Ge+r } and confidence scores. Finally, we feed
+RGB Graph Generation. To remain strictly time-aligned                           the fused graph and fusion policy into a text-generation
+with the event stream, we build the RGB graph on the RGB                        model to generate caption and up to three VQA items.
+keyframe synchronized with the selected event window. In                            To assess the reliability of our generation pipeline, we
+contrast to the event graph’s emphasis on temporal contours                     adopt a human-audited correction protocol, following re-
+and motion trends, the RGB graph focuses on appearance                          cent dataset-curation practice that performs large-scale cap-
+and static structure, prioritizing entity attributes (color, tex-               tion correction and validates quality via human studies [22].
+ture, shape), scene geometry, and the global spatial layout.                    Concretely, we randomly sampled N = 855 instances from
+We also incorporate degradation phenomena into both the                         PEOD and, for each instance, produced textual supervision
+description and the structured graph by explicitly annotating                   (QA pairs) using two systems: (i) our method and (ii) an
+degradations such as low light, overexposure, glare, motion                     RGB-only generation baseline (EventGPT [19]). Human
+blur, etc. These degradation labels are attached to the rele-                   annotators audited every item and marked it as requiring
+vant nodes and edges and later serve as principled evidence                     correction if any factual error appeared in either the question
+for modality weighting in graph fusion.                                         or the answer. As summarized in Tab. 1, our approach yields
+                                                                                a substantially lower correction rate, indicating more reliable
+3.2. Graph Fusion and QA Generation                                             supervision in adverse scenes.
+We employ an LLM to perform degradation-aware fusion                            Table 1. Manual QA corrections on PEOD samples. Human-audited
+between the event graph and the RGB graph. Concretely,                          correction rate and count comparing an RGB-only generation base-
+we propose a degradation-adaptive fusion strategy and de-                       line [19] with our method; lower is better.
+note the event graph by Ge and the RGB graph by Gr . We
+diagnose imaging quality solely from Gr based on its degra-                         Method                        Correction Rate                         Correction Count
+dation labels. We then perform field-level arbitration during
+fusion: all facts involving motion cues, temporal ordering,                         RGB VLM [19]                         54.2%                                       463
+and topological structure are anchored to Ge because event                          Ours                                 18.1%                                       155
+signals are more robust to dynamics and edge structures;
+facts involving light sources, color, or readable text are taken
+from Gr , provided that Gr is not severely degraded. If Gr is                   3.3. PEOD-Chat and RGBE-Chat
+degraded, its conclusions must not override those from Ge ;                     In challenging scenarios such as the PEOD dataset [6], we
+instead, they are retained as low-confidence candidates.                        apply the proposed pipeline to synthesize caption and QA
+   For geometry-related fields such as counts and positions,                    supervision from synchronized RGB-Event streams. After
+we adopt the consensus if Ge and Gr agree; otherwise, Gr                        manual screening, the resulting items form PEOD-Chat, an
+takes precedence and the outputs from Ge are downgraded                         RGB-Event-Text dataset for challenging illumination con-
+to secondary. We align and normalize entities, and attach                       ditions. For more general scenarios, we follow the dataset
+metadata such as modality presence and confidence. Semanti-                     construction protocol of EventGPT [19], and then apply the
+
+
+                                                                           4
+                                                           Large Language ModelδLLMε
+
+
+
+                              Provide a detailed                                                  Event Adapter                                RGB Adapter
+        Event Camera       description of the scene.
+               t
+                                                                                             Spatio-Temporal Alignment                     RGB Vision Encoder
+
+
+
+
+                                                   Event Vision Encoder
+        ti+2                                                                       Multi-scale
+                                                                                   T-DWConv
+                                                                                                      Module
+                                                                                                                                  Matrix
+                                                                                                                   Relation
+                                                                                                 Matrix
+        ti+1                                                                                                        Loss
+
+                        Event   Event tensors
+          ti           Stream
+                                                                                                    Event                      RGB
+                                                                                                   Attention                  Attention
+                                                                                                    Weight         Relation    Weight
+          y
+                                                                                                                 Token Weight                  RGB Image
+                   x
+
+Figure 4. RE-VLM model architecture. Synchronized RGB and event streams are encoded. During training, a Spatio-Temporal Alignment
+Module (STAM) provides alignment signals and a relation loss. During inference, event features after the temporal DWConv are projected
+(event adapter) and, together with RGB tokens (RGB adapter), are fed to the LLM.
+
+
+same human filtering procedure to obtain RGBE-Chat. To-                                                   and high dynamic range together with the RGB image’s
+gether, PEOD-Chat and RGBE-Chat serve as both training                                                    static appearance, enabling comprehensive understanding
+corpora and evaluation benchmarks; their sources and scales                                               in low-light or HDR scenes. The architecture comprises an
+are summarized in Tab. 2.                                                                                 RGB vision encoder, an event vision encoder, a lightweight
+                                                                                                          Spatio-Temporal Alignment Module (STAM, training-time
+Table 2. Composition of PEOD-Chat and RGBE-Chat datasets.                                                 only), two modality adapters, and an LLM decoder.
+Data sources and post-screening sample counts for captioning and                                              Given an RGB frame X and its temporally aligned event
+VQA tasks. In RGBE-ImageNet, the RGB data come from Ima-
+                                                                                                          stream S, the encoders produce feature maps
+geNet [7], and the paired event data are generated using the method
+of [31].                                                                                                               Fi = frgb (X),       Fe = fevent (S).         (1)
+
+           Dataset              Source                                      Size                          A temporal depthwise convolution (DWConv) over the event
+                                                                                                          slice axis yields an event representation F̃ e used for pro-
+           PEOD-Chat            PEOD [6]                                    11k
+                                                                                                          jection, while STAM is used only during training to com-
+                                TOTAL                                       11k                           pute alignment signals and the relation loss. The modality
+                                                                                                          adapters map features to the LLM space:
+                                RGBE-ImageNet                               60k
+                                                                                                                                          Te = ge F̃ e .
+                                                                                                                                                     
+                                DSEC [12]                                   12k                                         Ti = gi Fi ,                               (2)
+                                DDD17 [2]                                   1.7k
+           RGBE-Chat                                                                                      At inference, the LLM receives instruction tokens P concate-
+                                RGBE-SEG [5]                                15k
+                                MVSEC [36]                                  11k                           nated with the two projected streams and performs causal
+                                                                                                          decoding:
+                                M3ED [3]                                    14k                                                                    
+                                                                                                                            A = fLLM [P ; Ti ; Te ] .             (3)
+                                TOTAL                                     113.7k
+                                                                                                          4.2. Event Dynamics Encoding
+                                                                                                          Each raw event is represented as ej = (xj , yj , tj , pj ) with
+                                                                                                          polarity pj ∈ {+1, −1}. We consider a short temporal win-
+4. Method                                                                                                 dow around the image timestamp and divide it into Nw = 3
+4.1. Overview of RE-VLM                                                                                   slices; events falling in slice t are accumulated into a two-
+                                                                                                          channel image Et . Passing the sequence {Et }N  w
+                                                                                                                                                        t=1 through an
+We aim to achieve robust scene understanding under ad-                                                    event encoder (a ViT backbone) produces per-slice feature
+verse conditions by fusing fine-grained RGB appearance                                                    maps Fte = fevent (Et ) and thus a spatio-temporal tensor
+cues with event-driven dynamics. As shown in Fig. 4, RE-
+                                                                                                                                            Nw ×H×W ×D
+VLM leverages the event stream’s high temporal resolution                                                                F e = {Fte }N
+                                                                                                                                     t=1 ∈ R
+                                                                                                                                       w
+                                                                                                                                                       .             (4)
+
+
+                                                                                                  5
+To capture motion at multiple time scales, we apply                     discrepancies over all Tc frames:
+multi-scale depthwise 1D convolutions along the temporal
+                                                                                                                   T
+axis of F e , concatenate their outputs, and project back to                                                 1 X  c
+
+
+D channels, yielding an enhanced event feature tensor Fee .                               LCA-WTD =                 ⟨w(t) , D(t) ⟩.                            (8)
+                                                                                                             Tc t=1
+A lightweight SE-style temporal weighting is then applied
+to Fee to re-emphasize salient motion intervals and suppress            This loss penalizes feature mismatches between the two
+background slices, before projecting the event features into            modalities, with a stronger effect on important regions
+the LLM space via ge (·).                                               (where w(t) is high), thereby pulling RGB and event repre-
+Training-time Alignment with STAM. To encourage the                     sentations closer in those areas. The total training objective
+RGB and event features to align in time and space, we in-               adds this regularizer to the main VLM loss:
+troduce a Spatio-Temporal Alignment Module (STAM) dur-
+ing training. STAM computes two parallel self-attention                                          L = LLLM + λ LCA-WTD ,                                        (9)
+mappings and then fuses them to identify important re-
+gions across both modalities. Concretely, we first resam-               where LLLM is the standard language-guided loss and λ con-
+ple the image feature map F i (from the RGB encoder                     trols the strength of the alignment. We set λ = 0.1 in our
+at the same timestamp) and the event feature Fee to a                   experiments, following the common practice of using a small
+shared spatio-temporal lattice of size (Tc , Hc , Wc ) for align-       weight to balance auxiliary alignment losses [15].
+ment. Let R          e (t) ∈ RD×Hc ×Wc denote the aligned
+              e(t) , E
+RGB and event feature grids at time step t. We flatten                  4.3. Training Pipeline
+these feature maps into token matrices R(t) ∈ RD×Nr
+afnd E (t) ∈ RD×Ne (with Nr = Ne = Hc Wc ). We                            Large Language Model       Large Language Model              Large Language Model
+then perform channel-wise L2 normalization on each to-
+                                                                             Event                  Event         RGB                 Event         RGB
+ken vector to obtain R     b(t) = normD (R(t) ) and E    b (t) =            Adapter                Adapter       Adapter             Adapter       Adapter
+            (t)
+normD (E ). STAM’s dual self-attention is computed by                        Event       Text
+                                                                                                    STAM          RGB       Text
+                                                                                                                                      STAM          RGB       Text
+                                                                            Encoder                              Encoder                           Encoder
+taking dot-products within each modality:                                                           Event                             Event
+                                                                                                   Encoder                           Encoder
+
+        Pr(t) = R
+                b(t)⊤ R
+                      b(t) ,       Pe(t) = E
+                                           b (t)⊤ E
+                                                  b (t) .    (5)
+                                                                          Event Stream                          RGB Image                         RGB Image
+                                                                                                 Event Stream                      Event Stream
+From each self-attention matrix, we derive a token saliency
+as the graph degree (row-sum of affinities): for modality               Figure 5. Training pipeline. Three compact stages: (1) Initial event–
+                                       (t)
+m ∈ {r, e}, the degree vector from Pm is reshaped to the                language alignment, (2) Align the event and RGB modalities with
+                                             (t)
+spatial grid, yielding an importance map w em ∈ RHc ×Wc .               STAM, (3) End-to-end instruction tuning.
+We fuse the two modalities’ saliency maps by averaging and
+normalizing the result to avoid dominance by either modality,               We adopt a concise three-stage curriculum that first aligns
+producing a unified importance map for each frame t:                    event representations with language, then aligns it with
+                                                                       the RGB representation via STAM, and finally performs
+                                          
+              w(t) = norm 12 w
+                             er(t) + w
+                                     ee(t) .                 (6)        lightweight instruction tuning on the LLM.
+                                                                        Stage 1: Event-Language alignment. Starting from a pre-
+                                                                        trained RGB-based VLM backbone, we introduce the event
+Relation Loss during Training. Using these fused im-
+                                                                        vision encoder and event adapter and train them on a large-
+portance weights, we define a relation loss to align the
+                                                                        scale set of Event-Text caption pairs from RGBE-ImageNet
+two modalities’ features at the token level. First, we com-
+                                                                        dataset while keeping the LLM and the RGB branch frozen.
+pute a per-frame discrepancy map D(t) ∈ RHc ×Wc as the
+                                                                        This stage yields an event-only pathway whose representa-
+channel-wise mean absolute difference between the resam-
+                                                                        tions are directly aligned with the language space.
+pled RGB and event feature maps:
+                                                                        Stage 2: Event-RGB alignment. We then leverage paired
+                           D                                            RGB-Event data from ImageNet and N-ImageNet to align
+               (t)     1 X e(t)     e (t) .                             the event branch with the frozen RGB branch with captions
+             Dh,w =         R      −E                        (7)
+                       D c=1 c,h,w   c,h,w
+                                                                        serving as supervision. During this stage, the LLM and RGB
+                                                                        pathway remain frozen; we optimize the event vision encoder
+We then take the spatial inner product of the importance                together with the STAM module, which performs temporal
+map with this discrepancy map, ⟨w(t) , D(t) ⟩, which yields a           modeling on event tokens and imposes relation losses be-
+single alignment penalty for frame t. The cross-modal align-            tween event and RGB features. This step builds a coherent
+ment regularizer is defined as the average of these weighted            dual-branch representation.
+
+
+                                                                    6
+Table 3. Results on PEOD-Chat and RGBE-Chat. We report LLM-judge scores for Caption and VQA. Our RE-VLM attains the best
+performance on both benchmarks, with large gains on illumination-challenged PEOD-Chat, showing that jointly leveraging event streams
+and RGB improves illumination-challenged scene understanding. (*) denotes variants fine-tuned on PEOD-Chat and RGBE-Chat: the
+RGB-only model is trained with RGB–text supervision, and the event-only model with event–text supervision.
+
+                                                                  PEOD-Chat                            RGBE-Chat
+     Input           Models                 Params            Caption       VQA                    Caption       VQA
+                                                       CI      DO      CU     Ave    Acc     CI     DO     CU     Ave    Acc
+                     Qwen2.5-VL [1]           3B       2.47    2.03   3.04    3.47   0.52   3.34    2.70   3.64   3.80   0.66
+                     Intern2VL [4]            4B       3.09    2.38   3.68    3.36   0.49   3.47    2.84   3.91   3.70   0.68
+                     DeepSeek2-VL [21]        7B       3.25    2.42   3.73    3.37   0.50   3.63    2.89   4.11   3.49   0.52
+     RGB-only
+                     LLaVA-1.5 [16]           7B       2.71    2.05   3.03    3.59   0.54   3.12    2.31   3.60   3.69   0.62
+                     Qwen2.5-VL∗ [1]          3B       3.23    2.74   3.51    3.61   0.55   3.91    3.41   4.27   3.86   0.65
+                     EventGPT [19]            7B       2.51    2.06   2.65    3.04   0.40   2.82    2.34   3.08   3.10   0.39
+     Event-only
+                     Qwen2.5-VL∗ [1]          3B       2.74    2.48   2.97    3.24   0.45   2.79    2.57   3.16   3.59   0.58
+     RGB+Event       RE-VLM                   4B       3.68    3.12   3.95    3.82   0.63   4.03    3.50   4.34   4.20   0.75
+
+
+
+Stage 3: Instruction tuning. Finally, we freeze both visual           Evaluation Protocol and Metrics. Following the LLM-as-a-
+branches and STAM, and attach low-rank LoRA adapters                  judge protocol popularized by Video-ChatGPT [23], we con-
+to the LLM for supervised fine-tuning on multimodal in-               duct zero-shot evaluation on VQA-style prompts. GPT-3.5-
+struction data (captioning and VQA dialogues). Only the               Turbo acts as the judge and assigns 0–5 Likert scores along
+LoRA parameters are updated, preserving the aligned RGB               three dimensions: CI (Correctness of Information), DO (De-
+and event encoders while endowing RE-VLM with strong                  tail Orientation), and CU (Contextual Understanding). For
+instruction-following ability and flexible inference under            the VQA responses, we compute two overall measures: Ave,
+RGB-only, Event-only, or joint RGB+Event settings.                    the LLM-assigned average VQA answer quality score (0–5
+                                                                      scale), and Acc, a VQA accuracy metric computed at the
+5. Experiments                                                        attribute level (awarding 1 point for each correctly predicted
+                                                                      attribute, and 0 for any incorrect attribute).
+5.1. Experimental Settings
+                                                                      5.2. Comparison with State-of-the-Art Models
+Datasets. We construct two multimodal dialogue bench-
+marks tailored for challenging illumination and general               Quantitative Results. Tab. 3 compares our RE-VLM to
+scenes. From PEOD-Chat, we curate 1,750 test samples,                 recent MLLMs and an event-only VLM. Across both bench-
+with a distribution matching PEOD [6]: 60% adverse imag-              marks, RE-VLM achieves the highest scores on captioning
+ing (e.g., low light, overexposure, motion blur) and 40%              metrics (CI, DO, CU) and VQA performance (Ave, Acc),
+normal illumination. All text supervision from Section 3              indicating that jointly leveraging event streams alongside
+(captions and VQA pairs) manually corrected for factual ac-           RGB images significantly improves a model’s understanding
+curacy and consistent references. From RGBE-Chat, we sim-             of complex scenes. The gains are particularly pronounced
+ilarly curate 2,047 test samples covering diverse real-world          on the illumination-challenged PEOD-Chat, where RGB im-
+scenes. We enforce a strict sequence-level split, ensuring            age quality is degraded; in these cases, RE-VLM recovers
+none of the test sequences appear in the training set.                motion and structural cues from the event data while pro-
+Model & Training. Our RE-VLM backbone is based on                     viding color and texture information via the RGB branch
+Qwen2.5-VL-3b. Models are trained on 8×NVIDIA 4090                    that event-only models inherently lack. On the more diverse
+GPUs, proceeding in three stages: (i) Event-Language align-           RGBE-Chat benchmark, RE-VLM still yields improvements
+ment on 1,300K pairs with learning rate 1 × 10−4 and batch            over all baselines, suggesting that the proposed dual-stream
+size 32; (ii) Event-RGB alignment on 600K pairs with learn-           design generalizes beyond strictly adverse conditions.
+ing rate 1 × 10−4 and batch size 16; (iii) Instruction tuning         Qualitative analysis. Fig. 6 presents a qualitative com-
+on 120K samples with learning rate 2 × 10−4 and batch size            parison on a challenging scene. The RGB-only baseline
+16. To retain an end-to-end pipeline and ensure fair compari-         (Qwen2.5-VL) fails to detect a city bus under severe over-
+son under identical inputs, event streams are rendered into           exposure in the scene, erroneously reporting no bus present,
+event images for all competing models.                                whereas RE-VLM leverages motion cues from the event
+
+
+                                                                 7
+stream to correctly identify a city bus behind the car. Sim-                                   Table 4. Ablation on input modality and STAM on PEOD-
+ilarly, the event-only model (EventGPT) cannot determine                                       Chat. Single-branch rows drop the other stream at inference. For
+appearance attributes such as color while RE-VLM accu-                                         RGB+Event, ✗ indicates that STAM is not used.
+rately recognizes it as white by integrating the RGB image’s
+color and texture cues. These results highlight that by fusing                                                                    Caption          VQA
+                                                                                                 Input          STAM
+complementary motion and appearance information, RE-                                                                       CI       DO    CU     Ave Acc
+VLM can robustly identify object categories and attributes                                       RGB-only           —      3.05    2.51   3.32   3.63     0.57
+even under adverse conditions where single-modality models                                       Event-only         —      2.82    2.57   3.09   3.40     0.48
+falter.                                                                                          RGB+Event          ✗      3.62    3.08   3.91   3.79     0.61
+                                                                                                 RGB+Event          ✓      3.68    3.12   3.95   3.82     0.63
+
+                                                                                               Table 5. Ablation on input modality and STAM on RGBE-
+                                                                                               Chat. Single-branch rows drop the other stream at inference. For
+                                                                                               RGB+Event, ✗ indicates that STAM is not used.
+
+                                                                                                                                  Caption          VQA
+  Q: Describe in detail what happened in the scene. And how many city buses are                  Input          STAM
+  in the scene?                                                                                                            CI       DO    CU     Ave Acc
+  A: Qwen2.5-VL (RGB-only):
+  In the scene, there is a small car and a larger vehicle, ... The lighting is dim, with         RGB-only           —      3.97    3.46   4.32   4.10     0.73
+  the entrance to the garage being illuminated by natural light coming from
+  outside. The cars are positioned side by side, ... There are no city buses visible             Event-only         —      2.49    2.48   2.82   3.53     0.57
+  in this scene. The focus is on the two vehicles within the garage.
+  A: Ours RE-VLM (RGB + Event):
+                                                                                                 RGB+Event          ✗      4.01    3.47   4.35   4.19     0.74
+  The scene shows a car driving on a road with other vehicles, including a city bus.             RGB+Event          ✓      4.03    3.50   4.34   4.20     0.75
+  The city bus is positioned behind the car and appears to be moving in the same
+  direction...
+                                                                                               Table 6. Evaluation using an open-source LLM judge (Qwen3-
+  Q: What is the color of the vehicle at the center...?                                        Omni-30B [30]) in place of GPT-3.5-Turbo. The trends remain
+  A: EventGPT (Event-only):
+  The vehicle at the center of the image is black.
+                                                                                               consistent with the GPT-3.5-Turbo evaluation across metrics.
+  A: Ours RE-VLM (RGB + Event):
+  The vehicle at the center of the image is white.
+                                                                                                 Task      Metric       Qwen2.5VL    EventGPT     RE-VLM
+                                                                                                              CI          2.17            1.99          3.29
+Figure 6. Qualitative VQA comparison in an overexposed traffic
+scene. RGB-only and event-only baselines miss the city bus or                                    Caption      DO          1.82            1.89          3.45
+fail to capture the color, while RE-VLM correctly identifies both,                                            CU          2.71            2.50          3.85
+demonstrating robust scene understanding under challenging light-
+                                                                                                              Ave         2.78            2.38          3.43
+ing conditions.                                                                                  VQA
+                                                                                                              Acc         0.48            0.40          0.62
+
+
+5.3. Ablation Study
+                                                                                               recommendations to cross-validate LLM-as-a-judge evalua-
+Single-branch Inference and STAM Module. RE-VLM                                                tions [33], we additionally employ the open-source Qwen3-
+can operate not only with joint RGB+Event input, but also                                      Omni-30B [30] as an independent judge on PEOD-Chat.
+with a single modality at inference time. Tab. 4 and Tab. 5                                    Tab. 6 shows consistent trends across metrics, corroborating
+present an ablation study on input modalities and our Spatio-                                  the conclusions drawn with GPT-3.5-Turbo.
+Temporal Alignment Module (STAM). On both benchmarks,
+using only RGB or only event data still yields reasonable cap-                                 6. Conclusion
+tioning and VQA performance. The joint RGB+Event config-
+uration consistently outperforms either single-modality set-                                   We introduced RE-VLM, a dual-stream vision–language
+ting, demonstrating that our dual-branch architecture effec-                                   model that jointly leverages RGB images and event streams
+tively exploits the complementary information from events                                      for robust scene understanding. To address the scarcity of
+and RGB, especially under adverse conditions. We also ex-                                      RGB-Event-Text supervision, we further introduced a graph-
+amine the contribution of the STAM module by comparing                                         driven data generation pipeline and constructed two datasets
+against a variant that replaces STAM with naive feature con-                                   covering both common and challenging conditions. Experi-
+catenation. Incorporating STAM leads to consistent improve-                                    ments show that RE-VLM consistently outperforms strong
+ments or maintenance of performance across both datasets.                                      RGB-only and event-only baselines, particularly in challeng-
+Cross-Validation with an Open-Source LLM Judge. Be-                                            ing scenarios, providing a practical foundation for future
+cause GPT-3.5-Turbo is closed-source, and following recent                                     work on event-augmented vision-language understanding.
+
+
+                                                                                           8
+Acknowledgments                                                           [11] Daniel Gehrig, Henri Rebecq, Guillermo Gallego, and Davide
+                                                                               Scaramuzza. Asynchronous, photometric feature tracking
+This work was supported by the National Key R&D Pro-                           using events and frames. In Proceedings of the European
+gram of China (2021ZD0109802), the Beijing Natural Sci-                        Conference on Computer Vision (ECCV), pages 750–765,
+ence Foundation (4262060), the BUPT Innovation and En-                         2018. 2
+trepreneurship Support Program (2025-YC-T026), the Open-                  [12] Mathias Gehrig, Willem Aarents, Daniel Gehrig, and Davide
+ing Project of the State Key Laboratory of General Arti-                       Scaramuzza. Dsec: A stereo event camera dataset for driving
+ficial Intelligence, BIGAI/Peking University (Project No.                      scenarios. IEEE Robotics and Automation Letters, 6(3):4947–
+SKLAGI2025OP23), and the High-performance Computing                            4954, 2021. 5
+Platform of BUPT.                                                         [13] Aaron Hurst, Adam Lerer, Adam P Goucher, Adam Perelman,
+                                                                               Aditya Ramesh, Aidan Clark, AJ Ostrow, Akila Welihinda,
+                                                                               Alan Hayes, Alec Radford, et al. Gpt-4o system card. arXiv
+References
+                                                                               preprint arXiv:2410.21276, 2024. 2
+ [1] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin              [14] Hanme Kim, Stefan Leutenegger, and Andrew J Davison.
+     Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun                      Real-time 3d reconstruction and 6-dof tracking with an event
+     Tang, et al. Qwen2. 5-vl technical report. arXiv preprint                 camera. In European conference on computer vision, pages
+     arXiv:2502.13923, 2025. 1, 2, 7                                           349–364. Springer, 2016. 2
+ [2] Jonathan Binas, Daniel Neil, Shih-Chii Liu, and Tobi Del-            [15] Byounghwa Lee, Hwa Jeon Song, Young-Jin Park, and
+     bruck. Ddd17: End-to-end davis driving dataset. arXiv                     Byung Ok Kang. Multimodal alzheimer’s disease recognition
+     preprint arXiv:1711.01458, 2017. 5                                        from image, text and audio. Scientific Reports, 15(1):29038,
+ [3] Kenneth Chaney, Fernando Cladera, Ziyun Wang, Anthony                     2025. 6
+     Bisulco, M Ani Hsieh, Christopher Korpela, Vijay Kumar,              [16] Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee.
+     Camillo J Taylor, and Kostas Daniilidis. M3ed: Multi-robot,               Visual instruction tuning. Advances in neural information
+     multi-sensor, multi-environment event dataset. In Proceed-                processing systems, 36:34892–34916, 2023. 2, 7
+     ings of the IEEE/CVF Conference on Computer Vision and               [17] Haoyue Liu, Shihan Peng, Lin Zhu, Yi Chang, Hanyu Zhou,
+     Pattern Recognition, pages 4016–4023, 2023. 5                             and Luxin Yan. Seeing motion at nighttime with an event
+ [4] Zhe Chen, Jiannan Wu, Wenhai Wang, Weijie Su, Guo Chen,                   camera. In Proceedings of the IEEE/CVF Conference on Com-
+     Sen Xing, Muyan Zhong, Qinglong Zhang, Xizhou Zhu,                        puter Vision and Pattern Recognition, pages 25648–25658,
+     Lewei Lu, et al. Internvl: Scaling up vision foundation models            2024. 3
+     and aligning for generic visual-linguistic tasks. In Proceed-        [18] Mingjie Liu, Hanqing Liu, and Chuang Zhu. Beyond
+     ings of the IEEE/CVF conference on computer vision and                    rgb and events: Enhancing object detection under adverse
+     pattern recognition, pages 24185–24198, 2024. 1, 2, 7                     lighting with monocular normal maps. arXiv preprint
+ [5] Zhiwen Chen, Zhiyu Zhu, Yifan Zhang, Junhui Hou, Guang-                   arXiv:2508.02127, 2025. 2
+     ming Shi, and Jinjian Wu. Segment any event streams via              [19] Shaoyu Liu, Jianing Li, Guanghui Zhao, Yunjian Zhang, Xin
+     weighted adaptation of pivotal tokens. In Proceedings of                  Meng, Fei Richard Yu, Xiangyang Ji, and Ming Li. Eventgpt:
+     the IEEE/CVF Conference on Computer Vision and Pattern                    Event stream understanding with multimodal large language
+     Recognition, pages 3890–3900, 2024. 5                                     models. In Proceedings of the Computer Vision and Pattern
+ [6] Luoping Cui, Hanqing Liu, Mingjie Liu, Endian Lin,                        Recognition Conference, pages 29139–29149, 2025. 2, 4, 7
+     Donghong Jiang, Yuhao Wang, and Chuang Zhu. Peod: A                  [20] Zhanwen Liu, Nan Yang, Yang Wang, Yuke Li, Xiangmo
+     pixel-aligned event-rgb benchmark for object detection under              Zhao, and Fei-Yue Wang. Enhancing traffic object detec-
+     challenging conditions, 2025. 4, 5, 7                                     tion in variable illumination with rgb-event fusion. IEEE
+ [7] Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Li             Transactions on Intelligent Transportation Systems, 2024. 3
+     Fei-Fei. Imagenet: A large-scale hierarchical image database.        [21] Haoyu Lu, Wen Liu, Bo Zhang, Bingxuan Wang, Kai Dong,
+     In 2009 IEEE conference on computer vision and pattern                    Bo Liu, Jingxiang Sun, Tongzheng Ren, Zhuoshu Li, Hao
+     recognition, pages 248–255. Ieee, 2009. 5                                 Yang, et al. Deepseek-vl: towards real-world vision-language
+ [8] Yan Dong and Tao Zhang. Standard and event cameras fusion                 understanding. arXiv preprint arXiv:2403.05525, 2024. 1, 2,
+     for feature tracking. In Proceedings of the 2021 International            7
+     Conference on Machine Vision and Applications, pages 55–60,          [22] Tiange Luo, Justin Johnson, and Honglak Lee. View selection
+     2021. 3                                                                   for 3d captioning via diffusion ranking. In European Con-
+ [9] Guillermo Gallego, Tobi Delbrück, Garrick Orchard, Chiara                ference on Computer Vision, pages 180–197. Springer, 2024.
+     Bartolozzi, Brian Taba, Andrea Censi, Stefan Leutenegger,                 4
+     Andrew J Davison, Jörg Conradt, Kostas Daniilidis, et al.           [23] Muhammad Maaz, Hanoona Rasheed, Salman Khan, and Fa-
+     Event-based vision: A survey. IEEE transactions on pattern                had Khan. Video-chatgpt: Towards detailed video understand-
+     analysis and machine intelligence, 44(1):154–180, 2020. 1, 2              ing via large vision and language models. In Proceedings
+[10] Daniel Gehrig and Davide Scaramuzza. Low-latency automo-                  of the 62nd Annual Meeting of the Association for Compu-
+     tive vision with event cameras. Nature, 629(8014):1034–1040,              tational Linguistics (Volume 1: Long Papers), pages 12585–
+     2024. 2, 3                                                                12602, 2024. 7
+
+
+                                                                      9
+[24] Elias Mueggler, Chiara Bartolozzi, and Davide Scaramuzza.
+     Fast event-based corner detection. 2017. 2
+[25] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+     Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+     Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning
+     transferable visual models from natural language supervi-
+     sion. In International conference on machine learning, pages
+     8748–8763. PmLR, 2021. 2
+[26] Henri Rebecq, Guillermo Gallego, Elias Mueggler, and Da-
+     vide Scaramuzza. Emvs: Event-based multi-view stereo—3d
+     reconstruction with an event camera in real-time. Interna-
+     tional Journal of Computer Vision, 126(12):1394–1414, 2018.
+     2
+[27] Gemini Team, Rohan Anil, Sebastian Borgeaud, Jean-Baptiste
+     Alayrac, Jiahui Yu, Radu Soricut, Johan Schalkwyk, An-
+     drew M Dai, Anja Hauth, Katie Millican, et al. Gemini:
+     a family of highly capable multimodal models. arXiv preprint
+     arXiv:2312.11805, 2023. 2
+[28] Antoni Rosinol Vidal, Henri Rebecq, Timo Horstschaefer,
+     and Davide Scaramuzza. Ultimate slam? combining events,
+     images, and imu for robust visual slam in hdr and high-speed
+     scenarios. IEEE Robotics and Automation Letters, 3(2):994–
+     1001, 2018. 2
+[29] Ziyi Wu, Xudong Liu, and Igor Gilitschenski. Eventclip:
+     Adapting clip for event-based object recognition. arXiv
+     preprint arXiv:2306.06354, 2023. 2
+[30] Jin Xu, Zhifang Guo, Hangrui Hu, Yunfei Chu, Xiong Wang,
+     Jinzheng He, Yuxuan Wang, Xian Shi, Ting He, Xinfa
+     Zhu, et al. Qwen3-omni technical report. arXiv preprint
+     arXiv:2509.17765, 2025. 8
+[31] Yan Yang, Liyuan Pan, Dongxu Li, and Liu Liu. Ezsr: Event-
+     based zero-shot recognition. In Proceedings of the Computer
+     Vision and Pattern Recognition Conference, pages 4628–4638,
+     2025. 5
+[32] Jiqing Zhang, Yuanchen Wang, Wenxi Liu, Meng Li, Jinpeng
+     Bai, Baocai Yin, and Xin Yang. Frame-event alignment and
+     fusion network for high frame rate tracking. In Proceedings
+     of the IEEE/CVF conference on computer vision and pattern
+     recognition, pages 9781–9790, 2023. 3
+[33] Lianmin Zheng, Wei-Lin Chiang, Ying Sheng, Siyuan
+     Zhuang, Zhanghao Wu, Yonghao Zhuang, Zi Lin, Zhuohan
+     Li, Dacheng Li, Eric Xing, et al. Judging llm-as-a-judge with
+     mt-bench and chatbot arena. Advances in neural information
+     processing systems, 36:46595–46623, 2023. 8
+[34] Jiazhou Zhou, Xu Zheng, Yuanhuiyi Lyu, and Lin Wang.
+     Eventbind: Learning a unified representation to bind them
+     all for event-based open-world understanding. In European
+     Conference on Computer Vision, pages 477–494. Springer,
+     2024. 2
+[35] Zhuyun Zhou, Zongwei Wu, Rémi Boutteau, Fan Yang,
+     Cédric Demonceaux, and Dominique Ginhac. Rgb-event
+     fusion for moving object detection in autonomous driving.
+     arXiv preprint arXiv:2209.08323, 2022. 2, 3
+[36] Alex Zihao Zhu, Dinesh Thakur, Tolga Özaslan, Bernd Pfrom-
+     mer, Vijay Kumar, and Kostas Daniilidis. The multivehicle
+     stereo event camera dataset: An event camera dataset for 3d
+     perception. IEEE Robotics and Automation Letters, 3(3):
+     2032–2039, 2018. 5
+
+
+                                                                     10
+

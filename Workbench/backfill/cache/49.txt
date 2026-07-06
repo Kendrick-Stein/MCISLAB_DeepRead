@@ -1,0 +1,888 @@
+                                           Think, Then Verify: A Hypothesis–Verification Multi-Agent Framework for
+                                                                  Long Video Understanding
+
+                                           Zheng Wang1,2 Haoran Chen1 Haoxuan Qin1 Zhipeng Wei3 Tianwen Qian4 Cong Bai1,2 *
+                                                         {zhengwang, 211124120004, 302023315145, congbai}@zjut.edu.cn,
+                                                                 zwei@icsi.berkeley.edu, twqian@cs.ecnu.edu.cn
+                                                 1
+                                                   College of Computer Science, Zhejiang University of Technology, Zhejiang, China
+                                              2
+                                                Zhejiang Key Laboratory of Visual Information Intelligent Processing, Zhejiang, China
+
+
+
+
+arXiv:2603.04977v1 [cs.CV] 5 Mar 2026
+                                                                             3
+                                                                               UC Berkeley, CA, USA
+                                           4
+                                             College of Computer Science and Technology, East China Normal University, Shanghai, China
+
+
+                                                                  Abstract
+
+                                        Long video understanding is challenging due to dense vi-
+                                        sual redundancy, long-range temporal dependencies, and              Correlation-based Reasoning         Hypothesis-based Verification
+                                        the tendency of chain-of-thought and retrieval-based agents
+                                        to accumulate semantic drift and correlation-driven er-                   I’m not sure yet,                  If this is true, the
+                                        rors. We argue that long-video reasoning should begin not                 I need to find more                video should show …
+
+                                        with reactive retrieval, but with deliberate task formula-
+                                        tion: the model must first articulate what must be true in
+                                        the video for each candidate answer to hold. This thinking-
+                                        before-finding principle motivates VideoHV-Agent, a frame-                  Previous Agent                      VideoHV-Agent
+                                        work that reformulates video question answering as a struc-              Search and aggregate                Verify testable clue
+                                                                                                                 information from                    with detailed evidence
+                                        tured hypothesis–verification process. Based on video sum-               related clips                       to assess hypotheses
+                                        maries, a Thinker rewrites answer candidates into testable
+                                        hypotheses, a Judge derives a discriminative clue specifying       Figure 1. From correlation-based search to hypothesis verification:
+                                        what evidence must be checked, a Verifier grounds and tests        prior agents search and aggregate related clips, while VideoHV-
+                                        the clue using localized, fine-grained video content, and an       Agent verifies testable clues with focused visual evidence.
+                                        Answer agent integrates validated evidence to produce the
+                                        final answer. Experiments on three long-video understand-
+                                                                                                           ten leads to information overload and cascading reasoning
+                                        ing benchmarks show that VideoHV-Agent achieves state-
+                                                                                                           errors [42]. Although chain-of-thought (CoT) prompting
+                                        of-the-art accuracy while providing enhanced interpretabil-
+                                                                                                           introduces stepwise reasoning [3], long reasoning chains
+                                        ity, improved logical soundness, and lower computational
+                                                                                                           are prone to semantic drift and error accumulation [4, 33].
+                                        cost. We make our code publicly available at: https:
+                                                                                                           Moreover, processing every frame is computationally pro-
+                                        //github.com/Haorane/VideoHV-Agent.
+                                                                                                           hibitive and leads to mixing of irrelevant content.
+                                                                                                              To cope with the extended temporal scale, mainstream
+                                                                                                           approaches either (i) downscale inputs via key-frame/clip
+                                        1. Introduction                                                    selection [25, 40], or (ii) adopt multi-stage pipelines
+                                        Large Language Models (LLMs) have advanced video un-               that first localize candidate moments and then reason on
+                                        derstanding substantially, showing strong multimodal com-          them [17, 23, 24]. More recently, agent-based frame-
+                                        prehension and emerging long-range reasoning capabili-             works [5, 18, 35] have emerged as a promising approach for
+                                        ties. Yet long-form video question answering (VideoQA)             long video understanding. These systems typically harness
+                                        remains difficult: models must process dense, redundant            the observation, reasoning, and action capacities of LLMs.
+                                        content and reason over extended temporal spans, which of-         They use a pre-trained captioning model to obtain offline
+                                                                                                           textual descriptions, then let agents plan multi-step informa-
+                                          * Corresponding Author: Cong Bai.                                tion retrieval: iteratively search and aggregate video clips
+
+
+                                                                                                       1
+that appear semantically related to the question.                       long-form VideoQA, which reasons by first formulat-
+    However, existing agent-based frameworks remain fun-                ing testable hypotheses and then validating them against
+damentally correlation-driven. On the one hand, most                    video evidence.
+planners decompose the video’s complexity, such as video              • We implement this paradigm as a multi-agent framework,
+length, redundancy, and fine-grained information. While                 VideoHV-Agent, where a Thinker agent that generates
+they overlook the question’s complexity, e.g., composi-                 hypotheses and a Judge agent that distills a discriminative
+tional constraints over multiple entities, temporal order-              clue, a Verifier that performs clue-guided evidence gath-
+ing, and causal preconditions, each central to long-form                ering and verification with detailed video analysis, and
+VideoQA. As a result, long-range reasoning remains weak                 an Answer agent that integrates validated evidence into a
+and early retrieval errors tend to propagate across subse-              final decision.
+quent steps [19, 34]. On the other hand, retrieval is treated         • Extensive experiments on three long-video understanding
+as a reactive process. Agents repeatedly search for clips               benchmarks demonstrate that VideoHV-Agent achieves
+that correlate with the current plan, then re-plan based on             state-of-the-art performance with improved interpretabil-
+whatever is found, leading to expensive trial-and-error cy-             ity, logical accuracy, and computational efficiency.
+cles without explicitly checking whether the evidence actu-
+ally supports or refutes a candidate answer.                          2. Related Work
+    Thus, the core difficulty of long-form VideoQA is not
+merely locating relevant clips but determining what should            2.1. Chain-of-Thought Reasoning
+be looked for in the first place. We argue that reasoning             Chain-of-Thought (CoT) prompting [36] has been widely
+should begin with deliberate task formulation: before gath-           adopted to guide multi-step reasoning in long video under-
+ering evidence, the system must articulate what must be true          standing. It enables LLMs to decompose complex ques-
+in the video for each possible answer to hold. This “thinking         tions into intermediate steps, mirroring human problem-
+before finding” principle reframes long-video reasoning as            solving. ViQAgent [24] combines CoT reasoning with
+a structured inquiry rather than a purely correlation-driven          visual grounding, using tracked objects to align steps
+search, as shown in Fig. 1.                                           with video content. TraveLER [27] employs a pipeline
+    To this end, we propose VideoHV-Agent, a multi-agent              of agents to execute an “ask-locate-evaluate-replan” loop,
+framework that recasts long-video understanding as a hy-              where each sub-question is derived and answered sequen-
+pothesis–verification process, thus achieving “thinking then          tially. VideoINSTA [18] improves spatial-temporal rea-
+verify” principle. After obtaining textual descriptions of            soning ability by introducing event-based and context-
+sampled frames, we first build a query-conditioned video              based information with multi-round self-reflective rea-
+summary to quickly estimate which answers are plausible               soning mechanisms, improving confident self-evaluation.
+under coarse evidence. Then we can reason about which                 AoTD [28] incorporates automatically generated Chain-of-
+answers could be correct and why. Because the summary                 Thoughts (CoTs) into the instruction-tuning process, show-
+is inherently coarse, this preliminary reasoning is uncer-            ing the importance of constructing well-designed CoTs for
+tain and must be turned into concrete information needs.              instruction-tuning. Despite these advances, CoT-based sys-
+VideoHV-Agent addresses this via a two-stage reasoning                tems often remain fragile over long video contexts due to
+pipeline. In Stage 1, a Thinker agent rewrites each an-               semantic drift, where early reasoning errors accumulate.
+swer option into an explicit, testable hypothesis that spec-          Moreover, most lack explicit mechanisms to validate in-
+ifies key entities, actions, and temporal–causal constraints,         termediate reasoning outcomes, making them vulnerable to
+while a Judge agent generates a concise clue that captures            hallucinations or propagation of incorrect assumptions.
+the minimal visual observation needed to distinguish among
+hypotheses. In Stage 2, a Verifier agent grounds this clue            2.2. Efficient Contextualization for Long Video
+in the video, localizes a small set of relevant clips, and in-        To mitigate the processing burden of long videos, several
+vokes fine-grained captioning to test whether the observed            methods abstract or condense the video context before rea-
+evidence supports, partially supports, or refutes the clue. Fi-       soning. LVNet [25] and VideoTree [35] reduce the in-
+nally, an Answer agent integrates the verified evidence with          put size through keyword-based frame selection and hier-
+the summarized context to answer along with a transpar-               archical clustering, respectively. VideoMindPlace [10] fur-
+ent reasoning chain. By shifting from correlation-based re-           ther organizes activity zones via layout mapping and hand-
+trieval to hypothesis–verification, VideoHV-Agent enables             object interaction to improve spatial alignment. LLoVi [40]
+evidence-based, logically consistent, and interpretable rea-          employs short-term visual captioners to summarize clips,
+soning for long-form VideoQA. To summarize, our main                  which are later aggregated by LLMs for long-form under-
+contributions are:                                                    standing for better efficiency. VideoAgent [5] constructs a
+• We introduce a hypothesis–verification paradigm for                 memory bank of salient objects and events, enabling more
+
+                                                                  2
+targeted reasoning. Another direction for efficient long con-        3. Method
+text processing is to incorporate retrieval augmented gener-
+ation. Video-RAG [21] delivers auxiliary retrieval requests          3.1. Problem setup
+for OCR, ASR, and object information from the video, and             Given a long video V = {ft }L  t=1 and a question Q with
+the extracted auxiliary texts are combined with the query            multiple-choice options O = {oi }, our goal is to return an
+and the video to generate the response. Grounding-based              answer A supported by explicit, detailed video evidence E.
+approaches, instead, try to narrow down the searching win-
+dow during reasoning. TraveLER [27] employs ground-                  3.2. Overall Framework
+ing during sub-question answering by retrieving moments              We present VideoHV-Agent, a framework that consists of
+based on keyframe relevance. MoReVQA [23] proposes a                 three stages as shown in Fig. 2: context summarization,
+multi-stage planning with grounding and reasoning abili-             two-step reasoning, and evidence integration. The two-
+ties. Though these strategies enhance efficiency and visual          step reasoning stage reformulates long video question an-
+alignment, they often rely on static pipelines and do not re-        swering as a hypothesis–verification process, which can be
+visit raw evidence dynamically. Importantly, they lack log-          iterated through a self-refinement loop. The pseudo code
+ical validation across reasoning stages, limiting their relia-       is presented in Alg. 1. Specifically, VideoHV-Agent com-
+bility in multi-step inference settings.                             prises mainly four cooperative agents. In the hypothesis
+                                                                     generation step, a Thinker agent observes the summarized
+2.3. Specialized Agent Framework                                     video description and proposes testable hypotheses H for
+With the emergence of LVLMs, agent-based systems have                the candidate answers, while a Judger agent evaluates their
+become a prominent paradigm to improve modularity. For               quality and derives a concise clue κ that specifies what
+instance, VideoAgent [31] builds an agent pipeline with              needs to be verified. In the Verification step, a Verifier
+the ability to predict answers, self-reflect, and find miss-         agent grounds this clue in the video, collecting visual ev-
+ing information. VideoAgent [5] builds structured mem-               idence E to test it; once the clue is verified (represented
+ory modules to store spatiotemporal information and sup-             by the verification state S), an Answer agent combines the
+port interactive planning across long sequences. MASR [2]            summary and the gathered evidence to produce the final an-
+introduces a hierarchical, coarse-to-fine attention focusing         swer A. This framework enables interpretable, evidence-
+mechanism in an agent-based framework. OmAgent [42]                  based reasoning over long video content.
+formulates LVU as a retrieval and generation process, and            3.2.1. Context Summarization
+adopts a divide-and-conquer approach for task planning and
+                                                                     To address redundancy and complex temporal structure in
+execution. ViQAgent [24] combines the CoT framework
+                                                                     long videos, we follow prior work [31, 44] by first con-
+with grounded reasoning powered by a specialized object
+                                                                     verting each frame into textual descriptions Pv via cap-
+grounding model. VideoAgent2 [44] performs uncertainty-
+                                                                     tioning, and then deriving a compact, query-conditioned
+guided information retrieval, the retrieval plan is adjusted
+                                                                     summary Ps from the frame-level captions. Although the
+each round for collecting extra information with the help of
+                                                                     summarization step depends on the question and therefore
+specialized tool models. These agent-based designs demon-
+                                                                     cannot be performed fully offline, it is computationally
+strate the importance of separating planning, summariza-
+                                                                     lightweight compared to frame-level captioning, which re-
+tion, and action in long-form visual processing, laying the
+                                                                     quires repeated visual encoding.
+groundwork for modular reasoning across video timelines.
+                                                                        In previous methods, frame captions and summaries are
+2.4. Multi-Agent Collaboration Framework                             simply concatenated into a single long context [31], and
+                                                                     the model consumes it for both local and global reasoning,
+A more recent trend involves collaborative multi-agent               incurring a time cost linear in the number of frames. In
+frameworks for video understanding. TraveLER [27] ex-                contrast, we decouple their roles: frame-level captions are
+emplifies this by distributing across dedicated LLM agents.          used only for clip grounding, while the concise summary is
+Similarly, VideoMultiAgents [13] introduces modality-                used for global reasoning in other stages. This design pre-
+specific agents, each focusing on a particular input type            serves detailed information when necessary while keeping
+such as vision or language. VideoMind [20] adapts a sin-             the overall context compact and efficient to process.
+gle LVLM to four role-specific agents with LoRA fine-
+tuning [9]. While these architectures begin to emulate col-          3.2.2. Two-step Reasoning
+lective intelligence, most implement static or loosely cou-          Given the summary, VideoHV-Agent can quickly narrow
+pled pipelines without explicit validation across agents or          down plausible answers, but the summary alone is not suf-
+dynamic feedback loops. They tend to partition tasks by              ficient to reliably resolve the question. In addition, directly
+modality or function, but fall short of using the reasoning          reasoning over all frame-level captions is also impractical.
+ability to enable verifiable cooperation.                            It is time-consuming, and captions mainly describe salient
+
+
+                                                                 3
+              Long                                                                                                           Qu est ion
+                                                  Summary                   Vid eo                       Clip Det ails
+              Vid eo
+                                                                            Clip
+                                                                                                                         Can diAnswer 1
+                                                                                                            Clu e        …
+     Frame Capt ion                                 Clu e                Clu e                           Verificat ion   Can diAnswer m
+                                Thinke r                                                  Verifier
+                                 Age nt                                                    Age nt
+                                                                                                           Evidence          Evidence
+        Summary
+                               Hypothesis                              Action: Clip Grounding
+                               Ge neration         Judger
+                                                   Age nt              Cap tion + Clu e               Timestamp
+     Can diAnswer 1
+     …
+     Can diAnswer m           Hypothesis 1                             Action: Detailed Description                          Answer
+                              …                                                                                              Age nt
+                              Hypothesis m        Summary              Vid eo + T imestamp              Clip Details
+
+
+         Qu est ion                                                                                                       Fin al Answe r
+                                Step 1: Hypothesis                               Step 2: Verification
+
+   (a) Summary                                        (b) Two-step Reasoning                                             (c) Answer
+
+Figure 2. Overview of the proposed VideoHV-Agent framework. The framework first (a) summarizes the long video captions, then
+performs (b) two-step reasoning where a Thinker and a Judge agent rewrite options into hypotheses and a discriminative clue, and a
+Verifier agent grounds this clue to collect visual evidence, finally an Answer agent integrates the evidence to (c) answer the question.
+
+
+content while often missing fine-grained relations or events             3.2.3. Self-Refinement Loop
+needed for precise answering. Therefore, VideoHV-Agent                   To improve robustness, VideoHV-Agent incorporates a self-
+adopts a two-step hypothesis–verification process. First, it             refinement mechanism that mirrors human hypothesis revi-
+reasons about what information might be missing from the                 sion. When the verification status is inconclusive, we re-
+summary and formulates hypotheses that explicitly imagine                generate refined hypotheses and updated clues for an extra
+the potentially unseen context. Then, it performs a veri-                round of the reasoning stage. Two regeneration prompts are
+fication step that checks whether detailed visual evidence               used: (i) specificity enhancement, which makes hypothe-
+satisfies these hypotheses, enabling accurate and efficient              ses more concrete and testable when verification fails, and
+long-video reasoning. Here we outline the two-step reason-               (ii) discriminability enhancement, which increases semantic
+ing pipeline, with full methodological details provided in               contrast when hypotheses overlap. This ensures that each
+Sec. 3.3.                                                                reasoning loop progressively sharpens both the clarity of
+                                                                         hypotheses and the precision of verification, yielding stable
+Hypothesis Generation. Given the summarized video con-                   and logically grounded answers.
+text, the Thinker agent rewrites each answer candidate oi
+into a testable hypothesis hi that specifies what must be true           3.2.4. Evidence Integration
+in the video for oi to hold. Directly verifying all hypotheses           In the final stage, all verification results are integrated to in-
+one by one would ignore the logical relations among them.                fer the most plausible answer. With the summarized context
+To address this, we introduce a Judge agent that evaluates               and validated evidence, the video information is sufficient
+the set of hypotheses and induces a discriminative clue κ,               to resolve the question. The Answer agent re-evaluates each
+which condenses the key differences that need to be checked              candidate option, checks for conflicts with the evidence, and
+in order to distinguish among them.                                      constructs a reasoning chain outlining what was tested, ob-
+                                                                         served, and supported or refuted. The final prediction is
+Hypothesis Verification. Guided by clue κ, the Veri-                     produced through explicit, evidence-grounded reasoning.
+fier grounds a minimal temporal context needed to eval-
+uate it, to gather evidence to evaluate κ, invokes fine-                 3.3. Details of Two-step Reasoning
+grained tools (e.g., detailed captioning) to gather ev-
+idence, and outputs a structured status status(κ) ∈                      3.3.1. Step 1: Hypothesis
+{VERIFIED, PARTIAL, NOT VERIFIED} together with a                        Hypothesis Generation. We cast answer formation as hy-
+concise rationale.                                                       pothesis drafting: for each candidate option oi , the Thinker
+
+
+                                                                   4
+Agent produces a testable hypothesis hi that, if observed in          Algorithm 1 VideoHV-Agent
+the video, would make oi correct. The hypothesis hi spec-             Require: video V ; question Q; answer options O; frame-
+ifies what must be true in the video for oi to hold, explic-              level caption Pv ; LLM Fllm ; video summarizer Fvs ;
+itly naming the salient entities/objects, actions/events, and         Ensure: hypothesis H; clue κ; evidence E; verification
+temporal/causal constraints. Before generating hypotheses,                status S; final answer A;
+the Thinker agent filters out ill-posed or clearly incorrect           1: // Context Summarization
+options using only the summarized context, thereby reduc-              2: Pf ← Fvc (V )
+ing irrelevant noise for the subsequent verification step and          3: Ps ← Fvs (Pf , Q)
+avoiding unnecessary reasoning cost. Formally, we map the
+                                                                       4: // Two-Stage Reasoning
+option set O = {oi } to a hypothesis set H = {hi } with a
+                                                                       5: for t=1 to T do
+one-to-one correspondence intended for later verification.
+                                                                       6:      Step 1: Hypothesis Generation
+Clue Generation. To enhance discriminability, the Judge
+                                                                       7:        H ← Fllm (Q, O, Ps , promptHypothesis )
+agent further produces a concise clue κ for the hypothesis
+                                                                       8:        κ ← Fllm (H, Ps , promptJudge )
+set H. The clue summarizes the minimal observation that
+can distinguish hi from competing hypotheses, such as a                9:      Step 2: Hypothesis Verification
+specific object interaction, an event order, or a visual out-         10:        E ← Fllm (κ, Pf , promptEvidence )
+come that would hold only if hi were true. This clue serves           11:        S ← Fllm (κ, E, promptVerify )
+as focused guidance for the Verifier agent in the Verifica-           12:        if S == NOT VERIFIED then
+tion step, defining what needs to be checked and what kind            13:           continue
+of evidence would support or refute the hypothesis.                   14:        else
+                                                                      15:           break
+3.3.2. Step 2: Verification                                           16:         end if
+Temporal Localization. Given the clue κ, the Verifier uses            17: end for
+frame-level captions to localize the most probable temporal           18: // Evidence Integration
+window where the clue appears, focusing on finding clip               19: A ← Fllm (Q, O, Ps , κ, E, promptAnswer )
+details on decisive evidence rather than the entire video.            20: return A
+Detailed Captioning. After selecting the timestamp range,
+the Verifier revisits the raw frames within the window and
+invokes fine-grained captioning to extract detailed evidence          4. Experiment
+for verification, ensuring that the system’s capabilities are
+                                                                      4.1. Datasets and Metrics
+not constrained by the initial visual to text translation. Each
+call processes at most five frames.                                   We compare VideoHV-Agent against strong zero-shot and
+Clue Verification. The clue verification status for κ is one          supervised baselines under the accuracy metric, evaluat-
+of status(κ) ∈ {VERIFIED, PARTIAL, NOT VERIFIED},                     ing performance on three multi-choice video question an-
+accompanied by a concise rationale (timestamps, entities,             swering benchmarks: (i) EgoSchema [22] is a large-scale
+relations). VERIFIED means the clue can be verified by                test-only benchmark built on Ego4D, designed to evaluate
+the evidence, and an answer can be raised upon this clue              deep reasoning over 3-minute egocentric videos. It contains
+together with the summarized context. The Verifier agent              5,000 multiple-choice questions over 250+ hours of real-
+then synthesizes all collected evidence into a reasoning              world footage, with 500 publicly labeled questions used for
+trace that documents the logical inference, which is further          validation. (ii) NextQA [37] emphasizes causal and tempo-
+used by the Answer agent. PARTIAL indicates that part                 ral reasoning in natural daily-life videos. It includes 5,440
+of the clue is verified by the observed, but requires addi-           videos and 48,000 questions, with 43s average length. We
+tional evidence. Since a single round of evidence collec-             evaluate on the 570-video, 5,000-question validation split.
+tion may be insufficient or error-prone, the Verifier can trig-       (iii) IntentQA [15] focuses on understanding character in-
+ger additional rounds when the current assessment is incon-           tent in narrative videos. It contains 4,303 videos and 16,000
+clusive, explicitly specifying what further observations and          QA pairs, with 567 videos and 2,134 questions in the test
+frame ranges are needed. Then, VideoHV-Agent performs                 set. Results on longer videos, VideoMME-L [6], are in-
+a small verification-only self-refinement loop to retrieve            cluded in the supplementary materials.
+detailed descriptions from new timestamps and integrates
+them into the reasoning context. The NOT VERIFIED sta-                4.2. Implementation Details
+tus indicates that the agent finds the clue sub-optimal and           We extract all video frames at 1 fps for our experiments.
+should be regenerated along with the hypothesis. When the             Following the setup in [31, 44], we adopt LaViLa [43], a
+NOT VERIFIED status is presented, the large hypothesis-               clip-based captioning model, as the frame-level captioner
+verification self-refinement loop is activated.                       for EgoSchema, and for NextQA and IntentQA, we use Co-
+
+
+                                                                  5
+Table 1. Zero-Shot Performance on EgoSchema subset compared           Table 3. Zero-Shot performance on IntentQA compared to the
+to the state of the art.                                              state of the art.
+
+         Method                      Accuracy (%)                                  Method             Accuracy (%)
+         TS-LLAVA [26]                      57.8                                   SeViLA [39]              60.9
+         HCQA [41]                          58.8                                   IG-VLM [12]              65.3
+         VideoAgent [31]                    60.2                                   VideoTree [35]           66.9
+         VideoTree [35]                     66.2                                   LLoVi [40]               67.1
+         LVNet [25]                         68.2                                   TS-LLAVA [26]            67.9
+         Tarsier [29]                       68.6                                   ENTER [1]                71.5
+         LifelongMemory [32]                72.0                                   LVNet [25]               71.7
+         VideoMultiAgents [13]              75.4                                   VideoINSTA [18]          72.8
+         VideoAgent2 [44]                   80.6                                   VideoAgent2 [44]         73.9
+         VideoHV-Agent                      81.0                                   VideoHV-Agent            75.6
+
+Table 2. Results on NextQA dataset compared to the state of the                Table 4. Ablation of framework components.
+art.
+                                                                                Method                    Accuracy(%)
+                                             ATP-hard
+      Method                      val set                                       w/o hypothesis                  76.0
+                                              subset
+                                                                                w/o clue                        78.6
+      Supervised                                                                w/o verification status         74.0
+      ViLA [30]                    74.4             -
+                                                                                VideoHV-Agent                   81.0
+      VideoChat2 [16]              79.5            68.2
+      LLaVA-OV [14]                80.2             -
+      LinVT-Qwen2-VL [7]           85.5            69.1
+                                                                      strates that VideoHV-Agent has the ability to solve com-
+      Zero-shot                                                       plex problems. This is also consistent with our hypothe-
+      SeViLA [39]                  63.6            50.8               sis verification method, which focuses more on causal rea-
+      VideoAgent [31]              71.3            58.4               soning. VideoHV-Agent shows outstanding performance on
+      TS-LLAVA [26]                73.6             -                 both splits, highlighting the robustness of the method.
+      LLoVi [40]                   73.8             -
+      VideoMultiAgents [13]        79.6             -                 4.4. Ablation Study
+      VideoAgent2 [44]             80.5            68.2
+                                                                      Ablation of framework components. As reported in Ta-
+      VideoHV-Agent                80.7            71.2               ble 4, we conduct comprehensive ablation studies to vali-
+                                                                      date the effectiveness of each component in the proposed
+                                                                      framework:
+gAgent [8] to generate frame-level captions. GPT-4o [11]              (i) Without hypothesis generation. Removing the hypoth-
+is used as the LLM backbone for all four agents. Alter-               esis generation module and deriving clues directly from raw
+native backbone choices are detailed in the supplementary             option differences reduces accuracy by 5%. This indicates
+materials. For detailed captioning in the verification stage,         that explicit hypotheses, which capture key events, enti-
+we also employ GPT-4o to produce fine-grained textual de-             ties, and temporal–causal relations, provide crucial struc-
+scriptions.                                                           ture for downstream reasoning; without them, information
+                                                                      loss leads to degraded performance.
+4.3. Main Result                                                      (ii) Without clue generation. Disabling clue generation
+As shown in Table 1, 2 and 3, VideoHV-Agent achieved                  yields 78.6% accuracy. Clues translate high-level hypothe-
+SOTA among zero-shot methods on all datasets. It shows                ses into concrete, verifiable visual evidence (e.g., behaviors,
+that video agents perform well on problems such as tem-               locations, temporal order, object interactions). Removing
+poral order understanding, common sense understanding,                them weakens verification focus and reduces the effective-
+and character behavior intention. For the NextQA ATP-                 ness of targeted evidence collection.
+hard subset, our accuracy improved significantly. VideoHV-            (iii) Without verification status. In particular, removing
+Agent is not only effective at solving simple problems, but           the explicit verification status leads to a 7% performance
+also performs even better on difficult ones. This demon-              drop, demonstrating that verification is functionally nec-
+
+
+                                                                  6
+                                                                       Table 5. Averaged time cost comparison with other agent-based
+                                                                       methods.
+
+                                                                        Method                      Time Cost(s)     Accuracy(%)
+                                                                        VideoAgent [31]                129.46             60.2
+                                                                        VideoTree [35]                 160.21             66.2
+                                                                        VideoMultiAgents [13]          134.90             75.4
+                                                                        VideoHV-Agent                  123.66             81.0
+
+
+
+                                                                       4.5. Operational Efficiency
+
+                                                                       Most agent-based VideoQA systems operate in an “ex-
+                                                                       plore–reason–explore again” fashion. The LLM agent re-
+  Figure 3. Ablations of different maximum number of loops.            peatedly plans, retrieves new clips, updates its belief state,
+                                                                       and then issues further queries. Each cycle triggers addi-
+                                                                       tional visual encoding, captioning, and long context reason-
+                                                                       ing, and the number of such cycles typically grows with
+                                                                       video length. As a result, inference cost scales almost lin-
+                                                                       early with both the number of frames and the depth of the
+                                                                       interaction loop, making these methods slow and sensitive
+                                                                       to redundant content in long videos.
+                                                                           As shown in Table 5, VideoHV-Agent not only achieves
+                                                                       higher accuracy than existing methods, but also offers sub-
+                                                                       stantially lower per-question latency, yielding a dual gain in
+Figure 4. Proportion of samples with different numbers of loops.
+                                                                       performance and efficiency. This improvement comes from
+                                                                       its design: frame captions are first condensed into a global
+                                                                       summary, and the hypothesis-verification stages are guided
+                                                                       by a discriminative clue that narrows the search to a min-
+essary rather than a cosmetic explanation. This mecha-
+                                                                       imal temporal window. The Verifier then analyzes only a
+nism enables adaptive self-refinement, collects additional
+                                                                       small set of targeted frames with fine-grained captioning,
+evidence when needed, and regenerates poor hypotheses or
+                                                                       rather than repeatedly scanning the entire video. By pre-
+clues. Without it, refinement is disabled and performance
+                                                                       serving decision relevant information while avoiding redun-
+drops substantially.
+                                                                       dant frame-by-frame or multi-round inference, VideoHV-
+(iv) Full model. The complete framework with Thinker,                  Agent maintains a relatively low overall reasoning time.
+Judger, Verifier, and Answer agents achieves the highest ac-
+curacy of 81.0%.
+                                                                       4.6. Performance Analysis by Question Type
+Ablation of the number of loops. We investigate the
+effect of different maximum loop numbers on VideoHV-                   To demonstrate the effectiveness of our hypothesis-
+Agent. Hypothesis-verification refers to the number of self-           verification method, we analyze its accuracy across differ-
+refinement loop. Verification-only indicates the number of             ent question types on the NextQA dataset: (i) Causal, which
+times the Verifier looks for additional information when ver-          examines cause–effect relationships; (ii) Temporal, which
+ifying a hypothesis. As shown in Figure 3, performance on              focuses on event order and interactions over time; and (iii)
+the EgoSchema subset increases with more loops, reaches                Descriptive, which emphasizes key scenes, objects, and ac-
+a peak, and then stabilizes. In Figure 4, we show the ac-              tions. As shown in Fig. 6, we compare our approach with
+tual number of loops performed by VideoHV-Agent. The                   VideoAgent and VideoMultiAgents. Our method achieves
+largest proportion of loops is 1. These results indicate that          the best performance across all three categories within
+VideoHV-Agent typically identifies key information effi-               the agent-based video understanding framework, demon-
+ciently, while additional loops can further refine retrieval           strating the general effectiveness of the “hypothesis-and-
+when necessary. Beyond a certain point, however, extra it-             verification” paradigm for commonsense, causal, and tem-
+erations provide marginal gains.                                       poral reasoning.
+
+
+                                                                   7
+                                        …                                                                                 …
+              0:05              0:10                      0:25               0:30               0:35               0:40                      2:10               2:15               2:20
+ Question: What is the technique she applies to join the two pieces of cloth, and how does she ensure they are properly aligned througho ut the process?
+ Options: A. She uses a pair of scissors to join the two pieces of cloth. B. She uses a sewing machine to join the two pieces of cloth. C. She uses a needle and thread to join the two
+ pieces of cloth. D. She uses a glue gun to join the two pieces of cloth. E. She uses a stapler to join the two pieces of cloth.
+ Hypothesis: For B: She uses a sewing machine to join two pieces of cloth, ensuring proper alignment by adjusting the fabric on the sewing machine with hands. For C: She uses a
+ needle and thread to join two pieces of cloth, ensuring proper alignment by holding and adjusting the cloth with hands.
+ Clue: Check whether she uses a sewing machine or a needle and thread to join the cloth.
+ Frame Range: 0:03-0:08
+ Evidence found from 0:03-0:08 : She is seated at a sewing station with a sewing machine visible in the background. She is holding and adjusting lace fabric w ith their hands, but
+ there is no explicit action of sewing observed in these frames. The sewing machine is present but not actively in use.
+ Verification Result: NOT_VERIFIED. The clue cannot be confirmed based on the provided frames. Additional evidence is needed to observe the sewing technique being employed.
+ Additional Evidence Needed: Frames showing the individual actively sewing (e.g., using the sewing machine or handling a needle and thread) would be helpful for verification.
+ Frames such as 31-35 or 41-45 might provide relevant insights.
+
+ Hypothesis: For B: She uses a sewing machine to join the two pieces of cloth, ensuring proper alignment by adjusting the fabric on the sewing ma chine with hands during the sewing
+ process. For C: The individual uses a needle and thread to join the two pieces of cloth, ensuring proper alignment by holding and adjusting t he cloth with hands while sewing.
+ Clue: Check whether she uses scissors or a sewing machine to join the cloth during sewing.
+ Frame Range: 0:31-0:35
+ Evidence found from 0:31-0:35 : She is seated at a sewing station with a sewing machine visible in the background. She is holding and adjusting lace fabric w ith their hands, but
+ there is no explicit action of sewing observed in these frames. The sewing machine is present but not actively in use.
+ Verification Result: VERIFIED. The clue is supported by the evidence, as the sewing machine is clearly the tool used to join the fabric, and alignment is maintained through manual
+ adjustments during the sewing process.
+
+ Final Answer: B
+ The verification results confirm that she uses a sewing machine to join the cloth, as evidenced by the illuminated machine, the fabric being guided under the needle, and manual
+ adjustments for alignment. The evidence from the video and captions clearly shows that she uses a sewing machine to join the two pieces of cloth, ensuring alignment by manually
+ adjusting the fabric during the sewing process.
+
+
+Figure 5. Qualitative study of event understanding in long videos. VideoHV-Agent uses hypothesis–verification to locate decisive evidence,
+highlighting its ability to avoid search purposefully and ground conclusions in explicit visual proof.
+
+
+                                                                                                ified judgment consistent with the ground truth. This case
+                                                                                                demonstrates
+ Reasoning Trace: > She is seen holding and adjusting lace fabric at a sewing station. > The sewing machine          targeted
+                                                                                                              is visible but       evidence
+                                                                                                                             not actively        retrieval,
+                                                                                                                                          used in these         robust
+                                                                                                                                                        frames. There     uncertainty
+                                                                                                                                                                      is no evidence  of a
+ needle and thread being used either. > The clue cannot be verified based on these frames alone, as no sewing action is observed.
+                                                                                                handling,      and    transparent        reasoning       that  directly
+ Verification Result: NOT_VERIFIED. The clue cannot be confirmed based on the provided frames. Additional evidence is needed to observe the sewing technique being employed.
+                                                                                                                                                                            ties  visual
+                                                                                                observations
+ Additional Evidence Needed: Frames showing the individual actively sewing (e.g., using the sewing      machine or to   logical
+                                                                                                                   handling         decisions.
+                                                                                                                             a needle and  thread) would be helpful for verification. Frames
+ such as 31-35 or 41-45 might provide relevant insights.
+
+                                                                                                5. Conclusion
+                                                                                       We aspropose
+    Reasoning Trace: > She is actively using a sewing machine to attach lace trim to fabric,   evidenced byVideoHV-Agent,           a and
+                                                                                                              the illuminated machine   multi-agent
+                                                                                                                                          the fabric beingframework
+                                                                                                                                                            guided under the
+    needle. > The sewing machine is explicitly mentioned and observed as the tool beingfor
+                                                                                        used for joining the fabric.
+                                                                                             long-form     VideoQA    No evidence
+                                                                                                                           built of scissors or needle is
+                                                                                                                                  on a                    found in these frames.
+                                                                                                                                         hypothesis–verification
+    > The sewing machine is the primary technique used for joining the cloth, and proper alignment is ensured by manually guiding the fabric under the needle.
+                                                                                       paradigm. Unlike prior single-agent or retrieval-based
+    Verification Result: VERIFIED. The clue is supported by the evidence, as the sewing machine is clearly the tool used to join the fabric, and alignment is maintained
+    through manual adjustments during the sewing process.                              methods, it decomposes reasoning into explicit, verifi-
+                                                                                                able steps executed by specialized agents. By testing
+                                                                                                structured hypotheses instead of aggregating noisy evi-
+                                                                                                dence, VideoHV-Agent filters spurious information, focuses
+ Figure 6. Comparison for different types of NextQA questions.                                  on decision-relevant observations, and enables transparent
+                                                                                                agent coordination. This results in more robust, inter-
+                                                                                                pretable, and logically consistent video understanding. Ex-
+4.7. Qualitative Study                                                                          periments on EgoSchema, NextQA, and IntentQA show
+In Fig. 5, we qualitatively demonstrate the effectiveness of                                    that VideoHV-Agent achieves state-of-the-art accuracy with
+VideoHV-Agent. Given multiple possible cloth joint ways,                                        strong efficiency and interpretability.
+the Thinker formulates testable hypotheses and specifies the
+visual clue needed to distinguish them. When inspecting                                         6. Acknowledgements
+early frames (3–8), the Verifier finds insufficient evidence                                    This work is partially supported by Natural Science
+and marks the clue as unverified rather than guessing. In                                       Foundation of China (No.        62302453), Zhejiang
+a second round, it examines later frames (31–35), detects                                       Provincial Natural Science Foundation of China (No.
+clear sewing actions (e.g., illuminated machine, fabric un-                                     LMS25F020003), and Shanghai Municipal Science
+der the presser foot, manual alignment), and reaches a ver-                                     and Technology Major Project 2025SHZDZX025G16.
+
+
+                                                                                           8
+                                                                          [11] Aaron Hurst, Adam Lerer, Adam P Goucher, Adam Perel-
+                                                                               man, Aditya Ramesh, Aidan Clark, AJ Ostrow, Akila Weli-
+References                                                                     hinda, Alan Hayes, Alec Radford, et al. Gpt-4o system card.
+                                                                               arXiv preprint arXiv:2410.21276, 2024. 6
+ [1] Hammad Ayyubi, Junzhang Liu, Ali Asgarov, Zaber Ibn Ab-              [12] Wonkyun Kim, Changin Choi, Wonseok Lee, and Wonjong
+     dul Hakim, Najibul Haque Sarker, Zhecan Wang, Chia-                       Rhee. An image grid can be worth a video: Zero-shot video
+     Wei Tang, Hani Alomari, Md Atabuzzaman, Xudong Lin,                       question answering using a vlm. IEEE Access, 2024. 6
+     et al. Enter: Event based interpretable reasoning for videoqa.
+                                                                          [13] Noriyuki Kugo, Xiang Li, Zixin Li, Ashish Gupta, Arpan-
+     arXiv preprint arXiv:2501.14194, 2025. 6
+                                                                               deep Khatua, Nidhish Jain, Chaitanya Patel, Yuta Kyuragi,
+ [2] Shiwen Cao, Zhaoxing Zhang, Junming Jiao, Juyi Qiao,                      Yasunori Ishii, Masamoto Tanabiki, et al. Videomultia-
+     Guowen Song, Rong Shen, and Xiangbing Meng. Masr:                         gents: A multi-agent framework for video question answer-
+     Self-reflective reasoning through multimodal hierarchical at-             ing. arXiv preprint arXiv:2504.20091, 2025. 3, 6, 7
+     tention focusing for agent-based video understanding. arXiv
+                                                                          [14] Bo Li, Yuanhan Zhang, Dong Guo, Renrui Zhang, Feng Li,
+     preprint arXiv:2504.17213, 2025. 3
+                                                                               Hao Zhang, Kaichen Zhang, Peiyuan Zhang, Yanwei Li, Zi-
+ [3] Zhenfang Chen, Qinhong Zhou, Yikang Shen, Yining Hong,
+                                                                               wei Liu, et al. Llava-onevision: Easy visual task transfer.
+     Zhiqing Sun, Dan Gutfreund, and Chuang Gan. Visual chain-
+                                                                               arXiv preprint arXiv:2408.03326, 2024. 6
+     of-thought prompting for knowledge-based visual reasoning.
+                                                                          [15] Jiapeng Li, Ping Wei, Wenjuan Han, and Lifeng Fan. Inten-
+     In Proceedings of the AAAI Conference on Artificial Intelli-
+                                                                               tqa: Context-aware video intent reasoning. In Proceedings of
+     gence, pages 1254–1262, 2024. 1
+                                                                               the IEEE/CVF international conference on computer vision,
+ [4] Xiaoxue Cheng, Junyi Li, Wayne Xin Zhao, and Ji-Rong
+                                                                               pages 11963–11974, 2023. 5
+     Wen. Chainlm: Empowering large language models with
+     improved chain-of-thought prompting. In Proceedings of               [16] Kunchang Li, Yali Wang, Yinan He, Yizhuo Li, Yi Wang,
+     the 2024 Joint International Conference on Computational                  Yi Liu, Zun Wang, Jilan Xu, Guo Chen, Ping Luo, et al.
+     Linguistics, Language Resources and Evaluation (LREC-                     Mvbench: A comprehensive multi-modal video understand-
+     COLING 2024), pages 2969–2983, 2024. 1                                    ing benchmark. In Proceedings of the IEEE/CVF Conference
+                                                                               on Computer Vision and Pattern Recognition, pages 22195–
+ [5] Yue Fan, Xiaojian Ma, Rujie Wu, Yuntao Du, Jiaqi Li, Zhi
+                                                                               22206, 2024. 6
+     Gao, and Qing Li. Videoagent: A memory-augmented mul-
+     timodal agent for video understanding. In European Confer-           [17] Kailing Li, Qi’ao Xu, Tianwen Qian, Yuqian Fu, Yang Jiao,
+     ence on Computer Vision, pages 75–92. Springer, 2024. 1, 2,               and Xiaoling Wang. Clivis: Unleashing cognitive map
+     3                                                                         through linguistic-visual synergy for embodied visual rea-
+                                                                               soning, 2025. 1
+ [6] Chaoyou Fu, Yuhan Dai, Yongdong Luo, Lei Li, Shuhuai
+     Ren, Renrui Zhang, Zihan Wang, Chenyu Zhou, Yunhang                  [18] Ruotong Liao, Max Erler, Huiyu Wang, Guangyao Zhai,
+     Shen, Mengdan Zhang, et al. Video-mme: The first-ever                     Gengyuan Zhang, Yunpu Ma, and Volker Tresp. Videoinsta:
+     comprehensive evaluation benchmark of multi-modal llms in                 Zero-shot long video understanding via informative spatial-
+     video analysis. In Proceedings of the IEEE/CVF conference                 temporal reasoning with llms. In Findings of the Association
+     on computer vision and pattern recognition, pages 24108–                  for Computational Linguistics: EMNLP 2024, pages 6577–
+     24118, 2025. 5, 1                                                         6602, 2024. 1, 2, 6
+ [7] Lishuai Gao, Yujie Zhong, Yingsen Zeng, Haoxian Tan,                 [19] Zengrong Lin, Zheng Wang, Tianwen Qian, Pan Mu, Sixian
+     Dengjie Li, and Zheng Zhao. Linvt: Empower your image-                    Chan, and Cong Bai. Neighborretr: Balancing hub centrality
+     level large language model to understand videos. arXiv                    in cross-modal retrieval, 2025. 2
+     preprint arXiv:2412.05185, 2024. 6                                   [20] Ye Liu, Kevin Qinghong Lin, Chang Wen Chen, and
+ [8] Wenyi Hong, Weihan Wang, Qingsong Lv, Jiazheng Xu,                        Mike Zheng Shou. Videomind: A chain-of-lora agent for
+     Wenmeng Yu, Junhui Ji, Yan Wang, Zihan Wang, Yuxiao                       long video reasoning. arXiv preprint arXiv:2503.13444,
+     Dong, Ming Ding, et al. Cogagent: A visual language model                 2025. 3
+     for gui agents. In Proceedings of the IEEE/CVF Conference            [21] Yongdong Luo, Xiawu Zheng, Xiao Yang, Guilin Li,
+     on Computer Vision and Pattern Recognition, pages 14281–                  Haojia Lin, Jinfa Huang, Jiayi Ji, Fei Chao, Jiebo Luo,
+     14290, 2024. 6                                                            and Rongrong Ji. Video-rag: Visually-aligned retrieval-
+ [9] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-                   augmented long video comprehension. arXiv preprint
+     Zhu, Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen, et al.                 arXiv:2411.13093, 2024. 3
+     Lora: Low-rank adaptation of large language models. ICLR,            [22] Karttikeya Mangalam, Raiymbek Akshulakov, and Jitendra
+     1(2):3, 2022. 3                                                           Malik. Egoschema: A diagnostic benchmark for very long-
+[10] Zeyi Huang, Yuyang Ji, Xiaofang Wang, Nikhil Mehta, Tong                  form video language understanding. Advances in Neural In-
+     Xiao, Donghyun Lee, Sigmund Vanvalkenburgh, Shengxin                      formation Processing Systems, 36:46212–46244, 2023. 5
+     Zha, Bolin Lai, Licheng Yu, et al. Building a mind palace:           [23] Juhong Min, Shyamal Buch, Arsha Nagrani, Minsu Cho,
+     Structuring environment-grounded semantic graphs for ef-                  and Cordelia Schmid. Morevqa: Exploring modular reason-
+     fective long video analysis with llms. In Proceedings of the              ing models for video question answering. In Proceedings of
+     Computer Vision and Pattern Recognition Conference, pages                 the IEEE/CVF Conference on Computer Vision and Pattern
+     24169–24179, 2025. 2                                                      Recognition, pages 13235–13245, 2024. 1, 3
+
+
+                                                                      9
+[24] Tony Montes and Fernando Lozano. Viqagent: Zero-shot                       Chain-of-thought prompting elicits reasoning in large lan-
+     video question answering via agent with open-vocabulary                    guage models. Advances in neural information processing
+     grounding validation. arXiv preprint arXiv:2505.15928,                     systems, 35:24824–24837, 2022. 2
+     2025. 1, 2, 3                                                         [37] Junbin Xiao, Xindi Shang, Angela Yao, and Tat-Seng Chua.
+[25] Jongwoo Park, Kanchana Ranasinghe, Kumara Kahatapitiya,                    Next-qa: Next phase of question-answering to explaining
+     Wonjeong Ryu, Donghyun Kim, and Michael S Ryoo. Too                        temporal actions. In Proceedings of the IEEE/CVF con-
+     many frames, not all useful: Efficient strategies for long-                ference on computer vision and pattern recognition, pages
+     form video qa. In Workshop on Video-Language Models@                       9777–9786, 2021. 5
+     NeurIPS 2024, 2024. 1, 2, 6                                           [38] Zeyuan Yang, Delin Chen, Xueyang Yu, Maohao Shen, and
+[26] Tingyu Qu, Mingxiao Li, Tinne Tuytelaars, and Marie-                       Chuang Gan. Vca: Video curious agent for long video un-
+     Francine Moens. Ts-llava: Constructing visual tokens                       derstanding. In Proceedings of the IEEE/CVF International
+     through thumbnail-and-sampling for training-free video                     Conference on Computer Vision, pages 20168–20179, 2025.
+     large language models. arXiv preprint arXiv:2411.11066,                    1
+     2024. 6                                                               [39] Shoubin Yu, Jaemin Cho, Prateek Yadav, and Mohit Bansal.
+[27] Chuyi Shang, Amos You, Sanjay Subramanian, Trevor Dar-                     Self-chained image-language model for video localization
+     rell, and Roei Herzig. Traveler: A modular multi-lmm agent                 and question answering. Advances in Neural Information
+     framework for video question-answering. In Proceedings of                  Processing Systems, 36, 2024. 6
+     the 2024 Conference on Empirical Methods in Natural Lan-              [40] Ce Zhang, Taixi Lu, Md Mohaiminul Islam, Ziyang Wang,
+     guage Processing, pages 9740–9766, 2024. 2, 3                              Shoubin Yu, Mohit Bansal, and Gedas Bertasius. A simple
+[28] Yudi Shi, Shangzhe Di, Qirui Chen, and Weidi Xie. Enhanc-                  llm framework for long-range video question-answering. In
+     ing video-llm reasoning via agent-of-thoughts distillation. In             Proceedings of the 2024 Conference on Empirical Methods
+     Proceedings of the Computer Vision and Pattern Recognition                 in Natural Language Processing, pages 21715–21737, 2024.
+     Conference, pages 8523–8533, 2025. 2                                       1, 2, 6
+[29] Jiawei Wang, Liping Yuan, Yuchen Zhang, and Haomiao                   [41] Haoyu Zhang, Yuquan Xie, Yisen Feng, Zaijing Li, Meng
+     Sun. Tarsier: Recipes for training and evaluating large video              Liu, and Liqiang Nie. Hcqa @ ego4d egoschema challenge
+     description models, 2024. 6                                                2024, 2024. 6
+[30] Xijun Wang, Junbang Liang, Chun-Kai Wang, Kenan Deng,                 [42] Lu Zhang, Tiancheng Zhao, Heting Ying, Yibo Ma, and Kyu-
+     Yu Lou, Ming C Lin, and Shan Yang. Vila: Efficient video-                  song Lee. Omagent: A multi-modal agent framework for
+     language alignment for video question answering. In Eu-                    complex video understanding with task divide-and-conquer.
+     ropean Conference on Computer Vision, pages 186–204.                       In Proceedings of the 2024 Conference on Empirical Meth-
+     Springer, 2024. 6                                                          ods in Natural Language Processing, pages 10031–10045,
+[31] Xiaohan Wang, Yuhui Zhang, Orr Zohar, and Serena Yeung-                    2024. 1, 3
+     Levy. Videoagent: Long-form video understanding with                  [43] Yue Zhao, Ishan Misra, Philipp Krähenbühl, and Rohit
+     large language model as agent. In European Conference on                   Girdhar. Learning video representations from large lan-
+     Computer Vision, pages 58–76. Springer, 2024. 3, 5, 6, 7                   guage models. In Proceedings of the IEEE/CVF Conference
+[32] Ying Wang, Yanlai Yang, Mengye Ren, and et al. Lifelong-                   on Computer Vision and Pattern Recognition, pages 6586–
+     memory: Leveraging llms for answering queries in long-                     6597, 2023. 5
+     form egocentric videos. arXiv preprint arXiv:2312.05269,              [44] Zhuo Zhi, Qiangqiang Wu, Wenbo Li, Yinchuan Li, Kun
+     2023. 6                                                                    Shao, Kaiwen Zhou, et al. Videoagent2: Enhancing the
+[33] Yifei Wang, Zhenkai Li, Tianwen Qian, Huanran Zheng,                       llm-based agent system for long-form video understanding
+     Zheng Wang, Yuqian Fu, and Xiaoling Wang. Streameqa:                       by uncertainty-aware cot. arXiv preprint arXiv:2504.04471,
+     Towards streaming video understanding for embodied sce-                    2025. 3, 5, 6
+     narios, 2025. 1
+[34] Zheng Wang, Kun Huang, Zengrong Lin, and Cong Bai.
+     Event-driven hybrid and cross-stage guide for video corpus
+     moment retrieval. In Proceedings of the 2025 International
+     Conference on Multimedia Retrieval, page 1367–1376, New
+     York, NY, USA, 2025. Association for Computing Machin-
+     ery. 2
+[35] Ziyang Wang, Shoubin Yu, Elias Stengel-Eskin, Jaehong
+     Yoon, Feng Cheng, Gedas Bertasius, and Mohit Bansal.
+     Videotree: Adaptive tree-based video representation for llm
+     reasoning on long videos. In Proceedings of the Computer
+     Vision and Pattern Recognition Conference, pages 3272–
+     3283, 2025. 1, 2, 6, 7
+[36] Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten
+     Bosma, Fei Xia, Ed Chi, Quoc V Le, Denny Zhou, et al.
+
+
+                                                                      10
+    Think, Then Verify: A Hypothesis–Verification Multi-Agent Framework for
+                           Long Video Understanding
+                                              Supplementary Material
+A. Result on VideoMME-L                                                Table S1. Results on VideoMME-L, with VCA (ICCV’25).
+
+To further evaluate the generalization capability of our                         LLM         Methods       Accuracy (%)
+framework under broader video distributions and more
+                                                                                               CoT             46.7
+diverse question types, we extend our experiments to
+                                                                                            VideoTree      54.2 (+7.5%)
+VideoMME-L [6], a large-scale benchmark designed for                             GPT-4o
+                                                                                              VCA          56.3 (+9.6%)
+general VideoQA. Compared with EgoSchema, IntentQA,                                           Ours        60.6 (+13.9%)
+and NextQA, VideoMME-L covers more open-domain con-
+tent and varied reasoning scenarios, providing a more com-
+prehensive evaluation setting.                                       Table S2. Extra EgoSchema results under different LLM/cap-
+   Table S1 reports results on VideoMME-L, where our                 tioner.
+method remains strong, outperforming the recent Video Cu-
+                                                                      LLM              Caption Model      Methods         Egoschema
+rious Agent (VCA) in ICCV’25 [38]. Under the same
+LLM/caption backbone (Table S2), we consistently outper-                                    -                CoT            60.9
+                                                                      Claude-3-Haiku      LaViLa       LifelongMemory   64.8 (+3.9%)
+form the standard chain-of-thought reasoning and achieve                                  LaViLa             Ours       65.4 (+4.5%)
+the largest gains over prior approaches.                                                    -                CoT             60.4
+   In addition to accuracy, our framework demonstrates fa-            GPT-3.5
+                                                                                          GPT-4o            LVNet        61.0 (+0.6%)
+vorable efficiency across datasets. On NextQA, where the                                  LaViLa       LifelongMemory    64.0 (+3.6%)
+                                                                                          LaViLa             Ours       76.2 (+15.8%)
+average video duration is 39.5s, our framework requires
+                                                                                            -                CoT             66.0
+74.48s per sample on average. On EgoSchema, with an av-                                   GPT-4o            LVNet        68.2 (+2.2%)
+erage duration of 180s, the runtime is 123.67s. Notably, on           GPT-4o
+                                                                                          GPT-4o       LifelongMemory    72.0 (+6.0%)
+the long-video benchmark VideoMME-L, which has an av-                                     GPT-4o             Ours       81.0 (+15.0%)
+erage duration of 2466.7s, our method only takes 181.82s
+per sample on average. These results indicate that our ap-
+proach maintains stable and scalable computational cost              tive, indicating that our gains are not solely driven by using
+even as video length increases substantially, highlighting its       a stronger model.
+practicality for real-world long-form VideoQA scenarios.
+
+B. Results on Different Backbones                                    C. Details of prompt in VideoHV-Agent
+To better understand the contribution of our hypoth-                 We present all prompts used in the VideoHIV-Agent. First,
+esis–verification architecture independent of backbone               frame-level information is integrated through Context Sum-
+strength, we conduct additional controlled experiments with          marization. In the Hypothesis Generation stage, the agent
+different LLM and caption backbones. Since existing meth-            observes the summarized video description and proposes a
+ods adopt a variety of backbone configurations, directly             set of testable hypotheses for the candidate answers. In the
+comparing overall performance may obscure the architec-              Clue Generation stage, the agent evaluates the quality of
+tural contribution. Therefore, we explicitly disentangle             these hypotheses and derives a concise clue that specifies
+backbone effects by evaluating different backbone combi-             what needs to be verified. In the Clue Verification stage,
+nations within a unified setting.                                    the agent grounds the clue in the video content and col-
+   In Table 1, 7 of the 9 baselines already use strong LLM           lects visual evidence to test it. When the verification result
+backbones: 2 use GPT-4 and 5 use GPT-4o, while only TS-              is inconclusive or lacks sufficient discriminative power, a
+LLAVA and Tarsier do not. To further isolate the contribu-           hypothesis regeneration process is triggered. Specifically,
+tion of the hypothesis–verification design, Table S2 reports         Discriminability Enhancement addresses the problem of in-
+a fair backbone-controlled setting and also shows the base-          sufficient discrimination between hypotheses, while Speci-
+lines that do not perform hypothesis verification, but use           ficity Enhancement makes the hypotheses more concrete
+standard chain-of-thought reasoning (CoT). Under identi-             and testable when verification fails. The final stage, Evi-
+cal backbone and captioner, our method achieves the best             dence Integration, integrates all verification results to infer
+performance. Our framework remains consistently effec-               the most plausible answer.
+
+
+                                                                 1
+Context Summarization
+                                                             Generate a Distinguishing Clue:
+You are given some language descriptions of a first-         Produce a concise description of what kind of
+person view video. The video is {length} seconds             video evidence could distinguish between these
+long. Each sentence describes a 1.0s clip. The de-           hypotheses. For example: “Check whether the
+scriptions are sequential and non-overlapping which          person hands the object before or after speaking,”
+cover the whole video exactly. Here are the descrip-         or “Verify if the dog appears indoors or outdoors.”
+tions: {interval text}. Please give me a {words}
+words summary. When doing summarization, re-                 Assign a Distinction Score (0–1):
+member that your summary will be used to answer              Give a numeric score representing how distin-
+this multiple choice question: {question}                    guishable the hypotheses are based on likely video
+                                                             evidence, and provide the reasons for the score:
+                                                             0.0–0.3: Hypotheses are too similar or overlapping
+                                                             0.4–0.6: Moderate distinction but may require
+Hypothesis Generation
+                                                             nuanced understanding
+[Instruction]                                                0.7–1.0: Strongly distinct, clearly testable differ-
+You are a reasoning planner. Given a video-related           ence
+question and several answer options. Pay special             If the distinction score < 0.5, subsequent hypothe-
+attention to, if the option is clearly inappropriate         ses need to be regenerated.
+for the context, do not generate a corresponding
+hypothesis.     Rewrite remaining option into a              [Inputs]
+testable hypothesis that can be verified from the            Question: {question}
+video evidence.                                              Hypotheses: {hypotheses}
+Each hypothesis must specify:                                Context summary: {video summary}
+- The key entities or objects involved,
+- The main action or event,
+- The temporal or causal relation among them.
+
+[Inputs]
+Question: {question}                                         Clue Verification
+Options: {options}
+Context summary: {video summary}                             [Instruction]
+                                                             You are a reasoning verifier. You will verify
+[Output format]                                              whether a distinguishing clue derived from multi-
+Return option (It must be a complete option, not just        ple hypotheses can be supported or refuted by the
+numbers) and hypotheses.                                     provided video context information.
+                                                             Follow this reasoning plan:
+                                                             1. Clue Understanding
+Clue Generation                                              Reinterpret the clue in plain terms: what needs to
+                                                             be verified? Identify what kind of evidence (objects,
+[Instruction]                                                actions, relations, timing, spatial layout) would sup-
+You are a reasoning analyst. Given several rewrit-           port or contradict it.
+ten hypotheses corresponding to different answer             2. Contextual Search
+options of a video question, analyze how distinct            Examine the given video summary, transcript, or ex-
+they are in terms of testable evidence in the video.         tracted description. Find sentences, events, or visual
+Your task has three parts:                                   cues that are relevant to the clue.
+                                                             3. Reasoning Trace
+Compare Hypotheses:                                          Step by step, explain how the found evidence relates
+Identify the core difference in entities, actions,           to the clue. Explicitly note whether the evidence
+events, causal/temporal relations, or visual evi-            supports or contradicts each hypothesis. Main-
+dence type (e.g., spatial layout, sequence of actions,       tain logical transparency: show what was observed,
+emotional expression).                                       what inference was drawn, and what conclusion fol-
+                                                             lowed.
+
+
+
+                                                         2
+4. Final Output                                               5. Note that you should only refer to the Verifica-
+Summarize whether the clue was verified, partially            tion Results, not accept them wholesale.
+verified, or not found. Provide a short reasoning
+trace and the relevant evidence snippet.                      [Inputs]
+                                                              Question: {question}
+[Inputs]                                                      Option: {options}
+Question: {question}                                          Clue Verification Results: {verification outputs}
+Clue: {clue}                                                  Context summary: {video summary}
+Frame level caption: {frame caption}
+                                                              [Output format]
+[Output format]                                               “reasoning summary”: “Summarize the verification
+“clue understanding”: “Describe what is being                 results.”,
+tested”,                                                      “conflict resolution”: “If any conflicting evidence
+“evidence found”: “Summarize key details from                 exists, explain how it was resolved.”,
+the context or from tool retrieval”,                          “final answer”: “Choose from the options to return
+“reasoning trace”: “[                                         only numbers.”,
+Step 1: Identify action/event ...,                            “explanation”: “Give a concise, human-readable ra-
+Step 2: Compare with clue condition ...,                      tionale connecting evidence to conclusion.”
+Step 3: Draw inference ...
+]”,
+“verification result”: “verified / partially verified /
+not verified”,
+If you cannot verify clues well and which frames
+might be helpful for verification, describe what ad-
+ditional evidence is needed. Call only one tool at a
+                                                              Discriminability Enhancement
+time and frame range no more than 5 frames. If the
+verification result is not verified, it means the clue        [Instruction]
+is not good and needs to be regenerated.                      You are a reasoning planner for video question
+                                                              answering. The previous round of hypotheses
+                                                              had low distinction, meaning the hypotheses were
+Evidence Integration                                          too similar or not easily distinguishable based
+                                                              on video evidence. Your task is to regenerate a
+[Instruction]                                                 new set of hypotheses—each still grounded in its
+You are an answer reasoning agent. Given a                    respective option, but now rewritten to maximize
+video question, and the verification results of the           their semantic and evidential differences so that
+distinguishing clues, infer which option is best              they can be clearly tested and compared from the
+supported by the evidence. You must:                          video. Follow these reasoning steps:
+1. Integrate Verification Results                             1. Analyze Distinction Feedback
+2. Resolve Conflicts                                          Identify why the distinction score was low (e.g.,
+If multiple hypotheses are partially verified, reason         overlapping actions, vague entities, lack of tempo-
+which one is more strongly aligned with the overall           ral or causal contrast). Determine what types of
+context and clues. If all clues are unverified,               features (action, timing, spatial layout, emotion,
+indicate uncertainty and suggest that additional              interaction) can be emphasized to make them more
+evidence is needed.                                           distinct.
+3. Generate a Transparent Reasoning Chain                     2. Regenerate Option-based Hypotheses
+Summarize what was tested, what was found,                    Keep each hypothesis aligned with its original
+and how it leads to your conclusion. Avoid just               option’s meaning. Rewrite it to highlight unique,
+“guessing.” Show cause–effect reasoning.                      observable, and discriminative aspects of the event.
+4. Output a Final Answer                                      Ensure that each hypothesis involves different
+Specify the chosen option (0/1/2/...) and briefly             entities, actions, outcomes, or temporal relations
+justify it based on evidence.                                 whenever possible.
+
+
+
+
+                                                          3
+[Inputs]
+Question: {question}
+Options: {option}
+Previous hypotheses: {previous hypotheses}
+Verification feedback: {verification feedback}
+Context summary: {video summary}
+
+[Output format]
+Return option (It must be a complete option, not just
+numbers) and hypothesis.
+
+Specificity Enhancement
+
+[Instruction]
+You are a reasoning planner improving video-based
+hypotheses for a multiple-choice question. Each
+hypothesis must correspond directly to one answer
+option. The previous verification phase failed
+to confirm the clues, so you need to regenerate
+hypotheses that are: Still faithful to their respective
+answer options, More concretely testable from the
+video evidence, Better aligned with the available
+context.
+Follow these reasoning steps:
+1. Analyze Verification Feedback
+Identify why the previous verification failed (e.g.,
+missing actions, unclear subject, no visible timing,
+or too abstract). Determine what type of visual or
+contextual evidence is available or missing.
+2. Regenerate Option-based Hypotheses
+For each option, rewrite its hypothesis to make
+it more specific, testable, and observable within
+the context. Preserve each option’s core meaning
+(do not alter its logical claim). Avoid unverifiable
+statements (e.g., emotions, intentions, unseen
+causes). If an option is clearly impossible to verify
+from context, note that no valid hypothesis can be
+formed.
+
+[Inputs]
+Question: {question}
+Options: {option}
+Previous hypotheses: {previous hypotheses}
+Verification feedback: {verification feedback}
+Context summary: {video summary}
+
+[Output format]
+Return option (It must be a complete option, not just
+numbers) and hypothesis.
+
+
+
+
+                                                          4
+

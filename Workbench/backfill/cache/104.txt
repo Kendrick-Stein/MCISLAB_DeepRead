@@ -1,0 +1,889 @@
+                                                CrayonRobo: Object-Centric Prompt-Driven Vision-Language-Action
+                                                                Model for Robotic Manipulation
+
+                                            Xiaoqi Li1,2 , Lingyun Xu1 , Mingxu Zhang1 , Jiaming Liu1 , Yan Shen1,2 , Iaroslav Ponomarenko1,2 ,
+                                                      Jiahui Xu1 , Liang Heng1,2 , Siyuan Huang1 , Shanghang Zhang1 , Hao Dong1,2 *
+                                                            1
+                                                              School of Computer Science, Peking University 2 PKU-Agibot Lab
+
+
+
+
+arXiv:2505.02166v1 [cs.RO] 4 May 2025
+                                                                   Abstract                                        irrelevant to the task, such as background elements and non-
+                                                                                                                   interactive objects. Some methods use human demonstration
+                                        In robotic, task goals can be conveyed through various                     videos [10] or generated videos [6, 13, 14, 60] to outline
+                                        modalities, such as language, goal images, and goal videos.                tasks step-by-step. However, human demonstration videos
+                                        However, natural language can be ambiguous, while images                   are burdensome to encode, and generated videos depend
+                                        or videos may offer overly detailed specifications. To tackle              heavily on their quality. To address these challenges, sev-
+                                        these challenges, we introduce CrayonRobo that leverages                   eral works propose using visual prompts as a convenient
+                                        comprehensive multi-modal prompts that explicitly convey                   yet expressive modality for goal specification. These visual
+                                        both low-level actions and high-level planning in a simple                 prompts are easy for users to create and can effectively con-
+                                        manner. Specifically, for each key-frame in the task sequence,             vey the precise goals that the policy model should focus
+                                        our method allows for manual or automatic generation of                    on.
+                                        simple and expressive 2D visual prompts overlaid on RGB                        Among visual prompt-conditioned approaches, methods
+                                        images. These prompts represent the required task goals,                   [20, 33, 44, 49, 62] have attempted to convey task goals
+                                        such as the end-effector pose and the desired movement di-                 more effectively. The RT-Sketch [51] method emphasizes
+                                        rection after contact. We develop a training strategy that                 drawing the target state of the most relevant object to rep-
+                                        enables the model to interpret these visual-language prompts               resent the goal. However, it only depicts the final state and
+                                        and predict the corresponding contact poses and movement                   overlooks the intermediate key frames that are crucial for
+                                        directions in SE(3) space. Furthermore, by sequentially                    successful task execution. In contrast, RT-Trajectory [20]
+                                        executing all key-frame steps, the model can complete long-                (Figure1.(c)) illustrates the entire movement path of the end-
+                                        horizon tasks. This approach not only helps the model ex-                  effector, which helps bridge the gap between task compo-
+                                        plicitly understand the task objectives but also enhances its              nents and enhances generalization. Despite its advantages,
+                                        robustness on unseen tasks by providing easily interpretable               they provide only positional information and neglect the
+                                        prompts. We evaluate our method in both simulated and real-                action directional information, which is also critical for ac-
+                                        world environments, demonstrating its robust manipulation                  curate task completion. Additionally, as trajectories become
+                                        capabilities.                                                              longer and overlap between key-frames, they can create con-
+                                                                                                                   fusion for the model regarding overall task planning.
+                                                                                                                       This leads us to consider: is there any way to precisely
+                                        1. Introduction                                                            and non-redundantly convey the goal while also clearly com-
+                                                                                                                   municating the end-effector’s action? Since key-frames rep-
+                                        As thoughtful helpers for humans, it is crucial for robots
+                                                                                                                   resent important or bottleneck steps of the gripper during
+                                        to understand and successfully execute their assigned tasks.
+                                                                                                                   the task execution [18, 19, 27, 48, 61], we propose Cray-
+                                        Various approaches exist to convey the goals that robots
+                                                                                                                   onRobo, an approach that automatically generates or draws
+                                        should achieve, such as language descriptions, goal images,
+                                                                                                                   crayon-style visual prompts on images to effectively repre-
+                                        or goal videos. Language instructions [2, 24, 25, 32, 34,
+                                                                                                                   sent both low-level actions and high-level planning within
+                                        36, 40, 43, 47, 48, 57, 59] can be ambiguous and brief, mak-
+                                                                                                                   key-frame sequences. As illustrated in Figure 1(a), these
+                                        ing it challenging for the robot to understand the tasks, or
+                                                                                                                   prompts can include contact point, end-effector z-axis direc-
+                                        they can be overly detailed, increasing the difficulty for the
+                                                                                                                   tion, end-effector y-axis direction, and next moving direction
+                                        model to follow. Goal images [6, 7, 26, 41, 64], while provid-
+                                                                                                                   after contact, conveying the objective of where and how to in-
+                                        ing an accurate target, often contain extraneous information
+                                                                                                                   teract with the object. We further develop a training strategy
+                                          * Corresponding author. First author’s email: xl3062@columbia.edu.       and supervision objectives aimed at progressively enhancing
+
+
+                                                                                                               1
+    (a)                          (b)                                                             t      (c)
+                                                                                                                       RT-trajectory
+                   OR                               t1                                     t2
+                                                            directional rich
+       automatic        manual
+                                  Input                     no overlapping
+
+
+
+                                                         CrayonRobo(ours)                            V.S.
+
+
+                                                   t1                     t1          t2   t2
+
+
+                                  Execution
+     initial end
+      state state
+    end effector pose: z-axis            y-axis     contact point      next moving direction:
+
+Figure 1. (a) shows our expression of different color prompts. (b) shows that we utilize a sequence of images with crayon visual prompts to
+express the key-frame steps, with each step illustrating the required low-level task goals, i.e., t1-pick, t2-place. Based on the input goal
+prompt, the model determines the 6 DoF contact pose, enabling it to interact with the object as required. When a yellow prompt is presented,
+the model also predicts 3D movement directions, guiding the movement after contact, e.g., picking upward in t1. For simple steps, such as
+t2-place, there is no need to present the post-contact moving direction. By sequentially executing each step in the key-frame sequence, the
+overall task is completed. (c) shows its differences with RT-trajectory [9]
+
+the model’s ability to comprehend each type of prompt. This                2. Related Work
+allows the model to predict the corresponding SE(3) contact
+pose and the 3D next movement direction after contact, fa-                 Pure Vision-based Manipulation. In vision-based robotic
+cilitating the completion of each sub-goal task. Furthermore,              manipulation, numerous studies have employed a variety
+as illustrated in Figure 1(b), we use key-frame sequences                  of solutions, including deep learning [8, 9, 18, 48], imita-
+as input to express the task planning procedure, with each                 tion learning [11, 23, 28, 29, 37, 63], and reinforcement
+image presented with crayon visual prompts indicating its                  learning [3, 12, 39, 45]. For example, in deep learning-
+key-frame task goal. We leverage the predicted 3D move-                    based solutions, some methods design action policy net-
+ment direction to connect each step sequentially, completing               works [4, 15, 42, 54, 58] to calculate dense affordance
+the overall long-horizon task. This approach enables us to                 maps and determine contact points and action poses. How-
+instruct the model’s task objectives while also enhancing                  ever, pure vision-based manipulation networks focus more
+its robustness when encountering novel tasks by providing                  on actionability than functionality, potentially failing when
+model-understandable prompts.                                              functional actions are required to meet human needs.
+                                                                           Language-conditioned Manipulation. With advance-
+   Our experimental setup includes a diverse range of                      ments in language foundation models, language instruc-
+manipulation tasks, both familiar and novel, where our                     tions are increasingly used for goal specification in goal-
+method achieves a promising success rate in manip-                         conditioned policy learning, as seen in [8]. Other works,
+ulation.      Additional demonstrations are available at                   such as [2, 24, 32, 34, 40, 43, 47, 48, 56, 59], utilize tem-
+https://sites.google.com/view/crayonrobo.                                  plated or freeform language for task specification. Building
+                                                                           on this, Belkhale et al. [5] introduces language motions as
+   In summary, our contributions are as follows:                           an intermediate layer between high-level goals and low-level
+                                                                           actions. Despite progress, challenges remain: language in-
+• 1) We propose employing a sequence of key-frames pre-                    structions often struggle to specify detailed actions or convey
+  sented with prompts to explicitly convey the task objec-                 spatial objectives, frequently requiring human assistance to
+  tives in both low-level action and high-level planning.                  work effectively.
+• 2) We train a model that comprehends the visual-language                 Goal Image or Video-conditioned Manipulation. To en-
+  prompts and predicts accurate contact poses along with                   hance goal specificity and detail, several image-conditioned
+  moving directions in SE(3) space, ensuring the reliable                  policy representations have been developed, with goal-image
+  completion of each key-frame task and the connection                     conditioning being one of the most prominent techniques.
+  between steps to formulate a long-horizon task.                          In goal-image conditioning, a final goal image defines the
+• 3) Experiments at scale demonstrate its promising perfor-                desired end state of a task [6, 7, 26, 41, 64]. This approach
+  mance and robustness.                                                    inputs both the initial and target states of the object and
+
+
+                                                                      2
+outputs the actions needed to achieve the goal. In addi-               3.2. Data Collection
+tion to static images, some methods use video or generated
+                                                                       In this section, we elaborate on how to obtain the 2D prompt
+video [6, 13, 14, 60] to represent each step of the process
+                                                                       required for training. In the simulator, building upon some
+frame by frame, offering a more detailed execution proce-
+                                                                       effective rule-based heuristic approaches [32, 42], we inter-
+dure. However, both solutions encode excessive information,
+                                                                       act with objects and record the success contact pose of the
+much of which may be irrelevant to the task, such as back-                                                                          ′
+                                                                       end-effector including 3D contact point, z-axis direction aZ
+                                                                                                                                  0 ,
+ground details or unrelated objects.                                                           Y′
+                                                                       and y-axis direction a0 along with the moving direction
+                                                                           ′
+Visual Prompt-conditioned Manipulation. To address the                 aM0   of the object contact point. These are then served as
+issue of redundant goal information, recent approaches have            ground-truth to guide the training.
+proposed using visual prompts as goals. Sundaresan et al.                  As for the input prompt, 3D contact point is unprojected
+[51] suggests using goal sketches to indicate the target of the        onto a 2D image as ap0 = (x, y). We then adopt 3D contact
+                                                                                                                                ′
+task-involved object, while Gu et al. [20] proposes drawing            point as the center and locate other 3D points along aZ0 and
+moving trajectories with key waypoints to specify the desired            Y′
+                                                                       a0 . These points are then unprojected onto the 2D image.
+movement of the end-effector. Additionally, Nasiriany et al.           Subsequently, we connect these points with ap0 to calculate
+[44] introduces a method that iteratively selects waypoints            2D vectors az0 and ay0 , while obtaining red and green lines
+from a pool of potential options to form the overall trajectory,       respectively. We obtain the yellow moving direction line
+and Liu et al. [35], Stone et al. [49], Yang et al. [59] use           and obtain the 2D moving direction vector am   0 in the same
+                                                                                          ′
+external models to choose waypoints based on mark-based                way utilizing aM 0   . These are then served  as information
+visual prompts to complete tasks.                                      embedded in the input language prompt. The corresponding
+   Different from them, we propose an innovative solution              visual prompts are generated by overlaying these elements
+that allows manual drawing or automatic generating 2D                  in their respective colors onto the images.
+prompts to represent both low-level action and high-level
+                                                                       3.3. Training Strategy
+planning goals. This approach clearly conveys the objective
+of each key-frame step, i.e., where and how to interact with           3.3.1. Model Architecture
+the object, as well as the required task-planning procedure.           Given both the visual and language prompts, we require
+                                                                       the model to effectively interpret inputs from both modali-
+                                                                       ties. Observing the robust language understanding and visual
+3. Method                                                              processing capabilities of Vision Language Action Models
+                                                                       (VLAs) and inspired by their applications in prior robotic ma-
+3.1. Problem Formulation                                               nipulation tasks [30–32, 36], we follow the backbone archi-
+                                                                       tecture of an open-source VLA model [32] and adopt its pa-
+The task is defined as follows: the model takes the visual in-
+                                                                       rameter updating strategy which only finetunes the injected
+put I ∈ RH×W ×3 of an object presented with crayon visual
+                                                                       adapters [21] within LLaMa [53], alongside the multi-modal
+prompts. This prompt utilizes four colors: blue, representing
+                                                                       projection module, while keeping the primary parameters
+the contact point; red and green, indicating the z-axis and
+                                                                       frozen. This approach aims to preserve the inherent existing
+y-axis directions of the end-effector when contacting the
+                                                                       pre-trained knowledge, particularly in sim-to-real transfer,
+object; and yellow, symbolizing the next moving direction
+                                                                       while enhancing the model’s ability to comprehend visual
+after contacting. To eliminate ambiguities caused by visual
+                                                                       prompts and perform robotic manipulation in an efficient
+prompts overlapping each other, we specify their numerical
+                                                                       training time. Specifically, when presented with an RGB
+values in text inputs as a language prompt P , including the
+                                                                       image containing visual prompts I, we employ CLIP’s visual
+coordinates of the contact point denoted as ap0 ∈ R2 , the
+                                                                       encoder [46] to extract visual features. Simultaneously, text
+gripper’s 2D z-axis direction az0 and y-axis direction ay0 , and
+                                                                       prompts P are encoded into text features using LLaMa’s
+the 2D moving direction am     0 , all represented as unit vec-
+                                                                       pre-trained tokenizer [53]. The alignment of visual and text
+tors in R2 . The objective of the model is to generate an
+                  ′
+                                             p′                        feature representations is achieved through the multi-modal
+action a0 = (ap0 , aZ     Y    M
+                     0 , a0 , a0 ), where a0 is mapped into            projection module.
+3D position aP  0 using the depth information and camera
+parameters, while aZ       Y          M
+                      0 , a0 , and a0 are unit vectors in R
+                                                               3       3.3.2. Policy Learning
+representing the end-effector’s 3D z-axis, y-axis, and mov-            Input pairs: To help the model better understand the mean-
+ing directions, respectively. aZ           Y
+                                  0 and a0 jointly determine           ing of various prompts, we design a series of visual-textual
+the rotation for contacting the object, while aM 0 controls the        input pairs that progressively convey different levels of in-
+following movement after contact. Note that, the prediected            formation. This gradual progression enables the model to
+   ′
+ap0 can be different from the ap0 in the text prompt input due         develop a deeper understanding of the physical significance
+to potential input noise.                                              of each component. Specifically, as illustrated in (a)-(d) in
+
+
+                                                                   3
+                                    Input                                                                 Model                                                                                                                                                                                Loss
+       (a)
+                       Predict contact point and orientation...con-                                                                                                                                                                                         : Text Supervision Loss
+                       tact point
+                                                                                                                                                                                                                                                                      : Orthogonal Loss
+       (b)
+                       Predict contact point and orientation...con-                                                                                                                                                                                                    : Projection Loss
+                       tact point ... z-axis direction                                        Projection
+
+
+       (c)            Predict contact point and orientation...con-                                                                                                                                                                                                                               GT
+                      tact point ... z-axis direction ,... y-axis
+                      direction                                                                 LLaMA                                                                                                                            Contact point ...
+                                                                                                                                                                                                                                 Gripper z-axis direction                                                                                                                ...
+       (d)            Predict contact point and orientation...contact                                                                                                                                                            Gripper y-axis direction                                                                                                                ...
+                      point ... z-axis direction     ... y-axis                                          Adapter
+                                                                                                                                                                                                                                 Moving direction      ...
+                      direction    ,...moving direction
+
+                         end effector pose: z-axis       y-axis         contact point                                                                    next moving direction:
+
+Figure 2. We design training pairs that convey varying levels of information to enable the model to comprehend each type of prompt and
+introduce loss functions to guide it in predicting accurate poses.
+
+Figure 2 input. We formulate the problem of pose prediction                 locate 3D points along the direction with the contact point
+as a language modeling task, directly outputting 3D direc-                  as the center. The 3D point are then unprojected back onto
+tions in textual form. Thus, we generate the ground-truth                   the 2D plane, and connecting with aP        0 to generate predicted
+text as shown in Figure 2 to guide the training. The entire                 2D directional vectors az∗      0 . We employ a similar approach
+language description is shown in Appendix. A.                               to acquire ay∗        m∗
+                                                                                         0 and a0 , which are then supervised based
+                                                                            on the 2D directional prompts az0 , ay0 , and am    0 using cosine
+Training objectives: Our model’s objective is to accurately                 similarity loss , where  \cdot  denotes the dot product:
+predict 3D pose based on 2D visual-language prompts given
+different object and camera views. Therefore, we introduce                    \mathcal {L}_{P} = (1 - \frac {\mathbf {a_{0}^{z*}}\cdot \mathbf {a_{0}^{z}}}{\|\mathbf {a_{0}^{z*}}\| \|\mathbf {a_{0}^{z}}\|}) + (1 - \frac {\mathbf {a_{0}^{y*}}\cdot \mathbf {a_{0}^{y}}}{\|\mathbf {a_{0}^{y*}}\| \|\mathbf {a_{0}^{y}}\|}) + (1 - \frac {\mathbf {a_{0}^{m*}}\cdot \mathbf {a_{0}^{m}}}{\|\mathbf {a_{0}^{m*}}\| \|\mathbf {a_{0}^{m}}\|}) 
+the following losses to guide the policy training:
+   Text Supervision Loss LT : This loss ensures the effective                  Note that, LT and LO are consistent across all input pairs,
+alignment of the model’s visual and linguistic input, making                but LP varies based on the input prompts. For example, in
+sure it can output the correct output pattern. We formulate                 Input(c) of Figure. 2 where does not include the am   0 , we
+pose prediction as a classification task by discretizing the                will exclude the supervision for am   and a m∗
+                                                                                                                           in L P After
+                                                                                                                                 .
+                                                                                                               0        0
+continuous numbers in the normalized 3D direction vector                    completing the training process, the model, having been
+into 100 discrete bins [-50,50], with each bin spanning 0.02,               trained with dynamic input patterns, can understand each
+and adopt cross-entropy loss to supervise.                                  type of prompt and predict the required actions based on the
+   Orthogonal Loss LO : The orthogonality of a rotation                     provided prompts. The aforementioned losses are trained
+matrix necessitates that its components maintain orthogonal                 simultaneously under the total objective function: L = λ1 ∗
+relationships between each pair of directions. However, for-                LT +λ2 ∗ LO +λ3 ∗ LP .
+mulating direction prediction as language predictions for aZ   0
+and aY0 does not explicitly consider their geometric relation.              3.4. Inference and Interaction
+To address this, we extract aZ             Y
+                                0 and a0 from the model’s                   3.4.1. Model Inference
+output text and ensure their orthogonal relationship under
+                                                                            During the inference stage, we provide both automated and
+Gram-Schmidt loss [17].
+                                                                            manual drawing approach to extract these visual prompts, as
+   Projection Loss LP : 3D directional predictions should                   illustrated in Figure 3(i) and (ii). For automatic generation
+align with their corresponding 2D directional prompts when                  approach, we first use Grounded-DINO [38] to detect the
+unprojected back to the 2D plane. To establish an explicit
+connection between the input 2D directional prompt and the                  object’s bounding box and select its center, forming the
+output 3D directions, we introduce a projection loss designed               blue circle. Then, we automatically generate 32 uniformly
+to guide their correlation. Specifically, in the model’s output,            sampled 2D directional lines around the full 360-degree
+we extract the contact point aP   0 and map it to 3D space
+                                                                            circle with the blue circle as the center or as the middle. GPT-
+using the depth map and camera parameters. Subsequently,                    4 [1] is then prompted to select lines from all candidates to
+leveraging the predicted 3D direction in the z-axis aZ    0 , we            represent the gripper’s z-axis direction, y-axis direction, and
+
+
+                                                                        4
+                             ‘{pick the lid}’
+
+
+                                                                                Candidates
+                              Grounding                        automatic                                                     ....
+                                model                          promting
+      (i) Automatic
+                                                                                                  (a)             (b)                      (g)
+        generation                                                                                 : (b)                     : ‘select gripper z-axis
+                              Predict contact point and orientation...contact                      : (g)            direction of {pick the lid}...’
+                              point    ... z-axis direction  ,... y-axis                                   GPT4              : ‘select gripper y-axis
+                                                                                                   : (a)            direction of {pick the lid}...’
+                              direction ,...moving direction
+                                                                                                                             : ‘select moving
+                                                                                                                    direction of {pick the lid} ...’
+                                                                                             OR
+
+
+       (ii) Manual
+                               Predict contact point and orientation...contact
+                               point    ... z-axis direction ,... y-axis                                Crayon
+
+         drawing               direction ,...moving direction                                            Robo
+
+
+
+                            Figure 3. Illustration of model inference with input generated in different ways.
+
+
+
+moving direction, resulting in the red, green, and yellow                  pendix. D. After generating the visual prompt image, we
+lines, respectively. As shown in Figure 3(ii), for manual                  automatically extract the coordinates of the contact point
+drawing approach, we allow users to draw crayon visual                     and the direction vectors based on the pixel RGB values and
+prompts on the image, which then serve as the visual input.                then incorporate them into the language prompt. Given the
+                                                                           visual and language input, the model outputs the predicted
+    The contact pose is always required, while whether the                 action a0 .
+movement direction after contact is needed depending on the                    Note that although 2D directions may overlap, the model
+task characteristics. Specifically, Goyal et al. [18, 19], Johns           does not require them to originate from the same point, as
+[27], Shridhar et al. [48], Yuan et al. [61] observe that long-            long as the direction is accurate and clearly visible in the im-
+horizon tasks usually can be decomposed into several key-                  age, the model can interpret it. Additionally, if the direction
+frame tasks. Meanwhile, different key-frame tasks exhibit                  vector is perpendicular to the camera, it may be challenging
+distinct motion patterns: some require a specific moving                   to represent it as a 2D projection. In such cases, adding slight
+direction to guide the subsequent movement after contact,                  noise to the direction vector can enhance its visibility. Since
+while others end when executing contact pose. For example,                 the model is trained to interpret such situations, it can handle
+pick action requires moving along aM    0 , which usually indi-            similar scenarios during inference, where the direction may
+cates an upward movement. Similarly, pushing and pulling                   be perpendicular to the camera.
+actions require the robot to determine the direction in which
+to push or pull. In contrast, certain primitives, such as place            3.4.2. Interaction Strategy
+and move, are simple motions that do not require additional                We illustrate how we enable the robot to interact with ob-
+movement after approaching the object. For example, given                  jects given the predicted action a0 . Same with other VLA
+a pick-and-place task, once the object is picked up, the “pre-             models [22, 32, 36], ap0 is projected into 3D space utilizing
+place” pose is already established. Once the object is placed              depth information and camera parameters. The aZ      0 and a0
+                                                                                                                                        Y
+
+according to the contact pose prompt, the task is considered               jointly contribute to determining the rotation matrix of the
+complete. Therefore, there is no need to draw a moving                     end-effector, facilitating the establishment of initial contact
+prompt for these primitives. For actions like rotate, such as              with the object. If provided with am   0 , we then follow the
+rotating a button, the movement typically does not involve                 predicted moving direction aM  0  to determine the subsequent
+translating the position after contact. Instead, it focuses on             movements after contact.
+rotating the last joint. As a result, am
+                                       0 , which specifies trans-             For the long-horizon tasks, we leverage a sequence of key-
+lation, is not needed. Instead, we provide two key-frames as               frames with visual prompts to serve as high-level planning,
+prompts: one depicting the end effector pose at the moment                 with each frame representing a sub-goal step. By executing
+of contact and the other after the rotation. From these two                the key-frame steps sequentially, we can complete the long-
+temporal prompts, the required rotation direction becomes                  horizon tasks. The benefit of this approach revolves around
+evident. More visual details are demonstrated in the Ap-                   breaking down the complexity of long-horizon tasks and al-
+
+
+                                                                       5
+lowing us to optimize the success rate of each key-frame step        and target state point cloud of the object, key points are then
+to ensure the overall task’s success. Meanwhile, regarding           used to determine the end-effector pose for manipulation.
+each key-frame step as compositions, we can group them                   The above three methods use suction gripper as the end-
+into arbitrary combinations, enabling the model to handle            effector, which is compared with ours(s) in Table. 1
+diverse manipulation tasks.                                              Visual prompt conditioned model RT-trajectory [20]:
+                                                                     Since the RT-Trajectory code is not publicly available at
+4. Experiment                                                        the time of this paper’s submission, we replicate its method
+                                                                     for comparisons with implementation details in Appendix. C.
+In our experiments, we mainly focus on exploring the fol-
+                                                                         Goal video conditioned model AVDC [60]: The genera-
+lowing questions:
+                                                                     tive model is trained on our training split. During testing, we
+• Section 4.3.1: What is the effect of different types of
+                                                                     employ Gemini-1.5 [52] to evaluate the quality of the gener-
+  prompts on model performance?
+                                                                     ated videos by assessing whether they successfully complete
+• Section 4.3.2: How does the model handle noise in the
+                                                                     the given tasks, e.g., open the door. The ratio of successfully
+  input prompt, and is it user-friendly?
+                                                                     generated tasks is 10.2%. Given that the performance of
+• Section 4.4: Can the model perform specific tasks without
+                                                                     the generative video-based execution policy is highly depen-
+  prompts, given certain input distributions?
+                                                                     dent on the quality of the generated videos, we believe this
+4.1. Setup Details                                                   score can somehow reflect its overall effectiveness during
+                                                                     the following execution.
+Data Collection. Following previous work [32, 42], we
+                                                                         In Table 1, both Ours(s) and Ours(f) demonstrate a sub-
+utilize SAPIEN [55] along with the PartNet-Mobility dataset
+                                                                     stantial performance advantage over the baselines with man-
+to construct an environment, interacting with about 1500
+                                                                     ual generated prompts. For automatically generated prompts,
+object shapes under various camera view randomization.
+                                                                     the results are 0.64/0.62 on seen and unseen tasks, still
+The tasks involve several actions that require changes in
+                                                                     outperforming the baselines. It is important to note that
+both translation and rotation, e.g., pull the drawer, open
+                                                                     by selecting the center of the bounding box generated by
+the door, open the laptop lid, etc. The setup uses the flying
+                                                                     GroundingDiNO as the contact point input, there may be mis-
+Franka Panda Gripper for both the training and testing stages.
+                                                                     alignment with the actual contact point, introducing noise
+We follow the procedure in Section 3.2 to collect prompts
+                                                                     into the positional prompt. However, our results demon-
+within the simulator, which takes about 6-8 hours to collect
+                                                                     strate the robustness of CrayonRobo in handling such input
+about 10,000 training samples. Details of the training and
+                                                                     inaccuracies. This is because the model is trained to ma-
+testing dataset split and camera view randomization can be
+                                                                     nipulate objects, it can, to some extent, correct the noise in
+found in Appendix. B.
+                                                                     the prompts. Simulator visualizations are shown in the left
+Evaluation Metric. We utilize the manipulation success rate
+                                                                     of Figure 4, illustrating the prompt input, the robot’s con-
+to assess the effectiveness of the manipulation, calculated
+                                                                     tact state with the object, and the final state after movement.
+as the ratio of successfully manipulated samples to the total
+                                                                     We further conduct experiments involving tasks with multi-
+number of test samples. A successful sample is defined using
+                                                                     ple steps, such as pulling a door and subsequently pushing
+a binary criterion, with success determined by thresholding
+                                                                     it. Our method results in satisfactory performance: 0.69
+the distance that the object part moves.
+                                                                     and 0.68 on seen and unseen tasks, showing its potential in
+4.2. Comparisons with Baselines                                      handling long-horizon tasks.
+To ensure fairness in comparison, all methods adhere to the          4.3. Ablation Study
+same train and test split.
+   Pure vision model Flowbot3D [15]: It predicts motion              4.3.1. Analysis on The Effect of Different Types of
+direction on the point cloud, denoting it as flow. The point                Prompt
+with the largest flow magnitude serves as the interaction            In Table 2 Ex1-Ex3, since our model is able to handle various
+point, while the direction of the flow represents the end-           input patterns thanks to the proposed training strategy, we
+effector’s orientation and moving direction.                         progressively introduce each type of prompt during testing.
+   Language conditioned model ManipLLM [32]: It takes                When no am  0 is provided, we use rule-based approach [42]
+the task description and the object’s initial image, and then        to determine the movement after contact. Beginning with
+outputs the end-effector pose. We use its predicted contact          Ex1, where only a 2D position prompt is provided, the model
+point and rotation to contact with the object and adopt its          achieves impressive performance with scores of 0.42/0.37.
+active adaptation policy for moving.                                 We compare our results with using AnyGrasp [16] to predict
+   Vision Goal conditioned 3D model Implicit3D [64]: It              rotation given the same pixel coordinate, which results in
+develops a manipulation policy that utilizes the transporter         lower scores of 0.35/0.31. This shows even without direc-
+to detect key-points for 3D objects. By providing the initial        tional prompts, our model can accurately predict 3D poses,
+
+
+                                                                 6
+                                                                             Seen Tasks
+
+                   Method
+                Flowbot 0.76 0.86 0.08 0.67 0.26 0.05 0.58 0.29                 0.71   0.35 0.07 0.23 0.40 0.63 0.52 0.04
+               ManipLLM 0.68 0.64 0.36 0.77 0.26 0.62 0.65 0.61                 0.38   0.52 0.53 0.40 0.64 0.71 0.83 0.64
+               Implicit3D 0.53 0.58 0.35 0.55 0.30 0.66 0.58 0.51               0.31   0.41 0.45 0.34 0.69 0.54 0.31 0.43
+                Ours(s) 0.89 0.85 0.67 0.91 0.87 0.50 0.92 0.85                 0.87   0.85 0.54 0.84 0.85 0.92 0.85 0.75
+                RT-Traj 0.56 0.58 0.28 0.45 0.56 0.50 0.65 0.42                 0.29   0.56 0.40 0.49 0.46 0.53 0.52 0.27
+                 Ours(f) 0.71 0.79 0.58 0.81 0.79 0.43 0.81 0.81                0.75   0.78 0.50 0.75 0.76 0.79 0.81 0.73
+                                              Seen Tasks                                       Unseen Tasks
+
+                   Method                                                       AVG                                  AVG
+                Flowbot 0.18 0.10 0.39 0.10 0.10 0.61 0.34 0.19 0.43                   0.12 0.60 0.21 0.51 0.10 0.22 0.38
+               ManipLLM 0.41 0.75 0.44 0.67 0.38 0.22 0.81 0.86 0.51                   0.38 0.85 0.42 0.60 0.43 0.65 0.47
+               Implicit3D 0.27 0.65 0.20 0.33 0.45 0.17 0.80 0.53 0.55                 0.15 0.41 0.57 0.39 0.28 0.52 0.39
+                Ours(s) 0.65 0.90 0.78 0.79 0.68 0.91 0.94 0.46 0.80                   0.47 0.88 0.83 0.70 0.76 0.63 0.79
+                RT-Traj 0.32 0.46 0.40 0.31 0.37 0.68 0.58 0.47 0.57                   0.25 0.39 0.48 0.57 0.13 0.59 0.52
+                 Ours(f) 0.63 0.67 0.48 0.78 0.67 0.74 0.83 0.44 0.74                  0.46 0.88 0.82 0.63 0.61 0.61 0.72
+
+
+Table 1. Comparison of our method against baseline methods. (s) and (f) denote suction gripper and finger gripper, respectively. Bold text
+indicates the highest score within each end-effector type.
+
+
+
+
+                                                                                                                          heat toaster wipe table
+                   (a) lift folding chair
+
+
+
+                                                                                                                        open micro-
+
+                    (b) rotate faucet                                                                                      wave
+                                                                                                                                                    t
+
+                                        Figure 4. Visualization results in SAPIEN simulator and real world.
+
+
+                     ap0    az0   ay0      am
+                                            0     Seen    Unseen            enable the model to learn from images capturing only the
+       Ex1           ✓       -     -        -     0.42     0.37             object (without visual prompt), along with language contain-
+       Ex2           ✓      ✓      -        -     0.55     0.50             ing instructional prompts. This configuration results in a
+       Ex3           ✓      ✓     ✓         -     0.70     0.68             performance drop compared to inputting prompts from both
+       Ours          ✓      ✓     ✓        ✓      0.74     0.72
+                                                                            modalities. The reduced performance can be attributed to
+    Ours(w/o v.)     ✓      ✓     ✓        ✓      0.69     0.68                                                                     t
+                                                                            the difficulty the model has in effectively linking the given
+                     Table 2. Ablation Study.                               language prompt to the relevant objects. Consequently, it
+                                                                            becomes challenging to make accurate object-centric manip-
+                                                                            ulation predictions when relying solely on language prompts.
+showcasing its ability to comprehend objects and predict
+                                                                            We thus conclude that prompts from both modalities work
+appropriate poses based on positional prompts. Moreover,
+                                                                            together to enhance the model’s understanding and improve
+comparing Ex2 and Ex3, we observe that by introducing
+                                                                            its pose prediction capabilities.
+more prompts during testing, the model achieves more accu-
+rate predictions.                                                           4.3.2. Tolerance Analysis of Prompt Noise
+   Additionally, to investigate the differential effects of vi-             We further introduce noise into the 2D directional prompt
+sual and language prompts, in the last row of Table 2, we                   during testing while maintaining the accurate 2D contact
+
+
+                                                                        7
+          0.8
+                 0.74
+          0.7
+                        0.72   0.73
+                                      0.71      0.7
+                                                                            Green: seen categories
+                                                                            Blue: unseen categories              from the visual prompt, forming the text input. For each
+                                                      0.66    0.66
+
+          0.6
+                                                                     0.63
+                                                                                                                 task, we select one or two shapes of objects and perform five
+                                                                                    0.56
+
+          0.5
+                                                                                           0.52                  trials each with a different camera view angle and object’s
+          0.4
+                                                                                                                 initial pose. If the task has been completed, we consider the
+          0.3
+                                                                                                                 execution successful. To avoid a collision, we introduce a
+          0.2
+                                                                                                                 “pre-move” waypoint before reaching the predicted contact
+          0.1
+                                                                                                                 pose. This waypoint is positioned along the end-effector’s
+           0
+                    0%           10%                20%         30%                    40% Noise
+                                                                                                                 z-axis, at a distance away from the predicted contact pose.
+                                                                                                                 Qualitative and quantitative results are presented in Table.
+     Figure 5. Robustness analysis on the noise in prompts.                                                      3 and the right part of Figure. 4. The results demonstrate
+                                                                                                                 that CrayonRobo possesses strong zero-shot capability on
+                                                                                                                 novel tasks, as it interprets task execution prompts rather
+                Open the            Open                     Lift             Wipe                  Heat         than relying solely on images or language processing, which
+                trashcan         microwave*                  lid             table*               toaster*       can be challenging to handle in novel scenarios. Meanwhile,
+                                                                                                                 it exhibits strong capability in long-horizon tasks, achieving
+  dra.            9/10                       7/10            5/5               8/10                   3/5
+ auto.            8/10                       6/10            5/5               8/10                   2/5
+                                                                                                                 a success rate comparable to that of single-step tasks.
+ w/o P.             -                        5/10             -                6/10                    -             In the “w/o P.” row of Table. 3, we further explore whether
+                                                                                                                 it is possible to fine-tune the model using prompts provided
+   Table 3. Real-world success rate. * contains multiple steps.                                                  during the first set of executions for a specific task, and
+                                                                                                                 enable the model to perform subsequent executions inde-
+                                                                                                                 pendently, without requiring additional prompts. To inves-
+point, in order to evaluate the model’s tolerance to input                                                       tigate this, we selected two multi-step tasks: opening the
+disturbances. Random noise with a uniform distribution is                                                        microwave and wiping the table. The model is fine-tuned for
+added to the directional prompt, ranging from 10%, 20%,                                                          20 epochs using key frames and the corresponding predicted
+30%, to 40% of the original directional value. The results,                                                      3D poses from successful trials in the previous experiment
+shown in Figure 5, indicate that with 10% and 20% noise,                                                         as ground truth (GT), without providing any visual or text
+our method achieves performance levels comparable to those                                                       prompt inputs. During fine-tuning, the image input includes
+of the noise-free scenario. This demonstrates the model’s                                                        only the object, while the language input excludes all 2D
+ability to handle noisy inputs during testing. However, with                                                     prompts but incorporates the current robot state to ensure
+30% and 40% noise, performance degradation occurs as                                                             temporal consistency. The output format remains consis-
+the directional values deviate significantly from their in-                                                      tent with Figure 2. The fine-tuned model is then evaluated
+tended targets—deviations that would be unlikely to happen                                                       on these tasks, achieving success rates of 5/10 and 6/10,
+if drawn by a human, as they appear visibly unreasonable.                                                        respectively.
+Despite this, the model is still capable of successfully exe-
+cuting tasks, even when the directional inputs are imperfect                                                     5. Conclusion
+or provided by a non-expert. This highlights the model’s
+resilience, not only to noise but also to imperfect or non-                                                      We introduce a novel approach using comprehensive multi-
+ideal inputs, allowing it to perform effectively even when                                                       modal prompts that explicitly convey both low-level actions
+the prompts are not perfectly accurate.                                                                          and high-level planning in a simple manner. We devise a
+    Ablation experiments regarding the effectiveness of each                                                     training strategy that enables the model to comprehend the
+loss and failure case analysis are shown in Appendix. E and                                                      2D visual-language prompt and predict accurate contact pose
+Appendix. F.                                                                                                     along with moving direction, ensuring the reliability of task
+                                                                                                                 execution. Such model-interpretable prompts show promis-
+4.4. Real-world Experiment                                                                                       ing performance on both seen and unseen tasks, demonstrat-
+                                                                                                                 ing its robustness. Limitation: As for the limitation, though
+We conduct experiments involving interaction with various                                                        our method can not directly avoid obstacles, we can incorpo-
+real-world objects without additional sim-to-real finetuning.                                                    rate collision-free motion planner library like curobo [50] to
+Our setup includes a Franka Emika robotic arm equipped                                                           realize this to some extent.
+with its default parallel gripper, along with a RealSense 415
+camera for capturing RGB images and depth maps. In our                                                           Acknowledge
+real-world experiment, we employ the workstation’s built-in
+image editor to directly draw crayon visual prompts on the                                                       This project was supported by National Youth Talent Sup-
+images or automatic generating prompts, denoted as “dra.”                                                        port Program (8200800081) and National Natural Science
+and “auto.” in Table. 3 . We subsequently extract 2D vectors                                                     Foundation of China (62376006).
+
+
+                                                                                                             8
+References                                                               [13] Yilun Du, Mengjiao Yang, Pete Florence, Fei Xia, Ayzaan
+                                                                              Wahid, Brian Ichter, Pierre Sermanet, Tianhe Yu, Pieter
+ [1] Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ahmad,                 Abbeel, Joshua B Tenenbaum, et al. Video language planning.
+     Ilge Akkaya, Florencia Leoni Aleman, Diogo Almeida, Janko                arXiv preprint arXiv:2310.10625, 2023. 1, 3
+     Altenschmidt, Sam Altman, Shyamal Anadkat, et al. Gpt-4
+                                                                         [14] Yilun Du, Sherry Yang, Bo Dai, Hanjun Dai, Ofir Nachum,
+     technical report. arXiv preprint arXiv:2303.08774, 2023. 4
+                                                                              Josh Tenenbaum, Dale Schuurmans, and Pieter Abbeel. Learn-
+ [2] Michael Ahn, Anthony Brohan, Noah Brown, Yevgen Chebo-                   ing universal policies via text-guided video generation. Ad-
+     tar, Omar Cortes, Byron David, Chelsea Finn, Chuyuan Fu,                 vances in Neural Information Processing Systems, 36, 2024.
+     Keerthana Gopalakrishnan, Karol Hausman, et al. Do as i                  1, 3
+     can, not as i say: Grounding language in robotic affordances.
+     arXiv preprint arXiv:2204.01691, 2022. 1, 2                         [15] Ben Eisner, Harry Zhang, and David Held. Flowbot3d: Learn-
+                                                                              ing 3d articulation flow to manipulate articulated objects.
+ [3] Boshi An, Yiran Geng, Kai Chen, Xiaoqi Li, Qi Dou, and
+                                                                              arXiv preprint arXiv:2205.04382, 2022. 2, 6
+     Hao Dong. Rgbmanip: Monocular image-based robotic ma-
+     nipulation through active object pose estimation. In 2024           [16] Hao-Shu Fang, Chenxi Wang, Hongjie Fang, Minghao Gou,
+     IEEE International Conference on Robotics and Automation                 Jirong Liu, Hengxu Yan, Wenhai Liu, Yichen Xie, and Cewu
+     (ICRA), pages 7748–7755. IEEE, 2024. 2                                   Lu. Anygrasp: Robust and efficient grasp perception in spatial
+                                                                              and temporal domains. IEEE Transactions on Robotics, 2023.
+ [4] Shikhar Bahl, Russell Mendonca, Lili Chen, Unnat Jain, and
+                                                                              6
+     Deepak Pathak. Affordances from human videos as a versatile
+     representation for robotics. In Proceedings of the IEEE/CVF         [17] Luc Giraud, Julien Langou, and Miroslav Rozloznik. The
+     Conference on Computer Vision and Pattern Recognition,                   loss of orthogonality in the gram-schmidt orthogonalization
+     pages 13778–13790, 2023. 2                                               process. Computers & Mathematics with Applications, 50(7):
+                                                                              1069–1075, 2005. 4
+ [5] Suneel Belkhale, Tianli Ding, Ted Xiao, Pierre Sermanet,
+     Quon Vuong, Jonathan Tompson, Yevgen Chebotar, Debidatta            [18] Ankit Goyal, Jie Xu, Yijie Guo, Valts Blukis, Yu-Wei Chao,
+     Dwibedi, and Dorsa Sadigh. Rt-h: Action hierarchies using                and Dieter Fox. Rvt: Robotic view transformer for 3d object
+     language. arXiv preprint arXiv:2403.01823, 2024. 2                       manipulation. In Conference on Robot Learning, pages 694–
+                                                                              710. PMLR, 2023. 1, 2, 5
+ [6] Kevin Black, Mitsuhiko Nakamoto, Pranav Atreya, Homer
+     Walke, Chelsea Finn, Aviral Kumar, and Sergey Levine. Zero-         [19] Ankit Goyal, Valts Blukis, Jie Xu, Yijie Guo, Yu-Wei Chao,
+     shot robotic manipulation with pretrained image-editing dif-             and Dieter Fox. Rvt-2: Learning precise manipulation from
+     fusion models. arXiv preprint arXiv:2310.10639, 2023. 1, 2,              few demonstrations. arXiv preprint arXiv:2406.08545, 2024.
+     3                                                                        1, 5
+ [7] Konstantinos Bousmalis, Giulia Vezzani, Dushyant Rao, Col-          [20] Jiayuan Gu, Sean Kirmani, Paul Wohlhart, Yao Lu, Montser-
+     ine Devin, Alex X Lee, Maria Bauza, Todor Davchev, Yux-                  rat Gonzalez Arenas, Kanishka Rao, Wenhao Yu, Chuyuan
+     iang Zhou, Agrim Gupta, Akhil Raju, et al. Robocat: A                    Fu, Keerthana Gopalakrishnan, Zhuo Xu, et al. Rt-trajectory:
+     self-improving foundation agent for robotic manipulation.                Robotic task generalization via hindsight trajectory sketches.
+     arXiv preprint arXiv:2306.11706, 2023. 1, 2                              arXiv preprint arXiv:2311.01977, 2023. 1, 3, 6
+ [8] Anthony Brohan, Noah Brown, Justice Carbajal, Yevgen                [21] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu,
+     Chebotar, Joseph Dabis, Chelsea Finn, Keerthana Gopalakr-                Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen. Lora:
+     ishnan, Karol Hausman, Alex Herzog, Jasmine Hsu, et al.                  Low-rank adaptation of large language models. arXiv preprint
+     Rt-1: Robotics transformer for real-world control at scale.              arXiv:2106.09685, 2021. 3
+     arXiv preprint arXiv:2212.06817, 2022. 2                            [22] Siyuan Huang, Haonan Chang, Yuhan Liu, Yimeng Zhu, Hao
+ [9] Anthony Brohan, Noah Brown, Justice Carbajal, Yevgen                     Dong, Peng Gao, Abdeslam Boularias, and Hongsheng Li.
+     Chebotar, Xi Chen, Krzysztof Choromanski, Tianli Ding,                   A3vlm: Actionable articulation-aware vision language model.
+     Danny Driess, Avinava Dubey, Chelsea Finn, et al. Rt-2:                  arXiv preprint arXiv:2406.07549, 2024. 5
+     Vision-language-action models transfer web knowledge to             [23] Siyuan Huang, Iaroslav Ponomarenko, Zhengkai Jiang, Xi-
+     robotic control. arXiv preprint arXiv:2307.15818, 2023. 2                aoqi Li, Xiaobin Hu, Peng Gao, Hongsheng Li, and Hao
+[10] Elliot Chane-Sane, Cordelia Schmid, and Ivan Laptev. Learn-              Dong. Manipvqa: Injecting robotic affordance and physi-
+     ing video-conditioned policies for unseen manipulation tasks.            cally grounded information into multi-modal large language
+     In 2023 IEEE International Conference on Robotics and Au-                models. arXiv preprint arXiv:2403.11289, 2024. 2
+     tomation (ICRA), pages 909–916. IEEE, 2023. 1                       [24] Wenlong Huang, Chen Wang, Ruohan Zhang, Yunzhu Li,
+[11] Cheng Chi, Siyuan Feng, Yilun Du, Zhenjia Xu, Eric                       Jiajun Wu, and Li Fei-Fei. Voxposer: Composable 3d value
+     Cousineau, Benjamin Burchfiel, and Shuran Song. Diffu-                   maps for robotic manipulation with language models. arXiv
+     sion policy: Visuomotor policy learning via action diffusion.            preprint arXiv:2307.05973, 2023. 1, 2
+     arXiv preprint arXiv:2303.04137, 2023. 2                            [25] Yueru Jia, Jiaming Liu, Sixiang Chen, Chenyang Gu, Zhilue
+[12] Josef Dai, Xuehai Pan, Ruiyang Sun, Jiaming Ji, Xinbo Xu,                Wang, Longzan Luo, Lily Lee, Pengwei Wang, Zhongyuan
+     Mickel Liu, Yizhou Wang, and Yaodong Yang. Safe rlhf: Safe               Wang, Renrui Zhang, et al. Lift3d foundation policy: Lift-
+     reinforcement learning from human feedback. arXiv preprint               ing 2d large-scale pretrained models for robust 3d robotic
+     arXiv:2310.12773, 2023. 2                                                manipulation. arXiv preprint arXiv:2411.18623, 2024. 1
+
+
+                                                                     9
+[26] Yunfan Jiang, Agrim Gupta, Zichen Zhang, Guanzhi Wang,                    Zhu, et al. Grounding dino: Marrying dino with grounded
+     Yongqiang Dou, Yanjun Chen, Li Fei-Fei, Anima Anand-                      pre-training for open-set object detection. arXiv preprint
+     kumar, Yuke Zhu, and Linxi Fan. Vima: General robot                       arXiv:2303.05499, 2023. 4
+     manipulation with multimodal prompts. arXiv preprint                 [39] Jianlan Luo, Zheyuan Hu, Charles Xu, You Liang Tan, Ja-
+     arXiv:2210.03094, 2(3):6, 2022. 1, 2                                      cob Berg, Archit Sharma, Stefan Schaal, Chelsea Finn, Ab-
+[27] Edward Johns. Coarse-to-fine imitation learning: Robot ma-                hishek Gupta, and Sergey Levine. Serl: A software suite
+     nipulation from a single demonstration. In 2021 IEEE in-                  for sample-efficient robotic reinforcement learning. arXiv
+     ternational conference on robotics and automation (ICRA),                 preprint arXiv:2401.16013, 2024. 2
+     pages 4613–4619. IEEE, 2021. 1, 5                                    [40] Corey Lynch and Pierre Sermanet. Language conditioned
+[28] Yuanchen Ju, Kaizhe Hu, Guowei Zhang, Gu Zhang, Mingrun                   imitation learning over unstructured data. arXiv preprint
+     Jiang, and Huazhe Xu. Robo-abc: Affordance generalization                 arXiv:2005.07648, 2020. 1, 2
+     beyond categories via semantic correspondence for robot ma-          [41] Corey Lynch, Mohi Khansari, Ted Xiao, Vikash Kumar,
+     nipulation. arXiv preprint arXiv:2401.07487, 2024. 2                      Jonathan Tompson, Sergey Levine, and Pierre Sermanet.
+[29] Tsung-Wei Ke, Nikolaos Gkanatsios, and Katerina Fragki-                   Learning latent plans from play. In Conference on robot
+     adaki. 3d diffuser actor: Policy diffusion with 3d scene                  learning, pages 1113–1132. PMLR, 2020. 1, 2
+     representations. arXiv preprint arXiv:2402.10885, 2024. 2            [42] Kaichun Mo, Leonidas J Guibas, Mustafa Mukadam, Abhinav
+[30] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted                      Gupta, and Shubham Tulsiani. Where2act: From pixels to
+     Xiao, Ashwin Balakrishna, Suraj Nair, Rafael Rafailov, Ethan              actions for articulated 3d objects. In Proceedings of the
+     Foster, Grace Lam, Pannag Sanketi, et al. Openvla: An                     IEEE/CVF International Conference on Computer Vision,
+     open-source vision-language-action model. arXiv preprint                  pages 6813–6823, 2021. 2, 3, 6
+     arXiv:2406.09246, 2024. 3
+                                                                          [43] Suraj Nair, Eric Mitchell, Kevin Chen, Silvio Savarese,
+[31] Xinghang Li, Minghuan Liu, Hanbo Zhang, Cunjun Yu, Jie
+                                                                               Chelsea Finn, et al. Learning language-conditioned robot
+     Xu, Hongtao Wu, Chilam Cheang, Ya Jing, Weinan Zhang,
+                                                                               behavior from offline data and crowd-sourced annotation. In
+     Huaping Liu, et al. Vision-language foundation models as
+                                                                               Conference on Robot Learning, pages 1303–1315. PMLR,
+     effective robot imitators. arXiv preprint arXiv:2311.01378,
+                                                                               2022. 1, 2
+     2023.
+                                                                          [44] Soroush Nasiriany, Fei Xia, Wenhao Yu, Ted Xiao, Jacky
+[32] Xiaoqi Li, Mingxu Zhang, Yiran Geng, Haoran Geng, Yux-
+                                                                               Liang, Ishita Dasgupta, Annie Xie, Danny Driess, Ayzaan
+     ing Long, Yan Shen, Renrui Zhang, Jiaming Liu, and Hao
+                                                                               Wahid, Zhuo Xu, et al. Pivot: Iterative visual prompt-
+     Dong. Manipllm: Embodied multimodal large language
+                                                                               ing elicits actionable knowledge for vlms. arXiv preprint
+     model for object-centric robotic manipulation. In Proceed-
+                                                                               arXiv:2402.07872, 2024. 1, 3
+     ings of the IEEE/CVF Conference on Computer Vision and
+     Pattern Recognition, pages 18061–18070, 2024. 1, 2, 3, 5, 6          [45] Hai Nguyen and Hung La. Review of deep reinforcement
+                                                                               learning for robot manipulation. In 2019 Third IEEE interna-
+[33] Yi Li, Yuquan Deng, Jesse Zhang, Joel Jang, Marius Memme,
+                                                                               tional conference on robotic computing (IRC), pages 590–595.
+     Raymond Yu, Caelan Reed Garrett, Fabio Ramos, Dieter Fox,
+                                                                               IEEE, 2019. 2
+     Anqi Li, et al. Hamster: Hierarchical action models for open-
+     world robot manipulation. arXiv preprint arXiv:2502.05485,           [46] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+     2025. 1                                                                   Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+[34] Jacky Liang, Wenlong Huang, Fei Xia, Peng Xu, Karol Haus-                 Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning
+     man, Brian Ichter, Pete Florence, and Andy Zeng. Code                     transferable visual models from natural language supervi-
+     as policies: Language model programs for embodied con-                    sion. In International conference on machine learning, pages
+     trol. In 2023 IEEE International Conference on Robotics and               8748–8763. PMLR, 2021. 3
+     Automation (ICRA), pages 9493–9500. IEEE, 2023. 1, 2                 [47] Mohit Shridhar, Lucas Manuelli, and Dieter Fox. Cliport:
+[35] Fangchen Liu, Kuan Fang, Pieter Abbeel, and Sergey Levine.                What and where pathways for robotic manipulation. In Con-
+     Moka: Open-vocabulary robotic manipulation through mark-                  ference on robot learning, pages 894–906. PMLR, 2022. 1,
+     based visual prompting. arXiv preprint arXiv:2403.03174,                  2
+     2024. 3                                                              [48] Mohit Shridhar, Lucas Manuelli, and Dieter Fox. Perceiver-
+[36] Jiaming Liu, Mengzhen Liu, Zhenyu Wang, Lily Lee, Kaichen                 actor: A multi-task transformer for robotic manipulation. In
+     Zhou, Pengju An, Senqiao Yang, Renrui Zhang, Yandong                      Conference on Robot Learning, pages 785–799. PMLR, 2023.
+     Guo, and Shanghang Zhang. Robomamba: Multimodal state                     1, 2, 5
+     space model for efficient robot reasoning and manipulation.          [49] Austin Stone, Ted Xiao, Yao Lu, Keerthana Gopalakrishnan,
+     arXiv preprint arXiv:2406.04339, 2024. 1, 3, 5                            Kuang-Huei Lee, Quan Vuong, Paul Wohlhart, Sean Kirmani,
+[37] Jiaming Liu, Hao Chen, Pengju An, Zhuoyang Liu, Renrui                    Brianna Zitkovich, Fei Xia, et al. Open-world object ma-
+     Zhang, Chenyang Gu, Xiaoqi Li, Ziyu Guo, Sixiang Chen,                    nipulation using pre-trained vision-language models. arXiv
+     Mengzhen Liu, et al. Hybridvla: Collaborative diffusion                   preprint arXiv:2303.00905, 2023. 1, 3
+     and autoregression in a unified vision-language-action model.        [50] Balakumar Sundaralingam, Siva Kumar Sastry Hari, Adam
+     arXiv preprint arXiv:2503.10631, 2025. 2                                  Fishman, Caelan Garrett, Karl Van Wyk, Valts Blukis, Alexan-
+[38] Shilong Liu, Zhaoyang Zeng, Tianhe Ren, Feng Li, Hao                      der Millane, Helen Oleynikova, Ankur Handa, Fabio Ramos,
+     Zhang, Jie Yang, Chunyuan Li, Jianwei Yang, Hang Su, Jun                  et al. Curobo: Parallelized collision-free robot motion gener-
+
+
+                                                                     10
+     ation. In 2023 IEEE International Conference on Robotics            [64] Chengliang Zhong, Yuhang Zheng, Yupeng Zheng, Hao Zhao,
+     and Automation (ICRA), pages 8112–8119. IEEE, 2023. 8                    Li Yi, Xiaodong Mu, Ling Wang, Pengfei Li, Guyue Zhou,
+[51] Priya Sundaresan, Quan Vuong, Jiayuan Gu, Peng Xu, Ted                   Chao Yang, et al. 3d implicit transporter for temporally con-
+     Xiao, Sean Kirmani, Tianhe Yu, Michael Stark, Ajinkya Jain,              sistent keypoint discovery. In Proceedings of the IEEE/CVF
+     Karol Hausman, et al. Rt-sketch: Goal-conditioned imitation              International Conference on Computer Vision, pages 3869–
+     learning from hand-drawn sketches. 2023. 1, 3                            3880, 2023. 1, 2, 6
+[52] Gemini Team, Rohan Anil, Sebastian Borgeaud, Yonghui
+     Wu, Jean-Baptiste Alayrac, Jiahui Yu, Radu Soricut, Johan
+     Schalkwyk, Andrew M Dai, Anja Hauth, et al. Gemini: a               A. Input Details
+     family of highly capable multimodal models. arXiv preprint
+     arXiv:2312.11805, 2023. 6                                           We outline the complete input language and ground-truth
+[53] Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Mar-          supervision in Section3.3.2:
+     tinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste                  Input(a): “Predict the contact point and orientation for
+     Rozière, Naman Goyal, Eric Hambro, Faisal Azhar, et al.            manipulating the object. The hints in the image include the
+     Llama: Open and efficient foundation language models. arXiv         contact point with a blue dot. Specifically, the contact point
+     preprint arXiv:2302.13971, 2023. 3
+                                                                         is at ap0 .”
+[54] Chuan Wen, Xingyu Lin, John So, Kai Chen, Qi Dou, Yang
+     Gao, and Pieter Abbeel. Any-point trajectory modeling for               Input(b): “Predict the contact point and orientation for
+     policy learning. arXiv preprint arXiv:2401.00025, 2023. 2           manipulating the object. The hints in the image include a
+[55] Fanbo Xiang, Yuzhe Qin, Kaichun Mo, Yikuan Xia, Hao Zhu,            blue dot for the contact point and a red line for the gripper
+     Fangchen Liu, Minghua Liu, Hanxiao Jiang, Yifu Yuan, He             z-axis 2D direction. Specifically, the contact point is at ap0 ,
+     Wang, Li Yi, Angel X. Chang, Leonidas J. Guibas, and Hao            and the gripper z-axis 2D direction is az0 .”
+     Su. SAPIEN: A simulated part-based interactive environment.             Input(c): “Predict the contact point and orientation for
+     In The IEEE Conference on Computer Vision and Pattern               manipulating the object. The hints in the image include a
+     Recognition (CVPR), 2020. 6, 11                                     blue dot for the contact point, a red line for the gripper z-
+[56] Ted Xiao, Harris Chan, Pierre Sermanet, Ayzaan Wahid, An-           axis 2D direction, and a green line for the gripper y-axis 2D
+     thony Brohan, Karol Hausman, Sergey Levine, and Jonathan
+                                                                         direction. Specifically, the contact point is at ap0 , the gripper
+     Tompson. Robotic skill acquisition via instruction aug-
+                                                                         z-axis 2D direction is az0 , and the gripper y-axis 2D direction
+     mentation with vision-language models. arXiv preprint
+     arXiv:2211.11736, 2022. 2                                           is ay0 .”
+[57] Chuyan Xiong, Chengyu Shen, Xiaoqi Li, Kaichen Zhou,                    Input(d): “Predict the contact point and orientation for
+     Jiaming Liu, Ruiping Wang, and Hao Dong. Aic mllm: Au-              manipulating the object. The hints in the image include a
+     tonomous interactive correction mllm for robust robotic ma-         blue dot for the contact point, a red line for the gripper z-axis
+     nipulation. arXiv preprint arXiv:2406.11548, 2024. 1                2D direction, a green line for the gripper y-axis 2D direction,
+[58] Zhenjia Xu, Zhanpeng He, and Shuran Song. Universal                 and a yellow line for the moving 2D direction. Specifically,
+     manipulation policy network for articulated objects. IEEE           the contact point is at ap0 , the gripper z-axis 2D direction
+     Robotics and Automation Letters, 7(2):2447–2454, 2022. 2            is az0 , the gripper y-axis 2D direction is ay0 , and the gripper
+[59] Jiange Yang, Wenhui Tan, Chuhao Jin, Bei Liu, Jianlong              moving 2D direction is am    0 .”
+     Fu, Ruihua Song, and Limin Wang. Pave the way to grasp
+                                                                             Ground truth: “The contact point is at ap0 , the gripper
+     anything: Transferring foundation models for universal pick-                                    ′
+     place robots. arXiv preprint arXiv:2306.05716, 2023. 1, 2,          z-axis 3D direction is aZ 0 , the gripper y-axis   3D direction is
+                                                                             ′                                       ′
+     3                                                                   aY0 , and the moving 3D direction is aM   0 .”
+[60] Mengjiao Yang, Yilun Du, Kamyar Ghasemipour, Jonathan
+     Tompson, Dale Schuurmans, and Pieter Abbeel. Learn-                 B. Data Collection Details
+     ing interactive real-world simulators.      arXiv preprint
+     arXiv:2310.06114, 2023. 1, 3, 6                                     The size of the training dataset is around 10,000. Regarding
+[61] Wentao Yuan, Adithyavairavan Murali, Arsalan Mousavian,             the variation between training and testing data, the specific
+     and Dieter Fox. M2t2: Multi-task masked transformer for             variations can be divided into two aspects: 1) asset variation
+     object-centric pick and place. In 7th Annual Conference on          and 2) camera view variation.
+     Robot Learning, 2023. 1, 5
+                                                                            Asset Variation: We use 20 categories from PartNet-
+[62] Wentao Yuan, Jiafei Duan, Valts Blukis, Wilbert Pumacay,
+                                                                         mobility [55] for seen objects and reserve the remaining
+     Ranjay Krishna, Adithyavairavan Murali, Arsalan Mousavian,
+     and Dieter Fox. Robopoint: A vision-language model for
+                                                                         10 categories for unseen objects to analyze whether Cray-
+     spatial affordance prediction for robotics. arXiv preprint          onRobo can generalize to novel categories. Specifically, we
+     arXiv:2406.10721, 2024. 1                                           further divide the seen objects into 1,037 training shapes
+[63] Yanjie Ze, Gu Zhang, Kangning Zhang, Chenyuan Hu, Muhan             and 489 testing shapes, using only the training shapes to
+     Wang, and Huazhe Xu. 3d diffusion policy. arXiv preprint            construct the training data. Thus, the shapes of the seen
+     arXiv:2403.03954, 2024. 2                                           objects encountered during training and testing are different.
+
+
+                                                                    11
+                                                Pick                                Rotate                Place
+
+
+               Input
+
+
+
+
+                Execution
+
+
+
+                                                Push                                    Pull              Move
+
+               Input
+
+
+
+
+               Execution
+
+
+
+                                                                                                                    t
+
+                                         Figure 6. The completion of tyical key-frame tasks.
+
+
+For unseen categories, there are a total of 274 shapes, which          adapter, and fine-tune it to process both the trajectory image
+are used exclusively in the testing data.                              and the current object image. This allows the model to output
+    Camera View Variation: We observe the object in                    the 6DoF poses required to complete the tasks. The same
+the scene from an RGB-D camera with known intrinsics,                  training and testing splits are applied, resulting in an average
+mounted 4.5 to 5.5 units away from the object, facing its              success rate of 0.57 on seen categories and 0.52 on unseen
+center. The camera is located in the upper hemisphere of the           categories for RT-Trajectory, while our model achieves 0.74
+object with a random azimuth between 45◦ and −45◦ , and                and 0.72, respectively.
+a random altitude between 30◦ and 60◦ . We initialize the                  Further investigation reveals that in our replication of
+starting pose for each articulated part randomly between its           RT-Trajectory, while the method accurately captures the end-
+rest joint state (fully closed) and any position up to half of         effector’s trajectory position, the rotation estimation is not
+its joint state (half-opened). In both the training and testing        precise enough for interacting with articulated objects. Un-
+phases, the object is placed and captured randomly within              like tasks such as pick-and-place, where the end-effector’s
+the aforementioned scope.                                              rotation is relatively uniform, interactions with articulated
+                                                                       objects demand more diverse and complex rotational ad-
+C. Details of RT-Trajectory Replication                                justments, making it challenging for RT-Trajectory to learn
+                                                                       effectively. This also highlights the need to provide direc-
+Since the code for RT-Trajectory is not publicly available, we         tional prompts for the model to interpret.
+replicate its method based on the paper’s description. During
+data collection in the simulator, we record the 3D position            D. Visual Demonstration of Typical Atomic
+of the end-effector and project it onto the camera frame to
+                                                                          Tasks
+create the corresponding 2D trajectory. Given that the tasks
+are atomic, consisting of a single step (e.g., opening a door),        In Figure. 6, we demonstrate how the key-frame tasks dis-
+color grading is unnecessary. Instead, we mark the start and           cussed in Section 3.4.1 are executed. We focus on the “rota-
+end positions, as well as the gripper state, by drawing blue           tion button” task, which is unique because it does not involve
+and green circles, respectively.                                       the translation of the end effector but rather the rotation of
+   We use the same backbone as in our model, the LLaMA-                the last joint. Using visual prompts from two key frames,
+
+
+                                                                  12
+we predict two poses. By analyzing the predicted poses, we
+observe that the only difference between them is the orienta-
+tion of the end effector along the y-axis. We then pass these
+predictions to the ROS package for inverse kinematics (IK)
+computation, which allows us to achieve the desired rotation
+effect at the last joint.
+
+E. The Effectiveness of Each Loss.
+
+                  LT     LO     LP     Seen    Unseen
+          Ex1     ✓       -      -     0.68     0.57
+          Ex2     ✓      ✓       -     0.71     0.70
+          Ours    ✓      ✓      ✓      0.74     0.72
+
+
+             Table 4. The effectiveness of each loss
+
+
+   In Table. 4, we progressively introduce each loss objec-
+tive during training: Ex1 involves training solely with LT ;
+Ex2 combines LT with LO ; and Ours integrates LT with
+both LO and LP . Comparing Ex2 and Ex1, we observe that
+incorporating LO enhances accuracy by explicitly enforcing
+the orthogonality constraints between the z-axis and y-axis
+directions. Furthermore, the addition of LP in Ours results
+in a further accuracy improvement compared to Ex2, show-
+ing its effectiveness in capturing the correlation between 2D
+prompts and 3D directions.
+
+F. Failure Analysis
+We analyze the failure cases in real-world: for the push but-
+ton step in the open microwave task, the excessive reactive
+force during button pressing prevented the robotic arm from
+completing the push successfully. For the slide lever step in
+the heat toaster task, the gripper fingers we use are too short,
+which sometimes prevent them from firmly contacting the
+lever during movement.
+
+
+
+
+                                                                   13
+

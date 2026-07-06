@@ -1,0 +1,855 @@
+                     This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                  Except for this watermark, it is identical to the accepted version;
+                            the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+                                            : Cross-Skill Model Merging Toward a Generalist
+                                             Vision-Language-Action Agent
+
+           Yuxia Fu* Zhizhen Zhang* Yuqi Zhang Zijian Wang Zi Huang                                  Yadan Luo†
+                             UQMM Lab, The University of Queensland
+        {yuxia.fu, zhizhen.zhang, yuqi.zhang, zijian.wang, helen.huang, y.luo}@uq.edu.au
+
+
+
+                            Abstract                               1. Introduction
+                                                                   Vision-Language-Action (VLA) models [2–4, 17, 18, 22,
+Recent Vision-Language-Action (VLA) models reformulate             27, 28, 39, 40, 49, 56, 66] have recently enabled robot
+vision-language models by tuning them with millions of             agents to perform complex manipulation tasks by fine-
+robotic demonstrations. While they perform well when               tuning large vision-language models (VLMs) with millions
+fine-tuned for a single embodiment or task family, extend-         of robotic demonstrations. By reformulating action learn-
+ing them to multi-skill settings remains challenging: di-          ing as a language generation or policy decoding problem,
+rectly merging VLA experts trained on different tasks re-          VLA models inherit broad visual grounding and seman-
+sults in near-zero success rates. This raises a fundamen-          tic understanding from VLMs, and have shown notable
+tal question: what prevents VLAs from mastering multiple           performance in single-task or single-embodiment settings.
+skills within one model? With an empirical decomposition           However, real-world generalist agents must support multi-
+of learnable parameters during VLA fine-tuning, we iden-           ple skills, embodiments, and environments, requiring the
+tify two key sources of non-mergeability: (1) Finetuning           ability to consolidate many independently fine-tuned VLA
+drives LoRA adapters in the VLM backbone toward diver-             models into a single unified policy.
+gent, task-specific directions beyond the capacity of existing
+                                                                      A natural approach is model merging, which has proven
+merging methods to unify. (2) Action experts develop inter-
+                                                                   effective in large language and vision models [8, 20, 21,
+block dependencies through self-attention feedback, caus-
+                                                                   34, 41, 51, 59–61]. Those techniques can integrate multi-
+ing task information to spread across layers and prevent-
+                                                                   ple specialized models without joint retraining or revisiting
+ing modular recombination. To address these challenges,
+                                                                   their original datasets. Yet, when these approaches are ap-
+we present MergeVLA, a merging-oriented VLA architec-
+                                                                   plied to VLA experts fine-tuned on distinct manipulation
+ture that preserves mergeability by design. MergeVLA in-
+                                                                   tasks, the merged model exhibits near-zero success rate.
+troduces sparsely activated LoRA adapters via task masks
+                                                                   This failure suggests that VLA finetuning induces structural
+to retain consistent parameters and reduce irreconcilable
+                                                                   specialization incompatible across tasks, which is rarely ob-
+conflicts in the VLM. Its action expert replaces self-attention
+                                                                   served in conventional VLM merging.
+with cross-attention-only blocks to keep specialization lo-
+calized and composable. When the task is unknown, it                  To uncover the root causes, as shown in Figure 1, we
+uses a test-time task router to adaptively select the ap-          perform a fine-grained decomposition of trainable param-
+propriate task mask and expert head from the initial ob-           eters across representative VLA architectures and identify
+servation, enabling unsupervised task inference. Across            two major sources of non-mergeability: First, LoRA up-
+LIBERO, LIBERO-Plus, RoboTwin, and multi-task experi-              dates [19] within the VLM backbone diverge sharply across
+ments on the real SO101 robotic arm, MergeVLA achieves             tasks. Each manipulation task reshapes the pretrained repre-
+performance comparable to or even exceeding individu-              sentation space to satisfy its own perception-control align-
+ally finetuned experts, demonstrating robust generaliza-           ment. Direct averaging [21, 41] or sign-resolved merging
+tion across tasks, embodiments, and environments. Project          [51] thus reactivates irrelevant or even contradictory param-
+page: https://mergevla.github.io/                                  eters, corrupting shared vision-language subspaces and de-
+                                                                   grading task-invariant semantics. Second, the train-from-
+                                                                   scratch action decoders accumulate strong task-specific de-
+                                                                   pendencies across blocks through self-attention feedback.
+                                                                   This coupling spreads localized task information globally,
+  * Equal contribution. † Corresponding author.                    breaking modularity and preventing compositional merging
+
+
+
+                                                              22335
+even under identical architectures and initialization.
+                                                                      Language                               Block L                                           Block L
+                                                                                            Block L                                      Block L
+    Built upon these findings, we introduce MergeVLA, a                 Head
+merge–oriented VLA architecture that preserves mergeabil-             Language                           Block 1                                          Block 1
+
+                                                                        Model               Block 1         CA CA                        Block 1                     CA
+ity by design. When executing a specific task, MergeVLA
+applies sparsely activated LoRA adapters, implemented via                ViT                 ViT                   SA                     ViT                        CA
+task masks, to selectively activate the merged parameters                             VLM                          Action Expert   VLM                               Action Expert
+
+                                                                       OpenVLA                   VLA-Adapter                                    MergeVLA
+contributing to task-relevant responses while suppressing                 Non-mergeable Module     Mergeable Module      CA: Cross Attention    SA: Self Attention
+those that mislead other tasks. Moreover, MergeVLA re-
+configures the action expert to remove self-attention prop-       Figure 1. Comparison between the structures of different
+agation, relying solely on cross-attention pathways. This         VLAs. OpenVLA uses a standard VLM for token-based action
+eliminates the sustained accumulation of task dependence          generation. VLA-Adapter adds an action expert with cross- and
+across blocks, allowing most layers to be effectively merged      self-attention layers. MergeVLA simplifies this design by remov-
+using simple weight averaging. Due to these architec-             ing non-mergeable self-attention layers for effective merging.
+tural modifications, it surprisingly shows strong out-of-
+distribution (OOD) generalization by 13.4% higher success
+rate than VLA-Adapter under varying corruptions. How-            is a widely used open-source model based on Prismatic-
+ever, the deeper blocks of the action expert, referred to as     7B [26], which discretizes robot actions into rarely used vo-
+the expert head, remain unmergeable due to their strong task     cabulary tokens and generates them autoregressively. Sim-
+specialization. Consequently, each task keeps its own expert     ilarly, π0 [3] builds on existing VLMs with a dual-system
+head, which in practice is typically the final block L. To ad-   VLA architecture, introducing a lightweight action expert
+dress the challenge of mixed-task evaluation [20, 41], where     that uses conditional flow matching to generate continu-
+the task identity is unknown at inference time, we adopt         ous action chunks for faster inference. Building on this,
+a training-free test-time task router that identifies the most   π0.5 [22] retains the text-generation ability of the VLM,
+relevant task directly from the input features. For each can-    enabling simultaneous high-level subtask descriptions and
+didate task, the router runs the VLM with its corresponding      low-level action prediction. Recently, VLA-Adapter [47]
+task mask to obtain its hidden states, and then measures its     proposed a 0.5B-parameter dual-system model that coordi-
+response against principal components extracted from the         nates the VLM and action expert through a novel mecha-
+value projections of a shared merged action expert. It se-       nism, employing chunk-wise autoregressive generation for
+lects the task with the highest response and activates the as-   faster inference and strong performance at a small scale.
+sociated task mask and expert head. This allows MergeVLA         While existing VLAs perform well on widely used robotic
+to generalize to different tasks without additional supervi-     benchmarks [6, 31, 36, 44], their multi-task ability relies on
+sion, enabling a single merged model to adaptively activate      joint training [3, 22, 27, 47], making them inefficient. Be-
+the right skill components for execution.                        sides, their tightly coupled dual systems [3, 5, 9, 47, 62]
+                                                                 also hinder model merging.
+    Extensive experiments show that MergeVLA achieves
+success rates of 90.2%, 62.5%, and 70.7% on the                  2.2. Model Merging
+LIBERO [31], LIBERO-Plus [14], and RoboTwin [6]
+                                                                 Model merging [7, 54, 55] enables efficient knowledge
+benchmarks under the mixed-task evaluation setting, and
+                                                                 reuse by combining existing model weights to construct a
+90.0% on real-world experiments with the SO101 robotic
+                                                                 unified model capable of performing multiple tasks. Early
+arm, demonstrating its effectiveness and robustness across
+                                                                 studies [15, 23, 35, 37, 50] showed that simple weighted
+cross-skill, cross-environment, and cross-embodiment eval-
+                                                                 averaging of checkpoints can improve performance and in-
+uations. These results show that model merging is not only
+                                                                 troduce multi-task capability. Task Arithmetic (TA) [21]
+feasible for VLAs, but can serve as a scalable path toward
+                                                                 treats the parameter difference between fine-tuned and pre-
+generalist embodied agents.
+                                                                 trained models as a task vector and merges them to integrate
+                                                                 task-specific knowledge. Nonetheless, it overlooks vari-
+2. Related Work                                                  ous conflicts that may arise among different task vectors.
+                                                                 Subsequent methods [8, 10, 12, 42, 51, 58, 59] handle con-
+2.1. Vision-Language-Action Models
+                                                                 flicts via parameter pruning or rescaling, whereas subspace-
+Recent VLA models build on large-scale VLMs [26, 29,             based ones [16, 32, 34, 41] apply low-rank decomposi-
+53, 64] pretrained on internet data to leverage the common-      tion (e.g., SVD) for more consistent merging. Other stud-
+sense knowledge [33, 57, 63], and are fine-tuned on large-       ies [41, 60, 61, 65] design merging methods specifically
+scale robotic trajectory data [4, 38, 45, 66] in an end-to-      for parameter-efficient fine-tuning (PEFT) [19, 30] mod-
+end manner to obtain more generalizable visuomotor poli-         ules. In contrast to these pre-merge approaches, methods
+cies [1, 4, 13, 24, 25, 45, 66]. Among them, OpenVLA [27]        like [20, 32, 43, 46, 52] perform test-time [48] merging
+
+
+
+                                                             22336
+        (1) Task Conflicts in Finetuned VLM       (2) Specialization of Action Experts                      (3) Test-time Task Router
+                   Finetuned VLM                                Action Expert
+ Task    Mask                                         Head 1          Head             Head M                         Softmax       Task
+                                          VTA
+                       Block                                                                                           Mean
+                                          VTA                                                               Concat              Concat
+                       Block
+                                                                                                            L2 Norm             L2 Norm
+                                          VTA
+                       Block                                  Concat & FFN
+                                                    Task Cross-Attn Action Cross-Attn
+                         ViTs                                                     proprio
+                                                                                                      SVD                 SVD
+
+                                                                                                                 VLM                 VLM
+                                                                                                                Block               Block
+                   V       T      A                            Initial Action Tokens
+
+Figure 2. Overview of MergeVLA architecture. (1) To address destructive LoRA parameter interference in finetuned VLM, task masks
+are applied to all merged LoRA modules to selectively activate the merged parameters contributing to task-relevant responses while sup-
+pressing those that mislead other tasks. (2) To solve the incompatibility of action experts, the architecture is redesigned to contain only
+cross-attention blocks and use sigmoid gate to preserve and rely on robust VLM features. Most blocks then can be merged except deeper
+blocks named expert head are left unmerged due to their task specification. (3) To address the setting where the task identity is unknown at
+inference time, a training-free test-time task router is adopted to dynamically select task-specified components by computing task relevance
+from VLM hidden states in the value-based subspace of the merged action expert.
+
+to handle severe task interference, substantially improving                  4. Our Approach: MergeVLA
+performance. Yet, little work has explored model merging
+in VLA models. The recent ReVLA [11] applies merging                         Finetuning VLA models on individual manipulation tasks,
+to gradually reverse the vision backbone to mitigate visual                  while effective, produces isolated experts that cannot be
+catastrophic forgetting and enhance domain generalization,                   trivially merged. As discussed in Section 5.2, applying stan-
+rather than to enable multi-task VLA capabilities. To bridge                 dard model merging approaches to VLA specialists trained
+this gap, we propose MergeVLA which enables lightweight                      on LIBERO [31] results in a complete breakdown, with all
+multi-task robotic learning.                                                 merged variants achieving zero success rate. This failure
+                                                                             is unexpected given the success of merging strategies in
+3. Preliminary                                                               language-only and vision-language domains, and suggests
+Task Formulation. We consider a collection of single-                        that VLA merging presents a more severe challenge. To un-
+skill imitation learning datasets D = {Dm }M          m=1 where
+                                                                             derstand this phenomenon, we conduct a systematic anal-
+each dataset Dm corresponds to a distinct manipulation                       ysis of the parameter space and architectural behavior of
+                                                              T
+task. Each training set is denoted as Dm = {Ivt , Iw    t , L}t=1 ,
+                                                                             mainstream VLAs. Our findings, as depicted in Figure 3,
+          v                                          w                       show that VLA unmergeability arises from two comple-
+where It is the third-person view image, It the wrist-
+mounted image, L the task instruction at each time step t.                   mentary failure modes:
+Finetuning a pretrained VLA model on each dataset yields                     1. Destructive LoRA Parameter Interference: As shown
+M task-specific weights. The objective of model merging                          in the left plot, task-specific LoRA updates activate
+is to unify task-specific {Θ1 , . . . , ΘM } into a single general               largely disjoint subsets of channels. When merging only
+agent Θmerge without retraining.                                                 four tasks, the proportion of parameters that are rele-
+VLA Architectures. Figure 1 illustrates the architectures                        vant to exactly one task (i.e., selfish parameters) already
+of different VLAs. Some VLA models [27, 28, 39, 49, 56]                          exceeds 75%. Such extreme task exclusivity produces
+directly build upon existing VLMs, where only the lan-                           severe parameter conflicts, which directly cause naı̈ve
+guage component is non-mergeable as refered to our ex-                           model-merging strategies to fail.
+periments in Table 1. Others introduce an additional ac-                     2. Architectural Incompatibility of Action Experts:
+tion expert [3, 22, 47], among which VLA-Adapter trains                          More critically, resolving LoRA interference is neces-
+its action expert from scratch. However, this tightly cou-                       sary but not sufficient. Even when the VLM is perfectly
+pled dual-system design makes the overall model difficult                        merged, simply averaging the action experts in archi-
+to merge. MergeVLA simplifies this structure by removing                         tectures such as VLA-Adapter [47] still yields 0% suc-
+the non-mergeable self-attention layers, enabling all com-                       cess. The right plot explains why: although the shallow
+ponents except the expert head to be merged effectively.                         blocks remain moderately aligned across tasks, the pa-
+
+
+
+                                                                    22337
+   rameter distance explodes in the final layers. Such diver-                                                                                                                 100                       TA                             Ties
+
+
+
+                                                                                                                                                          Selfish Ratio (%)
+                                                                                                                                                                                                                                                                                   3.5
+
+                                                                                                                                                                                                                                                                  Avg. Log Dist.
+   gence arises because the action expert is trained entirely                                                                                                                  75
+   from scratch and contains self-attention layers that accu-
+                                                                                                                                                                               50                                                                                                  3.0
+   mulate task-specific differences over depth. Instead of                                                                                                                                                                                                                         2.5
+   providing modular transformations, these layers propa-                                                                                                                      25                                                                                                  2.0
+   gate and amplify task-dependent signals, causing deeper                                                                                                                      0    2     3     4                                                                                              0                5 10 15 20
+   blocks to become pathologically specialized to individ-                                                                                                                          Number of Models                                                                                                               Block
+   ual tasks. As a result, their parameters are inherently
+   irreconcilable under any merging scheme.                                                                                                                 Figure 3. Left: Selfish ratio of the masks from TA [21] and TIES
+Additionally, prior merging studies [20, 41] also note that                                                                                                 [51] by merging different numbers of tasks. The selfish ratio is
+the mixed-task setting is considerably more challenging                                                                                                     computed following Equation 4. Right: The average relative L2
+than per-task evaluation, where the task identity is un-                                                                                                    distance across blocks between all pairs of action experts.
+known. In practice, many approaches rely on hand-picked
+priors, e.g., task identity or an expert-specific prompt, to
+perform well, and degrade rapidly without them. Motivated                                                                                                   pruning parameters based on their alignment consistency,
+by these insights, we therefore structure MergeVLA as a                                                                                                     adapted here for LoRA merging, shares its core formulation
+unified framework that addresses these challenges by: (1)                                                                                                   with task-vector compression methods [46].
+Stabilizing VLM merging via task-specific masking (Sec                                                                                                      Analysis of Parameter Selfishness. Based on this formu-
+4.1) to address extreme LoRA parameter conflict (Q1); (2)                                                                                                   lation, we compute the proportion of selfish parameters,
+redesigning the action expert (Sec 4.2) to mitigate architec-                                                                                               namely those retained by exactly one task mask:
+tural incompatibility (Q2); (3) introducing a learning-free
+task routing mechanism (Sec 4.3) to enable operation with-                                                                                                                            \text {ratio}_{\mathrm {selfish}} = \frac {1}{N} \sum _{i=1}^{N} \mathbb {I}\!\left [\sum _{m=1}^{M} (\mathbf {S}_m)_i = 1\right ], \label {eq:selfish ratio}    (4)
+out a task identity at test time (Q3).
+4.1. Task Conflicts in LoRA-Finetuned VLM                                                                                                                   Empirically, as Figure 3 (left) shows, this selfish ratio on
+                                                                                                                                                            LIBERO for two merging methods as the number of merged
+To address Q1, we first consider a standard LoRA update.
+                                                                                                                                                            tasks increases from 2 to 4. In all cases, ratioselfish rises
+Let Θ0 denote the pretrained checkpoint and Θm the LoRA-
+                                                                                                                                                            at around 75%, indicating that most parameters are self-
+finetuned weights after finetuning on task m ∈ {1, . . . , M }.
+                                                                                                                                                            ish (kept exclusively by a single task) and underscoring the
+The task vector for task m is defined as τm = Θm − Θ0 .
+                                                                                                                                                            importance of task-specific masking to mitigate cross-task
+Most data-free methods R(·) construct a single merged up-
+                                                                                                                                                            interference. Notably, applying the task mask encourages
+date τmerge by merging the updates [16, 20, 21, 41, 51]:
+                                                                                                                                                            some LoRA-finetuned parameters to revert toward their pre-
+   \tau _{\mathrm {merge}} = \alpha \, \mathcal {R}(\{\tau _m\}_{m=1}^{M}), \quad \Theta _{\mathrm {merge}} = \Theta _0 + \tau _{\mathrm {merge}},  (1)     trained weights, improving merge stability. A similar ef-
+                                                                                                                                                            fect was observed in ReVLA [11], where VLA finetun-
+where α is the scaling factor. As τmerge is unusable directly                                                                                               ing was shown to overwrite pretrained visual knowledge.
+due to the conflicts we identified, we therefore move beyond                                                                                                This forgetting becomes more pronounced when multiple
+a single global update. We leverage a task-specific binary                                                                                                  experts are merged, as conflicting task updates distort the
+masking strategy Sm that isolates components in Θmerge                                                                                                      shared feature space. By sparsely activating merged LoRA
+beneficial to task m, while suppressing those encoding con-                                                                                                 parameters through the proposed mask, MergeVLA pre-
+flicts. Formally,                                                                                                                                           serves pretrained visual–language representations and miti-
+                                                                                                                                                            gates cross-task conflicts, enabling more consistent and sta-
+                                     \Theta _{\mathrm {merge}}^{(m)} = \Theta _0 + \mathbf {S}_m \odot \tau _{\mathrm {merge}},                (2)          ble merging across tasks.
+where ⊙ denotes element-wise multiplication. The mask                                                                                                       4.2. Redesigning the Action Expert for Mergeability
+Sm is constructed by a parameter-level consistency test: A
+                                                                                                                                                            Our diagnosis proved that stabilizing the VLM (Q1) is in-
+parameter is retained if and only if its task-specific τm is
+                                                                                                                                                            sufficient; the action expert itself is a fundamental barrier
+both (1) significant and (2) dominant over the scaled resid-
+                                                                                                                                                            (Q2). As shown in Section 5.2, applying only the LoRA
+ual difference with τmerge , indicating that it aligns with the
+                                                                                                                                                            task mask still results in 0% success rate. Our analysis pin-
+overall merge and contributes positively to task m:
+                                                                                                                                                            points the incompatibility with the VLA-Adapter [47] ar-
+                              \mathbf {S}_m = \mathbb {I}\left [\,|\tau _m| > \lambda \,|\tau _{\mathrm {merge}} - \tau _m|\,\right ],         (3)          chitecture (Fig. 1), which consists of L transformer blocks
+                                                                                                                                                            trained from scratch. Each block contains a self-attention
+where I[·] is the indicator function that returns 1 if the con-                                                                                             layer on the block input xi , two cross-attention layers con-
+dition is true and 0 otherwise, and mask ratio λ controls                                                                                                   ditioned on the VLM-provided hidden states hiT (task) and
+the tolerance for disagreement. This principled approach of                                                                                                 hiA (action), and a feed-forward network (FFN). A gating
+
+
+
+                                                                                                                                                      22338
+function is applied to the task stream, i.e., ĥiT = g(hiT ),     based solely on the input observations, enabling cross-skill
+with g(·) implemented as tanh.                                    ability at a joint-task level [41]. To this end, we propose a
+    Different from its flawed design, MergeVLA’s redesign         test-time task routing mechanism that infers task relevance
+(Fig. 2) is a principled response to nonmergeability diagno-      directly from the model’s internal parameter subspaces, in-
+sis, introducing two key modifications:                           spired by recent observations that fine-tuning pushes dif-
+• Remove Self-Attention: We eliminate the self-attention          ferent tasks into distinguishable parameter subspaces [43].
+  layers, retaining cross-attention only. Since the expert is     Given the merged LoRA parameters τmerge and task masks
+  trained from scratch, self-attention layers develop strong,     {Sm }M m=1 , we obtain M masked VLM variants by applying
+  task-specific biases that are irreconcilable. Removing          each mask to the merged weights:
+  them forces the expert to rely on the robust, shared VLM
+  features.                                                             \Theta ^{(m)}_{\mathrm {merge}} = \Theta _0 + \mathbf {S}_m \odot \tau _{\mathrm {merge}}, \quad m = 1,\dots ,M.                                                                                                                                                                                                                                                                                                           (5)
+• Replace Gating: We replace the tanh gate with a                                                                      
+                                                                  Each masked VLM produces hidden states hlT , hlA from
+  sigmoid gate. The original tanh gate can suppress VLM
+                                                                  block l, which is then forwarded to the corresponding
+  signals via negative activations, forcing the expert to rely
+                                                                  l-th block of the action expert. Inside this block, two
+  on its own scratch-trained (and task-specific) parameters.
+                                                                  cross-attention paths are present: one conditioned on the
+  sigmoid ensures VLM information is always preserved
+                                                                  task hidden state hTl with parameters (QTl , KTl , VTl ), and
+  and balanced.
+                                                                  the other conditioned on the action hidden state hAl with
+These two architectural changes alone are remarkably effec-       (QAl , KAl , VAl ).
+tive, achieving a 13.4% higher success rate on the out-of-            A key design choice is which subspace to use for rout-
+distribution (OOD) LIBERO-Plus [14] testbed. This con-            ing. We hypothesize that query Q and K govern atten-
+firms our new design better leverages the VLM’s robustness        tional selection, thus being sensitive to input scaling and
+and is inherently more generalizable.                             risk collapsing into task-specific subspaces. Empirically,
+Merging via Specialization Hierarchy. Since the action            value-based subspaces provide more stable and discrimi-
+expert is trained from scratch, existing task vector-based        native signals for routing, as they directly encode the task-
+merging approaches are inapplicable here, as there is no          dependent information written into the hidden states. We
+shared initialization among different experts. Therefore,         therefore analyze the principal components of the value pro-
+we adopt a simple weight-averaging strategy to merge the          jection matrices V of the l-th block for both paths via sin-
+parameters of the action experts across tasks. We observe         gular value decomposition (SVD):
+that such averaging works surprisingly well for the shal-
+low blocks of the action expert. However, it fails for the                                                                            \label {eq:svd} \begin {aligned} \mathbf {V}_{\mathrm {T}}^{\,l} &= \mathbf {L}_{\mathrm {T}}^{\,l}\,\mathbf {\Sigma }_{\mathrm {T}}^{\,l}\,(\mathbf {R}_{\mathrm {T}}^{\,l})^\top ,\\ \mathbf {V}_{\mathrm {A}}^{\,l} &= \mathbf {L}_{\mathrm {A}}^{\,l}\,\mathbf {\Sigma }_{\mathrm {A}}^{\,l}\,(\mathbf {R}_{\mathrm {A}}^{\,l})^\top . \end {aligned} 
+deeper blocks, where the parameter discrepancy tasks in-                                                                                                                                                                                                                                                                                                                                                                                                                                           (6)
+crease sharply.
+    This reflects strong task-specific specialization, and we      We retain the top-kr right singular vectors in each path to
+refer to these divergent layers collectively as the expert         form the dominant content components of the expert sub-
+head, denoted as Hl→L , spanning blocks l through L. In            space: PTl ∈ Rkr ×d , PAl ∈ Rkr ×d , formed by taking the
+most cases, l = L, meaning that only the final block               first kr rows of (RTl )⊤ and (RAl )⊤ , respectively. For each
+requires separate handling. We hypothesize that under              task m, the hidden state from its masked VLM is projected
+regression-based training objectives, each expert head be-         onto these two subspaces to measure its activation strength,
+comes highly specialized to the action distribution of its cor-
+responding task. Even small discrepancies between these
+                                                                               \label {eq:proj} r_{\mathrm {T},m} = \big \| \mathbf {P}_{\mathrm {T}}^{\,l} \mathbf {h}^{\,l}_{\mathrm {A},m} \big \|_2, r_{\mathrm {A},m} = \big \| \mathbf {P}_{\mathrm {A}}^{\,l} \mathbf {h}^{\,l}_{\mathrm {T},m} \big \|_2.                                                                                                                                                                                  (7)
+distributions can lead to incompatible weights, making sim-
+ple parameter averaging ineffective. This effect is particu-      Let rT , rA ∈ RM collect the scores {rT,m }M          m=1 and
+larly pronounced in fine-grained manipulation tasks, where        {rA,m }M m=1 , respectively. Here,  the combined   score  vector
+                                                                  is given by r = 12 rT + rA . The routing probabilities are
+                                                                                                
+minor output deviations can cause entire trajectories to fail.
+Therefore, we leave the expert heads unmerged and allow           calculated by softmax pm = softmax(r)m . Then we can
+the model to use the corresponding head for each task.            use arg maxm pm to choose the task index m∗ . Once m∗
+                                                                  is determined, the model uses the corresponding task mask
+4.3. Test-time Task Routing                                       Sm∗ and expert head Hl→L   m∗ to perform the forward pass.
+When the task identity is known, MergeVLA can already             This design allows the router to infer the underlying task
+accomplish each skill by manually selecting the corre-            purely from the input-driven hidden representations of the
+sponding task mask Sm and expert head Hl→L m . However,           masked VLMs, without any additional training or supervi-
+to operate without a known task identity (Q3) at inference        sion. In practice, we find that a single routing step using the
+time, the model must dynamically select these components          initial observation at t=0 is sufficient to identify the correct
+
+
+
+                                                              22339
+task. The selected task mask and expert head are then fixed
+for the rest of the episode, avoiding repeated routing during
+inference. Although this mechanism requires maintaining                                                            "push the plate to the front of the stove"
+M task masks and their corresponding action heads, the ad-                                                             "before turning on the burner, push
+                                                                                                                   the plate to the front of the stove"
+ditional computational and parameter overhead is minimal.
+
+5. Experiments
+                                                                  Figure 4. Seven perturbation types in the LIBERO-Plus bench-
+5.1. Experimental Setup                                           mark, used to evaluate robustness under visual and language shifts.
+
+Simulation Benchmarks. We evaluate MergeVLA on                                  Setting A: Cross embodiment, Single task
+three simulation benchmarks:                                                 Aloha-agilex        ARX-X5            Piper
+- LIBERO [31] is a comprehensive benchmark consisting
+of four distinct task suites: Spatial, Object, Goal, and Long.
+The benchmark enables the assessment of the robot’s multi-                                {Place Container Plate}
+skill competence, including spatial relationships, object in-                   Setting B: Cross embodiment, Cross task
+                                                                             Aloha-agilex        ARX-X5           Piper
+teractions, and task-specific objectives.
+- LIBERO-Plus [14] builds upon the original LIBERO
+benchmark by introducing seven distinct perturbations, as               {Place Container Plate, Handover Block, Open Microwave}
+shown in Figure 4. The benchmark comprises 10,030 tasks,
+providing diverse settings for evaluating model generaliza-       Figure 5. Experimental setup in the RoboTwin environment, fea-
+tion and robustness under shifts.                                 turing three robotic embodiments and a suite of manipulation tasks
+- RoboTwin 2.0 [6] serves as a cross-embodiment bench-            for cross-embodiment evaluation.
+mark for dual-arm manipulation. As shown in Figure 5, we
+select three embodiments and four tasks for a comprehen-          MergeVLA enables efficient knowledge reuse and strong
+sive assessment of the cross-embodiment cross-skill ability.      multi-task performance with a compact VLA model.
+- Real-World Experiments are provided in the Appendix.
+                                                                  5.3. Results on LIBERO-Plus
+5.2. Results on LIBERO                                            Experiments on the LIBERO benchmark verify that
+We first reproduce results of OpenVLA [27] and VLA-               MergeVLA achieves strong cross-task performance within
+Adapter [47] on four tasks, as highlighted in grey in Table 1.    known environments. To further examine the model’s
+OpenVLA performs notably worse than the others, with an           generalization and robustness to unseen scenes, we con-
+average success rate of 76.5% and only 53.7% on the long-         duct additional evaluations on LIBERO-Plus, a variant of
+horizon LIBERO-Long task. Our MergeVLA, modified                  LIBERO that introduces controlled distribution shifts in
+from VLA-Adapter to be merge-friendly, achieves compa-            both visual appearance and language descriptions. We use
+rable fine-tuning performance, indicating that our structural     the same models trained on LIBERO and directly test them
+changes preserve the original capability. We have tried eval-     on the shifted LIBERO-Plus environments without any ad-
+uating single-task finetuned models on unseen tasks (e.g.,        ditional finetuning. This setting allows us to rigorously
+testing a Spatial expert on the Object suite), all methods        assess MergeVLA’s ability to maintain performance under
+achieve 0% success across tasks. This suggests that exist-        out-of-distribution visual and linguistic conditions.
+ing VLA models lack cross-skill generalization. The lower             From Table 2, we first observe that when using single-
+part of Table 1 reports the merging results. Directly apply-      task finetuned checkpoints evaluated on their own tasks,
+ing TA [21] to OpenVLA fails entirely, while merging only         MergeVLA exhibits stronger robustness under various per-
+the vision and projector components improves to 44.2%.            turbations than existing VLA models. This improvement
+Adding a task-specific mask further raises the average suc-       stems from its architecture design, which preserves the
+cess rate to 62.4%, though performance remains unbal-             pretrained VLM’s inherent robustness to visual and lan-
+anced. On VLA-Adapter, tight coupling between the VLM             guage perturbations. Secondly, in the model-merging set-
+and action expert makes merging difficult even with mask-         ting, we find that applying different merging methods with
+ing, unless the final action block is excluded. As shown          MergeVLA maintains similar robustness even under cross-
+in the blue-highlighted rows, our MergeVLA consistently           task evaluation. Notably, when using TA and TIES merging,
+outperforms other merging baselines. With TIES [51] and           the merged model even surpasses OpenVLA, π0 , and VLA-
+WUDI [8], it achieves balanced results across all four tasks      Adapter in the single-task setting, demonstrating that our
+(Avg. 90.2%) , while remaining lightweight and only 6.5%          MergeVLA can effectively transfer and preserve robustness
+below fine-tuning performance. These results confirm that         across tasks.
+
+
+
+                                                             22340
+Table 1. LIBERO results across task splits. Comparison between finetuned and merged variants of MergeVLA. All numbers are success
+rates (%). S indicates that task masks are used during merging. “Params (B)” denotes the total number of model parameters (in billions)
+required to evaluate on all four tasks, including the LLM backbone and the action expert. Gray-highlighted rows correspond to per-task
+finetuned checkpoints evaluated on their own tasks, serving as upper-bound references for model merging.
+
+       Method                 Merge Method         Merge Part         Params (B)      Spatial    Object   Goal      Long    Avg.
+       Single-task Finetuned Model
+       OpenVLA [27]          -                     -                       7×4            84.7    88.4    79.2      53.7    76.5
+       VLA-Adapter [47] -                          -                     0.68 × 4         99.6    99.6    98.2      96.4    98.5
+       MergeVLA              -                     -                     0.68 × 4         98.0    98.6    95.0      95.0    96.7
+       Merged Model
+       OpenVLA                TA [21]              Vision Backbones       7×4             56.6    58.0    55.6       6.6    44.2
+       OpenVLA                TA [21]              All                      7              0.0     0.0     0.0       0.0     0.0
+       OpenVLA                TA [21] + S          All                      7             74.2    82.6    68.8      24.0    62.4
+       VLA-Adapter            TA [21]              All                    0.68             0.0     0.0     0.0       0.0     0.0
+       VLA-Adapter            TA [21] + S          All                    0.68            0.0     0.0      0.0      0.0      0.0
+       VLA-Adapter            TA [21] + S          Except HL→L            0.70            50.2    34.6     0.0       7.4    23.1
+       MergeVLAEMR            EMR [20]                                                    96.0    63.2    62.0      40.6    65.5
+       MergeVLATSV            TSV [16] + S                                                99.4    97.8    74.4      54.8    81.6
+       MergeVLAKnOTS          KnOTS[41] + S                                               96.8    98.8    84.8      71.4    88.0
+       MergeVLATA             TA [21] + S          Except HL→L                0.70        98.0    98.8    85.4      76.6    89.7
+       MergeVLAWUDI           WUDI [8] + S                                                97.6    98.2    85.6      78.2    89.9
+       MergeVLATIES           TIES [51] + S                                               94.8    94.6    91.8      79.4    90.2
+
+Table 2. Robustness of different models under visual and language shifts on LIBERO-Plus. All results are success rates (%) averaged
+over 4 task suites. Gray-highlighted rows correspond to per-task finetuned checkpoints evaluated on their own tasks, serving as upper-
+bound references for model merging. Shift definitions: S1 – Background Textures; S2 – Camera Viewpoints; S3 – Language Instructions;
+S4 – Lighting Conditions; S5 – Object Layout; S6 – Robot States; S7 – Sensor Noise.
+
+     Method                     S1           S2            S3            S4          S5          S6           S7           Avg.
+     Single-task Finetuned Model
+     OpenVLA [27]           34.8             0.8          23.0         8.1           28.5        3.5         15.2          16.3
+     π0 [3]                 81.4            13.8          58.8        85.0           68.9        6.9         79.0          56.3
+     VLA-Adapter [47]       76.6            36.4          73.8        71.0           70.2        37.4        57.2          59.0
+     MergeVLA               92.7            62.4          75.7        92.7           73.7        46.4        74.7          72.4
+     Merged Model
+     VLA-Adapter [47]          15.7         6.6           17.6        11.2           15.0        4.1          7.1          10.8
+     MergeVLATSV               64.3         44.8          58.8        72.9           59.4        30.4        52.7          53.5
+     MergeVLATA                78.2         53.1          68.4        79.0           65.0        34.6        62.7          61.6
+     MergeVLATIES              85.7         50.7          66.0        84.2           68.1        30.3        66.0          62.5
+
+
+5.4. Results on RoboTwin                                              form a different task: PLACE CONTAINER PLATE, HAN -
+                                                                      DOVER BLOCK, and OPEN MICROWAVE, respectively. For
+While evaluations on the LIBERO and LIBERO-Plus
+                                                                      each combination of {embodiment,task}, we collected 50
+benchmarks demonstrate that MergeVLA attains high per-
+                                                                      demonstration trajectories for finetuning. We report the suc-
+formance and robustness in cross-task settings, these tests
+                                                                      cess rate of (i) single-{task, embodiment} fine-tuned mod-
+are limited to a single embodiment. To examine the ef-
+                                                                      els, and (ii) merged models obtained using TA and TIES
+fectiveness of MergeVLA under cross-embodiment merg-
+                                                                      strategies under the MergeVLA framework. The detailed
+ing, we selected RoboTwin-2.0 as our evaluation plat-
+                                                                      results are presented in Table 3, where each result is the suc-
+form, since it supports multiple dual-arm robots and en-
+                                                                      cess rate over 50 trials. Unlike the experiments on LIBERO
+ables a broad assessment of generalization across hard-
+                                                                      and LIBERO-Plus, merging across different embodiments
+ware. Specifically, we designed two experimental settings:
+                                                                      in RoboTwin poses a greater challenge for the test-time task
+A: Three dual-arm robots, Aloha-Agilex, ARX-X5, and
+                                                                      router. We find that only keeping the final block L as expert
+Piper, each perform the same manipulation task PLACE
+                                                                      head is insufficient, as embodiment-specific differences in
+CONTAINER PLATE. B: The same three robots each per-
+
+
+
+
+                                                                 22341
+                                                                                      80                                            75
+
+
+                                                                                                                 Success Rate (%)
+                                                                                                       Spatial
+
+
+
+
+                                                                   Active Ratio (%)
+Table 3. RoboTwin success rates (%) of different variants                             70               Object
+                                                                                                       Goal
+of MergeVLA across embodiments and tasks. T1 : P LACE                                 60               Long-10                      50
+C ONTAINER P LATE, T2 : H ANDOVER B LOCK, T3 : O PEN M I -                            50
+CROWAVE . Gray-highlighted rows correspond to per-task fine-                          40                                            25
+tuned checkpoints evaluated on their own tasks.                                       30                                            0 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9
+                                                                                           0.2 0.4 0.6 0.8
+          Setting A: Cross embodiments, Single task
+                                                                       Figure 6. The ablation study and analysis of λ. (a) The mask
+ Method                                 T1                             active ratio across different λ of LIBERO. (b) The success rate
+                                                        Avg.
+                               Aloha    ARX     Piper                  across different λ of LIBERO-Long.
+ Single-task Finetuned         90.0     90.0    84.0    88.0           Table 4. Ablation results of MergeVLA with different subspaces
+ MergeVLATA,H(L−1)→L           86.0     82.0    68.0    78.7           used for routing on LIBERO.
+ MergeVLATIES,H(L−1)→L         88.0     92.0    86.0    88.7
+          Setting B: Cross embodiments, Cross task                                     Method       Spatial        Object                 Goal     Long     Avg.
+
+ Method                         T1       T2      T3                                    Only K        98.0                  0.0            39.6     76.6     53.6
+                                                        Avg.                           K&V           98.0                 0.0             85.8     76.6     65.1
+                               Aloha    ARX     Piper
+ Single-task Finetuned         90.0     46.0    92.0    76.0                           Only V        98.0                 98.8            85.4     76.6     89.7
+ MergeVLATA,H(L−1)→L           80.0      0.0    66.0    48.7
+ MergeVLATA,H(L−2)→L           82.0      0.0    66.0    49.3           merged task vector becomes effective only when the task-
+ MergeVLATIES,H(L−1)→L         90.0      0.0    88.0    59.3           specific weights dominate.
+ MergeVLATIES,H(L−2)→L         88.0     38.0    86.0    70.7           Impact of the Subspace Used for Routing. To validate our
+                                                                       task router design, we experiment on all four LIBERO task
+                                                                       suites using three configurations: (1) using K projections,
+morphology and action space introduce stronger specializa-             (2) using V projections, and (3) using K and V projec-
+tion and conflicts within the action heads. For Setting A,             tions jointly, while fixing λ = 0.6 for the task-specific mask
+routing H(L−1)→L preserves the performance of individ-                 and adopting TA for VLM merging. The results are sum-
+ually finetuned policies, indicating that the earlier merged           marized in Table 4. We observe that for Spatial and Long
+blocks still capture transferable knowledge across different           tasks, the choice of projection combination has little effect
+embodiments. For Setting B, routing H(L−2)→L and TIES                  on performance. Yet, for Object and Goal, using only K
+merging are need to maintain comparable performance, es-               or combining K and V leads to a dramatic drop in success
+pecially for the H ANDOVER B LOCK task, which requires                 rate, and even complete failure in some cases. By inspect-
+coordinated dual-arm motion and thus induces stronger                  ing the router’s task selection, we find that when using K,
+conflicts in the action space. Overall, these findings high-           the router tends to misassign tasks. From the perspective of
+light MergeVLA’s ability for cross-embodiment generaliza-              attention interaction, the value projection captures the ac-
+tion.                                                                  tual behavioral semantics retrieved by the query, whereas
+                                                                       the key projection primarily defines the similarity structure
+5.5. Ablation Study                                                    of the query. Consequently, value-based alignment provides
+Impact of Mask Ratio. We analyze the effect of the task                a more reliable indicator of task identity.
+mask under different λ, which controls the active ratio of the
+mask. We vary λ from 0.2 to 0.9 and obtain the merged task             6. Conclusion
+vector using Task Arithmetic (TA). Figure 6 (a) shows the              The lack of cross-skill capability in existing VLA mod-
+active ratio of the mask across four tasks. As λ increases,            els remains a critical yet unexplored challenge. We show
+fewer parameters remain active, with the LIBERO-Spatial                that current model merging techniques cannot be directly
+task consistently showing the highest activation ratio, indi-          applied to VLAs due to destructive LoRA parameter inter-
+cating its dominant weight contribution. We further eval-              ference and architectural incompatibility of action experts.
+uate the impact of λ on the model’s performance in the                 We propose MergeVLA, a framework for merging VLA
+LIBERO-Long task, as shown in Figure 6 (b). When λ                     models that is compatible with mainstream merging meth-
+is small (e.g., 0.2), the mask activates too many parame-              ods toward an embodied generalist. Experiments across
+ters, leading to severe task interference and even complete            three benchmarks demonstrate MergeVLA’s strong multi-
+failure. In contrast, when λ lies between 0.6 and 0.9, the             task ability and robustness under distribution shifts, with
+success rate exceeds 70%. These results suggest that mod-              transferability across embodiments. Future work will ex-
+erate sparsity enables an effective balance between task-              plore this promising direction further, including whether
+specific and merged task vectors. When the parameter dif-              larger VLM backbones remain compatible with our frame-
+ferences across tasks are large, relying more on the pre-              work and whether pretraining on diverse robot datasets can
+trained model yields better results, whereas emphasizing the           further enhance merging effectiveness.
+
+
+
+                                                               22342
+7. Acknowledgments                                                                        Liu, Qiwei Liang, Zixuan Li, Xianliang Lin, Yiheng Ge,
+                                                                                          Zhenyu Gu, Weiliang Deng, Yubin Guo, Tian Nian, Xuan-
+This work was partially supported by ARC DE240100105,                                     bing Xie, Qiangyu Chen, Kailun Su, Tianling Xu, Guodong
+DP240101814, DP230101196, BA24006, and ARC Indus-                                         Liu, Mengkang Hu, Huan-ang Gao, Kaixuan Wang, Zhix-
+trial Transformation Research Hubs IH230100013.                                           uan Liang, Yusen Qin, Xiaokang Yang, Ping Luo, and Yao
+                                                                                          Mu. Robotwin 2.0: A scalable data generator and bench-
+References                                                                                mark with strong domain randomization for robust bimanual
+                                                                                          robotic manipulation. CoRR, abs/2506.18088, 2025. 2, 6
+ [1] Homanga Bharadhwaj, Jay Vakil, Mohit Sharma, Abhinav                             [7] Zhuoxiao Chen, Junjie Meng, Mahsa Baktashmotlagh,
+     Gupta, Shubham Tulsiani, and Vikash Kumar. Roboagent:                                Yonggang Zhang, Zi Huang, and Yadan Luo. MOS: model
+     Generalization and efficiency in robot manipulation via se-                          synergy for test-time adaptation on lidar-based 3d object
+     mantic augmentations and action chunking. In IEEE In-                                detection. In The Thirteenth International Conference on
+     ternational Conference on Robotics and Automation, ICRA                              Learning Representations, ICLR 2025, Singapore, April 24-
+     2024, Yokohama, Japan, May 13-17, 2024, pages 4788–                                  28, 2025. OpenReview.net, 2025. 2
+     4795. IEEE, 2024. 2                                                              [8] Runxi Cheng, Feng Xiong, Yongxian Wei, Wanyun Zhu, and
+ [2] Johan Bjorck, Fernando Castañeda, Nikita Cherniadev,                                Chun Yuan. Whoever started the interference should end it:
+     Xingye Da, Runyu Ding, Linxi Fan, Yu Fang, Dieter Fox,                               Guiding data-free model merging via task vectors. CoRR,
+     Fengyuan Hu, Spencer Huang, Joel Jang, Zhenyu Jiang, Jan                             abs/2503.08099, 2025. 1, 2, 6, 7
+     Kautz, Kaushil Kundalia, Lawrence Lao, Zhiqi Li, Zongyu                          [9] Can Cui, Pengxiang Ding, Wenxuan Song, Shuanghao Bai,
+     Lin, Kevin Lin, Guilin Liu, Edith LLontop, Loic Magne,                               Xinyang Tong, Zirui Ge, Runze Suo, Wanqi Zhou, Yang Liu,
+     Ajay Mandlekar, Avnish Narayan, Soroush Nasiriany, Scott                             Bofang Jia, Han Zhao, Siteng Huang, and Donglin Wang.
+     Reed, You Liang Tan, Guanzhi Wang, Zu Wang, Jing Wang,                               Openhelix: A short survey, empirical analysis, and open-
+     Qi Wang, Jiannan Xiang, Yuqi Xie, Yinzhen Xu, Zhenjia Xu,                            source dual-system VLA model for robotic manipulation.
+     Seonghyeon Ye, Zhiding Yu, Ao Zhang, Hao Zhang, Yizhou                               CoRR, abs/2505.03912, 2025. 2
+     Zhao, Ruijie Zheng, and Yuke Zhu. GR00T N1: an open                             [10] MohammadReza Davari and Eugene Belilovsky. Model
+     foundation model for generalist humanoid robots. CoRR,                               breadcrumbs: Scaling multi-task model merging with sparse
+     abs/2503.14734, 2025. 1                                                              masks. In Computer Vision - ECCV 2024 - 18th European
+ [3] Kevin Black, Noah Brown, Danny Driess, Adnan Esmail,                                 Conference, Milan, Italy, September 29-October 4, 2024,
+     Michael Equi, Chelsea Finn, Niccolo Fusai, Lachy Groom,                              Proceedings, Part LXXV, pages 270–287. Springer, 2024. 2
+     Karol Hausman, Brian Ichter, Szymon Jakubczak, Tim                              [11] Sombit Dey, Jan-Nico Zaech, Nikolay Nikolov, Luc Van
+     Jones, Liyiming Ke, Sergey Levine, Adrian Li-Bell, Mohith                            Gool, and Danda Pani Paudel. Revla: Reverting visual do-
+     Mothukuri, Suraj Nair, Karl Pertsch, Lucy Xiaoyang Shi,                              main limitation of robotic foundation models. In IEEE In-
+     James Tanner, Quan Vuong, Anna Walling, Haohuan Wang,                                ternational Conference on Robotics and Automation, ICRA
+     and Ury Zhilinsky. \pi  {}_{\mbox {0}} : A vision-language-action flow model         2025, Atlanta, GA, USA, May 19-23, 2025, pages 8679–
+     for general robot control. CoRR, abs/2410.24164, 2024. 2,                            8686. IEEE, 2025. 3, 4
+     3, 7                                                                            [12] Guodong Du, Junlin Lee, Jing Li, Runhua Jiang, Yifei Guo,
+ [4] Anthony Brohan, Noah Brown, Justice Carbajal, Yevgen                                 Shuyang Yu, Hanting Liu, Sim Kuan Goh, Ho-Kin Tang,
+     Chebotar, Joseph Dabis, Chelsea Finn, Keerthana Gopalakr-                            Daojing He, and Min Zhang. Parameter competition balanc-
+     ishnan, Karol Hausman, Alexander Herzog, Jasmine Hsu,                                ing for model merging. In Advances in Neural Information
+     Julian Ibarz, Brian Ichter, Alex Irpan, Tomas Jackson, Sally                         Processing Systems 38: Annual Conference on Neural Infor-
+     Jesmonth, Nikhil J. Joshi, Ryan Julian, Dmitry Kalash-                               mation Processing Systems 2024, NeurIPS 2024, Vancouver,
+     nikov, Yuheng Kuang, Isabel Leal, Kuang-Huei Lee, Sergey                             BC, Canada, December 10 - 15, 2024, 2024. 2
+     Levine, Yao Lu, Utsav Malla, Deeksha Manjunath, Igor                            [13] Frederik Ebert, Yanlai Yang, Karl Schmeckpeper, Bernadette
+     Mordatch, Ofir Nachum, Carolina Parada, Jodilyn Peralta,                             Bucher, Georgios Georgakis, Kostas Daniilidis, Chelsea
+     Emily Perez, Karl Pertsch, Jornell Quiambao, Kanishka Rao,                           Finn, and Sergey Levine. Bridge data: Boosting gener-
+     Michael S. Ryoo, Grecia Salazar, Pannag R. Sanketi, Kevin                            alization of robotic skills with cross-domain datasets. In
+     Sayed, Jaspiar Singh, Sumedh Sontakke, Austin Stone, Clay-                           Robotics: Science and Systems XVIII, New York City, NY,
+     ton Tan, Huong T. Tran, Vincent Vanhoucke, Steve Vega,                               USA, June 27 - July 1, 2022, 2022. 2
+     Quan Vuong, Fei Xia, Ted Xiao, Peng Xu, Sichun Xu,                              [14] Senyu Fei, Siyin Wang, Junhao Shi, Zihao Dai, Jikun Cai,
+     Tianhe Yu, and Brianna Zitkovich. RT-1: robotics trans-                              Pengfang Qian, Li Ji, Xinzhe He, Shiduo Zhang, Zhaoye Fei,
+     former for real-world control at scale. In Robotics: Sci-                            Jinlan Fu, Jingjing Gong, and Xipeng Qiu. Libero-plus: In-
+     ence and Systems XIX, Daegu, Republic of Korea, July 10-                             depth robustness analysis of vision-language-action models,
+     14, 2023, 2023. 1, 2                                                                 2025. 2, 5, 6
+ [5] Qingwen Bu, Hongyang Li, Li Chen, Jisong Cai, Jia Zeng,                         [15] Jonathan Frankle, Gintare Karolina Dziugaite, Daniel M.
+     Heming Cui, Maoqing Yao, and Yu Qiao. Towards synergis-                              Roy, and Michael Carbin. Linear mode connectivity and the
+     tic, generalized, and efficient dual-system for robotic manip-                       lottery ticket hypothesis. In Proceedings of the 37th Interna-
+     ulation. CoRR, abs/2410.08001, 2024. 2                                               tional Conference on Machine Learning, ICML 2020, 13-18
+ [6] Tianxing Chen, Zanxin Chen, Baijun Chen, Zijian Cai, Yibin                           July 2020, Virtual Event, pages 3259–3269. PMLR, 2020. 2
+
+
+
+
+                                                                                22343
+[16] Antonio Andrea Gargiulo, Donato Crisostomi, Maria Sofia                     Levine. Qt-opt: Scalable deep reinforcement learning for
+     Bucarelli, Simone Scardapane, Fabrizio Silvestri, and                       vision-based robotic manipulation. CoRR, abs/1806.10293,
+     Emanuele Rodolà. Task singular vectors: Reducing task                      2018. 2
+     interference in model merging. In IEEE/CVF Conference                  [25] Dmitry Kalashnikov, Jacob Varley, Yevgen Chebotar, Ben-
+     on Computer Vision and Pattern Recognition, CVPR 2025,                      jamin Swanson, Rico Jonschkowski, Chelsea Finn, Sergey
+     Nashville, TN, USA, June 11-15, 2025, pages 18695–18705.                    Levine, and Karol Hausman. Mt-opt: Continuous multi-
+     Computer Vision Foundation / IEEE, 2025. 2, 4, 7                            task robotic reinforcement learning at scale.           CoRR,
+[17] Dibya Ghosh, Homer Rich Walke, Karl Pertsch, Kevin                          abs/2104.08212, 2021. 2
+     Black, Oier Mees, Sudeep Dasari, Joey Hejna, Tobias                    [26] Siddharth Karamcheti, Suraj Nair, Ashwin Balakrishna,
+     Kreiman, Charles Xu, Jianlan Luo, You Liang Tan,                            Percy Liang, Thomas Kollar, and Dorsa Sadigh. Prismatic
+     Lawrence Yunliang Chen, Quan Vuong, Ted Xiao, Pannag R.                     vlms: Investigating the design space of visually-conditioned
+     Sanketi, Dorsa Sadigh, Chelsea Finn, and Sergey Levine.                     language models. In Forty-first International Conference on
+     Octo: An open-source generalist robot policy. In Robotics:                  Machine Learning, ICML 2024, Vienna, Austria, July 21-27,
+     Science and Systems XX, Delft, The Netherlands, July 15-19,                 2024. OpenReview.net, 2024. 2
+     2024, 2024. 1
+                                                                            [27] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao,
+[18] Asher J. Hancock, Xindi Wu, Lihan Zha, Olga Russakovsky,                    Ashwin Balakrishna, Suraj Nair, Rafael Rafailov, Ethan Paul
+     and Anirudha Majumdar. Actions as language: Fine-                           Foster, Pannag R. Sanketi, Quan Vuong, Thomas Kollar,
+     tuning vlms into vlas without catastrophic forgetting. CoRR,                Benjamin Burchfiel, Russ Tedrake, Dorsa Sadigh, Sergey
+     abs/2509.22195, 2025. 1                                                     Levine, Percy Liang, and Chelsea Finn. Openvla: An
+[19] Edward J. Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-                    open-source vision-language-action model. In Conference
+     Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen.                      on Robot Learning, 6-9 November 2024, Munich, Germany,
+     Lora: Low-rank adaptation of large language models. In                      pages 2679–2713. PMLR, 2024. 1, 2, 3, 6, 7
+     The Tenth International Conference on Learning Represen-
+                                                                            [28] Moo Jin Kim, Chelsea Finn, and Percy Liang. Fine-tuning
+     tations, ICLR 2022, Virtual Event, April 25-29, 2022. Open-
+                                                                                 vision-language-action models: Optimizing speed and suc-
+     Review.net, 2022. 1, 2
+                                                                                 cess. CoRR, abs/2502.19645, 2025. 1, 3
+[20] Chenyu Huang, Peng Ye, Tao Chen, Tong He, Xiangyu
+                                                                            [29] Lingdong Kong, Shaoyuan Xie, Zeying Gong, Ye Li, Meng
+     Yue, and Wanli Ouyang. Emr-merging: Tuning-free high-
+                                                                                 Chu, Ao Liang, Yuhao Dong, Tianshuai Hu, Ronghe Qiu,
+     performance model merging. In Advances in Neural Infor-
+                                                                                 Rong Li, Hanjiang Hu, Dongyue Lu, Wei Yin, Wenhao Ding,
+     mation Processing Systems 38: Annual Conference on Neu-
+                                                                                 Linfeng Li, Hang Song, Wenwei Zhang, Yuexin Ma, Junwei
+     ral Information Processing Systems 2024, NeurIPS 2024,
+                                                                                 Liang, Zhedong Zheng, Lai Xing Ng, Benoit R. Cottereau,
+     Vancouver, BC, Canada, December 10 - 15, 2024, 2024. 1,
+                                                                                 Wei Tsang Ooi, and Ziwei Liu. The robosense challenge:
+     2, 4, 7
+                                                                                 Sense anything, navigate anywhere, adapt across platforms.
+[21] Gabriel Ilharco, Marco Túlio Ribeiro, Mitchell Wortsman,
+                                                                                 CoRR, abs/2601.05014, 2026. 2
+     Ludwig Schmidt, Hannaneh Hajishirzi, and Ali Farhadi.
+     Editing models with task arithmetic. In The Eleventh In-               [30] Jia Syuen Lim, Zhuoxiao Chen, Zhi Chen, Mahsa Baktash-
+     ternational Conference on Learning Representations, ICLR                    motlagh, Xin Yu, Zi Huang, and Yadan Luo. Dipex: Dispers-
+     2023, Kigali, Rwanda, May 1-5, 2023. OpenReview.net,                        ing prompt expansion for class-agnostic object detection. In
+     2023. 1, 2, 4, 6, 7                                                         Advances in Neural Information Processing Systems 38: An-
+[22] Physical Intelligence, Kevin Black, Noah Brown, James                       nual Conference on Neural Information Processing Systems
+     Darpinian, Karan Dhabalia, Danny Driess, Adnan Esmail,                      2024, NeurIPS 2024, Vancouver, BC, Canada, December 10
+     Michael Equi, Chelsea Finn, Niccolo Fusai, Manuel Y. Gal-                   - 15, 2024, 2024. 2
+     liker, Dibya Ghosh, Lachy Groom, Karol Hausman, Brian                  [31] Bo Liu, Yifeng Zhu, Chongkai Gao, Yihao Feng, Qiang Liu,
+     Ichter, Szymon Jakubczak, Tim Jones, Liyiming Ke, Devin                     Yuke Zhu, and Peter Stone. LIBERO: benchmarking knowl-
+     LeBlanc, Sergey Levine, Adrian Li-Bell, Mohith Mothukuri,                   edge transfer for lifelong robot learning. In Advances in Neu-
+     Suraj Nair, Karl Pertsch, Allen Z. Ren, Lucy Xiaoyang Shi,                  ral Information Processing Systems 36: Annual Conference
+     Laura Smith, Jost Tobias Springenberg, Kyle Stachowicz,                     on Neural Information Processing Systems 2023, NeurIPS
+     James Tanner, Quan Vuong, Homer Walke, Anna Walling,                        2023, New Orleans, LA, USA, December 10 - 16, 2023, 2023.
+     Haohuan Wang, Lili Yu, and Ury Zhilinsky. \pi  {}_{\mbox {0.5}} : a         2, 3, 6
+     vision-language-action model with open-world generaliza-               [32] Zhenyi Lu, Chenghao Fan, Wei Wei, Xiaoye Qu, Dangyang
+     tion. CoRR, abs/2504.16054, 2025. 1, 2, 3                                   Chen, and Yu Cheng. Twin-merging: Dynamic integration
+[23] Xisen Jin, Xiang Ren, Daniel Preotiuc-Pietro, and Pengxiang                 of modular expertise in model merging. In Advances in Neu-
+     Cheng. Dataless knowledge fusion by merging weights of                      ral Information Processing Systems 38: Annual Conference
+     language models. In The Eleventh International Conference                   on Neural Information Processing Systems 2024, NeurIPS
+     on Learning Representations, ICLR 2023, Kigali, Rwanda,                     2024, Vancouver, BC, Canada, December 10 - 15, 2024,
+     May 1-5, 2023. OpenReview.net, 2023. 2                                      2024. 2
+[24] Dmitry Kalashnikov, Alex Irpan, Peter Pastor, Julian Ibarz,            [33] Hao Luo, Yicheng Feng, Wanpeng Zhang, Sipeng Zheng,
+     Alexander Herzog, Eric Jang, Deirdre Quillen, Ethan                         Ye Wang, Haoqi Yuan, Jiazheng Liu, Chaoyi Xu, Qin Jin,
+     Holly, Mrinal Kalakrishnan, Vincent Vanhoucke, and Sergey                   and Zongqing Lu. Being-h0: Vision-language-action pre-
+
+
+
+
+                                                                       22344
+     training from large-scale human videos. arXiv preprint              lis, Krishan Rana, Krishnan Srinivasan, Kuan Fang, Ku-
+     arXiv:2507.15597, 2025. 2                                           nal Pratap Singh, Kuo-Hao Zeng, Kyle Hatch, Kyle Hsu,
+[34] Daniel Marczak, Simone Magistri, Sebastian Cygert, Bart-            Laurent Itti, Lawrence Yunliang Chen, Lerrel Pinto, Li Fei-
+     lomiej Twardowski, Andrew D. Bagdanov, and Joost van de             Fei, Liam Tan, Linxi Jim Fan, Lionel Ott, Lisa Lee, Luca
+     Weijer.    No task left behind: Isotropic model merg-               Weihs, Magnum Chen, Marion Lepert, Marius Memmel,
+     ing with common and task-specific subspaces. CoRR,                  Masayoshi Tomizuka, Masha Itkina, Mateo Guaman Cas-
+     abs/2502.04959, 2025. 1, 2                                          tro, Max Spero, Maximilian Du, Michael Ahn, Michael C.
+[35] Michael Matena and Colin Raffel. Merging models with                Yip, Mingtong Zhang, Mingyu Ding, Minho Heo, Mo-
+     fisher-weighted averaging. In Advances in Neural Informa-           han Kumar Srirama, Mohit Sharma, Moo Jin Kim, Naoaki
+     tion Processing Systems 35: Annual Conference on Neural             Kanazawa, Nicklas Hansen, Nicolas Heess, Nikhil J. Joshi,
+     Information Processing Systems 2022, NeurIPS 2022, New              Niko Sünderhauf, Ning Liu, Norman Di Palo, Nur Muham-
+     Orleans, LA, USA, November 28 - December 9, 2022, 2022.             mad (Mahi) Shafiullah, Oier Mees, Oliver Kroemer, Osbert
+     2                                                                   Bastani, Pannag R. Sanketi, Patrick Tree Miller, Patrick Yin,
+[36] Oier Mees, Lukás Hermann, Erick Rosete-Beas, and Wol-              Paul Wohlhart, Peng Xu, Peter David Fagan, Peter Mitrano,
+     fram Burgard. CALVIN: A benchmark for language-                     Pierre Sermanet, Pieter Abbeel, Priya Sundaresan, Qiuyu
+     conditioned policy learning for long-horizon robot manip-           Chen, Quan Vuong, Rafael Rafailov, Ran Tian, Ria Doshi,
+     ulation tasks. IEEE Robotics Autom. Lett., 7(3):7327–7334,          Roberto Martı́n-Martı́n, Rohan Baijal, Rosario Scalise, Rose
+     2022. 2                                                             Hendrix, Roy Lin, Runjia Qian, Ruohan Zhang, Russell
+[37] Behnam Neyshabur, Hanie Sedghi, and Chiyuan Zhang.                  Mendonca, Rutav Shah, Ryan Hoque, Ryan Julian, Samuel
+     What is being transferred in transfer learning?     In Ad-          Bustamante-Gomez, Sean Kirmani, Sergey Levine, Shan
+     vances in Neural Information Processing Systems 33: An-             Lin, Sherry Moore, Shikhar Bahl, Shivin Dass, Shubham D.
+     nual Conference on Neural Information Processing Systems            Sonawani, Shuran Song, Sichun Xu, Siddhant Haldar, Sid-
+     2020, NeurIPS 2020, December 6-12, 2020, virtual, 2020. 2           dharth Karamcheti, Simeon Adebola, Simon Guist, Soroush
+[38] Abby O’Neill, Abdul Rehman, Abhiram Maddukuri, Ab-                  Nasiriany, Stefan Schaal, Stefan Welker, Stephen Tian, Sub-
+     hishek Gupta, Abhishek Padalkar, Abraham Lee, Acorn                 ramanian Ramamoorthy, Sudeep Dasari, Suneel Belkhale,
+     Pooley, Agrim Gupta, Ajay Mandlekar, Ajinkya Jain, Al-              Sungjae Park, Suraj Nair, Suvir Mirchandani, Takayuki
+     bert Tung, Alex Bewley, Alexander Herzog, Alex Irpan,               Osa, Tanmay Gupta, Tatsuya Harada, Tatsuya Matsushima,
+     Alexander Khazatsky, Anant Rai, Anchit Gupta, Andrew E.             Ted Xiao, Thomas Kollar, Tianhe Yu, Tianli Ding, Todor
+     Wang, Anikait Singh, Animesh Garg, Aniruddha Kemb-                  Davchev, Tony Z. Zhao, Travis Armstrong, Trevor Dar-
+     havi, Annie Xie, Anthony Brohan, Antonin Raffin, Ar-                rell, Trinity Chung, Vidhi Jain, Vincent Vanhoucke, Wei
+     chit Sharma, Arefeh Yavary, Arhan Jain, Ashwin Balakr-              Zhan, Wenxuan Zhou, Wolfram Burgard, Xi Chen, Xiaolong
+     ishna, Ayzaan Wahid, Ben Burgess-Limerick, Beomjoon                 Wang, Xinghao Zhu, Xinyang Geng, Xiyuan Liu, Liangwei
+     Kim, Bernhard Schölkopf, Blake Wulfe, Brian Ichter, Cewu           Xu, Xuanlin Li, Yao Lu, Yecheng Jason Ma, Yejin Kim, Yev-
+     Lu, Charles Xu, Charlotte Le, Chelsea Finn, Chen Wang,              gen Chebotar, Yifan Zhou, Yifeng Zhu, Yilin Wu, Ying Xu,
+     Chenfeng Xu, Cheng Chi, Chenguang Huang, Christine                  Yixuan Wang, Yonatan Bisk, Yoonyoung Cho, Youngwoon
+     Chan, Christopher Agia, Chuer Pan, Chuyuan Fu, Coline               Lee, Yuchen Cui, Yue Cao, Yueh-Hua Wu, Yujin Tang, Yuke
+     Devin, Danfei Xu, Daniel Morton, Danny Driess, Daphne               Zhu, Yunchu Zhang, Yunfan Jiang, Yunshuang Li, Yunzhu
+     Chen, Deepak Pathak, Dhruv Shah, Dieter Büchler, Di-               Li, Yusuke Iwasawa, Yutaka Matsuo, Zehan Ma, Zhuo Xu,
+     nesh Jayaraman, Dmitry Kalashnikov, Dorsa Sadigh, Ed-               Zichen Jeff Cui, Zichen Zhang, and Zipeng Lin. Open x-
+     ward Johns, Ethan Paul Foster, Fangchen Liu, Federico Ce-           embodiment: Robotic learning datasets and RT-X models :
+     ola, Fei Xia, Feiyu Zhao, Freek Stulp, Gaoyue Zhou, Gau-            Open x-embodiment collaboration. In IEEE International
+     rav S. Sukhatme, Gautam Salhotra, Ge Yan, Gilbert Feng,             Conference on Robotics and Automation, ICRA 2024, Yoko-
+     Giulio Schiavi, Glen Berseth, Gregory Kahn, Guanzhi Wang,           hama, Japan, May 13-17, 2024, pages 6892–6903. IEEE,
+     Hao Su, Haoshu Fang, Haochen Shi, Henghui Bao, Heni Ben             2024. 2
+     Amor, Henrik I. Christensen, Hiroki Furuta, Homer Walke,       [39] Delin Qu, Haoming Song, Qizhi Chen, Yuanqi Yao, Xinyi
+     Hongjie Fang, Huy Ha, Igor Mordatch, Ilija Radosavovic,             Ye, Yan Ding, Zhigang Wang, JiaYuan Gu, Bin Zhao,
+     Isabel Leal, Jacky Liang, Jad Abou-Chakra, Jaehyung Kim,            Dong Wang, and Xuelong Li. Spatialvla: Exploring spa-
+     Jaimyn Drake, Jan Peters, Jan Schneider, Jasmine Hsu, Jean-         tial representations for visual-language-action model. CoRR,
+     nette Bohg, Jeffrey T. Bingham, Jeffrey Wu, Jensen Gao,             abs/2501.15830, 2025. 1, 3
+     Jiaheng Hu, Jiajun Wu, Jialin Wu, Jiankai Sun, Jianlan         [40] Mustafa Shukor, Dana Aubakirova, Francesco Capuano,
+     Luo, Jiayuan Gu, Jie Tan, Jihoon Oh, Jimmy Wu, Jing-                Pepijn Kooijmans, Steven Palma, Adil Zouitine, Michel Ar-
+     pei Lu, Jingyun Yang, Jitendra Malik, João Silvério, Joey         actingi, Caroline Pascal, Martino Russi, Andrés Marafioti,
+     Hejna, Jonathan Booher, Jonathan Tompson, Jonathan Yang,            Simon Alibert, Matthieu Cord, Thomas Wolf, and Rémi
+     Jordi Salvador, Joseph J. Lim, Junhyek Han, Kaiyuan Wang,           Cadène. Smolvla: A vision-language-action model for af-
+     Kanishka Rao, Karl Pertsch, Karol Hausman, Keegan Go,               fordable and efficient robotics. CoRR, abs/2506.01844,
+     Keerthana Gopalakrishnan, Ken Goldberg, Kendra Byrne,               2025. 1
+     Kenneth Oslund, Kento Kawaharazuka, Kevin Black, Kevin         [41] George Stoica, Pratik Ramesh, Boglarka Ecsedi, Leshem
+     Lin, Kevin Zhang, Kiana Ehsani, Kiran Lekkala, Kirsty El-           Choshen, and Judy Hoffman. Model merging with SVD to
+
+
+
+
+                                                               22345
+     tie the knots. In The Thirteenth International Conference on             leans, LA, USA, December 10 - 16, 2023, 2023. 1, 2, 4, 6,
+     Learning Representations, ICLR 2025, Singapore, April 24-                7
+     28, 2025. OpenReview.net, 2025. 1, 2, 4, 5, 7                       [52] Kunda Yan, Min Zhang, Sen Cui, Zikun Qu, Bo Jiang,
+[42] Wenju Sun, Qingyong Li, Yangli-ao Geng, and Boyang Li.                   Feng Liu, and Changshui Zhang. CALM: consensus-
+     CAT merging: A training-free approach for resolving con-                 aware localized merging for multi-task learning. CoRR,
+     flicts in model merging. CoRR, abs/2505.06977, 2025. 2                   abs/2506.13406, 2025. 2
+[43] Anke Tang, Li Shen, Yong Luo, Shuai Xie, Han Hu, Lefei              [53] An Yang, Baosong Yang, Beichen Zhang, Binyuan Hui, Bo
+     Zhang, Bo Du, and Dacheng Tao. SMILE: zero-shot sparse                   Zheng, Bowen Yu, Chengyuan Li, Dayiheng Liu, Fei Huang,
+     mixture of low-rank experts construction from pre-trained                Haoran Wei, Huan Lin, Jian Yang, Jianhong Tu, Jianwei
+     foundation models. CoRR, abs/2408.10174, 2024. 2, 5                      Zhang, Jianxin Yang, Jiaxi Yang, Jingren Zhou, Junyang Lin,
+[44] Stone Tao, Fanbo Xiang, Arth Shukla, Yuzhe Qin, Xander                   Kai Dang, Keming Lu, Keqin Bao, Kexin Yang, Le Yu, Mei
+     Hinrichsen, Xiaodi Yuan, Chen Bao, Xinsong Lin, Yulin Liu,               Li, Mingfeng Xue, Pei Zhang, Qin Zhu, Rui Men, Runji
+     Tse-kai Chan, Yuan Gao, Xuanlin Li, Tongzhou Mu, Nan                     Lin, Tianhao Li, Tianyi Tang, Tingyu Xia, Xingzhang Ren,
+     Xiao, Arnav Gurha, Zhiao Huang, Roberto Calandra, Rui                    Xuancheng Ren, Yang Fan, Yang Su, Yichang Zhang, Yu
+     Chen, Shan Luo, and Hao Su. Maniskill3: GPU parallelized                 Wan, Yuqiong Liu, Zeyu Cui, Zhenru Zhang, and Zihan Qiu.
+     robotics simulation and rendering for generalizable embod-               Qwen2.5 technical report, 2025. 2
+     ied AI. CoRR, abs/2410.00425, 2024. 2                               [54] Enneng Yang, Li Shen, Guibing Guo, Xingwei Wang, Xi-
+[45] Homer Rich Walke, Kevin Black, Tony Z. Zhao, Quan                        aochun Cao, Jie Zhang, and Dacheng Tao. Model merging
+     Vuong, Chongyi Zheng, Philippe Hansen-Estruch, An-                       in llms, mllms, and beyond: Methods, theories, applications
+     dre Wang He, Vivek Myers, Moo Jin Kim, Max Du, Abra-                     and opportunities. CoRR, abs/2408.07666, 2024. 2
+     ham Lee, Kuan Fang, Chelsea Finn, and Sergey Levine.                [55] Huitong Yang, Zhuoxiao Chen, Fengyi Zhang, Zi Huang,
+     Bridgedata V2: A dataset for robot learning at scale. In Con-            and Yadan Luo. Codemerge: Codebook-guided model merg-
+     ference on Robot Learning, CoRL 2023, 6-9 November 2023,                 ing for robust test-time adaptation in autonomous driving. In
+     Atlanta, GA, USA, pages 1723–1736. PMLR, 2023. 2                         The Thirty-ninth Annual Conference on Neural Information
+[46] Ke Wang, Nikolaos Dimitriadis, Guillermo Ortiz-Jiménez,                 Processing Systems, 2025. 2
+     François Fleuret, and Pascal Frossard. Localizing task in-         [56] Jianwei Yang, Reuben Tan, Qianhui Wu, Ruijie Zheng,
+     formation for improved model merging and compression. In                 Baolin Peng, Yongyuan Liang, Yu Gu, Mu Cai, Seonghyeon
+     Forty-first International Conference on Machine Learning,                Ye, Joel Jang, Yuquan Deng, and Jianfeng Gao. Magma: A
+     ICML 2024, Vienna, Austria, July 21-27, 2024. OpenRe-                    foundation model for multimodal AI agents. In IEEE/CVF
+     view.net, 2024. 2, 4                                                     Conference on Computer Vision and Pattern Recognition,
+[47] Yihao Wang, Pengxiang Ding, Lingxiao Li, Can Cui, Zirui                  CVPR 2025, Nashville, TN, USA, June 11-15, 2025, pages
+     Ge, Xinyang Tong, Wenxuan Song, Han Zhao, Wei Zhao,                      14203–14214. Computer Vision Foundation / IEEE, 2025.
+     Pengxu Hou, Siteng Huang, Yifan Tang, Wenhui Wang,                       1, 3
+     Ru Zhang, Jianyi Liu, and Donglin Wang. Vla-adapter:                [57] Ruihan Yang, Qinxi Yu, Yecheng Wu, Rui Yan, Borui Li,
+     An effective paradigm for tiny-scale vision-language-action              An-Chieh Cheng, Xueyan Zou, Yunhao Fang, Xuxin Cheng,
+     model. CoRR, abs/2509.09372, 2025. 2, 3, 4, 6, 7                         Ri-Zhao Qiu, Hongxu Yin, Sifei Liu, Song Han, Yao Lu, and
+[48] Zixin Wang, Yadan Luo, Liang Zheng, Zhuoxiao Chen, Sen                   Xiaolong Wang. Egovla: Learning vision-language-action
+     Wang, and Zi Huang. In search of lost online test-time adap-             models from egocentric human videos, 2025. 2
+     tation: A survey. Int. J. Comput. Vis., 133(3):1106–1139,           [58] Zongzhen Yang, Binhang Qi, Hailong Sun, Wenrui Long,
+     2025. 2                                                                  Ruobing Zhao, and Xiang Gao. CABS: conflict-aware and
+[49] Junjie Wen, Yichen Zhu, Jinming Li, Minjie Zhu, Kun Wu,                  balanced sparsification for enhancing model merging. CoRR,
+     Zhiyuan Xu, Ning Liu, Ran Cheng, Chaomin Shen, Yaxin                     abs/2503.01874, 2025. 2
+     Peng, Feifei Feng, and Jian Tang. Tinyvla: Towards fast,            [59] Le Yu, Bowen Yu, Haiyang Yu, Fei Huang, and Yongbin
+     data-efficient vision-language-action models for robotic ma-             Li. Language models are super mario: Absorbing abilities
+     nipulation. CoRR, abs/2409.12514, 2024. 1, 3                             from homologous models as a free lunch. In Forty-first In-
+[50] Mitchell Wortsman, Gabriel Ilharco, Samir Ya Gadre, Re-                  ternational Conference on Machine Learning, ICML 2024,
+     becca Roelofs, Raphael Gontijo-Lopes, Ari S Morcos,                      Vienna, Austria, July 21-27, 2024. OpenReview.net, 2024. 1,
+     Hongseok Namkoong, Ali Farhadi, Yair Carmon, Simon Ko-                   2
+     rnblith, et al. Model soups: averaging weights of multiple          [60] Fanhu Zeng, Haiyang Guo, Fei Zhu, Li Shen, and Hao Tang.
+     fine-tuned models improves accuracy without increasing in-               Robustmerge: Parameter-efficient model merging for mllms
+     ference time. In International conference on machine learn-              with direction robustness, 2025. 2
+     ing, pages 23965–23998. PMLR, 2022. 2                               [61] Jinghan Zhang, Shiqi Chen, Junteng Liu, and Junxian He.
+[51] Prateek Yadav, Derek Tam, Leshem Choshen, Colin A. Raf-                  Composing parameter-efficient modules with arithmetic op-
+     fel, and Mohit Bansal. Ties-merging: Resolving interference              erations. CoRR, abs/2306.14870, 2023. 1, 2
+     when merging models. In Advances in Neural Information              [62] Jianke Zhang, Yanjiang Guo, Xiaoyu Chen, Yen-Jen Wang,
+     Processing Systems 36: Annual Conference on Neural Infor-                Yucheng Hu, Chengming Shi, and Jianyu Chen. Hirt: En-
+     mation Processing Systems 2023, NeurIPS 2023, New Or-                    hancing robotic control with hierarchical robot transformers.
+
+
+
+
+                                                                 22346
+     In Conference on Robot Learning, 6-9 November 2024, Mu-
+     nich, Germany, pages 933–946. PMLR, 2024. 2
+[63] Zhizhen Zhang, Lei Zhu, Zhen Fang, Zi Huang, and Yadan
+     Luo. Provable ordering and continuity in vision-language
+     pretraining for generalizable embodied agents, 2025. 2
+[64] Zecheng Zhao, Zhi Chen, Zi Huang, Shazia Sadiq, and Tong
+     Chen. Generative recall, dense reranking: Learning multi-
+     view semantic ids for efficient text-to-video retrieval. CoRR,
+     abs/2601.21193, 2026. 2
+[65] Shenghe Zheng, Hongzhi Wang, Chenyu Huang, Xiaohui
+     Wang, Tao Chen, Jiayuan Fan, Shuyue Hu, and Peng Ye.
+     Decouple and orthogonalize: A data-free framework for lora
+     merging. CoRR, abs/2505.15875, 2025. 2
+[66] Brianna Zitkovich, Tianhe Yu, Sichun Xu, Peng Xu, Ted
+     Xiao, Fei Xia, Jialin Wu, Paul Wohlhart, Stefan Welker,
+     Ayzaan Wahid, Quan Vuong, Vincent Vanhoucke, Huong T.
+     Tran, Radu Soricut, Anikait Singh, Jaspiar Singh, Pierre
+     Sermanet, Pannag R. Sanketi, Grecia Salazar, Michael S.
+     Ryoo, Krista Reymann, Kanishka Rao, Karl Pertsch, Igor
+     Mordatch, Henryk Michalewski, Yao Lu, Sergey Levine,
+     Lisa Lee, Tsang-Wei Edward Lee, Isabel Leal, Yuheng
+     Kuang, Dmitry Kalashnikov, Ryan Julian, Nikhil J. Joshi,
+     Alex Irpan, Brian Ichter, Jasmine Hsu, Alexander Herzog,
+     Karol Hausman, Keerthana Gopalakrishnan, Chuyuan Fu,
+     Pete Florence, Chelsea Finn, Kumar Avinava Dubey, Danny
+     Driess, Tianli Ding, Krzysztof Marcin Choromanski, Xi
+     Chen, Yevgen Chebotar, Justice Carbajal, Noah Brown, An-
+     thony Brohan, Montserrat Gonzalez Arenas, and Kehang
+     Han. RT-2: vision-language-action models transfer web
+     knowledge to robotic control. In Conference on Robot
+     Learning, CoRL 2023, 6-9 November 2023, Atlanta, GA,
+     USA, pages 2165–2183. PMLR, 2023. 1, 2
+
+
+
+
+                                                                  22347
+

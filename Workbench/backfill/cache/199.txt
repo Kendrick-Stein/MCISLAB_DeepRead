@@ -1,0 +1,743 @@
+                                                        VLM-Guided Group Preference Alignment for Diffusion-based
+                                                                       Human Mesh Recovery
+
+                                                        Wenhao Shen1 Hao Wang2† Wanqi Yin3 Fayao Liu4 Xulei Yang4
+                                                                   Chao Liang1 Zhongang Cai3 Guosheng Lin1†
+                                                1
+                                                  Nanyang Technological University 2 HKUST(GZ) 3 SenseTime Research 4 A*STAR
+
+
+
+
+arXiv:2602.19180v1 [cs.CV] 22 Feb 2026
+                                                                       Abstract                                           Rule Memory
+                                                                                                                          - No self-penetration
+                                                                                                                          - Valid limb length
+                                                                                                                          - Consistent depth
+                                         Human mesh recovery (HMR) from a single RGB image is                 Prototype
+                                                                                                              Memory
+                                         inherently ambiguous, as multiple 3D poses can correspond                                                Score: 35           Score: 89     Score: 40
+                                                                                                                                                  - “unnatural pose”; - “high       - “feet penetration”
+                                         to the same 2D observation. Recent diffusion-based meth-                                                 - “wrong physical plausibility”   - “wrong physical
+                                                                                                                                                    contact”                           contact”
+                                         ods tackle this by generating various hypotheses, but often                                                            Group Preference
+                                                                                                                                                                  Alignment for
+                                         sacrifice accuracy. They yield predictions that are either                                                                   HMR
+                                         physically implausible or drift from the input image, espe-
+                                                                                                                Diffusion-based                                       Finetuned
+                                         cially under occlusion or in cluttered, in-the-wild scenes.             HMR Model                                           HMR Model
+                                         To address this, we introduce a dual-memory augmented
+                                         HMR critique agent with self-reflection to produce context-
+                                         aware quality scores for predicted meshes. These scores
+                                         distill fine-grained cues about 3D human motion structure,
+                                         physical feasibility, and alignment with the input image.
+                                                                                                          Figure 1. We introduce a VLM-guided HMR critique agent
+                                         We use these scores to build a group-wise HMR preference         equipped with a dual-memory mechanism that delivers stable and
+                                         dataset. Leveraging this dataset, we propose a group pref-       semantically grounded assessments for groups of estimated 3D
+                                         erence alignment framework for finetuning diffusion-based        meshes. Building on these group-wise signals, our group pref-
+                                         HMR models. This process injects the rich preference sig-        erence alignment framework steers diffusion-based HMR models
+                                         nals into the model, guiding it to generate more physically      towards more coherent and reliable mesh generation.
+                                         plausible and image-consistent human meshes. Extensive
+                                         experiments demonstrate that our method achieves superior        ods [16, 28, 47, 50, 61] model this uncertainty via multiple
+                                         performance compared to state-of-the-art approaches.             predictions but often sacrifice accuracy for diversity.
+                                                                                                              It is observed that diffusion-based HMR methods [17,
+                                                                                                          61] often produce 3D meshes inconsistent with the 2D in-
+                                         1. Introduction                                                  put, due to the lack of explicit 3D joint re-projection con-
+                                                                                                          straints. ADHMR [50] addresses this with Direct Prefer-
+                                         This paper aims to tackle the challenge of monocular human
+                                                                                                          ence Optimization (DPO), using a scorer to rank predic-
+                                         mesh recovery (HMR), which involves estimating both hu-
+                                                                                                          tion quality. However, the image-driven scorer can be mis-
+                                         man pose and shape from a single RGB image. Accurate
+                                                                                                          led, favoring silhouette-aligned but physically implausible
+                                         3D human perception is crucial for understanding activities
+                                                                                                          poses. In challenging scenarios, such as occlusion or in-
+                                         and enabling applications such as VR, robotics, and gam-
+                                                                                                          correct contacts (e.g., floating feet, self-penetration), DPO
+                                         ing. However, this task is inherently ill-posed, as lifting 2D
+                                                                                                          often provides unreliable guidance. This is because DPO
+                                         observations to 3D motion is highly ambiguous.
+                                                                                                          relies only on pairwise comparisons and ignores the quality
+                                            Specifically, optimization-based methods [6, 23, 41] it-
+                                                                                                          relationships among multiple predictions.
+                                         eratively refine human pose and shape from 2D cues, while
+                                                                                                              In this work, we propose a comprehensive framework
+                                         regression-based approaches [18, 40, 45, 59] directly pre-
+                                                                                                          that utilizes a Visual Language Model (VLM)-based cri-
+                                         dict a single mesh per image. Both struggle with the
+                                                                                                          tique agent to improve the performance of the diffusion-
+                                         ambiguity of lifting 2D to 3D, especially under occlu-
+                                                                                                          based HMR model, as illustrated in Fig. 1. We observe
+                                         sion or depth uncertainty. In contrast, probabilistic meth-
+                                                                                                          that large VLMs already encode strong priors about human
+                                            † Corresponding authors.                                      pose semantics, contact relations, and spatial consistency,
+enabling them to assess the physical and geometric plausi-         2. Related Work
+bility of 3D reconstructions from a single image. However,
+because of the criteria drift and subjective biases [30, 48],      Human Mesh Recovery from a Single Image. Cur-
+their raw judgments often lead to inconsistent or incompara-       rent HMR methods can be broadly divided into determin-
+ble scores between prediction samples. To address this, we         istic and probabilistic paradigms. Deterministic methods
+introduce a dual-memory augmented critique agent that can          produce a single estimate for each input image. Early
+actively retrieve and reflect. In the exploration phase, it per-   optimization-based approaches [6, 23, 29, 41] are time-
+forms self-reflection to mine new judging rules and typical        consuming and often trapped in local minima due to poor
+prediction prototypes, thereby refining its reasoning. Dur-        initialization. More recent works [13, 18, 24, 31, 40, 45, 59]
+ing the evaluation phase, memory updates are disabled. The         leverage deep neural networks to directly regress human
+critique agent automatically retrieves relevant judging rules      model parameters, achieving strong performance yet still
+and prototype examples from its memory to ground each              failing to address inherent depth and occlusion ambiguities
+evaluation, yielding stable and semantically aligned assess-       in monocular settings. To tackle these ambiguities, proba-
+ments under occlusion or complex scene contexts.                   bilistic methods [3, 15, 28, 50, 61] aim to generate multi-
+                                                                   ple predictions or model full posterior distributions. Score-
+    Then, we aim to transfer the rich knowledge embed-
+                                                                   Hypo [61] introduces a diffusion-based generator to pro-
+ded in the critique agent to the human mesh estimator. In-
+                                                                   duce diverse hypotheses and relies on an auxiliary selector
+spired by the success of Group Relative Policy Optimiza-
+                                                                   network to choose the best estimate. ADHMR [50] uses
+tion (GRPO) [19, 49] in aligning large language models, we
+                                                                   Diffusion-DPO to align diffusion sampling with a learned
+adapt its group-wise preference learning to diffusion-based
+                                                                   HMR-Scorer. However, its 2D-based scorer is easily mis-
+HMR. However, applying GRPO to diffusion is challeng-
+                                                                   led by occlusions and cluttered backgrounds. MEGA [16]
+ing because GRPO relies on stochastic rollouts, whereas
+                                                                   explores stochastic generation through iterative token un-
+diffusion models typically rely on deterministic ODE sam-
+                                                                   masking but remains limited by the expressiveness of its
+plers for better efficiency and quality [38, 51]. Prior at-
+                                                                   vector-quantized mesh codebook. In contrast, we extend
+tempts [36, 62] introduce stochasticity via SDE sampling
+                                                                   GRPO to diffusion in an offline setting, using group-wise
+but require training along the entire diffusion trajectory, in-
+                                                                   advantages to refine sampling and enhance fidelity.
+creasing computation cost and reducing output fidelity.
+                                                                   Preference Learning for Diffusion Models. LLM align-
+    We keep the efficiency of ODE-based diffusion and fo-          ment commonly uses Reinforcement Learning from Human
+cus on the key benefit of GRPO, which is learning from             Feedback (RLHF) [10], but it suffers from high cost and in-
+group-level preference signals. Specifically, for each im-         stability. While Direct Preference Optimization (DPO) [44]
+age, we generate several mesh hypotheses, score them with          is simpler, it is often weaker. Recently, Group Relative
+the critique agent, and convert these scores into advantages       Policy Optimization (GRPO) [19, 49] has emerged as a
+that capture their relative quality. Using these advantages,       more stable and powerful framework, markedly improv-
+we formulate a simple and ODE-compatible group prefer-             ing LLM reasoning. Inspired by this success, recent stud-
+ence loss that transfers the critique agent’s judgment with-       ies have begun exploring aligning diffusion models. Early
+out requiring trajectory-level reinforcement. We find that         works [4, 11, 14, 60] follow the RLHF paradigm, while
+this group-wise, advantage-weighted alignment enables the          later efforts adapt DPO to diffusion [32, 34, 56, 63]. Only
+model to discern and refine subtle pose details, producing         a few attempts explore GRPO for diffusion, hindered by
+more semantically consistent results. Crucially, because our       the mismatch between GRPO’s stochastic exploration and
+method relies on relative preference signals from the cri-         the deterministic nature of ODE-based diffusion sampling.
+tique model, it remains effective even when finetuned on           Recent works [36, 62] address this via SDE sampling, but
+in-the-wild datasets with unreliable 3D annotations.               at the cost of higher computation and slower convergence.
+    To summarize, our main contributions are:                      Our method extends GRPO to diffusion in an offline set-
+• We propose a dual-memory augmented, self-reflective              ting, retaining both the stability of group optimization and
+   HMR critique agent to ensure consistent, semantically           the efficiency of standard diffusion models.
+   grounded scoring for human mesh predictions.                    LLM as a Scorer. LLMs are increasingly used as scal-
+• We propose a group preference alignment framework for            able alternatives to expert judgment. Existing approaches
+   diffusion-based HMR models that operates without 3D             include fine-tuned judges [21, 26, 58, 69], prompted
+   ground truth. This design enables effective finetuning on       judges [12, 33, 42], and multi-agent judges [8, 54, 66].
+   noisy in-the-wild datasets and leads to more plausible and      Fine-tuned models offer strong accuracy but often fail to
+   better 2D-aligned human mesh predictions.                       generalize, prompted methods depend heavily on prompt
+• Extensive experiments show that this framework can ef-           design, and multi-agent pipelines are computationally ex-
+   fectively improve diffusion-based HMR models on chal-           pensive. We introduce the first VLM-enhanced scoring
+   lenging in-the-wild datasets.                                   agent for HMR, equipped with dual memory and self-
+         Prediction Group                         Memory-augmented prompt                                                                 Group Preference Alignment
+                                                                                                                                              for HMR Diffusion
+                                                          Retrieved Prototypes                                      VLM
+                     …
+                                                             Retrieved Rules
+                                                                                                                                            95        48           …   25
+                                Memory                                                          Reflective Knowledge                             Scored Prediction Group
+                                Retrieval                                                           Construction
+
+   Diffusion-based
+                                                    Dual-Memory Mechanism                                                                          Group Computation
+    HMR Model
+                              Prototype Memory                                              Rule Memory
+                         1.    Score: 87;                                1. Rule: If feet exhibit minor lift or lack solid grounding,
+                                                                            deduct 3-5 points.                                             Advantages: 𝐴1     𝐴2       …    𝐴𝐺
+                               Rational: Good overall pose with slight
+                               hand drift …                                 Tags: ["grounding"]
+                               Tags: ["hand drift", …]
+                                                                         2. Rule: If visible self-penetration occurs, deduct 5-
+                         2.    Score: 45;                                    10 points from the score, with greater deduction
+                               Rationale: noticeable arm–thigh               for cumulative errors.                                                  Diffusion-based
+                               penetration …
+                               Tags: ["penetration", …]                      Tags: [”penetration"], [”physical plausibility"]                         HMR Model
+                                         ……                                                         ……
+
+
+Figure 2. Overview of our framework. Our purpose is to refine a diffusion-based HMR model that generates a group of human mesh
+predictions per input image. We propose a VLM-enhanced HMR critique agent that assigns a score for each human mesh prediction.
+This critique agent is equipped with a dual-memory mechanism to give stable assessments. Then, we use this critique agent to build a
+group-wise HMR preference dataset without the need for manual labeling. Finally, we employ this preference dataset to finetune the base
+model to preferentially generate predictions that are physically plausible and better aligned with the image cues.
+
+reflection to retrieve judging rules and visual prototypes,                                  Human Feedback (RLHF) to a group-wise formulation,
+enabling consistent and semantically grounded evaluation                                     providing more stable policy updates while removing the
+without finetuning.                                                                          need for a separate value model. For each condition c, a
+                                                                                             set of G samples {xi0 }G  i=1 is generated from the old policy
+3. Method                                                                                    pθold (·|c). Formally, GRPO updates the policy parameters
+                                                                                             θ by maximizing the advantage-weighted likelihood ratio
+3.1. Preliminaries                                                                           (we omit the clip term and KL term hereinafter for brevity):
+Diffusion Models. Diffusion models [20, 52] define a                                                                     " G                  #
+forward process that progressively adds Gaussian noise                                                                    X pθ (xi |c)
+                                                                                                                                   0        i
+to clean data x over T timesteps. In our setting, x                                                       max Ec, {xi0 }                A(x0 ) ,        (3)
+                                                                                                           θ                  p (xi |c)
+                                                                                                                          i=1 ref 0
+represents the joint swing and twist parameters follow-
+ing [31, 61], which are later converted into SMPL [37] pose                                  where the advantage term is computed using a group of re-
+parameters.
+   √           The forward
+                             process follows q(xt |xt−1 ) =                                 wards {ri }G
+                                                                                                        i=1 corresponding to samples within the group:
+N 1 − βt xt−1√     , βt I , where
+                             √ the noisy sample can be ex-
+pressed as xt = ᾱt x0 + 1 − ᾱt ϵ, with ϵ ∼ N (0, I). The                                                                   ri − mean({r1 , r2 , . . . , rG })
+                                                                                                                  Ai =                                          .                (4)
+reverse process is modeled as                                                                                                    std({r1 , r2 , . . . , rG })
+
+          pθ (xt−1 |xt ) = N xt−1 ; µθ (xt , t), σt2 I ,                                     3.2. Overview
+                                                      
+                                                          (1)
+                                                                                             An overview of our proposed framework is presented in
+where βt , αt and σt are the noise schedules, µθ is computed
+                                                                                             Fig. 2. Given an input image I, we aim to predict the human
+from the noise prediction model ϵθ . The model is trained by
+                                                                                             pose parameters θ ∈ R24×3 and shape parameters β ∈ R10
+minimizing a denoising loss:
+                                                                                             of the SMPL model [41]. Following [61], we formulate
+           LDM = Et,x0 ,ϵ λt ∥ϵ − ϵθ (xt , t)∥22 ,                                           this problem using a reverse diffusion process conditioned
+                                               
+                                                         (2)
+                                                                                             on the input image features c to tackle the inherent recon-
+where λt is a timestep weighting function.            In the                                 struction ambiguity. We first propose a VLM-guided cri-
+continuous-time view [52], the diffusion process is modeled                                  tique agent to assess the quality of human mesh predictions
+as a stochastic differential equation (SDE), and its reverse-                                given an input image in Sec. 3.3. Next, we construct a syn-
+time SDE governs denoising. Removing the stochastic                                          thetic group-wise HMR preference dataset (Sec. 3.4). Can-
+term yields a deterministic probability-flow ODE, which                                      didate human mesh predictions are generated by the refer-
+DDIM [51] leverages for faster, consistent sampling with                                     ence model ϵref and then grouped based on scores provided
+the same trained model.                                                                      by the critique agent. To distill knowledge from this syn-
+Group Relative Policy Optimization (GRPO).                                                   thetic preference dataset, we propose a group-wise prefer-
+GRPO [49] extends Reinforcement Learning from                                                ence optimization framework that finetunes an HMR diffu-
+sion model ϵθ to preferentially generate preferred human           which balances the exploitation of high-success-rate rules
+mesh predictions (Sec. 3.5), and ϵθ is initialized from ϵref .     and the exploration of rarely used rules. Here, ρi = Nis /Niu
+                                                                   is the historical success  rate, C is an exploration constant,
+3.3. VLM-Guided HMR Critique Agent                                 and Ntotal = 1 + i Niu is the total number of rule appli-
+                                                                                      P
+
+To automate the nuanced task of evaluating HMR predic-             cations. (3) Finally, a context-rich prompt is dynamically
+tions, we introduce a VLM-guided HMR critique agent                constructed, including the retrieved rules and prototype ra-
+CVLM . Unlike traditional regressors that predict a score from     tionales. This prompt is fed to the VLM, which generates
+2D joint data [50], our agent emulates expert human judg-          the final score s and critique c.
+ment by working directly from rendered images. Formally,           3.3.2. Reflective Knowledge Construction
+given an RGB image I and n human mesh prediction over-
+                                                                   We observe that while VLMs possess an inherent ability
+lays {Iˆj }nj=1 rendered on I, the agent outputs per-overlay
+                                                                   to judge 3D human mesh quality, direct prompting often
+scores sj ∈ [0, 100] and one-sentence critiques cj .
+                                                                   yields unstable and inconsistent results. To this end, we
+   The agent’s architecture combines a VLM scoring en-
+                                                                   allow the agent to build and refine domain-specific human
+gine with a dual-memory mechanism and a self-reflective
+                                                                   pose estimation knowledge by itself in the exploration phase
+knowledge construction loop. It operates in two phases:
+                                                                   to stabilize its scoring capability.
+an exploration phase to learn and build its memory, and an
+                                                                       The exploration phase is an iterative process where
+evaluation phase where this frozen knowledge is applied for
+                                                                   the agent’s primary goal is to populate its dual-memory
+consistent, robust scoring.
+                                                                   by learning from ground-truth (GT) data: (1) The agent
+3.3.1. Dual-Memory Mechanism                                       first performs the memory-augmented scoring process on
+The foundation of the agent is a VLM scoring engine                a batch of data, which increments the use count Niu for
+guided by a dual-memory augmentation design. This de-              every rule applied. (2) After scoring, it performs proto-
+sign provides a lightweight yet interpretable prior that can       type memory write-back, saving salient examples back into
+be queried and expanded over time. Specifically, we use            MP . (3) The agent then performs an update for existing
+two different types of memory:                                     rules. It compares its score ranking against GT metrics via
+• Rule Memory: MR = {(ti , Ti , Niu , Nis )}R    i=1 , where ti
+                                                                   Spearman rank correlation. If the correlation is higher than
+   is the assessment rule text, Ti is a set of semantic tags,      a threshold τ , the applied rules are deemed effective, and
+   Niu is a use count (tracking how often the rule has been        their corresponding success count Nis is incremented, re-
+   applied), and Nis is a success count (tracking how often        inforcing their efficacy. (4) The core learning step is new
+   its application led to a ground-truth-aligned score).           rules mining via reflection. The agent instructs the VLM
+• Prototype Memory: MP , stores previously judged hy-              to inspect the discrepancy between its own output and the
+   pothesis images as precedents. MP = {(vi , ri , Ti )}P  i=1 ,
+                                                                   GT metrics and then propose 1-2 new, testable rules. These
+   where vi is a visual embedding of the SMPL prediction           auto-mined rules are added to MR as new entries.
+   overlay image using CLIP [43], and ri is the textual ratio-         In the evaluation phase, the agent’s learning loop and
+   nale (including assigned score) for its assessment. Ti is a     memory are frozen. It exclusively performs the memory-
+   set of semantic tags.                                           augmented scoring to generate consistent, final evaluations
+Dual-memory augmented scoring. The dual-memory                     on unseen data.
+augmented scoring process is the agent’s core action, uti-         3.4. HMR Group Preference Dataset
+lized in both the exploration and evaluation phases. It con-
+sists of three steps: (1) The agent queries prototype memory       To effectively train our mesh prediction policy using GRPO,
+MP to retrieve the top-K most visually similar past exam-          we must first construct a dataset that provides richer super-
+ples by maximizing cosine similarity with the query image          vision than standard pairwise preferences. However, manu-
+embedding vq . (2) The agent queries MR using a hybrid             ally annotating G complex 3D meshes is prohibitively slow,
+score Ψj to select the most effective rules. This score com-       expensive, and subject to high inter-annotator variance. We
+bines semantic relevance (R) with UCB exploration (U):             overcome this bottleneck by leveraging our critique agent
+                                                                   CVLM as a high-fidelity, automated annotator.
+                   Ψi = R(Tq , Ti ) + Ui .                  (5)        The dataset construction process follows two main
+                                                                   stages: (1) Group generation: For each image I in our
+The Relevance Score, R(Tq , Ti ) = |Tq ∩ Ti |, rewards rules       training corpus, we first require a diverse set of G human
+matching the query tags Tq from retrieved prototypes. The          mesh predictions, {mi }G  i=1 . This set spans a wide range of
+Upper Confidence Bound (UCB) [2] score is:                         qualities, from common failure modes to high-quality align-
+                             s                                     ments. We generate this group by sampling our frozen, pre-
+                                 log Ntotal                        trained diffusion-based HMR model, ϵref for G times, con-
+               Ui = ρi + C                  ,            (6)
+                                  Niu + 1                          ditioned on I but initiated with different initial noises. (2)
+Group-wise scoring: We employ our critique agent CVLM              and express the log-ratio through the corresponding diffu-
+to score the entire group of G predictions simultaneously          sion paths xi0:T :
+to obtain consistent relative quality judgments within one
+group. The model is prompted with the image I and the                           pθ (mi | c)                      pθ (xi0:T )
+                                                                         log                 ≈ E   i     i
+                                                                                                q(x1:T |m ) log               ,    (10)
+complete set of mesh predictions {mi }G    i=1 (visualized as                  pref (mi | c)                    pref (xi0:T )
+2D overlays) to get a set of scalar quality scores {si }G
+                                                        i=1 :
+                                                                   where we approximate the intractable posterior over paths
+          {s1 , . . . , sG } = CVLM (I, m1 , . . . , mG ).   (7)   with the forward noising process q(xi1:T | mi ). Under the
+                                                                   standard Gaussian parameterization of the reverse diffusion
+By applying the scoring to all generated groups, we                process (Eq. (1)), pθ is induced by the noise predictor ϵθ ,
+obtain our final, fully annotated group-wise preference            and the log-likelihood ratio admits the following diffusion
+dataset, GHMR . Each entry in this dataset is a tuple              surrogate (we omit c for brevity hereinafter):
+containing the input image, the group of predictions,
+ their1 corresponding
+and                           VLM-assigned     scores GHMR =          pθ (mi | c)                   h
+                                                                                                        ref    i         θ     i
+                                                                                                                                     i
+  I, (m , s1 ), (m2 , s2 ), . . . , (mG , sG ) . This collection   log              ≈    T  λ t Et,ϵ   LDM  (x t , ϵ) − LDM (x t , ϵ)  ,
+                                                                      pref (mi | c)
+provides the dense preference signals {si } required to train                                                                      (11)
+our GRPO refinement policy.                                        where t ∼ U ({1, . . . , T }), ϵ ∼ N (0, I), λt is a timestep
+                                                                   weighting function, xit is obtained by diffusing mi , and
+3.5. Group Preference Alignment for HMR
+                                                                                                                         2
+Once we obtain the group-wise preference dataset GHMR                                   LθDM (xit , ϵ) = ϵθ (xit , t) − ϵ 2        (12)
+that encodes rich quality cues for HMR, we seek to instill
+this rich preference information into our diffusion model.         is the standard diffusion noise prediction loss (with an anal-
+While pairwise methods like Diffusion-DPO [50, 56] ex-             ogous definition for Lref
+                                                                                           DM ). Plugging this surrogate into (9)
+ist, probabilistic HMR models inherently generate multiple         yields our final training objective:
+hypotheses to address the one-to-many mapping ambigu-
+                                                                               L(θ) = Em∼GHMR ,t∼U (1,T ),ϵ∼N (0,I)
+ity. This multi-hypothesis approach necessitates a learn-
+                                                                                G h
+ing signal that is more stable and comprehensive than com-                     X                                          i        (13)
+parisons between isolated pairs. To this end, we introduce               βT λt      A(mi ) (LθDM (xit , ϵ)−Lref
+                                                                                                            DM t(x i
+                                                                                                                     , ϵ))  ,
+group preference alignment for HMR diffusion models. Our                          i=1
+
+objective is to optimize a diffusion-based HMR estimator           where the hyperparameter β controls regularization.
+ϵθ , initialized from a reference denoiser ϵref , such that it        Intuitively, meshes with higher critique scores (positive
+learns from the static group-wise HMR preference data and          advantages) are encouraged to achieve a smaller denoising
+produces human mesh predictions that are more physically           loss than the reference model, while lower-scored meshes
+plausible and better aligned with image evidence.                  are pushed in the opposite direction, aligning the HMR dif-
+    Concretely, given the human mesh group preference              fusion model with the group-wise preference signal.
+dataset GHMR and the image condition c, we follow GRPO
+(Eq. (4)) to compute the relative prediction quality advan-        4. Experiments
+tage A(·) using their quality scores s1 , . . . , sG :
+                                                                   4.1. Experimental Setup
+                      si − mean({si }G   i=1 )
+                 Ai =                          .             (8)   Datasets. In the exploration phase, our critique agent
+                          std({si }G
+                                   i=1 )
+                                                                   samples images from five datasets: HI4D [64], BED-
+Building on the GRPO objective in Eq. (3), which max-              LAM [5], DNA-Rendering [9], GTA-Human II [7], and
+imizes advantage-weighted likelihood ratios within each            SPEC [27]. These studio-based or synthetic datasets pro-
+group, we treat the diffusion sampler as a conditional policy      vide accurate 3D ground-truth annotations across diverse
+pθ (m | c) parameterized by the noise predictor ϵθ . Inspired      scenes, offering reliable quality signals for building the
+by [44, 56], we then instantiate the group-wise update rule        agent’s knowledge. For the evaluation of the agent, we fol-
+as an advantage-weighted log-likelihood ratio between the          low ADHMR [50] to construct our test sets. This involves
+trainable policy pθ and the frozen reference policy pref :         using data from the DNA-Rendering [9] and GTA-Human
+                       " G                            #            II [7] test splits. For our reference diffusion model, we
+                        X
+                                 i       pθ (mi | c)               adopt the architecture from [50, 61] and train it on standard
+   L(θ) = −Ec, {mi }        A(m ) log                   . (9)      HMR datasets: Human3.6M [22], 3DPW [55], MPI-INF-
+                        i=1
+                                        pref (mi | c)
+                                                                   3DHP [39], MPII [1], COCO [35], and UP-3D [29].
+   To specialize this objective to diffusion-based HMR, we         Metrics. We evaluate human mesh recovery using four
+follow the reparameterization used in Diffusion-DPO [56]           standard metrics: PVE for mesh surface accuracy, MPJPE
+                                                                  3DPW [55]                        Human3.6M [22]
+                           Methods                M
+                                                        PVE ↓    MPJPE ↓   PA-MPJPE ↓      PVE ↓   MPJPE ↓    PA-MPJPE ↓
+                           HMR [24]                -    152.7     130.0          81.3      96.1      88.0           56.8
+                           HybrIK [31]             -    86.5      74.1           45.0      65.7      54.4           34.5
+
+
+
+           Deterministic
+                           PyMaf [67]              -    110.1     92.8           58.9       -        57.7           40.5
+                           HMR 2.0 [18]            -      -       70.0           44.5       -        44.8           33.6
+                           POTTER [68]             -    87.4      75.0           44.8       -        56.5           35.1
+                           Zolly [57]              -    76.3      65.0           39.8       -        49.4           32.3
+                           ScoreHMR [53]           -      -       76.8           51.1       -         -              -
+                           CameraHMR [40]          -    65.9      56.0           35.1       -         -              -
+                           PromptHMR [59]          -    69.4      58.7           36.6       -         -              -
+                           3D Multibodies [3]      25    -        75.8           55.6       -        58.2           42.2
+                           ProHMR [28]             25    -         -             52.4       -         -             36.8
+                           Sengupta et al. [46]    25    -        75.1           47.0       -         -              -
+                           HMDiff [17]             25   82.4      72.7           44.5       -        49.3           32.4
+                           HuManiFlow [47]        100    -        65.1           39.9       -         -              -
+                                                   10   79.8      68.5           41.0      52.5      42.4           29.0
+
+
+           Probabilistic
+                           ScoreHypo [61]
+                                                  100   73.4      63.0           37.6      47.5      38.4           26.0
+                           MEGA [16]               25   75.1      63.6           40.4       -         -              -
+                                                   10   73.8      64.2           38.3      52.1      41.8           28.4
+                           ADHMR [50]
+                                                  100   65.4      57.2           33.5      45.9      36.9           24.8
+                                                   10   69.0      59.3           36.3      49.5      39.6           27.2
+                           Ours                   100   60.9      52.5           31.5      43.8      35.0           23.9
+                                                  200   59.0      51.0           30.2      42.4      34.0           23.2
+                                                   10   67.2      56.6           36.4      49.2      39.0           26.9
+                           Ours†                  100   59.5      49.9           31.9      43.2      34.3           23.5
+                                                  200   57.7      48.5           30.5      42.0      33.2           22.8
+
+Table 1. Comparison with state-of-the-arts on the 3DPW [55] and Human3.6M [22] dataset. M is the number of predictions of probabilistic
+methods. Ours† is trained on an additional in-the-wild dataset InstaVariety [25], using only preference signals without 3D labels.
+
+       Input                           Ours                    ADHMR               Input           Ours                    ADHMR
+
+
+(a)                                                                        (b)
+
+
+
+
+(c)                                                                        (d)
+
+
+
+
+(e)                                                                        (f)
+
+
+
+
+(g)                                                                        (h)
+
+
+
+
+Figure 3. Qualitative comparison between our method and the state-of-the-art probabilistic model ADHMR [50]. Examples (a) ∼ (e) are
+from the 3DPW [55] dataset, while (f) ∼ (h) are challenging internet images. Both overlay and side-view results are shown.
+                                                      Initial score: 0.85                                       Initial score: 0.61
+                                                      Our score: 0.43                                           Our score: 0.19
+                                                      Critique: Feet grounded                                   Critique: Significant self-
+                      (a)                             with natural spine; arms   (b)                            penetration at thigh; feet
+                                                      roughly aligned but left                                  alignment is slightly off and
+                                                      arm floats outward.                                       losing the natural surfing
+                                                                                                                stance.
+                                                      Initial score: 0.57                                        Initial score: 0.40
+                                                      Our score: 0.34                                            Our score: 0.93
+                                                      Critique: Severe mesh-torso                                Critique: Good foot
+                      (c)                             intersection and poor arm (d)                              grounding and spine
+    Input image                                       alignment; good spine                                      alignment; strong
+                                                      alignment; knee position is                                alignment with surfing pose;
+                                                      subtly inaccurate.                                         hand alignment is precise.
+
+Figure 4. Visualization of our critique agent on an internet image. We compare the erroneous initial score from HMR-Scorer [50] with the
+corrected score from our critique agent, along with the corresponding critique.
+
+
+   Methods
+                                        3DPW [55]                         tuned on the InstaVariety [25] dataset. Crucially, instead of
+                               PVE ↓   MPJPE ↓   PA-MPJPE ↓               using the dataset’s noisy pseudo 3D labels for a loss, we use
+   Base Diffusion Model         73.4    63.0        37.6                  its images to construct a new group-wise preference dataset
+     + supervised finetuning    70.2    61.3        36.5                  via our critique agent and the frozen reference model. This
+   Ours                         59.5    49.9        31.9                  approach allows our model to achieve superior results, sur-
+     DPO w/ critique agent      63.9    53.1        33.4                  passing the previous SOTA ADHMR [50]. This perfor-
+     w/o critique agent         65.4    54.9        34.7
+                                                                          mance boost highlights the generalizability of our critique
+Table 2. Ablation study on the 3DPW [55] test set. All models are         agent and the effectiveness of our group preference align-
+finetuned on the InstaVariety [25] dataset. M = 100 for all.              ment framework in enhancing in-the-wild generalization.
+                                                                          Qualitative results. Fig. 3 compares our method with the
+for 3D joint accuracy, and their Procrustes-aligned variants              state-of-the-art probabilistic method ADHMR on challeng-
+(PA-PVE and PA-MPJPE) that remove global misalign-                        ing samples from 3DPW and in-the-wild internet images.
+ment. To evaluate our critique agent, we follow standard                  The results prove our model’s superior performance under
+score-prediction protocols [50, 65] and compute three cor-                severe occlusion and complex human-object interactions.
+relation metrics between predicted scores and ground-truth                In cases (a) and (b), our model recovers more plausible
+quality: PLCC for linear correlation, and SRCC and KRCC                   poses for the partially occluded arms and achieves better
+for rank-based consistency. Higher values (closer to 1.0)                 alignment with the input image. In (d), where the subject
+indicate better correlation.                                              is making a phone call, ADHMR misestimates the depth
+Implementation details. We use Qwen3-VL-32B as our                        relationship between the left arm and the head, whereas
+VLM in the critique agent. We use a learning rate of 1e-4                 our model correctly places the arm near the face, reflecting
+for the group preference finetuning with a batch size of 80               stronger semantic and spatial reasoning. In (g), ADHMR
+images. We use a group size of G = 20 for training.                       generates self-penetration artifacts, while our result remains
+                                                                          physically valid. In (h), despite heavy occlusion on the left
+4.2. Human Mesh Recovery Results                                          side, our model still predicts a coherent 3D pose, whereas
+Quantitative comparison. Tab. 1 shows the comparison                      ADHMR falls into depth ambiguity. These results collec-
+of our method with state-of-the-art methods on two widely                 tively demonstrate that our model is substantially more ro-
+used benchmark datasets: Human3.6M [22] and in-the-                       bust than ADHMR on challenging in-the-wild scenarios.
+wild 3DPW [55]. Following standard conventions for prob-                  Ablation study. Tab. 2 presents our ablation study. All
+abilistic methods [3, 50, 61], we generate M estimates                    variants are fine-tuned on the in-the-wild InstaVariety [25]
+and report the minimum PVE, MPJPE, and PA-MPJPE.                          dataset and evaluated on the 3DPW [55] test set. The base
+When fine-tuned directly on these benchmarks, our method                  diffusion model serves as our reference model, and we note
+significantly improves the reference model’s performance,                 that conventional supervised fine-tuning on noisy pseudo-
+demonstrating its ability to effectively leverage group-wise              labels provides only limited improvement. To assess the
+reward signals. Notably, on the 3DPW in-the-wild bench-                   value of our group preference alignment framework, we
+mark, our model achieves an 8.2% MPJPE improvement                        compare it with a DPO-style pairwise variant following
+(M = 100) over ADHMR [50], even without using an ad-                      ADHMR [50], using the same critique agent for fairness.
+ditional in-the-wild dataset. To further evaluate in-the-wild             Compared with the DPO-based variant, our group pref-
+effectiveness, we introduce a variant, Ours† , which is fine-             erence alignment framework reduces the MPJPE error by
+                                                          GTA-Human II [7]                                                      DNA-Rendering [9]
+                                            PVE                   MPJPE                   PA-MPJPE                PVE                MPJPE             PA-MPJPE
+ Methods
+                                  SRCC ↑      KRCC ↑      SRCC ↑      KRCC ↑           SRCC ↑   KRCC ↑   SRCC ↑     KRCC ↑      SRCC ↑   KRCC ↑     SRCC ↑   KRCC ↑
+ ScoreNet [61]                    0.464           0.411    0.468           0.404       0.430     0.327    0.532         0.512    0.496    0.469     0.458     0.367
+ HMR-Scorer [50]                  0.578           0.506    0.588           0.513       0.489     0.428    0.610         0.540    0.562    0.508     0.475     0.393
+ Ours                             0.605           0.539    0.615           0.556       0.528     0.461    0.633         0.556    0.588    0.532     0.510     0.433
+   w/o rule memory                0.597           0.491    0.577           0.480       0.454     0.427    0.619         0.487    0.564    0.520     0.484     0.377
+   w/o prototype memory           0.590           0.455    0.602           0.479       0.464     0.398    0.622         0.542    0.564    0.513     0.482     0.378
+   w/o self-reflection            0.534           0.426    0.542           0.444       0.440     0.285    0.568         0.463    0.567    0.460     0.483     0.298
+
+Table 3. Group-wise score prediction results. We report the SRCC and KRCC between the predicted scores and the ground-truth HMR
+metrics. Our method consistently outperforms all baselines and ablation variants.
+
+
+ Methods
+                           GTA-Human II [7] - PLCC        DNA-Rendering [9] - PLCC              duct ablations by removing each core component. Ours w/o
+                          PVE      MPJPE     PA-MPJPE     PVE     MPJPE      PA-MPJPE
+                                                                                                rule memory removes the agent’s access to the learned rules,
+ ScoreNet [61]            0.524     0.516         0.472   0.550    0.551       0.499
+ HMR-Scorer [50]          0.634     0.627         0.565   0.664    0.659       0.620            leading to weaker and less stable ratings. Ours w/o proto-
+ Ours                     0.695     0.697         0.653   0.737    0.717       0.700            type memory removes instance-level prediction prototypes,
+   w/o rule memory        0.683     0.672         0.630   0.701    0.673       0.650
+   w/o prototype memory   0.645     0.629         0.597   0.677    0.659       0.629            which also degrades performance. Ours w/o self-reflection
+   w/o self-reflection    0.610     0.613         0.540   0.642    0.656       0.581
+                                                                                                eliminates reflective knowledge construction in the explo-
+Table 4. Point-wise score prediction results. We report the PLCC                                ration phase. This variant causes the most significant per-
+between the predicted scores and the ground-truth metrics.
+                                                                                                formance drop across all metrics, strongly underscoring that
+                                                                                                the self-reflection process is a critical component for en-
+6.0%, reflecting its stronger ability to leverage group-wise
+                                                                                                hancing the ranking stability of the agent.
+preference signals and mitigate the mapping ambiguity of
+probabilistic models. When removing the critique agent and                                      Point-wise results. Tab. 4 presents the point-wise score
+using only the group alignment framework (Ours w/o cri-                                         prediction results. The ablations further validate our design:
+tique agent), we rely on the HMR-Scorer [50] to build the                                       removing either the rule memory or the prototype memory
+preference dataset. This variant improves over the baseline                                     causes a noticeable performance drop, showing that both
+but still lags behind our full model, highlighting the value of                                 general rules and instance-level prototypes are important for
+high-fidelity signals provided by the critique agent. Overall,                                  accurate quality prediction. The self-reflection mechanism
+the ablation results indicate that our performance gains arise                                  is also essential, as its removal leads to the largest decline,
+from the combination of the critique agent’s richer supervi-                                    confirming its role in producing reliable scores.
+sion and the strong alignment capability of our method.                                         Visualization. Fig. 4 illustrates the clear advantages of our
+                                                                                                critique agent over the HMR-Scorer baseline. The base-
+4.3. HMR Critique Agent Results                                                                 line’s “Initial score” is unreliable and appears to lack 3D
+Evaluation protocol. To evaluate the critique agent, we                                         awareness: it assigns a high score to a flawed pose (a) and
+use two protocols: point-wise and group-wise. Point-wise                                        an incorrectly low score to a high-quality 3D mesh (d). In
+evaluation assesses the agent’s ability to predict the absolute                                 contrast, our critique agent demonstrates a robust compre-
+quality of each single prediction, while group-wise evalua-                                     hension of the 3D action and geometry. It correctly identi-
+tion tests its ability to rank the relative quality of K pre-                                   fies that poses (a) and (c) fail to capture the proper surfing
+dictions for the same image. Our point-wise benchmark                                           stance, especially the incorrectly extended left arm. Our
+is identical to that of ADHMR, using single perturbed GT                                        agent also identifies major 3D geometric failures such as
+poses to simulate predictions. For group-wise evaluation,                                       severe self-penetration (b, c). This shows our agent’s feed-
+we generate K distinct predictions per image and compute                                        back is grounded in a precise understanding of 3D human
+correlation within each group, reporting the mean across                                        motion, allowing it to identify subtle errors, thus rectifying
+groups. We calibrate the critique agent’s outputs to the                                        the base model’s flawed assessments via our group prefer-
+HMR-Scorer’s numeric range using a quadratic program-                                           ence optimization framework.
+ming post-processing step that learns a linear scale-and-
+shift transformation.                                                                           5. Conclusion
+Group-wise results. Tab. 3 reports the group-wise score
+                                                                                                In this work, we introduce a VLM-driven critique agent
+prediction results. We compare against two baselines:
+                                                                                                and a group preference alignment framework that together
+ScoreNet [61] and HMR-Scorer [50], both of which rely                                           align diffusion-based HMR. By providing semantically
+merely on joint-guided image features. Results show that                                        grounded preferences and learning from them without
+our critique agent outperforms all baseline methods in both                                     3D supervision, our method produces more accurate hu-
+SRCC and KRCC metrics, indicating its stronger capabil-                                         man meshes, especially in challenging in-the-wild settings.
+ity to capture subtle 3D pose variations. We further con-
+References                                                                 Advances in Neural Information Processing Systems, 36:
+                                                                           30039–30069, 2023. 2
+ [1] Mykhaylo Andriluka, Leonid Pishchulin, Peter Gehler, and         [13] Sai Kumar Dwivedi, Yu Sun, Priyanka Patel, Yao Feng, and
+     Bernt Schiele. 2d human pose estimation: New benchmark                Michael J Black. Tokenhmr: Advancing human mesh recov-
+     and state of the art analysis. In Proceedings of the IEEE Con-        ery with a tokenized pose representation. In Proceedings of
+     ference on computer Vision and Pattern Recognition, pages             the IEEE/CVF Conference on Computer Vision and Pattern
+     3686–3693, 2014. 5                                                    Recognition, pages 1323–1333, 2024. 2
+ [2] Peter Auer, Nicolo Cesa-Bianchi, and Paul Fischer. Finite-       [14] Ying Fan, Olivia Watkins, Yuqing Du, Hao Liu,
+     time analysis of the multiarmed bandit problem. Machine               Moonkyung Ryu, Craig Boutilier, Pieter Abbeel, Moham-
+     learning, 47(2):235–256, 2002. 4                                      mad Ghavamzadeh, Kangwook Lee, and Kimin Lee. Dpok:
+ [3] Benjamin Biggs, David Novotny, Sebastien Ehrhardt, Han-               Reinforcement learning for fine-tuning text-to-image diffu-
+     byul Joo, Ben Graham, and Andrea Vedaldi. 3d multi-bodies:            sion models. Advances in Neural Information Processing
+     Fitting sets of plausible 3d human models to ambiguous im-            Systems, 36:79858–79885, 2023. 2
+     age data. Advances in neural information processing sys-         [15] Qi Fang, Kang Chen, Yinghui Fan, Qing Shuai, Jiefeng
+     tems, 33:20496–20507, 2020. 2, 6, 7                                   Li, and Weidong Zhang. Learning analytical posterior
+ [4] Kevin Black, Michael Janner, Yilun Du, Ilya Kostrikov, and            probability for human mesh recovery. In Proceedings of
+     Sergey Levine. Training diffusion models with reinforce-              the IEEE/CVF Conference on Computer Vision and Pattern
+     ment learning. In The Twelfth International Conference on             Recognition, pages 8781–8791, 2023. 2
+     Learning Representations, 2024. 2                                [16] Guénolé Fiche, Simon Leglaive, Xavier Alameda-Pineda,
+ [5] Michael J Black, Priyanka Patel, Joachim Tesch, and Jin-              and Francesc Moreno-Noguer. Mega: Masked generative au-
+     long Yang. Bedlam: A synthetic dataset of bodies exhibit-             toencoder for human mesh recovery. In Proceedings of the
+     ing detailed lifelike animated motion. In Proceedings of              Computer Vision and Pattern Recognition Conference, pages
+     the IEEE/CVF Conference on Computer Vision and Pattern                5366–5378, 2025. 1, 2, 6
+     Recognition, pages 8726–8737, 2023. 5                            [17] Lin Geng Foo, Jia Gong, Hossein Rahmani, and Jun Liu.
+ [6] Federica Bogo, Angjoo Kanazawa, Christoph Lassner, Peter              Distribution-aligned diffusion for human mesh recovery. In
+     Gehler, Javier Romero, and Michael J Black. Keep it smpl:             Proceedings of the IEEE/CVF International Conference on
+     Automatic estimation of 3d human pose and shape from a                Computer Vision, pages 9221–9232, 2023. 1, 6
+     single image. In Computer Vision–ECCV 2016: 14th Euro-           [18] Shubham Goel, Georgios Pavlakos, Jathushan Rajasegaran,
+     pean Conference, Amsterdam, The Netherlands, October 11-              Angjoo Kanazawa, and Jitendra Malik. Humans in 4d: Re-
+     14, 2016, Proceedings, Part V 14, pages 561–578. Springer,            constructing and tracking humans with transformers. In
+     2016. 1, 2                                                            Proceedings of the IEEE/CVF International Conference on
+ [7] Zhongang Cai, Mingyuan Zhang, Jiawei Ren, Chen Wei,                   Computer Vision, pages 14783–14794, 2023. 1, 2, 6
+     Daxuan Ren, Zhengyu Lin, Haiyu Zhao, Lei Yang,                   [19] Daya Guo, Dejian Yang, Haowei Zhang, Junxiao Song,
+     Chen Change Loy, and Ziwei Liu. Playing for 3d human re-              Ruoyu Zhang, Runxin Xu, Qihao Zhu, Shirong Ma, Peiyi
+     covery. IEEE Transactions on Pattern Analysis and Machine             Wang, Xiao Bi, et al. Deepseek-r1: Incentivizing reasoning
+     Intelligence, 2024. 5, 8                                              capability in llms via reinforcement learning. arXiv preprint
+ [8] Chi-Min Chan, Weize Chen, Yusheng Su, Jianxuan Yu, Wei                arXiv:2501.12948, 2025. 2
+     Xue, Shanghang Zhang, Jie Fu, and Zhiyuan Liu. Chateval:         [20] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising dif-
+     Towards better llm-based evaluators through multi-agent de-           fusion probabilistic models. Advances in neural information
+     bate. arXiv preprint arXiv:2308.07201, 2023. 2                        processing systems, 33:6840–6851, 2020. 3
+ [9] Wei Cheng, Ruixiang Chen, Siming Fan, Wanqi Yin, Keyu            [21] Hui Huang, Xingyuan Bu, Hongli Zhou, Yingqi Qu, Jing
+     Chen, Zhongang Cai, Jingbo Wang, Yang Gao, Zhengming                  Liu, Muyun Yang, Bing Xu, and Tiejun Zhao. An empirical
+     Yu, Zhengyu Lin, et al. Dna-rendering: A diverse neural               study of llm-as-a-judge for llm evaluation: Fine-tuned judge
+     actor repository for high-fidelity human-centric rendering. In        model is not a general substitute for gpt-4. In Findings of
+     Proceedings of the IEEE/CVF International Conference on               the Association for Computational Linguistics: ACL 2025,
+     Computer Vision, pages 19982–19993, 2023. 5, 8                        pages 5880–5895, 2025. 2
+[10] Paul F Christiano, Jan Leike, Tom Brown, Miljan Martic,          [22] Catalin Ionescu, Dragos Papava, Vlad Olaru, and Cristian
+     Shane Legg, and Dario Amodei. Deep reinforcement learn-               Sminchisescu. Human3. 6m: Large scale datasets and pre-
+     ing from human preferences. Advances in neural information            dictive methods for 3d human sensing in natural environ-
+     processing systems, 30, 2017. 2                                       ments. IEEE transactions on pattern analysis and machine
+[11] Kevin Clark, Paul Vicol, Kevin Swersky, and David J Fleet.            intelligence, 36(7):1325–1339, 2013. 5, 6, 7
+     Directly fine-tuning diffusion models on differentiable re-      [23] Hanbyul Joo, Natalia Neverova, and Andrea Vedaldi. Ex-
+     wards. In The Twelfth International Conference on Learning            emplar fine-tuning for 3d human model fitting towards in-
+     Representations, 2024. 2                                              the-wild 3d human pose estimation. In 2021 International
+[12] Yann Dubois, Chen Xuechen Li, Rohan Taori, Tianyi Zhang,              Conference on 3D Vision (3DV), pages 42–52. IEEE, 2021.
+     Ishaan Gulrajani, Jimmy Ba, Carlos Guestrin, Percy S Liang,           1, 2
+     and Tatsunori B Hashimoto. Alpacafarm: A simulation              [24] Angjoo Kanazawa, Michael J Black, David W Jacobs, and
+     framework for methods that learn from human feedback.                 Jitendra Malik. End-to-end recovery of human shape and
+     pose. In Proceedings of the IEEE conference on computer             Zitnick. Microsoft coco: Common objects in context. In
+     vision and pattern recognition, pages 7122–7131, 2018. 2, 6         Computer Vision–ECCV 2014: 13th European Conference,
+[25] Angjoo Kanazawa, Jason Y Zhang, Panna Felsen, and Jiten-            Zurich, Switzerland, September 6-12, 2014, Proceedings,
+     dra Malik. Learning 3d human dynamics from video. In                Part V 13, pages 740–755. Springer, 2014. 5
+     Proceedings of the IEEE/CVF conference on computer vi-         [36] Jie Liu, Gongye Liu, Jiajun Liang, Yangguang Li, Jiaheng
+     sion and pattern recognition, pages 5614–5623, 2019. 6, 7           Liu, Xintao Wang, Pengfei Wan, Di Zhang, and Wanli
+[26] Seungone Kim, Jamin Shin, Yejin Cho, Joel Jang, Shayne              Ouyang. Flow-grpo: Training flow matching models via on-
+     Longpre, Hwaran Lee, Sangdoo Yun, Seongjin Shin, Sung-              line rl. arXiv preprint arXiv:2505.05470, 2025. 2
+     dong Kim, James Thorne, et al. Prometheus: Inducing fine-      [37] Matthew Loper, Naureen Mahmood, Javier Romero, Gerard
+     grained evaluation capability in language models. In The            Pons-Moll, and Michael J Black. Smpl: a skinned multi-
+     Twelfth International Conference on Learning Representa-            person linear model. ACM Transactions on Graphics (TOG),
+     tions, 2023. 2                                                      34(6):1–16, 2015. 3
+[27] Muhammed Kocabas, Chun-Hao P Huang, Joachim Tesch,             [38] Cheng Lu, Yuhao Zhou, Fan Bao, Jianfei Chen, Chongxuan
+     Lea Müller, Otmar Hilliges, and Michael J Black. Spec:             Li, and Jun Zhu. Dpm-solver: A fast ode solver for diffu-
+     Seeing people in the wild with an estimated camera. In              sion probabilistic model sampling in around 10 steps. Ad-
+     Proceedings of the IEEE/CVF International Conference on             vances in neural information processing systems, 35:5775–
+     Computer Vision, pages 11035–11045, 2021. 5                         5787, 2022. 2
+[28] Nikos Kolotouros, Georgios Pavlakos, Dinesh Jayaraman,         [39] Dushyant Mehta, Helge Rhodin, Dan Casas, Pascal
+     and Kostas Daniilidis. Probabilistic modeling for human             Fua, Oleksandr Sotnychenko, Weipeng Xu, and Christian
+     mesh recovery. In Proceedings of the IEEE/CVF interna-              Theobalt. Monocular 3d human pose estimation in the wild
+     tional conference on computer vision, pages 11605–11614,            using improved cnn supervision. In 2017 international con-
+     2021. 1, 2, 6                                                       ference on 3D vision (3DV), pages 506–516. IEEE, 2017. 5
+[29] Christoph Lassner, Javier Romero, Martin Kiefel, Federica      [40] Priyanka Patel and Michael J Black. Camerahmr: Aligning
+     Bogo, Michael J Black, and Peter V Gehler. Unite the peo-           people with perspective. In 2025 International Conference
+     ple: Closing the loop between 3d and 2d human representa-           on 3D Vision (3DV), pages 1562–1571. IEEE, 2025. 1, 2, 6
+     tions. In Proceedings of the IEEE conference on computer       [41] Georgios Pavlakos, Vasileios Choutas, Nima Ghorbani,
+     vision and pattern recognition, pages 6050–6059, 2017. 2, 5         Timo Bolkart, Ahmed AA Osman, Dimitrios Tzionas, and
+[30] Dawei Li, Bohan Jiang, Liangjie Huang, Alimohammad                  Michael J Black. Expressive body capture: 3d hands,
+     Beigi, Chengshuai Zhao, Zhen Tan, Amrita Bhattacharjee,             face, and body from a single image. In Proceedings of
+     Yuxuan Jiang, Canyu Chen, Tianhao Wu, et al. From gener-            the IEEE/CVF conference on computer vision and pattern
+     ation to judgment: Opportunities and challenges of llm-as-a-        recognition, pages 10975–10985, 2019. 1, 2, 3
+     judge. In Proceedings of the 2025 Conference on Empirical      [42] Zhen Qin, Rolf Jagerman, Kai Hui, Honglei Zhuang, Junru
+     Methods in Natural Language Processing, pages 2757–2791,            Wu, Le Yan, Jiaming Shen, Tianqi Liu, Jialu Liu, Donald
+     2025. 2                                                             Metzler, et al. Large language models are effective text
+[31] Jiefeng Li, Chao Xu, Zhicun Chen, Siyuan Bian, Lixin Yang,          rankers with pairwise ranking prompting. In Findings of the
+     and Cewu Lu. Hybrik: A hybrid analytical-neural inverse             Association for Computational Linguistics: NAACL 2024,
+     kinematics solution for 3d human pose and shape estimation.         pages 1504–1518, 2024. 2
+     In Proceedings of the IEEE/CVF conference on computer vi-      [43] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+     sion and pattern recognition, pages 3383–3393, 2021. 2, 3,          Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+     6                                                                   Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning
+[32] Shufan Li, Konstantinos Kallidromitis, Akash Gokul,                 transferable visual models from natural language supervi-
+     Yusuke Kato, and Kazuki Kozuka. Aligning diffusion mod-             sion. In International conference on machine learning, pages
+     els by optimizing human utility. Advances in Neural Infor-          8748–8763. PMLR, 2021. 4
+     mation Processing Systems, 37:24897–24925, 2024. 2             [44] Rafael Rafailov, Archit Sharma, Eric Mitchell, Christo-
+[33] Tianle Li, Wei-Lin Chiang, Evan Frick, Lisa Dunlap, Tian-           pher D Manning, Stefano Ermon, and Chelsea Finn. Direct
+     hao Wu, Banghua Zhu, Joseph E Gonzalez, and Ion Sto-                preference optimization: Your language model is secretly a
+     ica. From crowdsourced data to high-quality benchmarks:             reward model. Advances in Neural Information Processing
+     Arena-hard and benchbuilder pipeline.        arXiv preprint         Systems, 36, 2024. 2, 5
+     arXiv:2406.11939, 2024. 2                                      [45] István Sárándi and Gerard Pons-Moll. Neural localizer
+[34] Zhanhao Liang, Yuhui Yuan, Shuyang Gu, Bohan Chen,                  fields for continuous 3d human pose and shape estimation.
+     Tiankai Hang, Mingxi Cheng, Ji Li, and Liang Zheng. Aes-            Advances in Neural Information Processing Systems, 37:
+     thetic post-training diffusion models from generic prefer-          140032–140065, 2024. 1, 2
+     ences with step-by-step preference optimization. In Proceed-   [46] Akash Sengupta, Ignas Budvytis, and Roberto Cipolla. Hi-
+     ings of the Computer Vision and Pattern Recognition Confer-         erarchical kinematic probability distributions for 3d human
+     ence, pages 13199–13208, 2025. 2                                    shape and pose estimation from images in the wild. In Pro-
+[35] Tsung-Yi Lin, Michael Maire, Serge Belongie, James Hays,            ceedings of the IEEE/CVF international conference on com-
+     Pietro Perona, Deva Ramanan, Piotr Dollár, and C Lawrence          puter vision, pages 11219–11229, 2021. 6
+[47] Akash Sengupta, Ignas Budvytis, and Roberto Cipolla. Hu-             Cunxiang Wang, Zhen Wu, et al. Trustjudge: Inconsistencies
+     maniflow: Ancestor-conditioned normalising flows on so (3)           of llm-as-a-judge and how to alleviate them. arXiv preprint
+     manifolds for human pose and shape distribution estimation.          arXiv:2509.21117, 2025. 2
+     In Proceedings of the IEEE/CVF Conference on Computer           [59] Yufu Wang, Yu Sun, Priyanka Patel, Kostas Daniilidis,
+     Vision and Pattern Recognition, pages 4779–4789, 2023. 1,            Michael J Black, and Muhammed Kocabas. Prompthmr:
+     6                                                                    Promptable human mesh recovery. In Proceedings of the
+[48] Shreya Shankar, JD Zamfirescu-Pereira, Björn Hartmann,              Computer Vision and Pattern Recognition Conference, pages
+     Aditya Parameswaran, and Ian Arawjo. Who validates the               1148–1159, 2025. 1, 2, 6
+     validators? aligning llm-assisted evaluation of llm outputs     [60] Jiazheng Xu, Xiao Liu, Yuchen Wu, Yuxuan Tong, Qinkai
+     with human preferences. In Proceedings of the 37th Annual            Li, Ming Ding, Jie Tang, and Yuxiao Dong. Imagere-
+     ACM Symposium on User Interface Software and Technol-                ward: Learning and evaluating human preferences for text-
+     ogy, pages 1–14, 2024. 2                                             to-image generation. Advances in Neural Information Pro-
+[49] Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junx-                cessing Systems, 36, 2024. 2
+     iao Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, YK            [61] Yuan Xu, Xiaoxuan Ma, Jiajun Su, Wentao Zhu, Yu Qiao,
+     Li, et al. Deepseekmath: Pushing the limits of mathemat-             and Yizhou Wang. Scorehypo: Probabilistic human mesh
+     ical reasoning in open language models. arXiv preprint               estimation with hypothesis scoring. In Proceedings of the
+     arXiv:2402.03300, 2024. 2, 3                                         IEEE/CVF Conference on Computer Vision and Pattern
+[50] Wenhao Shen, Wanqi Yin, Xiaofeng Yang, Cheng Chen,                   Recognition, pages 979–989, 2024. 1, 2, 3, 5, 6, 7, 8
+     Chaoyue Song, Zhongang Cai, Lei Yang, Hao Wang, and             [62] Zeyue Xue, Jie Wu, Yu Gao, Fangyuan Kong, Lingting
+     Guosheng Lin. Adhmr: Aligning diffusion-based human                  Zhu, Mengzhao Chen, Zhiheng Liu, Wei Liu, Qiushan Guo,
+     mesh recovery via direct preference optimization. arXiv              Weilin Huang, et al. Dancegrpo: Unleashing grpo on visual
+     preprint arXiv:2505.10250, 2025. 1, 2, 4, 5, 6, 7, 8                 generation. arXiv preprint arXiv:2505.07818, 2025. 2
+[51] Jiaming Song, Chenlin Meng, and Stefano Ermon.                  [63] Kai Yang, Jian Tao, Jiafei Lyu, Chunjiang Ge, Jiaxin Chen,
+     Denoising diffusion implicit models.          arXiv preprint         Weihan Shen, Xiaolong Zhu, and Xiu Li. Using human
+     arXiv:2010.02502, 2020. 2, 3                                         feedback to fine-tune diffusion models without any reward
+[52] Yang Song, Jascha Sohl-Dickstein, Diederik P Kingma, Ab-             model. In Proceedings of the IEEE/CVF Conference on
+     hishek Kumar, Stefano Ermon, and Ben Poole. Score-based              Computer Vision and Pattern Recognition, pages 8941–
+     generative modeling through stochastic differential equa-            8951, 2024. 2
+     tions. In International Conference on Learning Represen-        [64] Yifei Yin, Chen Guo, Manuel Kaufmann, Juan Jose Zarate,
+     tations, 2021. 3                                                     Jie Song, and Otmar Hilliges. Hi4d: 4d instance seg-
+[53] Anastasis Stathopoulos, Ligong Han, and Dimitris Metaxas.            mentation of close human interaction. In Proceedings of
+     Score-guided diffusion for 3d human recovery. In Proceed-            the IEEE/CVF Conference on Computer Vision and Pattern
+     ings of the IEEE/CVF Conference on Computer Vision and               Recognition, pages 17016–17027, 2023. 5
+     Pattern Recognition, pages 906–915, 2024. 6
+                                                                     [65] Guangtao Zhai and Xiongkuo Min. Perceptual image quality
+[54] Pat Verga, Sebastian Hofstatter, Sophia Althammer, Yixuan            assessment: a survey. Science China Information Sciences,
+     Su, Aleksandra Piktus, Arkady Arkhangorodsky, Minjie Xu,             63:1–52, 2020. 7
+     Naomi White, and Patrick Lewis. Replacing judges with ju-
+                                                                     [66] Bang Zhang, Ruotian Ma, Qingxuan Jiang, Peisong Wang,
+     ries: Evaluating llm generations with a panel of diverse mod-
+                                                                          Jiaqi Chen, Zheng Xie, Xingyu Chen, Yue Wang, Fanghua
+     els. arXiv preprint arXiv:2404.18796, 2024. 2
+                                                                          Ye, Jian Li, et al. Sentient agent as a judge: Evaluat-
+[55] Timo Von Marcard, Roberto Henschel, Michael J Black,
+                                                                          ing higher-order social cognition in large language models.
+     Bodo Rosenhahn, and Gerard Pons-Moll. Recovering ac-
+                                                                          arXiv preprint arXiv:2505.02847, 2025. 2
+     curate 3d human pose in the wild using imus and a moving
+                                                                     [67] Hongwen Zhang, Yating Tian, Xinchi Zhou, Wanli Ouyang,
+     camera. In Proceedings of the European conference on com-
+                                                                          Yebin Liu, Limin Wang, and Zhenan Sun. Pymaf: 3d human
+     puter vision (ECCV), pages 601–617, 2018. 5, 6, 7
+                                                                          pose and shape regression with pyramidal mesh alignment
+[56] Bram Wallace, Meihua Dang, Rafael Rafailov, Linqi Zhou,
+                                                                          feedback loop. In Proceedings of the IEEE/CVF Interna-
+     Aaron Lou, Senthil Purushwalkam, Stefano Ermon, Caiming
+                                                                          tional Conference on Computer Vision, pages 11446–11456,
+     Xiong, Shafiq Joty, and Nikhil Naik. Diffusion model align-
+                                                                          2021. 6
+     ment using direct preference optimization. In Proceedings of
+                                                                     [68] Ce Zheng, Xianpeng Liu, Guo-Jun Qi, and Chen Chen.
+     the IEEE/CVF Conference on Computer Vision and Pattern
+                                                                          Potter: Pooling attention transformer for efficient human
+     Recognition, pages 8228–8238, 2024. 2, 5
+                                                                          mesh recovery. In Proceedings of the IEEE/CVF Conference
+[57] Wenjia Wang, Yongtao Ge, Haiyi Mei, Zhongang Cai, Qing-
+                                                                          on Computer Vision and Pattern Recognition, pages 1611–
+     ping Sun, Yanjun Wang, Chunhua Shen, Lei Yang, and Taku
+                                                                          1620, 2023. 6
+     Komura. Zolly: Zoom focal length correctly for perspective-
+     distorted human mesh reconstruction. In Proceedings of the      [69] Lianghui Zhu, Xinggang Wang, and Xinlong Wang.
+     IEEE/CVF International Conference on Computer Vision,                Judgelm: Fine-tuned large language models are scalable
+     pages 3925–3935, 2023. 6                                             judges. arXiv preprint arXiv:2310.17631, 2023. 2
+[58] Yidong Wang, Yunze Song, Tingyuan Zhu, Xuanwang
+     Zhang, Zhuohao Yu, Hao Chen, Chiyu Song, Qiufeng Wang,
+

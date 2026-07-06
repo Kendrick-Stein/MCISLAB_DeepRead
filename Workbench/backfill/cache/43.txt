@@ -1,0 +1,1648 @@
+                                                         See and Fix the Flaws: Enabling VLMs and Diffusion Models
+                                                          to Comprehend Visual Artifacts via Agentic Data Synthesis
+
+                                            Jaehyun Park1,∗ Minyoung Ahn2,3,∗ Minkyu Kim3 Jonghyun Lee3 Jae-Gil Lee1 Dongmin Park3,†
+                                                                 1
+                                                                   KAIST 2 Seoul National University 3 KRAFTON
+                                          {jhpark813,jaegil}@kaist.ac.kr,{minkyu.kim,jonghyunlee,dongmin.park}@krafton.com,michellahn02@snu.ac.kr
+
+
+
+
+arXiv:2602.20951v2 [cs.CV] 26 Mar 2026
+                                                                   Abstract                                        Meanwhile, in image understanding, vision-language
+                                                                                                               models (VLMs) have made substantial progress, showing
+                                         Despite recent advances in diffusion models, AI generated             strong capabilities in visual question answering and scene
+                                         images still often contain visual artifacts that compromise           description [54]. These advances have allowed VLMs to
+                                         realism. Although more thorough pre-training and bigger               serve as automatic systems for many vision tasks, including
+                                         models might reduce artifacts, there is no assurance that             medical analysis [16] and robotics control [24]. However,
+                                         they can be completely eliminated, which makes artifact               we find that VLMs face challenges when confronted with
+                                         mitigation a highly crucial area of study. Previous artifact-         visual artifacts. As shown in Figure 1(a), even state-of-the-
+                                         aware methodologies depend on human-labeled artifact                  art VLMs, such as GPT-5 [34] and Gemini-2.5-pro [8], ex-
+                                         datasets, which are costly and difficult to scale, underscor-         hibit limited ability to detect, localize, or explain artifacts
+                                         ing the need for an automated approach to reliably acquire            in AI-generated images, nearly indistinguishable from ran-
+                                         artifact-annotated datasets. In this paper, we propose Ar-            dom guessing (see § 6 for details). Consequently, VLMs
+                                         tiAgent, which efficiently creates pairs of real and artifact-        cannot yet serve as reliable systems for artifact comprehen-
+                                         injected images. It comprises three agents: a perception              sion, which constrains their utility.
+                                         agent that recognizes and grounds entities and subentities                Recently, several approaches have been proposed to
+                                         from real images, a synthesis agent that introduces artifacts         tackle visual artifacts in VLMs and diffusions[20, 48, 55].
+                                         via artifact injection tools through novel patch-wise embed-          However, existing efforts exhibit two major limitations: (1)
+                                         ding manipulation within a diffusion transformer, and a cu-           they mainly target simple artifact types (e.g., Gaussian noise
+                                         ration agent that filters the synthesized artifacts and gener-        or blur), which were prevalent in early diffusion models
+                                         ates both local and global explanations for each instance.            such as SD1.0 [43], but are rarely observed in modern mod-
+                                         Using ArtiAgent, we synthesize 100K images with rich ar-              els, where more plausible physical distortions are predom-
+                                         tifact annotations and demonstrate both efficacy and versa-           inant; and (2) they rely heavily on human-annotated arti-
+                                         tility across diverse applications. Code is available at link.        facts (e.g., as many as 10K labels), which is costly and
+                                                                                                               fundamentally limited in scalability to capture the full di-
+                                         1. Introduction                                                       versity of diffusion-generated artifacts. These limitations
+                                                                                                               highlight the need for scalable, annotator-free methods to
+                                         Recent advances in diffusion models have led to remarkable            address plausible and extensive artifacts across diverse vi-
+                                         success in generating highly photorealistic images [45, 53].          sual contexts produced by modern diffusion models.
+                                         While these models have demonstrated striking achieve-                    To fill this gap, we introduce ArtiAgent (Figure 1(b)),
+                                         ments in text-to-image alignment and aesthetic quality, they          a novel agentic framework that injects plausible artifacts
+                                         still suffer from producing visual artifacts, unintended dis-         without human intervention via inversion-restoration [9] by
+                                         tortions or anomalies in generated outputs. For example,              perturbing the attention of DiT (see § 4.2.2). ArtiAgent con-
+                                         in Figure 1(a), even state-of-the-art models such as Nano-            sists of three agents: (1) a perception agent, which iden-
+                                         Banana [13] produce artifacts, e.g., six-fingered hands and           tifies the most suitable objects or entities in a real image
+                                         fused entities, reducing user satisfaction, e.g., uncanny val-        to perturb, (2) a synthesis agent, which selects and applies
+                                         ley. Furthermore, mitigating such artifacts is especially crit-       the tools to generate plausible artifacts, and (3) a curation
+                                         ical in high-stakes diffusion applications where reliability          agent, which filters low-quality results and refines their an-
+                                         is paramount, including image generation in medicine [23],            notations. Through this agentic pipeline, ArtiAgent pro-
+                                         robotics [17], autonomous driving [19], and so on.                    duces high-quality artifact-injected images with rich anno-
+                                            * Equal contribution; work done during an internship at KRAFTON.   tations, including binary labels, locations, and explanations
+                                            † Corresponding author.                                            suitable for detection, localization, and reasoning.
+                 (a) Limitations of SOTA Diffusions & VLMs                                        (b) Agentic Artifact-Aware Data Synthesis
+  Duplication              Distortion                                                            Real Inversion-Injection Synthesized
+                                                     Is there anything wrong with the                                                                  The nose of the
+                                                                  image?                                                                               bear is
+                                                                                                                              tort
+                                                                                                                        Dis                            distorted.
+                                                               SD3.5, FLUX,
+                                                               Qwen-Image,                                                                             There is an
+                                                                                                                                     A dd              extra paw of the
+              FLUX.1-dev
+                                                     Diffusion Nano-Banana
+                                        Qwen-Image                                                                                                     bear.
+   Omission                Fusion
+                                                      There is nothing wrong with the                      ArtiAgent
+                                                                   image.                                          Re                                  The child’s hand
+                                                                                                                        mo
+                                                                                                                              ve
+                                                                                                                                                       is missing.
+                                                      VLM           GPT-5, GPT-4o                                  Fu
+                                                                                                                      s   e                            The teddy bear
+                                                                      Gemini-2.5-Pro                                                                   and the child are
+                                                                                                                                                       merged.
+                   SD3.5            Nano-Banana
+
+    (c) VLM Artifact Comprehension                        (d) Reward-Guided Generation                      (e) VLM-Guided Image Correction
+                Is there anything wrong                                                                   Detect                                      Verify
+                     with the image?
+                                                                                                                                            Inpaint
+
+        There is a hand holding a
+          phone with an extra
+           finger in <bbox>.                           Reward=0.2                Reward=0.8
+ VLM
+                                                                    Real    Synthesized
+
+Figure 1. Overview of our challenges and approach. The red boxes indicate the regions with visual artifacts. (a) Examples of structural
+visual artifacts in state-of-the-art diffusion models and the inability of VLMs to recognize or explain them. (b) Overview of ArtiAgent,
+a novel agentic framework that synthesizes artifacts for arbitrary visual contexts without human intervention. (c) Example of VLM-
+based artifact comprehension via detection, explanation, and localization. (d) Application to reward-guided text-to-image generation. (e)
+Application to image correction, where artifact-aware VLM-guided inpainting removes the flawed regions.
+    For thorough validation, we present ArtiBench, a new                               challenging benchmark of 1K images generated by mod-
+benchmark of 1K AI-generated images produced by modern                                 ern generative models with human labels.
+generative models such as FLUX-dev and Nano-Banana,                                  • Experiments. Extensive experiments demonstrate the
+where each image is carefully annotated by humans with                                 superiority of ArtiAgent by scaling up VLM performance
+binary artifact labels, their bounding box locations, and ex-                          on core artifact-perception tasks. Moreover, we show
+planations. We evaluate ArtiAgent on ArtiBench as well                                 its utility in downstream diffusion-based applications:
+as three existing benchmarks, showing that open-source                                 artifact-free image generation and editing.
+VLMs (e.g., Qwen2.5-VL) fine-tuned on 100K training
+samples generated by ArtiAgent consistently outperform
+                                                                                     2. Related Work
+proprietary VLMs (e.g., GPT-5) and prior baselines across
+major artifact-perception tasks, including detection, local-
+                                                                                     Visual Artifact Datasets. Several training datasets have
+ization, and reasoning. Furthermore, with these artifact-
+                                                                                     been introduced to supervise the understanding of visual
+aware VLM, we benefit two downstream applications: (1)
+                                                                                     artifacts in generative models. PAL [55] provides 10K
+guiding diffusion sampling toward artifact-free generation
+                                                                                     images with pixel-level annotations of perceptual defects
+with VLM-based artifact reward, and (2) automatically edit-
+                                                                                     for segmentation-based training. SynthScars [20] provides
+ing diffusion outputs that contain artifacts, substantially im-
+                                                                                     12K images with pixel-level masks and textual explana-
+proving the image generation pipelines.
+                                                                                     tions. DiffDoctor [48] scales human labeling through semi-
+    Our key contributions are summarized as follows:
+                                                                                     supervised expansion from a 25K seed set. Although these
+ • Framework. We introduce ArtiAgent, an agentic data
+                                                                                     datasets offer essential supervision for artifact detection and
+   synthesis framework that produces diverse plausible arti-
+                                                                                     correction, their reliance on human annotation makes them
+   facts at scale, enriched with high-quality annotations.
+                                                                                     costly and difficult to scale.
+ • Tools. We develop agentic tools that inject artifacts via
+   our novel inversion-injection method during image re-                                 Moreover, several benchmark datasets have been re-
+   construction, which can be used by any DiT model.                                 leased to evaluate models’ ability to understand visual arti-
+ • Datasets. We synthesize a large-scale training set with                           facts. RichHF-18K [27] provides annotated artifact regions,
+   100K examples via ArtiAgent, along with ArtiBench1 , a                            while LOKI [51] adds natural-language explanations with
+                                                                                     bounding box labels. SynthScars also releases evaluation
+   1 https://huggingface.co/datasets/KRAFTON/ArtiBench                               splits to test perception, localization, and explanation ca-
+pabilities. These benchmarks serve as reference points for        Table 1. Artifact frequency of            20%
+measuring a model’s artifact awareness; however, most of          modern diffusion models.                             37%
+them rely on artifacts from earlier diffusion models and tend
+                                                                     Generative Model    Freq.
+to focus on degenerate artifacts (e.g., Gaussian noise), lim-                                              34%
+iting their relevance to the richer and more diverse failure            SD3.5-Large       36%                         9%
+modes of modern generative systems.                                    FLUX-schnell       28%
+                                                                        Qwen-Image        17%           duplication   omission
+Handling Visual Artifacts. Using these datasets, different               FLUX-dev         12%           distortion    fusion
+modeling strategies have been explored. PAL [55] trains                Nano-Banana         5%      Figure 2. Artifact type distri-
+segmentation models to localize artifact regions and enables                                       bution of diffusion models.
+automated correction via inpainting. RichHF-18K [27]
+is used to train multimodal models that predict human-            Qwen-Image [49], and Nano-Banana [13]. For each gener-
+like feedback heatmaps, which can then refine diffusion           ated image, a human annotator manually inspected the out-
+models through preference learning. LEGION [20] trains            puts and identified whether they contained any artifacts, fur-
+GLaMM [39] with the SynthScars dataset that allows de-            ther categorizing them into the four structural types. Based
+tection, localization, and explanation into a unified model.      on this evaluation, Table 1 summarizes the frequency of ar-
+DiffDoctor [48] employs its dataset to train an artifact seg-     tifacts for each model, while Figure 2 presents the relative
+mentation model, which is used for diffusion fine-tuning to       occurrence of different artifact types. These findings un-
+alleviate artifact generation. While these studies emphasize      derscore the importance of addressing structural artifacts in
+the value of artifact detection and reasoning, they also reveal   modern generative modeling, highlighting the need for scal-
+the necessity of reducing reliance on manual annotation to        able methods to detect, analyze, and mitigate them.
+enable scalable and reliable dataset construction.
+                                                                  4. Agentic Pipeline for Artifact Synthesis
+3. Understanding Visual Artifacts
+                                                                  We propose ArtiAgent, a fully automated agentic pipeline
+3.1. Problem Scope                                                that synthesizes visual artifacts in clean images. As shown
+As generative models have matured, the types of visual            in Figure 3, three agents (perception, synthesis, curation)
+artifacts that frequently appear have also changed. Early         select injection candidates, inject artifacts, and curate out-
+GANs [15] and U-Net–based diffusions [42] predominantly           puts with local and global explanations. Leveraging re-
+exhibited naive distortions such as Gaussian-like noise or        cent LLMs and our artifact-injection tools, ArtiAgent de-
+low-level pixel corruption [55]. Modern diffusion mod-            termines the artifact types and locations for each image and
+els, equipped with DiT-based architectures and trained on         produces high-quality annotations. Full agent details and
+higher-quality datasets, have largely overcome these naive        visualizations are in Appendices A.
+distortions. However, they still generate plausible structural
+visual artifacts, which are the main focus of this work.          4.1. Perception Agent (Figure 3(a))
+Definition 3.1. (Informal) Structural visual artifacts refer      The perception agent aims to analyze a real image and de-
+to defects in which the inherent physical structures of ob-       compose it into meaningful semantic units that can serve as
+jects are distorted in the generated image. That is, while        reliable candidates for the synthesis agent.
+the contents specified in the prompt are represented, their
+                                                                  4.1.1. Entity-Subentity Vocabulary Generation
+form violates common-sense plausibility (e.g., a generated
+dog with two noses). This definition excludes text-to-image       The agent uses out-of-the-box VLMs to decompose the in-
+misalignments where the prompt content itself is misrepre-        put image into a hierarchical vocabulary of entities (e.g.,
+sented (e.g., generating a cat given the prompt of a dog).        dog) and subentities (e.g., nose). These are grouped into
+                                                                  two semantic levels: peripheral subentities, such as fingers
+3.2. Artifact Analysis in Modern Generative Models                or legs, and intermediate subentities, such as body or face.
+We have categorized structural artifacts into four represen-      The prompt template for this module is in Appendix A.2.1.
+tative types: duplication, omission, distortion, and fusion.
+Figure 1(a) provides illustrative examples of each case,          4.1.2. Entity-Subentity Grounding
+showing how diffusion models can compromise reliability           The agent then employs Grounded-SAM [41] to ground en-
+while still producing visually high-quality pixels. To sys-       tities and subentities visible in the image. Once the seg-
+tematically analyze these artifacts, we randomly sampled          mentation masks for both entities (e.g., dog) and subentities
+100 captions from the MS-COCO dataset [7] and used them           (e.g., leg) are obtained, the agent performs a containment
+as text-to-image prompts across five state-of-the-art diffu-      analysis to associate each subentity with its parent entity
+sion models, including Stable Diffusion 3.5 [11], FLUX [5],       (e.g., a leg of a dog) by computing the overlap ratio.
+        (a) Perception Agent                                  (b) Synthesis Agent                                  (c) Curation Agent
+        Entity-Subentity Vocab.                                                                                                           Filtering
+                                                                                                                                          Compare [real] and
+                 Instruction                                                                                                              [injected] image.
+                                                      Entity     Intermediate          Peripheral
+             Decompose the
+             image into entities                                                                                                                    LPIPS
+                                                   Toolbox
+             and subentities.
+                                                             Peripheral         Intermediate     Entity
+
+                 Response                            add          remove          distort            fuse
+       [“person”:                                                                                            Explanation Generation
+       {“peripheral”: [“hand”, “nose”],
+       “intermediate”: [“face”, “ear”]}]
+                                                                                                                  What is wrong with [bbox] of [injected]?
+                                                                                                                  “<bbox1>”: “the face … distorted”
+                                                                                                                  “<bbox2>”: “… duplicate hand”
+                                                                                patch mapping
+        Grounding
+                                                                                                                  Explain the [injected] image.
+                                                                                                                  “There is a surfer with an extra
+                     Grounding-SAM                                                                                hand. Also, the face is …”
+                                                                          DiT                  DiT
+
+                                                      Real                 Inversion-Injection
+
+
+                                                                                “type”: “distortion”
+                                                                                “entity”: “person”
+                                                                                “subentity”: “face”
+                                                                                                            “<bbox1>”: “The face has been distorted”
+                                                                                “type”: “duplication”
+        “person”:                                                                                           “<bbox2>”: “There is a duplicate hand”
+                                                                                “entity”: “person”          “exp”: “There is a surfer with an extra
+        [“face”, “hand1”, “hand2”, “nose”]                                      “subentity”: “hand”
+                                                             Injected                                       hand. Also, the face is unnaturally warped …”
+
+
+Figure 3. ArtiAgent consists of three coordinated agents: (1) the perception agent detects entities and subentities using Grounded-SAM;
+(2) the synthesis agent injects artifacts through patch mapping tool and the inversion-injection paradigm; and (3) the curation agent filters
+low-quality results and generates localized and global textual explanations.
+                 (a) Add           (b) Remove (c) Distort      (d) Fuse
+                                                                                       mapping. It applies add and remove to peripheral suben-
+
+ Reference
+                                                                                       tities, distort to intermediate subentities, and fuse to two
+                                                                                       overlapping entities. Figure 4 shows one example per tool.
+                                                                                       Detailed algorithms are in Appendix A.3.
+                                                                                        • Add. Reference patches are the original subentity re-
+                                                                                           gion, while the tool chooses the best target-patch candi-
+  Target                                                                                   date from surrounding patches. Nearby patches without
+                                                                                           overlaps or subentity class conflicts are preferred.
+                                                                                        • Remove. Target patches are given as the original suben-
+                                                                                           tity region, while the tool creates reference patch map-
+
+  Result
+                                                                                           pings to replace them with the surrounding context.
+                                                                                        • Distort. Target patches are the original subentity region,
+                                                                                           while the tool applies kernels to target patches to generate
+Figure 4. Visualization of each target-reference patch mapping                             distorted mappings to reference patches. We use three
+and its resulting artifact-injected image.                                                 kernels: jitter for random displacement, strip for circular
+4.2. Synthesis Agent (Figure 3(b))                                                         shifts over bands, and a random permutation kernel.
+                                                                                        • Fuse. The fuse tool generates mappings that blend con-
+The synthesis agent uses the perception agent’s grounding                                  tent across multiple entities. The target patches contain
+to inject artifacts into an image via two components: a tool-                              the overlapping region between two entity instances, and
+box that generates target-reference patch mappings and an                                  the chunks of reference patches from one entity are as-
+inversion-injection module that applies them to the image.                                 signed to the target patches of the other entity.
+4.2.1. Target-Reference Patch Mapping Toolbox                                          4.2.2. Inversion-Injection Method for Artifact Synthesis
+The toolbox has four artifact-injection tools: add, remove,                            We propose an inversion-injection module, which extends
+distort, and fuse, each producing a target-reference patch                             the inversion-restoration paradigm from image editing [9,
+                  DiT Self-Attention            DiT Self-Attention
+                                                                     Background 𝑝)   • Background Region. For a non-target patch pb ∈ PB ,
+                             𝑄"!!,#$%           𝑄"!!,#$'             Target 𝑝*
+                                                                                       we keep their original positional information and reuse
+                                        Value                        Reference 𝑝+
+       For 𝑃! ,              $!
+                             𝐾                  𝐾$!                                          (ℓ)
+                                !,#$%              !,#$'                               the Vinv values to maintain the context of the original im-
+                             𝑉!!,#$%            𝑉!!,#$%                                        (ℓ)            (ℓ)        (ℓ)              (ℓ)
+                      Inversion                       Injection
+                                                                                       age: Q̃pb = RoPE(Qpb , pb ), K̃pb = RoPE(Kpb , pb ),
+                             𝑄"!&,#$%           𝑄"!(,#$'                                      (ℓ)     (ℓ)
+                                                                                       and Vpb ← Vpb ,inv .
+                             $!
+                             𝐾                  $!
+                                                𝐾
+   For 𝑃" & ℳ,
+                                &,#$%
+                                        Value
+                                                   (,#$'
+                                                                                        Then, self-attention is performed as in Equation (3).
+                             𝑉!&,#$%    & PE    𝑉!(,#$%
+                                                                                        In general, PE injection controls where the model be-
+                                                                                     lieves denoising is occurring, while value injection provides
+Figure 5. Inversion-injection module. In this example, the right
+                                                                                     what semantic content fills that position. Their combina-
+arm from the reference patches is added to target patches below it.
+                                                                                     tion allows for local injections of realistic artifacts, while
+29, 31, 47]. Specifically, the inversion-injection module em-                        the background remains consistent with the original image.
+ploys the target-reference patch mapping to manipulate the                           Although value injection [9, 47] is a well-established ap-
+positional information in the self-attention layers of DiT, al-                      proach in image editing research, our method introduces
+lowing realistic structural artifact synthesis.                                      the novel idea of manipulating their positions during injec-
+                                                                                     tion. Furthermore, PE injection itself has not been used in
+Notations. Let X (ℓ) ∈ RN ×d denote the input to a trans-                            previous image editing works. Combining PE and value
+former layer ℓ, where N is the number of image patches                               injections offers a particularly effective methodology for
+and d is the embedding dimensionality. We denote the set                             generating structural artifacts, as it enables direct manip-
+of all patch indices as P = {1, . . . , N }. During artifact in-                     ulation of spatial information during the reconstruction pro-
+jection, we accept the target-reference patch mapping M =                            cess. To prevent shortcut-feature learning (e.g., edge dis-
+{(pt , pr ) ∈ P × P} provided by the toolbox, where pt is a                          continuities), we restrict PE and value injections to early-
+target patch to be modified and pr its reference patch. The                          to-middle layers and disable them during the final denois-
+set of all target patches is PT = {pt | (pt , pr ) ∈ M}, the                         ing steps. We provide attention visualizations and ablation
+set of all reference patches is PR = {pr | (pt , pr ) ∈ M},                          studies (including injection-step ablations) to support these
+and the set of background patches becomes PB = P \ PT .                              design choices in Appendices A.4 and A.5. Furthermore,
+Inversion Stage. The inversion stage maps the input image                            our training-free inversion-injection method is inherently
+into its corresponding noisy latent representation. Queries,                         model-agnostic, making it readily generalizable to other
+keys, and values for the self-attention layer are                                    emerging DiT-based image generation models.
+
+                      (ℓ)                           (ℓ)
+Q(ℓ) = X (ℓ) WQ , K (ℓ) = X (ℓ) WK , V (ℓ) = X (ℓ) WV ,
+                                                                              (ℓ)    4.3. Curation Agent (Figure 3(c))
+                                                       (1)                           The curation agent is the pipeline’s quality assurance and
+          (ℓ)   (ℓ)    (ℓ)
+where WQ , WK , WV ∈ Rd×d are learnable. We encode                                   enrichment stage, which refines the synthesis agent’s output
+positions with rotary embeddings (RoPE) [46] such that                               into training-ready datasets for downstream tasks. Given
+                                                                                     paired real and artifact-injected images, the curation agent
+   p = RoPE(Q , p), K̃p = RoPE(K
+ Q̃(ℓ)             (ℓ)       (ℓ)               (ℓ)
+                                                   , p), p ∈ P.                      performs data filtering and explanation generation. This
+                                                              (2)                    paired input enables reliable filtering and explanation by
+Then, the layer’s attention output is                                                contrasting artifact-injected regions with real counterparts.
+
+                                                                                     4.3.1. Data Filtering
+                                                   !
+                                    Q̃(ℓ) K̃ (ℓ)⊤
+       Attn (X ) = Softmax
+           (ℓ)   (ℓ)
+                                        √             V (ℓ) . (3)
+                                           d                                         This stage applies one of two filtering methods depending
+                                                                                     on which tool was used for artifact injection.
+While executing Equation (3), we cache the per-layer value                           • LPIPS-Based Filtering. Distortion artifacts are val-
+              (ℓ)
+embeddings Vinv ← V (ℓ) for use in the injection stage.                                idated using the LPIPS [56] metric, which measures
+Injection Stage. As in Figure 5, during the denoising pro-                             the perceptual difference between two images by com-
+cess, the injection stage injects structural artifacts into PT                         paring their feature representations, producing a met-
+by borrowing spatial semantics from PR , while keeping the                             ric that aligns much more closely with human judg-
+original semantics of PB .                                                             ments. For each cropped original-injected pair, we com-
+                                                                                       pute the LPIPS score and retain the pair if it satisfies
+• Target Region. For pt ∈ PT mapped to pr , we replace                                 τ1 ≤ 1 − dLPIPS (xoriginal , xartifact ) ≤ τ2 , with τ2 filtering
+  the positional embedding (PE) and the value embedding                                out pairs too similar with unidentifiable changes, while
+                              (ℓ)        (ℓ)         (ℓ)
+  of pt with those of pr : Q̃pt = RoPE(Qpt , pr ), K̃pt =                              τ1 filters out severely corrupted samples with implausi-
+            (ℓ)            (ℓ)    (ℓ)
+  RoPE(Kpt , pr ), and Vpt ← Vpr ,inv .                                                ble damage in the region.
+• VLM-Based Filtering. For duplication, omission, and              Table 2. Comparison of artifact benchmark datasets. If a
+  fusion artifacts, we employ a VLM to validate whether            benchmark reused another dataset as a source, we describe the
+  the injected change is perceptible and localized within the      generative models used in that source. The table with the full cita-
+                                                                   tions is provided in Appendix B.1.
+  designated region. The VLM receives the original image
+  with the target region masked out (to provide the global                            Source Models
+                                                                   Benchmark                                Sample Bin. Loc. Exp.
+                                                                                   Oldest      Newest
+  scene context), the original image cropped to the target
+  region (to show the unaltered content), and the artifact-                                    Dreamlike
+                                                                   RichHF          SD2.1                      955            ✓
+                                                                                               Photoreal
+  injected image cropped to the same region (to focus on
+  the modification). From this triplet, the VLM makes a            LOKI           pix2pix        FLUX         229            ✓     ✓
+  binary judgment, confirming whether a new instance has           SynthScars   Midjourney     DALL·E3        1K             ✓     ✓
+  appeared (duplication), an expected object has become            ArtiBench       SD3.5     Nano-Banana      1K      ✓      ✓     ✓
+  missing (omission), or two objects have been unnaturally
+  merged (fusion). For a detailed prompt template used for         though valuable at the time, no longer capture the charac-
+  VLM-based filtering, see Appendix A.2.2.                         teristics of modern artifacts produced by current diffusion
+                                                                   and multimodal transformers. As a result, the evalua-
+4.3.2. Explanation Generation
+                                                                   tion on these benchmarks may not accurately reflect the
+• Local Explanation. For each candidate region, the VLM            artifact-handling capabilities of today’s models.
+  receives the same triplet used in filtering. We prompt the           To address this issue, we introduce ArtiBench, a new
+  VLM to synthesize a short local description by guiding           benchmark that reflects the current state of artifact phenom-
+  the VLM to describe what is different in the artifact re-        ena in recent generative models. As summarized in Table 2,
+  gion compared to the real counterpart. For the detailed          previous benchmarks were limited either in sample diver-
+  prompt template used, see Appendix A.2.3.                        sity, recency of generative sources, or task coverage. Our
+• Global Explanation. After generating local explana-              benchmark is designed to overcome these limitations by in-
+  tions for all artifacts, the curation agent generates a global   cluding data from recent models and providing comprehen-
+  explanation for the whole image. The VLM accepts                 sive annotations for multiple artifact-related tasks.
+  the artifact image and a list of artifact-injected bounding          We construct ArtiBench with 1K images generated
+  boxes and their corresponding local explanations. The            by five state-of-the-art diffusion models, Stable Diffu-
+  VLM is prompted to explain why this artifact injected            sion3.5 [11], FLUX-schnell/dev [5], Qwen-Image [49],
+  image is indeed an artifact. For the detailed prompt tem-        and Nano-Banana [13], with the prompts sampled from
+  plate used, see Appendix A.2.3.                                  three datasets, MS-COCO [7], PartiPrompts [52], and Fuse-
+                                                                   Cap [44]. For annotation, we involve 12 human annotators
+4.4. Data Collection                                               and label each image with: (1) a binary indicator denoting
+With our novel three-stage agentic pipeline, we collect            the presence or absence of artifacts, (2) bounding boxes for
+50K pairs of artifact-injected images and the correspond-          all artifact regions, and (3) concise descriptions of the ob-
+ing original images, along with the metadata consisting of         served abnormalities. The dataset is balanced with an equal
+artifact explanation shown in the final output of Figure 3.        ratio of artifact-free and artifact-containing samples. Fur-
+Here, we reconstruct the source images using the inversion-        ther details on the construction and annotation pipeline are
+restoration method to alleviate pairwise differences origi-        provided in Appendix B.2.
+nating from diffusion-generated image traits. The source
+images are composed of four different datasets, COCO [7],          6. Experiments
+Caltech-101 [12], 11K Hands [1], and Celeba HQ [21],
+                                                                   6.1. Understanding Artifacts with VLMs
+broadening the distribution from diverse real-world scenes
+to specific single entity images. We employ GPT-4o [33]            We assess the efficacy of ArtiAgent by training VLMs with
+as the VLM that contributes to our agentic flow. In addi-          visual question-answering (VQA) samples generated from
+tion, the inversion-injection method in Section 4.2.2 uses         ArtiAgent and measuring their performance on artifact-
+FLUX.1-dev [5] for the DiT and FireFlow [9] for the                aware benchmarks, including ArtiBench.
+inversion-injection module.                                        6.1.1. Setup
+5. ArtiBench: Artifact Detection Benchmark                         We consider three tasks, artifact detection, localization, and
+                                                                   explanation. For evaluation metrics, we use accuracy and
+Existing artifact detection benchmarks, such as                    F1 score for detection, mIoU and F1 score for localiza-
+RichHF [25], LOKI [51], and SynthScars [20] were                   tion, and ROUGE and CSS for explanation. More details of
+built primarily using earlier diffusion models, including          the evaluation protocol are provided in Appendix B.3. For
+Stable Diffusion 1 or 2 and Midjourney. These datasets,            baselines, we use three artifact segmentation algorithms,
+Table 3. Artifact understanding performance across (a) binary detection, (b) localization, and (c) explanation. The benchmarks are
+listed in the order in which they were published.
+                   (a) Binary detection                           (b) Localization                                                     (c) Explanation
+      Methods           ArtiBench            RichHF            LOKI            SynthScars         ArtiBench           LOKI               SynthScars           ArtiBench
+                      Acc        F1       mIoU     F1      mIoU     F1      mIoU       F1       mIoU      F1      ROUGE    CSS        ROUGE      CSS        ROUGE    CSS
+        PAL            -         -        0.079   0.028     0.021   0.037   0.035    0.053      0.040     0.066      -         -          -          -         -           -
+     DiffDoctor        -         -        0.077   0.139     0.175   0.274   0.083    0.136      0.081     0.137      -         -          -          -         -           -
+     LEGION            -         -        0.067   0.112     0.100   0.158   0.106†   0.152†     0.062     0.099    0.133     0.314     0.247†     0.589†     0.143       0.332
+   GPT-4o            0.619     0.601      0.086   0.040     0.037   0.056   0.032    0.052      0.049     0.084    0.107     0.266      0.125     0.404      0.143       0.433
+Gemini-2.5-Pro       0.582     0.575      0.061   0.091     0.109   0.169   0.064    0.101      0.095     0.147    0.097     0.358      0.103     0.474      0.159       0.420
+   GPT-5             0.599     0.577      0.126   0.146     0.089   0.141   0.117    0.185      0.061     0.099    0.121     0.382      0.120     0.461      0.145       0.434
+Qwen2.5-VL-7B        0.501     0.336      0.075   0.028     0.052   0.068   0.013    0.018      0.010     0.014    0.106     0.267      0.115     0.362      0.117       0.263
+  + ArtiAgent        0.627     0.627      0.119   0.198     0.129   0.198   0.137    0.214      0.111     0.168    0.169     0.454      0.196     0.578      0.233       0.643
+InternVL3.5-8B       0.498     0.357      0.013   0.022     0.015   0.025   0.019    0.033      0.010     0.015    0.081     0.189      0.050     0.180      0.126       0.256
+  + ArtiAgent        0.630     0.620      0.100   0.170     0.126   0.196   0.140    0.217      0.119     0.176    0.137     0.401      0.179     0.513      0.226       0.625
+†
+    LEGION was trained on the SynthScars training dataset split.
+
+PAL [55], DiffDoctor [48], and LEGION [20]; and three
+proprietary VLMs, GPT-4o [33], Gemini-2.5-Pro [14], and
+GPT-5 [34]. PAL and DiffDoctor are evaluated only on
+the localization task as they output only segmentations, LE-                                                                         (0.10)                     (0.43)
+
+GION is evaluated on the localization and explanation tasks,
+                                                                                         Figure 6. Scaling effect of data generated by ArtiAgent with
+and the three VLMs are evaluated on all three tasks. We                                  Qwen2.5-VL-7B. We average the results of all the benchmarks.
+fine-tune Qwen2.5-VL-7B [4] and InternVL3.5-8B [57] on
+a 100K training set generated by ArtiAgent. The detailed                                      Table 4. ArtiBench result of the VLM trained on a 1K dataset.
+procedure for VQA generation is provided in Appendix B.4.                                                (a) Binary detection    (b) Localization           (c) Explanation
+                                                                                              Methods
+                                                                                                            Acc        F1        mIoU        F1            ROUGE       CSS
+6.1.2. Main Results                                                                         SynthScars    0.555      0.548       0.094          0.147       0.156        0.521
+                                                                                            ArtiAgent     0.555      0.550       0.074          0.121       0.222        0.606
+Overall, fine-tuning open-source VLMs with synthetic data
+generated by ArtiAgent consistently enhances their abil-                                 Artifact Explanation. Table 3(c) shows that training with
+ity to detect, explain, and localize visual artifacts. Across                            the ArtiAgent’s generated dataset greatly strengthens the
+all three tasks, ArtiAgent-trained models not only outper-                               reasoning and description capabilities of VLMs. The fine-
+form their vanilla counterparts but also match or exceed                                 tuned models exhibit clear improvements in the ROUGE
+the performance of proprietary systems such as GPT-5 and                                 and CSS metrics across all benchmarks.
+Gemini-2.5-Pro. These gains highlight the quality and scal-
+ability of ArtiAgent-generated supervision, demonstrating                                6.1.3. Data Scaling Effect of ArtiAgent
+that artifact synthesis through agentic data generation pro-                             Figure 6 shows how model performance grows as we in-
+vides rich, transferable signals for both spatial grounding                              crease the size of the training data with ArtiAgent. In all
+and semantic reasoning.                                                                  three tasks, we observe a clear upward trend, which means
+                                                                                         that more synthesized data consistently lead to better arti-
+Artifact Binary Detection. Table 3(a) shows that VLMs
+                                                                                         fact understanding. Notably, for localization and explana-
+trained with ArtiAgent achieve clearly superior artifact de-
+                                                                                         tion, the performance with subsets as small as 1K samples
+tection performance. Specifically, ArtiAgent improves the
+                                                                                         already surpasses that of GPT-5, showing that ArtiAgent
+accuracy of InternVL3.5-8B by 26.5%. At the same time,
+                                                                                         provides highly sample-efficient supervision. In contrast,
+the overall low accuracy on ArtiBench highlights the dif-
+                                                                                         the binary detection task continues to improve up to the
+ficulty and importance of understanding visual artifacts in
+                                                                                         100K scale, suggesting that detection benefits from larger
+AI-generated images, especially because modern diffusion
+                                                                                         and more diverse artifacts. These results highlight the rich
+models increasingly exhibit subtle, structured failures that
+                                                                                         supervision and the strong scaling potential of ArtiAgent.
+current VLMs easily miss.
+Artifact Localization. Table 3(b) shows that ArtiAgent                                   6.1.4. Comparison with Human-Annotated Supervision
+consistently enhances the spatial grounding capability of                                To compare the quality of human annotation and ArtiAgent-
+open-source VLMs. Although DiffDoctor exhibits high ac-                                  generated annotations, we train Qwen2.5-VL-7B with 500
+curacy in LOKI, it fails to generalize to more recent bench-                             SynthScars samples and 500 clean samples from ArtiAgent
+marks, including ArtiBench. This outcome means that Art-                                 and compare it with a counterpart trained on 1K ArtiA-
+iBench further extends the artifact detection field one step                             gent samples. Table 4 shows that ArtiAgent’s synthetic
+deeper, by capturing artifacts that prior artifact-detection                             supervision remains competitive with human annotation:
+models struggle to identify.                                                             SynthScars is slightly better in localization, while ArtiA-
+503   FLUX-schnell. We run six search rounds each for 100                       tifact in the region has been fully resolved. If the VLM              525
+504   prompts sampled from MS-COCO and measure how much                         continues to detect an artifact, the inpainting procedure is          526
+505   the reward increases as the search progresses.                            repeated. This iterative loop continues until the VLM con-            527
+506   Results.                                                                  firms the absence of artifacts.                                       528
+
+      Table 4. Reward-guided generation. ArtiAgent can train a re-              Results. Figure 8 presents qualitative results of our image           529
+      ward model that guides diffusion to generate artifact-free images.        correction pipeline. The VLM accurately identifies the ar-            530
+                                                                                tifact
+                                                                                   Beforeregion, and After
+                                                                                                      the inpainting Before
+                                                                                                                     model correctsAfter
+                                                                                                                                     the region       531
+                                ! Reward
+           0      0.06±0.11 0.10±0.08 0.13±0.08 0.16±0.07 0.23±0.08             with natural and structurally consistent content. These re-           532
+                                                                                sults demonstrate that the proposed pipeline can reliably lo-         533
+                     “a photo of a man holding a phone”
+                                                                                cate and correct artifacts, depicting the usefulness of our           534
+                                                                                artifact understanding VLM.                                           535
+                                                                                   Before          After            Before          After
+
+                                                                                7. Conclusion                                                         536
+          “a very small child is laying on the ground with oranges”
+                                                                                In this work, we introduce ArtiAgent, a scalable agen-                 537
+                                                                                tic framework that automatically synthesizes visual arti-              538
+                                                                                facts through positional embedding manipulation in diffu-              539
+                                                                                sion  transformers.After
+                                                                                   Before
+                                                                                                     By integratingBefore
+                                                                                                                     perception, synthesis,
+                                                                                                                                    After
+                                                                                                                                              and      540
+       Round 1                  Search rounds                  Round 6          curation agents, our pipeline generates large-scale, richly            541
+507       As 7.
+      Figure  canReward-guided
+                  be seen in Figure   7, the reward
+                                   generation.       steadily
+                                                ArtiAgent   canimproves
+                                                                train a re-     annotated artifact datasets without human supervision. Ex-             542
+508    throughout   the  search  rounds,  indicating that the  diffusion
+      ward model that guides diffusion to generate artifact-free  images.       periments showed that VLMs fine-tuned on ArtiAgent data                543
+509    model continues to generate images with fewer artifacts.                 achieved substantial gains in artifact detection, localization,        544
+510   gent  matches in
+       Qualitatively,  thedetection
+                           examplesand     performs
+                                      in Figure      better
+                                                  7 how      in explana-
+                                                          clearer  struc-       and explanation, and that the resulting models can guide               545
+511   tion.
+       tures and reduced artifact patterns in later rounds,the
+             We  attribute  the localization  gap  mainly   to      patch-
+                                                                 demon-                      Image correction.
+                                                                                  Figure 8.sampling
+                                                                                diffusion                       The ArtiAgent-trained
+                                                                                                      toward artifact-free generationsVLM      can ef- 546
+                                                                                                                                          and per-
+      level  granularity  of  ArtiAgent   labels.  Overall, these  results        fectively guide image inpainting models to correct artifact regions.
+512    strating that the reward model successfully guides sampling              form automated artifact correction. Together, these results            547
+      indicate that ArtiAgent is a cost-effective and scalable alter-
+      native to human annotation while maintaining comparable                    Setup. We use Qwen2.5-VL-7B trained with ArtiAgent to
+      supervision quality.                                                  8
+                                                                                 determine whether an artifact is present in a given image
+                                                                                 and to localize the artifact region. This region is then pro-
+      6.2. Mitigating Artifacts in Diffusion Models
+                                                                                 cessed by the FLUX inpainting pipeline [3], which synthe-
+      6.2.1. Reward-Guided Artifact-Free Generation                              sizes a corrected version of the localized area. Next, the cor-
+      A key strength of ArtiAgent is its pairwise data design: for               rected image is re-evaluated by the VLM to verify whether
+      every instance, it provides two tightly matched images with                the artifact in the region has been fully resolved in the spec-
+      the same content, one clean and one with artifact. This                    ified region. If the VLM continues to detect an artifact, the
+      structure gives extremely rich supervision for learning ar-                inpainting procedure is repeated. This iterative loop contin-
+      tifact preferences. Using these pairs, we adopt the reward-                ues until the VLM confirms the absence of artifacts. The
+      guided test-time scaling framework [28] that steers diffu-                 detailed procedure is provided in the Appendix C.2.
+      sion models toward producing artifact-free images.                         Results. Figure 8 presents qualitative results of our image
+      Setup. We use CLIP as the backbone of the Bradley-                         correction pipeline. The VLM accurately identifies the ar-
+      Terry [6] reward model. The model learns to assign a higher                tifact region and the inpainting model corrects the region
+      score to the real image over the artifact image. With this                 with natural and structurally consistent content. These re-
+      artifact-aware reward model, we apply test-time scaling to                 sults demonstrate that the proposed pipeline can reliably lo-
+      FLUX-schnell. We run six search rounds, each for 100                       cate and correct artifacts, depicting the usefulness of our
+      prompts sampled from MS-COCO and measure how much                          artifact understanding VLM.
+      the reward increases as the search progresses. The detailed
+      training schema and the test-time scaling procedure are pro-               7. Conclusion
+      vided in the Appendix C.1.                                                 In this work, we introduce ArtiAgent, a scalable agen-
+      Results. As can be seen in Figure 7, the reward steadily                   tic framework that automatically synthesizes visual arti-
+      improves throughout the search rounds, indicating that the                 facts through positional embedding manipulation in diffu-
+      diffusion model continues to generate images with fewer                    sion transformers. By integrating perception, synthesis, and
+      artifacts. Qualitatively, the examples in Figure 7 show                    curation agents, our pipeline generates large-scale, richly
+      clearer structures and reduced artifact patterns in later                  annotated artifact datasets without human supervision. Ex-
+      rounds, demonstrating that the reward model has success-                   periments showed that VLMs fine-tuned on the ArtiAgent
+      fully learned the real-artifact preference and enables guid-               datasets achieved substantial gains in artifact detection, lo-
+      ance towards artifact-free images.                                         calization, and explanation, and that the resulting models
+                                                                                 can guide diffusion sampling toward artifact-free genera-
+      6.2.2. VLM-Guided Artifact Correction                                      tions and perform automated artifact correction. Together,
+      Since our artifact-trained VLM can reliably detect and lo-                 these results demonstrate that agentic data synthesis pro-
+      calize artifacts, we employ it to guide an image inpainting                vides an effective and general pathway to perceiving and
+      model to correct artifact regions in AI-generated images.                  mitigating visual artifacts in modern generative models.
+Acknowledgements                                                          In Proceedings of the International Conference on Machine
+                                                                          Learning (ICML), 2024. 3, 6, 16
+This work was supported by Institute of Information &                [12] Li Fei-Fei, Rob Fergus, and Pietro Perona. Learning gener-
+Communications Technology Planning & Evaluation (IITP)                    ative visual models from few training examples: An incre-
+grant funded by the Korea government (MSIT) (No. RS-                      mental bayesian approach tested on 101 object categories.
+2020-II200862, DB4DL: High-Usability and Performance                      Computer Vision and Image Understanding, 106(1):59–70,
+In-Memory Distributed DBMS for Deep Learning, 50% and                     2007. 6
+No. RS-2025-25442149, LG AI STAR Talent Development                  [13] Alisa Fortin, Guillaume Vernade, Kat Kampf, and Am-
+Program for Leading Large-Scale Generative AI Models in                   maar Reshi.         Introducing gemini 2.5 flash image.
+the Physical AI Domain, 50%).                                             https : / / developers . googleblog . com / en /
+                                                                          introducing-gemini-2-5-flash-image/, 2025.
+                                                                          Google AI / DeepMind blog post, August 26 2025. 1, 3, 6,
+References                                                                16
+ [1] Mahmoud Afifi. 11k hands: gender recognition and biomet-        [14] Gemini Team, Google DeepMind. Gemini 2.5: pushing the
+     ric identification using a large dataset of hand images. Mul-        frontier with advanced reasoning, multimodality, long con-
+     timedia Tools and Applications, 78:20835–20854, 2019. 6              text, and next generation agentic capabilities. Technical Re-
+ [2] Vatsal Agarwal, Matthew Gwilliam, Gefen Kohavi, Eshan                port, 2025. 7
+     Verma, Daniel Ulbricht, and Abhinav Shrivastava. Towards        [15] Ian Goodfellow, Jean Pouget-abadie, Mehdi Mirza, Bing
+     multimodal understanding via stable diffusion as a task-             Xu, David Warde-farley, Sherjil Ozair, Aaron Courville, and
+     aware feature extractor. arXiv preprint arXiv:2507.07106,            Yoshua Bengio. Generative adversarial networks. Commu-
+     2025. 1                                                              nications of the ACM, 63(11):139–144, 2020. 3
+ [3] AlimamaCreative. Flux.1-dev controlnet inpainting (beta).       [16] Iryna Hartsock and Ghulam Rasool. Vision-language mod-
+     https://huggingface.co/alimama-creative/                             els for medical report generation and visual question answer-
+     FLUX . 1 - dev - Controlnet - Inpainting - Beta,                     ing: a review. Frontiers in Artificial Intelligence, 7:1430984,
+     2024. Model weights released under the FLUX.1 [dev] Non-             2024. 1
+     Commercial License. 8, 18                                       [17] Xinyu Huang. A survey of domain adaptation in robotics
+ [4] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wen-                using diffusion models. Applied and Computational Engi-
+     bin Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang,                 neering, 179:1–8, 2025. 1
+     Jun Tang, and Others. Qwen2. 5-vl technical report. Arxiv       [18] Phillip Isola, Jun-Yan Zhu, Tinghui Zhou, and Alexei A
+     Preprint Arxiv:2502.13923, 2025. 7, 17                               Efros. Image-to-image translation with conditional adversar-
+                                                                          ial networks. In Proceedings of the IEEE/CVF Conference
+ [5] Blackforestlabs. Flux: a powerful tool for text generation.
+                                                                          on Computer Vision and Pattern Recognition (CVPR), pages
+     https://blackforestlabs.ai/, 2024. 3, 6, 16
+                                                                          1125–1134, 2017. 16
+ [6] Ralph Allan Bradley and Milton E Terry. Rank analysis of
+                                                                     [19] Max Jiang, Yijing Bai, Andre Cornman, Christopher Davis,
+     incomplete block designs: I. the method of paired compar-
+                                                                          Xiukun Huang, Hong Jeon, Sakshum Kulshrestha, John
+     isons. Biometrika, 39(3/4):324–345, 1952. 8, 17
+                                                                          Lambert, Shuangyu Li, Xuanyu Zhou, and Others. Scenedif-
+ [7] Xinlei Chen, Hao Fang, Tsung-Yi Lin, Ramakrishna Vedan-              fuser: efficient and controllable driving simulation initializa-
+     tam, Saurabh Gupta, Piotr Dollár, and C Lawrence Zit-               tion and rollout. In Proceedings of the Conference on Neural
+     nick. Microsoft coco captions: data collection and evaluation        Information Processing Systems (NeurIPS), pages 55729–
+     server. Arxiv Preprint Arxiv:1504.00325, 2015. 3, 6                  55760, 2024. 1
+ [8] Gheorghe Comanici, Eric Bieber, Mike Schaekermann, Ice          [20] Hengrui Kang, Siwei Wen, Zichen Wen, Junyan Ye, Wei-
+     Pasupat, Noveen Sachdeva, Inderjit Dhillon, Marcel Blistein,         jia Li, Peilin Feng, Baichuan Zhou, Bin Wang, Dahua Lin,
+     Ori Ram, Dan Zhang, Evan Rosen, and Others. Gemini 2.5:              Linfeng Zhang, and Others. Legion: learning to ground
+     pushing the frontier with advanced reasoning, multimodality,         and explain for synthetic image detection. Arxiv Preprint
+     long context, and next generation agentic capabilities. Arxiv        Arxiv:2503.15264, 2025. 1, 2, 3, 6, 7, 16
+     Preprint Arxiv:2507.06261, 2025. 1                              [21] Tero Karras, Timo Aila, Samuli Laine, and Jaakko Lehtinen.
+ [9] Yingying Deng, Xiangyu He, Changwang Mei, Peisong                    Progressive growing of gans for improved quality, stability,
+     Wang, and Fan Tang. Fireflow: fast inversion of rectified            and variation. In Proceedings of the International Confer-
+     flow for image semantic editing. In Proceedings of the Inter-        ence on Learning Representations (ICLR), 2018. 6
+     national Conference on Machine Learning (ICML), 2025. 1,        [22] Tero Karras, Samuli Laine, Miika Aittala, Janne Hellsten,
+     4, 5, 6                                                              Jaakko Lehtinen, and Timo Aila. Analyzing and improv-
+[10] Dreamlike Art. Dreamlike photoreal 2.0. https://                     ing the image quality of stylegan. In Proceedings of the
+     huggingface.co/dreamlike- art/dreamlike-                             IEEE/CVF Conference on Computer Vision and Pattern
+     photoreal-2.0, 2023. 16                                              Recognition (CVPR), pages 8110–8119, 2020. 16
+[11] Patrick Esser, Sumith Kulal, Andreas Blattmann, Rahim           [23] Firas Khader,         Gustav Müller-Franzes,           Soroosh
+     Entezari, Jonas Müller, Harry Saini, Yam Levi, Dominik              Tayebi Arasteh, Tianyu Han, Christoph Haarburger,
+     Lorenz, Axel Sauer, Frederic Boesel, et al. Scaling recti-           Maximilian Schulze-Hagen, Philipp Schad, Sandy Engel-
+     fied flow transformers for high-resolution image synthesis.          hardt, Bettina Baeßler, Sebastian Foersch, et al. Denoising
+     diffusion probabilistic models for 3d medical image                 Proceedings of the Conference on Neural Information Pro-
+     generation. Scientific Reports, 13(1):7303, 2023. 1                 cessing Systems (NeurIPS), pages 24129–24142, 2023. 1
+[24] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao,     [38] Dustin Podell, Zion English, Kyle Lacey, Andreas
+     Ashwin Balakrishna, Suraj Nair, Rafael Rafailov, Ethan Fos-         Blattmann, Tim Dockhorn, Jonas Müller, Joe Penna, and
+     ter, Grace Lam, Pannag Sanketi, and Others. Openvla: an             Robin Rombach. SDXL: Improving latent diffusion mod-
+     open-source vision-language-action model. Arxiv Preprint            els for high-resolution image synthesis. In Proceedings of
+     Arxiv:2406.09246, 2024. 1                                           the International Conference on Learning Representations
+[25] Yuval Kirstain, Adam Polyak, Uriel Singer, Shahbuland Ma-           (ICLR), 2024. 16
+     tiana, Joe Penna, and Omer Levy. Pick-a-pic: An open           [39] Hanoona Rasheed, Muhammad Maaz, Sahal Shaji, Abdel-
+     dataset of user preferences for text-to-image generation.           rahman Shaker, Salman Khan, Hisham Cholakkal, Rao M
+     Arxiv Preprint Arxiv:2305.01569, 2023. 6                            Anwer, Eric Xing, Ming-Hsuan Yang, and Fahad S Khan.
+[26] Junnan Li, Dongxu Li, Silvio Savarese, and Steven Hoi.              Glamm: pixel grounding large multimodal model. In Pro-
+     Blip-2: Bootstrapping language-image pre-training with              ceedings of the IEEE/CVF Conference on Computer Vision
+     frozen image encoders and large language models. In Pro-            and Pattern Recognition (CVPR), pages 13009–13018, 2024.
+     ceedings of the International Conference on Machine Learn-          3
+     ing (ICML), pages 19730–19742. PMLR, 2023. 1                   [40] Nils Reimers and Iryna Gurevych. Sentence-bert: Sentence
+[27] Youwei Liang, Junfeng He, Gang Li, Peizhao Li, Arseniy              embeddings using siamese bert-networks. In Proceedings
+     Klimovskiy, Nicholas Carolan, Jiao Sun, Jordi Pont-tuset,           of the Conference on Empirical Methods in Natural Lan-
+     Sarah Young, Feng Yang, and Others. Rich human feed-                guage Processing (EMNLP), pages 3982–3992. Association
+     back for text-to-image generation. In Proceedings of the            for Computational Linguistics, 2019. 16
+     IEEE/CVF Conference on Computer Vision and Pattern             [41] Tianhe Ren, Shilong Liu, Ailing Zeng, Jing Lin, Kun-
+     Recognition (CVPR), pages 19401–19411, 2024. 2, 3, 16               chang Li, He Cao, Jiayu Chen, Xinyu Huang, Yukang
+[28] Nanye Ma, Shangyuan Tong, Haolin Jia, Hexiang Hu, Yu-               Chen, Feng Yan, and Others. Grounded sam: assembling
+     Chuan Su, Mingda Zhang, Xuan Yang, Yandong Li, Tommi                open-world models for diverse visual tasks. Arxiv Preprint
+     Jaakkola, Xuhui Jia, and Others. Inference-time scaling             Arxiv:2401.14159, 2024. 3
+     for diffusion models beyond scaling denoising steps. Arxiv     [42] Robin Rombach, Andreas Blattmann, Dominik Lorenz,
+     Preprint Arxiv:2501.09732, 2025. 8, 17                              Patrick Esser, and Björn Ommer. High-resolution image
+                                                                         synthesis with latent diffusion models. In Proceedings of
+[29] Chenlin Meng, Yutong He, Yang Song, Jiaming Song, Jiajun
+                                                                         the IEEE/CVF Conference on Computer Vision and Pattern
+     Wu, Jun yan Zhu, and Stefano Ermon. SDEdit: Guided im-
+                                                                         Recognition (CVPR), pages 10684–10695, 2022. 3, 16
+     age synthesis and editing with stochastic differential equa-
+     tions. In Proceedings of the International Conference on       [43] Robin Rombach, Andreas Blattmann, Dominik Lorenz,
+     Learning Representations (ICLR), 2022. 5                            Patrick Esser, and Björn Ommer. High-resolution image
+                                                                         synthesis with latent diffusion models. In Proceedings of
+[30] Midjourney, Inc.        Midjourney.     https : / / www .
+                                                                         the IEEE/CVF Conference on Computer Vision and Pattern
+     midjourney.com/, 2022. 16
+                                                                         Recognition (CVPR), pages 10684–10695, 2022. 1
+[31] Ron Mokady, Amir Hertz, Kfir Aberman, Yael Pritch, and
+                                                                    [44] Noam Rotstein, David Bensaid, Shaked Brody, Roy Ganz,
+     Daniel Cohen-or. Null-text inversion for editing real im-
+                                                                         and Ron Kimmel. Fusecap: leveraging large language mod-
+     ages using guided diffusion models. In Proceedings of
+                                                                         els for enriched fused image captions. In Proceedings of the
+     the IEEE/CVF Conference on Computer Vision and Pattern
+                                                                         IEEE/CVF Winter Conference on Applications of Computer
+     Recognition (CVPR), pages 6038–6047, 2023. 5
+                                                                         Vision, pages 5689–5700, 2024. 6
+[32] Openai. Dall·e 3. https://openai.com/research/                 [45] Chitwan Saharia, William Chan, Saurabh Saxena, Lala
+     dall-e-3, 2023. 16                                                  Li, Jay Whang, Emily L Denton, Kamyar Ghasemipour,
+[33] OpenAI.       Gpt-4o system card.         Technical Report          Raphael Gontijo lopes, Burcu Karagol ayan, Tim Salimans,
+     arXiv:2410.21276, OpenAI, 2024. 6, 7, 1                             and Others. Photorealistic text-to-image diffusion mod-
+[34] Openai. Gpt-5: large language model. https : / /                    els with deep language understanding. In Proceedings of
+     openai.com/research/gpt-5, 2025. 1, 7                               the Conference on Neural Information Processing Systems
+[35] Ji-Hoon Park, Yeong-Joon Ju, and Seong-Whan Lee. Ex-                (NeurIPS), pages 36479–36494, 2022. 1
+     plaining generative diffusion models via visual analysis for   [46] Jianlin Su, Murtadha Ahmed, Yu Lu, Shengfeng Pan, Wen
+     interpretable decision-making process. Expert Systems with          Bo, and Yunfeng Liu. Roformer: enhanced transformer with
+     Applications, 248:123231, 2024. 1                                   rotary position embedding. Neurocomputing, 568:127063,
+[36] Taesung Park, Alexei A Efros, Richard Zhang, and Jun-               2024. 5
+     Yan Zhu. Contrastive learning for unpaired image-to-image      [47] Jiangshan Wang, Junfu Pu, Zhongang Qi, Jiayi Guo, Yue Ma,
+     translation. In Proceedings of the European Conference on           Nisha Huang, Yuxin Chen, Xiu Li, and Ying Shan. Taming
+     Computer Vision (ECCV), pages 319–345. Springer, 2020.              rectified flow for inversion and editing. In Proceedings of
+     16                                                                  the International Conference on Machine Learning (ICML),
+[37] Yong-Hyun Park, Mingi Kwon, Jaewoong Choi, Junghyo Jo,              2025. 5
+     and Youngjung Uh. Understanding the latent space of dif-       [48] Yiyang Wang, Xi Chen, Xiaogang Xu, Sihui Ji, Yu Liu,
+     fusion models through the lens of riemannian geometry. In           Yujun Shen, and Hengshuang Zhao. Diffdoctor: diagnos-
+     ing image diffusion models before treating. Arxiv Preprint
+     Arxiv:2501.12382, 2025. 1, 2, 3, 7
+[49] Chenfei Wu, Jiahao Li, Jingren Zhou, Junyang Lin, Kaiyuan
+     Gao, Kun Yan, Sheng-Ming Yin, Shuai Bai, Xiao Xu, Yilei
+     Chen, and Others. Qwen-image technical report. Arxiv
+     Preprint Arxiv:2508.02324, 2025. 3, 6, 16
+[50] Shilin Yan, Ouxiang Li, Jiayin Cai, Yanbin Hao, Xiaolong
+     Jiang, Yao Hu, and Weidi Xie. A sanity check for AI-
+     generated image detection. In Proceedings of the Inter-
+     national Conference on Learning Representations (ICLR),
+     2025. 16
+[51] Junyan Ye, Baichuan Zhou, Zilong Huang, Junan Zhang,
+     Tianyi Bai, Hengrui Kang, Jun He, Honglin Lin, Zihao
+     Wang, Tong Wu, and Others. Loki: a comprehensive
+     synthetic data detection benchmark using large multimodal
+     models. Arxiv Preprint Arxiv:2410.09732, 2024. 2, 6, 16
+[52] Jiahui Yu, Yuanzhong Xu, Jing Yu Koh, Thang Luong, Gun-
+     jan Baid, Zirui Wang, Vijay Vasudevan, Alexander Ku, Yin-
+     fei Yang, Burcu Karagol Ayan, Ben Hutchinson, Wei Han,
+     Zarana Parekh, Xin Li, Han Zhang, Jason Baldridge, and
+     Yonghui Wu. Scaling autoregressive models for content-rich
+     text-to-image generation. Transactions on Machine Learn-
+     ing Research, 2022. Featured Certification. 6
+[53] Chenshuang Zhang, Chaoning Zhang, Mengchun Zhang,
+     and In So Kweon. Text-to-image diffusion models in gen-
+     erative ai: a survey. Arxiv Preprint Arxiv:2303.07909, 2023.
+     1
+[54] Jingyi Zhang, Jiaxing Huang, Sheng Jin, and Shijian Lu.
+     Vision-language models for vision tasks: a survey. IEEE
+     Transactions on Pattern Analysis and Machine Intelligence,
+     46(8):5625–5644, 2024. 1
+[55] Lingzhi Zhang, Zhengjie Xu, Connelly Barnes, Yuqian
+     Zhou, Qing Liu, He Zhang, Sohrab Amirghodsi, Zhe Lin,
+     Eli Shechtman, and Jianbo Shi. Perceptual artifacts localiza-
+     tion for image synthesis tasks. In Proceedings of the IEEE
+     International Conference on Computer Vision (ICCV), pages
+     7579–7590, 2023. 1, 2, 3, 7
+[56] Richard Zhang, Phillip Isola, Alexei A Efros, Eli Shecht-
+     man, and Oliver Wang. The unreasonable effectiveness of
+     deep features as a perceptual metric. In Proceedings of
+     the IEEE/CVF Conference on Computer Vision and Pattern
+     Recognition (CVPR), pages 586–595, 2018. 5
+[57] Jinguo Zhu, Weiyun Wang, Zhe Chen, Zhaoyang Liu, Shen-
+     glong Ye, Lixin Gu, Hao Tian, Yuchen Duan, Weijie Su, Jie
+     Shao, Zhangwei Gao, Erfei Cui, Xuehui Wang, Yue Cao,
+     Yangzhou Liu, Xingguang Wei, Hongjie Zhang, Haomin
+     Wang, Weiye Xu, Hao Li, Jiahao Wang, Nianchen Deng,
+     Songze Li, Yinan He, Tan Jiang, Jiapeng Luo, Yi Wang, Con-
+     ghui He, Botian Shi, Xingcheng Zhang, Wenqi Shao, Junjun
+     He, Yingtong Xiong, Wenwen Qu, Peng Sun, Penglong Jiao,
+     Han Lv, Lijun Wu, Kaipeng Zhang, Huipeng Deng, Jiaye
+     Ge, Kai Chen, Limin Wang, Min Dou, Lewei Lu, Xizhou
+     Zhu, Tong Lu, Dahua Lin, Yu Qiao, Jifeng Dai, and Wenhai
+     Wang. Internvl3: exploring advanced training and test-time
+     recipes for open-source multimodal models. Arxiv Preprint
+     Arxiv:2504.10479, 2025. 7, 17
+                See and Fix the Flaws: Enabling VLMs and Diffusion Models
+                 to Comprehend Visual Artifacts via Agentic Data Synthesis
+                                                Supplementary Material
+A. ArtiAgent Pipeline Details (§ 4)                                strict rules and guidance as in Figure 12 and instruct the
+                                                                   VLM model to respond with qualified sets of vocabulary
+A.1. Implementation Details                                        in an explicit format. Figure 13 shows the precise prompt
+                                                                   used to generate the entity-subentity vocabulary sets and an
+Injection Stage. The details of the injection process in Sec-
+                                                                   example response from the perception agent.
+tion 4.2.2 were designed to introduce natural and coherent
+structural artifacts to the image. We accept and build on the      A.2.2. Data Filtering (§ 4.3.1)
+coarse-to-fine manner of denoising processes, adapting the
+                                                                   The curation agent uses a set of deliberately described ar-
+understanding that earlier denoising time steps contribute to
+                                                                   tifact types referring to the injection methods and detailed
+overall structural context, while later steps focus on regions
+                                                                   instructions to detect or explain the artifacts, shown in Fig-
+of fine-grained details [2, 35, 37].
+                                                                   ure 14. Utilizing the descriptions and criteria according to
+• PE Injection. Among the 25 denoising steps, we disable           the type of artifact injected, we query the VLM model with
+   PE injection for selected final steps and apply PE injec-       the entity name and a triplet of images consisting of (1) the
+   tion only in the earlier steps. Duplication, distortion, and    original image with the target part masked out, (2) the orig-
+   fusion artifacts disable five final steps, focusing on intro-   inal image with only the target part cropped, and (3) the
+   ducing coarse context of structural modifications while         generated image with only the target part cropped.
+   maintaining natural connection with the original scene. In
+                                                                       Although modern out-of-the-box VLMs demonstrate
+   contrast, the omission artifact is generated by disabling
+                                                                   limited understanding of structural artifacts, providing the
+   PE injection only in the final timestep, since it requires
+                                                                   models with the rich image context through the image triplet
+   stronger perturbation on positional context to remove an
+                                                                   and detailed descriptions of the type of artifact enhances
+   existing feature from the image and distinguish the newly
+                                                                   their reliability for this task. The prompt template is elabo-
+   injected background from its original entity.
+                                                                   rated in Figure 15.
+• Value Injection. Value injection is performed only for
+   the first 15 denoising steps. Reducing the injection steps      A.2.3. Explanation Generation (§ 4.3.2)
+   for value injection ensures artifact injection while main-
+                                                                   Similarly to Appendix A.2.2, we employ artifact type de-
+   taining image quality. For the architecture consisting of
+                                                                   scription in Figure 14 to generate rich explanations. The
+   sequential double stream blocks and single stream blocks
+                                                                   detailed prompt and an example of the local and global ex-
+   of FLUX.1-dev, only the deeper single stream blocks (20-
+                                                                   planation generation process is shown in Figure 16 and Fig-
+   38) carry out the value injection process.
+                                                                   ure 17. By providing multiple images that contain both the
+Filtering. To ensure alignment with human visual percep-           global and local view, we maximize VLM capacity of un-
+tion, the distortion-type artifact filtering thresholds, τ1 and    derstanding structural artifacts for reliable quality in expla-
+τ2 , were heuristically established at 0.5 and 0.9, respec-        nations. Moreover, we employ BLIP2 [26] to generate con-
+tively. For each artifact region cropped from the original         cise caption describing the real image.
+image and the artifact-injected image, a LPIPS distance was
+measured to ensure certain quality among the artifacts intro-      A.3. Synthesis Agent Tools (§ 4.2.1)
+duced. While malformed regions that are not acceptable as          The artifact injection tools in the synthesis agent produce
+plausible structural artifacts are filtered out by a high LPIPS    target–reference patch mappings that are subsequently con-
+distance over 0.5, unsuccessful artifact injections with sim-      sumed by the inversion–injection module in Section 4.2.2.
+ilar features are discarded by the low LPIPS distance, indi-       Each tool follows a common interface but implements a dif-
+cating high similarity.                                            ferent geometric prior tailored to a specific artifact type (du-
+                                                                   plication, omission, distortion, and fusion).
+A.2. Prompt Templates for ArtiAgent
+                                                                   Notation. Let the image be discretized into a patch grid
+A.2.1. Entity-Subentity Vocabulary (§ 4.1.1)                       of size (hp , wp ), and let Pall be the set of all patch coordi-
+We employ the capability of GPT-4o [33] to identify and            nates on this grid. For a given tool call, the tool outputs a
+recognize relationships between entities in images. To en-         target–reference mapping
+sure that the extracted entity-subentity sets are clearly seg-
+mentable and valid for generating plausible artifacts, we set                            M = {(pt , pr )},
+where pt ∈ Pall denotes a target patch to be modified,             target set PT is the set of patch coordinates belonging to
+and pr ∈ Pall is its reference patch whose semantics will          the subentity being removed. The tool constructs a local
+be injected at pt during the diffusion inversion–injection         neighborhood
+stage. We freely switch between linear indices and (y, x)
+grid coordinates using simple index–coordinate conversion           Pnbr = { p ∈ Pall : ∥p − pt ∥1 ≤ R, pt ∈ PT , p ∈
+                                                                                                                    / PT },
+routines.                                                          discarding any coordinates outside the valid patch grid.
+   For tools that operate on entity- or subentity-specific re-        From this neighborhood it derives:
+gions, we additionally assume access to patch sets such as
+the same-entity foreground Pent and same-subentity fore-             Pnbr-no-sub = Pnbr \ Psub ,          Pnbr-non-ent = Pnbr \ Pent .
+ground Psub . Concretely, Pent contains all patches that be-
+long to a single object instance (e.g., one person or one dog),       If sufficiently many true background patches exist, i.e.
+while Psub ⊆ Pall marks patches of other instances of the                           |Pnbr-non-ent |⟩ 21 |Pnbr-no-sub |,
+same semantic part (e.g., hands of other people, paws of
+                                                                                                                        pool
+other dogs) that we want to avoid colliding with. These sets       the tool prioritizes them as the reference pool PR        =
+are provided by the synthesis agent’s perception stage (e.g.,                                        pool
+                                                                   Pnbr-non-ent ; otherwise it uses PR = Pnbr-no-sub , which
+derived from instance/part segmentation) and are treated as        avoids collisions with other same-subentity patches but may
+fixed inputs when running the tools.                               include same-entity foreground.
+   Whenever we say that we clip to the valid patch grid, we           Finally, each target patch pt ∈ PT selects the nearest
+mean that any candidate coordinate (i, j) whose row or col-        reference patch under L1 distance:
+umn index falls outside the range 0 ≤ i⟨hp or 0 ≤ j⟨wp is
+either discarded or projected back into the rectangular do-                         pr = arg min ∥pt − p∥1 ,
+                                                                                                   pool
+                                                                                                p∈PR
+main [0, hp − 1] × [0, wp − 1] by truncating it to the nearest
+boundary index, so that all patches used by the tools lie on       and the Remove Tool outputs the mapping M = {(pt , pr )}.
+valid positions of the patch grid.
+                                                                   Distort Tool (distortion). The Distort Tool (Algorithm 3)
+Add Tool (duplication). The Add Tool (Algorithm 1) re-             performs structural perturbations within a subentity while
+alizes duplication-type artifacts by creating an extra, plau-      keeping its global placement intact. Here, the target and
+sibly placed copy of a subentity (e.g., an extra hand or           reference sets are drawn from the same foreground region:
+paw adjacent to the original one). Given a set of reference        PT indexes the original subentity patches, and PR is ob-
+patches PR for the original subentity, the tool first computes     tained by applying a distortion kernel. The tool supports
+the subentity centroid (ci , cj ) in patch space and constructs    three kernel types:
+a perimeter band Pring of candidate locations around this          • Shuffle kernel. The simplest kernel copies PT into PR
+centroid with Manhattan distance in [1, α]. For each candi-          and applies a random permutation. Each target patch is
+date (i, j) ∈ Pring , it evaluates the score                         thus reassigned to a randomly chosen patch of the same
+                                                                    subentity, breaking local structure while preserving ap-
+            S(i, j) = 3 − rself − rent − rsub gdist ,
+                                                                     pearance statistics.
+where rself , rent , and rsub measure the overlap ratio of the     • Gaussian jitter kernel. For each (py , px ) ∈ PT , the ker-
+shifted subentity with (i) the original subentity region it-         nel repeatedly samples a discrete offset from a Gaussian
+self, (ii) other foreground patches of the same entity, and          distribution in patch space, (δy , δx ) ∼ N (0, σ 2 I). If a
+(iii) foreground patches belonging to other instances of the         sampled location falls within the same-entity foreground
+same subentity, respectively, and gdist is a distance-based de-      Pent , it is accepted as the reference; otherwise, the kernel
+cay term that penalizes large offsets. Intuitively, this prefers     resamples up to a fixed budget and falls back to the near-
+candidate locations that (i) stay close to the source entity,        est foreground (or self) patch if necessary. This yields
+(ii) minimally overlap the original instance, and (iii) avoid        small, local displacements that bend the entity’s internal
+collisions with other same-subentity regions. The tool then          geometry.
+selects the best-scoring perimeter patch (i⋆ , j ⋆ ), computes     • Strip kernel. This kernel first computes the bounding
+the corresponding offset (∆⋆i , ∆⋆j ), and builds the mapping        box of PT and chooses a dominant direction (vertical or
+                                                                     horizontal) by aspect ratio. It then partitions the subentity
+  M = {((ri + ∆⋆i , rj + ∆⋆j ), (ri , rj )) : (ri , rj ) ∈ PR },     into S strips along that direction and, within each strip,
+                                                                     imposes an ordering of patches. Each strip is circularly
+which duplicates the entire subentity at the chosen location.        shifted by an integer offset ∆s (with alternating signs and
+Remove Tool (omission). The Remove Tool (Algorithm 2)                magnitudes), and the shifted positions define the refer-
+implements omission-type artifacts by erasing a subentity            ences. This produces band-like shearing or sliding arti-
+and filling the region with nearby background context. The           facts within the entity.
+After applying the chosen kernel to form PR , the tool             (a) ArtiAgent                    (b) ArtiBench
+returns the one-to-one mapping M = {(PT [i], PR [i])},
+which causes the inversion–injection module to reconstruct
+a structurally distorted yet context-consistent object.
+Fuse Tool (fusion). The Fuse Tool (Algorithms 4–5) intro-
+duces fusion artifacts along the interface of two overlapping
+entities with patch sets PA and PB . It first identifies the       Figure 9. Attention Visualization. We compare the attention
+overlap region                                                     maps of InternVL3.5-8B before (base) and after (fine-tuned) train-
+                    Poverlap = PA ∩ PB                             ing on ArtiAgent. The fine-tuned model reliably focuses on gen-
+                                                                   uine artifact features across both synthesized images and real-
+and the union foreground Pfg = PA ∪ PB , as well as the            world images.
+non-overlapping parts PA\B = PA \ Poverlap and PB\A =
+PB \ Poverlap . If Poverlap = ∅, no fusion is applied. Given the
+overlap, the tool constructs a thin fusion band PT around          A.5. Ablation Studies
+Poverlap by dilating each overlap patch within an L1 radius        To justify the selected configuration of the synthesis agent
+R and intersecting with Pfg .                                      in Appendix A.1, we conducted ablations on the PE injec-
+   To avoid treating the band as a single global region, the       tion steps along with the value injection blocks and visual-
+tool selects up to K seeds on PT via farthest-point sampling       ized their results. Figure 18 shows how the choice of injec-
+and assigns each band patch to its nearest seed in L1 dis-         tion steps and value-injecting blocks affects artifact injec-
+tance, forming local regions {Rs }. For each region, it then       tion quality.
+chooses an opposite-side pool Popp : if the region’s seed is          To investigate the effect of injection strength on artifact
+closer (in L1 ) to PA\B , the pool is PB\A , and vice versa; if    synthesis, we conducted an ablation study on the number of
+distances tie or a side is empty, the pool defaults to Pfg \PT .   injection steps during the denoising process. Table 5 shows
+Over a discrete set of small integer offsets                       that VLM performance peaks when artifacts are injected for
+                                                                   15 steps. Downstream performance degrades if the steps are
+        Ω = {(∆i , ∆j ) : 1 ≤ |∆i | + |∆j | ≤ Roff },
+                                                                   too few (due to failed artifact injection) or too many (due to
+the tool then selects the offset ∆⋆ which, when applied to         overall image quality degradation), supporting our choice
+patches in the region, maps the largest number of them onto        of 15 injection steps.
+valid, non-band patches in Popp . Each band patch is finally
+                                                                   Table 5. Ablation study on injection steps. Performance of
+paired either with its offset-shifted opposite patch (if valid)    Qwen2.5-VL-7B on ArtiBench binary detection when trained with
+or with the nearest patch in Popp in L1 distance. The re-          1K ArtiAgent samples generated using varying numbers of injec-
+sulting mapping M injects appearance from one entity into          tion steps out of 25 total steps.
+the boundary band of the other, producing visually plausi-
+ble yet structurally implausible fusion along their interface.                             Steps Acc    F1
+In practice, we optionally add a subset of reversed pairs
+                                                                                           5/25 0.513 0.377
+(pr , pt ) while ensuring that each target is unique, which
+                                                                                          10/25 0.583 0.565
+yields more symmetric blending as visualized in Figure 4.                                 15/25 0.586 0.570
+A.4. Qualitative Visualizations                                                           20/25 0.540 0.477
+
+To validate the coverage and generalization of our synthe-
+sized artifacts to natural ones, we analyze attention maps for
+InternVL3.5-8B before and after fine-tuning with ArtiAgent
+data. As shown in Figure 9, the fine-tuned model precisely
+attends to artifact regions in both synthetic (ArtiAgent) and
+real (ArtiBench) images. This comparison confirms that our
+ArtiAgent-trained VLM successfully learns general artifact
+features rather than relying on shortcut features such as edge
+discontinuities, thereby demonstrating strong distributional
+alignment.
+   Figure 10 and Figure 11 illustrate the sampled images
+generated by the ArtiAgent pipeline and its synthesized an-
+notations. The bounding boxes highlight the target patch
+area where artifacts are injected by the synthesis agent.
+Figure 10. Visualizations of artifacts injected with ArtiAgent. The first and third rows show the original images, whereas the second and
+fourth rows show the output images with artifacts injected.
+
+
+
+
+                                                        “bbox”: [424, 317, 456, 397]
+                                                        “entity”: “person”
+                                                        “subentity”: “leg”
+                                                        “label”: “The person is missing a leg.”
+                                                        “explanation”: “The image depicts a person surfing, but there is an
+                                                        unusual absence of one leg, creating an empty space where the leg
+                                                        should be. This anomaly disrupts the natural appearance of the
+                                                        scene, as the person appears to be balancing on the surfboard with
+                                                        only one leg visible.”
+                                                        ”image_caption”: “a person is standing on a surfboard in the ocean.”
+           Clean                      Artifact
+                                        Figure 11. An instance of ArtiAgent with the annotation.
+<Output Format>
+peripheral: {
+         "<peripheral_entity1>": ["<peripheral_sub1>", "<peripheral_sub2>", "..."],
+         "<peripheral_entity2>": ["<peripheral_sub1>", "<peripheral_sub2>", "..."],
+...},
+intermediate: {
+         "<intermediate_entity1>": ["<intermediate_sub1>", "<intermediate_sub2>", "..."],
+         "<intermediate_entity2>": ["<intermediate_sub1>", "<intermediate_sub2>", "..."],
+...}
+
+
+<Hard Rules>
+1) Each returned entity MUST have at least one subentity in its dictionary. b return an empty list for any entity.
+2) If you cannot name at least one clearly visible subentity for an entity in that layer, omit that entity from that dictionary.
+3) Subentities must be clearly visible and reasonably segmentable in the image.
+4) Exclude parts that are tightly bound to or visually fused with the torso/core body (e.g., arms pressed to sides, folded wings against body). Only include
+subentities with clear visual separation.
+5) Do not invent parts that are occluded, cropped out, or ambiguous.
+6) Use concise, lowercase nouns; de-duplicate terms. Prefer 1–6 subentities per entity per dictionary.
+7) Return exactly one JSON object with exactly two top-level keys: "peripheral" and "intermediate" (not an array, not multiple objects).
+8) Granularity rule (coarsity): Choose the most specific visible entity. If only a part is clearly visible (e.g., a leg without enough evidence of the full
+person), output that part as the entity (e.g., "leg") rather than its parent (e.g., "person"). Do not infer parent entities that are not clearly visible.
+9) Peripheral variable-cardinality ban: In the peripheral dictionary, do not include variable-cardinality micro-parts (0..n multiplicity) such as leaves,
+hairs, feathers, scales, spikes, thorns, grains, pebbles, raindrops, confetti, crowd members, etc. Prefer distal parts with fixed or small bounded counts (e.g.,
+hand, finger, ear, eye, wheel, mirror). If only variable-cardinality micro-parts are visible for an entity, omit that entity from the peripheral dictionary.
+
+<Layering Guidance>
+- Peripheral dictionary (index 0): Include outermost parts with clear boundaries (e.g., arm, leg, wing, fin, hand, finger, nail, ear, eye, paw, tail, wheel,
+mirror, antenna).
+- For the peripheral dictionary, exclude variable-cardinality micro-parts (e.g., leaves, hairs, feathers, scales, spots/pattern dots, raindrops); select fixed-
+cardinality or bounded-count distal parts instead.
+- Intermediate/Core dictionary (index 1): Include mid-level structural parts (e.g., arm, leg, face, door, window).
+- If a subentity fits both notions, prefer peripheral only if it is clearly distal and separable (e.g., "hand" → peripheral; "arm" → intermediate).
+- If a candidate layer has no valid entities with visible subentities, set that key to an empty object `[]` (e.g., `"peripheral": []` or `"intermediate": []`).
+
+
+                                Figure 12. Guidance and rules for generating entity-subentity vocabulary sets.
+<User Prompt>
+You are given an image. Identify the visible entities and their subentities, split into two layers:
+- Peripheral (outermost) subentities first (e.g., hands, fingers, eyes, ears, paws, tails, wheels, mirrors).
+- Intermediate/Core subentities second (e.g., arms, legs, face, head, door, window).
+
+Output must return two dictionaries for each peripheral and intermediate types: {OUTPUT FORMAT}
+
+Hard rules: {HARD RULES}
+Layering guidance: {LAYERING GUIDANCE}
+
+Clarifications:
+   - Examples of valid subentities:
+            • person → face, arm, hand, leg, foot, ear, eye
+            • hand → finger, nail, palm
+            • dog → ear, snout, leg, tail, paw
+            • car → wheel, door, window, mirror
+   - Avoid generic torso-like regions. If no fine-grained parts are clearly separable for a candidate entity, omit the entity rather than returning an empty
+list.
+   - Granularity examples:
+            • If only a single leg is clearly visible:
+             {"peripheral": {"leg": ["knee", "ankle", "foot"]}, "intermediate": []}
+   - Variable-cardinality micro-parts are not allowed in the peripheral dictionary. Examples to avoid: leaf/leaves (tree), hair/hairs (person/animal),
+feather/feathers (bird), scale/scales (fish/reptile), spot/spots (dalmatian), petal/petals (flower), book/books (bookshelf), crowd/persons (crowd scene).
+
+Bad examples (NOT allowed):
+  - Returning a single array or more than one top-level JSON object
+  - {"dog": []} # empty subentities list
+  - Multiple separate top-level JSON objects
+  - "peripheral": [{
+           "entity": "tree",
+           "subentities": ["leaf", "fruit"]
+     }]   # variable-cardinality micro-parts in peripheral
+
+Good format examples (illustrative only):
+     { "peripheral": [{"entity": "person","subentities": ["hand", "finger", "leg", "arm"]},
+                    {"entity": "car","subentities": ["wheel", "mirror"]},
+                    {"entity": "dog", "subentities": ["ear", "paw", "leg", "tail"]}],
+       "intermediate": [{"entity": "person", "subentities": ["face", "palm"]},
+                    {"entity": "car", "subentities": ["door", "window"]},
+                    {"entity": "dog", "subentities": ["leg", "face"]}] }
+
+     { "peripheral": [{"entity": "cat", "subentities": ["ear", "paw", "leg", "tail"]},
+                    {"entity": "bicycle", "subentities": ["wheel", "pedal"]}],
+         "intermediate": [{"entity": "cat", "subentities": ["face"]},
+                    {"entity": "bicycle", "subentities": ["frame", "seat"]}] }
+
+Edge-case examples:
+ - Only distal parts visible:
+           {"peripheral": [{"entity": "hand", "subentities": ["finger", "nail"]}], "intermediate": []}
+ - Only intermediate parts visible:
+           {"peripheral": [], "intermediate": [{"entity": "person", "subentities": ["face", "palm"]}]}
+ - Multiple distal entities visible, no intermediate:
+           {"peripheral": [{"entity": "hand", "subentities": ["finger", "nail"]},
+                    {"entity": "dog", "subentities": ["ear", "paw", "tail", "leg"]}], "intermediate": []}
+
+
+<Example>
+Input: {image} {USER PROMPT}
+Output: {"peripheral": {"cannon": ["wheels", "barrel opening"]},
+           "intermediate": {"cannon": ["barrel", "carriage"]}}
+
+
+
+
+                                      Figure 13. Full prompt for generating entity-subentity vocabulary sets.
+Algorithm 1 Add Tool
+Require: Reference patches PR , patch grid (hp , wp ), same-entity foreground Pent , same-subentity foreground Psub , ring thickness α, distance weight
+    λdist
+Ensure: target-reference patch mapping M = {(pt , pr )}
+ 1: (ci , cj ) ← C ENTROID(PR ) /* subentity center in patch space */
+ 2: Pring ← P ERIMETER BAND(PR , (ci , cj ), α, hp , wp ) /* candidate centroid patches band around the subentity */
+ 3: S ← ∅
+ 4: for each (i, j) ∈ Pring do
+ 5:      ∆i ← i − c i , ∆ j ← j − cj
+ 6:      Pshift ← {(ri + ∆i , rj + ∆j ) : (ri , rj ) ∈ PR }
+                 |P    ∩PR |
+ 7:      rself ← shift
+                    |P   |
+                       shift
+              |Pshift ∩(Pent \PR )|
+ 8:     rent ←        |Pshift |
+              |P      ∩Psub |
+ 9:     rsub ← shift
+                 |Pshift |
+10:      dL1 ← |i − ci | + |j − cj |
+11:      gdist ← 1+λ1 d
+                      dist L1
+12:      S(i, j) ← (3 − rself − rent − rsub ) · gdist
+13: (i⋆ , j ⋆ ) ← arg max(i,j)∈Pring S(i, j)
+14: ∆⋆i ← i⋆ − ci , ∆⋆j ← j ⋆ − cj
+15: M ← {((ri + ∆⋆i , rj + ∆⋆j ), (ri , rj )) : (ri , rj ) ∈ PR }
+16: return M
+
+17: function C ENTROID(PR )
+18:    n ← |PRP  |
+              1
+19:    ci ← n       (ri ,rj )∈PR ri
+              1 P
+20:    cj ← n       (ri ,rj )∈PR rj
+21:    ci ← round(ci ), cj ← round(cj )
+22:    return (ci , cj )
+
+23: function P ERIMETER BAND(PR , (ci , cj ), α, hp , wp )
+24:    Pring ← ∅
+25:    for i ← 0 to hp − 1 do
+26:        for j ← 0 to wp − 1 do
+27:            dL1 ← |i − ci | + |j − cj |
+28:            if 1 ≤ dL1 ≤ α then
+29:                Pring ← Pring ∪ {(i, j)}
+30:     return Pring
+Algorithm 2 Remove Tool
+Require: Subentity patch set PT , patch grid (hp , wp ), same-entity foreground Pent , same-subentity foreground Psub , neighborhood radius R
+Ensure: Target–reference mapping M
+ 1: Pnbr ← L OCAL N EIGHBORHOOD(PT , R, hp , wp ) /* collect nearby non-target patches in the grid */
+ 2: Pnbr-no-sub ← Pnbr \ Psub
+ 3: Pnbr-non-ent ← Pnbr \ Pent
+ 4: if |Pnbr-non-ent | > 12 |Pnbr-no-sub | then
+         pool
+ 5:     PR ← Pnbr-non-ent
+ 6: else
+         pool
+ 7:     PR ← Pnbr-no-sub
+ 8: M ← ∅
+ 9: for each pt ∈ PT do
+10:     pr ← arg minq∈P pool ∥pt − q∥1
+                           R
+11:     M ← M ∪ {(pt , pr )}
+12: return M
+
+13: function L OCAL N EIGHBORHOOD(PT , R, hp , wp )
+14:    Pnbr ← ∅
+15:    for each (ti , tj ) ∈ PT do
+16:        for dy = −R to R do
+17:            for dx = −R to R do
+18:                if |dy| + |dx| ≤ R and (dy, dx) ̸= (0, 0) then
+19:                     pi ← ti + dy, pj ← tj + dx
+20:                     if 0 ≤ pi < hp and 0 ≤ pj < wp and (pi , pj ) ∈
+                                                                      / PT then
+21:                         Pnbr ← Pnbr ∪ {(pi , pj )}
+22:    return Pnbr
+Algorithm 3 Distort Tool
+Require: Subentity patches PT , patch grid (hp , wp ), same-entity patches Pent , kernel type k ∈ {shuffle, jitter, strip}
+Ensure: target-reference patch mapping M = {(pt , pr )}
+ 1: if k = shuffle then
+ 2:     PR ← S HUFFLE K ERNEL(PT ) /* randomly permute subentity patches */
+ 3: else if k = jitter then
+ 4:     PR ← G AUSSIAN J ITTER K ERNEL(PT , σ, hp , wp , Pent ) /* locally jitter patches within the entity */
+ 5: else if k = strip then
+ 6:     PR ← S TRIP S HIFTING K ERNEL(PT , S, hp , wp ) /* shift patches along strips of the subentity */
+ 7: M ← {(PT [i], PR [i]) : i = 1, . . . , |PT |}
+ 8: return M
+
+ 9: function S HUFFLE K ERNEL(PT )
+10:    PR ← PT
+11:    R ANDOM S HUFFLE(PR )
+12:    return PR
+
+13: function G AUSSIAN J ITTER K ERNEL(PT , σ, hp , wp , Pent )
+14:    PR ← ∅
+15:    for each (py , px ) ∈ PT do
+16:        found ← False
+17:        for a ← 1 to Amax do
+18:            δy ∼ N (0, σ 2 ), δx ∼ N (0, σ 2 )
+19:            ny ← clip(round(py + δy ), 0, hp − 1)
+20:            nx ← clip(round(px + δx ), 0, wp − 1)
+21:            if Pent = ∅ or (ny , nx ) ∈ Pent then
+22:                PR ← PR ∪ {(ny , nx )}
+23:                found ← True
+24:                break
+25:        if not found then
+26:            (ny , nx ) ← N EAREST F OREGROUND O R S ELF(py , px , Pent )
+27:            PR ← PR ∪ {(ny , nx )}
+28:    return PR
+
+29: function S TRIP S HIFTING K ERNEL(PT , S, hp , wp )
+30:    Compute bounding box of PT in patch space
+31:    Determine direction d ∈ {vertical, horizontal} from aspect ratio
+32:    Partition PT into S strips {S1 , . . . , SS } along d
+                                                                (s)        (s)
+33:    For each strip Ss , sort patches to obtain an order (p1 , . . . , pns )
+34:    Choose integer strip shifts {∆s }S s=1    (alternating signs, increasing magnitudes)
+35:    PR ← list of length |PT |
+36:    for s ← 1 to S do
+37:        ∆ ← ∆s converted to patch units (circular shift)
+38:        for u ← 1 to ns do
+39:            v ← 1 + ((u + ∆ − 1) mod ns )
+                                  (s)     (s)
+40:            Set reference of pu to pv in PR
+41:    return PR
+Algorithm 4 Fuse Tool (Main)
+Require: Entity A patches PA , entity B patches PB , patch grid (hp , wp ), band radius R, max offset Roff , number of seeds K
+Ensure: target-reference patch mapping M = {(pt , pr )}
+ 1: Poverlap ← PA ∩ PB
+ 2: if Poverlap = ∅ then
+ 3:     return ∅
+ 4: Pfg ← PA ∪ PB
+ 5: PA\B ← PA \ Poverlap , PB\A ← PB \ Poverlap
+ 6: PT ← OVERLAP F USION BAND(Poverlap , Pfg , R, hp , wp ) /* build foreground band around the overlap */
+ 7: if PT = ∅ then
+ 8:     return ∅
+ 9: S ← FARTHEST P OINT S AMPLING(PT , K) /* choose seeds that cover the band */
+10: Initialize {Rs }s∈S as empty sets
+11: for each p ∈ PT do
+12:     s⋆ ← arg mins∈S ∥p − s∥1
+13:     Rs⋆ ← Rs⋆ ∪ {p}
+14: Ω ← {(∆i , ∆j ) : 1 ≤ |∆i | + |∆j | ≤ Roff }
+15: M ← ∅
+16: for each seed s ∈ S do
+17:     R ← Rs
+18:     if R = ∅ then
+19:          continue
+20:     Popp ← O PPOSITE R EGION(s, PA\B , PB\A , Pfg , PT ) /* decide which side to fuse from */
+21:     ∆⋆ ← B EST O FFSET(R, Popp , Ω, hp , wp , PT ) /* find best shared shift for this region */
+22:     for each p ∈ R do
+23:          pr ← O FFSET O R N EAREST(p, ∆⋆ , Popp , hp , wp , PT ) /* apply offset or nearest opposite patch */
+24:          M ← M ∪ {(p, pr )}
+25: return M
+Algorithm 5 Fuse Tool (Helpers)
+ 1: function OVERLAP F USION BAND(Poverlap , Pfg , R, hp , wp )
+ 2:    PT ← ∅
+ 3:    for each (oi , oj ) ∈ Poverlap do
+ 4:        for dy ← −R to R do
+ 5:            for dx ← −R to R do
+ 6:                if |dy| + |dx| ≤ R then
+ 7:                     vi ← oi + dy, vj ← oj + dx
+ 8:                     if 0 ≤ vi < hp and 0 ≤ vj < wp and (vi , vj ) ∈ Pfg then
+ 9:                         PT ← PT ∪ {(vi , vj )}
+10:    return PT
+
+11: function FARTHEST P OINT S AMPLING(P, K)
+12:    if P = ∅ then
+13:        return ∅
+14:    K ← min(K, |P|)
+15:    Choose initial seed s1 ∈ P (e.g., closest to centroid)
+16:    S ← {s1 }; d(p) ← ∥p − s1 ∥1 for all p ∈ P
+17:    for m ← 2 to K do
+18:        sm ← arg maxp∈P d(p)
+19:        S ← S ∪ {sm }
+20:        for each p ∈ P do
+21:            d(p) ← min{d(p), ∥p − sm ∥1 }
+22:    return S
+
+23: function O PPOSITE R EGION(s, PA\B , PB\A , Pfg , PT )
+24:    dA ← +∞, dB ← +∞
+25:    if PA\B ̸= ∅ then
+26:        dA ← mina∈PA\B ∥s − a∥1
+27:     if PB\A ̸= ∅ then
+28:         dB ← minb∈PB\A ∥s − b∥1
+29:     if dA < dB then
+30:         return PB\A
+31:     else if dB < dA then
+32:         return PA\B
+33:     else
+34:         return Pfg \ PT
+
+35: function B EST O FFSET(R, Popp , Ω, hp , wp , PT )
+36:    ∆⋆ ← None, m⋆ ← 0
+37:    for each (∆i , ∆j ) ∈ Ω do
+38:        count ← 0
+39:        for each (vi , vj ) ∈ R do
+40:            ri ← vi + ∆i , rj ← vj + ∆j
+41:            if 0 ≤ ri < hp and 0 ≤ rj < wp and (ri , rj ) ∈ Popp and (ri , rj ) ∈
+                                                                                   / PT then
+42:                count ← count + 1
+43:        if count > m⋆ then
+44:            m⋆ ← count, ∆⋆ ← (∆i , ∆j )
+45:    return ∆⋆
+
+46: function O FFSET O R N EAREST(p, ∆⋆ , Popp , hp , wp , PT )
+47:    (vi , vj ) ← p
+48:    if ∆⋆ ̸= None then
+49:         (∆i , ∆j ) ← ∆⋆
+50:         ri ← vi + ∆i , rj ← vj + ∆j
+51:         if 0 ≤ ri < hp and 0 ≤ rj < wp and (ri , rj ) ∈ Popp and (ri , rj ) ∈
+                                                                                / PT then
+52:             return (ri , rj )
+53:    return arg minu∈Popp ∥(vi , vj ) − u∥1
+Duplication
+<Type Description>
+Duplication artifacts occur when a part of an object is duplicated and placed
+adjacent to the original, creating anatomically or structurally implausible
+duplications (e.g., extra fingers, duplicate ears, duplicate wheels).
+
+<Detection Criteria>
+• Case A — Object present in target (Image 2): If the second image already
+contains the specified object, then the third image must show a plausible
+duplication or additional instance of the object. The new instance should be
+distinct from the original.
+• Case B — No object in target (Image 2): If the second image does not contain
+the object, the third image must show a clearly new instance with a distinct
+boundary/contour.
+Reject if there is only subtle texture change, brightness shift, or local warping     <User Prompt>
+rather than a new instance.
+                                                                                      You are an expert at detecting [duplication, omission, fusion]–
+                                                                                      type artifacts in AI-generated images.
+<Explanation Instructions>
+Focus on cues like duplicated parts, unnatural growths, or extra elements that
+conflict with normal anatomy or structure.                                            ## Type Description
+
+                                                                                      You will be shown :
+Omission                                                                              1. An original image without the target region
+<Type Description>                                                                    2. An original image with only the target region
+Omission artifacts occur when a part of an object is deleted and the area is          3. An artifact image with only the target region
+inpainted with background, resulting in missing features or gaps where something      4. The object name that may be [added, removed, fused]
+should be present (e.g., missing fingers, absent ears).
+                                                                                      Your task is to determine if there is a successful [duplication,
+<Detection Criteria>
+• Definitive removal evidence : stump/ termination cues, disrupted silhouette,        omission, fusion] artifact in the third image.
+hollow/negative space, texture continuation/inpainting traces, mismatched
+shadows/reflections, or symmetry break.                                               Detection criteria (be strict): ## Detection Criteria
+• Ambiguity/occlusion rule: If the missing part could plausibly be merely hidden,
+set has_artifact = false.                                                             Return your analysis in the following format:
+• Anatomical plausibility check: If the scene still reads as anatomically correct         "has_artifact": true/false (whether the artifact is
+and a typical pose could hide the part, set has_artifact = false.
+                                                                                      successfully present, always true for distortion)
+<Explanation Instructions>
+Focus on cues like missing structure, unnatural gaps, smoothed-over areas, or         Important:
+anatomical discontinuity where something appears to be absent.                          - Focus on visible evidence in the target region
+
+Distortion                                                                            <Example>
+                                                                                      Input: {images} {USER PROMPT[‘addition’]}
+<Type Description>
+Distortion artifacts occur when parts are warped, creating unnatural geometry,
+irregular textures, or visual blending errors.
+
+<Explanation Instructions>
+Focus on cues like warped shapes, unnatural geometry, irregular textures, or visual
+blending errors that make the structure appear broken or malformed.
+
+Fusion
+                                                                                      OUTPUT: “has_artifact”: false
+<Type Description>
+Fusion artifacts occur when parts or distinct entities are unnaturally merged             Figure 15. Full prompt and example for data filtering.
+together, creating blurred boundaries, overlapped textures, or structural
+entanglement (e.g., two animals merged into one).
+
+<Detection Criteria>
+• Boundary visibility comparison: Compare Image 2 and Image 3. If a clear,
+continuous boundary between the two objects remains visible in Image 3 (similar
+to Image 2), set has_artifact = false.
+• Fusion cues needed: boundary loss/softening across seams; cross-object
+texture/color blending; geometry interpenetration; inconsistent occlusion ordering.
+• Not fusion: mere blur, minor warping, or lighting change that preserves
+recognizable boundary.
+
+<Explanation Instructions>
+Focus on cues like boundary loss/softening across seams, cross-object texture/color
+bleed, geometry interpenetration, and inconsistent occlusion ordering.
+
+Figure 14. Type descriptions and instructions by artifact type.
+                                                                                   <User Prompt>
+  <User Prompt>                                                                    You are an image artifact analyst. You will be given an image with
+  You are an expert at describing [duplication, omission, distortion,              artifacts and a list of injected artifact annotations, in the format of
+  fusion]–type artifacts in AI-generated images.                                   bbox:<(xmin, ymin, xmax, ymax)> description:<description of the
+                                                                                   artifact in that bbox region>.
+  ## Type Description
+                                                                                   Your job: Read ALL artifact annotations and write a single, holistic
+  You will be shown :
+  1. An original image without the target region
+                                                                                   explanation the explanation of the anomalies in the image.
+  2. An original image with only the target region                                 Guidance:
+  3. An artifact image with only the target region                                 - Do NOT mention coordinates or the term "bbox". Use the
+  4. The object name that may be [added, removed, fused, distorted]                annotations only to understand what is wrong.
+                                                                                   - Use commonsense knowledge about typical anatomy/structure (e.g.,
+  Your task is to describe what looks wrong or unnatural in the target region.     zebras normally have four legs).
+                                                                                   - If multiple issues appear, summarize the combined effect coherently
+  For explanation: ## Explanation Instructions                                     rather than listing them mechanically.
+                                                                                   - Keep it concise (2-3 sentences) and easy to understand. Avoid
+  Return your analysis in the following format:                                    making concluding sentences. Just focus on explaining the
+    "explanation": "Detailed description of what looks wrong in
+  the region, without reasoning about the artifact type or how
+                                                                                   abnormality.
+  the artifact is created."
+      "label": "Brief description of the artifact (empty string                    <Examples>
+  if no artifact)"                                                                 Input: {images} {USER PROMPT}
+                                                                                   [“bbox: [352, 240, 416, 336] description: "The elephant's
+    Important:                                                                     trunk appears to blend unnaturally with the surrounding
+    - Focus on visible evidence in the target region                               vegetation, creating a confusing visual where the trunk's
+    - Use simple, clear language for explanations                                  shape is not clearly defined. The tusk also seems
+    - Do not refer to images by number; say "the region" or "the area" instead     partially obscured by the blending, making it look
+    - Make explanations understandable for non-experts                             irregular.", “bbox: [128, 160, 240, 288] description: 'The
+                                                                                   elephant has an extra ear on its back, which is not
+  <Examples>                                                                       naturally possible. Elephants typically have two ears on
+  Input: {images} {USER PROMPT}                                                    the sides of their head.”]
+
+
+
+
+                                                                                   Output: The image shows an elephant with an unusual
+  Output: “explanation”: “The elephant has an extra ear on its
+  back, which is not naturally possible. Elephants typically have
+                                                                                   anomaly where an extra ear is positioned on its back,
+  two ears on the sides of their head.”,                                           which is not typical for elephants. Additionally, the
+  “label”: “duplicated ear”                                                        trunk appears to blend with the surrounding vegetation,
+                                                                                   causing it to lose its distinct shape and making the tusk
+                                                                                   appear irregular.
+Figure 16. Full prompt and example for regional explanation gen-
+eration.                                                                         Figure 17. Full prompt and example for global explanation gener-
+                                                                                 ation.
+                                                            Value Injection Steps
+                            10   15          20              24                10            15              20              24
+
+
+
+                       10
+
+
+
+
+                       15
+
+
+
+
+  PE Injection Steps
+                       20
+
+
+
+
+                       24
+
+
+
+
+Figure 18. Hyperparameter study on PE injection and value injection steps (1). The image in the red box shows our selected configuration.
+B. Benchmarks and Evaluation Protocols (§ 5                         RichHF-18K         LOKI         SynthScars       ArtiBench
+    & § 6.1)
+B.1. Benchmark Datasets (§ 5)
+Table 6 shows the fully cited artifact benchmark datasets
+and the sources used for generation. Details on the dataset’s
+metadata formats for artifact region representations and im-
+age explanations are elaborated below.
+• RichHF. The RichHF dataset, with 995 images sampled
+  and annotated from the Pick-a-Pic dataset, provides the
+  artifact map in a heatmap format, highlighting the proba-
+  bility of abnormal regions in the image. Annotations and
+  scores are generated by the trained multi-modal trans-
+  former to predict human perception-aligned feedback.
+• LOKI. The LOKI benchmark is a multi-modal synthetic-
+  data detection dataset, covering image, video, text, audio,
+  and 3D content, and comprises roughly 18,000 curated           Figure 19. Artifact examples of the four benchmarks, listed in the
+  questions across 26 subcategories. It includes coarse          order of publishment.
+  real vs. synthetic judgments, multiple-choice detection,
+  anomaly / artifact region selection, and explanation tasks.
+  We use the image artifact subset of the dataset, which         • Classification. Annotators are asked to meticulously ob-
+  consists of 229 images.                                          serve the images and determine whether there are any ar-
+• SynthScars. The SynthScars dataset consists of 12,236            tifacts visible in the image. The caption used for T2I gen-
+  fully synthetic images across four distinct content types        eration is provided with the image for better understand-
+  (Human, Object, Scene, Animal) and three artifact cat-           ing of generative intentions and respecting the model’s
+  egories (Physics, Distortion, Structure). Each image is          capability to follow instructions on generating abnormal-
+  annotated with pixel-level segmentation masks delimit-           ities. All images classified as having artifacts proceed to
+  ing artifact regions, detailed textual explanations of the       the next step, where they are shuffled and redistributed to
+  artifact(s), and artifact-category labels.                       the annotators to mitigate human bias in the examination
+Visualizations. Visualizations of the evaluated bench-             process.
+marks, including ArtiBench, are shown in Figure 19. It           • Bounding Box Labeling. For the artifact-containing im-
+is clearly visible that even though our benchmark dataset          ages from the classification step, annotators are expected
+shows overall better quality of image generation compared          to generate bounding boxes, identify the type of artifact,
+to the previous benchmarks, image artifacts are still visible      and write a short description about what abnormalities
+in the generated images. We emphasize the importance of            exist in the specified region.
+our timely benchmark that successfully represents structural     • Explanation Generation. The final annotations are used
+artifacts remaining in the most recent diffusion models.           as the input of the VLM query to generate a comprehen-
+                                                                   sive and polished explanation for the full image. With the
+B.2. ArtiBench Generation (§ 5)                                    prompt used for generation and the list of pairs of bound-
+                                                                   ing box and captions as the input, the VLM is required
+Image Generation. ArtiBench is built on a set of images            to output a global explanation of the image regarding all
+generated by state-of-the-art diffusion models, reflecting the     artifacts mentioned in the captions.
+most timely artifacts appearing in current image generation      • Expert Curation. With the set of images and the meta-
+models. We use five different models for image genera-             data completed, we curate the images to build the final
+tion and three reliable prompt sources. After generating a         version of our 1K benchmark. Images are carefully se-
+set of images with the five models from randomly sampled           lected to ensure a balanced set that provides a clear and
+prompts, the images were annotated according to the strictly       straightforward view of plausible artifacts.
+guided annotation process.
+Annotation Pipeline. With the set of diffusion-generated
+images, we construct ArtiBench following a guided 4-step
+annotation process: (1) classification, (2) bounding box la-
+beling, (3) explanation generation, and (4) expert curation.
+Table 6. Comparison of artifact benchmark datasets, their generative sources, and evaluation tasks. Highlighted entries denote
+dataset sources that were reused by subsequent benchmarks.
+ Benchmark         Generative Sources                                                                              Sample Bin. Loc. Exp.
+ RichHF [27]       SD2.1 [42], SDXL [38], Dreamlike Photoreal [10]                                                    955                  ✓
+ LOKI [51]         FLUX [5], SD1.4–2.1 [42], Midjourney [30], StyleGAN [22], pix2pix [18], CUT [36]                   229                  ✓        ✓
+ SynthScars [20]   RichHF [27], Chameleon [50], Midjourney [30], DALL·E 3 [32], SD1.x [42]                            1K                   ✓        ✓
+ ArtiBench         SD3.5 [11], FLUX [5], Qwen-Image [49], Nano-Banana [13]                                            1K          ✓        ✓        ✓
+
+
+B.3. Evaluation Protocol (§ 6.1)                                     B.3.4. Evaluation Prompt of VLMs
+B.3.1. Binary Classification                                         Figure 20 shows the specific prompts used for the evaluation
+• Accuracy. The rate of true predictions is measured to              on VLMs. Artifact priors are shared for all tasks, providing
+  show basic performance of accurate classification.                 understanding of the structural artifacts we are focusing on.
+• Macro F1. In addition, we use the macro F1 score, to
+  achieve fair comparison across unbalanced datasets and
+                                                                       <Artifact Prior>
+  biased predictions. F1 scores are relatively calculated for          Image artifacts refer to unintended, implausible, or visibly corrupted
+  positive and negative samples to be averaged, exposing               regions within images generated by diffusion models. These artifacts often
+  the model’s capability to precisely capture both artifact            break the natural semantics or visual coherence of an image, such as a
+                                                                       person with extra fingers, a car with warped wheels, or missing parts of
+  presence and absence without random guessing.                        animals, and can significantly degrade image quality or realism. Artifacts
+                                                                       are a critical concern in both model evaluation and training.
+B.3.2. Localization
+We alleviate the unfairness between divergent representa-
+                                                                       There are four types of image artifacts: Duplication, Omission, Distortion,
+tions of artifact regions, including bounding boxes, polygo-           and Fusion.
+nal segmentation maps, and heatmaps, by mapping all rep-
+                                                                       1. Duplication: These artifacts appear as excessive or repeated components,
+resentations to pixel-wise binary maps.                                leading to unrealistic objects or implausible duplication.
+ • IoU. With the binary maps obtained, we calculate the
+   pixel-wise IoU between the foreground region predic-                2. Omission: These artifacts appear as omitted components, leading to
+                                                                       unrealistic or incomplete objects.
+   tions and ground-truth areas. IoU scores prefer tight
+   and highly overlapping predictions, providing intuitions            3. Distortion: These artifacts occur when objects have details that are not
+   on precise predictions but highly possible of penalizing            typical, making the object unrecognizable or visually broken, such as
+                                                                       geometric inconsistencies, abnormal textures, unnatural asymmetry or
+   bounding box representations for over-prediction.                   twisted, warped, scrambled parts.
+ • F1. Pixel-wise predictions are measured to capture true
+                                                                       4. Fusion: These artifacts result from the combination of objects so their
+   predictions on a fine-grained basis. Unlike the macro F1            boundaries or interiors merge into one ambiguous, hybrid part, resulting in
+   score used in binary detection tasks, F1 scores are mea-            a visually incoherent region.
+   sured only for positive ground truth regions to prioritize
+                                                                       <User Prompt – Binary Classification>
+   true detections. With each pixel prediction classified, we          {ARTIFACT PRIOR}
+   use the pixel count for true positive (TP), false positive          Your task is to identify if there are any artifacts within this image.
+   (FP), and false negative (FN) predictions to use them for           Are there any artifacts in this image? Use lowercase "true" or "false"
+                                                                       (boolean values).
+   calculating the F1 score. This method lessens the penalty
+   on loose region representations of bounding boxes over              <User Prompt – Localization>
+   segmentation maps or heatmaps.                                      {ARTIFACT PRIOR}
+                                                                       Identify and localize artifact regions in this image.
+B.3.3. Explanation                                                     For each artifact found, provide bounding box coordinates [x_min, y_min,
+                                                                       x_max, y_max] where coordinates are in pixels.
+• ROUGE-L. The ROUGE-L score shows the proportion                      Do NOT output multiple bboxes that indicate the same region
+  of the longest overlapping phrase among the full data.
+                                                                       <User Prompt – Explanation>
+  This captures the words or phrases that focus on specific            {ARTIFACT PRIOR}
+  artifact regions and objects, with higher scores showing             Analyze the artifacts visible in this image and provide a comprehensive
+                                                                       explanation.
+  that the model better understands the visual artifact.               If no artifacts are found, state "There are no artifacts in this image." If the
+• CSS. Cosine similarity was measured on sentence em-                  image is inaccessible, state: "Image not available for analysis."
+  beddings generated by sentence-transformers [40]. CSS
+  portrays the general similarity in context between the de-                        Figure 20. Evaluation prompts for VLMs.
+  scriptions regarding the full scenery’s plausibility.
+B.4. VQA Dataset Structure (§ 6.1)                                training with a smaller learning rate of 1×10−6 , with 200
+                                                                  steps. Both stages use the same VQA dataset.
+This section presents the structure of our multi-turn visual
+question answering (VQA) dataset, which provides the su-
+pervision used to train VLMs in artifact detection, localiza-
+                                                                  C. Mitigating Artifacts in Diffusion Models
+tion, and explanation. Each data instance is derived from            (§ 6.2.1 & § 6.2.2)
+a paired clean–artifact image generated by ArtiAgent with         C.1. Reward-guided generation (§ 6.2.1)
+the synthesized annotations as in Figure 11, enabling the
+construction of tightly aligned conversations that elicit the     Verifier Training. We train an artifact verifier modeled
+model’s ability to identify normal content and reason about       with Bradley-Terry model [6] to score images by how likely
+artifact regions.                                                 they are to be artifact-free. The model is trained to assign
+                                                                  higher scores to the clean image and lower scores to the
+B.4.1. VQA Template
+                                                                  artifact-injected image. The verifier uses a frozen ViT-B/16
+Each ArtiAgent instance yields two conversations: one for         encoder with a lightweight MLP head, and is optimized us-
+the clean reconstruction image and one for the correspond-        ing AdamW (learning rate 1×10−3 , weight decay 1×10−4 ,
+ing artifact image. Tables 7 and 8 summarize the question-        L2 regularization 1 × 10−4 ). Training uses a batch size of
+answer templates implemented across these two settings.           32 for 5 epochs. Each batch additionally includes two cross-
+                                                                  scene negative pairs to encourage content-agnostic ranking.
+    Task Template                                                 Test-Time Scaling. At inference time, we use the verifier
+             Q: Does this image contain any visual artifacts?     as a reward model in a compute-scaled best-of-N sampling
+    Bin.
+             A: No.                                               procedure [28]. For each prompt, round r samples 2r inde-
+             Q: Locate the 〈entity〉’s 〈subentity〉.                pendent latent noises, generates all corresponding images,
+    Loc. 1                                                        and evaluates them with the verifier. The highest-scoring
+             A: 〈bbox〉
+             Q: Is there a 〈entity〉’s 〈subentity〉 in 〈bbox〉?
+                                                                  image is retained, and the search space doubles in the next
+    Loc. 2                                                        round. This random-search strategy expands the candidate
+             A: Yes / No
+                                                                  pool exponentially, enabling the diffusion model to reliably
+             Q: Describe the clean image.
+    Exp.                                                          discover images with fewer artifacts without modifying the
+             A: 〈image caption〉
+                                                                  weights of the model.
+             Table 7. VQA templates for clean images.
+                                                                  C.2. Image Correction (§ 6.2.2)
+                                                                  In our artifact-correction pipeline, all VLM interactions are
+   Task Template                                                  carried out using the Qwen2.5-VL-7B model fine-tuned
+                                                                  with ArtiAgent supervision. This unified VLM is respon-
+            Q: Does this image contain any visual artifacts?
+   Bin.                                                           sible for localizing artifact regions, generating artifact-free
+            A: Yes.
+                                                                  captions, and verifying whether the corrected content re-
+            Q: Provide bounding boxes for all artifact regions.   mains flawed. We describe each of the three prompts used
+   Loc. 1
+            A: [〈bbox〉]                                           in the loop below. The actual prompt is shown in Table 9.
+            Q: Explain why region 〈bbox〉 is an artifact.
+   Loc. 2
+            A: 〈label〉
+                                                                     Prompt        Instruction Text
+        Q: Describe all artifacts in the image.
+   Exp.                                                              Localization “Provide the bounding box for the artifact
+        A: 〈explanation〉
+                                                                                  region. Format as [x min, y min, x max,
+      Table 8. VQA templates for artifact-injected images.                        y max]. Only output the bounding box.”
+                                                                     Captioning “Describe what the image would look like if
+                                                                                  it had no artifacts. Provide a short caption
+B.4.2. VLM Training Configuration                                                 of the clean scene.”
+We train the VLM using a two-stage supervised fine-tuning            Verifying    “Is there an artifact within 〈B〉? Answer
+setup. We use Qwen2.5-VL-7B-Instruct [4] and Intern3.5-                           Yes or No.”
+VL-8B [57] as the backbone, and use the identical config-
+                                                                  Table 9. Prompts used by the VLM in the artifact-correction loop.
+urations. In the first stage, we fine-tune only the language
+model and multi-modal projector while keeping the vision
+encoder frozen, using a learning rate of 1×10−5 , batch size      Localization prompt plocalize . This prompt instructs the
+64, cosine decay scheduling, and one training epoch. In the       VLM to identify the spatial extent of the artifact within
+second stage, we unfreeze the vision encoder and continue         the input image. The model is asked to produce a single
+Algorithm 6 VLM-Guided Artifact Correction Loop
+Require: Image I containing at least one artifact
+ 1: /* localize artifact region */
+ 2: B ← VLM(I, plocalize )
+ 3: /* generate caption of the image */
+ 4: c ← VLM(I, pcaption )
+ 5: while true do
+ 6:     /* Inpaint region B using caption c */
+ 7:     I ← Inpaint(I, B, c)
+ 8:     /* check artifact existence inside B */
+ 9:     r ← VLM(I, pverify )
+10:     if not r then
+11:         return I
+
+
+bounding box formatted as [x min, y min, x max,
+y max] without additional commentary. This strict output
+format ensures deterministic parsing. The resulting bound-
+ing box B is computed once at the beginning of the proce-
+dure and kept fixed across all subsequent iterations, provid-
+ing spatial stability for the iterative refinement process.
+Captioning prompt pcaption . To guide inpainting, the VLM
+is prompted to describe the overall image without specify-
+ing the artifacts in the image. Rather than summarizing the
+corrupted content, the model is explicitly instructed to gen-
+erate a short caption that reflects the intended clean version
+of the scene. This caption serves as the semantic condi-
+tioning signal for the FLUX inpainting pipeline [3], which
+synthesizes corrected content inside the region B.
+Verifying prompt pverify . After each inpainting step, the
+VLM is queried to assess whether the corrected region B
+still contains an artifact. The prompt restricts the judgment
+to the localized region, returning a binary response (Yes
+or No). This local verification prevents the algorithm from
+drifting to unrelated image regions and directly determines
+whether the loop terminates or continues.
+    Together, these three prompts coordinate the interaction
+between the ArtiAgent-trained VLM and the FLUX inpaint-
+ing pipeline: the VLM identifies the corrupted area, pro-
+vides semantic guidance for correction, and validates the
+result, while the inpainting model performs the pixel-level
+repair. This iterative coupling enables consistent and stable
+reduction of visual artifacts while preserving overall image
+semantics. The whole procedure is shown in Algorithm 6.
+

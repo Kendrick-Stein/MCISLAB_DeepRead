@@ -1,0 +1,939 @@
+                                                        AVA-VLA: Improving Vision-Language-Action models with Active
+                                                                             Visual Attention
+
+                                                                                      ∗                                                                  †
+                                                                         Lei Xiao1,  Jifeng Li1, * Juntao Gao1,2 Feiyang Ye1,
+                                                                                                                              †
+                                                                 Yan Jin1 Jingjing Qian3 Jing Zhang2 Yong Wu1 Xiaoyuan Yu1,
+                                          1                        2                                      3
+                                              LiAuto Inc.              Beijing University of Technology       The Chinese University of Hong Kong, Shenzhen
+
+
+
+
+arXiv:2511.18960v4 [cs.LG] 14 Jun 2026
+                                                                         Abstract                         Vanilla
+                                                                                                                     Action T-1                  Action T
+
+                                             Vision-Language-Action (VLA) models have shown re-
+                                         markable progress in embodied tasks recently, but most
+                                         methods process visual observations independently at each                          VLA model                 VLA model
+
+                                         timestep. This history-agnostic design treats robot manip-
+                                         ulation as a Markov Decision Process, even though real-                            Observation               Observation
+                                                                                                                               T-1                        T
+                                         world robotic control is inherently partially observable and
+                                         requires reasoning over past interactions. To address this
+                                                                                                              Ours
+                                         mismatch, we reformulate VLA policy learning from a Par-                    Action T-1                  Action T
+                                         tially Observable Markov Decision Process perspective and              Recurrent                 Recurrent                 Recurrent
+                                         propose AVA-VLA, a framework that conditions action gen-                 State                     State                     State
+
+                                         eration on a recurrent state that serves as a neural ap-                           VLA model                 VLA model
+                                         proximation to the agent’s belief over task history. Built
+                                         on this recurrent state, we introduce Active Visual Atten-
+                                                                                                                            Observation               Observation
+                                         tion (AVA), which dynamically reweights visual tokens in the                          T-1                        T
+                                         current observation to focus on regions most relevant given
+                                         both the instruction and execution history. Extensive exper-     Figure 1. (a) Visualized comparison of the proposed AVA-VLA
+                                         iments show that AVA-VLA achieves state-of-the-art perfor-       framework and vanilla VLAs. (b) Qualitative comparison of vi-
+                                         mance on standard robotic benchmarks, including LIBERO           sual focus from two viewpoints while executing the task “turn
+                                         and CALVIN, and transfers effectively to real-world dual-        on the stove and put the moka pot on it.” The vanilla OpenVLA-
+                                         arm manipulation tasks. These results demonstrate the ef-        OFT [20] baseline fails to locate the task-critical “stove” switch,
+                                         fectiveness of temporally grounded active visual process-        whereas AVA-VLA exhibits more stable focus by leveraging his-
+                                         ing for improving VLA performance in robotic sequential          torical context.
+                                         decision-making. The project page is available at https:
+                                         //liauto-dsr.github.io/AVA-VLA-Page.                             exhibit strong understanding and generalization abilities af-
+                                                                                                          ter being fine-tuned for downstream scenarios.
+                                                                                                              To adopt the ability to understand diverse scenes, ob-
+                                         1. Introduction                                                  jects, and language instructions, most VLA models are
+                                                                                                          built upon pretrained Vision-Language Models (VLMs)
+                                         Recent advances in robotic manipulation have demonstrated        [9, 18, 29]. Such models typically extend VLM architec-
+                                         impressive progress in training robot action policies that       tures with modules such as action tokenization [19, 45] or
+                                         can act across diverse real-world tasks. One transformative      specialized action experts [22, 57] to enable action-oriented
+                                         paradigm is Vision-Language-Action (VLA) models [2–              outputs. Based on this architectural inheritance, these VLA
+                                         4, 7, 19, 22, 36, 65], which integrate visual perception, nat-   models typically process visual inputs as isolated temporal
+                                         ural language understanding, and action generation within a      frames, treating each frame independently. This implicitly
+                                         unified neural architecture. These models, which are capa-       formulates robot manipulation as a Markov Decision Pro-
+                                         ble of instruction following and robotic action generation,      cess (MDP) [16, 31], where actions are generated from the
+                                              * Equal contribution.                                       current visual observation, assumed to represent the com-
+                                              † Corresponding author.                                     plete world state. In realistic robotic manipulation, how-
+ever, the current visual frame is only a partial observation of   demonstrate that our proposed active visual attention mod-
+the environment state. This full state includes unobservable      ule helps improve policy performance compared to previous
+dynamics across time, such as internal states and occluded        VLA frameworks. Our contributions are threefold:
+information. By discarding the rich context from the past,        • We propose the novel AVA-VLA framework to solve the
+this MDP-based approach is suboptimal for the dynamic se-           critical limitation of lacking historical context in MDP-
+quential decision-making required in robotic manipulation.          based VLA models. To our knowledge, it is the first
+    This limitation of the MDP-based assumption has signif-         VLA framework to explicitly address this limitation via
+icant impacts on VLA models, particularly for the model’s           a POMDP-inspired approach.
+visual processing capabilities. VLA modeling is essentially       • We introduce an Active Visual Attention (AVA) module
+a dynamic feedback control problem, where each preceding            that leverages the recurrent state to dynamically modu-
+action directly alters the current visual input. However, by        late the visual processing of the current frame for action
+processing frames in isolation, the visual attention weights,       prediction.
+guided by the static language instruction, are forced to re-      • We conduct comprehensive evaluations in both simula-
+evaluate the independent visual information from scratch            tion and real-world tasks, demonstrating that the AVA-
+at each decision step. Without global context, the model            VLA framework improves VLA performance, and our
+cannot effectively suppress temporally redundant informa-           method achieves state-of-the-art performance across mul-
+tion and focus on regions made important by past actions.           tiple robot tasks.
+As a result, the visual system remains passive rather than
+active. In fact, the inability to anticipate perceptual in-       2. Related Work
+tent a priori makes active visual modules difficult to realize    Vision-Language-Action Models. VLMs [9, 18, 29, 42]
+in computer vision. However, the sequential dynamics of           have been pivotal in advancing robotic control by providing
+decision-making create an opportunity for active visual per-      rich multi-modal representations. This has fostered the de-
+ception. Recognizing the limitations of processing frames         velopment of VLA models [2–4, 7, 19, 22, 36, 37, 46, 65]
+in isolation, some recent methods [24, 52, 58] have begun to      that bridge high-level perception with low-level action gen-
+leverage historical information, such as frame comparison         eration. A significant paradigm shift was the introduction
+results and KV-cache reuse, for efficient visual token pro-       of action tokenization by the RT series [1, 4, 65]. This ap-
+cessing [8, 62]. However, these approaches mainly focus           proach treats control as a sequence modeling problem, en-
+on visual token pruning for efficiency. Therefore, design-        abling scalable web-to-robot transfer. Models like Open-
+ing a dynamic, context-aware visual processing paradigm           VLA [19] and UniVLA [5] generate action policies in the
+that improves both visual processing and VLA generaliza-          autoregressive (AR) manner. While expressive, the se-
+tion remains a significant challenge.                             quential nature of AR decoding is computationally inten-
+    To address this challenge, we propose AVA-VLA, in-            sive. Therefore, recent research has diversified into more
+spired by the Partially Observable Markov Decision Process        efficient and effective action decoding strategies. Models
+(POMDP) framework [21, 44]. We observe that the core              such as CogACT [22] and the π series [3, 36], have ex-
+challenge identified above is similar to the POMDP chal-          plored diffusion-based decoders for the iterative refinement
+lenge of forming a robust belief state, which functions as a      of continuous action trajectories. Other recent works, such
+summary of past observations and actions to guide decision-       as OpenVLA-OFT [20] and its variant [23], employ paral-
+making under uncertainty. Since directly computing or rep-        lel decoding, which enables the simultaneous prediction of
+resenting the belief state is generally intractable, we intro-    actions within the action chunk, improving inference effi-
+duce a recurrent state, which functions as a neural approxi-      ciency and supporting scalable deployment.
+mation of this belief state and is calculated by the intermedi-   Sequential Processing in VLMs. Many VLM studies
+ate output of the model in the previous time step. Then, we       [10, 33, 38, 53] focus on processing sequential visual data
+design an Active Visual Attention (AVA) module to lever-          for tasks such as video understanding and temporal-based
+age this recurrent state to calculate the importance of visual    video questions. These works efficiently aggregate his-
+tokens and dynamically modulating the visual processing           torical information, allowing the model to build a holis-
+of the current frame. This allows the model to filter and         tic, temporal-aware representation of the video’s content.
+focus its attention based on its historical belief, rather than   VLM-3R [10] employs a geometry encoder to derive im-
+purely static language instruction. Therefore, the proposed       plicit 3D tokens that represent spatial-temporal understand-
+AVA-VLA framework does not rely solely on the current             ing. [53] incrementally updates a persistent internal state
+observation but learns to explicitly condition the action pre-    that encodes the scene content. These VLM models use
+diction on the recurrent state.                                   history for passive comprehension or offline understand-
+    Through extensive experiments in both simulation              ing. In contrast, VLA models operate in an active, dynamic
+benchmarks [11, 28, 31] and real-world tasks [5], we              decision-making environment, which requires the model to
+interact with the environment. This distinction motivates            as a Markov decision process:
+our POMDP-inspired approach, which focuses on maintain-
+ing a recurrent state for active decision-making.                                         Āt ∼ Pθ (At | xt ).                  (3)
+
+3. Methods                                                           3.2. AVA-VLA Framework
+In this section, we present our proposed VLA method. We              The history-agnostic design for policy learning in Eq. (3) is
+begin with the preliminaries (3.1), followed by the AVA-             suboptimal for effective visual token processing in dynamic
+VLA framework (3.2) and the detailed description of the              sequential decision-making [21, 61], as it fails to capture
+proposed Active Visual Attention module (3.3). We then               non-observable dynamics or occluded information. This
+explain our training and inference procedures (3.4). An              limitation inspired us to re-formulate the VLA model from
+overview of the proposed AVA-VLA framework is shown                  a POMDP perspective. In a POMDP framework, the opti-
+in Figure 2.                                                         mal policy at timestep t should be conditioned not only on
+                                                                     the current observation xt but also on a belief state bt−1 ,
+3.1. Preliminaries                                                   which captures all relevant historical context, including ob-
+A typical VLA model Pθ , parameterized by θ, consists of             servations and actions, i.e., bt−1 = P (st−1 | x<t , A<t ).
+four main components: a Large-Language-Model (LLM)                   Inspired by this theoretical framework, we re-formulate the
+backbone M, a vision encoder E, a language tokenizer T ,             VLA policy as
+and an action head (or de-tokenizer) Q. We thus define the
+                                                                                       Āt ∼ Pθ (At | xt , bt−1 ).              (4)
+model as P = {M, E, T , Q}.
+     Following the representative OpenVLA [19], at timestep             This formulation provides a theoretical foundation for
+t, given an input tuple xt = (xtI , xtS ), the visual encoder        designing a more effective visual processing paradigm, sug-
+E first encodes the input image xtI into LI visual tokens:           gesting that leveraging historical context in observations
+z tI = E(xtI ) ∈ RLI ×d , where d denotes the embedding di-          can improve VLA generalization. Since computing the the-
+mension. These visual tokens are then concatenated with              oretical belief state bt−1 is generally intractable, we instead
+                                              t
+LtS language tokens, z tS = T (xtS ) ∈ RLS ×d . The com-             propose to learn a compressed representation, r t−1 , as its
+bined sequence is then fed into the LLM backbone M to                neural approximation. This approach naturally transforms
+generate output hidden states ht . Finally, the action head          the VLA model into a recurrent structure [30], leading to
+Q maps the output hidden states ht into a D-dimensional              a non-Markovian policy conditioned on this learned repre-
+executable action At for robotic control (e.g., D = 7 for            sentation: Āt ∼ Pθ (At | xt , r t−1 ).
+3-DoF translation, 3-DoF rotation, and binary gripper con-              In our proposed AVA-VLA framework, we term this ap-
+trol). Thus, the entire forward pass at timestep t can be            proximate vector r t−1 the recurrent state, which captures
+formulated as:                                                       historical context. In typical VLA models, the hidden states
+                                                                     immediately preceding action generation contain fused vi-
+              At = Q(ht ) = Q(M(z tI , z tS )).               (1)    sual and language information and are predictive of the
+                                                                     agent’s intent. Therefore, we derive the recurrent state for
+   Recent representative VLA models, such as OpenVLA-                timestep t from the action-related hidden state at timestep
+OFT [20] and its variant [23], map the output hidden states          t − 1.
+into an executable action chunk At = [at0 , at1 , ..., atLc −1 ] ∈      Specifically, for a parallel-decoding-based VLA model,
+RLc ×D , where Lc and D represent the length of the ac-              which contains M decoder layers that predict LA = Lc D
+tion chunk and the dimensionality of each atomic action,             actions in one forward pass, we denote its hidden states out-
+respectively. To facilitate parallel generation, a learn-            put at the m-th layer and time t by htm ∈ RLA ×d . The
+able action placeholder embedding pt is appended to the              corresponding recurrent state is computed by:
+input sequence [23, 27]. This placeholder embedding
+                                                                                                      LA ×d
+is set to empty in OpenVLA-OFT, i.e., pt = 0̄ =                                      r t−1 = B(ht−1
+                                                                                                M )∈R       ,                   (5)
+[00 , 01 , ..., 0Lc −1 ] ∈ RLc ×D×d . The corresponding for-
+ward pass under parallel decoding at timestep t can thus             where B is an MLP module that transforms the hidden state
+be expressed as:                                                     into the recurrent state.
+                                                                         We employ this recurrent state to guide the VLA model
+               At = Q(Mparallel (z tI , z tS , pt )).         (2)    to actively focus on visual regions that become critical along
+                                                                     the time sequence. To utilize the recurrent state, we intro-
+Regardless of whether AR or parallel decoding is used,               duce the active visual attention module by quantifying the
+these VLA models learn to predict the action Āt only from           importance of visual tokens and dynamically modulating
+the current observation xt . This implicitly models the task         the processing of the visual frame for the current timestep.
+                                                                                                        x
+
+
+
+
+       Time step                                                                                                                AVA
+          T-1
+                                                                                                                                                                           Image token
+
+
+
+
+                        Vision Encoder
+                                                                                                                                                                           Text token
+
+
+
+                                                                                                                                                             Action Head
+                                                           Attn   Attn          Attn        Attn                    Attn   Attn               Attn   Attn                  Hidden state
+
+                                                                         Active Visual Attention
+
+                                                                                                                            Recurrent State
+                                                                                      Self-Attn
+                                                     t-2
+                                                                                        Cross-Attn
+           Instructions
+
+                                         Tokenizer                                                                               MLP
+                                                                                            FiLM
+       Pick the eggplant and                                                                                        t-1
+       Put it into the bucket                                            Modality
+                                                                          MLP
+       Time step
+           T
+
+
+
+
+                        Vision Encoder
+                                                                                                                                                             Action Head
+                                                                                                                                                                            Recurrent
+                                                           Attn   Attn         Attn        Attn                     Attn   Attn               Attn    Attn
+                                                                                                                                                                              State
+
+                                                                                                                                                                            Forward
+
+                                                     t-1                                                                                                                     Predict
+                                                                         AVA
+
+
+Figure 2. Overview of the proposed AVA-VLA framework. At each timestep, the recurrent state is projected from the previous hidden
+                                                                                                  xx x x x x x x
+
+
+
+state to preserve historical context and to initialize the current action tokens. Then the AVA module combines this recurrent state with text-
+conditioned visual features from the current observation to generate soft importance scores, which modulate the visual attention matrices
+throughout the backbone LLM, enabling the model to focus on task-relevant regions based on both temporal context and current perception.
+
+Moreover, in order to preserve the rich historical informa-                                                        where WQ , WK , WV are linear projection layers, and
+                                                                                                                                    ′
+tion, we use this recurrent state r t−1 for action placeholder                                                     r̂ t−1 ∈ RLA ×d is the output of r t−1 after MLP encoding.
+[20, 23] embedding initialization, i.e., pt = r t−1 .                                                              Then it computes the attention matrix and feeds the output
+   For simplicity, our framework is built upon the                                                                 into a self-attention layer
+OpenVLA-OFT foundation model. Therefore, the forward
+                                                                                                                             Ot = Self-Att Cross-Att(Qt , Kt , Vt ) .
+                                                                                                                                                                   
+pass at timestep t, incorporating the AVA module and state-                                                                                                               (9)
+based initialization, is formulated as:
+                                                                                                                   Inspired by [40, 47], we feed the resulting tokens Ot ∈
+       At = Q(Mparallel (z tI , V(xt , r t−1 ), z tS , r t−1 )),                         (6)                              ′
+                                                                                                                   RLI ×d into a Feedforward Neural Network (FFN), a linear
+                                                                                                                                 ′
+where V is the proposed AVA module, which takes the cur-                                                           layer W : Rd → R2 , and apply a Softmax function along
+rent observations and the recurrent state as input.                                                                the feature dimension. This predicts the logits for enhancing
+                                                                                                                   or weakening each visual token as:
+3.3. Active Visual Attention
+                                                                                                                         ρt = Softmax W FFN Ot             ∈ RLI ×2 .
+                                                                                                                                                       
+We now describe the detailed architecture of the AVA mod-                                                                                                                   (10)
+ule V, which is designed to modulate visual processing in a
+dynamic manner.                                                                                                    Then we compute the final soft weights for visual tokens at
+    The AVA module first employs modality-specific MLPs                                                            time t by ω t = ρt γ, where γ is a 2-dimensional vector.
+to encode the visual features z tI and the instruction fea-                                                        These soft weights directly represent the importance scores
+                              ′                  t     ′
+ture z tS into z̄ tI ∈ RLI ×d and z̄ tS ∈ RLS ×d , respectively,                                                   of the visual tokens. The components of γ, γ0 and γ1 , repre-
+where d′ < d. A feature-wise linear modulation (FiLM)                                                              sent the scalar scores for enhancing and weakening a visual
+[35] is applied to condition the visual features on the lan-                                                       token, respectively.
+guage instruction, i.e., ẑ tI = Fγ (z̄ tS ) ⊙ z̄ tI + Fβ (z̄ tS ). Then                                               The soft weights vector ω t is applied to all layers of the
+it uses the visual tokens ẑ tI as the query,                                                                      LLM backbone. Specifically, at time step t, let the total se-
+                                                             ′
+                                                                                                                   quence length be Lto , we denote the attention score of the m-
+                        Qt = WQ ẑ tI ∈ RLI ×d ,                                         (7)                                                t   t
+                                                                                                                   th layer by Ct,m ∈ RLo ×Lo , which is calculated by apply-
+and the recurrent state as the key and value                                                                       ing the original attention mask to the raw attention scores.
+                                                                         ′                                         The final attention matrix of the m-th layer At,m is calcu-
+             Kt , Vt = (WK /WV )r̂ t−1 ∈ RLA ×d ,                                        (8)                       lated by applying the soft attention mask matrix Ut with the
+Softmax operation to Ct,m :                                        any sequence, the initial recurrent state r −1 is initialized as
+                                                                   a zero embedding, i.e., r −1 = 0̄.
+     t,m     exp(Ct,m      t
+                   i,j )Ui,j                                           During inference, the model operates in a fully recurrent
+    Ai,j = PLt                   , 1 ≤ i, j ≤ Lto ,        (11)
+              o
+                exp(C  t,m
+                           )Ut                                     manner. At the beginning of a new episode (t = 0), the
+            l=1        i,l   i,l
+                                                                   initial recurrent state r −1 is initialized as the zero embed-
+where the soft attention matrix Ut is constructed based on         ding. Then, for each subsequent timestep t ≥ 0, the agent
+the soft weights vector ω t :                                      receives the current observation xt and performs a single
+                                                                   forward pass as defined in Eq. (6), conditioned on both xt
+                                                                   and the previously computed recurrent state r t−1 . This for-
+          (
+            1    if i = j or j ̸∈ ΛI , 1 ≤ i, j ≤ Lto
+  Uti,j =                                              , (12)      ward pass predicts the action chunk At and simultaneously
+            ω tj if i ̸= j and j ∈ ΛI , 1 ≤ i, j ≤ Lto
+                                                                   extracts the recurrent state r t . This loop continues for the
+                                                                   entire inference process.
+where the set ΛI represents the indices of the visual tokens.
+                                                                   Remark. We explicitly note that the soft weights vector ω t
+   Therefore, the proposed AVA module uses the recurrent
+                                                                   computed by the AVA module has a natural application in
+state and current visual observation to calculate soft weights
+                                                                   visual token reduction [24, 54]. Visual tokens with low im-
+to guide the VLA model to filter and focus its attention
+                                                                   portance scores can be pruned to reduce the computational
+based on historical information.
+                                                                   cost of the LLM backbone. While this is a valid direction
+3.4. Training and Inference Procedure                              for improving model efficiency, it is not the primary focus of
+                                                                   this work. We provide a preliminary exploratory analysis on
+The proposed AVA-VLA framework introduces a recurrent              leveraging the weight vector to do token reduction, which
+dependency through the recurrent state r t−1 . Training such       further validates the effectiveness of our proposed method.
+a recurrent model ideally requires backpropagation through         Details can be found in Section 4.4.
+time over the entire trajectory to capture long-term depen-
+dencies. However, given the substantial memory constraint          4. Experiments
+and computational cost of modern VLA backbones, per-
+forming the full backpropagation through time is compu-            We evaluate the effectiveness of our approach through a set
+tationally prohibitive [34].                                       of experiments spanning both simulation benchmarks and
+    To address this challenge, we adopt a truncated back-          real-world robot manipulation tasks. Additionally, we con-
+propagation through time strategy [25]. We unroll the              duct a comprehensive ablation study and analysis to validate
+model for a fixed, short horizon. Specifically, for the n-th       the effectiveness of our approach. All experiments are con-
+sample in the training batch, it contains a continuous obser-      ducted on Nvidia A800 GPUs.
+                            −1
+vation sequence {xt,n }Tt=0    . For each timestep t in this se-
+quence, we calculate the action chunk prediction loss using
+                                                                   4.1. Experimental Setup
+the Mean Absolute Error (MAE): Lt,n = L(At,n , At,n    GT ). To    We conduct experiments on three challenging settings: the
+prevent overly dispersed soft attention weights, we add an         LIBERO [28] and CALVIN [31] benchmarks for evalua-
+L2 penalty regularizer Lt,nω on the mean value of the weight       tion in simulation environments, and a real-world table-
+vector ω t,n , defined as:                                         mounted Mobile ALOHA robot with four test tasks, to
+                                                                   validate the sim-to-real transferability of our method. We
+                     Lt,n
+                      ω = ∥µ(ω
+                               t,n
+                                   ) − c∥,                 (13)    use the open-source OpenVLA-OFT [20] as our foundation
+                                                                   model, which consists of a two-branch vision encoder (DI-
+where µ(·) is the mean function and c is a target mean hy-         NOv2 and SigLIP) and a LLaMA2-7B backbone [51]. Due
+perparameter. This encourages the AVA module to focus              to space limitations, implementation details are provided in
+on task-relevant regions while suppressing distracting back-       Appendix A.
+ground responses (see Appendix D for more analysis).               LIBERO. LIBERO [28] is a benchmark for lifelong robot
+   Therefore, the total loss of one training batch is the sum      learning. It uses a Franka Emika Panda arm in Mu-
+of the prediction loss and penalty loss of N truncated se-         JoCo, with datasets split into four suites: LIBERO-Spatial,
+quences:                                                           LIBERO-Object, LIBERO-Goal, and LIBERO-Long. It
+                     XN       XT −1                                contains 5,000 episodes across 100 tasks. Data includes
+          Ltotal =                    (Lt,n + λLt,n
+                                                ω ),       (14)    RGB images, proprioceptive states, and delta actions, with
+                        n=1     t=0
+                                                                   procedural generation for diversity. LIBERO+ [11] is a
+where N is the batch size, and λ is a balancing coefficient.       challenging LIBERO-based benchmark, which offers a ro-
+In our experiments, we set T = 4 to balance computational          bust benchmarking framework with 7 perturbation dimen-
+feasibility with the need to learn the temporal dynamics cap-      sions and 21 sub-dimensions. It allows users to assess
+tured by the recurrent state. At the first timestep (t = 0) of     model performance across various challenges systemati-
+Table 1. Comparison on the LIBERO benchmark. The results are reported in two groups: one policy for all 4 suites, and one policy per
+suite. The best results in each column of each group are highlighted in bold.
+
+               Method                Spatial SR (%)   Object SR (%)     Goal SR (%)    Long SR (%)       Average SR (%)
+                                                      One policy for all 4 suites
+               TraceVLA [64]              84.6             85.2              75.1          54.1                 74.8
+               WorldVLA [6]               87.6             96.2              83.4          60.0                 81.8
+               π0 [3]                     96.8             98.8              95.8          85.2                 94.2
+               π0 -FAST [36]              96.4             96.8              88.6          60.2                 85.5
+               UnifiedVLA [56]            95.4             98.8              93.6          94.0                 95.5
+               OpenVLA-OFT [20]           97.7             98.0              96.1          95.3                 96.8
+               AVA-VLA (Ours)             97.4             99.4             97.4           97.6                 98.0
+                                                        One policy per suite
+               OpenVLA [19]               84.7            88.4              79.2           53.7                 76.5
+               SpatialVLA [39]            88.2            89.9              78.6           55.5                 78.1
+               CoT-VLA [63]               87.5            91.6              87.6           69.0                 83.9
+               NORA [15]                  92.2            95.4              89.4           74.6                 87.9
+               PD-VLA [45]                95.5            96.7              94.9           91.7                 94.7
+               UniVLA [5]                 96.5            96.8              95.6           92.0                 95.2
+               OpenVLA-OFT [20]           97.6            98.4              97.9           94.5                 97.1
+               FLOWER [41]                97.5            99.1              96.1           94.9                 96.9
+               RIPT-VLA [48]              99.0            98.6              98.6           93.8                 97.5
+               AVA-VLA (Ours)             99.2             99.6             97.9           96.2                 98.2
+
+
+cally. We conduct additional experiments on the LIBERO+               Table 2. Comparison on the CALVIN ABC→D benchmark. The
+benchmark, and the results are put in Appendix D.                     results are reported in terms of success rates (%) and average
+                                                                      length. The best results in each column are highlighted in bold.
+CALVIN. CALVIN [31] is a simulated benchmark for
+language-conditioned, long-horizon manipulation, using a                CALVIN                     Task completed in a row ↑      Avg. len
+                                                                        ABC→D                 1        2     3       4       5       ↑
+Franka Panda arm with RGBD observations, propriocep-
+tion, and natural language goals. It evaluates sequential               OpenVLA [19]        91.3     77.8    62.0   52.1   43.5    3.27
+                                                                        UniVLA [5]          95.5     85.8    75.4   66.9   56.5    3.80
+reasoning in VLA. CALVIN spans 34 tasks across four en-                 UnifiedVLA [56]     98.9     94.8    89.0   82.8   75.1    4.41
+vironments (A-D), with 20,000+ episodes, emphasizing un-                OpenVLA-OFT [20]    96.9     92.0    85.7   80.4   72.9    4.28
+seen object generalization and multi-stage sequences (e.g.,             FLOWER [41]         99.4     95.8    90.7   84.9   77.8    4.53
+“open drawer, pick blue block, push into drawer”). Follow-              VLA-Adapter [55]    99.1     94.6    88.8   82.8   76.5    4.42
+                                                                        Seer [50]           96.3     91.6    86.1   80.3   74.0    4.28
+ing [5], we used the CALVIN “ABC→D” setting, which
+means training on environments A, B, and C and evaluating               AVA-VLA (Ours)      99.6     97.6    94.1   89.9   84.1    4.65
+on environment D, to evaluate performance on the zero-shot
+generalization tasks.                                                 tween 30 and 450 demonstrations. Details of the task suites
+                                                                      are provided in Appendix B.
+Mobile ALOHA Real-Robot Experiments. We use a sta-
+tionary cobot magic dual-arm robot to assess our model’s              4.2. Evaluation Results
+adaptability to novel real-world environments with a small
+number of robot demonstrations. Following [5, 63], we per-            Baselines. We selected recently published works’ main
+form evaluations across four challenging tasks. These in-             method as baselines. They are TraceVLA [64], WorldVLA
+clude Pick and Place, which involves placing the bucket in            [6], π0 [3], π0 -FAST [36], UnifiedVLA [56], OpenVLA-
+the center, and then placing irregular-shaped objects into            OFT [20], OpenVLA [19], SpatialVLA [39], CoT-VLA
+the bucket (e.g., “put <obj> into bucket”), and Sequenced             [63], NORA [15], PD-VLA [45], UniVLA [5], OpenVLA-
+Instruction Understanding, which requires executing multi-            OFT [20], FLOWER [41], RIPT-VLA [48], VLA-Adapter
+step commands like stacking a Tower of Hanoi (“Stack                  [55], Seer [50]. The results of these baselines in LIBERO
+tower of hanoi”). We also test Flexible Object Folding,               and CALVIN benchmarks are based on original references
+a deformable object manipulation task requiring a specific            or other published works, ensuring objectivity and correct-
+three-stage process to fold a towel (“fold towel twice”), and         ness. For Mobile ALOHA real-robot experiments, we select
+Dexterous Action, which involves fine-motor skills such               UniVLA and OpenVLA-OFT methods as baselines.
+as using a shovel to scoop small items (e.g., corn, sesame            Evaluation Metrics.      We use widely adopted perfor-
+seeds) into a bowl. For each task, the dataset contains be-           mance evaluation metrics “Success Rate (SR)” (the same
+Figure 3. Comparison on the Mobile ALOHA real-world experiments. Evaluation across four manipulation tasks, including (a) Pick and
+Place, (b) Sequenced Instruction Understanding, (c) Flexible Object Folding, (d) Dexterous Action. Left: Representative middle states for
+each task setup. Right: Task-specific success rates and cross-task averages for our method and baselines.
+
+in LIBERO [28]) to evaluate the results for three challeng-            pre-trained on robotic data, the prismatic VLM trained on
+ing settings. In addition, we use “Average len” of completed           LLaMA2-7B [51], and the prismatic VLM [18] trained on
+tasks (the larger the better, with values between 0-5) as met-         Qwen2.5-0.5B [49]. The last two are different-scale back-
+rics for the CALVIN benchmark.                                         bones without pre-training on robotic data. We compare
+LIBERO. We present quantitative results in Table 1. Fol-               the proposed method against the standard OpenVLA-OFT
+lowing established baselines, we conduct experiments in                method on the LIBERO-Long task suite in the single task
+two different settings: training policies on each task suite           setting. Results reported in Table 3 show that our method
+independently (single-task learning) and training a single             improves performance across different backbones, even on
+policy for all task suites (multi-task learning [26]). Re-             backbones not pre-trained on robotic datasets.
+sults demonstrate that the proposed AVA-VLA framework
+                                                                       Table 3. Ablation study on the model backbones. Comparison on
+achieves state-of-the-art overall performance in both single-          the LIBERO-Long task suite in the LIBERO benchmark in terms
+task and multi-task settings. Moreover, it consistently                of success rates (%). The best results of each model backbone
+achieves the best performance on the most challenging                  setting are highlighted in bold.
+LIBERO-Long task suite. These results demonstrate the su-
+periority of the proposed AVA-VLA framework.                               Backbones               OpenVLA-OFT           AVA-VLA
+CALVIN. We present the success rates for each task and                     OpenVLA-7B [19]               94.5          96.2 (1.7% ↑)
+the average completed length across all five tasks of the                  LLaMA2-7B [51]                90.0          92.6 (2.6% ↑)
+CALVIN benchmark in Table 2. The results show that the                     Qwen2.5-0.5B [49]             89.4          90.8 (1.4% ↑)
+proposed AVA-VLA framework comprehensively outper-
+forms baseline methods across all tasks. This demonstrates             AVA Module and State-Based Initialization. The AVA-
+our method’s strong generalization ability, with an average            VLA framework consists of two components: the state-
+length superior to previous state-of-the-art baselines.                based initialization strategy and the AVA module. To val-
+Mobile ALOHA. The Pick and Place task is evaluated for                 idate their individual effectiveness, we conduct ablation ex-
+a total of 30 trials (10 per object), while other tasks are eval-      periments on the LIBERO benchmark. As shown in Ta-
+uated for 24 trials each. The experimental results on real-            ble 4, the two recurrent-state-driven components are com-
+world tasks are reported in Figure 3. In this setting, models          plementary. State-based initialization injects the recurrent
+are fine-tuned on a relatively small set of demonstrations.            state into the action placeholder to preserve temporal con-
+The results demonstrate that the proposed model possesses              text, which is especially beneficial on LIBERO-Long. The
+robust semantic understanding and dexterous action capa-               AVA module uses the recurrent state to reweight visual to-
+bilities after training. Overall, AVA-VLA achieves the high-           kens and suppress irrelevant visual content, leading to con-
+est average performance compared to baseline approaches,               sistent gains across suites. Each component alone improves
+confirming its real-world applicability. We visualize the ex-          over OpenVLA-OFT, and their combination achieves the
+ecution trajectories for these tasks in Appendix B.                    best overall performance.
+4.3. Ablation Studies                                                  4.4. Analysis
+Model Backbones. To validate the effectiveness of the                  Qualitative Visualization. To investigate the AVA mod-
+proposed framework, following [55], we compare three                   ule’s focus during task execution, we visualize the soft
+kinds of backbones: The OpenVLA-7B backbone [19]                       weights ω t across visual tokens during inference. As illus-
+Table 4. Ablation study on the two key components in the AVA-VLA framework. The results on LIBERO in terms of success rates (%)
+under the “one policy for all 4 suites” setting are reported. The best results in each column are highlighted in bold.
+
+   Method                                              Spatial SR (%)   Object SR (%)   Goal SR (%)   Long SR (%)    Average SR (%)
+   OpenVLA-OFT                                              97.7             98.0          96.1           95.3            96.8
+   AVA-VLA (State-based initialization)                     97.2             98.8          96.6           97.2            97.5
+   AVA-VLA (AVA module)                                     97.8             98.6          97.0           96.6            97.5
+   AVA-VLA (AVA module + State-based initialization)        97.4             99.4          97.4           97.6            98.0
+
+
+
+
+    Figure 4. Visual dynamics. The evolution of soft weights during the task “put both moka pots on the stove” from two viewpoints.
+
+Table 5. Study on the visual token pruning with different pruning       demonstrate the robustness of our method: the model suf-
+ratios. The results on LIBERO in terms of success rates (%) under       fers only a negligible drop in performance after pruning.
+the “one policy for all 4 suites” setting are reported.                 Notably, with pruning ratios of 50%, 60%, and 70%, the
+   Pruning   Spatial    Object     Goal      Long       Avg.            proposed method continues to outperform the OpenVLA-
+   Ratio     SR (%)     SR (%)    SR (%)    SR (%)     SR (%)           OFT and maintains performance comparable to the state-
+   0%          97.4      99.4      97.4      97.6       98.0
+                                                                        of-the-art baselines reported in Table 1. The decline in suc-
+   50%         97.2      99.4      97.2      95.2       97.3            cess rate mainly comes from the most challenging LIBERO
+   60%         97.6      99.4      97.0      95.0       97.3            Long task suite, while the results remain consistent across
+   70%         97.4      99.2      98.0      94.6       97.3            the other task suites. Even after reducing 90% of the visual
+   80%         96.8      98.2      96.2      92.8       96.0            tokens, our method still outperforms many baseline meth-
+   90%         94.2      97.8      94.2      89.2       93.9            ods listed in Table 1. This result further demonstrates the
+trated in Figure 4, the attention weights consistently con-             effectiveness of the proposed AVA-VLA framework.
+centrate on the robotic arm’s contact regions and the tar-
+get objects. This selective focus demonstrates the module’s
+                                                                        5. Conclusion
+ability to identify task-relevant visual features, validating its       In this paper, we reformulate robot manipulation from
+effectiveness. Furthermore, a direct comparison in Figure 1             a POMDP perspective and propose AVA-VLA, a novel
+reveals that while the vanilla OpenVLA-OFT baseline fails               vision-language-action framework for temporally grounded
+to localize the task-relevant region across viewpoints, AVA-            decision-making. Unlike prior VLA models that process
+VLA maintains a robust and spatially consistent focus by                each frame independently, our method introduces a recur-
+effectively leveraging historical context.                              rent state to approximate the agent’s belief, and builds an
+Visual Token Reduction. The proposed AVA module has a                   Active Visual Attention module to dynamically modulate
+potential application in visual token reduction. Although vi-           visual processing of the current observation. In this way,
+sual token pruning causes the model to lose some visual in-             AVA-VLA can actively suppress irrelevant information and
+formation, it reduces the model’s computational cost and is             focus on task-critical visual features based on historical
+beneficial for efficient inference [17, 52, 56, 58]. To validate        context. Extensive experiments demonstrate the superiority
+that our AVA module effectively prioritizes task-relevant in-           of AVA-VLA, achieving state-of-the-art performance across
+formation, we apply a direct ranking strategy to prune visual           multiple robot simulation benchmarks, including LIBERO
+tokens during inference. Specifically, for a given pruning              and CALVIN, and transferring effectively to diverse real-
+ratio, we rank all visual tokens by their soft weights and              world robotic tasks. These results highlight the value of re-
+retain only the top-ranked portion corresponding to the de-             current state modeling and history-aware visual processing
+sired retention percentage. The results reported in Table 5,            for robotic sequential decision-making.
+Acknowledgements                                                      [12] Matthew J Hausknecht and Peter Stone. Deep recurrent q-
+                                                                           learning for partially observable mdps. In AAAI fall sym-
+This work is supported by Beijing Natural Science Founda-                  posia, page 141, 2015. 2
+tion (No. L247025).                                                   [13] Yicong Hong, Qi Wu, Yuankai Qi, Cristian Rodriguez-
+                                                                           Opazo, and Stephen Gould. Vln bert: A recurrent vision-
+References                                                                 and-language bert for navigation. In Proceedings of the
+                                                                           IEEE/CVF conference on Computer Vision and Pattern
+ [1] Suneel Belkhale, Tianli Ding, Ted Xiao, Pierre Sermanet,
+                                                                           Recognition, pages 1643–1653, 2021. 2
+     Quon Vuong, Jonathan Tompson, Yevgen Chebotar, De-
+     bidatta Dwibedi, and Dorsa Sadigh. Rt-h: Action hierarchies      [14] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-
+     using language. arXiv preprint arXiv:2403.01823, 2024. 2              Zhu, Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen, et al.
+                                                                           Lora: Low-rank adaptation of large language models. ICLR,
+ [2] Johan Bjorck, Fernando Castañeda, Nikita Cherniadev,
+                                                                           1(2):3, 2022. 1
+     Xingye Da, Runyu Ding, Linxi Fan, Yu Fang, Dieter Fox,
+     Fengyuan Hu, Spencer Huang, et al. Gr00t n1: An open             [15] Chia-Yu Hung, Qi Sun, Pengfei Hong, Amir Zadeh, Chuan
+     foundation model for generalist humanoid robots. arXiv                Li, U Tan, Navonil Majumder, Soujanya Poria, et al. Nora: A
+     preprint arXiv:2503.14734, 2025. 1, 2                                 small open-sourced generalist vision language action model
+                                                                           for embodied tasks. arXiv preprint arXiv:2504.19854, 2025.
+ [3] Kevin Black, Noah Brown, Danny Driess, Adnan Esmail,
+                                                                           6, 3
+     Michael Equi, Chelsea Finn, Niccolo Fusai, Lachy Groom,
+     Karol Hausman, Brian Ichter, et al. π0 : A vision-language-      [16] Anqing Jiang, Yu Gao, Yiru Wang, Zhigang Sun, Shuo
+     action flow model for general robot control. arXiv preprint           Wang, Yuwen Heng, Hao Sun, Shichen Tang, Lijuan Zhu,
+     arXiv:2410.24164, 2024. 2, 6, 3                                       Jinhao Chai, et al. Irl-vla: Training an vision-language-
+ [4] Anthony Brohan, Noah Brown, Justice Carbajal, Yevgen                  action policy via reward world model. arXiv preprint
+     Chebotar, Joseph Dabis, Chelsea Finn, Keerthana Gopalakr-             arXiv:2508.06571, 2025. 1
+     ishnan, Karol Hausman, Alex Herzog, Jasmine Hsu, et al.          [17] Titong Jiang, Xuefeng Jiang, Yuan Ma, Xin Wen, Bailin Li,
+     Rt-1: Robotics transformer for real-world control at scale.           Kun Zhan, Peng Jia, Yahui Liu, Sheng Sun, and Xianpeng
+     arXiv preprint arXiv:2212.06817, 2022. 1, 2                           Lang. The better you learn, the smarter you prune: Towards
+ [5] Qingwen Bu, Yanting Yang, Jisong Cai, Shenyuan Gao,                   efficient vision-language-action models via differentiable to-
+     Guanghui Ren, Maoqing Yao, Ping Luo, and Hongyang Li.                 ken pruning. arXiv preprint arXiv:2509.12594, 2025. 8
+     Univla: Learning to act anywhere with task-centric latent ac-    [18] Siddharth Karamcheti, Suraj Nair, Ashwin Balakrishna,
+     tions. arXiv preprint arXiv:2505.06111, 2025. 2, 6, 1, 3              Percy Liang, Thomas Kollar, and Dorsa Sadigh. Prismatic
+ [6] Jun Cen, Chaohui Yu, Hangjie Yuan, Yuming Jiang, Siteng               vlms: Investigating the design space of visually-conditioned
+     Huang, Jiayan Guo, Xin Li, Yibing Song, Hao Luo, Fan                  language models. In Forty-first International Conference on
+     Wang, et al. Worldvla: Towards autoregressive action world            Machine Learning, 2024. 1, 2, 7
+     model. arXiv preprint arXiv:2506.21539, 2025. 6, 3               [19] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao,
+ [7] Chilam Cheang, Sijin Chen, Zhongren Cui, Yingdong Hu,                 Ashwin Balakrishna, Suraj Nair, Rafael Rafailov, Ethan
+     Liqun Huang, Tao Kong, Hang Li, Yifeng Li, Yuxiao Liu,                Foster, Grace Lam, Pannag Sanketi, et al. Openvla: An
+     Xiao Ma, et al. Gr-3 technical report. arXiv preprint                 open-source vision-language-action model. arXiv preprint
+     arXiv:2507.15493, 2025. 1, 2                                          arXiv:2406.09246, 2024. 1, 2, 3, 6, 7
+ [8] Liang Chen, Haozhe Zhao, Tianyu Liu, Shuai Bai, Junyang          [20] Moo Jin Kim, Chelsea Finn, and Percy Liang. Fine-tuning
+     Lin, Chang Zhou, and Baobao Chang. An image is worth 1/2              vision-language-action models: Optimizing speed and suc-
+     tokens after layer 2: Plug-and-play inference acceleration for        cess. arXiv preprint arXiv:2502.19645, 2025. 1, 2, 3, 4, 5,
+     large vision-language models. In European Conference on               6
+     Computer Vision, pages 19–35. Springer, 2024. 2                  [21] Mikko Lauri, David Hsu, and Joni Pajarinen. Partially ob-
+ [9] Xi Chen, Xiao Wang, Lucas Beyer, Alexander Kolesnikov,                servable markov decision processes in robotics: A survey.
+     Jialin Wu, Paul Voigtlaender, Basil Mustafa, Sebastian                IEEE Transactions on Robotics, 39(1):21–40, 2022. 2, 3
+     Goodman, Ibrahim Alabdulmohsin, Piotr Padlewski, et al.          [22] Qixiu Li, Yaobo Liang, Zeyu Wang, Lin Luo, Xi Chen,
+     Pali-3 vision language models: Smaller, faster, stronger.             Mozheng Liao, Fangyun Wei, Yu Deng, Sicheng Xu,
+     arXiv preprint arXiv:2310.09199, 2023. 1, 2                           Yizhong Zhang, et al. Cogact: A foundational vision-
+[10] Zhiwen Fan, Jian Zhang, Renjie Li, Junge Zhang, Runjin                language-action model for synergizing cognition and action
+     Chen, Hezhen Hu, Kevin Wang, Huaizhi Qu, Dilin Wang,                  in robotic manipulation. arXiv preprint arXiv:2411.19650,
+     Zhicheng Yan, et al. Vlm-3r: Vision-language models aug-              2024. 1, 2
+     mented with instruction-aligned 3d reconstruction. arXiv         [23] Wei Li, Renshan Zhang, Rui Shao, Jie He, and Liqiang
+     preprint arXiv:2505.20279, 2025. 2                                    Nie. Cogvla: Cognition-aligned vision-language-action
+[11] Senyu Fei, Siyin Wang, Junhao Shi, Zihao Dai, Jikun Cai,              model via instruction-driven routing & sparsification. arXiv
+     Pengfang Qian, Li Ji, Xinzhe He, Shiduo Zhang, Zhaoye Fei,            preprint arXiv:2508.21046, 2025. 2, 3, 4
+     et al. Libero-plus: In-depth robustness analysis of vision-      [24] Ye Li, Yuan Meng, Zewen Sun, Kangye Ji, Chen Tang, Ji-
+     language-action models. arXiv preprint arXiv:2510.13626,              ajun Fan, Xinzhu Ma, Shutao Xia, Zhi Wang, and Wenwu
+     2025. 2, 5, 4                                                         Zhu. Sp-vla: A joint model scheduling and token prun-
+     ing approach for vla model acceleration. arXiv preprint                understanding with large language models. Advances in Neu-
+     arXiv:2506.12723, 2025. 2, 5                                           ral Information Processing Systems, 37:119336–119360,
+[25] Renjie Liao, Yuwen Xiong, Ethan Fetaya, Lisa Zhang, Ki-                2024. 2
+     Jung Yoon, Xaq Pitkow, Raquel Urtasun, and Richard Zemel.         [39] Delin Qu, Haoming Song, Qizhi Chen, Yuanqi Yao, Xinyi
+     Reviving and improving recurrent back-propagation. In In-              Ye, Yan Ding, Zhigang Wang, JiaYuan Gu, Bin Zhao,
+     ternational conference on machine learning, pages 3082–                Dong Wang, et al. Spatialvla: Exploring spatial represen-
+     3091. PMLR, 2018. 5                                                    tations for visual-language-action model. arXiv preprint
+[26] Baijiong Lin, Feiyang Ye, Yu Zhang, and Ivor Tsang. Rea-               arXiv:2501.15830, 2025. 6
+     sonable effectiveness of random weighting: A litmus test for      [40] Yongming Rao, Wenliang Zhao, Benlin Liu, Jiwen Lu, Jie
+     multi-task learning. Transactions on Machine Learning Re-              Zhou, and Cho-Jui Hsieh. Dynamicvit: Efficient vision
+     search. 7                                                              transformers with dynamic token sparsification. Advances
+[27] Shengsheng Lin, Weiwei Lin, Wentai Wu, Songbo Wang,                    in neural information processing systems, 34:13937–13949,
+     and Yongxiang Wang. Petformer: Long-term time series                   2021. 4
+     forecasting via placeholder-enhanced transformer. IEEE            [41] Moritz Reuss, Hongyi Zhou, Marcel Rühle, Ömer Erdinç
+     Transactions on Emerging Topics in Computational Intelli-              Yağmurlu, Fabian Otto, and Rudolf Lioutikov. Flower:
+     gence, 2024. 3                                                         Democratizing generalist robot policies with efficient
+[28] Bo Liu, Yifeng Zhu, Chongkai Gao, Yihao Feng, Qiang Liu,               vision-language-action flow policies.        arXiv preprint
+     Yuke Zhu, and Peter Stone. Libero: Benchmarking knowl-                 arXiv:2509.04996, 2025. 6
+     edge transfer for lifelong robot learning. Advances in Neural     [42] Leyang Shen, Gongwei Chen, Rui Shao, Weili Guan, and
+     Information Processing Systems, 36:44776–44791, 2023. 2,               Liqiang Nie. Mome: Mixture of multimodal experts for gen-
+     5, 7                                                                   eralist multimodal large language models. Advances in neu-
+[29] Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee.               ral information processing systems, 37:42048–42070, 2024.
+     Visual instruction tuning. Advances in neural information              2
+     processing systems, 36:34892–34916, 2023. 1, 2
+                                                                       [43] Hao Shi, Bin Xie, Yingfei Liu, Lin Sun, Fengrong Liu,
+[30] Larry R Medsker, Lakhmi Jain, et al. Recurrent neural net-
+                                                                            Tiancai Wang, Erjin Zhou, Haoqiang Fan, Xiangyu Zhang,
+     works. Design and applications, 5(64-67):2, 2001. 3
+                                                                            and Gao Huang. Memoryvla: Perceptual-cognitive memory
+[31] Oier Mees, Lukas Hermann, Erick Rosete-Beas, and Wol-                  in vision-language-action models for robotic manipulation.
+     fram Burgard.         Calvin: A benchmark for language-                arXiv preprint arXiv:2508.19236, 2025. 2
+     conditioned policy learning for long-horizon robot manip-
+                                                                       [44] Richard D Smallwood and Edward J Sondik. The optimal
+     ulation tasks. IEEE Robotics and Automation Letters, 7(3):
+                                                                            control of partially observable markov processes over a finite
+     7327–7334, 2022. 1, 2, 5, 6
+                                                                            horizon. Operations research, 21(5):1071–1088, 1973. 2
+[32] Tianwei Ni, Benjamin Eysenbach, and Ruslan Salakhutdi-
+                                                                       [45] Wenxuan Song, Jiayi Chen, Pengxiang Ding, Han Zhao, Wei
+     nov. Recurrent model-free rl can be a strong baseline for
+                                                                            Zhao, Zhide Zhong, Zongyuan Ge, Jun Ma, and Haoang
+     many pomdps. arXiv preprint arXiv:2110.05038, 2021. 2
+                                                                            Li. Accelerating vision-language-action model integrated
+[33] Feiyu Pan, Hao Fang, Fangkai Li, Yanyu Xu, Yawei Li, Luca
+                                                                            with action chunking via parallel decoding. arXiv preprint
+     Benini, and Xiankai Lu. Semantic and sequential alignment
+                                                                            arXiv:2503.02310, 2025. 1, 6
+     for referring video object segmentation. In Proceedings of
+     the Computer Vision and Pattern Recognition Conference,           [46] Wenxuan Song, Ziyang Zhou, Han Zhao, Jiayi Chen, Pengx-
+     pages 19067–19076, 2025. 2                                             iang Ding, Haodong Yan, Yuxin Huang, Feilong Tang,
+[34] Razvan Pascanu, Tomas Mikolov, and Yoshua Bengio. On                   Donglin Wang, and Haoang Li. Reconvla: Reconstructive
+     the difficulty of training recurrent neural networks. In Inter-        vision-language-action model as effective robot perceiver.
+     national conference on machine learning, pages 1310–1318.              arXiv preprint arXiv:2508.10333, 2025. 2
+     Pmlr, 2013. 5                                                     [47] Yizheng Sun, Yanze Xin, Hao Li, Jingyuan Sun, Chenghua
+[35] Ethan Perez, Florian Strub, Harm De Vries, Vincent Du-                 Lin, and Riza Theresa Batista-Navarro. Lvpruning: An ef-
+     moulin, and Aaron Courville. Film: Visual reasoning with a             fective yet simple language-guided vision token pruning ap-
+     general conditioning layer. In Proceedings of the AAAI con-            proach for multi-modal large language models. In Findings
+     ference on artificial intelligence, 2018. 4                            of the Association for Computational Linguistics: NAACL
+[36] Karl Pertsch, Kyle Stachowicz, Brian Ichter, Danny Driess,             2025, pages 4299–4308, 2025. 4
+     Suraj Nair, Quan Vuong, Oier Mees, Chelsea Finn, and              [48] Shuhan Tan, Kairan Dou, Yue Zhao, and Philipp
+     Sergey Levine. Fast: Efficient action tokenization for vision-         Krähenbühl. Interactive post-training for vision-language-
+     language-action models. arXiv preprint arXiv:2501.09747,               action models. arXiv preprint arXiv:2505.17016, 2025. 6,
+     2025. 1, 2, 6, 3                                                       3
+[37] Jingjing Qian, Boyao Han, Chen Shi, Lei Xiao, Long Yang,          [49] Qwen Team et al. Qwen2 technical report. arXiv preprint
+     Shaoshuai Shi, and Li Jiang. Geopredict: Leveraging pre-               arXiv:2407.10671, 2(3), 2024. 7
+     dictive kinematics and 3d gaussian geometry for precise vla       [50] Yang Tian, Sizhe Yang, Jia Zeng, Ping Wang, Dahua Lin,
+     manipulation. arXiv preprint arXiv:2512.16811, 2025. 2                 Hao Dong, and Jiangmiao Pang. Predictive inverse dynamics
+[38] Rui Qian, Xiaoyi Dong, Pan Zhang, Yuhang Zang, Shuan-                  models are scalable learners for robotic manipulation. arXiv
+     grui Ding, Dahua Lin, and Jiaqi Wang. Streaming long video             preprint arXiv:2412.15109, 2024. 6
+[51] Hugo Touvron, Louis Martin, Kevin Stone, Peter Albert,                Chelsea Finn, et al. Cot-vla: Visual chain-of-thought rea-
+     Amjad Almahairi, Yasmine Babaei, Nikolay Bashlykov,                   soning for vision-language-action models. In Proceedings
+     Soumya Batra, Prajjwal Bhargava, Shruti Bhosale, et al.               of the Computer Vision and Pattern Recognition Conference,
+     Llama 2: Open foundation and fine-tuned chat models. arXiv            pages 1702–1713, 2025. 6
+     preprint arXiv:2307.09288, 2023. 5, 7                            [64] Ruijie Zheng, Yongyuan Liang, Shuaiyi Huang, Jianfeng
+[52] Hanzhen Wang, Jiaming Xu, Jiayi Pan, Yongkang Zhou, and               Gao, Hal Daumé III, Andrey Kolobov, Furong Huang, and
+     Guohao Dai. Specprune-vla: Accelerating vision-language-              Jianwei Yang. Tracevla: Visual trace prompting enhances
+     action models via action-aware self-speculative pruning.              spatial-temporal awareness for generalist robotic policies. In
+     arXiv preprint arXiv:2509.05614, 2025. 2, 8                           The Thirteenth International Conference on Learning Rep-
+[53] Qianqian Wang, Yifei Zhang, Aleksander Holynski,                      resentations, 2025. 6
+     Alexei A Efros, and Angjoo Kanazawa. Continuous 3d per-          [65] Brianna Zitkovich, Tianhe Yu, Sichun Xu, Peng Xu, Ted
+     ception model with persistent state. In Proceedings of the            Xiao, Fei Xia, Jialin Wu, Paul Wohlhart, Stefan Welker,
+     Computer Vision and Pattern Recognition Conference, pages             Ayzaan Wahid, et al. Rt-2: Vision-language-action models
+     10510–10522, 2025. 2                                                  transfer web knowledge to robotic control. In Conference on
+[54] Tiannan Wang, Wangchunshu Zhou, Yan Zeng, and Xin-                    Robot Learning, pages 2165–2183. PMLR, 2023. 1, 2
+     song Zhang. Efficientvlm: Fast and accurate vision-language
+     models via knowledge distillation and modal-adaptive prun-
+     ing. In Findings of the association for computational linguis-
+     tics: ACL 2023, pages 13899–13913, 2023. 5
+[55] Yihao Wang, Pengxiang Ding, Lingxiao Li, Can Cui, Zirui
+     Ge, Xinyang Tong, Wenxuan Song, Han Zhao, Wei Zhao,
+     Pengxu Hou, et al. Vla-adapter: An effective paradigm
+     for tiny-scale vision-language-action model. arXiv preprint
+     arXiv:2509.09372, 2025. 6, 7
+[56] Yuqi Wang, Xinghang Li, Wenxuan Wang, Junbo Zhang,
+     Yingyan Li, Yuntao Chen, Xinlong Wang, and Zhaoxi-
+     ang Zhang. Unified vision-language-action model. arXiv
+     preprint arXiv:2506.19850, 2025. 6, 8
+[57] Junjie Wen, Yichen Zhu, Jinming Li, Minjie Zhu, Zhibin
+     Tang, Kun Wu, Zhiyuan Xu, Ning Liu, Ran Cheng, Chaomin
+     Shen, et al. Tinyvla: Towards fast, data-efficient vision-
+     language-action models for robotic manipulation. IEEE
+     Robotics and Automation Letters, 2025. 1
+[58] Siyu Xu, Yunke Wang, Chenghao Xia, Dihao Zhu, Tao
+     Huang, and Chang Xu. Vla-cache: Towards efficient vision-
+     language-action model via adaptive token caching in robotic
+     manipulation. arXiv preprint arXiv:2502.02175, 2025. 2, 8
+[59] Borong Zhang, Yuhao Zhang, Jiaming Ji, Yingshan Lei,
+     Josef Dai, Yuanpei Chen, and Yaodong Yang. Safevla:
+     Towards safety alignment of vision-language-action model
+     via constrained learning. arXiv preprint arXiv:2503.03480,
+     2025. 2
+[60] Jiazhao Zhang, Kunyu Wang, Rongtao Xu, Gengze Zhou,
+     Yicong Hong, Xiaomeng Fang, Qi Wu, Zhizheng Zhang,
+     and He Wang. Navid: Video-based vlm plans the next
+     step for vision-and-language navigation. arXiv preprint
+     arXiv:2402.15852, 2024. 2
+[61] Shiqi Zhang, Piyush Khandelwal, and Peter Stone. Dynam-
+     ically constructed (po) mdps for adaptive robot planning.
+     In Proceedings of the AAAI conference on artificial intelli-
+     gence, 2017. 3
+[62] Yuan Zhang, Chun-Kai Fan, Junpeng Ma, Wenzhao Zheng,
+     Tao Huang, Kuan Cheng, Denis Gudovskiy, Tomoyuki
+     Okuno, Yohei Nakata, Kurt Keutzer, et al. Sparsevlm: Vi-
+     sual token sparsification for efficient vision-language model
+     inference. arXiv preprint arXiv:2410.04417, 2024. 2
+[63] Qingqing Zhao, Yao Lu, Moo Jin Kim, Zipeng Fu, Zhuoyang
+     Zhang, Yecheng Wu, Zhaoshuo Li, Qianli Ma, Song Han,
+           AVA-VLA: Improving Vision-Language-Action models with Active
+                                Visual Attention
+                                              Supplementary Material
+A. Implementation Details                                        training, the gradient is detached between the second and
+                                                                 the third timestep. Hyperparameters are set as follows:
+We report the implementation details of our proposed AVA-        λ = 1.0, c = 0.6, γ = [1.9, 0.1]. The action chunk
+VLA framework based on the OpenVLA-OFT architecture,             size is set to Lc = 8. The batch size is set to 64. The
+and the training details of all experiments.                     model is trained for 40,000 gradient steps with an initial
+Base OpenVLA-OFT architecture. Our main experi-                  learning rate of 5e-4, which includes a warm-up phase by
+ments are based on the OpenVLA-OFT architecture. It inte-        10% of the value for stability. Additionally, a cosine learn-
+grates a shared SigLIP-DINOv2 backbone for multi-image           ing rate scheduler and a maximum gradient norm of 1.0
+processing, a Llama-2 7B language model, a 3-layer MLP           is used. For the ablation study on the model backbone in
+projector with GELU activation for mapping visual features       Section 4.3, OpenVLA-OFT models follow standard imple-
+into the language embedding space, a 2-layer MLP with            mentation details [20] with varying initializations, and the
+GELU activation for projecting robot proprioceptive state        AVA-VLA models are trained with implementation details
+to the language embedding space, and a 4-layer MLP with          described above using the corresponding OpenVLA-OFT
+ReLU activation for continuous action generation. Dis-           models as initialization.
+tinct from the standard OpenVLA, this architecture replaces
+causal attention with bidirectional attention to enable par-         For the CALVIN benchmark, we train the base
+allel decoding, outputting chunks of Lc actions at each          OpenVLA-OFT architecture following standard settings in
+timestep.                                                        [20] using official checkpoints. The AVA-VLA model is
+                                                                 trained using the same configuration as the LIBERO bench-
+AVA-VLA framework modifications. Our main experi-
+                                                                 mark, with the exception of setting c = 0.2 to account for
+ments introduce the following modifications for deploying
+                                                                 the smaller region of interest.
+the AVA-VLA framework on the OpenVLA-OFT founda-
+tion model: 1) a 2-layer MLP with SiLU activation for map-           For Mobile ALOHA real-world experiments, inputs in-
+ping hidden state to the aforementioned recurrent state, 2)      clude one third-person and two wrist-mounted camera im-
+three 2-layer MLPs with SiLU activation for mapping vi-          ages (left wrist + right wrist), we provide the implementa-
+sual features, instruction feature, and recurrent state from     tion details of the three comparison methods. For the Uni-
+d-dimension to d′ -dimension, respectively, 3) a feature-wise    VLA baseline, following [5], we fine-tune the pre-trained
+linear modulation (FiLM) to condition the visual features on     checkpoint using the recommended configuration. We em-
+the language instruction, 4) a cross-attention layer, a self-    ploy the latent action decoder on primary images to obtain
+attention layer, a FFN, and a linear layer with Softmax acti-    latent action supervision. We incorporate proprioceptive
+vation for predicting the logits for enhancing or weakening      states into the action head and integrate dual wrist camera
+each visual token, 5) replacement of the empty placeholder       feeds as additional LLM inputs. The action chunk size is
+embedding with the recurrent state, 6) modification of the fi-   set to 25. The model is fine-tuned for 30,000 steps with
+nal attention weight matrix based on calculated soft weights     a learning rate of 3.5e-4, which is decayed to 3.5e-5 after
+vector from the AVA module.                                      24,000 steps. For the OpenVLA-OFT baseline, following
+    The proposed AVA-VLA framework introduces only               [20], we use the official OpenVLA checkpoints as initial-
+lightweight additional components on top of OpenVLA-             ization, and apply the LoRA technique with a rank of 32
+OFT. In total, these AVA-related modules add fewer than          to the vision encoder and LLM backbone, while the action
+50M parameters, accounting for less than 1% of the full          head and proprioceptive projector are fully optimized. The
+model size. Therefore, the parameter and compute over-           action chunk size is set to Lc = 25. The model is trained for
+head introduced by our modifications are negligible relative     100,000 gradient steps with an initial learning rate of 5e-4.
+to the backbone model.                                           The learning rate is decayed to 5e-5 after 50,000 steps. The
+Training Details. For the experiments on the LIBERO              batch size is set to 64. For the AVA-VLA model, we utilize
+benchmark, we use their corresponding official OpenVLA-          the trained OpenVLA-OFT model as initialization, and train
+OFT checkpoints. To fine-tune the AVA-VLA model, we              the model for 20,000 gradient steps following our LIBERO
+apply LoRA [14] with a rank of 32 to the LLM backbone,           hyperparameter settings, maintaining an action chunk size
+vision encoder, action head and proprioceptive projector,        of Lc = 25.
+while fully optimizing the proposed AVA mechanism. We            Training initialization and continued training. In our
+set the observation sequence length K = 4. For efficient         main training recipe, AVA-VLA is initialized from a post-
+trained OpenVLA-OFT checkpoint. This design is intended           • Task: Stack the medium tower on top of the large one
+to provide a better recurrent-state initialization and improve      first, and then stack the small one on top of the medium
+optimization efficiency of the proposed modules, rather             one.
+than to gain performance simply by extending training. To         • Dataset: 60 demonstrations (10 per formulation).
+verify this explicitly, we additionally compare OpenVLA-          • Episode length: 600 timesteps (24 seconds).
+OFT and AVA-VLA under matched training settings in Ap-            • Evaluation: 24 trials (4 for each).
+pendix D.                                                         Flexible Object Folding
+                                                                  • Instruction: “fold towel twice”.
+B. Real-World Experiment Details                                  • Task: First fold the towel vertically, then fold horizon-
+                                                                    tally, and finally flatten it.
+In this section, we report the additional details of the Mobile   • Dataset: 30 demonstrations.
+ALOHA real-world experiments, including the task suites           • Episode length: 900 timesteps (36 seconds).
+and execution trajectories. We adopt AgileX Cobot Magic           • Evaluation: 24 trials.
+platforms: Based on Stanford’s Mobile ALOHA project 1 ,           Dexterous Action
+this platform includes a differential-drive AGV base Tracer,      • Instructions: “scoop X into bowl”.
+dual-arm manipulators, and RGB-D sensors. A platform              • Task: Move the bowl to the center of vision, pick up and
+demonstration can be seen in Figure 5.                              use the shovel to scoop up different objects (corn, sesame,
+                                                                    sunflower seeds) and transfer them into the bowl.
+                                                                  • Dataset: 60 demonstrations (20 of each small object).
+                                                                  • Episode length: 1000 timesteps (40 seconds).
+                                                                  • Evaluation: 24 trials (8 for each).
+
+                                                                  B.2. Execution Trajectories
+                                                                  We provide the execution trajectories of the four real-world
+                                                                  task suites in Figure 6. The proposed AVA-VLA method
+                                                                  can perform various tasks in real-world scenarios.
+
+                                                                  C. Additional Discussions
+                                                                  The proposed AVA-VLA framework is different from recent
+                                                                  memory-augmented VLA models, such as MemoryVLA
+                                                                  [43]. MemoryVLA relies on an explicit, large-scale mem-
+                                                                  ory bank for retrieval-based feature augmentation, while
+                                                                  AVA-VLA adopts a formal POMDP formulation to com-
+                                                                  press historical interactions into a compact, implicit recur-
+           Figure 5. AgileX Cobot Magic platforms.                rent state. Moreover, MemoryVLA focuses on augmenting
+                                                                  current features with historical tokens, while our AVA-VLA
+                                                                  method utilizes the recurrent state to dynamically modulate
+B.1. Real-World Task Suites
+                                                                  and prune visual tokens at the input level, enabling active
+We introduce the detailed specifications for each task suite      visual perception that focuses on task-relevant regions.
+in our Mobile ALOHA real-world experiments:                          The significance of temporal modeling and memory
+Pick and Place                                                    mechanisms is well-established across various fields, such
+• Instructions: “put X into bucket”.                              as Vision-Language Navigation (VLN) [13, 59, 60] and Re-
+• Task: Place the bucket in the center and put the simulated      inforcement Learning [12, 32]. Unlike the explicit memory-
+  toy objects of which the instruction has given (yellow ba-      bank architectures in VLN-BERT [13] and SafeVLA [59]
+  nana, green pepper, purple eggplant) into the bucket.           or the LSTM-based aggregation in NaVid [60], our ap-
+• Dataset: 450 demonstrations (150 per target).                   proach explicitly incorporates a recurrent state based on
+• Episode length: 700 timesteps (28 seconds).                     POMDP to enhance visual representations in a simple yet
+• Evaluation: 30 trials (10 for each).                            effective manner. Furthermore, while conceptually related
+Sequenced Instruction Understanding                               to POMDP-inspired RL algorithms such as Recurrent-PPO
+• Instruction: “stack tower of hanoi”.                            [32] or DRQN [12], AVA-VLA is specifically tailored for
+                                                                  VLA tasks, prioritizing visual processing efficiency and the
+  1 “https://global.agilex.ai/products/cobot-magic”               focus on task-relevant features over general policy stability.
+Table 6. Model performance under different perturbations in the LIBERO+ benchmark. For each column, the average task success
+rate (%) of four task suites (LIBERO-Spatial, LIBERO-Object, LIBERO-Goal, and LIBERO-Long) under the given perturbation type is
+reported. The last column reports the average task success rate over seven perturbation types. The best results in each column of each
+group are highlighted in bold.
+
+        Method                         Camera      Robot      Language     Light    Background         Noise     Layout     Average
+                                                           One policy for all 4 suites
+        WorldVLA [6]                     0.1       27.9         41.6       43.7          17.1           10.9      38.0           25.0
+        π0 [3]                          13.8        6.0         58.8       85.0          81.4           79.0      68.9           53.6
+        π0 -FAST [36]                   65.1       21.6         61.0       73.2          73.2           74.4      68.8           61.6
+        OpenVLA-OFT [20]                55.6       21.7         81.0       92.7          91.0           78.6      68.7           67.9
+        AVA-VLA (Ours)                  55.5       25.9          85.6       95.5         88.9           78.0      74.1           70.1
+                                                             One policy per suite
+        OpenVLA [19]                     0.8        3.5        23.0        8.1           34.8           15.2      28.5           15.6
+        NORA [15]                        2.2       37.0        65.1       45.7           58.6           12.8      62.1           39.0
+        UniVLA [5]                       1.8       46.2        69.6       69.0           81.0           21.2      31.9           42.9
+        OpenVLA-OFT [20]                56.4       31.9        79.5       88.7           93.3           75.8      74.2           69.6
+        RIPT-VLA [48]                   55.2       31.2        77.6       88.4           91.6           73.5      74.2           68.4
+        AVA-VLA (Ours)                  69.4       34.9          81.5       97.5         94.1           79.1      78.3           74.7
+
+Table 7. Comparison under matched training settings. The                    Table 9. Ablation study of the two modules on the CALVIN
+results on the LIBERO benchmark in terms of success rates (%)               ABC→D benchmark. ”+init” denotes enabling state-based ini-
+under the “one policy for all 4 suites” setting are reported. Both          tialization only, and ”+ava” denotes enabling the AVA module
+OpenVLA-OFT and AVA-VLA are initialized from the same pre-                  only. The results are reported in terms of success rates (%) and
+trained OpenVLA checkpoint and trained with 100K gradient                   average length. The best results in each column are highlighted in
+steps in a batch size of 256. The best results in each column are           bold.
+highlighted in bold.
+                                                                              CALVIN                    Task completed in a row ↑        Avg. len
+ Method
+                   Spatial     Object     Goal      Long       Avg.           ABC→D                1        2     3       4       5         ↑
+                   SR (%)      SR (%)    SR (%)    SR (%)     SR (%)
+                                                                              OpenVLA-OFT        96.9     92.0    85.7    80.4    72.9    4.28
+ OpenVLA-OFT         97.0       98.8      96.0      95.2       96.8           +init              99.5     96.9    93.4    90.0    83.6    4.63
+ AVA-VLA             98.4       99.4      98.4      96.8       98.3
+                                                                              +ava               99.1     96.5    93.1    89.2    82.7    4.61
+Table 8. Ablation study of the loss design on the LIBERO                      AVA-VLA            99.6     97.6    94.1    89.9    84.1    4.65
+benchmark. The results in terms of success rates (%) under the
+“one policy for all 4 suites” setting are reported. We remove the           parison (Table 7), where OpenVLA-OFT and AVA-VLA
+L2 penalty regularizer Lω while keeping all other training settings         are initialized from the same pretrained OpenVLA check-
+unchanged. The best results in each column are highlighted in               point and trained under identical settings, including the
+bold.                                                                       same equivalent batch size and the same number of op-
+                     Spatial    Object     Goal      Long      Avg.         timization steps. Under this controlled setup, AVA-VLA
+ Method
+                     SR (%)     SR (%)    SR (%)    SR (%)    SR (%)        consistently outperforms OpenVLA-OFT (and its perfor-
+ AVA-VLA              97.4       99.4      97.4      97.6       98.0        mance is even better than that reported in Table 1), indicat-
+ AVA-VLA w/o Lω       97.4       98.8      97.2      96.4       97.5        ing that the gain is not explained by a larger training com-
+                                                                            pute alone. Combined with the small parameter overhead
+D. Additional Experimental Results                                          of AVA-VLA (<50M, <1% of the full model), these results
+In this section, we provide additional evidence for three                   suggest that the performance gain mainly comes from the
+aspects of AVA-VLA: (i) the gain is not explained by ex-                    proposed architectural synergy between recurrent-state ini-
+tra training compute, (ii) the proposed design generalizes                  tialization and active visual attention.
+across benchmarks and controlled perturbations, and (iii)
+the learned attention is interpretable.                                     D.2. Module Ablation on CALVIN Benchmark
+                                                                            To further evaluate whether the effects of the two mod-
+D.1. Comparison Under Matched Training Settings                             ules generalize beyond LIBERO, we conduct the same ab-
+To rule out the confounding effect of additional training                   lation study on the CALVIN benchmark. As shown in
+compute, we conduct an additional matched-setting com-                      Table 9, both state-based initialization and AVA consis-
+tently improve over OpenVLA-OFT, while their combina-             and allocates more mass to irrelevant background regions.
+tion achieves the best overall results. Importantly, the gains    Compared with the full model visualization in Figure 4, this
+become more pronounced as the task horizon increases.             suggests that Lω stabilizes the sparsity pattern of AVA and
+These results support the same conclusion as Table 4 in           helps the model maintain task-relevant focus over time.
+the main paper: state-based initialization preserves tempo-
+ral belief across steps, AVA refines perception by suppress-      D.5. Attention Visualization Across Tasks
+ing irrelevant visual content, and the two components are         In Section 4.4, we visualize the soft weights ω t related to
+complementary, especially in long-horizon settings.               the corresponding visual tokens during the inference of one
+                                                                  example from the LIBERO benchmark. Additionally, we
+D.3. Robustness on LIBERO+ Benchmark                              present further visualizations of the soft weights calculated
+The LIBERO+ [11] benchmark enables us to perform a                by the AVA module across a broader set of examples to
+systematic vulnerability analysis by introducing controlled       demonstrate the proposed method’s consistency.
+perturbations across seven dimensions: camera viewpoints             Figure 7 and Figure 8 illustrate results from Mobile
+(change the viewpoint/pose and field-of-view of the third-        ALOHA real-world experiments, covering two task suites
+person camera), robot initial states (change the manip-           across three viewpoints. The results demonstrate the pro-
+ulator’s initial pose), language instructions (rewrite task       posed framework’s ability to focus on important visual in-
+instructions to increase linguistic richness and complex-         formation. Specifically, in the “put yellow banana into
+ity), light conditions (vary illumination intensity, direction,   bucket” task, the model consistently locates and focuses on
+color, and shadow patterns), background textures (modify          the objects requiring interaction: the yellow banana and the
+table/scene textures and materials), sensor noise (inject pho-    bucket. Similarly, for the “scoop sesame into bowl” task,
+tometric distortions into input images), and object layout        the model accurately pinpoints the interaction target, such
+(add confounding objects and/or shift the target object’s po-     as the ladle handle in frame 375 of the right wrist-mounted
+sition).                                                          camera.
+    We evaluate the proposed method on the LIBERO+                   Extended visualization results for simulated environ-
+benchmark using the AVA-VLA models trained on the                 ments are presented in Figures 9, 10, and 11. Figure 9 dis-
+LIBERO benchmark. We do not use additional data to                plays the results for the continuous tasks “Lift red block
+train these models. The evaluation results of two differ-         table” and “Place in slider” from two viewpoints for the ex-
+ent settings: “one policy for all 4 suites” and “one policy       periment on the CALVIN benchmark. Figure 10 and Fig-
+per suite” are reported in Table 6. The results of baselines      ure 11 display the results for two tasks from two viewpoints
+in LIBERO+ benchmarks are based on original references            for the experiment on the LIBERO benchmark, respectively.
+[11]. The results show that the proposed AVA-VLA method           These additional visualization results on the simulation en-
+achieves the best total results over the seven perturbation       vironments consistently corroborate our findings. The pro-
+types on two different settings, demonstrating the superi-        posed AVA-VLA method can enable the VLA model to ef-
+ority of the proposed framework. Notably, the AVA-VLA             fectively enhance the perception of critical visual informa-
+model exhibits strong robustness under the Light and the          tion while suppressing irrelevant regions, thereby improv-
+Layout perturbations, further demonstrating that the pro-         ing the model’s performance.
+posed AVA module helps the model enhance the important
+visual information and reduce the interference of unimpor-        E. Limitations
+tant parts on prediction, thereby improving the model’s ro-       Despite its strong performance, AVA-VLA still faces a fun-
+bustness under visual interference.                               damental challenge of POMDP modeling: small percep-
+                                                                  tion or state-estimation errors may accumulate over long
+D.4. Effect of the Lω Regularizer
+                                                                  horizons, gradually leading to belief drift and failures in
+We further analyze the regularization term Lω introduced in       precision-sensitive manipulation such as grasping or place-
+Section 3.4 of the main paper. Specifically, we remove the        ment. See the provided qualitative failure cases in Figure
+L2 penalty on the soft attention weights while keeping all        13. This issue is especially pronounced in long-horizon
+other training settings unchanged. Quantitative results on        tasks such as LIBERO-Long, where performance drops
+the LIBERO benchmark are reported in Table 8. Removing            more markedly under visual token reduction. A promising
+Lω reduces the average success rate from 98.0% to 97.5%,          direction for future work is to improve the stability of re-
+with the most noticeable drop on the LIBERO-Long suite.           current state propagation, for example, through more robust
+   We also visualize the effect of removing the regulariza-       state-update mechanisms, explicit error-correction strate-
+tion term Lω on the same task instance used in Figure 4 of        gies, or longer-horizon training schemes that better align the
+the main paper. As shown in Figure 12, without Lω , the           recurrent state with task-relevant environment dynamics.
+learned soft attention becomes noticeably more dispersed
+Figure 6. Real-world task execution. Key observations from four long-horizon manipulation tasks.
+Figure 7. Attention dynamics on Mobile ALOHA. Soft weights for “put yellow banana into bucket” from three viewpoints.
+
+
+
+
+  Figure 8. Attention dynamics on Mobile ALOHA. Soft weights for “scoop sesame into bowl” from three viewpoints.
+Figure 9. Attention dynamics on CALVIN. Soft weights for the continuous tasks “Lift red block table” and “Place in slider” from two
+viewpoints.
+
+
+
+
+Figure 10. Attention dynamics on LIBERO. Soft weights for “put the black bowl in the bottom drawer of the cabinet and close it” from
+two viewpoints.
+
+
+
+
+Figure 11. Attention dynamics on LIBERO. Soft weights for “put the yellow and white mug in the microwave and close it” from two
+viewpoints.
+Figure 12. Visualization of the soft weights without the regularizer Lω on LIBERO. Compared with the full AVA-VLA result shown
+in Figure 4, removing Lω leads to more dispersed attention and increased responses on irrelevant background regions, indicating that the
+regularizer helps maintain more selective and structurally robust attention masks.
+
+
+
+
+                            (a) Task: Put the white mug on the plate and put the chocolate pudding to the right of the plate.
+
+
+
+
+                                                      (b) Task: Put both moka pots on the stove.
+
+Figure 13. Failure cases of AVA-VLA on LIBERO. (a) The gripper fails to align with the chocolate pudding due to drifted spatial
+belief. (b) A slight positional deviation prevents the robot from securely grasping the moka pot handle. These cases illustrate how minor
+perceptual inaccuracies accumulate in the recurrent state, leading to drifted object/contact beliefs and eventual failures in precision-sensitive
+long-horizon tasks.
+

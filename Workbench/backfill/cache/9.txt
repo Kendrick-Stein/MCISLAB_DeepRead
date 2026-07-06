@@ -1,0 +1,1017 @@
+                      This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                   Except for this watermark, it is identical to the accepted version;
+                             the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+WebGym: Scaling Training Environments for Long-Horizon Visual Web Agents
+                          with Realistic Tasks
+
+         Hao Bai1,2 * Alexey Taymanov1 Tong Zhang2 Aviral Kumar3                                                 Spencer Whitehead1
+                                  1
+                                    Microsoft 2 UIUC 3 CMU
+
+
+
+
+Figure 1. Example rollouts from visual web agents trained on different training environments. Row 1: prior training setups (TTI; Shen et al. [34]) fail on
+held-out tasks. Row 2: WebGym (300k tasks, 3× TTI) trains agents that solve diverse tasks via RL. See §A for full task descriptions.
+
+
+                             Abstract                                           achieve 27.1% and 29.8%, respectively. This improvement
+                                                                                is substantial because our test set consists only of tasks on
+                                                                                websites never seen during training, unlike many other prior
+We present WebGym, the largest-to-date open-source environ-
+                                                                                works on training visual web agents.
+ment for training realistic visual web agents. Real websites
+are non-stationary and diverse, making artificial or small-
+scale task sets insufficient for robust policy learning. Web-
+                                                                                1. Introduction
+Gym contains nearly 300,000 tasks with rubric-based evalua-
+tions across diverse, real-world websites and difficulty levels.                Vision-language models (VLMs) have recently demonstrated
+We train agents with a simple reinforcement learning (RL)                       remarkable performance on agentic tasks on the web. These
+recipe, which trains on the agent’s own interaction traces                      tasks often resemble those that a human user would aim
+(rollouts), using task rewards as feedback to guide learning.                   to perform on the web, such as “Compare the prices and
+To enable scaling RL, we speed up sampling of trajectories in                   specs between AirPod 3 and AirPod 2 on Apple.com”. To
+WebGym by developing a high-throughput asynchronous roll-                       solve such tasks, an agent will perform a series of actions,
+out system, designed specifically for web agents. Our system                    such as navigating to the relevant website, searching for
+achieves a 4-5x rollout speedup compared to naı̈ve imple-                       both products, and finally, deciding on and submitting an
+mentations. Second, we scale the task set breadth, depth, and                   answer to complete the task. Some web agents rely purely
+size, which results in continued performance improvement.                       on textual information and try to solve tasks by simply utiliz-
+Fine-tuning a strong base vision-language model, Qwen-3-                        ing accessibility trees [45] as the observation for the agent,
+VL-8B-Instruct, on WebGym results in an improvement in                          while we focus on visual web agents, where agents observe
+success rate on an out-of-distribution test set from 26.2%                      screenshots, much like humans. This choice is based on
+to 42.9%, significantly outperforming agents based on pro-                      the premise that web interaction semantics are defined by
+prietary models such as GPT-4o and GPT-5-Thinking that                          the rendered interface users see, and that reasoning over vi-
+
+
+
+                                                                         12248
+sual affordances enables more robust generalization across           Source Task Set           Difficulties   # Websites      # Tasks
+diverse and dynamically generated web pages [21, 34, 46].            InSTA-v3 [36]                  ✗           146,348       146,441
+                                                                     PAE-WebVoyager [46]            ✗              13         128,499
+   There is a growing body of work on evaluating visual              AgentSynth-Web [40]            ✓             328          2,086
+web agents by using benchmarks that involve either artificial        BrowseComp [37]                ✗               7          1,266
+                                                                     TravelPlanner [39]             ✗               1          1,225
+or real-world websites. Benchmarks with artificial websites          Mind2Web-Live [25]             ✗              76           542
+typically provide source code for hosting simulated environ-         Online Mind2Web [42]           ✗             139           300
+ments that resemble real websites, such as REAL Bench [10]           DeepShop [22]                  ✗               1           150
+                                                                     Mind2Web-2 [12]                ✗              44           130
+and VisualWebArena [21]. In contrast, realistic benchmarks
+                                                                     GAIA-Web [23]                  ✓               1            87
+such as GAIA-Web [23], BrowseComp [37], and InSTA-
+v3 [36] use tasks based on live websites. These “live-website”       WebGym (Ours)                  ✓           127,645       292,092
+benchmarks tend to be more challenging, as real websites         Table 1. Task sourcing for WebGym. We aggregate 10 benchmarks to seed
+are inherently non-stationary [3, 4]. For example, each time     procedural construction. Sources with 1 website lack task-specific URLs.
+an agent visits the homepage of an e-commerce site, the set
+of displayed products may differ, and the same sequence of        2. Related Work
+past actions could yield very different outcomes.
+                                                                 Visual web agents for realistic tasks. We focus on vi-
+    Recent work has demonstrated that vision-language mod-       sual web agents that take screenshots as input and output
+els can be adapted into web agents via supervised fine-tuning    browser actions. General-purpose VLMs (Gemma3 [11],
+and task-specific training pipelines [16]. However, in con-      GLM-4.1v [16], Qwen3-VL [5]) and web-specific agents
+trast to the rapid progress of online reinforcement learn-       (UI-TARS [30]) have shown strong results on such tasks.
+ing (RL) in text-only domains such as software engineering          Evaluation benchmarks and training environments.
+and mathematical reasoning [24, 33], scaling RL for visual       Robust evaluation benchmarks have advanced substantially
+web agents remains substantially more challenging. Unlike        (WebVoyager [14], Mind2Web-Live [25], Mind2Web-2 [12],
+text-based settings, where rollouts are fast and rewards are     InSTA [36], BrowseComp [37], GAIA [23]), while training
+easily verifiable, visual web tasks require reasoning over       environments remain scarce. WebRL [29] and PAE [46]
+fine-grained rendered interfaces and often lack unambiguous      have limited task diversity and unoptimized rollout systems.
+success signals [17, 32, 42]. Addressing these challenges        WebGym addresses both via rubric-derived decomposition
+requires three ingredients: a large, diverse task set spanning   and asynchronous rollouts.
+many domains and difficulty levels to encourage generaliz-           Scaling online RL for training agents. Scaling on-
+able policy learning, clear evaluation protocols that provide     line RL trajectories boosts agent capabilities with REIN-
+meaningful learning signals, and high rollout speed, since        FORCE [38] across software engineering [24], math [33],
+simulating web browsers dominates wall-clock time [46].           and deep research [15, 19, 44]. WebGym builds on these
+                                                                  insights with a large, diverse task set and on-policy RL.
+   To advance scaling of training recipes for visual web
+agents, we introduce WebGym, a training environment fea-
+turing the largest open-source task set and the fastest           3. Tasks in WebGym and Evaluation Protocol
+rollout system to date (to our knowledge) for training web
+agents. Specifically, WebGym provides (1) a task set with        Training with online RL requires a large number of model-
+nearly 300,000 tasks spanning a wide range of difficulties,      generated rollouts guided by reliable reward signals on a
+domains, and evaluation criteria, enabling agents to gen-        family of tasks (“environments” in traditional multi-task
+eralize across diverse and challenging scenarios, and (2)        RL nomenclature) that we curate. To learn generalizable
+an efficient asynchronous rollout system capable of collect-     policies with such a procedure, the task set must (1) span
+ing 1,800 trajectories with an average of 13.2 steps in just     diverse domains and websites, (2) cover a range of “diffi-
+30 minutes using 128 CPUs and 24 NVIDIA H100 GPUs.               culties” from atomic to compositional tasks, and (3) include
+This achieves a 4-5× speedup compared to traditional syn-        verifiable evaluators that translate outcomes into meaningful
+chronous rollout systems. We study three dimensions of           learning signals. Existing web agent benchmarks, while ef-
+scaling the task set in WebGym: task set breadth, depth          fective for evaluation, are typically too small and static for
+and size, and observe significant improvements over each         large-scale training. Existing training tasks are either non-
+dimension with the task set introduced in WebGym. We             diverse [46] and lack a wide range of task difficulties [36],
+demonstrate that a simple REINFORCE-like algorithm can           or do not come paired with good task-level evaluation crite-
+improve Qwen3-VL-Instruct-8B to state-of-the-art perfor-         ria, rubrics, or guidance for enabling robust policy evalua-
+mance on web agent benchmarks across tasks from easy to          tion [23, 36, 37, 40, 46]. We describe how we procedurally
+long-horizon in out-of-domain settings.                          construct a task set that satisfies these desiderata.
+
+
+
+                                                             12249
+Algorithm 1 Task Set Construction Procedure of WebGym.                                                                                                                                      website. Next, we use GPT-4o to generate an evaluation
+ 1: Input: Task set C with N tasks. Gather all tasks from datasets in                                                                                                                       rubric structured as fact groups, where each group contains
+    WebGym.
+ 2: for each task in C:
+                                                                                                                                                                                            one or more evaluation facts. We define the difficulty or
+ 3:     Infer website and domain; generate evaluator rubric as fact groups                                                                                                                  difficulty level of a task as the total number of facts across
+    using LLM; set difficulty = total number of facts.                                                                                                                                      all groups in its evaluation rubric. The prompt we use to
+ 4:     if ≥2 groups and ≥1 group has ≥3 facts:                                                                                                                                             generate the evaluation rubric is shown in §L.5.
+ 5:         for each proper subset with ≥1 large group:
+ 6:            Create decomposed task via LLM, add to C.                                                                                                                                        With these fact groups, we can procedurally generate de-
+                                                                                                Step 2 Fact Groups → Decomposed Tasks (Generate New Tasks)
+                                                                                                                                                                                            composed tasks through combinations. Task decomposition
+       Step 1 Task → Fact Groups (Generate Evaluation Rubrics)
+Seed Task
+      Examine the all items displayed on the webpage, compare their prices and 
+
+                                                                                                 Filter what fact groups satisfies condition
+                                                                                                    Fact Group 1: 3 criteria > 3 criteria
+     Fact Group 2: 1 criteria < 3 criteria
+
+                                                                                                                                                                                            occurs only when two conditions are met: (1) the original
+      amounts and add the item with lowest unit price and one to shopping cart.                     Should contribute to a new task            Should not contribute to a new task
+
+                                                  GPT-4o                                                                  Group 1 is the only group to be decomposed
+
+                                                                                                                          {Group 1} → combination only contains {Group 1}
+                                                                                                                                                                                            task has at least 2 fact groups, and (2) at least one group
+Fact Group 1: Item Information                      Fact Group 2: Cart Manipulation
+Criterion 1: Check prices of all items
+
+Criterion 2: Check amounts of all items
+
+                                                    Criterion 1: Add the item with lowest 
+
+                                                                 unit price to the shopping 
+
+                                                                                                 New Task (Easier)
+                                                                                                 Check prices and amounts of all items and calculate the unit prices of all items.
+                                                                                                                                                                                            is “large” (i.e., it contains 3 or more facts). When these
+Criterion 3: Calculate unit prices of all items                  cart.
+
+                                   Difficulty=4 (Medium)                                                                           Difficulty=3 (Easy)                                      conditions are satisfied, we generate new tasks by selecting
+Figure 2. Task decomposition system. WebGym decomposes tasks by                                                                                                                             proper subsets of the fact groups, where each subset must
+generating valid combinations of fact groups from the original task’s rubric.                                                                                                               contain at least one “large” group to ensure meaningful task
+Decomposition requires ≥2 groups with at least one “large” group (≥3                                                                                                                        complexity. For example, as illustrated in Figure 2, the seed
+facts). Each valid combination (excluding the full set) produces a new task
+with lower difficulty while maintaining consistency with the original task.                                                                                                                 task “Examine all the items displayed on the webpage, com-
+                                                                                                                                                                                            pare their prices and amounts and add the item with lowest
+3.1. Obtaining a Seed Set of Tasks                                                                                                                                                          unit price and one to shopping cart” contains 2 fact groups,
+To obtain a set of seed tasks, we collect 10 of the most recent                                                                                                                             with one fact group containing 3 criterion while the other
+and highly utilized task sets in the open-source community,                                                                                                                                 fact group containing only 1. In this case, only the first fact
+as listed in Table 1. These tasks come from both existing                                                                                                                                   group will participate in the decomposition, and thus our
+benchmarks and existing training sets. Importantly, we do                                                                                                                                   algorithm generates only 1 new task with the only “large”
+not designate any entire benchmark as “held out”, because                                                                                                                                   group. A more detailed example with a harder task is pro-
+many benchmarks share websites, domains, or task patterns                                                                                                                                   vided in §C. Example rubrics can be found in §K.1, and the
+with one another, making train-test separation at the level                                                                                                                                 prompt for generating decomposed tasks is in §L.6.
+of existing benchmarks unreliable. Instead, WebGym con-                                                                                                                                         As a result, tasks generated by WebGym (1) avoid be-
+structs its own train-test split at the task and website level to                                                                                                                           ing trivial by restricting to sufficiently large groups, (2) are
+ensure strict separation without discarding large amounts of                                                                                                                                strictly easier than the original task, yielding denser reward
+useful data. Specifically, our tasks come from a) InSTA-                                                                                                                                    signals, and (3) are guaranteed to be well-defined when-
+v3 [36], which provides wide coverage of websites and                                                                                                                                       ever the original task is well-defined. In contrast, PAE [46]
+domains; b) PAE-WebVoyager [46] and AgentSynth [40],                                                                                                                                        generates synthetic tasks that may be ill-posed or impossi-
+which provide synthetic tasks focused on narrow domains;                                                                                                                                    ble to solve. While WebGym is related to the approach in
+c) BrowseComp [37] and GAIA-Web [23], which include                                                                                                                                         AgentSynth [40], it requires no rollouts for task generation.
+difficult tasks with concrete, verifiable answers; d) Trav-
+                                                                                                                                                                                            3.3. Train-Test Split
+elPlanner [39] and DeepShop [22], which focus on domain-
+specific browsing problems; and e) Mind2Web-Live [25],                                                                                                                                      Having expanded the source tasks into a substantially larger
+Online Mind2Web [42], and Mind2Web-2 [12], which con-                                                                                                                                       task set, we next describe the train-test split. As we’re primar-
+tain human-verified high-quality tasks that are indeed solv-                                                                                                                                ily interested in imbuing agents with broadly generalizable
+able. We next describe how we construct our full task set.                                                                                                                                  skills and capabilities, we construct an out-of-distribution
+                                                                                                                                                                                            (OOD) task set with 1,167 tasks where each OOD task orig-
+3.2. Task Set Construction Procedure                                                                                                                                                        inates from a distinct website. We remove all tasks in the
+Recent research has demonstrated strong improvements                                                                                                                                        training set associated with the same websites as those in
+when constructing curriculum on tasks with similar goals but                                                                                                                                the test set. This guarantees that all OOD tasks come from
+different hardness [33, 34]. In parallel, other efforts show                                                                                                                                entirely unseen websites relative to the training set.
+that developing evaluation rubrics can significantly improve
+evaluation accuracy [13, 18, 26]. We combine these ideas
+                                                                                                                                                                                             3.4. Statistics: Size, Breadth and Depth
+by generating evaluation rubrics and using them to construct                                                                                                                                After the train-test split, the WebGym training set contains
+decomposed tasks. We elaborate our task construction al-                                                                                                                                    292,092 tasks spanning 127,645 websites. The top 20 web-
+gorithm in Algorithm 1 and an example in Figure 2. All                                                                                                                                      sites account for about half of all tasks (Figure 3, left), most
+constructions are generated using GPT-4o.                                                                                                                                                   of which are from the PAE-WebVoyager synthetic task set,
+   We begin by sourcing and merging all tasks specified                                                                                                                                     while there are a significant number of websites with few
+in §3.1. For benchmarks that do not specify a concrete                                                                                                                                      tasks that build the diversity up, which is majorly composed
+website for a task, we prompt GPT-4o to infer an appropriate                                                                                                                                of other source task sets. This reflects an intentional balance:
+
+
+
+                                                                                                                                                                                        12250
+Number of Tasks (log scale)
+                                                                                                                                                                                                                                                                                                     Train Original (258595)
+                              104
+                                         High-concentration                                                                                                                                                                                           100000
+                                                                                                                                                                                                                                                                    102665                           Train Decomposed (33497)
+                                                                                                                                                                                                                                                                                                     Test (1167)                700                           at visually similar but incorrect pages, and generate answers
+
+
+                                                                                                                                                                                                                             Train Tasks (n=292092)
+                                           (few websites)                                                                                                                                                                                                                                            Easy (1-3 facts)
+                                                                                                                                                                                                                                                                                                                                600
+
+
+
+                                                                                                                                                                                                                                                                                                                                    Test Tasks (n=1167)
+                              103                                                                                                                                                                                                                      80000
+                                                                                                                                                                                                                                                                                                     Medium (4-6 facts)
+                                                                                                                                                                                                                                                                                                     Hard (7+ facts)
+                                                                                                                                                                                                                                                                                                                                500
+                                                                                                                                                                                                                                                                                                                                                              that may appear correct unless verified against grounded
+                              102
+                                                                                                                                      23 websites with >100 tasks
+                                                                                                                                                                                                                                                       60000              361                                                   400                           evidence. Unlike math reasoning or coding, “reference” an-
+                                                                                                                                                                                                                                                                                                                                300
+                              101                                                                                                                 Long-tail
+                                                                                                                                                                                                                                                       40000
+                                                                                                                                                                                                                                                                                                                                200
+                                                                                                                                                                                                                                                                                                                                                              swers of any sort are rare to obtain for most task instructions
+                                                                                                                                               (many websites)
+                                                                                                                                                                                                                                                       20000                                                                                                  because only a small minority of benchmarks provide them
+                                                                                                                                                                                                                                                                                                                                100
+                              100                                                                                                                                                                                                                                                                                9013
+                                                                                                                                                                                                                                                           0                                                                    0
+                                      100                    101
+                                                             Website Rank (log scale)
+                                                                                                                           102                       103                               104        105                                                           1        2         3   4     5   6
+                                                                                                                                                                                                                                                                                           Difficulty
+                                                                                                                                                                                                                                                                                                        7    8    9 10+                                       (for example BrowseComp and GAIA-Web [23, 37]) and
+                                                                                                                                                                                                                                                                                                                                                              the notion of a reference answer does not exist in many
+     Figure 3. WebGym training set. Left: website distribution. Right: difficulty
+     distribution. Transparent: decomposed; slashed: test.                                                                                                                                                                                                                                                                                                    cases (e.g., tasks that do not involve question answering).
+                                                                                0.9%
+                                                                                0.7%                          1.6%          2.0%
+                                                                                                                                                                                                                                                                                                                                                              This difference reflects a fundamental challenge in designing
+                                                                                                                                        5.5%
+                                            14.4
+                                               %
+                                                                                   Fashion & Beauty
+                                                                                                          Hobbies & DIY
+                                                                                                                           e                                                                                                                                                                                                                                  open-ended web tasks with a binary answer. Thus, evalua-
+                                                                                                                     Health
+                                                                                                                                                                                                                                    35
+                                                                                 Pets & Animal Welfare
+                                                                                                                                                                       %
+
+
+
+
+                                                                                                                                                                                                        Trajectory Length (steps)
+                                                                y&                                                 & Medicin
+                                                                                                                               Sp
+                                                                                                                               Fitnorts &
+                                                                                                                                                                    7.2
+                                                            log                                                                                                                                                                                           n=5912                            n=2062                      n=470
+                                                        hno nce
+                                                                                                                                    ess
+                                                     Tec Scie
+                                                                                                                                                     &
+                                                                                                                                                  od ing
+                                                                                                                                                Fo ook
+                                                                                                                                                 C
+                                                                                                                                                                                                                                    30                                                                                                                        tion cannot rely on direct matching to ground-truth outputs
+                                                           Sci                                                              yle                                                        8.6%                                         25                                                                                                                        and must instead interpret the trajectory in context. We use
+          10.6%
+                                  Resear
+                                  Academch &                     en                                                    est                                 Shoppi
+                                                                                                                                                                  ng
+                                                                       ce
+                                         ia                                                              Lif                                                                                                                        20                     Mean
+                                                                                                                          Ent Travel
+                                                                                                                             ert
+                                                                                                                                 ain
+                                                                                                                                                       Ticketed Activities
+                                                                                                                                                      Outdoor & Recreat
+                                                                                                                                                          Travel
+                                                                                                                                                    & Accom
+                                                                                                                                                                        ion
+                                                                                                                                                                                        1.0%
+                                                                                                                                                                                        1.2%
+                                                                                                                                                                                                                                    15                     KDE Mode                                                                                           LLM-judged evaluation with reference answer overrides.
+                                                                                                                                     me
+                                                 .
+                                                              sc.
+                                                                                                                  Care                 nt       LiveGaming
+                                                                                                                                                            mo      dation
+                                                                                                                                                                                   3.7%                                                                                                                                             11.9
+                                   Gen
+                                      era l Info
+                                                           Mi
+                                                                                                                          er
+                                                                                                                                                     Show & Virtu
+                                                                                                                                                          s&     al
+                                                                                                                                                             Pe Wor
+                                                                                                                                                 Film Mus rform lds                                                                 10                                                               9.9
+                                                                                                                                                                                                                                                                                                                                                                  For faithful evaluation, recent research has adopted a cri-
+                              %
+                                                                                                                                                     s&
+                                                                                                                                               & R Bo TV Sh
+                                                                                                                                                            ic      ance
+                                                                                                                                                                         s
+                                                                                                                                                                                1.1%                                                                                  7.8
+                     10.9                                                  s                                                                 Job  ea oks ows
+                                                                                                                                                                              1.2%
+                                                                                                                                                                                                                                     5                                                               4.9                            5.5
+                                                                                                                                                     d                     1.
+                                                                                                                                                                                                                                                                      3.7
+                                                                     Legal &
+                                                                                                                                                     ing                          5%
+
+                                                                                                                                                                                                                                                                                                                                                              terion proposal approach that generates task-specific criteria
+                                                                                                                                              s&
+
+                                                               Governm                                                                  n&
+                                                                                  Finance & Investment
+                                                       s                                                                                         Ca
+                                                                                                                                     iong
+                                                     New                                                                                           ree                     1.8%
+                                                                                                                                   atni
+                                                                                                                                ucar                                                                                                 0
+                                                                                                                                                    r
+
+
+                                                                       ent Servi                         Real Estate
+                                                                                                                                                                2.0
+                                                                                                                              EdLe
+                                                                                                                                                                                                                                                           Easy                            Medium                       Hard
+                                                                                                                                                                      %
+
+                                                                                 ce
+                                                                                                                                                             0.7%
+                                            %
+                                                                                                                                                                                                                                                           (1-3)                            (4-6)                       (7+)                                  to guide evaluation [7, 20]. However, we posit that tasks usu-
+                                                                                                                                                                                                                                                                                   Task Difficulty
+                                         6.4
+
+                                                              4.5%                                                                     10.5%
+                                                                                  1.4%                    0.4%
+
+
+                                                                                                                                                                                                                                                                                                                                                              ally come with structures, so we propose to generate rubric
+     Figure 4. WebGym task set. Left: domain distribution [12]. Right: trajec-
+     tory lengths by difficulty.                                                                                                                                                                                                                                                                                                                              with structures such as fact groups. As discussed in Sec-
+                              100                                                                                                                                                 100                                                                                              100
+                                                                                                                                                                                                                                                                                                                                                              tion 3.2, in WebGym, each task is paired with a rubric of
+                                                                                                                                                                                                                                                                                                                                                              several fact groups, where each group contains one or more
+                                  90                                                                                                                                                   90                                                                                          90
+                                                                                                                                                                                                                                                                                                                                                              criteria guiding evaluation and reducing false positives.
+
+   Accuracy (%)                                                                                                                                               Precision (%)                                                                                           Recall (%)
+                                  80                                                                                                                                                   80                                                                                          80                                                                             With the task-specific rubric, a trajectory receives reward
+                                  70                                                                                                                                                   70                                                                                          70                                                                         only when all criteria are satisfied, producing a binary signal
+                                                                                                                                                                                                                                                                                                            GPT-4o
+                                  60                                                                                                                                                   60                                                                                          60
+                                                                                                                                                                                                                                                                                                            Qwen3-VL-8B                                       consistent across domains and difficulty levels. Since not all
+                                                                                                                                                                                                                                                                                                            Gemma3-27B
+                                                                                                                                                                                                                                                                                                                                                              screenshots are informative, the judge focuses on evidence-
+                                         w/o rubric                                                                                  w/ rubric                                                 w/o rubric                                                 w/ rubric                        w/o rubric                   w/ rubric
+                                                                                                                                                                                                                                                                                                                                                              bearing pages, obtained via a high-recall keypoint selection
+     Figure 5. Evaluator–human agreement. Rubric-based evaluation im-
+                                                                                                                                                                                                                                                                                                                                                              process inspired by Online Mind2Web [42] that retains rele-
+     proves accuracy and precision across LLM evaluators.
+                                                                                                                                                                                                                                                                                                                                                              vant observations while filtering out distractors such as de-
+  many long-tail websites ensure cross-domain diversity, while                                                                                                                                                                                                                                                                                                tours and ads. In practice, we use GPT-4o for both keypoint
+  frequent websites provide sufficient repetition for effective                                                                                                                                                                                                                                                                                               selection (prompt shown in §L.2 and per-criterion evaluation
+  RL training. The task difficulty distribution (Figure 3, right)                                                                                                                                                                                                                                                                                             (prompt shown in §L.3). The evaluator proposes keypoint
+  shows that around 80% of the tasks are Easy tasks (difficulty                                                                                                                                                                                                                                                                                               screenshots from the task description, iterates through tra-
+  1-3), which is intentional to encourage learning generaliz-                                                                                                                                                                                                                                                                                                 jectory steps, and issues binary judgments for each criterion
+  able basic skills while we focus on more specific objectives                                                                                                                                                                                                                                                                                                using the selected keypoints and final answer.
+  at higher difficulty levels. To verify topical coverage beyond                                                                                                                                                                                                                                                                                                  We validate the evaluator against human annotations on
+  high-frequency sites, we compute domain diversity using the                                                                                                                                                                                                                                                                                                 80 collected trajectories sampled uniformly across difficulty
+  Mind2Web-2 taxonomy (6 domains, 24 subdomains) with                                                                                                                                                                                                                                                                                                         levels (10 trajectories per level from difficulties 1-6, and
+  GPT-4o. Figure 4 (left) illustrates broad domain coverage,                                                                                                                                                                                                                                                                                                  around 5 trajectories per level from difficulties 7-10), where
+  with rollouts from different domains to promote diverse train-                                                                                                                                                                                                                                                                                              nearly half of the trajectories in each difficulty are marked
+  ing samples. The trajectory length analysis (Figure 4, right)                                                                                                                                                                                                                                                                                               as correct by the WebGym evaluator to balance the set, and
+  reveals a clear correlation between task difficulty and the                                                                                                                                                                                                                                                                                                 find that rubric-guided evaluation improves agreement over
+  number of steps required: easy tasks (difficulty 1-3) require                                                                                                                                                                                                                                                                                               task-only judging, which increases accuracy and precision
+  7.8 steps, medium tasks (difficulty 4-6) require 9.9 steps, and                                                                                                                                                                                                                                                                                             for all evaluator models being tested (GPT-4o, Qwen3-VL-
+  hard tasks (difficulty 7+) demand 11.9 steps on average. The                                                                                                                                                                                                                                                                                                8B-Instruct, and Gemma3-27B-it). We observe minor regres-
+  KDE mode (which measures most likely trajectory length)                                                                                                                                                                                                                                                                                                     sions in the recall metric for the subset of stronger evaluator
+  also increases with difficulty, from 3.7 to 4.9 to 5.5 steps.                                                                                                                                                                                                                                                                                               models (Qwen3-VL-8B-Instruct and especially GPT-4o),
+  This trend confirms that the tasks classified to be ”harder” in                                                                                                                                                                                                                                                                                             where some rubrics tend to be overly strict (Figure 5). Note
+  WebGym do actually involve more complex multi-step action                                                                                                                                                                                                                                                                                                   that this regression is almost impossible to eliminate when
+  and navigation before the agent can provide an answer.                                                                                                                                                                                                                                                                                                      using an LLM-based rubric proposer: depending on the
+                                                                                                                                                                                                                                                                                                                                                              prompt used to instruct the model, it may generate stricter
+     3.5. Evaluator and Reward Function Design                                                                                                                                                                                                                                                                                                                rubrics, occasionally resulting in over-strict evaluations. Ex-
+     Evaluating long-horizon visual agents is challenging because                                                                                                                                                                                                                                                                                             amples of evaluations with and without criteria are shown
+     the produced trajectories often make partial progress, end up                                                                                                                                                                                                                                                                                            in §K.2. This trade-off benefits RL training: we exchange a
+
+
+
+                                                                                                                                                                                                                                                                                                                                                          12251
+                                                                                                                      WebGym Asynchronous Rollout Pipeline
+
+slight reduction in sample efficiency for more precise learn-         CPU Load
+
+
+                                                                      GPU Load
+                                                                                      3     3   2
+
+
+                                                                                                1
+                                                                                                      1
+
+
+                                                                                                      2
+                                                                                                            2
+
+
+                                                                                                            1
+                                                                                                                  3    1
+
+
+                                                                                                                       2
+                                                                                                                             1
+
+
+                                                                                                                             2
+                                                                                                                                 2     1
+
+
+                                                                                                                                       1
+                                                                                                                                             2
+
+
+                                                                                                                                             1
+                                                                                                                                                   2
+
+
+                                                                                                                                                   1
+                                                                                                                                                       1
+
+
+                                                                                                                                                       2
+                                                                                                                                                             1
+
+
+                                                                                                                                                             2
+                                                                                                                                                                 1
+
+
+                                                                                                                                                                 1
+                                                                                                                                                                       1
+
+
+                                                                                                                                                                       1     1     1
+                                                                                                                                                                                                                                                                                100                                                  Sync
+                                                                                                                                                                                                                                                                                                                                     WebGym Async
+ing signals, helping prevent error accumulation.                         Task 1           get         get              get                 get         get       get         get
+                                                                                                                                                                                                                                                                                80
+
+
+
+
+                                                                                                                                                                                                                                                      Average CPU Utility (%)
+                                                                         Task 2       get       get         get        get       get
+                                                                                                                                                                                                           No synchronization
+
+                                                                         Task 3                 get                    get             get             get       get
+
+
+                                                                         Task 4                                                              get       get       get         get         get
+                                                                                                                                                                                                                                                                                60
+
+4. Rollout System in WebGym                                           CPU Load        3     3   2     1     1     1
+                                                                                                                                 Synchronous Rollout Pipeline
+                                                                                                                                 2     1     2     2                   1     1                         1     1             1     1
+                                                                                                                                                                                                                                                                                40
+                                                                      GPU Load                                         3     3                         3     3   1                 1     1                       1     1             1      1
+                                                                                                                                                                                                                                                                                20
+                                                                         Task 1           get                          get             get                 get         get         get         get
+
+
+
+The primary bottleneck in scaling up RL training for web                 Task 2
+
+
+                                                                         Task 3
+                                                                                      get
+
+
+                                                                                                get
+                                                                                                                       get
+
+
+                                                                                                                       get
+                                                                                                                                 get
+
+
+                                                                                                                                       get
+                                                                                                                                                       get
+
+
+                                                                                                                                                       get
+                                                                                                                                                                       get
+
+
+                                                                                                                                                                       get
+                                                                                                                                                                                                       synchronizing the episode                                                 0
+                                                                                                                                                                                                                                                                                      0       10          20         30         40       50         60
+                                                                                                                                                                                                                                                                                                               Time Elapsed (s)
+agents lies in the slow speed of rollout generation, partic-             Task 4                                       synchronizing the step                                                           get       get       get        get       get
+
+
+
+
+ularly in multi-step RL settings. This challenge becomes              Figure 6. Async rollout system. Left: process-pool design. Right: CPU
+                                                                      utilization (sync vs. async).
+more severe when simulation resources, such as CPUs, are
+                                                                                    350             crash                                                                                                                                                                       1800                                                      1650.0
+limited. To make WebGym practical for large-scale agent                             300
+                                                                                                                                       CPU-heavy                                       GPU-heavy
+                                                                                                                                                                                                                                                                                1600
+                                                                                                                                                                                                                                                                                             WebGym Async
+                                                                                                                                                                                                                                                                                             Linear Speedup
+                                                                                                                                  264.0                                                                                                                                         1400                                       1237.5             1475.8
+training, we address this issue by replacing synchronized,
+
+                                                                                                                                                                                                                                                      Throughput (steps/min)
+                                                                                    250
+                                                                                                                                                                                                                                                                                1200
+
+
+                                                                  Time Cost (min)
+                                                                                                                                                                                                                 WebGym Async
+                                                                                    200                                                                                                                          Sync                                                           1000                                            1089.9
+batch-style rollout collection with an asynchronous system                          150                                                          5.4x                                                                                                                            800
+                                                                                                                                                                                                                                                                                                          825.0
+                                                                                                                                                                       125.0
+that keeps both CPUs and GPUs fully utilized throughout                                                                                                                                              99.4                            92.4                                        600      412.5                 737.9
+                                                                                    100             crash
+                                                                                                                                                                                 5.0x                                                                                            400
+                                                                                    50                                                                                                                       4.3x                           4.2x                                                  412.5
+multi-step rollout generation. We show in Figure 6 how                               0
+                                                                                                                                       48.6
+                                                                                                                                                                       24.8                          23.2                            21.8
+                                                                                                                                                                                                                                                                                 200                               Enough CPU
+                                                                                                                                                                                                                                                                                   0
+                                                                                                                                                                                                                                                                                             8                 16           24                32
+tasks are queued into a process pool, how stateful browser                                          64/256                           64/128                      128/256
+                                                                                                                                                   # CPU / # Browsers
+                                                                                                                                                                                                     256/256                     768/256
+                                                                                                                                                                                                                                                                                                               # H100 nodes
+
+sessions are isolated for each rollout, and how new tasks im-         Figure 7. Benchmarking WebGym rollout framework. Left: 4–5×
+mediately begin inference once resources become available,            speedup over synchronous systems. Right: Near-linear GPU scaling.
+eliminating the need for global synchronization barriers. We
+now describe this system and benchmark its throughput.                the GPU-based client hosts agents and streams observations
+   To our knowledge, WebGym provides the first open-                  asynchronously, eliminating synchronization barriers. An
+source rollout system optimized for asynchronous multi-               operation-specific local queue spreads workload evenly (de-
+turn web agent simulations. Unlike RL infrastructure for              tails in §I.1). The full architecture description is in §D.
+LLMs, WebGym speeds up rollout generation by introduc-
+                                                                      4.2. Benchmarking our Rollout System
+ing an efficient simulation server so that the rollout pipeline
+does not synchronize between any step or episode. It inte-        We demonstrate the strong capability of the framework under
+grates with any RL framework focusing on system-level or          different GPU/CPU resource constraints, comparing Web-
+algorithmic speedups, such as veRL [35], veRL-agent [8],          Gym to a synchronized multi-step rollout strategy, as shown
+PipelineRL [28], SkyRL [6], and AReaL [9].                        in Figure 7 (left). We fix the number of GPUs (to 3 nodes of 8
+   We use the simplest RL loop where rollout and train-           NVIDIA H100 GPUs) and environments for all experiments
+ing happen synchronously, focusing on optimizing rollout          to collect 1800 trajectories with an average (instead of max)
+generation; benchmarking uses inference only.                     of 13.2 steps thus in total 23,760 steps, then modify only the
+                                                                  number of CPUs on the asynchronous rollout server. Each
+4.1. Strategy and System Architecture                             CPU worker node provides 64 AMD EPYC 7763 CPUs.
+Naı̈ve implementations of rollout systems are synchronous             We observe a 4-5× speedup with our rollout system com-
+in nature, like what was implemented in Bai et al. [3], Qi        pared to the synchronous framework shown in Figure 6 (left),
+et al. [29], Shen et al. [34], where a fixed group of browser     with greater gains under tighter CPU constraints (Figure 7,
+sessions is forced to advance at the same pace to perform         left). Using only 64 CPUs, our system collects 1.8k rollouts
+some number of rollouts in parallel. At each step, every          in 48.6 minutes, whereas the synchronous system requires
+session loads its webpage on the CPUs, the system sends           264 minutes. As the number of CPUs increases, the roll-
+all screenshots from the group together to the GPU for one        out time decreases until around 128 CPUs, beyond which
+combined policy call, and then waits until the slowest session    inference throughput plateaus as the three H100 GPU nodes
+completes before any session proceeds; a common variant           become the primary bottleneck. In this GPU-limited infer-
+waits at the end of each full trajectory instead of at every      ence regime, adding more CPUs provides minimal benefit
+step. These step and episode barriers are problematic in          because the GPU inference service becomes saturated, caus-
+web settings because step times and horizons vary widely          ing requests to queue. This effect appears in Figure 7 (left)
+across tasks and even across data-collection policies. Faster     as the flattened throughput curve and in Figure 6 (right) as re-
+sessions sit idle while slower ones catch up, and hardware        duced CPU utilization while workers await GPU responses.
+activity arrives in synchronized bursts that saturate either          When CPU resources are scarce, the asynchronous de-
+CPUs or GPUs at once, and then drop to idle. We illustrate        sign streams observations to the GPUs as soon as they are
+this “burst-idle” behavior in Figure 6 and quantify its impact    available, preventing GPU starvation and maintaining high
+on data collection time and scaling in Figure 7.                  GPU utilization while smoothing CPU load. This contrast
+    To mitigate this inefficiency, our framework adopts a         between CPU-limited and GPU-limited regimes explains
+server/client architecture [2]: the CPU-based server sim-         the utilization patterns and measured time-to-trajectory ob-
+ulates browsers via a master/worker paradigm [1], while           served in Figure 7. We also benchmark the scalability of
+
+
+
+                                                              12252
+                                                                                                34                                                                 40
+WebGym by increasing the number of concurrent trajectory
+
+
+
+                                                                    Test-set Success Rate (%)
+                                                                                                          Instruct-8B
+
+
+
+
+                                                                                                                                                                                                                   Avg. Steps per Trajectory
+                                                                                                          Thinking-8B                                              35
+                                                                                                                                                                                                                  24
+
+
+
+                                                                                                                                               % Same Screenshot
+collections. In this experiment, we provision sufficient CPU                                    32        w/o Memory Prompt
+                                                                                                          w/o Repetition Penalty                                   30
+                                                                                                          GPT-4o-SoM
+                                                                                                          GPT-5-SoM (Think)
+resources (768 CPUs) and vary the number of H100 GPU                                            30                                                                 25                                             23
+nodes used by the system. Figure 7 (right) shows the system                                                                                                        20
+                                                                                                28                                                                                                                22
+                                                                                                                                                                   15      Instruct-8B (% Same Scr.)
+exhibits strong scaling that is sub-linear, but very close to                                                                                                      10
+                                                                                                                                                                           w/o Repetition Penalty (% Same Scr.)
+                                                                                                                                                                           Instruct-8B (Steps)                    21
+                                                                                                26                                                                         w/o Repetition Penalty (Steps)
+the desired linear speed-up curve. Slowdown stems from                                                                                                              5
+                                                                                                     0k        6k        12k 18k 24k 30k 36k                            0k 6k 12k 18k 24k 30k 36k
+cross-node synchronization overhead.                                                                      #Training Trajectories Collected                              #Training Trajectories Collected
+                                                                        Figure 8. Ablations on models, prompting, and action filtering. (left)
+5. Training Web Agents with WebGym                                      test-set success rate for different models and design choices. (right) same-
+                                                                        screenshot rate and trajectory length before/after repetition penalty (§A).
+We train web agents using the tasks and system provided by
+WebGym. Our goal is to study the design choices behind a            wasted environment interactions during data collection and
+simple, visual web agent by training on WebGym. Concretely,         bias training toward shorter, more efficient successes, im-
+we center our empirical results around two central questions.       proving step efficiency. This is also preferable to simply tun-
+First, we study how WebGym can transform existing VLMs              ing the learning objective to emphasize trajectories shorter
+to efficiently solve complex web tasks via RL training (§5.2).      than a threshold while still collecting long trajectories, be-
+Second, we investigate how the agent’s generalization ca-           cause the horizon cap prevents spending those extra steps
+pability scales when trained with the large and diverse task        rather than only downweighting them. We study this in §5.3.
+set provided by WebGym, which eventually leads to perfor-               Probing task hardness with proprietary VLMs. To
+mance improvement (§5.3). Via a simple REINFORCE-style              understand the hardness of the OOD test set in WebGym, we
+procedure, we improve performance from 26.2% to 42.9%               also evaluate GPT-4o and GPT-5 (Thinking) as two strong
+on the test split of WebGym (hyper-parameters in §M).               proprietary models on the OOD test set. Results show that
+                                                                    simply using the same prompt as Qwen3-VL (§L.1) with
+5.1. Experimental Setup                                             Set-of-Marks (SoM [43], used here because these models
+Action space. We parameterize the action space by ex-               cannot accurately output coordinates) leads to non-trivial
+tending the definition of Shen et al. [34] with a navigation        but far below 100% performance, where GPT-4o achieves
+action, so that the action space now includes clicking, typing,     27.1% on the full test set, and GPT-5 achieves 29.8% on a
+scrolling, returning to the previous page, and navigating to a      randomly sampled subset with 300 tasks from the OOD test
+website specified by the agent. The WebGym rollout system           set (subsampled due to the budget costs associated with GPT-
+supports both the Set-of-Marks mode [43], where interac-            5). Note that GPT-4o achieves 25.6% on this task subset, so
+tive elements are labeled in the screenshots by the simulator,      the variance caused by subsampling is not significant. Our
+and a coordinate-based screenshot-only mode. We operate             trained agent outperforms both significantly.
+directly in the coordinate-based mode, which is supported
+by the base model (Qwen3-VL-8B) we use to train via RL.
+                                                                        5.2. Design Choices for Agent Training
+    Policy update and base model. We run REIN-                      In this subsection, we describe the key design choices we
+FORCE [38] with binary terminal rewards, without any base-          had to utilize to train agents via RL on WebGym. Inspired by
+line or negative gradient. This update is equivalent to online      prior research on RL for LLMs [33, 41], we note that biasing
+filtered behavior cloning (BC) [3] or a “thresholded” ver-          the sampled tasks towards hard tasks improves the perfor-
+sion of reward-weighted regression [27], which retains only         mance and sample efficiency, as long as easy tasks are also
+successful trajectories and maximizes their log-likelihood          used either via co-training or via a prior stage of a curriculum.
+(objective in §F). We use Qwen3-VL-8B [5, 31] with both             Thus, we start from a difficulty sampling that slightly biases
+Instruct and Thinking variants. We ablate on random and             towards harder tasks (concretely, easy : medium : hard =
+ratio-over-difficulty task sampling (§5.3), maintaining a dy-       2 : 5 : 3). All experiments in this section follow this task
+namic blocklist of websites that block access, excluding            sampling strategy, ; we study different strategies in §5.3.
+them from subsequent training sampling (§I.2).                          Memory prompt for long-horizon tasks. Our base
+    Controlling horizon during training. To keep rollout            model (Qwen3-VL-8B) follows a simple prompting tem-
+collection efficient, we cap the maximum number of interac-         plate for computer-use agents, which includes a high-level
+tion steps per episode. Although these trajectories may still       action description (e.g., “click on the search button”) paired
+be successful (i.e., they eventually solve the task), they can be   with a low-level tool call (e.g., “Click [209, 441]”) [5, 31].
+suboptimal in terms of step count, taking many unnecessary          The exact prompt is shown in §L.1. From preliminary ex-
+interactions compared to a shorter solution. Without a step         periments, we observe that this template yields strong ini-
+cap, rollouts may include many such long-but-successful tra-        tial performance, because the Qwen-3 series of models are
+jectories, which are expensive to collect and dilute training       trained on data collected from web environments with this
+with avoidable steps. By truncating the horizon, we reduce          prompt [5, 31], but yields limited RL gains (Figure 8, left).
+
+
+
+                                                                12253
+                                                                                                                                (a) Overall                                                                                               (b) Easy (1-3)
+    This limitation arises from the model’s inability to retain                                                                                                                                  50.0
+                                                                                                        uniform sampling
+                                                                                              40        biased to hard
+                                                                                                        only easy                                                                                47.5
+
+
+
+
+                                                                  Test-set Success Rate (%)                                                                          Test-set Success Rate (%)
+and reuse information gathered in earlier steps. For example,                                 38        only medium
+                                                                                                        exclude domains                                                                          45.0
+                                                                                              36        shorten horizon
+in the task shown in Figure 2, where the goal is to compare                                   34                                                                                                 42.5
+                                                                                              32                                                                                                 40.0
+two products, the agent must recall details about the first                                   30                                                                                                 37.5
+product when evaluating the second. In the current design,                                    28                                                                                                 35.0
+                                                                                              26                                                                                                 32.5
+this requires including the entire conversation history and all                                    0k       6k        12k       18k      24k       30k   36k   42k                                                      0k   6k   12k       18k      24k       30k   36k   42k
+                                                                                                                            #Training Trajectories                                                                                      #Training Trajectories
+prior screenshots as input, which is inefficient and imprac-                                                                (c) Medium (4-6)                                                                                               (d) Hard (7+)
+                                                                                              22
+tical. A POMDP perspective on this challenge is in §J. To                                                                                                                                                           4
+
+
+
+
+                                                                  Test-set Success Rate (%)                                                                                             Test-set Success Rate (%)
+                                                                                              20
+solve this, we propose that the model maintain a memory                                       18                                                                                                                    3
+by responding with updated memory at each step, inspired                                      16
+                                                                                                                                                                                                                    2
+                                                                                              14
+by GLM-4.1v [16] (prompt in §L.1). This boosts RL perfor-                                     12                                                                                                                    1
+mance (Figure 8, left: Instruct-8B vs. w/o Memory).                                           10                                                                                                                    0
+                                                                                                   0k       6k        12k       18k      24k       30k   36k   42k                                                      0k   6k   12k       18k      24k       30k   36k   42k
+Removing repeated actions with a reward penalty. We                                                                         #Training Trajectories                                                                                      #Training Trajectories
+
+frequently observe cases where the base model is stuck at           Figure 9. Scaling dimensions of WebGym. Test-set success rate for (a)
+the same screenshot and attempts to repeat the same action          Overall, (b) Easy, (c) Medium, (d) Hard (§A).
+multiple times. In order to measure how often this behavior
+                                                                  obtain by running RL on WebGym. In the end, we’re able to
+happens, we calculate the fraction of times the screenshot
+                                                                  scale the performance up to 42.9%, significantly surpassing
+at one step is the same as the next one (% Same Screen-
+                                                                  existing agents empowered by proprietary models like GPT-
+shot), and the trajectory length (Avg. Steps per Trajectory)
+                                                                  4o and GPT-5-Thinking and strong open-source models like
+in Figure 8 (middle). Preliminary experiments show that
+                                                                  Qwen3-VL-Instruct-8B and Qwen3-VL-Thinking-8B. The
+standard RL substantially reduces this behavior of repeating
+                                                                  comparison of these results are demonstrated in Table 2. In
+ineffective actions, but does not fully eliminate it(Figure 8,
+                                                                  this section, we will understand how WebGym enables these
+middle). Thus, we design a penalty for these repeated actions
+                                                                  results by specifically studying the effects of: (i) breadth
+when doing RL: we explicitly filter out a step if the result-
+                                                                  (domain diversity), (ii) depth (difficulty composition), and
+ing next step presents an identical screenshot, even if the
+                                                                  (iii) the train-time interaction horizon. Our starting point is
+current step is a part of a successful trajectory. This penalty
+                                                                  the best checkpoint from §5.2, which biases towards harder
+makes RL substantially more sample efficient (Figure 8, left:
+                                                                  tasks (easy : medium : hard = 2 : 5 : 3).
+Instruct-8B vs. “w/o Repetition Penalty”).
+                                                                      1) Scaling task set breadth (domain coverage) for bet-
+Use of thinking for every step. In addition to the Instruct       ter generalization. To study the effect of having a wide
+variant of Qwen3-VL-8B, we also experiment with the Think-        variety of domains in WebGym, we randomly remove half of
+ing variant of this model with exactly the same prompt as         the subdomains from the training set (“exclude domains”)
+the Instruct model. Results as shown in Figure 8 (left) reveal    while keeping the same training recipe otherwise as all the
+that the Thinking model attains a higher initial performance      comparisons. This results in the subsampled training task
+compared to the Instruct model, suggesting that extended          set that only contains 53% of original tasks. Across all
+reasoning at each step can be beneficial. However, the Think-     evaluation slices, removing domains (“exclude domains”)
+ing model produces significantly longer responses: before         compared to using all tasks from WebGym (“biased to hard”)
+RL training: for instance, it produces 2139 characters per        consistently slows down improvements and lowers the final
+response compared to 1088 of the Instruct model on the            success rate (Figure 9a–d), indicating that domain breadth
+held-out test tasks. Thus training the Thinking model incurs      matters even when the difficulty mixing ratio is unchanged.
+a larger latency cost and requires more compute. Notably,         This gap is not due to oversampling and overfitting on fewer
+as training progresses with WebGym, the performance gap           tasks: note that the number of collected training trajectories
+between the Instruct and Thinking models decreases consid-        (36k) is far smaller than the number of training tasks remain-
+erably, and soon the Instruct model surpasses the Thinking        ing (∼ 150k), so most training happens on distinct tasks.
+model. Given the favorable trade-off between performance          The degradation reflects reduced domain diversity, which
+and efficiency, we adopt the Instruct model for subsequent ex-    limits generalization to unseen websites and subdomains.
+periments, though developing a compute-efficient RL recipe            To study 2) and 3) below, we compare four task composi-
+for Thinking models is an interesting future direction.           tions: a) training only on easy tasks (“only easy”, 1 : 0 : 0),
+                                                                  b) only on medium tasks (“only medium”, 0 : 1 : 0), c) a
+5.3. Scaling Agent Performance with WebGym
+                                                                  task mixture biased towards harder tasks (“biased to hard”,
+Next, we present our main results scaling agent performance       2 : 5 : 3, as used in §5.2), and d) sampling tasks uniformly
+with WebGym. In particular, we are interested in under-           at random from the full training set (“uniform sampling”,
+standing what concretely about the design of WebGym scales        approximating a ratio of 25 : 5 : 1 given the task set).
+performance the most, and how much improvement we can                 2) Scaling candidate task set size by sampling more
+
+
+
+                                                              12254
+easy tasks avoids overfitting to narrow hard tasks with            plest way to achieve this is through uniform sampling from
+the filtered BC loss. In our previous experiments, we sam-         the full training set. We find that uniform sampling yields
+ple with a difficulty mixture of 2 : 5 : 3, which we note is       the highest overall performance among the four difficulty-
+heavily biased towards harder tasks compared to uniform            mixing strategies we evaluate (Figure 9a), and it achieves
+sampling, because easy tasks actually comprise around 80%          a significantly higher success rate on the medium-difficulty
+of all tasks. This can make the effective task set size (i.e.,     test set compared to training on easy tasks alone (Figure 9c).
+expected number of tasks sampled at any given training itera-      Because the “only easy” setting already draws from a large
+tion that are distinct from all current and previous iterations)   and diverse pool of tasks, the additional gains from uni-
+very small because a large portion of the training tasks are       form sampling are best attributed to the inclusion of some
+repeated high-difficulty tasks. As we roll out more and more       medium- and hard-difficulty tasks. Injecting these harder
+trajectories, we believe that this imbalance leads to overfit-     tasks provides training signals that enable the agent to de-
+ting because the test performance curve begins to drop right       velop capabilities beyond easy interactions, particularly on
+around 36k-42k training trajectories on the x-axis, as shown       medium-difficulty test tasks. Finally, since uniform sam-
+in Figure 9 (biased to hard). This problem can, in princi-         pling includes only a small fraction of hard tasks, we do not
+ple, be resolved with a better loss function or, perhaps more      observe a significant difference between these two settings
+simply, be resolved by scaling the size of candidate task set.     on the hard-difficulty test set.
+We choose to scale up the size of the candidate task set by           4) Horizon: controlling train-time interaction budget.
+adjusting the task sampling ratio so that the sampled tasks        Additionally, we study one important train-time hyperparam-
+include more easy tasks that are distinct from each other.         eter for algorithmic exploration: the train-time interaction
+   In fact, we found that training exclusively on easy tasks       budget. To control this budget and shape the distribution of
+performs surprisingly well and is more stable than over-           training trajectories, we reduce the per-episode step limit
+emphasizing medium and hard tasks. In particular, the “only        from (15, 30, 45) to (10, 20, 30) (“shortened horizon”). Em-
+easy” setting consistently outperforms “only medium” on            pirically, shortening the horizon improves both sample effi-
+overall success as well as on easy and medium test tasks (Fig-     ciency and final performance across all difficulty slices. In
+ure 9a–c), and it does not exhibit the late-stage plateauing or    particular, the success rate increases from a peak of 38.2% at
+mild performance regression observed when harder tasks are         the previous best checkpoint (uniform sampling with a step
+upweighted (e.g., the “biased to hard” setting after ∼36k tra-     budget of (15, 30, 45)) to a peak of 42.9%. We hypothesize
+jectories; Figure 9a–c). This behavior contrasts with typical      that a tighter step budget acts as a regularizer on the policy’s
+findings in LLM reasoning, but is consistent with the struc-       interaction process. By limiting opportunities for late-stage
+ture of WebGym, where the very large set of easy tasks spans       recovery, it discourages trajectories that succeed only after
+many websites and domains and thus supports generalization         extended sequences of low-yield exploration, and instead
+to unseen websites. On the other hand, very hard tasks in          concentrates training signal on earlier, higher-impact deci-
+math reasoning can be built for all sub-areas for mathemat-        sions. This increases the density of informative state–action
+ics. While repeated exposure to a narrower set of domains          transitions per episode, improving credit assignment and re-
+that provide harder tasks remains important (as discussed          ducing variance in policy updates. Notably, performance on
+below), the size afforded by easy tasks plays a crucial role       hard tasks also improves substantially (Figure 9d), consistent
+in mitigating overfitting and enabling generalization to new       with the model learning more robust and reusable interaction
+websites. In contrast, aggressively upweighting medium and         primitives (e.g., efficient navigation and decisive goal com-
+hard tasks increases repeated exposure to a smaller subset of      pletion) that transfer beyond the capped training horizon and
+domains and interaction patterns, leading to overfitting that      support longer-horizon problem instances at evaluation time.
+manifests as performance plateaus and slight degradation in           Our final agent uses memory prompt, repetition penalty,
+our results.                                                       horizon (10, 20, 30), and uniform sampling, surpassing GPT-
+                                                                   5-Thinking by 13.1% (Tables 2 to 4).
+    3) Scaling candidate task set depth (wider range of
+difficulty levels) by including tasks from all difficulty           6. Conclusion
+levels to promote more efficient learning. Despite the
+strong performance of the “only easy” setting, we believe          We introduced WebGym, the largest open-source training
+that higher-difficulty tasks still play an important role. This    environment for visual web agents, featuring nearly 300k
+intuition is also supported by our empirical observations: the     procedurally constructed tasks with structured evaluation
+performance gap between “only easy” and “biased to hard”           rubrics and an asynchronous rollout system that achieves a 4–
+is substantially smaller on the medium- and hard-difficulty        5× speedup. A simple REINFORCE algorithm on WebGym
+test subsets than on the easy-difficulty subset. Motivated by      improves Qwen3-VL-8B to state-of-the-art performance, out-
+this, we increase the depth of the task set by incorporating       performing GPT-4o and GPT-5. Discussion and future work
+tasks spanning a wider range of difficulty levels. The sim-        are in §B.
+
+
+
+                                                               12255
+Acknowledgements                                                              Zhang, et al. Rm-r1: Reward modeling as reasoning. arXiv
+                                                                              preprint arXiv:2505.02387, 2025. 4
+We thank Rui Yang, Nan Jiang, Rui Pan, Yifei He from UIUC, Yifei          [8] Lang Feng, Zhenghai Xue, Tingcong Liu, and Bo An. Group-
+Zhou from UC Berkeley, Anikait Singh, Salman Abdullah from                    in-group policy optimization for llm agent training. arXiv
+Stanford for their early discussions of this research, members of the         preprint arXiv:2505.10978, 2025. 5
+CMU AIRe lab for their feedback on human evaluation and presen-           [9] Wei Fu, Jiaxuan Gao, Xujie Shen, Chen Zhu, Zhiyu Mei,
+tations, and Eduardo Salinas, Gustavo De Rosa, Ahmed Awadallah                Chuyi He, Shusheng Xu, Guo Wei, Jun Mei, Jiashu Wang,
+from Microsoft Research (AI Frontiers Lab) for their continued                Tongkai Yang, Binhang Yuan, and Yi Wu. Areal: A large-
+support throughout this work. This work is partially supported                scale asynchronous reinforcement learning system for lan-
+by NSF under Grant No. 2416897, Grant No. 2505932, and by                     guage reasoning, 2025. 5
+ONR under Grant No. N000142512318. This research used both               [10] Divyansh Garg, Shaun VanWeelden, Diego Caples, Andis
+                                                                              Draguns, Nikil Ravi, Pranav Putta, Naman Garg, Tomas Abra-
+Delta (NSF award OAC 2005572) and DeltaAI (NSF award OAC
+                                                                              ham, Michael Lara, Federico Lopez, et al. Real: Benchmark-
+2320345) advanced computing systems, and computing resources
+                                                                              ing autonomous agents on deterministic simulations of real
+provided by Illinois Computes and NAIRR Pilot NAIRR250157.                    websites. arXiv preprint arXiv:2504.11543, 2025. 2
+                                                                         [11] Gemma-Team, Aishwarya Kamath, Johan Ferret, Shreya
+References                                                                    Pathak, Nino Vieillard, Ramona Merhej, Sarah Perrin, Ta-
+                                                                              tiana Matejovicova, Alexandre Ramé, Morgane Rivière, et al.
+ [1] Kento Aida, Wataru Natsume, and Yoshiaki Futakata. Dis-
+                                                                              Gemma 3 technical report. arXiv preprint arXiv:2503.19786,
+     tributed computing with hierarchical master-worker paradigm
+                                                                              2025. 2
+     for parallel branch and bound algorithm. In CCGrid 2003.
+                                                                         [12] Boyu Gou, Zanming Huang, Yuting Ning, Yu Gu, Michael
+     3rd IEEE/ACM International Symposium on Cluster Comput-
+                                                                              Lin, Weijian Qi, Andrei Kopanev, Botao Yu, Bernal Jiménez
+     ing and the Grid, 2003. Proceedings., pages 156–163. IEEE,
+                                                                              Gutiérrez, Yiheng Shu, et al. Mind2web 2: Evaluat-
+     2003. 5, 1
+                                                                              ing agentic search with agent-as-a-judge. arXiv preprint
+ [2] S Ali, R Alauldeen, and A Ruaa. What is client-server system:            arXiv:2506.21506, 2025. 2, 3, 4
+     architecture, issues and challenge of client-server system.         [13] Anisha Gunjal, Anthony Wang, Elaine Lau, Vaskar Nath,
+     HBRP Publication, 2(1):1–6, 2020. 5                                      Yunzhong He, Bing Liu, and Sean Hendryx. Rubrics as
+ [3] Hao Bai, Yifei Zhou, Jiayi Pan, Mert Cemri, Alane Suhr,                  rewards: Reinforcement learning beyond verifiable domains.
+     Sergey Levine, and Aviral Kumar. Digirl: Training in-the-                arXiv preprint arXiv:2507.17746, 2025. 3
+     wild device-control agents with autonomous reinforcement            [14] Hongliang He, Wenlin Yao, Kaixin Ma, Wenhao Yu, Yong
+     learning. Advances in Neural Information Processing Systems,             Dai, Hongming Zhang, Zhenzhong Lan, and Dong Yu. Web-
+     37:12461–12495, 2024. 2, 5, 6, 1                                         voyager: Building an end-to-end web agent with large multi-
+ [4] Hao Bai, Yifei Zhou, Li Erran Li, Sergey Levine, and Avi-                modal models. arXiv preprint arXiv:2401.13919, 2024. 2
+     ral Kumar. Digi-q: Learning q-value functions for train-            [15] Yichen He, Guanhua Huang, Peiyuan Feng, Yuan Lin, Yuchen
+     ing device-control agents. arXiv preprint arXiv:2502.15760,              Zhang, Hang Li, et al. Pasa: An llm agent for comprehensive
+     2025. 2                                                                  academic paper search. arXiv preprint arXiv:2501.10120,
+ [5] Shuai Bai, Yuxuan Cai, Ruizhe Chen, Keqin Chen, Xionghui                 2025. 2
+     Chen, Zesen Cheng, Lianghao Deng, Wei Ding, Chang Gao,              [16] Wenyi Hong, Wenmeng Yu, Xiaotao Gu, Guo Wang, Guobing
+     Chunjiang Ge, Wenbin Ge, Zhifang Guo, Qidong Huang,                      Gan, Haomiao Tang, Jiale Cheng, Ji Qi, Junhui Ji, Lihang Pan,
+     Jie Huang, Fei Huang, Binyuan Hui, Shutong Jiang, Zhao-                  et al. Glm-4.1 v-thinking: Towards versatile multimodal rea-
+     hai Li, Mingsheng Li, Mei Li, Kaixin Li, Zicheng Lin, Jun-               soning with scalable reinforcement learning. arXiv e-prints,
+     yang Lin, Xuejing Liu, Jiawei Liu, Chenglong Liu, Yang Liu,              pages arXiv–2507, 2025. 2, 7, 4
+     Dayiheng Liu, Shixuan Liu, Dunjie Lu, Ruilin Luo, Chenxu            [17] Wenxuan Huang, Bohan Jia, Zijie Zhai, Shaosheng Cao,
+     Lv, Rui Men, Lingchen Meng, Xuancheng Ren, Xingzhang                     Zheyu Ye, Fei Zhao, Zhe Xu, Yao Hu, and Shaohui Lin.
+     Ren, Sibo Song, Yuchong Sun, Jun Tang, Jianhong Tu, Jian-                Vision-r1: Incentivizing reasoning capability in multimodal
+     qiang Wan, Peng Wang, Pengfei Wang, Qiuyue Wang, Yuxuan                  large language models. arXiv preprint arXiv:2503.06749,
+     Wang, Tianbao Xie, Yiheng Xu, Haiyang Xu, Jin Xu, Zhibo                  2025. 2
+     Yang, Mingkun Yang, Jianxin Yang, An Yang, Bowen Yu, Fei            [18] Zenan Huang, Yihong Zhuang, Guoshan Lu, Zeyu Qin,
+     Zhang, Hang Zhang, Xi Zhang, Bo Zheng, Humen Zhong,                      Haokai Xu, Tianyu Zhao, Ru Peng, Jiaqi Hu, Zhanming Shen,
+     Jingren Zhou, Fan Zhou, Jing Zhou, Yuanzhi Zhu, and Ke                   Xiaomeng Hu, et al. Reinforcement learning with rubric
+     Zhu. Qwen3-vl technical report, 2025. 2, 6, 3                            anchors. arXiv preprint arXiv:2508.12790, 2025. 3
+ [6] Shiyi Cao, Dacheng Li, Fangzhou Zhao, Shuo Yuan,                    [19] Bowen Jin, Hansi Zeng, Zhenrui Yue, Jinsung Yoon, Sercan
+     Sumanth R. Hegde, Connor Chen, Charlie Ruan, Tyler Griggs,               Arik, Dong Wang, Hamed Zamani, and Jiawei Han. Search-
+     Shu Liu, Eric Tang, Richard Liaw, Philipp Moritz, Matei                  r1: Training llms to reason and leverage search engines with
+     Zaharia, Joseph E. Gonzalez, and Ion Stoica. Skyrl-agent:                reinforcement learning. arXiv preprint arXiv:2503.09516,
+     Efficient rl training for multi-turn llm agent, 2025. 5                  2025. 2
+ [7] Xiusi Chen, Gaotang Li, Ziqi Wang, Bowen Jin, Cheng Qian,           [20] Kimi-Team, Yifan Bai, Yiping Bao, Guanduo Chen, Jiahao
+     Yu Wang, Hongru Wang, Yu Zhang, Denghui Zhang, Tong                      Chen, Ningxin Chen, Ruijue Chen, Yanru Chen, Yuankun
+
+
+
+
+                                                                    12256
+     Chen, Yutian Chen, Zhuofu Chen, Jialei Cui, Hao Ding,                online environments. arXiv preprint arXiv:2406.12373, 2024.
+     Mengnan Dong, Angang Du, Chenzhuang Du, Dikang Du,                   2, 3
+     Yulun Du, Yu Fan, Yichen Feng, Kelin Fu, Bofei Gao,             [26] Aditya Pathak, Rachit Gandhi, Vaibhav Uttam, Arnav Ra-
+     Hongcheng Gao, Peizhong Gao, Tong Gao, Xinran Gu,                    mamoorthy, Pratyush Ghosh, Aaryan Raj Jindal, Shreyash
+     Longyu Guan, Haiqing Guo, Jianhang Guo, Hao Hu, Xiaoru               Verma, Aditya Mittal, Aashna Ased, Chirag Khatri, et al.
+     Hao, Tianhong He, Weiran He, Wenyang He, Chao Hong,                  Rubric is all you need: Improving llm-based code evaluation
+     Yangyang Hu, Zhenxing Hu, Weixiao Huang, Zhiqi Huang,                with question-specific rubrics. In Proceedings of the 2025
+     Zihao Huang, Tao Jiang, Zhejun Jiang, Xinyi Jin, Yongsheng           ACM Conference on International Computing Education Re-
+     Kang, Guokun Lai, Cheng Li, Fang Li, Haoyang Li, Ming                search V. 1, pages 181–195, 2025. 3
+     Li, Wentao Li, Yanhao Li, Yiwei Li, Zhaowei Li, Zhem-           [27] Jan Peters and Stefan Schaal. Reinforcement learning by
+     ing Li, Hongzhan Lin, Xiaohan Lin, Zongyu Lin, Chengyin              reward-weighted regression for operational space control. In
+     Liu, Chenyu Liu, Hongzhang Liu, Jingyuan Liu, Junqi Liu,             Machine Learning, Proceedings of the Twenty-Fourth Inter-
+     Liang Liu, Shaowei Liu, T. Y. Liu, Tianwei Liu, Weizhou Liu,         national Conference (ICML 2007), Corvallis, Oregon, USA,
+     Yangyang Liu, Yibo Liu, Yiping Liu, Yue Liu, Zhengying               June 20-24, 2007, pages 745–750. ACM, 2007. 6
+     Liu, Enzhe Lu, Lijun Lu, Shengling Ma, Xinyu Ma, Yingwei        [28] Alexandre Piché, Ehsan Kamalloo, Rafael Pardinas, Xiaoyin
+     Ma, Shaoguang Mao, Jie Mei, Xin Men, Yibo Miao, Siyuan               Chen, and Dzmitry Bahdanau. Pipelinerl: Faster on-policy
+     Pan, Yebo Peng, Ruoyu Qin, Bowen Qu, Zeyu Shang, Lidong              reinforcement learning for long sequence generation, 2025. 5
+     Shi, Shengyuan Shi, Feifan Song, Jianlin Su, Zhengyuan Su,      [29] Zehan Qi, Xiao Liu, Iat Long Iong, Hanyu Lai, Xueqiao Sun,
+     Xinjie Sun, Flood Sung, Heyi Tang, Jiawen Tao, Qifeng Teng,          Wenyi Zhao, Yu Yang, Xinyue Yang, Jiadai Sun, Shuntian
+     Chensi Wang, Dinglu Wang, Feng Wang, Haiming Wang,                   Yao, et al. Webrl: Training llm web agents via self-evolving
+     Jianzhou Wang, Jiaxing Wang, Jinhong Wang, Shengjie Wang,            online curriculum reinforcement learning. arXiv preprint
+     Shuyi Wang, Yao Wang, Yejie Wang, Yiqin Wang, Yuxin                  arXiv:2411.02337, 2024. 2, 5
+     Wang, Yuzhi Wang, Zhaoji Wang, Zhengtao Wang, Zhexu             [30] Yujia Qin, Yining Ye, Junjie Fang, Haoming Wang, Shihao
+     Wang, Chu Wei, Qianqian Wei, Wenhao Wu, Xingzhe Wu,                  Liang, Shizuo Tian, Junda Zhang, Jiahao Li, Yunxin Li, Shi-
+     Yuxin Wu, Chenjun Xiao, Xiaotong Xie, Weimin Xiong,                  jue Huang, et al. Ui-tars: Pioneering automated gui inter-
+     Boyu Xu, Jing Xu, Jinjing Xu, L. H. Xu, Lin Xu, Suting Xu,           action with native agents. arXiv preprint arXiv:2501.12326,
+     Weixin Xu, Xinran Xu, Yangchuan Xu, Ziyao Xu, Junjie Yan,            2025. 2
+     Yuzi Yan, Xiaofei Yang, Ying Yang, Zhen Yang, Zhilin Yang,      [31] QwenLM-Team. Qwen3-vl: Vision-language models by
+     Zonghan Yang, Haotian Yao, Xingcheng Yao, Wenjie Ye,                 qwenlm. https://github.com/QwenLM/Qwen3-
+     Zhuorui Ye, Bohong Yin, Longhui Yu, Enming Yuan, Hong-               VL, https://github.com/QwenLM/Qwen3- VL/
+     bang Yuan, Mengjie Yuan, Haobing Zhan, Dehao Zhang, Hao              issues/1651, 2025. GitHub repository. 6, 2, 3, 7
+     Zhang, Wanlu Zhang, Xiaobin Zhang, Yangkun Zhang, Yizhi         [32] Gabriel Sarch, Snigdha Saha, Naitik Khandelwal, Ayush
+     Zhang, Yongting Zhang, Yu Zhang, Yutao Zhang, Yutong                 Jain, Michael J Tarr, Aviral Kumar, and Katerina Fragkiadaki.
+     Zhang, Zheng Zhang, Haotian Zhao, Yikai Zhao, Huabin                 Grounded reinforcement learning for visual reasoning. arXiv
+     Zheng, Shaojie Zheng, Jianren Zhou, Xinyu Zhou, Zaida                preprint arXiv:2505.23678, 2025. 2
+     Zhou, Zhen Zhu, Weiyu Zhuang, and Xinxing Zu. Kimi k2:          [33] Amrith Setlur, Matthew YR Yang, Charlie Snell, Jeremy
+     Open agentic intelligence, 2025. 4                                   Greer, Ian Wu, Virginia Smith, Max Simchowitz, and Aviral
+[21] Jing Yu Koh, Robert Lo, Lawrence Jang, Vikram Duvvur,                Kumar. e3: Learning to explore enables extrapolation of
+     Ming Chong Lim, Po-Yu Huang, Graham Neubig, Shuyan                   test-time compute for llms. arXiv preprint arXiv:2506.09026,
+     Zhou, Ruslan Salakhutdinov, and Daniel Fried. Visualwe-              2025. 2, 3, 6
+     barena: Evaluating multimodal agents on realistic visual web    [34] Junhong Shen, Hao Bai, Lunjun Zhang, Yifei Zhou, Amrith
+     tasks. arXiv preprint arXiv:2401.13649, 2024. 2                      Setlur, Shengbang Tong, Diego Caples, Nan Jiang, Tong
+[22] Yougang Lyu, Xiaoyu Zhang, Lingyong Yan, Maarten de                  Zhang, Ameet Talwalkar, et al. Thinking vs. doing: Agents
+     Rijke, Zhaochun Ren, and Xiuying Chen. Deepshop: A                   that reason by scaling test-time interaction. arXiv preprint
+     benchmark for deep research shopping agents. arXiv preprint          arXiv:2506.07976, 2025. 1, 2, 3, 5, 6
+     arXiv:2506.02839, 2025. 2, 3                                    [35] Guangming Sheng, Chi Zhang, Zilingfeng Ye, Xibin Wu,
+                                                                          Wang Zhang, Ru Zhang, Yanghua Peng, Haibin Lin, and
+[23] Grégoire Mialon, Clémentine Fourrier, Thomas Wolf, Yann
+                                                                          Chuan Wu. Hybridflow: A flexible and efficient rlhf frame-
+     LeCun, and Thomas Scialom. Gaia: a benchmark for general
+                                                                          work. In Proceedings of the Twentieth European Conference
+     ai assistants. In The Twelfth International Conference on
+                                                                          on Computer Systems, pages 1279–1297, 2025. 5
+     Learning Representations, 2023. 2, 3, 4
+                                                                     [36] Brandon Trabucco, Gunnar Sigurdsson, Robinson Piramuthu,
+[24] Jiayi Pan, Xingyao Wang, Graham Neubig, Navdeep Jaitly,              and Ruslan Salakhutdinov. Towards internet-scale training
+     Heng Ji, Alane Suhr, and Yizhe Zhang. Training software              for agents. arXiv preprint arXiv:2502.06776, 2025. 2, 3
+     engineering agents and verifiers with swe-gym. arXiv preprint   [37] Jason Wei, Zhiqing Sun, Spencer Papay, Scott McKinney,
+     arXiv:2412.21139, 2024. 2                                            Jeffrey Han, Isa Fulford, Hyung Won Chung, Alex Tachard
+[25] Yichen Pan, Dehan Kong, Sida Zhou, Cheng Cui, Yifei Leng,            Passos, William Fedus, and Amelia Glaese. Browsecomp: A
+     Bing Jiang, Hangyu Liu, Yanyi Shang, Shuyan Zhou, Tong-              simple yet challenging benchmark for browsing agents. arXiv
+     shuang Wu, et al. Webcanvas: Benchmarking web agents in              preprint arXiv:2504.12516, 2025. 2, 3, 4
+
+
+
+
+                                                                 12257
+[38] Ronald J Williams. Simple statistical gradient-following al-
+     gorithms for connectionist reinforcement learning. Machine
+     learning, 8(3):229–256, 1992. 2, 6
+[39] Jian Xie, Kai Zhang, Jiangjie Chen, Tinghui Zhu, Renze Lou,
+     Yuandong Tian, Yanghua Xiao, and Yu Su. Travelplanner:
+     A benchmark for real-world planning with language agents.
+     arXiv preprint arXiv:2402.01622, 2024. 2, 3
+[40] Jingxu Xie, Dylan Xu, Xuandong Zhao, and Dawn Song.
+     Agentsynth: Scalable task generation for generalist computer-
+     use agents. arXiv preprint arXiv:2506.14205, 2025. 2, 3
+[41] Wei Xiong, Chenlu Ye, Baohao Liao, Hanze Dong, Xinxing
+     Xu, Christof Monz, Jiang Bian, Nan Jiang, and Tong Zhang.
+     Reinforce-ada: An adaptive sampling framework under non-
+     linear rl objectives, 2025. 6
+[42] Tianci Xue, Weijian Qi, Tianneng Shi, Chan Hee Song, Boyu
+     Gou, Dawn Song, Huan Sun, and Yu Su. An illusion of
+     progress? assessing the current state of web agents. arXiv
+     preprint arXiv:2504.01382, 2025. 2, 3, 4
+[43] Jianwei Yang, Hao Zhang, Feng Li, Xueyan Zou, Chunyuan
+     Li, and Jianfeng Gao. Set-of-mark prompting unleashes
+     extraordinary visual grounding in gpt-4v. arXiv preprint
+     arXiv:2310.11441, 2023. 6
+[44] Yuxiang Zheng, Dayuan Fu, Xiangkun Hu, Xiaojie Cai, Lyu-
+     manshan Ye, Pengrui Lu, and Pengfei Liu. Deepresearcher:
+     Scaling deep research via reinforcement learning in real-world
+     environments. arXiv preprint arXiv:2504.03160, 2025. 2
+[45] Shuyan Zhou, Frank F Xu, Hao Zhu, Xuhui Zhou, Robert
+     Lo, Abishek Sridhar, Xianyi Cheng, Tianyue Ou, Yonatan
+     Bisk, Daniel Fried, et al. Webarena: A realistic web en-
+     vironment for building autonomous agents. arXiv preprint
+     arXiv:2307.13854, 2023. 1
+[46] Yifei Zhou, Qianlan Yang, Kaixiang Lin, Min Bai, Xiong
+     Zhou, Yu-Xiong Wang, Sergey Levine, and Erran Li.
+     Proposer-agent-evaluator (pae): Autonomous skill discov-
+     ery for foundation model internet agents. arXiv preprint
+     arXiv:2412.13194, 2024. 2, 3
+
+
+
+
+                                                                  12258
+

@@ -1,0 +1,2222 @@
+                                                                     PyraTok: Language-Aligned Pyramidal Tokenizer
+                                                                     for Video Understanding and Generation
+                                                                                              ⧫                            ♣                      ⧫                            ⧫
+                                                                    Onkar Susladkar                 Tushar Prakash               Adheesh Juvekar        Kiet A. Nguyen
+                                                                                                          ⧫                           ♥♠                            ⧫
+                                                                                Dong-Hwan Jang                   Inderjit S Dhillon        Ismini Lourentzou
+                                                       ⧫                                                                   ♣                              ♥                    ♠
+                                                           University of Illinois Urbana-Champaign                             Independent Researcher         UTAustin              Google
+
+
+
+
+                                          Video Question Answering                            Zero-Shot Video Segmentation                                Video Reconstruction
+                                           Question: What colors are the cars in the video?   Prompts:                                                        Input frames
+
+
+
+
+arXiv:2601.16210v2 [cs.CV] 23 Feb 2026
+                                            Answer: There is one white car and one red car.   motorcycle person road                                     (masked, shuffled):
+
+
+
+
+                                                                                                                           PyraTok                        Prompt: red car driving
+
+
+
+
+                                                                                              Prompt:
+                                                        Classification label:                 a motorcyclist and two
+                                                         riding a motorcycle                  cars on a highway at night
+                                          Video Classification          Text-to-Video Generation                Temporal Action Grounding
+                                         Figure 1: Given a video and text prompt, PyraTok encodes compact latents, facilitating high-quality
+                                         reconstruction and a wide range of video-language understanding tasks.
+
+
+                                            Abstract. Discrete video VAEs underpin modern text-to-video generation and video understanding systems,
+                                            yet existing tokenizers typically learn visual codebooks at a single scale with limited vocabularies and shallow
+                                            language supervision, leading to poor cross-modal alignment and zero-shot transfer. We introduce PyraTok,
+                                            a language-aligned pyramidal tokenizer that learns semantically structured discrete latents across multiple
+                                            spatiotemporal resolutions. PyraTok builds on a pretrained video VAE and a novel Language aligned Pyramidal
+                                            Quantization (LaPQ) module that discretizes encoder features at several depths using a shared large binary
+                                            codebook, yielding compact yet expressive video token sequences. To tightly couple visual tokens with language,
+                                            PyraTok jointly optimizes multi-scale text-guided quantization and a global autoregressive objective over the token
+                                            hierarchy. Across ten benchmarks, PyraTok delivers state-of-the-art (SOTA) video reconstruction, consistently
+                                            improves text-to-video quality, and sets new SOTA zero-shot performance on video segmentation, temporal action
+                                            localization, and video understanding, scaling robustly to up to 4K/8K resolutions.
+                                            https://plan-lab.github.io/pyratok
+
+                                         1. Introduction                                                                          modeling high-dimensional pixel distributions,
+                                                                                                                                  improving efficiency and reducing computational
+                                         In recent years, multimodal video generation                                             cost. Variational Autoencoders (VAEs) are central to
+                                         has gained significant attention [23, 27, 39].                                           this setup. In particular, discrete VAEs [10, 52] have
+                                         Text-to-video models such as VideoGPT [65],                                              proven especially effective, as their learned code-
+                                         CogVideoX [67], and OmniGen2 [60] are particu-                                           books quantize the latent space into discrete tokens,
+                                         larly prominent. Most of these models are built on                                       enabling scalable and high-quality video synthesis.
+                                         latent diffusion frameworks [4, 8], which generate
+                                         videos in a compact latent space rather than directly                                   Although discrete VAEs offer strong compression
+                                                                                                                                 and generation capabilities, their codebooks are
+                                                                                              2   RELATED WORK
+
+
+typically learned solely from visual data [52, 70].           Notably, PyraTok is the first VAE to reach SoTA zero-
+This limits performance on downstream tasks such              shot video semantic segmentation, outperforming
+as text-to-video generation or video understanding,           zero-shot and unsupervised methods by up to +10
+due to the semantic gap between textual input                 and +7.0 mAP, respectively. Fig. 2 illustrates Pyra-
+and visual representation. Bridging this gap dur-             Tok’s interpretable text-guided cross-modal attention.
+ing downstream training increases convergence
+                                                              Contributions: In summary, our contributions are:
+time and resource demands. Recent works have
+integrated text supervision directly within VAE               • We introduce PyraTok, a multi-scale semantically
+architectures [13, 28, 37, 46, 71].                             aligned Video VAE that couples spatiotemporal
+                                                                quantization with dual semantic alignment,
+However, despite these advances, current methods                enabling coarse-to-fine understanding and
+have few major limitations: (1) They largely capture            efficient video generation.
+semantics at a single scale, i.e., only after obtaining
+                                                              • PyraTok leverages LaPQ, a novel language-
+latent representations from the encoder, which lim-
+                                                                aligned pyramidal quantization framework,
+its their ability to leverage the hierarchical nature
+                                                                designed to hierarchically encode multi-scale
+of VAEs that model features from low-level spatial
+                                                                video representations through lateral encoder
+details to high-level semantics [45, 51], leaving po-
+                                                                connections at each stage. Our design enables
+tential for more fine-grained text-video alignment.
+                                                                efficient use of a large ∼48K token vocabulary,
+(2) They typically employ small codebooks (4K–8K
+                                                                with up to 95% codebook utilization.
+tokens), which are sufficient for basic visual pat-
+terns but limit the representational capacity of both         • We propose a dual semantic alignment strategy
+visual and textual modalities [70]. These smaller               that injects text-conditioned priors at every LaPQ
+codebooks hinder effective cross-modal alignment                level (local alignment) and refines them with
+and constrain the expressiveness of text-conditioned            an autoregressive objective over the sequence of
+video generation models. (3) Shallow, single-site               quantized tokens (global alignment). This jointly
+text alignment causes semantic drift. Most exist-               enforces token-level grounding and sequence-
+ing methods inject language either globally through             level (temporal and relational) coherence,
+sequence-level contrastive objectives [13, 28] or lo-           preventing semantic drift across scales and time.
+cally via token-level codebook distillation [71], dur-        • We further introduce a hierarchical semantic
+ing codebook learning only. As a result, the learned            codebook loss that ties a shared binary codebook
+representations exhibit semantic drift and temporal             to text embeddings and preserves semantic con-
+inconsistency, where local visual tokens fail to remain         sistency across pyramid levels through stage-wise
+aligned with global textual intent.                             KL regularization.
+To address the aforementioned limitations, we in-             PyraTok achieves SoTA reconstruction fidelity and
+troduce PyraTok, a video tokenizer that leverages             downstream performance across 10 diverse video
+a novel Language aligned Pyramidal Quantization               benchmarks, scaling to 4K and 8K resolutions. For
+(LaPQ) to hierarchically encode coarse-to-fine video          example, PyraTok is, to our knowledge, the first
+features using an expressive codebook of large vocab-         discrete quantized VAE to demonstrate zero-shot
+ulary. To bridge visual and text semantics, we intro-         text-guided video segmentation, with up to 2×
+duce a dual semantic alignment strategy that jointly          improvement in mAP on OVIS over strong baselines.
+aligns text and video representations via multi-scale
+quantization and autoregressive refinement. Empir-            2. Related Work
+ically, PyraTok achieves SoTA performance across
+video generation and various video understanding              Visual Quantized VAEs for Video.           VAEs
+tasks. PyraTok surpasses the best prior VAE baseline          have become a cornerstone in video genera-
+by +5.75 mAP on temporal action localization, +2.82           tion [23, 27, 41] and downstream tasks such as
+on videoQA, and up to +9.16 on video classification.          text-to-video [61, 67, 72] and video understand-
+
+                                                          2
+                                                                                                                 3        METHOD
+
+
+ing [3, 29, 56], enabling efficient sampling and                       Text Query:Player in Nike shoes kicking a Football
+
+scalable generation by learning compact latent
+spaces. A key advance is discrete latent VAEs,
+introduced in VQ-VAE [52]. Unlike continuous VAEs,
+which map inputs to Gaussian spaces, VQ-VAEs
+tokenize features into a learnable codebook. This                         Text Query: Two Bikes cursing on the road
+
+yields structured, non-redundant representations
+suitable for sequence modeling and scalable training.
+VQ-GAN [10] adds adversarial training to reduce
+blur, while ViT-VQGAN [68] replaces CNNs with
+Vision Transformers [9] for long-range modeling.              Figure 2: PyraTok attention maps illustrating
+                                                              fine-grained cross-modal alignment. Highlighted
+These models have been adapted to video through
+                                                              regions indicate language-guided semantic localiza-
+spatiotemporal extensions. VideoGPT [65] intro-
+                                                              tion (e.g., Nike shoes, bikes).
+duces a 3D VQ-VAE by replacing 2D CNNs with
+3D convolutions to maintain temporal coherence.
+MAGVITv2 [33, 70] further improves fidelity                   a motion-aware language codebook with decou-
+via Lookup-Free Quantization (LFQ), enabling                  pled spatial-temporal tokenization for compact,
+substantially larger codebooks with efficient training.       semantically rich video representations. However,
+More recent tokenizers extend this direction. For             these models typically align semantics at a single
+instance, OmniTokenizer [57] unifies image–video              resolution, overlooking the hierarchical, coarse-to-
+tokenization via a spatial–temporal decoupled                 fine structure of visual understanding. In contrast,
+design, LARP [55] introduces an autoregressive-               we propose PyraTok, a language-enhanced video
+friendly latent prior, and 3D-MBQ-VAE [44] improves           VAE for video generation and understanding, that
+efficiency and temporal consistency with mobile               introduces multi-scale semantic alignment within
+inverted blocks and full-frame masking. However,              discrete latent spaces, enabling joint reasoning over
+these approaches remain limited in capturing                  both global context and fine-grained details.
+fine-grained spatial details because quantization is
+performed at a fixed spatial scale.
+                                                              3. Method
+Text Quantization in VAEs. While vanilla VQ-VAEs
+effectively compress visual information, they in-             3.1. Problem Definition
+herently lack cross-modal alignment, limiting their
+                                                                                                   C×T×H×W
+applicability to tasks requiring semantic consistency,        Given an input video X ∈ R         with T frames,
+such as text-to-video generation and VideoQA.                 H × W spatial resolution, and C channels. The
+Early methods like Frozen [50] attempted align-               goal is to learn a compact latent representation
+ment using frozen language models but required                that preserves both spatiotemporal fidelity and
+large paired datasets. To address this, several               semantic correspondence with conditioning text
+image generation methods such as TokLIP [28],                 embedding et . The input video is masked (X̃)
+LG-VQ [13], and TokenFlow [37] have proposed                  and encoded by ℰ n to produce latent features
+                                                                                               ′   ′    ′
+unified quantization strategies that embed visual             Z = ℰ n(X̃), where Z ∈ R
+                                                                                             T ×H ×W ×d
+                                                                                                    and T = T/ f + 1,
+                                                                                                                      ′
+
+data into language-informed spaces in VAEs.                     ′             ′
+                                                              H = H/2 f , W = W/2 f denote compressed temporal
+Despite significant progress in image generation,             and spatial dimensions with compression factor f
+only a few methods extend such strategies to video            with d dimensions. Encoded features are discretized
+VAEs. For example, VideoVAE+ [63] integrates                  through a text-conditioned quantization process
+captions into the quantization stage using frozen             q = 𝒬(Z, et ), and the decoder reconstructs the video
+BERT embeddings to align spatiotemporal latents               as X̂ = 𝒟e(q). This yields a text-guided video autoen-
+with language semantics. SweetTok [46] introduces             coding objective that learns compact representations
+
+                                                          3
+3.2         PyraTok Architecture                                                                                                                                                                            3        METHOD
+
+
+                                                                                                                                                                         Qwen 2.5 VL                        drift     Ground truth
+                                                             Language-Aligned
+                      LaPQ
+                                                                                                                         Text embedder
+                                                               Quantization Block
+
+                                                                                                            text query
+            LoRA                       08 27 38
+                                       49 55 68
+                                       47 23 46
+                                                                                Conv3D                                                                                                                  DINO
+            LoRA
+                                      24 65 79    lateral connection
+                                                                                                            <SOI>
+                                      88 18 03
+                                      42 21 98                                                                                                                                                                               recon
+                                                                                 Conv
+                                                                                                                                                              Layer 35     Layer 36
+            LoRA
+                                                                                                                                              Layer 1                                       Layer K
+                                                                                                C                                                       ...                           ...                       AR
+                                                  text embedding
+                                      99 01 24                              k    v      q
+
+
+
+
+                                                                                                                         Vision embedder
+            LoRA                      11 12 67
+                                      45 73 88
+                                                                           Multihead Attn.
+   Encoder
+                                                                                                                                                                                                      MLP
+                                                                                            Codebook
+                                                                   Quantization      01 02 03 04 05 ... N
+                                     77 67 92
+   Input                             03 54 48                                                  codebook
+ frames                              02 74 17                                                                                                                                                                          Decoder
+(masked,
+shuffled)
+
+
+Figure 3: Overview of the proposed PyraTok architecture. Masked video frames are encoded and
+quantized at multiple scales via Language-aligned Pyramidal Quantization (LaPQ) blocks guided by text
+embeddings. The resulting multi-scale discrete tokens are aligned through a vision-language model for
+semantic consistency, enabling high-fidelity and text-aware video reconstruction.
+
+for efficient downstream generative modeling.                               coder, with progressive downsampling along spatial
+                                                                            and temporal dimensions. To capture both fine and
+3.2. PyraTok Architecture                                                   coarse spatiotemporal details, we quantize Z in a
+                                                                            pyramidal manner across encoder depths. Specifi-
+3.2.1. Language-aligned Pyramidal Quantization                              cally, at each stage l, we introduce a Quantization
+                                                                            Block 𝒬l that receives the current encoder feature
+Videos exhibit rich structure across multiple spatial                         (l)                                          (l−1)
+                                                                            F , the previous quantized representation q          ,
+and temporal scales, but single-scale quantization
+                                                                            and the query text embedding et for semantic align-
+methods [10, 52] tend to overfit global patterns or
+                                                                            ment, producing a new semantically aligned quan-
+miss fine-grained details. While larger codebooks                                                   (l)
+can improve generation quality [69], they introduce                         tized representation q at stage l:
+prohibitive memory and compute costs. To address                                                                    (l)                                       (l−1)                   (l)
+                                                                                                            q                              = 𝒬l (q                        , F , et )                                          (1)
+this, we introduce Language-aligned Pyramidal
+Quantization (LaPQ), a novel framework that                                This hierarchical process enables progressive seman-
+discretizes features at multiple encoder depths via                        tic alignment across L stages. Fig. 3 illustrates the
+lateral connections, capturing global semantics from                       whole architecture of PyraTok. The internal architec-
+deeper layers and local details from shallower ones                        ture of 𝒬 is detailed in the following subsection.
+without high-dimensional codebooks.
+In addition, LaPQ aligns both the quantization as-                          3.2.2. Dual Semantic Alignment
+signments and codewords with text embeddings, en-                          We propose a novel alignment strategy to ensure
+suring that each discrete token is informative of the                      that quantized video tokens remain both locally
+associated language description. This language align-                      faithful to visual structure and globally consistent
+ment is essential for text-conditioned video gener-                        with textual semantics.
+ation and zero-shot video understanding, as it pro-
+duces a discrete video token space that is natively                         ❶ Multi-scale Semantic Alignment in Quantiza-
+compatible with multimodal models.                                          tion Blocks (local): In each Quantization Block
+                                                                            𝒬l of LaPQ, semantic discretization is performed at
+Formally, the encoder ℰ n processes a masked in-                            a specific encoder depth by integrating visual and
+put video through L hierarchical stages to extract                          text information, capturing semantics across multiple
+                                              (l)                                                            (l)
+multi-scale spatiotemporal representations F =                              scales. Given encoder features F , we incorporate
+      (l−1)          (0)            (l)
+            ), with F = X̃, where F ∈ R l l l l
+                                        C ×T ×H ×W
+ℰ n(F                                                                       lateral connections to retain spatial and temporal
+                                   th
+denotes the feature map at the l stage of the en-                           locality. Semantic context is introduced by attend-
+
+                                                                       4
+3.2                   PyraTok Architecture                                                                                                                                                                                                                                                                                                                       3   METHOD
+
+
+ing to the text embedding et , extracted from a pre-                                                                                                                                                                                                                                                                         Frame
+
+trained VLM, via multi-head self-attention, enabling
+language-guided modulation of visual features. The
+attended visual–text features are subsequently fused
+through projection layers, yielding modality-aligned
+representations suitable for quantization.
+To discretize these representations efficiently, we
+adopt Lookup-Free Quantization (LFQ) [70], which                                                                                                                                                                                                                                                                          Figure 4: PCA projections of quantized tokens
+replaces the conventional learned codebook C ∈ R
+                                                 K×d                                                                                                                                                                                                                                                                                                           (1) (4)
+                                                                                                                                                                                                                                                                                                                          from each LaPQ’s stage. Columns (q –q ) show
+with compact binary codewords Cv = {−1, 1}
+                                               log2 K
+                                                      .                                                                                                                                                                                                                                                                   hierarchical outputs capturing progressively refined
+This eliminates high-dimensional embedding lookups                                                                                                                                                                                                                                                                        and semantically aligned regions.
+and significantly reduces memory overhead, enabling
+efficient scaling to a large vocabulary. The binary                                                                                                                                                                                                                                                                       more distinct separation of road lanes, vehicles, and
+codebook Cv is shared across all 𝒬l quantization                                                                                                                                                                                                                                                                          background elements.
+blocks, ensuring consistency across pyramid levels
+                                                                                                                                                                                                                                                                                                                          ❷ Autoregressive Semantic Alignment (global):
+while minimizing parameter growth. The codebook
+                                                                                                                                                                                                                                                                                                                          To enforce global semantic consistency between
+is used only during training to compute alignment
+                                                                                                                                                                                                                                                                                                                          language and discrete latents, we introduce an au-
+losses and guide structure. During inference, quan-
+                                                                                                                                                                                                                                                                                                                          toregressive alignment objective over the quantized
+tization operates without lookups, preserving the
+                                                                                                                                                                                                                                                                                                                          token sequence. Given a text query t, we obtain its
+efficiency of LFQ. To jointly optimize quantization
+                                                                                                                                                                                                                                                                                                                          embedding et = VLM(t) and extract discrete tokens
+and semantic alignment, we introduce a hierarchical
+                                                                                                                                                                                                                                                                                                                          from each quantization block using the shared code-
+semantic codebook loss:
+                                                                                                                                                                                                                                                                                                                          book Cv . Tokens from all levels are concatenated
+                 Â (l)
+                                                             L
+                                                                                                             Â2                                                                                                                                                                                                           with separator tokens ⟨Q-SEP⟩ to retain hierarchical
+ ℒcodebook = ∑ [ Â     q − sg(Cv )Â
+                                                                                                                                                                  (l)                                           (l)
+                 Â
+                 Â                                                                                           Â
+                                                                                                             Â            + E[−q log q ]
+                 Â                                                                                           Â
+             l=1 ÍÒÒ Ò Ò ÒÒ Ò Ò ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò Ñ Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ï ÍÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò Ò Ò ÑÒ Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò ÒÒ Ò Ò Ò Ò Ò ÒÒ Ò ÒÒ Ò ÒÒ Ò ÒÏ
+                                                                                                                                                                                                                                                                                                                          structure, and a start-of-image token ⟨SOI⟩ is
+                                                                                           vision-commitment                                                                                 entropy regularization                                                                                                       prepended after the text. The resulting sequence is
+                                                              (l)                             (l−1)                                                                                                                                                                                                                       fed into the VLM decoder, which autoregressively pre-
+              + DKL (q ∥ q                                                                                                   ) + Eqi ∈q(l) [DKL (qi ∥ sg(et ))]
+                                                                                                                                                                                                                                                                                                                (2)
+                ÍÒ Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò ÒÑÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ Ï ÍÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò ÑÒ Ò ÒÒ ÒÒ Ò Ò ÒÒ Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò ÒÒ Ò Ò Ò ÒÒ Ò ÒÒ Ò ÒÒ Ò Ò Ï           dicts each visual token conditioned on the text and
+                                                                                                                                                          text-conditioned alignment                                                                                                                                                                               (l)   (<l)
+                                                                                                                                                                                                                                                                                                                          preceding tokens: ℒAR = − ∑l=1 log p(q ∣ q , et ).
+                          hierarchical consistency                                                                                                                                                                                                                                                                                                      L
+
+                                                                                                                                                                                                                                                                                                                          By making visual tokens predictable from the text
+                                                                                                                                           + Ec∈Cv DKL (c ∥ sg(et )) ].
+                                                                                                                                             ÍÒ Ò ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ò Ò ÒÒ ÒÒ Ñ Ò Ò Ò ÒÒ ÒÒ Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò Ò ÒÒ ÒÒ Ò ÒÒ Ï                                   prefix, this objective encourages the shared codebook
+                                                                                                                                                              text–codebook alignment
+                                                                                                                                                                                                                                                                                                                          to encode globally consistent, language-aligned
+Here, sg(⋅) denotes the stop-gradient operator. The                                                                                                                                                                                                                                                                       semantics. The separator tokens retain hierarchical
+first term encourages vision-commitment by pulling                                                                                                                                                                                                                                                                        structure while enabling unified sequential mod-
+  (l)
+q toward the binary code vectors Cv , while entropy                                                                                                                                                                                                                                                                       eling, improving both reconstruction quality and
+regularization sharpens the assignments toward                                                                                                                                                                                                                                                                            latent-space controllability.
+near one-hot distributions. The hierarchical KL term
+enforces hierarchical consistency across quantization                                                                                                                                                                                                                                                                     3.2.3. Pretrained VAE Encoder and LoRA
+levels. The remaining KL terms introduce semantic
+                                                                                                                                                                                                                                                                                                                          PyraTok leverages a pretrained video VAE, keep-
+structure through text-conditioned alignment of
+                                                                                                                                                                                                                                                                                                                          ing both encoder ℰ n and decoder 𝒟e frozen to pre-
+assignments and text–codebook alignment of the
+                                                                                                                                                                                                                                                                                                                          serve high-fidelity reconstruction and focus learn-
+LFQ codebook. Together, these terms enable stable
+                                                                                                                                                                                                                                                                                                                          ing on multi-scale semantic alignment. To enable
+multi-scale quantization with strong cross-modal
+                                                                                                                                                                                                                                                                                                                          efficient adaptation to high-resolution inputs, we
+coherence. Fig. 4 illustrates this refinement, with
+                                                                                                                                                                                                                                                                                                                          insert LoRA modules [15] into encoder blocks, en-
+deeper stages producing clearer semantic structure.
+                                                                                                                                                                                                                                                                                                                          abling lightweight feature modulation without mod-
+For example, in the first row, later stages reveal
+                                                                                                                                                                                                                                                                                                                          ifying pretrained weights. Text-conditioned super-
+
+                                                                                                                                                                                                                                                                                                                      5
+                                                                                                  4   EXPERIMENTS
+
+
+Table 1: Reconstruction quality comparison. Latency measured on 25 frames (256×256) using a single
+V100 GPU. Best highlighted with bold and second-best underlined.
+                                                         WebVid-10M                             COCO-Val
+  Methods                Params    Latency
+                                    (ms)      PSNR (↑)    SSIM (↑)  LPIPS (↓)        PSNR (↑)   SSIM (↑)   LPIPS (↓)
+  CogVideoX [67]         288M        712       29.92       0.811      0.141           30.11      0.833       0.111
+  3D-MBQ-VAE [44]        317M        650       33.00       0.848      0.092           32.11      0.858       0.108
+  WAN 2.2 [53]           222M        449       32.94       0.841      0.101           33.43      0.861       0.103
+  OmniTokenizer [57]      82M        444       32.03       0.812      0.152           32.09      0.845       0.141
+  LARP [55]              183M        689       33.03       0.851      0.091           34.26      0.853       0.089
+  TokenFlow [37]         176M        600       28.21       0.799      0.189           30.11      0.811       0.177
+  VideoVae+ [63]         192M        555       29.17       0.812      0.201           31.45      0.832       0.162
+  TexTok [71]            173M        661       27.42       0.831      0.222           29.29      0.841       0.181
+  LG-VQ [13]             168M        598       30.23       0.807      0.173           31.32      0.836       0.152
+  TokLIP [28]            207M        604       31.28       0.837      0.152           33.42      0.849       0.105
+  SweetTok [46]          128M        432       32.32       0.842      0.137           32.78      0.847       0.123
+  PyraTok (Ours)         192M        492       35.72       0.879     0.066            36.05      0.885      0.071
+
+
+vision can cause latent drift from the pretrained vi-            PyraTok is trained on a large-scale subset of Droplet-
+sual manifold. To stabilize adaptation, we add a                 10M [73] comprising HD videos, augmented with
+drift-regularization term that anchors adapted fea-              additional HD samples from OpenVid-1M [35] and
+tures to a frozen large-scale reference encoder En:              ultra-high-resolution (4K/8K) videos with recon-
+ℒdrift = DKL (ℰ n(X̃)∣∣En(X̃)), This stabilizes training         structed captions from UltraVideo [64]. Additional
+by preserving alignment with the original visual prior           implementation and experimental setup details are
+while allowing semantically guided updates.                      provided in the supplementary material.
+
+3.2.4. Total Objective and Regularization.                       4.1. Video Generation Tasks
+PyraTok is trained with a composite loss balancing               Frame Reconstruction. As shown in Table 1, Pyra-
+reconstruction quality, semantic alignment, and quan-            Tok achieves the best frame reconstruction quality
+tization consistency λrecon ℒrecon +λcodebook ℒcodebook +        on both WebVid-10M [2] and COCO-Val [31], sur-
+λAR ℒAR + λdrift ℒdrift , where λrecon , λcodebook , λAR ,       passing all prior semantic and non-semantic video
+and λdrift coefficients. The reconstruction loss                 VAEs. Compared to SweetTok [46] and TokLIP [28],
+combines pixel-level and perceptual terms, ℒrecon =              which also incorporate semantic alignment, Pyra-
+ℒSSIM + ℒL1 + ℒLPIPS , while ℒcodebook enforces multi-           Tok achieves 10.51% and 14.19% higher PSNR, and
+scale semantic alignment, ℒdrift ensures that low-rank           51.62% and 56.57% lower LPIPS, respectively. Sweet-
+adapters do not drift using alignment, and ℒAR pro-              Tok decouples spatial and temporal tokens but pro-
+motes autoregressive alignment with the query text.              cesses them independently, hindering global seman-
+                                                                 tic consistency, while TokLIP enriches visual tokens
+                                                                 with CLIP-level [38] semantics but lacks temporal
+4. Experiments                                                   modeling. PyraTok overcomes both limitations by
+                                                                 combining fine-grained, text-guided quantization at
+We comprehensively evaluate PyraTok on frame re-
+                                                                 each LaPQ level with a global autoregressive prior
+construction, text-o-video generation, and a diverse
+                                                                 that enforces temporal coherence. Furthermore,
+set of multimodal understanding tasks, including
+                                                                 SoTA non-semantic VAEs such as 3D-MBQ-VAE [44],
+zero-shot segmentation, temporal action localiza-
+                                                                 CogVideoX [67], and LARP [55] are also outper-
+tion, general video understanding, and text-to-video
+                                                                 formed, highlighting PyraTok ’s ability to capture
+generation. Evaluations are conducted across 10
+                                                                 text semantics while maintaining high fidelity.
+real-world benchmarks, such as WebVid-10M [2],
+YouTube-VIS 2021 [66], MVBench [25], etc.                        These trends are clearly reflected in the qualitative
+
+                                                             6
+4.2   Video Understanding Tasks                                                                         4   EXPERIMENTS
+
+
+       OmniTokenizer           SweetTok             LARP                   MotionAura                   PyraTok
+
+
+
+
+Figure 5: Frame reconstruction qualitative comparison. PyraTok generates sharper details, clearer
+textures, and better spatial structure than baselines, demonstrating better fidelity and semantic consistency.
+
+                                                             Table 2: T2V performance on WebVid-10M. Incor-
+                                                             porating PyraTok (✓) consistently improves percep-
+                                                             tual quality and semantic alignment compared to
+                                                             base models without it (✗).
+                                                                                                            FVD (↓) / TC (↑)
+                                                              Base Model                 Type
+       PyraTok          SweetTok           LARP                                                         ✗ PyraTok    ✓ PyraTok
+                                                              MotionAura [44]      Discrete Diffusion    374 / 204   365 / 246
+                                                              Open MAGVITv2 [33]    AutoRegressive       433 / 191   411 / 214
+                                                              Omnigenv2 [60]        AutoRegressive       398 / 185   377 / 208
+
+
+                                                             Text-2-Video (T2V) Generation. Table 2 and
+      VideoVAE+         OmniTok           TexTok
+                                                             Fig. 7 show that substituting the native VAEs in
+Figure 6: t-SNE visualization showing PyraTok with           MotionAura [44], MAGVITv2 [33, 70], and Omni-
+more distinct, well-separated clusters, indicating im-       GenV2 [60] with PyraTok consistently improves per-
+proved semantic organization.                                ceptual fidelity, texture sharpness, and text–video
+                                                             semantic alignment. Quantitatively, PyraTok reduces
+                                                             FVD by 9–22 points and increases TC by 20–27 points
+results. As shown in Fig. 5, PyraTok reconstructs            across all backbones. Qualitatively (shown in Fig. 7),
+legible text in the street scene, crisp leaf textures        PyraTok recovers details such as clearer facial struc-
+in the ramen and plant examples, and fine facial             ture, and more coherent structure like robotic hand
+structures on the polar bear, whereas all baselines          geometry in the OmniGenV2 example.
+exhibit noticeable blurring or distortion. The t-SNE
+visualization in Fig. 6 further reveals that PyraTok’s       4.2. Video Understanding Tasks
+latent space forms compact, well-separated clusters
+corresponding to coherent semantic categories, evi-          Video Segmentation. As shown in Table 3, PyraTok
+dencing effective multi-scale semantic organization.         demonstrates strong zero-shot performance on
+                                                             YouTube-VIS 2021 [66] and OVIS [36]. Compared
+
+                                                         7
+4.2    Video Understanding Tasks                                                                                                  4     EXPERIMENTS
+
+      MotionAura                 MAGVIT V2                OmniGenV2                          Prompt: Players are kicking a soccer ball on the field
+
+
+
+
+                                                                                      Prompt: Man and women talking and horse is grazing under the tree
+
+ MotionAura + PyraTok MAGVIT V2 + PyraTok OmniGenV2 + PyraTok
+
+
+
+
+                                                                                      Figure 8: Zero-shot segmentation results showing
+                                                                                      PyraTok’s precise text-guided segmentation of multi-
+Figure 7: T2V generation across various back-                                         ple objects in complex scenes.
+bones. Integrating PyraTok enhances detail, sharp-
+ness, and spatial consistency.                                                        Table 4: Video action localization under the 50%
+                                                                                      Seen / 50% Unseen setup. Best highlighted with
+Table 3: Video semantic segmentation results on                                       bold and second-best underlined. ⋆ supervised and
+YouTube-VIS 2021 and OVIS. Best highlighted with                                      Ç zero-shot methods.
+bold and second-best underlined. ⋆ supervised, Ó                                       Method               Training   VAE
+                                                                                                                              THUMOS14      ActivityNet v1.3
+                                                                                                                             Avg. mAP (↑)    Avg. mAP (↑)
+unsupervised, Ç zero-shot methods.                                                     STALE [34]             ⋆         ✗        22.2            20.5
+ Method               Training
+                                  YouTube-VIS 2021                 OVIS                DeTAL [26]             ⋆         ✗        24.1            22.4
+                                 mAP (↑)   Jaccard (↑)   mAP (↑)    Jaccard (↑)        STOV-TAL [18]          ⋆         ✗        48.8            29.6
+ CLIP-VIS [76]          ⋆         44.2       76.31        18.6            60.09        STOV-TAL [18]          Ç        ✗         31.5             28.0
+ VideoCutLER [58]       Ó         17.1       62.23          –               –          VideoVae+ [63]         Ç        ✓        23.12            21.37
+ UVIS [16]              Ó         17.5       63.11         3.5            36.71        OmniTokenizer [57]     Ç        ✓        23.47            22.48
+ VideoVae+ [63]         Ç         12.33      51.21         2.8            29.91        SweetTok [46]          Ç        ✓        25.32            24.53
+ LARP [55]              Ç         10.52      49.37         1.7            28.45        LARP [55]              Ç        ✓        27.42            25.53
+ OmniTokenizer [57]     Ç         14.54      51.12         2.8            33.27
+                                                                                       PyraTok (Ours)         Ç        ✓        33.17            29.11
+ PyraTok (Ours)         Ç         24.54      66.56         8.9        49.44
+
+
+
+                                                                                      complex multi-object scenes (e.g., players, soccer ball,
+to the zero-shot SoTA OmniTokenizer [28], which
+                                                                                      and field) with precise boundaries and strong seman-
+lacks explicit text-semantic supervision, PyraTok
+                                                                                      tic correspondence between textual and visual cues.
+achieves 68.8% and 30.2% relative improvements
+in mAP and Jaccard on YouTube-VIS 2021, and
+remarkable gains of 217.9% and 48.6% on OVIS, re-                                     Video Action Localization. As shown in Table 4,
+spectively. These results underscore the effectiveness                                PyraTok achieves the best zero-shot performance
+of our semantically aligned video representation in                                   on THUMOS14 and ActivityNet, outperforming
+enabling robust zero-shot generalization. To the best                                 the previous zero-shot SoTA LARP [55] by +5.75
+of our knowledge, PyraTok is the first demonstration                                  mAP and +3.58 mAP, respectively. Although LARP
+of zero-shot video semantic segmentation using a                                      and SweetTok [46] incorporate semantics, their
+language-aligned discrete VAE.                                                        alignment remains limited. For instance, SweetTok
+                                                                                      separates spatial and temporal streams, and LARP
+Compared to unsupervised baselines like VideoCut-
+                                                                                      lacks explicit text-conditioned supervision.    In
+LER [58] and UVIS [16], which suffer from mo-
+                                                                                      contrast, PyraTok combines multi-scale text-guided
+tion ambiguity and inconsistent grouping, PyraTok’s
+                                                                                      quantization with a global autoregressive prior,
+multi-scale text-conditioned quantization achieves co-
+                                                                                      enabling fine-grained temporal reasoning and
+herent segmentation with enhanced spatial–temporal
+                                                                                      stronger cross-modal consistency.
+consistency. Qualitative results in Fig. 8 further val-
+idate these findings. PyraTok accurately segments                                     These advantages are evident in Fig. 9, where Pyra-
+
+                                                                                  8
+4.3   Ablations                                                                                                                                   4       EXPERIMENTS
+
+              Frames showing a person hitting a baseball with a bat                     Codebook-size vs PSNR            Codebook-size vs SSIM
+                                                                                                                 d=16 0.89                        d=16
+                                                                                                                                                          Codebook-size vs LPIPS
+                                                                                                                                                            d=32
+                                                                                    36.0       d=16 d=16         d=16
+                                                                                                                                      d=16                     d=32
+                                                                                                                                                                         Coco-Val
+                                                                                            d=32 d=16                            d=16             d=160.075 d=32         WebVid-Val
+                                                                                    35.5                              0.88       d=16
+                                                                                                                                      d=16
+                                                                                                                                                                  d=16
+                                                                                                                                                                                    d=16
+                                                                                 PSNR                            SSIM                             LPIPS
+                                                                                         d=32                                 d=32                             d=32 d=16
+                                                                                    35.0 d=32
+                                                                                               d=16
+                                                                                                                      0.87 d=32                       0.070
+      GT
+                                                                                                      Coco-Val                          Coco-Val                  d=16
+                                                                                                                                                                       d=16
+                                                                                    34.5 d=32         WebVid-Val           d=32
+                                                                                                                      0.86 d=32         WebVid-Val 0.065
+SweetTok                                                                                                                                                                            d=16
+   LARP                                                                                  20K 40K 60K 80K 100K              20K 40K 60K 80K 100K             20K 40K 60K 80K 100K
+ PyraTok
+                                                                                              Codebook-size                     Codebook-size                    Codebook-size
+
+Figure 9: Video action localization results. Pyra-                                Figure 10: Effect of codebook size on reconstruc-
+Tok aligns action boundaries more accurately.                                     tion quality.
+
+Table 5: Accuracy (%) on general video under-                                     quantization, which offers stronger semantic ground-
+standing and video classification. Best highlighted                               ing and temporal coherence. By contrast, although
+with bold and second-best underlined.                                             SweetTok [46] and LARP [55] incorporate semantic
+                               MVBench                 Kinetics
+                                                                                  cues, their limited text–video alignment constrains
+ Method                 VAE
+                                 Overall       400       600          700
+                                                                                  temporal reasoning. Within VAE-based methods,
+                                                                                  PyraTok further outperforms VILA-U [62], OmniTok-
+ InternVL3-78B [75]      ✗         79.2         –         –            –
+ Qwen2.5-72B [1]         ✗         71.3         –         –            –          enizer [57], and VideoVAE+ [63], demonstrating the
+ InternVL3-38B [75]      ✗         76.0         –         –            –          effectiveness of language-conditioned quantized rep-
+ Qwen2.5VL-7B [1]                  67.2         –         –            –
+                         ✗
+                                                                                  resentations. The consistent gains across understand-
+ Qwen2.5VL-3B [1]        ✗         67.0         –         –            –
+ InternVL [75]           ✗          –          69.1      68.9         60.6        ing and classification tasks highlight PyraTok’s capa-
+ InternVideo2 [59]       ✗          –          73.1      72.8         64.9        bility as a unified, semantically grounded video repre-
+ VideoPrism-g [74]       ✗          –          76.4       –            –
+ SigLIP2-g-opt[49]       ✗          –          69.8      67.0         61.8
+                                                                                  sentation model with robust zero-shot generalization.
+ PEcoreG [5]             ✗          –          76.9      76.1         69.1
+ VILA-U [62]             ✓        81.21         –         –         –
+ VideoVae+ [63]          ✓          –         63.32     61.27     55.55           4.3. Ablations
+ OmniTokenizer [57]      ✓        79.44       65.03     62.75     58.71
+ SweetTok [46]           ✓          –         67.54     65.01     61.45           Fig. 10 and Table 6 present ablations on key PyraTok
+ LARP [55]               ✓        83.21       69.27     68.52     66.89
+                                                                                  components, including codebook size, loss config-
+ PyraTok (Ours)          ✓        86.03       78.43     77.11     74.08
+                                                                                  uration, the presence of pyramidal and recurrent
+                                                                                  quantization modules, the number of quantization
+                                                                                  blocks, and variations in the multimodal encoder or
+Tok more accurately localizes the baseball bat swing
+                                                                                  pretrained video VAE.
+action than others. This design also allows PyraTok
+to surpass supervised approaches such as STALE and                               Codebook Size. As shown in Fig. 10, increasing code-
+DeTAL [26], highlighting the strength of semantically                            book size and dimensionality consistently improves
+aligned discrete latents for action localization.                                reconstruction and perceptual quality. Larger and
+                                                                                 higher-dimensional codebooks provide a richer la-
+General Video Understanding and Classification.
+                                                                                 tent space, enabling finer feature representation and
+As shown in Table 5, PyraTok achieves SoTA perfor-
+                                                                                 reducing quantization error. However, performance
+mance on both the MVBench [25] and Kinetics bench-
+                                                                                 gains saturate beyond 80K vocab size, suggesting a
+marks [22]. Specifically, our model attains an overall
+                                                                                 trade-off between model capacity and efficiency.
+accuracy of 86.03% across diverse video understand-
+ing tasks on MVBench. Furthermore, it demonstrates                               Component Ablation. Removing LaPQ leads to
+substantial improvements of 13.22%, 12.54%, and                                  the largest degradation across all metrics, highlight-
+10.75% over LARP [55] on the Kinetics-400, -600,                                 ing the importance of hierarchical language-aligned
+and -700 benchmarks, respectively. PyraTok surpass                               quantization. Excluding text guidance noticeably
+prior VAE-based and large-scale non-VAE foundation                               weakens semantic grounding, reducing both fidelity
+models, including InternVL3-78B [75], Qwen2.5-VL-                                and perceptual quality. Dropping the pyramidal-Q
+7B [1], and VideoPrism-g [74]. This performance                                  design similarly harms performance, confirming the
+gain stems from PyraTok’s multi-scale text-guided                                effectiveness of multi-scale quantization.
+
+                                                                             9
+                                                                                                                               REFERENCES
+
+
+Table 6: Ablations on PyraTok components.                                               Qwen2.5-VL achieves the best overall performance,
+                                       COCO-Val               WebVid-10M                while LLaMA-3 and Gemma-3 variants maintain
+                                   PSNR / SSIM / LPIPS     PSNR / SSIM / LPIPS
+                                                                                        competitive results.
+                                1. Component Ablation
+ w/o LaPQ                          31.41 / 0.831 / 0.101   31.47 / 0.799 / 0.118        Pretrained VAEs. Substituting the pretrained back-
+ w/o Text Guidance                 33.43 / 0.861 / 0.081   36.02 / 0.833 / 0.082
+ w/o Pyramidal-Q                   34.02 / 0.859 / 0.082   34.02 / 0.839 / 0.094        bone shows that PyraTok maintains consistent im-
+                      2. Quantization(𝒬)-Blocks Ablation                                provements across encoders. The Wan 2.2 VAE [53]
+ 2 Blocks                          33.21 / 0.821 / 0.092   33.98 / 0.844 / 0.101        (default) delivers the best results, but strong perfor-
+ 3 Blocks                          34.78 / 0.862 / 0.089   35.14 / 0.867 / 0.085
+ 4 Blocks (Default)                35.72 / 0.879 / 0.066   36.05 / 0.885 / 0.071
+                                                                                        mance with 3DMBQ-VAE, CogVideoX, and Mochi-
+                            3. Loss Function Ablation
+                                                                                        VAE confirms the robustness and transferability of
+ w/o ℒdrift                        33.48 / 0.839 / 0.082   34.52 / 0.853 / 0.081        the proposed semantic quantization design.
+ w/o ℒAR                           33.42 / 0.842 / 0.079   34.01 / 0.844 / 0.079
+ w/o ℒdrift & ℒAR                  32.17 / 0.832 / 0.093   32.32 / 0.831 / 0.092
+                            4. Codebook Loss Ablation                                   5. Conclusion
+ w/o ℒvision-commitment            32.88 / 0.819 / 0.097   33.45 / 0.839 / 0.101
+ w/o ℒtext-cond. alignment         33.27 / 0.822 / 0.092   34.12 / 0.855 / 0.091
+ w/o ℒtext-codebook alignment      34.11 / 0.849 / 0.087   34.78 / 0.872 / 0.083        We introduce PyraTok, a language-aligned pyramidal
+                                5. Multi-Modal Models                                   video tokenizer that performs multi-scale vector quan-
+ Qwen-2.5 VL [1] (Default)         35.72 / 0.879 / 0.066   36.05 / 0.885 / 0.071        tization with a shared large binary codebook. Our
+ LLaMA-3 8B [12]                   35.62 / 0.871 / 0.069   35.34 / 0.878 / 0.079
+ Gemma-3 4B [47]                   35.29 / 0.865 / 0.069   35.92 / 0.882 / 0.078
+                                                                                        dual semantic alignment couples text-conditioned,
+                                  6. Pretrained VAEs                                    per-level quantization with a global autoregressive
+ 3D-MBQ-VAE [44]                   35.01 / 0.869 / 0.069   35.33 / 0.878 / 0.075        objective, producing semantically consistent discrete
+ CogVideoX-VAE [67]                34.92 / 0.861 / 0.069   35.12 / 0.873 / 0.080        latents. PyraTok delivers state-of-the-art 4K/8K
+ SVD-VAE [4]                       34.18 / 0.859 / 0.074   34.78 / 0.865 / 0.083
+ Mochi-VAE [48]                    34.95 / 0.864 / 0.071   35.06 / 0.873 / 0.076        reconstruction and strong zero-shot transfer on
+ PyraTok                           36.05 / 0.885 / 0.071   35.72 / 0.879 / 0.066        video segmentation, temporal action localization,
+                                                                                        VideoQA, and video classification. Compatibility
+                                                                                        studies show consistent gains across vision–language
+Quantization-Blocks. Performance improves con-
+                                                                                        encoders and diverse VAE backbones. Ablations
+sistently as the number of 𝒬 blocks increases, with
+                                                                                        confirm the necessity of the pyramidal path and
+four blocks yielding the best results. This shows that
+                                                                                        RVQ, the benefit of four quantization blocks, and the
+deeper quantization hierarchies enhance semantic
+                                                                                        contributions of the autoregressive and drift terms,
+representation and reconstruction fidelity by captur-
+                                                                                        as well as codebook alignment losses. These results
+ing both coarse and fine visual details.
+                                                                                        establish PyraTok as a practical, general-purpose
+Loss Functions. Excluding ℒdrift or ℒAR weakens                                         tokenizer for modern video–language systems.
+semantic coherence and structure preservation,
+while removing both leads to the largest performance
+drop. This confirms that feature-level alignment and                                    References
+variance regularization jointly stabilize semantic
+                                                                                         [1] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang,
+learning and reconstruction.
+                                                                                             Wenbin Ge, Sibo Song, Kai Dang, Peng Wang,
+Codebook Loss. Without vision-commitment, as-                                                Shijie Wang, Jun Tang, et al. Qwen2.5-VL tech-
+signments become unstable, whereas without text-                                             nical report. arXiv:2502.13923, 2025.
+conditioned alignment, semantic guidance weakens.
+Removing text–codebook alignment disrupts global                                         [2] Max Bain, Arsha Nagrani, Gül Varol, and An-
+semantic structure, producing the largest degrada-                                           drew Zisserman. Frozen in time: A joint video
+tion. This demonstrates all three terms are crucial                                          and image encoder for end-to-end retrieval.
+for stable and semantically coherent quantization.                                           In International Conference on Computer Vision
+                                                                                             (ICCV), 2021.
+Multimodal Models. Using different vision-language
+encoders demonstrates the generality of PyraTok.                                         [3] Gedas Bertasius, Heng Wang, and Lorenzo Tor-
+
+                                                                                   10
+REFERENCES                                                                                     REFERENCES
+
+
+    resani. Is space-time attention all you need for      [10] Patrick Esser, Robin Rombach, and Bjorn Om-
+    video understanding? In International Confer-              mer. Taming transformers for high-resolution
+    ence on Machine Learning (ICML), 2021.                     image synthesis. In IEEE Conference on Com-
+                                                               puter Vision and Pattern Recognition (CVPR),
+[4] Andreas Blattmann, Tim Dockhorn, Sumith Ku-                2021.
+    lal, Daniel Mendelevitch, Maciej Kilian, Do-
+    minik Lorenz, Yam Levi, Zion English, Vikram          [11] Songwei Ge, Thomas Hayes, Harry Yang, Xi Yin,
+    Voleti, Adam Letts, et al. Stable video diffusion:         Guan Pang, David Jacobs, Jia-Bin Huang, and
+    Scaling latent video diffusion models to large             Devi Parikh. Long video generation with time-
+    datasets. arXiv preprint arXiv:2311.15127,                 agnostic VQGAN and time-sensitive transformer.
+    2023.                                                      In European Conference on Computer Vision
+                                                               (ECCV), 2022.
+[5] Daniel Bolya, Po-Yao Huang, Peize Sun,
+    Jang Hyun Cho, Andrea Madotto, Chen Wei,              [12] Aaron Grattafiori, Abhimanyu Dubey, Abhi-
+    Tengyu Ma, Jiale Zhi, Jathushan Rajasegaran,               nav Jauhri, Abhinav Pandey, Abhishek Ka-
+    Hanoona Rasheed, et al.       Perception en-               dian, Ahmad Al-Dahle, Aiesha Letman, Akhil
+    coder: The best visual embeddings are not                  Mathur, Alan Schelten, Alex Vaughan, et al.
+    at the output of the network. arXiv preprint               The llama 3 herd of models. arXiv preprint
+    arXiv:2504.13181, 2025.                                    arXiv:2407.21783, 2024.
+
+[6] Benjamin Bross, Ye-Kui Wang, Yan Ye, Shan             [13] Liang Guotao, Baoquan Zhang, Yaowei Wang,
+    Liu, Jianle Chen, Gary J Sullivan, and Jens-               Yunming Ye, Xutao Li, and Luo Chuyao. LG-
+    Rainer Ohm. Overview of the versatile video                VQ: Language-guided codebook learning. Ad-
+    coding (vvc) standard and its applications. IEEE           vances in Neural Information Processing Systems
+    Transactions on Circuits and Systems for Video             (NeurIPS), 2024.
+    Technology (TCSVT), 2021.                             [14] Kaiming He, Xinlei Chen, Saining Xie, Yanghao
+[7] Fabian Caba Heilbron, Victor Escorcia, Bernard             Li, Piotr Dollár, and Ross Girshick. Masked
+    Ghanem, and Juan Carlos Niebles. ActivityNet:              autoencoders are scalable vision learners. In
+    A large-scale video benchmark for human ac-                IEEE Conference on Computer Vision and Pattern
+    tivity understanding. In IEEE Conference on                Recognition (CVPR), 2022.
+    Computer Vision and Pattern Recognition (CVPR),       [15] Edward J Hu, Yelong Shen, Phillip Wallis,
+    2015.                                                      Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang,
+                                                               Lu Wang, Weizhu Chen, et al. LoRA: Low-rank
+[8] Haoxin Chen, Menghan Xia, Yingqing He, Yong
+                                                               adaptation of large language models. Interna-
+    Zhang, Xiaodong Cun, Shaoshu Yang, Jinbo
+                                                               tional Conference on Learning Representations
+    Xing, Yaofang Liu, Qifeng Chen, Xintao Wang,
+                                                               (ICLR), 2022.
+    et al. VideoCrafter1: Open diffusion models for
+    high-quality video generation. arXiv preprint         [16] Shuaiyi Huang, Saksham Suri, Kamal Gupta,
+    arXiv:2310.19512, 2023.                                    Sai Saketh Rambhatla, Ser-nam Lim, and Ab-
+                                                               hinav Shrivastava. UVIS: Unsupervised video
+[9] Alexey Dosovitskiy, Lucas Beyer, Alexan-
+                                                               instance segmentation. In IEEE Conference on
+    der Kolesnikov, Dirk Weissenborn, Xiaohua
+                                                               Computer Vision and Pattern Recognition (CVPR),
+    Zhai, Thomas Unterthiner, Mostafa Dehghani,
+                                                               2024.
+    Matthias Minderer, Georg Heigold, Sylvain
+    Gelly, et al. An image is worth 16x16 words:          [17] Hugging Face.      Text generation inference
+    Transformers for image recognition at scale. In-           documentation.   https://huggingface.
+    ternational Conference on Learning Representa-             co/docs/text-generation-inference/
+    tions (ICLR), 2021.                                        en/index, 2025. Accessed: 2025-09-15.
+
+                                                     11
+REFERENCES                                                                                    REFERENCES
+
+
+[18] Jeongseok Hyun, Su Ho Han, Hyolim Kang,                   Ping Luo, et al. MVBench: A comprehensive
+     Joon-Young Lee, and Seon Joo Kim. Exploring               multi-modal video understanding benchmark.
+     scalability of self-training for open-vocabulary          In IEEE Conference on Computer Vision and Pat-
+     temporal action localization. In IEEE/CVF Win-            tern Recognition (CVPR), 2024.
+     ter Conference on Applications of Computer Vi-
+     sion (WACV), 2025.                                   [26] Zhiheng Li, Yujie Zhong, Ran Song, Tianjiao
+                                                               Li, Lin Ma, and Wei Zhang. DeTAL: Open-
+[19] Haroon Idrees, Amir R Zamir, Yu-Gang Jiang,               vocabulary temporal action localization with
+     Alex Gorban, Ivan Laptev, Rahul Sukthankar,               decoupled networks. IEEE Trans. Pattern Anal.
+     and Mubarak Shah. The thumos challenge on                 Mach. Intell. (TPAMI), 2024.
+     action recognition for videos “in the wild”. Com-
+                                                          [27] Bin Lin, Yunyang Ge, Xinhua Cheng, Zongjian
+     puter Vision and Image Understanding, 2017.
+                                                               Li, Bin Zhu, Shaodong Wang, Xianyi He, Yang
+[20] Eric Jang, Shixiang Gu, and Ben Poole. Categor-           Ye, Shenghai Yuan, Liuhan Chen, et al. Open-
+     ical reparametrization with gumble-softmax. In            Sora Plan: Open-source large video generation
+     International Conference on Learning Represen-            model. arXiv:2412.00131, 2024.
+     tations (ICLR), 2017.
+                                                          [28] Haokun Lin, Teng Wang, Yixiao Ge, Yuying Ge,
+[21] Yang Jin, Zhicheng Sun, Kun Xu, Liwei Chen,               Zhichao Lu, Ying Wei, Qingfu Zhang, Zhenan
+     Hao Jiang, Quzhe Huang, Chengru Song, Yu-                 Sun, and Ying Shan. TokLIP: Marry visual to-
+     liang Liu, Di Zhang, Yang Song, et al. Video-             kens to clip for multimodal comprehension and
+     LaVIT: Unified video-language pre-training                generation. arXiv:2505.05422, 2025.
+     with decoupled visual-motional tokenization.         [29] Ji Lin, Chuang Gan, and Song Han. TSM: Tem-
+     In International Conference on Machine Learning           poral shift module for efficient video under-
+     (ICML), 2024.                                             standing. In International Conference on Com-
+[22] Will Kay, Joao Carreira, Karen Simonyan,                  puter Vision (ICCV), 2019.
+     Brian Zhang, Chloe Hillier, Sudheendra Vijaya-       [30] Ji Lin, Jiaming Tang, Haotian Tang, Shang
+     narasimhan, Fabio Viola, Tim Green, Trevor                Yang, Wei-Ming Chen, Wei-Chen Wang,
+     Back, Paul Natsev, et al. The kinetics hu-                Guangxuan Xiao, Xingyu Dang, Chuang Gan,
+     man action video dataset. arXiv preprint                  and Song Han. AWQ: Activation-aware weight
+     arXiv:1705.06950, 2017.                                   quantization for on-device llm compression and
+                                                               acceleration. Proceedings of Machine Learning
+[23] Dan Kondratyuk, Lijun Yu, Xiuye Gu, José
+                                                               and Systems, 2024.
+     Lezama, Jonathan Huang, Grant Schindler,
+     Rachel Hornung, Vighnesh Birodkar, Jimmy             [31] Tsung-Yi Lin, Michael Maire, Serge Belongie,
+     Yan, Ming-Chang Chiu, et al. VideoPoet: A                 James Hays, Pietro Perona, Deva Ramanan, Pi-
+     large language model for zero-shot video gen-             otr Dollár, and C Lawrence Zitnick. Microsoft
+     eration. International Conference on Machine              COCO: Common objects in context. In European
+     Learning (ICML), 2023.                                    Conference on Computer Vision (ECCV), 2014.
+[24] Doyup Lee, Chiheon Kim, Saehoon Kim, Minsu           [32] Ilya Loshchilov and Frank Hutter. Decoupled
+     Cho, and Wook-Shin Han. Autoregressive im-                weight decay regularization. International
+     age generation using residual quantization. In            Conference on Learning Representations (ICLR),
+     IEEE Conference on Computer Vision and Pattern            2019.
+     Recognition (CVPR), 2022.
+                                                          [33] Zhuoyan Luo, Fengyuan Shi, Yixiao Ge, Yu-
+[25] Kunchang Li, Yali Wang, Yinan He, Yizhuo Li,              jiu Yang, Limin Wang, and Ying Shan. Open-
+     Yi Wang, Yi Liu, Zun Wang, Jilan Xu, Guo Chen,            MAGVIT2: An open-source project toward de-
+
+                                                     12
+REFERENCES                                                                                       REFERENCES
+
+
+     mocratizing auto-regressive visual generation.             Michaël Ramamonjisoa, et al. DINOv3. arXiv
+     arXiv preprint arXiv:2409.04410, 2024.                     preprint arXiv:2508.10104, 2025.
+
+[34] Sauradip Nag, Xiatian Zhu, Yi-Zhe Song, and           [41] Uriel Singer, Adam Polyak, Thomas Hayes,
+     Tao Xiang. Zero-shot temporal action detection             Xi Yin, Jie An, Songyang Zhang, Qiyuan Hu,
+     via vision-language prompting. In European                 Harry Yang, Oron Ashual, Oran Gafni, et al.
+     Conference on Computer Vision (ECCV), 2022.                Make-A-Video: Text-to-video generation with-
+                                                                out text-video data. arXiv:2209.14792, 2023.
+[35] Kepan Nan, Rui Xie, Penghao Zhou, Tiehan Fan,
+                                                           [42] Khurram Soomro, Amir Roshan Zamir, and
+     Zhenheng Yang, Zhijie Chen, Xiang Li, Jian
+                                                                Mubarak Shah. Ucf101: A dataset of 101 hu-
+     Yang, and Ying Tai. Openvid-1m: A large-scale
+                                                                man actions classes from videos in the wild.
+     high-quality dataset for text-to-video genera-
+                                                                arXiv preprint arXiv:1212.0402, 2012.
+     tion. In International Conference on Learning
+     Representations (ICLR), 2025.                         [43] Gary J Sullivan, Jens-Rainer Ohm, Woo-Jin
+                                                                Han, and Thomas Wiegand. Overview of the
+[36] Jiyang Qi, Yan Gao, Yao Hu, Xinggang Wang,                 high efficiency video coding (HEVC) standard.
+     Xiaoyu Liu, Xiang Bai, Serge Belongie, Alan                IEEE Transactions on Circuits and Systems for
+     Yuille, Philip HS Torr, and Song Bai. Occluded             Video Technology (TCSVT), 2012.
+     video instance segmentation: A benchmark. In-
+     ternational Journal on Computer Vision (IJCV),        [44] Onkar Kishor Susladkar, Jishu Sen Gupta, Chi-
+     2022.                                                      rag Sehgal, Sparsh Mittal, and Rekha Singhal.
+                                                                MotionAura: Generating high-quality and mo-
+[37] Liao Qu, Huichao Zhang, Yiheng Liu, Xu Wang,               tion consistent videos using discrete diffusion.
+     Yi Jiang, Yiming Gao, Hu Ye, Daniel K Du, Ze-              In International Conference on Learning Repre-
+     huan Yuan, and Xinglong Wu. TokenFlow:                     sentations (ICLR), 2025.
+     Unified image tokenizer for multimodal under-
+     standing and generation. In IEEE Conference on        [45] Yuhta Takida, Yukara Ikemiya, Takashi Shibuya,
+     Computer Vision and Pattern Recognition (CVPR),            Kazuki Shimada, Woosung Choi, Chieh-Hsin
+     2025.                                                      Lai, Naoki Murata, Toshimitsu Uesaka, Kengo
+                                                                Uchida, Wei-Hsiang Liao, et al. HQ-VAE: Hier-
+[38] Alec Radford, Jong Wook Kim, Chris Hallacy,                archical discrete representation learning with
+     Aditya Ramesh, Gabriel Goh, Sandhini Agarwal,              variational bayes. Transactions on Machine
+     Girish Sastry, Amanda Askell, Pamela Mishkin,              Learning Research (TMLR), 2024.
+     Jack Clark, et al. Learning transferable visual
+                                                           [46] Zhentao Tan, Ben Xue, Jian Jia, Junhao Wang,
+     models from natural language supervision. In
+                                                                Wencai Ye, Shaoyun Shi, Mingjie Sun, Wenjin
+     International Conference on Machine Learning
+                                                                Wu, Quan Chen, and Peng Jiang. Sweettok:
+     (ICML), 2021.
+                                                                Semantic-aware spatial-temporal tokenizer for
+[39] Ludan Ruan, Yiyang Ma, Huan Yang, Huiguo                   compact video discretization. In International
+     He, Bei Liu, Jianlong Fu, Nicholas Jing Yuan,              Conference on Computer Vision (ICCV), 2025.
+     Qin Jin, and Baining Guo. MM-Diffusion:               [47] Gemma Team, Aishwarya Kamath, Johan Fer-
+     Learning multi-modal diffusion models for joint            ret, Shreya Pathak, Nino Vieillard, Ramona Mer-
+     audio and video generation. In IEEE Confer-                hej, Sarah Perrin, Tatiana Matejovicova, Alexan-
+     ence on Computer Vision and Pattern Recognition            dre Ramé, Morgane Rivière, et al. Gemma 3
+     (CVPR), 2023.                                              technical report. arXiv:2503.19786, 2025.
+[40] Oriane Siméoni, Huy V Vo, Maximilian Seitzer,         [48] Genmo Team. Mochi 1. https://github.
+     Federico Baldassarre, Maxime Oquab, Cijo Jose,             com/genmoai/models, 2024.   Accessed:
+     Vasil Khalidov, Marc Szafraniec, Seungeun Yi,              2025-09-15.
+
+                                                      13
+REFERENCES                                                                                    REFERENCES
+
+
+[49] Michael Tschannen, Alexey Gritsenko, Xiao                universal video understanding. In IEEE Confer-
+     Wang, Muhammad Ferjad Naeem, Ibrahim                     ence on Computer Vision and Pattern Recognition
+     Alabdulmohsin, Nikhil Parthasarathy, Talfan              (CVPR), 2024.
+     Evans, Lucas Beyer, Ye Xia, Basil Mustafa,
+     et al. SigLIP 2: Multilingual vision-language       [57] Junke Wang, Yi Jiang, Zehuan Yuan, Bingyue
+     encoders with improved semantic under-                   Peng, Zuxuan Wu, and Yu-Gang Jiang. Omni-
+     standing, localization, and dense features.              Tokenizer: A joint image-video tokenizer for
+     arXiv:2502.14786, 2025.                                  visual generation. Advances in Neural Informa-
+                                                              tion Processing Systems (NeurIPS), 2024.
+[50] Maria Tsimpoukelli, Jacob L Menick, Serkan
+                                                         [58] Xudong Wang, Ishan Misra, Ziyun Zeng, Rohit
+     Cabi, SM Eslami, Oriol Vinyals, and Felix Hill.
+                                                              Girdhar, and Trevor Darrell. VideoCutLER: Sur-
+     Multimodal few-shot learning with frozen lan-
+                                                              prisingly simple unsupervised video instance
+     guage models. Advances in Neural Information
+                                                              segmentation. In IEEE Conference on Computer
+     Processing Systems (NeurIPS), 2021.
+                                                              Vision and Pattern Recognition (CVPR), 2024.
+[51] Arash Vahdat and Jan Kautz.           NVAE: A
+                                                         [59] Yi Wang, Kunchang Li, Xinhao Li, Jiashuo
+     deep hierarchical variational autoencoder. Ad-
+                                                              Yu, Yinan He, Guo Chen, Baoqi Pei, Rongkun
+     vances in Neural Information Processing Systems
+                                                              Zheng, Zun Wang, Yansong Shi, et al. Intern-
+     (NeurIPS), 2020.
+                                                              Video2: Scaling foundation models for multi-
+                                                              modal video understanding. In European Con-
+[52] Aaron van den Oord, Oriol Vinyals, and Koray
+                                                              ference on Computer Vision (ECCV), 2024.
+     Kavukcuoglu. Neural discrete representation
+     learning. In Advances in Neural Information         [60] Chenyuan Wu, Pengfei Zheng, Ruiran Yan, Shi-
+     Processing Systems (NeurIPS), 2017.                      tao Xiao, Xin Luo, Yueze Wang, Wanli Li, Xiyan
+                                                              Jiang, Yexin Liu, Junjie Zhou, et al. OmniGen2:
+[53] Team Wan, Ang Wang, Baole Ai, Bin Wen, Chao-
+                                                              Exploration to advanced multimodal genera-
+     jie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu,
+                                                              tion. arXiv:2506.18871, 2025.
+     Haiming Zhao, Jianxiao Yang, et al. Wan: Open
+     and advanced large-scale video generative mod-      [61] Jay Zhangjie Wu, Yixiao Ge, Xintao Wang,
+     els. arXiv:2503.20314, 2025.                             Stan Weixian Lei, Yuchao Gu, Yufei Shi, Wynne
+                                                              Hsu, Ying Shan, Xiaohu Qie, and Mike Zheng
+[54] Haiqiang Wang, Weihao Gan, Sudeng Hu,                    Shou. Tune-A-Video: One-shot tuning of image
+     Joe Yuchieh Lin, Lina Jin, Longguang Song,               diffusion models for text-to-video generation.
+     Ping Wang, Ioannis Katsavounidis, Anne Aaron,            In International Conference on Computer Vision
+     and C-C Jay Kuo. MCL-JCV: a jnd-based h.                 (ICCV), 2023.
+     264/avc video quality assessment dataset. In
+     IEEE International Conference on Image Process-     [62] Yecheng Wu, Zhuoyang Zhang, Junyu Chen,
+     ing (ICIP), 2016.                                        Haotian Tang, Dacheng Li, Yunhao Fang,
+                                                              Ligeng Zhu, Enze Xie, Hongxu Yin, Li Yi, et al.
+[55] Hanyu Wang, Saksham Suri, Yixuan Ren, Hao                VILA-U: A unified foundation model integrat-
+     Chen, and Abhinav Shrivastava. Larp: Tok-                ing visual understanding and generation. In
+     enizing videos with a learned autoregressive             International Conference on Learning Represen-
+     generative prior. In International Conference on         tations (ICLR), 2025.
+     Learning Representations (ICLR), 2025.
+                                                         [63] Yazhou Xing, Yang Fei, Yingqing He, Jingye
+[56] Junke Wang, Dongdong Chen, Chong Luo,                    Chen, Jiaxin Xie, Xiaowei Chi, and Qifeng Chen.
+     Bo He, Lu Yuan, Zuxuan Wu, and Yu-Gang                   Large motion video autoencoding with cross-
+     Jiang. OmniViD: A generative framework for               modal video vae. arXiv:2412.17805, 2024.
+
+                                                    14
+REFERENCES                                                                                   REFERENCES
+
+
+[64] Zhucun Xue, Jiangning Zhang, Teng Hu,              [71] Kaiwen Zha, Lijun Yu, Alireza Fathi, David A
+     Haoyang He, Yinan Chen, Yuxuan Cai, Yabiao              Ross, Cordelia Schmid, Dina Katabi, and Xiuye
+     Wang, Chengjie Wang, Yong Liu, Xiangtai Li,             Gu. Language-guided image tokenization for
+     et al. UltraVideo: High-quality uhd video               generation. In IEEE Conference on Computer
+     dataset with comprehensive captions. arXiv              Vision and Pattern Recognition (CVPR), 2025.
+     preprint arXiv:2506.13691, 2025.
+                                                        [72] David Junhao Zhang, Jay Zhangjie Wu, Jia-Wei
+[65] Wilson Yan, Yunzhi Zhang, Pieter Abbeel,                Liu, Rui Zhao, Lingmin Ran, Yuchao Gu, Difei
+     and Aravind Srinivas.   VideoGPT: Video                 Gao, and Mike Zheng Shou. Show-1: Marry-
+     generation using vq-vae and transformers.               ing pixel and latent diffusion models for text-
+     arXiv:2104.10157, 2021.                                 to-video generation. International Journal on
+                                                             Computer Vision (IJCV), 2025.
+[66] Linjie Yang, Yuchen Fan, Yang Fu, and Ning Xu.
+     The 3rd large-scale video object segmentation      [73] Runze Zhang, Guoguang Du, Xiaochuan Li,
+     challenge-video instance segmentation track.            Qi Jia, Liang Jin, Lu Liu, Jingjing Wang,
+     In IEEE Conf. on Computer Vision and Pattern            Cong Xu, Zhenhua Guo, Yaqian Zhao, et al.
+     Recognition Workshops (CVPRW), 2021.                    DropletVideo: A dataset and approach to ex-
+                                                             plore integral spatio-temporal consistent video
+[67] Zhuoyi Yang, Jiayan Teng, Wendi Zheng, Ming             generation. In International Conference on Com-
+     Ding, Shiyu Huang, Jiazheng Xu, Yuanming                puter Vision (ICCV), 2025.
+     Yang, Wenyi Hong, Xiaohan Zhang, Guanyu
+                                                        [74] Long Zhao, Nitesh Bharadwaj Gundavarapu,
+     Feng, et al. Cogvideox: Text-to-video diffusion
+                                                             Liangzhe Yuan, Hao Zhou, Shen Yan, Jennifer J
+     models with an expert transformer. In Interna-
+                                                             Sun, Luke Friedman, Rui Qian, Tobias Weyand,
+     tional Conference on Learning Representations
+                                                             Yue Zhao, et al. VideoPrism: A foundational
+     (ICLR), 2025.
+                                                             visual encoder for video understanding. In
+                                                             International Conference on Machine Learning
+[68] Jiahui Yu, Xin Li, Jing Yu Koh, Han Zhang,
+                                                             (ICML), 2024.
+     Ruoming Pang, James Qin, Alexander Ku,
+     Yuanzhong Xu, Jason Baldridge, and Yonghui         [75] Jinguo Zhu, Weiyun Wang, Zhe Chen,
+     Wu. Vector-quantized image modeling with im-            Zhaoyang Liu, Shenglong Ye, Lixin Gu, Hao
+     proved VQGAN. In International Conference on            Tian, Yuchen Duan, Weijie Su, Jie Shao, et al.
+     Machine Learning (ICML), 2022.                          InternVL3: Exploring advanced training and
+                                                             test-time recipes for open-source multimodal
+[69] Lijun Yu, Yong Cheng, Kihyuk Sohn, José                 models. arXiv preprint arXiv:2504.10479,
+     Lezama, Han Zhang, Huiwen Chang, Alexan-                2025.
+     der G Hauptmann, Ming-Hsuan Yang, Yuan
+     Hao, Irfan Essa, et al. MAGVIT: Masked gener-      [76] Wenqi Zhu, Jiale Cao, Jin Xie, Shuangming
+     ative video transformer. In IEEE Conference on          Yang, and Yanwei Pang. CLIP-VIS: Adapting clip
+     Computer Vision and Pattern Recognition (CVPR),         for open-vocabulary video instance segmenta-
+     2023.                                                   tion. IEEE Transactions on Circuits and Systems
+                                                             for Video Technology (TCSVT), 2024.
+[70] Lijun Yu, José Lezama, Nitesh B Gundavarapu,
+     Luca Versari, Kihyuk Sohn, David Minnen, Yong
+     Cheng, Vighnesh Birodkar, Agrim Gupta, Xi-
+     uye Gu, et al. Language model beats diffusion–
+     tokenizer is key to visual generation. Interna-
+     tional Conference on Learning Representations
+     (ICLR), 2024.
+
+                                                   15
+                     A   THEORETICAL ANALYSIS OF LANGUAGE-ALIGNED PYRAMIDAL QUANTIZATION
+
+
+A. Theoretical Analysis of Language- E(X,t)∼𝒟 [ℓrecon (X̂c , X)]. By the non-degeneracy of 𝒟
+   aligned Pyramidal Quantization    and standard properties of L1 /SSIM/LPIPS recon-
+                                                                structions, there exists a non-constant mapping X ↦
+We analyze the behavior of the Language-aligned                 X̂(X) that achieves strictly lower expected reconstruc-
+Pyramidal Quantization (LaPQ) objective and the                 tion error than any constant prediction. Using the
+conditions under which the model avoids posterior               model expressiveness assumption, we can approxi-
+collapse. Let θ denote all trainable parameters. LaPQ           mate such a mapping with some parameter vector θnc
+is composed of smooth losses (reconstruction, code-                                                       (l)
+                                                                that yields non-collapsed assignments q and recon-
+book, autoregressive, and drift), each of which is              structions X̂(X). Therefore ℒrecon (θnc ) < ℒrecon (θc ).
+an expectation over the training distribution 𝒟 of              We now inspect the remaining terms in the objective.
+video–text pairs (X, t), i.e., ℒθ = E(X,t)∼𝒟 [ℓ(θ; X, t)].
+All LaPQ modules (LoRA layers, AR head, LFQ quan-               (i) Hierarchical KL and entropy terms. For a
+tizers, etc.) use differentiable operations, so ℒθ is a         fully collapsed posterior, the hierarchical KL terms
+                                                                        (l) (l−1)
+smooth, lower-bounded deep-network objective.                   DKL (q ∥q         ) vanish only if all levels share ex-
+                                                                actly the same constant distribution; otherwise, they
+Why LaPQ Mitigates Posterior Collapse. At LaPQ
+                 (l)          (l−1) (l)
+                                                                incur a positive penalty. Moreover, the entropy term
+level l, let q = 𝒬l (q              , F , et ) be the (soft)           (l)    (l)
+                                           (l)
+                                                                E[−q log q ] is minimized by near one-hot dis-
+assignment distribution, where F are encoder                    tributions. A fully collapsed solution that is both
+features and et is the text embedding extracted from            constant and sharply peaked is incompatible with
+the text t. LaPQ at level l is collapsed if there exists a      representing the variability in X and induces subop-
+                         (l)    (l)    (l)
+fixed distribution q̄ s.t. q ≡ q̄ for all (X, t) ∼ 𝒟.           timal hierarchical penalties.
+A fully collapsed LaPQ posterior satisfies this for all
+                                                                (ii) Text-conditioned and AR terms. For a collapsed
+levels l = 1, . . . , L. Assume the following conditions:                                  (l)
+                                                                posterior, assignments q are independent of the
+1. Data non-degeneracy: The data distribution 𝒟 is                                             (l)
+                                                                text embedding et , i.e., if q is constant, it cannot
+   non-degenerate, i.e., there exist (X, t) and (X , t )
+                                                   ′ ′
+                                                                match varying text embeddings. Consequently, the
+   s.t. the corresponding optimal reconstruction out-
+                                                                text-conditioned KL terms DKL (qi ∥ sg(et )) for qi ∈
+   puts under reconstruction loss ℒrecon differ.                  (l)
+2. Decoder injectivity: For any two distinct latent             q and the global text–codebook alignment terms
+                              ′
+   code sequences q ≠ q , the decoder produces                  cannot be minimized across distinct texts. Similarly,
+   distinct reconstructions 𝒟e(q) ≠ 𝒟e(q ).
+                                             ′                  the autoregressive loss ℒAR cannot exploit visual or
+3. Model expressiveness: For any measurable map-                textual information because the discrete tokens do
+   ping (X, t) ↦ q
+                    (1∶L)
+                          , realizable via encoder fea-         not depend on (X, t). By contrast, a non-collapsed
+            (l)                                                 posterior can strictly reduce both.
+   tures F and text embedding et , there exists a
+   parameter θ that realizes it to arbitrary precision.         Combining all pieces, ℒ(θnc ) < ℒ(θc ) since ℒrecon is
+                                                                strictly lower and the remaining terms can be made
+Proposition 1 (Non-optimality of Collapsed LaPQ                 no worse, and typically strictly better, by making as-
+Posteriors). Any fully collapsed LaPQ posterior                 signments depend on (X, t) while respecting regular-
+ (l)    (l)
+q ≡ q̄ cannot minimize the LaPQ objective.                      izers. Thus θc cannot be a global minimizer of ℒ.
+Proof. Consider any parameter vector θc that yields             Proposition 1 states that any fully collapsed LaPQ
+a fully collapsed posterior. Then, by definition, every         posterior is suboptimal under the proposed objective,
+                                  (l)
+quantizer output distribution q is constant across              provided natural structural assumptions on the data
+inputs, hence the decoder input (the discrete code              and model capacity. Therefore, gradient-based train-
+sequence qc ) is also constant. Hence, all reconstruc-          ing of LaPQ is driven toward stationary points that
+tions are equal to X̂c = 𝒟e(qc ). Then, the reconstruc-         preserve dependent discrete representations, thereby
+tion loss ℒrecon (θc ) is the expected reconstruction           mitigating posterior collapse and encouraging
+loss under a constant prediction, i.e., ℒrecon (θc ) =          high-utilization codebooks.
+
+                                                           16
+                                                                                     B   ADDITIONAL RESULTS
+
+
+  Input Image            GT        OmniTokenizer              LARP               VideoVAE+      PyraTok
+
+
+
+
+Figure 11: Zero-shot semantic segmentation comparison across various scenes. Results illustrate
+PyraTok’s ability to recover fine object boundaries, preserve small structures, and produce semantically
+coherent segmentations across diverse domains. Details in B.1.
+
+
+B. Additional Results                                  we first pass the video through the frozen PyraTok
+                                                       encoder and its Language-aligned Pyramidal Quan-
+B.1. Zero-shot Video Segmentation                      tization (LaPQ) hierarchy and extract the quantized
+                                                       features from the last quantization block, denoted by
+Given an input video and a natural language text        (L)
+                                                                     ′   ′
+                                                                 T ×H ×W ×d
+                                                                             ′
+
+t, we leverage the language-aligned discrete repre-    q    ∈R            , which capture high-level, text-
+sentation produced by PyraTok to obtain zero-shot,     aligned semantics at a compressed spatio-temporal
+text-guided spatio-temporal masks. Specifically,       resolution. We then decompose the input text into
+                                                       a set of semantic units (typically content words or
+
+                                                  17
+B.2   Video Question Answering                                                        B   ADDITIONAL RESULTS
+
+
+
+
+                              Leaf
+
+
+Figure 12: Zero-shot semantic segmentation examples produced by PyraTok using only text prompts.
+Each column shows an input image, the corresponding segmentation mask predicted by PyraTok, and the set
+of text labels used. Results span diverse object types, demonstrating PyraTok’s ability to segment both rare
+and common entities without task-specific training. Details in B.1.
+
+
+short phrases), {w1 , . . . , wK }, and obtain a language    amples in Fig. 12. Existing tokenizers often yield
+embedding ewk for each unit using the same vision–           coarse, blob-like masks with strong label confusion:
+language model employed during PyraTok training.             OmniTokenizer and LARP tend to over-smooth object
+For every semantic unit wk , we compute a similarity         boundaries and merge adjacent instances (e.g., bus
+                                              (L)            and road, trees and background), while VideoVAE+
+score between ewk and each token in q (e.g., via
+cosine similarity in the shared embedding space),            frequently misses thin structures such as bike frames,
+                                              tok ′ ′
+yielding a token-level relevance map Swk (t , h , w ).
+                                                       ′     surfboards, and traffic signs, or hallucinates spurious
+This relevance map is then upsampled to the                  regions in uniform areas. These methods also strug-
+original video resolution, following the encoder             gle with rare or fine-grained concepts, leading to in-
+downsampling pattern (or via decoder-aligned pro-            complete segmentation of small objects (e.g., cat ears,
+jection), to produce a dense per-pixel score volume          surfboard tips) and inconsistent labeling across the
+Swk (x, y, t) for each semantic unit. We treat these         image. In contrast, PyraTok produces masks that are
+volumes as unary potentials in a fully connected 3D          both sharper and more semantically aligned with the
+Conditional Random Field (CRF) defined over the              ground truth, accurately separating foreground from
+spatio-temporal lattice (x, y, t), with pairwise terms       background and preserving thin structures. Fig. 12
+encouraging spatial smoothness aligned to image              further demonstrates strong zero-shot generalization:
+edges and temporal consistency across adjacent               PyraTok cleanly segments unseen categories such as
+frames. Running mean-field inference in this 3D-CRF          millennium falcon, tordelli, golden retriever, Pikachu,
+refines the raw scores into a binary segmentation            and axolotl, and simultaneously grounds multiple
+mask Mwk (x, y, t) ∈ {0, 1} that assigns each pixel          text queries (e.g., “golden retriever / puppy / grass
+in each frame to semantic unit wk . Repeating this           field / vegetation”) in the correct regions, highlight-
+procedure iteratively over all semantic units in the         ing that our language-aligned tokens carry richer se-
+prompt yields a set of word-level, zero-shot, text-          mantic information than prior VAE-based tokenizers.
+guided segmentation masks that are both spatially
+precise and temporally coherent across the video.
+                                                             B.2. Video Question Answering
+We compare our language-guided tokenizer with Om-
+niTokenizer [57], LARP [55], and VideoVAE+ [63],             For all question answering results, we adopt
+on diverse scenes in Fig. 11 and novel-category ex-          Qwen2.5-VL-3B [1] as the default vision–language
+
+                                                        18
+B.3   Action Localization                                                                 B   ADDITIONAL RESULTS
+
+                                                                                                                 d
+(VLM) backbone to generate open-ended answers                  to obtain a compact frame descriptor vt ∈ R . The
+from our video representations. Given an input clip,           textual query is encoded by the same language back-
+we first encode the video with our proposed PyraTok            bone used for PyraTok’s cross-modal training, produc-
+VAE and extract the discrete representations from                                                      d
+                                                               ing a normalized embedding z ∈ R . We compute co-
+all quantization blocks. These multi-scale features            sine similarity scores st = ⟨vt , z⟩ for all frames, which
+are projected into the language embedding space                yield a dense text–video alignment signal over time.
+and prepended to the question tokens, yielding a
+unified conditioning sequence for the autoregressive           To robustly localize an action interval, we evaluate
+decoder. The Qwen2.5-VL-3B model then performs                 similarities in a sliding-window fashion. The video is
+conditional text generation to produce the final               partitioned into overlapping chunks (t, t + K − 1) of
+answer. All VQA inferences are executed using                  length K=25 frames (with stride 1 in all experiments).
+the Text Generation Inference (TGI) pipeline from              For each chunk we aggregate the frame scores, St =
+                                                                1  t+K−1
+HuggingFace [17], which provides a stable and                  K
+                                                                  ∑i=t si , resulting in a 1D confidence trajectory
+                                                               {St }t=1
+                                                                   N−K+1
+reproducible deployment for our qualitative analysis.                      that reflects how strongly the query is
+                                                               grounded in each temporal neighborhood. We then
+Furthermore, across Fig. 13 to Fig. 15, we compare
+                                                               decode this trajectory into contiguous segments us-
+PyraTok against Qwen2.5-3B, VideoVAE+, Omni-
+                                                               ing a longest-connected-sequence algorithm: (i) we
+Tokenizer, and LARP on diverse video scenarios,
+                                                               threshold St at a fixed confidence τ to obtain a binary
+including action sequences (helicopter crash, mo-
+                                                               sequence; (ii) identify all maximally connected high-
+torcycle chase, aircraft destruction), transformation
+                                                               confidence segments; and (iii) select the segment
+events (monster emergence, firetruck-to-robot), and
+                                                               with the highest average score as the predicted ac-
+emotional interactions (a surprise proposal). The
+                                                               tion interval. For multi-action queries, we iteratively
+lower-capacity baselines (Qwen2.5-3B and Video-
+                                                               remove the selected interval and repeat, merging
+VAE+) often produce vague or partially incorrect
+                                                               overlapping segments when necessary. The resulting
+explanations, while OmniTokenizer and LARP cap-
+                                                               segments define our temporal action predictions.
+ture events more reliably but still miss finer details.
+PyraTok consistently provides the most accurate,               Fig. 16 and Fig. 17 visualize localized action seg-
+complete, and context-aware interpretations across             ments for different tokenizers on several challenging
+all scenarios, demonstrating stronger temporal                 examples. For each text query, the ground-truth
+reasoning, causal understanding, and fine-grained              (GT) segment is shown in blue, and the predictions
+visual grounding compared to competing models.                 obtained from VideoVAE [63],+, SweetTok [46],
+                                                               LARP [55], and PyraTok are displayed as colored
+                                                               bars beneath. The baselines consistently exhibit
+B.3. Action Localization
+                                                               temporally diffuse and fragmented activations:
+We tackle temporal action localization in long,                their similarity signals tend to fire on visually
+untrimmed videos by directly operating in the dis-             similar but semantically off-target frames, producing
+crete latent space of PyraTok. Given a video of N              multiple short segments or systematically shifted
+RGB frames and a textual description of the target ac-         intervals. For instance, in Fig. 16, in the clip “A girl
+tion, we first encode every frame with our pyramidal           shoots an arrow”, both VideoVAE + and SweetTok
+                                         (1)
+tokenizer. Empirically, we observe that q offers the           activate broadly over the whole sequence and fail
+best trade-off between semantic expressiveness and             to concentrate probability on the actual release
+temporal resolution: it preserves subtle motion cues           moment, while LARP on several disjoint intervals
+(e.g., arm swing before an arrow release, the instant          before and after the shot. In contrast, PyraTok yields
+of impact in a punch, see Fig. 16) that are strongly           a single, compact segment that tightly aligns with the
+                                                   (1)         GT span around the arrow release. A similar pattern
+smoothed out in deeper levels. We therefore use q
+                                                               appears for text query “A person fires a shotgun”,
+as our frame-level features. For each frame t, we spa-
+                        (1)                                    where baseline tokenizers localize earlier or later
+tially pool the tokens qt     (mean-pooling over space)
+
+                                                          19
+B.4   Text-2-Video Generation                                                       B   ADDITIONAL RESULTS
+
+
+segments, whereas PyraTok localizes correctly.             Fig. 18 and Fig. 19 show qualitative comparisons
+                                                           on text-to-video generation where we keep the
+The advantages of our fine-grained features are even
+                                                           Qwen-2.5VL decoder architecture fixed and only
+more evident for actions with multiple sub-events. In
+                                                           swap the underlying tokenizer. OmniTokenizer
+Fig. 16 example “An MMA fighter knocks down his
+                                                           and LARP tend to under-utilize fine-grained textual
+opponent with a punch to the face” and “. . . with a
+                                                           cues, often missing localized attributes such as the
+kick to the face”, the motion unfolds rapidly and is
+                                                           “two egg halves” in the ramen bowl or the “motion
+preceded by visually similar feints. VideoVAE + and
+                                                           blur on pedestrians” in the neon street scene, and
+SweetTok tend to spread confidence over the entire
+                                                           producing over-smoothed or distorted structures in
+exchange, leading to overly long or misaligned seg-
+                                                           complex compositions like the tree city and Mars
+ments, while LARP often localizes only part of the
+                                                           spaceport. SweetTok better preserves global layout
+motion (e.g., the wind-up but not the impact). Pyra-
+                                                           but still struggles with high-frequency details and
+Tok, by contrast, localizes a concise window centered
+                                                           subtle style descriptors (e.g., HDR interior lighting,
+around the decisive contact, closely matching the
+                                                           crisp spray around the polar bear), leading to muted
+GT. In Fig. 17, for “A person performs two overhead
+                                                           textures and inconsistent object shapes.
+presses”, PyraTok produces two high-confidence
+video segments that track both overhead press rep-         In contrast, PyraTok yields samples that more faith-
+etitions, whereas baselines either miss the second         fully reflect both global scene descriptions and fine-
+repetition or merge the two into one coarse interval.      grained phrases in the prompts. The additional ob-
+For complex, extended actions such as “A man and           jects specified in the text appear at the correct loca-
+a woman engage in sword fighting” and “Three mis-          tions, motion-related cues are rendered more plau-
+siles are launched from a desert”, baseline tokenizers     sibly, and material and lighting properties (glossy
+again show scattered activations, localizing short seg-    chocolate surface, bioluminescent foliage, cinematic
+ments around high-motion frames or transient explo-        city glow) are captured with higher fidelity. Fig. 20
+sions, and resulting in under-coverage of the GT. In       further illustrates 4K text-to-video generation for a
+contrast, PyraTok yields more accurate localization.       3-second clip, where PyraTok renders fine-grained
+                                                           details and maintains sharp structures, demonstrat-
+                                                           ing that our multi-scale quantization supports high-
+B.4. Text-2-Video Generation                               resolution, text-aligned video synthesis.
+
+To assess the usefulness of our tokens for generative
+modeling, we couple PyraTok with a conditional             B.5. High-resolution Frame Reconstruction
+video decoder built on Qwen-2.5VL [1]. Concretely,
+we treat the text encoder of Qwen-2.5VL as a               We further evaluate PyraTok on 4K frame recon-
+frozen condition network and fine-tune its video           struction in Fig. 21. At this resolution, prior tok-
+decoder to autoregressively predict PyraTok codes.         enizers struggle to preserve fine structures and high-
+Given a textual prompt, we first encode the prompt         frequency textures. VideoVAE+ [63] produces strong
+into language features, which are injected into a          over-smoothing: the coral branches, tree leaves, and
+transformer-based decoder that models the joint            fur on the buffalo become noticeably blurred, and
+distribution over all spatio–temporal tokens from our      small objects such as distant boats and fire lamps
+four quantizers. The decoder predicts the next token       nearly vanish in the zoomed-in crops. OmniTok-
+conditioned on the text and all previously generated       enizer [57] improves sharpness but introduces ring-
+tokens, until a full sequence of discrete video codes      ing and aliasing along high-contrast boundaries (e.g.,
+is obtained. These codes are then passed through           the product watch edges and mountain silhouettes),
+the PyraTok VAE decoder to synthesize the final            and often exhibits color bleeding in specular regions.
+video. Thanks to PyraTok’s compact yet expressive          SweetTok [46] and LARP [55] retain more detail
+representation, this pipeline can generate videos at       yet still suffer from blocky artifacts on repetitive
+20 FPS with resolutions up to 4K.                          textures (grass, foliage, brick walls) and inconsis-
+
+                                                      20
+B.6    Adapting Pretrained T2V Priors with PyraTok                 C   ABLATIONS AND ADDITIONAL ANALYSES
+
+
+Table 7: Video compression at 0.034 bitrate.                   To this end, we replace the original VAE/tokenizer
+      Methods           PSNR (↑)   SSIM (↑)   LPIPS (↓)        in three pretrained models, i.e., Open source version
+      HEVC [43]          30.10      0.943      0.199           of MAGVIT-V2 [33, 70] and OmniGenV2 [60]
+      VCC [6]            32.65      0.966      0.153           (autoregressive priors) and MotionAura [44] (dis-
+      MAGVIT [69]        23.70      0.846      0.144           crete diffusion prior), and fine-tune only the prior
+      MAGVIT-v2 [70]     26.18      0.894      0.104           on 10k clips from OpenVid-1M [35] so that it
+      3D-MBQ-VAE [44]    29.09      0.922      0.089           models PyraTok codes. Under identical prompts and
+      PyraTok (Ours)     29.82      0.942      0.068           sampling hyper-parameters, and across all archi-
+                                                               tectures, using the native tokenizer leads to typical
+                                                               failure modes: colors and exposure drift over time,
+tent reconstruction of tiny highlights, such as reflec-        geometry “breathes” (e.g., wobbling backgrounds
+tions on the watch bezel and lights on the night har-          and object contours), high-frequency details such
+bor. In contrast, our PyraTok reconstructions remain           as dough surface texture or water droplets quickly
+consistently crisp and coherent. Objects across all            collapse into smooth blobs, and object semantics
+scenes—from coral polyps and reef fish to product              are weakly preserved (e.g., inconsistent shape of the
+shots and distant architectural details—retain sharp           claw-machine robot or citrus slices). After swapping
+contours and clean textures without haloing. Fine-             in PyraTok, the same priors produce videos that are
+grained elements such as fur strands, leaf veins, and          both more semantically aligned with the prompts
+small fruits are faithfully preserved, demonstrating           and markedly more temporally consistent.
+that our pyramidal tokenization scales effectively to
+ultra-high resolutions while avoiding the blurring and         In Figure 26, MAGVITv2+PyraTok maintains stable
+aliasing present in prior methods.                             neon lighting in the arcade, preserves the dough’s
+                                                               volume and hand pose across frames, and keeps the
+In qualitative video reconstruction comparisons                boiling dumplings sharp with coherent bubble motion.
+(Figs. 22–25), existing tokenizers show consistent             In Figure 27, OmniGenV2+PyraTok yields crisp tree
+limitations across diverse scenes. TokenFlow [37]              trunks and facial details with reduced frame-to-frame
+and SweetTok often oversmooth high-frequency                   jitter, while the splashing juice exhibits smoother,
+content, causing foliage, clothing textures, and facial        physically plausible trajectories.
+details to blur, and small or thin structures to distort
+or disappear; they also introduce blocky artifacts             Similarly, MotionAura+PyraTok in Figure 28 sup-
+under large motion. LARP better preserves local                presses diffusion-induced flicker in backgrounds.
+contrast but frequently produces ringing around                These improvements indicate that PyraTok’s multi-
+boundaries and unstable illumination, leading to               scale discrete representation reduces quantization
+flickering highlights and shadows. MotionAura [44]             artifacts and exposes a more structured latent space,
+improves temporal smoothness yet still suffers from            making it easier for both autoregressive and diffusion
+identity drift in talking-head sequences and ghosting          priors to model long-range spatio-temporal depen-
+around fast movements, reducing perceptual realism.            dencies and maintain object identity over time, even
+Moreover, as previous methods were trained on low-             with minimal fine-tuning data.
+resolution data, their high-resolution reconstructions
+exhibit temporal artifacts such as frame stuttering.           C. Ablations and Additional Analyses
+In contrast, our 4K-trained PyraTok preserves
+high-frequency detail and temporal coherence,                  C.1. Video Compression
+producing smooth and stable video.
+                                                               As reported in Table 7, PyraTok attains the lowest
+B.6. Adapting Pretrained T2V Priors with PyraTok               LPIPS and competitive PSNR/SSIM on MCL-JCV [54]
+                                                               at a bitrate of 0.034, surpassing traditional codecs
+We further study whether PyraTok can serve as a                like HEVC [43] and VCC [6] in perceptual fidelity
+drop-in tokenizer for existing text-to-video priors.           (LPIPS) by preserving fine texture and temporal
+
+                                                          21
+C.2   Video Generation                                             C   ABLATIONS AND ADDITIONAL ANALYSES
+
+
+Table 8: Class-guided video generation.                        a different way of discretizing the encoder features,
+Tokenizer       Type    #Tokens #Params (Gen.) gFVD (↓)        specified by its quantization type, vocabulary
+MAGVIT [69]       AR     1024        306M        265           size, and embedding dimensionality. The simple
+MAGVIT-V2 [70]    AR     1280        307M        109           single-codebook baseline VQ [52] (4096 / 256), with
+MAGVIT [69]      MLLM    1024        306M         76
+MAGVIT-V2 [70] MLLM      1280        307M         58           vocal size of 4096 and a dimension of 256, yields the
+LARP-L [55]       AR     1024        632M         57           weakest reconstruction quality on both COCO [31]
+CogVideoX [67]    AR     6800        9.4B        626
+TATS [11]         AR     4096        321M        332
+                                                               and WebVid [2], confirming that a single global
+Video-LaVIT [21]  AR      512         7B         280           codebook is insufficient to capture the variability
+OmniTok [57]      AR     5120        650M        191           of natural image–video data. Introducing a group
+LARP-L [55]       AR     1024        632M         99
+SweetTok [46]     AR     1280        1.9B         65           structure in GVQ [20] (4096 / 256) slightly improves
+PyraTok (Ours)    AR     1024        2.3B        51            PSNR and SSIM, and reduces LPIPS; however, the
+                                                               gains are modest because each group still operates
+                                                               with a relatively small shared codebook. The lookup-
+coherence through semantically guided quantization.            free single-block variant, LFQ [70] (32800 / 16),
+                                                               increases the effective vocabulary while reducing the
+                                                               per-code dimension, resulting in a clear improvement
+C.2. Video Generation                                          in PSNR and SSIM, and a lower LPIPS, indicating
+We evaluate our tokenizer and generator on class-              that finer local code assignment is beneficial.
+guided video generation using the UCF-101 [42]                 Residual quantization with a higher-dimensional
+dataset. Given a target action class, the model                code space, RVQ [24] (8000 / 512), further reduces
+is conditioned on the class label and asked to                 distortion over vanilla VQ, and replacing the residual
+synthesize a short video clip from scratch. This               codebook with our latent product quantizer, LaPQ
+setting measures not only low-level visual fidelity            (8000 / 512), yields another consistent improve-
+(appearance, motion smoothness) but also whether               ment, showing that decomposing the latent channels
+the generated sequence is semantically consistent              into product codebooks makes better use of the
+with the requested action category.                            same vocabulary size. When we combine residual
+We compare PyraTok against a broad set of video gen-           modeling with LFQ-style factorization, RVQ (32800
+erative models that rely on different tokenizers and           / 16) achieves even better performance, but our
+generator architectures, including MAGVIT/MAGVIT-              full LaPQ (Ours, 48000 / 16) achieves the best
+V2, LARP-L, CogVideo, TATS, Video-LaVIT, OmniTok,              performance across all metrics on both validation
+and SweetTok. For all methods, we report the gen-              sets, with the highest PSNR/SSIM and lowest LPIPS,
+erative Fréchet Video Distance (gFVD), where lower             while incurring only a small increase in inference
+values indicate better alignment with the distribu-            time compared to simpler schemes. Overall, results
+tion of real videos. As shown in Table 8, our method           demonstrate that LaPQ’s combination of lookup-free
+achieves the lowest gFVD on UCF-101, improving                 factorization and product–residual coding provides a
+upon the strongest prior tokenizer by a substantial            significantly more expressive and distortion-resilient
+margin. These results indicate that our represen-              discrete representation than standard VQ, GVQ, LFQ,
+tation is better suited for high-quality, temporally           or RVQ under comparable computational budgets.
+coherent video synthesis, and that scaling the gen-
+erator on top of our tokens directly translates into
+stronger video generation performance.                         C.4. Codebook Utilization vs. Resolution
+
+                                                               We further analyze how the effectiveness of our
+C.3. Ablation on VQ Techniques                                 tokenizer scales with input resolution by measuring
+                                                               the percentage of active codewords at different
+Table 9 presents an ablation of the quantization               spatial resolutions (see Fig. 29). As the resolution
+module in PyraTok, where each row corresponds to               increases from 240p to 4320p, codebook utilization
+
+                                                          22
+C.5                         Ablation on Losses for Video Understanding                                         C     ABLATIONS AND ADDITIONAL ANALYSES
+
+
+Table 9: Ablation study of different quantization techniques in PyraTok. Each method is specified by its
+quantization type, codebook vocabulary size, and embedding dimensionality.
+                                                                                            COCO-Val                                WebVid-10M
+  Quantization                                    Vocab      Dim                                                                                                  Inf. Time
+                                                                          PSNR (↑)          SSIM (↑) LPIPS (↓)        PSNR (↑)       SSIM (↑) LPIPS (↓)
+  VQ [52]                                        4096        256           31.45             0.825     0.093           32.91          0.838     0.092               409
+  GVQ [20]                                       4096        256           32.25             0.836     0.089           33.34          0.842     0.089               438
+  LFQ [70]                                      32800         16           34.22             0.842     0.084           33.92          0.855     0.085               419
+  RVQ [24]                                       8000        512           33.92             0.849     0.078           34.22          0.865     0.079               489
+  LaPQ                                           8000        512           34.45             0.855     0.073           34.98          0.871     0.076               503
+  RVQ [24]                                      32800         16           34.78             0.869     0.076           35.27          0.879     0.074               488
+  LaPQ (Ours)                                   48000         16           35.72             0.879    0.066            36.05          0.885    0.071                492
+
+
+rises monotonically from 55.23% to 97.12%, indicat-                                                       Table 10: Ablation on loss functions.
+ing that higher-resolution inputs naturally excite a                                                                                     THUMOS14   ActivityNet    MVBench
+                                                                                                            ✗ ℒdift                        31.27      27.62         83.32
+richer subset of the learned vocabulary rather than                                                         ✗ ℒAR                          32.45      27.98         79.45
+collapsing to a small set of frequently used tokens.                                                        ✗ ℒdino & ℒAR                  29.29      26.78         81.57
+                                                                                                                                           30.22      27.55         83.56
+In particular, utilization already exceeds 79% at                                                           ✗ ℒtext-cond. alignment
+                                                                                                            ✗ ℒvision_commitment           32.67      28.21         84.23
+1080p and surpasses 90% in the 4K regime (2160p                                                             ✗ ℒtext-codebook alignment     31.11      27.07         83.91
+and 4320p), suggesting that the proposed pyramidal                                                          ✓ All losses                   33.17      29.11         86.03
+design can effectively exploit the larger spatial
+support to express more diverse and fine-grained
+                                                                                                          temporal action localization, and MVBench for
+semantics. This trend confirms that our discrete
+                                                                                                          video question answering (Table 10). With the
+latent space remains expressive and well-populated
+                                                                                                          full objective, PyraTok achieves 33.17/29.11 Avg.
+as we scale to high-resolution video, which is critical
+                                                                                                          mAP on THUMOS14/ActivityNet and 86.03 mAP
+for both faithful reconstruction and downstream
+                                                                                                          on MVBench. Removing the drift regularizer ℒdrift ,
+video-language understanding tasks.
+                                                                                                          which anchors the adapted encoder to the pretrained
+                                                                                                          VAE manifold, degrades performance by 1.90/1.49
+                                           Codebook Utilization by Resolution
+                            100
+                                                                                    91.44
+                                                                                             97.12        mAP on THUMOS14/ActivityNet and by 2.71 points
+                             80                                    79.16
+                                                                            85.38
+                                                                                                          on MVBench, indicating that maintaining a stable
+
+
+
+   % Codebook Utilization
+                                                           73.45
+                                                   67.82                                                  latent space is important for robust transfer across
+                                          59.57
+                             60   55.23                                                                   both localization and QA.
+                             40                                                                           The autoregressive alignment loss ℒAR has a different
+                             20                                                                           effect: dropping it leads to a relatively small drop
+                                                                                                          on temporal localization (0.72/1.13 mAP), but causes
+                              0
+                                  240     360       480    720     1080     1440    2160     4320         a pronounced 6.58-point decline on MVBench. This
+                                                            Resolution
+                                                                                                          suggests that sequence-level token modeling is espe-
+Figure 29: Codebook utilization as a function of                                                          cially critical for high-level video reasoning, where
+input resolution. Higher resolutions activate a larger                                                    the model must integrate information over longer
+fraction of the vocabulary, indicating that PyraTok                                                       temporal horizons. When we remove both the DINO-
+effectively exploits the increased spatial support to                                                     guided visual loss and the autoregressive loss (ℒdino +
+encode more diverse semantics.                                                                            ℒAR ), performance drops most severely on TAL (by
+                                                                                                          3.88 and 2.33 mAP on THUMOS14 and ActivityNet,
+C.5. Ablation on Losses for Video Understanding                                                           respectively) and by 4.46 points on MVBench, high-
+                                                                                                          lighting the complementarity between discriminative
+We ablate each component of the training objec-
+                                                                                                          visual supervision and global token prediction.
+tive on three video understanding benchmarks:
+THUMOS14 [19] and ActivityNet v1.3 [7] for                                                                We further study the codebook-related objectives, as
+
+                                                                                                     23
+                                                                                 D   IMPLEMENTATION DETAILS
+
+
+described in Eq. (2). Ablating the text-conditioned           we apply VAE tiling for latent-space tokenization
+alignment term ℒtext-cond. reduces performance by             and quantize the alignment VLM to AWQ INT-4 [30].
+2.95/1.56 mAP on THUMOS14/ActivityNet and                     In PyraTok, En(⋅) refers to the frozen DINOv3 [40]
+by 2.47 points on MVBench, while removing the                 encoder, which serves as a strong pretrained visual
+text–codebook alignment ℒtext-codebook yields a               encoder. It is used to provide stable, high-quality
+similar degradation (2.06/2.04 mAP and 2.12 points).          visual features that anchor adaptation and prevent
+These results confirm that both local token–text              drift from the pretrained visual manifold.
+alignment and global codeword–text alignment
+                                                              All baselines are trained under identical dataset set-
+are necessary to maintain semantically structured
+                                                              tings to ensure fair comparison. The average prompt
+latents that generalize well across detection and QA
+                                                              length during training is ∼60 tokens. Training is con-
+tasks. In contrast, dropping the vision-comment loss
+                                                              ducted in three progressive stages, each designed to
+ℒvision_commitment produces the smallest degradation
+                                                              incrementally strengthen multimodal alignment and
+(at most 0.50/0.90 mAP on THUMOS14/ActivityNet
+                                                              visual–temporal consistency.
+and 1.80 points on MVBench), suggesting that, for
+downstream understanding, the semantic shaping                Stage 1 — Self-Supervised Pretraining. In the first
+of the codebook is more critical than the pure vision         stage, we perform self-supervised pretraining focused
+commitment penalty. Overall, the complete loss                on language alignment. Input spatial resolutions
+formulation is consistently superior, validating our          vary from 512 × 512 up to 2048 × 2048, and we train
+multi-part objective for unified video understanding.         across multiple aspect ratios, including 1∶1, 4∶3, 3∶2,
+                                                              16∶9, and 2∶1. For temporal modeling, the number
+                                                              of frames ranges from 16+1 to 96+1, where the ad-
+D. Implementation Details                                     ditional frame denotes the conditioning key frame.
+                                                              This stage establishes robust cross-modal grounding
+PyraTok is implemented using the pretrained Wan               and spatial-temporal coherence.
+2.2L [53] video VAE as the backbone to ensure high-
+fidelity visual reconstruction. We initialize the en-         Stage 2 — Text–Visual Token Alignment. The sec-
+coder with pretrained WAN-2.2 weights, while the              ond stage incorporates text–visual token alignment
+LaPQ module and decoder are randomly initialized.             through the pretrained Qwen-2.5-VL (3B) backbone.
+Both the encoder and decoder of Wan 2.2L are kept             We maintain the same spatial and temporal config-
+frozen to preserve the pretrained visual quality. To          urations as Stage 1 for training stability. This stage
+encourage the model to capture long-range temporal            refines the alignment between linguistic tokens and
+dependencies and motion continuity, we temporally             visual embeddings, enhancing the semantic consis-
+mask 30% of frames and apply cosine-based spatial             tency of multimodal representations.
+masking on each frame following [14].                         Stage 3 — Full-Scale Fine-Tuning. In the final
+To enable efficient adaptation to our multi-scale             stage, the model is exposed to multi-resolution and
+semantic learning objective without full fine-tuning,         multi–aspect-ratio inputs, ranging from 128 × 128
+we incorporate LoRA adapters [15] with rank                   to 4096 × 4096, covering the same aspect ratios
+16 and alpha 32 into all encoder blocks. These                (1∶1, 4∶3, 3∶2, 16∶9, 2∶1). The number of frames
+adapters provide lightweight parameterization while           is kept consistent with previous stages. Due to
+preserving the representational capacity of the               increased resolution and GPU memory demands,
+backbone. For text conditioning, we employ the                the batch size is reduced from 4 → 2 per GPU. This
+Qwen2.5-VL (3B) [1], referred as pretrained VLM               stage optimizes the model with both alignment
+in main paper, to extract semantically rich textual           loss and a frame-level retention loss computed
+embeddings that guide both the quantization and the           using DINOv3 [40], ensuring long-range temporal
+multimodal semantic alignment. Loss weights are set           retention and fine-grained visual correspondence.
+to λrecon =2.5, λcodebook =2.5, λAR =1.5, and λdrift =0.6.    All training stages are optimized using AdamW [32]
+To reduce memory footprint and accelerate training,
+
+                                                         24
+                                                                                                     E   DATASETS
+
+
+                                                             textual variation, improving open-domain caption
+                                      −5
+with an initial learning rate of 1 × 10 and a cosine
+annealing scheduler. Gradient accumulation steps are         understanding and cross-modal reasoning.
+kept constant across stages. We train on a cluster of
+                                                             UltraVideo [64] (40K with Reconstructed Cap-
+128×NVIDIA A100 (80 GB) GPUs. The total number
+                                                             tions). To enrich representation at extreme reso-
+of optimization steps is 30K for Stage 1, 60K for
+                                                             lutions, we incorporate 40K ultra–high-definition
+Stage 2, and 180K for Stage 3.
+                                                             videos (4K and 8K) from the UltraVideo dataset.
+                                                             Since many of these videos lack high-quality tex-
+                                                             tual descriptions, we generate captions using a multi-
+                                                             modal LLM pipeline. This enables the model to learn
+                                                             from high-fidelity visual data and supports scalability
+                                                             to higher-resolution downstream applications.
+
+
+                                                             E.2. Testing and Validation Datasets
+
+                                                             OpenVid-1M [35] (Test Split). We employ 100K
+                                                             samples from the OpenVid-1M test split for evaluat-
+Figure 30: Reconstruction loss over 200K training            ing generalization to unseen open-domain video–text
+steps. The best PSNR configuration (VQ-Blocks: 4)            pairs. This ensures consistency with the distribu-
+converges at a loss of 0.12, while other ablation vari-      tion of the training data while validating model
+ants stabilize above 0.25.                                   generalization under identical data conditions.
+                                                             WebVid-10M [2] (Validation) and COCO [31] (Val-
+                                                             idation). For generative evaluation, we follow the
+E. Datasets
+                                                             WebVid-10M and COCO-Val validation protocols. For
+To comprehensively train, validate, and evaluate             class-guided video generation, we further evaluate
+PyraTok, we employ a diverse collection of large-scale       on the UCF-101 [42] dataset.
+video–text datasets spanning various resolutions, do-        MCL-JCV [54] (Compression Validation). To as-
+mains, and task-specific settings.                           sess the effectiveness of our video compression and
+                                                             reconstruction, we employ the MCL-JCV benchmark.
+E.1. Training Datasets                                       This dataset provides a controlled setup for evaluat-
+                                                             ing perceptual quality and rate–distortion tradeoffs
+Droplet-10M [73] (Subset). We curate a subset of             under varying compression levels.
+the Droplet-10M dataset, consisting of approximately
+                                                             To evaluate generalization beyond supervised train-
+4–5 million HD videos (720p). This subset serves as
+                                                             ing, we test the model under zero-shot conditions
+the foundation for pretraining, providing broad cov-
+                                                             across diverse downstream video understanding
+erage of human activities, natural scenes, and diverse
+                                                             tasks. For zero-shot action localization, we evalu-
+motion patterns, and a dense caption distribution and
+                                                             ate on ActivityNet [7] and THUMOS14 [19], which
+consistent temporal dynamics, crucial for learning
+                                                             contain diverse and complex activities. For zero-shot
+fine-grained video–text alignment. To ensure data
+                                                             video segmentation, we benchmark on YouTube-VIS
+quality and maintain high spatial fidelity, only videos
+                                                             2021 [66] and OVIS [36]. Both datasets present chal-
+at 720p or higher resolution are retained.
+                                                             lenging dynamic scenes with multiple interacting ob-
+OpenVid-1M [35] (300K Subset). We supplement                 jects and frequent occlusions. For video classification,
+training with 300K high-quality video–caption pairs          we utilize Kinetics [22], while for VideoQA, we adopt
+sampled from OpenVid-1M. Only HD videos are se-              MVBench [25], a comprehensive multi-task bench-
+lected to maintain visual consistency. This subset           mark covering spatiotemporal reasoning, action un-
+contributes to expanding linguistic diversity and con-       derstanding, and commonsense interpretation.
+
+                                                        25
+                                                                                                          E   DATASETS
+
+
+
+
+                                 Question: How does the copter in the video crash?
+
+                  Qwen2.5-3B : The helicopter seems to lose control after clipping part of a building
+                                structure, which sends it spinning before it crashes.
+               VideoVAE+ : The helicopter hits a wire hanging between the buildings and can’t stabilize
+                                          afterward, leading to the crash.
+                 OmniTokenizer : The helicopter crashes after making contact with an overhead line
+                                           stretched across the street.
+                 LARP : It collides with a tight cable strung between the buildings. The wire snags the
+                              helicopter, throwing it off balance and causing it to crash.
+                   PyraTok : The helicopter gets tangled in the steel wire stretched between the
+                          buildings, loses control instantly, and crashes onto the street
+
+
+
+
+                    Question: From where did the big green monster come into the glass cage?
+
+                Qwen2.5-3B : The green monster looks like it arrives from another area of the facility
+                             and ends up inside the glass cage during the commotion.
+                 VideoVAE+ : The monster spawns inside the glass chamber after the man disappears
+                                                   completely.
+                 OmniTokenizer : The creature is actually the man in the cell changing form. He turns
+                                    into the green monster inside the glass cage.
+                   LARP : The monster comes from the man inside the cage. He transforms into the
+                             creature while still being held in the glass containment unit.
+                 PyraTok : The big green monster appears after the man inside the cage transforms
+                into his creature form. He morphs from a normal human into the monster while still
+                                             inside the glass chamber.
+Figure 13: Qualitative comparison of video understanding across two challenging temporal-reasoning
+questions. For each example, we show representative frames from the input video and the corresponding
+answers produced by different models. Baselines typically provide generic or partially plausible descriptions
+that miss key causal events. In contrast, PyraTok produces precise, temporally grounded explanations that
+correctly capture fine-grained interactions, entity tracking, and scene dynamics. These examples demonstrate
+PyraTok’s ability to support detailed video comprehension and causal reasoning from short video sequences.
+Discussion in B.2.
+
+
+                                                          26
+                                                                                                   E    DATASETS
+
+
+
+
+                                  Question: What is happening in the video?
+
+           Qwen2.5-3B : A man on a motorcycle is racing across an open area as the plane takes
+                    off, and it looks like he’s trying to catch up after being left behind.
+              VideoVAE+ : A man is riding a motorcycle near an aircraft preparing to leave. He
+                   appears to be trying to reach the plane while something is chasing him.
+            OmniTokenizer : The man rides a motorcycle in the desert with dinosaurs chasing him.
+            He heads for a plane that’s starting to take off and drives into it from the back ramp
+              LARP : A man on a motorcycle is being chased by dinosaurs. He tries to escape by
+            reaching a transport plane that is lifting off and drives up the rear ramp to get inside.
+               PyraTok : The man is speeding on a motorcycle while being chased by several
+               dinosaurs. He races toward a military-style plane as it begins taking off and
+                    manages to board through the rear ramp while still riding the bike.
+
+
+
+
+                         Question: Why does the woman in the video seem surprised?
+
+                Qwen2.5-3B : The woman seems surprised because the man suddenly shows her
+                               something in his hand, catching her off guard.
+             VideoVAE+ : She appears surprised because the man gives her something unexpected
+                                        during their beach picnic.
+             OmniTokenizer : She seems surprised because the man takes out a ring and proposes,
+                                    which she wasn’t fully prepared for.
+                LARP : She looks surprised because the man is proposing to her, and she wasn’t
+                         expecting it. His gesture catches her off guard emotionally.
+             PyraTok : The woman reacts with surprise because the man suddenly proposes, and
+                          she’s overwhelmed by the unexpected romantic moment.
+Figure 14: Qualitative comparison of video reasoning ability across models. Models describe major
+actions in two dynamic scenes (a motorcycle escape from dinosaurs and a surprise beach proposal). PyraTok
+delivers the most precise and context-aware answers across both scenarios. Discussion in B.2.
+
+
+                                                       27
+                                                                                                            E   DATASETS
+
+
+
+
+                                Question: Where did the red giant robot come from?
+
+                  Qwen2.5-3B : The giant robot seems to come from inside the fire truck when the
+                                  vehicle breaks apart and reveals the machine.
+               VideoVAE+ : The robot appears to rise out of the fire truck after it opens up and shifts
+                                                   its structure.
+                OmniTokenizer : It comes from the fire truck, which transforms piece by piece into the
+                                                        robot.
+                 LARP : The robot originates from the fire truck. The vehicle folds and reshapes itself
+                                         until it becomes the large red robot.
+                 PyraTok : The red giant robot emerges by transforming from the fire truck. The
+                             truck’s parts shift and reassemble into the robot form.
+
+
+
+
+                                    Question: How does the aircraft get destroyed?
+
+                Qwen2.5-3B : The plane crashes in flames after something impacts it on the runway as
+                                               it’s trying to take off.
+                VideoVAE+ : The aircraft is blown apart after being struck by an explosive attack from
+                                       the runway area during its takeoff roll.
+                    OmniTokenizer : It gets destroyed because a missile hits it just as it’s lifting off,
+                                 triggering an explosion that breaks the jet apart.
+                   LARP : The jet is destroyed by a missile launched from the portable launcher. The
+                             explosion hits it during takeoff and tears the aircraft apart.
+                  PyraTok : The aircraft is destroyed when the person in black fires a missile at it
+                 right as it begins to take off. The missile strikes the jet, causing a large explosion
+                                                   that rips it apart
+
+Figure 15: Qualitative comparison of video understanding on two transformation- and action-level
+reasoning tasks. Baseline methods provide generic or underspecified descriptions (e.g., stating that the
+robot “comes from the fire truck”), often missing key causal events, responsible agents, and transformation
+mechanics. In contrast, PyraTok produces precise, temporally grounded explanations that correctly identify
+object transformations, causal triggers, and scene dynamics, such as the fire truck’s parts reassembling into
+the robot or the person in black firing the missile that destroys the aircraft. Discussion in B.2.
+
+
+                                                            28
+                                                                                             E   DATASETS
+
+
+
+
+                                             A girl shoots an arrow.
+
+
+
+
+                GT
+        VideoVAE+
+         SweetTok
+             LARP
+           PyraTok
+                                            A person fires a shotgun.
+
+
+
+
+                GT
+        VideoVAE+
+         SweetTok
+             LARP
+           PyraTok
+                       An MMA fighter knocks down his opponent with a punch to the
+                                                 face.
+
+
+
+
+                GT
+        VideoVAE+
+         SweetTok
+             LARP
+           PyraTok
+                     An MMA fighter knocks down his opponent with a kick to the face.
+
+
+
+
+                GT
+        VideoVAE+
+         SweetTok
+             LARP
+           PyraTok
+Figure 16: Action localization results comparing PyraTok with several baselines. For each prompt,
+the top row shows sampled video frames, followed by temporal action segments for the ground truth and
+predictions from each method. PyraTok produces action intervals that align more closely with the ground-truth
+boundaries, demonstrating improved temporal precision and robustness across diverse actions. Details in B.3.
+
+
+
+                                                    29
+                                                                                            E   DATASETS
+
+
+
+
+                                    A person performs two overhead presses
+
+
+
+                GT
+        VideoVAE+
+         SweetTok
+             LARP
+           PyraTok
+                                A man and a woman engage in sword fighting.
+
+
+
+
+                GT
+        VideoVAE+
+         SweetTok
+             LARP
+           PyraTok
+                                   Three missiles are launched from a desert.
+
+
+
+                 GT
+         VideoVAE+
+          SweetTok
+              LARP
+            PyraTok
+Figure 17: Additional action localization comparisons across diverse scenarios. Each example shows
+sampled frames followed by ground-truth action intervals and model predictions. PyraTok consistently yields
+temporally aligned and coherent action segments, reducing fragmentation and improving boundary accuracy
+compared to prior baselines. Details in B.3.
+
+
+
+
+                                                    30
+                                                                                                 E   DATASETS
+
+
+
+                 OmniTokenizer            LARP             SweetTok             PyraTok
+
+
+
+
+                  Photorealistic alpine lake at sunrise, glassy water reflecting snow-capped
+                 peaks, soft golden light, mist rising from the surface, ultra-detailed, 50mm,
+                                             shallow depth of field.
+
+
+
+
+                 Top-down food photo of a steaming bowl of ramen, with two egg halfs, on a
+                   rustic wooden table, rich broth, perfectly arranged chashu, soft natural
+                              window light, artisan ceramic bowl, high-detail"
+
+
+
+
+                Rain-soaked neon night market in Tokyo, umbrellas and reflections on glossy
+                pavement, cinematic wide-angle, motion blur on pedestrians, volumetric fog,
+                                 cyberpunk color palette, highly detailed
+
+
+
+
+                Massive ancient city built into living trees with hanging gardens and floating
+                 lanterns, bioluminescent flora at twilight, painterly concept art, intricate
+                                  architecture, panoramic, highly detailed
+Figure 18: Text-to-video qualitative comparison, showing a representative frame from each generated clip
+across diverse prompt categories, including photorealistic landscapes, detailed food scenes, night-market
+environments, and stylized concept art. Although only a single frame per video is shown, the green boxes
+highlight fine-grained details faithfully produced by PyraTok, such as the correct depiction of “two half eggs”
+in the ramen scene and realistic motion blur on pedestrians in the night-market prompt, illustrating PyraTok’s
+ability to accurately interpret and render subtle textual attributes in T2V generation. Discussion in B.4.
+
+
+
+                                                      31
+                                                                                                 E   DATASETS
+
+
+
+               OmniTokenizer             LARP               SweetTok             PyraTok
+
+
+
+
+               Sunlit Scandinavian living room with mid-century furniture, textured textiles,
+                abundant plants, airy composition, wide-angle lens, natural morning light,
+                                         HDR interior photography
+
+
+
+
+                Moody close-up of a glossy chocolate tart topped with edible gold bits on a
+                    dark slate plate, low-key lighting, shallow depth of field, pastry
+                                   photography, mouth-watering detail
+
+
+
+
+               Futuristic Mars spaceport at dusk, orange dusty sky, sleek starships docking,
+                crowds in futuristic attire, holographic signage, cinematic wide shot, high-
+                                              detail concept art
+
+
+
+
+                Action shot of a polar bear leaping between ice floes, frozen spray mid-air,
+                 crisp cold-blue color grading, high shutter-speed realism, editorial wildlife
+                                                 photography
+Figure 19: Text-to-video generation comparisons, showing a representative frame from each generated
+clip across a diverse set of prompts, including interior scenes, food close-ups, sci-fi concept art, and wildlife
+action. PyraTok consistently captures fine-grained details, accurate lighting, textures, object geometry, and
+scene composition, demonstrating strong prompt alignment and high-fidelity generation across varied visual
+domains. Discussion in B.4.
+
+
+                                                       32
+                                                                                            E   DATASETS
+
+
+
+
+    A 4k resolution drone video of a futuristic city skyline at night, flying between tall neon-lit
+   skyscrapers with cars moving far below. Aerial shot, high angle, bird’s-eye view. The camera
+ glides steadily across the city, revealing illuminated buildings and busy highways. Long-exposure
+                                    lighting, cinematic neon glow.
+
+
+
+
+    A 4k resolution cinematic video of a lone traveler wearing a cap walking through a foggy
+ forest at dawn. Captured in a high-angle shot with iridescent lighting, the slow panning camera
+               reveals trees swaying gently and birds gliding across the misty sky.
+Figure 20: Text-to-video generation results at 4K resolution using PyraTok, shown as representative
+frames from two distinct prompts. The first example depicts a futuristic neon-lit city captured by a flying
+drone, where PyraTok maintains crisp details, stable long-exposure lighting, and smooth camera motion.
+The second example illustrates a foggy forest at dawn featuring “a lone traveler wearing a cap.” Even though
+the person occupies only a tiny fraction of the scene, PyraTok accurately renders fine-grained details, such
+as the cap on the traveler’s head, demonstrating strong text-alignment and high-resolution consistency in
+large-scale, wide-angle video generation. Discussion in B.4.
+
+
+
+
+                                                    33
+                                                                                              E   DATASETS
+
+
+
+
+Figure 21: Qualitative comparison of single-frame reconstruction across diverse scenes, including
+underwater environments, fantasy landscapes, product renders, food close-ups, urban views, interview
+settings, night scenes, wildlife, mountain vistas, and natural textures. Each row shows outputs from one
+method for the same input frame, with red boxes highlighting fine details, such as small objects, textures,
+reflections, and thin structures, used to compare reconstruction fidelity, sharpness, and color consistency.
+PyraTok preserves fine details reliably and delivers consistent, high-quality reconstructions across all scene
+types. Discussion in B.5.
+
+
+                                                     34
+                                                                                            E   DATASETS
+
+
+
+
+SweetTok TokenFlow
+
+
+
+
+ LARP
+
+
+
+
+ PyraTok MotionAura
+
+
+Figure 22: Qualitative comparison of video reconstruction methods on a fast-moving dinosaur sequence
+containing dense foliage, small background animals, and detailed facial motions. Each row shows outputs
+from one method on the same frames. Red boxes highlight challenging regions such as vegetation, moving
+creatures, and fine facial details, where differences in sharpness, temporal coherence, and motion fidelity
+are most apparent. Discussion in B.5.
+
+
+
+
+                                                    35
+                                                                                                E   DATASETS
+
+
+
+
+TokenFlow
+
+
+
+
+SweetTok
+
+
+
+
+LARP
+
+
+
+
+MotionAura
+
+
+
+
+PyraTok
+
+Figure 23: Qualitative comparison of PyraTok with other video reconstruction methods on a dynamic
+café scene containing multiple people, complex indoor lighting, and detailed textures. Each row shows
+outputs from one method on the same frames. The scene highlights challenges such as preserving facial
+details, clothing patterns, reflections, and background structures, allowing visual comparison of reconstruction
+sharpness and temporal consistency. Details in B.5.
+
+
+
+
+                                                      36
+                                                                                         E   DATASETS
+
+
+
+
+SweetTok TokenFlow
+
+
+
+
+LARP
+
+
+
+
+MotionAura
+
+
+
+
+PyraTok
+
+Figure 24: Qualitative comparison of PyraTok with other video reconstruction methods on an indoor
+interview scene featuring expressive hand motions, detailed facial appearance, and complex background
+textures, revealing differences in preserving facial clarity, hand motion coherence, and fine background
+details such as books, fabrics, and stone textures. Details in B.5.
+
+
+
+
+                                                  37
+                                                                                            E   DATASETS
+
+
+
+
+TokenFlow
+
+
+
+
+SweetTok
+
+
+
+
+LARP
+
+
+
+
+MotionAura
+
+
+
+
+PyraTok
+
+
+Figure 25: Qualitative comparison of PyraTok with other video reconstruction methods on a workshop
+scene involving fast arm movements, reflective machinery, and detailed background clutter, highlighting
+differences in preserving motion clarity, fine textures on tools and equipment, and the stability of subtle
+visual details under rapid motion. Details in B.5.
+
+
+
+
+                                                    38
+                                                                                              E   DATASETS
+
+
+
+
+  MAGVITv2
+
+
+
+
+MAGVITv2
+
++PyraTok
+
+
+
+
+  MAGVITv2
+
+
+
+
+MAGVITv2
+
++PyraTok
+
+
+
+
+  MAGVITv2
+
+
+
+
+MAGVITv2
+
++PyraTok
+
+
+Figure 26: Comparison of video reconstruction quality when replacing the default MAGVIT-V2 [70]
+VAE with our PyraTok VAE. Each pair of rows shows frames generated by the original MAGVIT-V2 (top)
+and the enhanced MAGVIT-V2 + PyraTok configuration (bottom). Across diverse scenes, including arcade
+environments with complex lighting, close-up dough preparation, and detailed cooking sequences, PyraTok
+improves visual sharpness, color consistency, and fine-detail preservation, demonstrating its effectiveness as
+a drop-in VAE replacement for higher-quality video generation. Discussion in B.6.
+
+
+
+
+                                                     39
+                                                                                              E   DATASETS
+
+
+
+
+  OmniGenV2
+
+
+
+
+OmniGenV2
+
+ +PyraTok
+
+
+
+
+  OmniGenV2
+
+
+
+
+OmniGenV2
+
+ +PyraTok
+
+
+
+
+  OmniGenV2
+
+
+
+
+OmniGenV2
+
+ +PyraTok
+
+Figure 27: Comparison of video generation quality when replacing the default VAE of OmniGen-V2 [60]
+with our PyraTok VAE. For each scene, the top row shows frames produced by the original OmniGen-V2,
+while the bottom row shows frames from OmniGen-V2 + PyraTok. PyraTok improves texture sharpness,
+color fidelity, and fine-detail preservation, demonstrating its effectiveness as a universal, high-quality VAE
+substitute for diverse video generation pipelines. Discussion in B.6.
+
+
+
+
+                                                     40
+                                                                                          E   DATASETS
+
+
+
+
+  MotionAura
+
+
+
+
+MotionAura
+
+ +PyraTok
+
+
+
+
+  MotionAura
+
+
+
+
+MotionAura
+
+ +PyraTok
+
+
+
+
+  MotionAura
+
+
+
+
+MotionAura
+
+ +PyraTok
+
+Figure 28: Comparison of video generation quality when substituting the default VAE in Mo-
+tionAura [44] with our PyraTok VAE. For each example, the top row shows frames produced by the
+original MotionAura, while the bottom row shows results from MotionAura + PyraTok. Across kitchen scenes,
+outdoor human activity, and close-up liquid motion, PyraTok enhances sharpness, preserves fine textures,
+and improves temporal consistency—demonstrating its effectiveness as a high-quality VAE replacement for
+improving realism and detail in MotionAura-generated videos. Discussion in B.6.
+
+
+
+
+                                                  41
+

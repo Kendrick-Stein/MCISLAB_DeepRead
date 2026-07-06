@@ -1,0 +1,895 @@
+                                                    Dual-Agent Reinforcement Learning for Adaptive and Cost-Aware
+                                                                       Visual–Inertial Odometry
+
+                                                              Feiyang Pan1† , Shenghe Zheng2† , Chunyan Yin1∗ , Guangbin Dou1 *
+                                                                  1                        2
+                                                                    Southeast University      Harbin Institute of Technology
+                                                                                               230238437@seu.edu.cn
+
+
+
+
+arXiv:2511.21083v2 [cs.RO] 17 Mar 2026
+                                                                   Abstract                                     denied environments, as well as real-time 6-DoF tracking
+                                                                                                                for AR[10, 15, 28]. Visual-Inertial Odometry (VIO) has be-
+                                             Visual-Inertial Odometry (VIO) is a critical component             come a dominant paradigm, fusing visual and inertial data
+                                         for robust ego-motion estimation, enabling foundational ca-            to deliver high-frequency, metrically scaled pose estimates.
+                                         pabilities such as autonomous navigation in robotics and               A typical VIO pipeline processes high-rate IMU measure-
+                                         real-time 6-DoF tracking for augmented reality. Exist-                 ments (via pre-integration) and low-rate visual frames (for
+                                         ing methods face a well-known trade-off: filter-based ap-              feature tracking), which are then reconciled by a backend
+                                         proaches are efficient but prone to drift, while optimization-         estimator into a single coherent state.
+                                         based methods, though accurate, rely on computationally                    The backend estimator for this reconciliation has his-
+                                         prohibitive Visual-Inertial Bundle Adjustment (VIBA) that              torically been dominated by two paradigms. Filter-based
+                                         is difficult to run on resource-constrained platforms. Rather          approaches[4, 20, 22] offer high computational efficiency
+                                         than removing VIBA altogether, we aim to reduce how of-                for real-time deployment, but their accuracy is sub-optimal
+                                         ten and how heavily it must be invoked. To this end, we                due to linearization errors and noise accumulation. Con-
+                                         cast two key design choices in modern VIO, when to run the             versely, optimization-based methods achieve superior accu-
+                                         visual frontend and how strongly to trust its output, as se-           racy by performing non-linear Visual-Inertial Bundle Ad-
+                                         quential decision problems, and solve them with lightweight            justment (VIBA)[7, 29, 30, 38]. However, the substan-
+                                         reinforcement learning (RL) agents. Our framework intro-               tial computational burden of this backend VIBA optimiza-
+                                         duces a lightweight, dual-pronged RL policy that serves as             tion makes it challenging to deploy on resource-constrained
+                                         our core contribution: (1) a Select Agent intelligently gates          edge devices . Recent advancements in deep learning (DL)
+                                         the entire VO pipeline based only on high-frequency IMU                have attempted to alleviate this trade-off. However, end-to-
+                                         data; and (2) a composite Fusion Agent that first estimates            end DL models[1, 14, 33], while novel, still exhibit lim-
+                                         a robust velocity state via a supervised network , before an           itations in precision and generalization compared to ma-
+                                         RL policy adaptively fuses the full (p, v, q) state. Experi-           ture optimization frameworks. Hybrid methods have also
+                                         ments on the EuRoC MAV and TUM-VI datasets show that,                  emerged, integrating learned components for robustness[18,
+                                         in our unified evaluation, the proposed method achieves a              27]. While promising, these hybrid approaches are still
+                                         more favorable accuracy–efficiency–memory trade-off than               ultimately constrained by the exact same computational
+                                         prior GPU-based VO/VIO systems: it attains the best aver-              VIBA bottleneck they build upon . As a result, the accu-
+                                         age ATE while running up to 1.77× faster and using less                racy–efficiency trade-off remains a practical challenge for
+                                         GPU memory. Compared to classical optimization-based                   real-time VIO on resource-constrained platforms.
+                                         VIO systems, our approach maintains competitive trajec-                    Rather than attempting to remove VIBA altogether, our
+                                         tory accuracy while substantially reducing computational               goal is to reduce how often and how heavily it must be in-
+                                         load.                                                                  voked. To this end, we focus on two key design choices in
+                                                                                                                modern VIO: (i) when to run the visual frontend, and (ii)
+                                                                                                                how strongly to trust its output relative to IMU-based prop-
+                                         1. Introduction                                                        agation. We view these choices not as fixed heuristics or
+                                                                                                                implicit byproducts of an optimizer, but as explicit sequen-
+                                         Accurate, robust, real-time ego-motion estimation is funda-
+                                                                                                                tial decisions. Casting them as a decision process naturally
+                                         mental for autonomous systems, underpinning navigation
+                                                                                                                leads to a reinforcement learning (RL) formulation: a policy
+                                         for mobile robots, UAVs, and self-driving cars in GPS-
+                                                                                                                can learn, from data, to trigger costly VO updates only when
+                                           * Corresponding Author(gdou@seu.edu.cn). † Equal Contribution.       needed and to adapt fusion weights according to motion in-
+
+
+                                                                                                            1
+                                                                       In our unified evaluation, it achieves a better accu-
+                                                                       racy–throughput–memory trade-off than prior GPU-based
+                                                                       VO/VIO systems and remains competitive with classical
+                                                                       optimization-based VIO methods.
+
+                                                                       2. Related Works
+                                                                       2.1. Classical VIO Paradigms
+                                                                       Classical VIO approaches are largely divided into two
+                                                                       paradigms. Filter-based methods, such as the seminal
+                                                                       MSCKF[22] and ROVIO[4], are highly computationally
+                                                                       efficient, but their accuracy is often sub-optimal due to
+                                                                       linearization errors and noise accumulation. Conversely,
+                                                                       optimization-based methods[30, 38, 39], popularized by
+                                                                       VINS-Mono[29] and advanced by systems like ORB-
+                                                                       SLAM3[7], achieve state-of-the-art accuracy by performing
+                                                                       non-linear Visual-Inertial Bundle Adjustment (VIBA). This
+Figure 1. The accuracy-efficiency trade-off in VIO. (a) The tra-
+ditional tightly-coupled VIO framework, which relies on a mono-
+                                                                       superior precision, however, comes at the cost of a signifi-
+lithic and computationally expensive Visual-Inertial Bundle Ad-        cant computational burden, which remains a primary bottle-
+justment (VIBA) block. (b) Our proposed decoupled RL-based             neck for deployment on resource-constrained edge devices.
+framework. We mitigate the VIBA bottleneck by introducing two          Our work aims to resolve this fundamental trade-off.
+intelligent agents.
+                                                                       2.2. Deep Learning in VO/VIO
+                                                                       The advent of deep learning (DL) has inspired two new
+tensity and visual reliability. As depicted in Figure 1(b),            VIO paradigms. End-to-end systems, such as VINet[14],
+we introduce a novel, dual-pronged RL policy . This policy             BotVIO[41] and SelfVIO[1], attempt to regress ego-motion
+features a Select Agent that learns an intelligent scheduling          directly from raw sensor inputs, but have generally strug-
+policy; crucially, it makes an a prior decision based purely           gled to match the precision and generalization of clas-
+on high-frequency IMU data, allowing it to skip the entire             sical methods[19]. Consequently, a hybrid paradigm
+costly VO pipeline on redundant frames. This is comple-                has emerged, integrating DL modules into traditional
+mented by a composite Fusion Agent that first employs a                pipelines[5, 43]. Works like iSLAM[18] and DPVO[36] use
+supervised network (MLP1) to estimate a robust velocity                learned components to enhance feature matching or back-
+state, after which its core RL policy (MLP2) learns to adap-           end optimization[27, 35]. Several methods, such as RNIN-
+tively fuse the full (p, v, q) state. This dual-RL approach            VIO [12] and CoVIO[37] learn inertial or fusion compo-
+mitigates the monolithic, costly VIBA with a flexible, low-            nents on large-scale driving datasets and and evaluate pri-
+overhead, and intelligent decision-making process, thereby             marily on KITTI outdoor benchmarks[24]. More closely
+mitigating the primary computational bottleneck. In sum-               related to our setting, adaptive visual-modality selection ap-
+mary, the main contributions of this work can be summa-                proaches [27, 42] dynamically re-weight visual and iner-
+rized as follows:                                                      tial cues inside deep VIO pipelines to improve robustness.
+• We cast two key VIO design problems, VO scheduling                   However, these methods operate at the feature or latent rep-
+and visual–inertial fusion, as sequential decision tasks and           resentation level and still run the visual encoder on every
+solve them with lightweight RL agents. Instead of replac-              frame, targeting accuracy and adaptivity rather than explic-
+ing the VO backend, this formulation learns a long-horizon,            itly optimizing compute. In contrast, we target fully 6-DoF
+cost-aware policy that reduces the reliance on heavy VIBA.             MAV and handheld scenarios with aggressive motion, and
+• We design a dual-agent RL architecture consisting of (i)             introduce a cost-aware decision layer on top of a VO back-
+an IMU-only Select Agent that reduces computational load               end that (i) makes IMU-only scheduling decisions before
+by deciding when to run the entire VO pipeline, and (ii)               any visual computation and (ii) learns fusion weights that
+a composite Fusion Agent that combines a supervised ve-                jointly account for motion, VO reliability, and computa-
+locity estimator with an RL-based full-state fusion policy,            tional budget.
+improving the accuracy–efficiency trade-off.
+• We validate our framework on the EuRoC MAV and
+                                                                       2.3. Reinforcement Learning in VO/VIO
+TUM-VI datasets, where it substantially reduces com-                   Reinforcement Learning (RL) has been successfully applied
+putational overhead while maintaining strong accuracy.                 to high-level robotics tasks like autonomous exploration[8,
+
+
+                                                                   2
+9, 13], and more recently, to low-level control within odom-          policy that decides whether to activate the high-cost Vi-
+etry pipelines. A highly relevant work by Messikom-                   sual Odometry (VO) module (Sec. 3.5). When invoked,
+mer et al. reframes Visual Odometry (VO) as a sequen-                 the DPVO-inspired VO backend outputs a sparse, high-
+tial decision-making task, using an RL agent within the               accuracy but non-metric pose Tk , which is converted to a
+VO pipeline to replace internal heuristics like keyframe              metric observation using a scale s recovered during initial-
+selection[25]. Our work differs in two key ways. First, we            ization (Sec. 3.6). The Fusion Agent (Sec. 3.6) then takes
+use RL not to tune internal VO heuristics given already-              the scaled pose, VO confidence, the IMU pre-integration re-
+                                                                                                          f
+computed visual features, but as a high-level, IMU-only               sult, and the previous fused pose Tk−1   to produce the final
+scheduler that decides whether to run the entire VO pipeline                  f
+                                                                      pose Tk . This fused pose is fed back to the state propaga-
+at a given time step. This allows the policy to skip the costly       tion module as the starting point for the next cycle, closing
+visual optimization component altogether when IMU in-                 the loop.
+tegration is sufficient, yielding much larger computational
+savings than decisions that are conditioned on image fea-             3.3. IMU Bias Estimator
+tures which have already been extracted. Second, we go                A high-fidelity IMU prediction is foundational to our frame-
+beyond pure VO and address the full visual–inertial fusion            work. We train a bias estimator rather than a signal de-
+problem: a second RL agent learns to adaptively fuse high-            noiser, as an estimator is more adept at modeling the dom-
+frequency IMU predictions with sparse VO updates using                inant, slowly-varying bias patterns and is less prone to
+uncertainty-aware state representations.                              overfitting[11, 23, 26]. Our architecture consists of two
+                                                                                                         g                        a
+                                                                      lightweight encoder networks, fbias      (for gyro) and fbias
+3. Method                                                             (for accelerometer). Each network ingests a window of raw,
+                                                                      noisy sensor data along with the sensor’s calibrated intrin-
+3.1. Motivation                                                       sic parameters (noise density and bias stability). The gyro
+                                                                                   g
+Our design is guided by three practical goals for improving           estimator fbias   inputs the raw angular velocity sequence
+the accuracy–efficiency trade-off in VIO.                             Ω̃ = {ω̃k } and its noise profile ng , outputting a single 3-
+    First, we aim to reduce reliance on tightly coupled                                                g                          a
+                                                                      axis gyro bias estimate b̂g = fbias (Ω̃, ng ). Similarly, fbias
+visual–inertial bundle adjustment (VIBA). While accu-                 inputs the raw acceleration sequence Ã = {ãk } and its
+rate, VIBA is expensive for resource-constrained platforms,                                                  a
+                                                                      noise profile na , outputting b̂a = fbias   (Ã, na ). Training
+whereas loosely coupled schemes with fixed-gain filters [2,           details in Appendix A.
+16] are efficient but cannot adapt well to changing motion            Pre-integration[17]. At inference, the pre-trained fbiasg
+                                                                                                                                  and
+and sensor conditions. Instead of using a fixed filter, we              a
+                                                                      fbias  networks are used to correct the raw IMU measure-
+introduce a learned fusion policy and cast fusion as a se-            ments between two consecutive camera frames (tk , tk+1 ).
+quential decision problem, enabling RL to optimize a long-            These corrected measurements, ω̂(k) and â(k), are then fed
+horizon, cost-aware policy.                                           into a standard IMU pre-integration process . This module’s
+    Second, we seek to avoid running the costly VO pipeline           final output, which is passed to the RL agents, consists of
+on redundant or uninformative frames. Existing keyframe               the relative motion ∆p, ∆q, ∆v and the estimated bias b̂
+selection strategies typically require image processing be-           for that interval. The detailed IMU pre-integration equa-
+fore deciding whether a frame is useful. In contrast, our Se-         tions are provided in Appendix B.
+lect Agent makes a priori scheduling decisions using only
+high-frequency IMU signals, allowing the system to skip               3.4. RL-based Computational Scheduling
+entire VO passes and save computation.                                We treat VO scheduling as a sequential decision problem
+    Third, our dual-agent strategy depends on accurate IMU            under uncertainty: activating the VO pipeline improves ac-
+state predictions. Because IMU integration is highly sen-             curacy but increases computation, while skipping it saves
+sitive to sensor bias, we introduce a dedicated IMU Bias              resources at the risk of drift. We therefore formulate
+Estimator network that provides pre-compensated inertial              scheduling as a Markov Decision Process (MDP) [3] and
+measurements as a reliable foundation for both the Select             learn a long-horizon, cost-aware observation policy via re-
+and Fusion agents.                                                    inforcement learning. During training, the Select Agent in-
+                                                                      teracts with a log-driven but closed-loop simulator.
+3.2. System Overview
+                                                                      • State Space (Ssel ): The Select Agent observes a com-
+Our overall framework, illustrated in Fig. 2, consists of             pact IMU-only state ssel                         vo
+                                                                                             t = {∆pt , ∆qt , ∆vt , ∆tt }, which
+four interacting modules. The IMU Preprocess module                   summarizes pose/velocity drift and the elapsed time since
+(Sec. 3.3) uses a Bias Encoder followed by pre-integration            the last VO update. This allows scheduling decisions to be
+to produce inter-frame inertial states (∆p, ∆q, ∆v, ∆t).              made purely from inertial signals, without computing any
+These states are fed to the Select Agent (Sec. 3.4), an RL            visual features.
+
+                                                                  3
+Figure 2. Overview of our proposed VIO pipeline. The system is composed of four decoupled modules: (1) IMU Preprocess, (2) Select
+Agent, (3) Visual Odometry, and (4) Fusion Agent. This framework leverages Reinforcement Learning to intelligently schedule and fuse
+sensor data, offering a highly computationally efficient alternative to traditional, tightly-coupled Visual-Inertial Bundle Adjustment.
+
+
+• Action Space (Asel ):          The action asel  t      ∈
+{0 (Skip VO), 1 (Run VO)} determines whether to in-
+voke the VO pipeline at time t. This binary design enables
+complete omission of the visual encoder on skipped
+frames, while still allowing adaptive activation when drift
+risk increases.
+• Reward Function (Rsel ): We combine a terminal, ATE-
+based objective with a dense per-step shaping term. At the                        Figure 3. Visual summary of initialization.
+end of each episode, we assign
+
+                              A                                           It then computes visual similarity (correlation) by com-
+               Repisode =           − B · Nf ,               (1)
+                            ATE + ϵ                                       paring the patch’s original features against the match-
+                                                                                                           ′
+                                                                          ing features Ftm sampled at P̂kt   .This correlation signal,
+where Nf is the number of VO calls in the episode, encour-                along with the context features Ftc , is fed into its re-
+aging low trajectory error with few VO invocations. During                current network, which outputs the 2D correction target
+rollouts, each step t additionally receives a small penalty               δkt ∈ R2 and a confidence weight Σkt ∈ R2 .
+that depends on the instantaneous pose error, which stabi-             3. Map Points: The Map Points (patches P) and the Poses
+lizes learning. We train the agent with PPO [32]; shaping                 (Tk ) form the set of variables to be optimized. The cor-
+coefficients, clipping ranges, and other hyperparameters are              rection targets (δ, Σ) define the factors in a factor graph,
+detailed in Appendix A.                                                   representing the optimization objective.
+                                                         sel
+• Policy Network: The Select Agent policy πsel (asel
+                                                   t | st )            4. Bundle Adjustment: This differentiable layer min-
+is parameterized by a small multi-layer perceptron (MLP).                 imizes the objective function defined by these fac-
+                                                                          tors, solving for the optimal pose and depth updates
+3.5. Visual Odometry Module                                               (∆T, ∆P):
+This module (Fig. 2) is activated only when the Select                                                                                   2
+Agent(Sec. 3.4) outputs asel
+                                                                                                 X
+                                                                                                                            ′
+                         t = 1. Its architecture is heavily               ∆T, ∆P = arg min               ω̂it (T, Pk ) − [P̂kt + δkt ]
+inspired by the patch-based, recurrent optimization princi-                                                                              Σkt
+                                                                                                 (k,t)
+ples of Deep Patch Visual Odometry (DPVO)[36]. The                                                                             (2)
+process, following our system diagram, is as follows:                     The final optimized pose zVt = Tinit
+                                                                                                           t   · ∆T  serves as the
+1. Feature Encoder: A CNN processes the input image It                 high-accuracy observation for our fusion policy.
+   to extract dense feature maps , which are used for both
+   context and matching.                                               3.6. RL-based Adaptive Fusion
+2. Correction Predictor: This module takes the feature                 We fuse high-rate IMU state propagation with sparse, high-
+   maps from the Feature Encoder and the current state                 accuracy VO. To resolve the monocular scale ambiguity, a
+   (poses T, patch depths P) as input. It first reprojects             single global scale is estimated at start-up before fusion pro-
+                   ′
+   patch centers P̂kt = ωit (T, Pk ) into the current frame.           ceeds.
+
+
+                                                                   4
+1. System Initialization (R, T, S). We first align the world                   Policy Formulation (for MLP2): We model the fusion
+frame W with the initial IMU body frame b0 , setting pw   0 =               process as a Markov Decision Process, where each fusion
+0 and aligning the z-axis with the measured gravity g. This                 step influences future drift and uncertainty. The state stacks
+fixes the initial pose (Rw     w
+                          0 , T0 ).                                         VO and IMU pose/velocity estimates together with confi-
+   To estimate the metric scale s and the initial body-frame                dence cues, where VO confidence is derived from parallax
+velocities vbwk , we adapt the linear initialization of VINS-               and backend residuals and IMU confidence from the bias
+Mono. Over a sliding window of n keyframes (Fig. 3), we                     estimator and the integration horizon since the last VO up-
+collect IMU pre-integrations (α, β) and VO-derived rela-                    date. The policy outputs per-axis fusion weights
+                    (k,k+1)
+tive translations pvo       .
+                                                                                w = [wpx , wpy , wpz , wvx , wvy , wvz , wq ] ∈ [0, 1]7 ,
+   The metric IMU propagation provides
+                                                                            Each component is interpreted as the VO mixing weight and
+           vbwk+1 = vbwk − gw ∆tk + Rw⊤
+                                     bk β k,k+1 ,                (3)
+                                                                            we use a convex per-axis blend: the IMU weight is 1 − w
+  pw       w     w        1 w   2    w⊤                                     for the same axis. Let Wp = diag(wpx , wpy , wpz ) and
+   bk+1 = pbk + vbk ∆tk − 2 g ∆tk + Rbk αk,k+1 . (4)
+                                                                            Wv = diag(wvx , wvy , wvz ). Then
+Camera pose from IMU via extrinsics. We obtain the cam-
+era orientation in the world, Rw     ck , from the IMU-derived              pk = Wp pVO          I
+                                                                                     k +(I−Wp ) pk ,         vk = Wv vkVO +(I−Wv ) vkI ,
+body orientation Rw   bk using   the fixed camera–IMU extrin-                                                                   
+sics (Rbc , tbc ) (body w.r.t. camera):                                     and orientation is updated via slerp qkI , qkVO , wq to pre-
+                    ⊤
+                                                                            serve quaternion normalization[34]. When VO is skipped,
+         Rw     w
+          ck = Rbk Rbc ,          pw     w     w
+                                   ck = pbk + Rbk tbc .                     w defaults to zero and the system relies purely on IMU
+The extrinsics are obtained offline (e.g., Kalibr) and kept                 propagation. The reward encourages long-term consistency
+fixed during all experiments.                                               rather than per-step accuracy, formulated as:
+Scale–translation coupling. Relating IMU-propagated po-                                  rk = −∥pk − pgt ∥22 − λ Tr(Σk )                    (7)
+sitions to scaled VO translations gives the body–to–body
+displacement:                                                                   The first term drives the agent to reduce trajectory er-
+                                                                            ror, while the trace penalty discourages overconfident yet
+  pw        w      w     (k,k+1)
+                                   + Rw         w
+                                                  
+    bk+1 − pbk = Rck s pvo             ck+1 − Rck tbc . (5)                 inaccurate updates by penalizing large predicted uncer-
+Substituting (4) yields, for each pair (k, k + 1), the linear               tainty. Σk denotes a low-cost approximation of the fused-
+constraint                                                                  state uncertainty, constructed from the IMU residual stan-
+                                                          1 w     2         dard deviation σkimu and VO confidence cvo   k as Σk =
+  Rw  ck pvo
+            (k,k+1)
+                        s − ∆tk I vbwk = Rw⊤bk αk,k+1 − 2 g ∆tk             αdiag((σkimu )2 ) + diag((1 − cvo  2
+                                                                                                            k ) ).
+                                           − Rw            w
+                                                             
+                                                 ck+1 − Rck tbc .               Training Protocol: We adopt a two-stage training
+                                                                  (6)       scheme: MLP1 is trained under supervision, and MLP2 is
+    Stacking (3)–(6) over n keyframes forms an over-                        initialized with a supervised fusion loss before PPO fine-
+determined linear system HX = b with X =                                    tuning. The PPO fine-tuning is performed on real-world
+[vbw0 , . . . , vbwn , s]⊤ . We solve it in least squares to obtain a       trajectories (EuRoC, TUM-VI) in a Gym-style replay envi-
+single global metric scale s. Subsequently, all VO poses are                ronment, where recorded IMU–VO pairs are replayed step-
+scaled by s and aligned with the IMU-derived orientation                    by-step to compute fusion rewards. This setup inherently
+before entering the fusion pipeline.                                        captures real sensor drift and noise, eliminating the need
+2. RL-based Adaptive Fusion Policy The Fusion Agent                         for synthetic domain randomization.
+addresses the challenge of dynamically balancing high-
+rate inertial propagation and low-rate visual updates. Un-                  4. Experiment
+like static fusion schemes, it learns a long-term policy that
+adapts the sensor weighting according to the evolving un-                   4.1. Experimental Setup
+certainty and motion dynamics.                                              Datasets. Our visual net is first pre-trained on the large-
+    The module consists of three components: (1) MLP1                       scale synthetic TartanAir dataset [40]. To adapt to real-
+(VO Velocity Estimator): a supervised network that esti-                    world sensor characteristics, we fine-tune the IMU Bias
+mates metric velocity from scaled VO poses and IMU pre-                     Estimator and both RL agents on a single validation se-
+integration. (2) State Propagation: a deterministic module                  quence from each dataset (MH 01 in EuRoC[6], Corridor 4
+that propagates the last fused state forward using IMU pre-                 in TUM-VI[31]) and evaluate on all remaining sequences
+integration and estimated velocity. (3) MLP2 (Adaptive Fu-                  without further tuning. All datasets used for training and
+sion Policy): an RL agent that learns to weigh the IMU pre-                 evaluation are publicly available.
+diction against the VO observation to maximize long-term                    Evaluate Metrics. We evaluate our method against base-
+estimation consistency.                                                     lines using three key criteria:
+
+
+                                                                        5
+Table 1. Comparison with traditional CPU-based monocular visual-inertial odometry systems on the EuRoC MAV dataset. We report the
+SE(3)-aligned RMSE ATE (m). The Scale Error (%) row for our method reports the percentage error of our initial scale estimation.
+
+     Method                 MH2       MH3      MH4       MH5        V11      V12       V13      V21       V22      V23        Avg
+     MSCKF[22]               0.45      0.23     0.37     0.48        0.34   0.20       0.67      0.10     0.16     1.13       0.413
+     OKVIS[21]               0.37      0.25     0.27     0.39       0.094   0.14       0.21     0.090     0.17     0.23       0.221
+     ROVIO[4]                0.25      0.25     0.49     0.52        0.10   0.10       0.14      0.12     0.14     0.14       0.225
+     VINS-MONO[29]           0.15      0.22     0.32      0.30      0.079   0.11       0.18     0.080     0.16     0.27       0.187
+     VI-DSO[39]             0.044     0.117    0.132     0.121      0.059   0.067      0.096    0.040     0.062    0.174      0.091
+     DM-VIO[38]             0.044     0.097    0.102     0.096      0.048   0.045      0.069    0.029     0.050    0.114      0.069
+     ORB-SLAM3[7]           0.037     0.046    0.075     0.057      0.049   0.015      0.037    0.042     0.021    0.027      0.041
+     Ours                   0.064     0.119    0.112     0.112      0.047   0.125      0.073    0.055     0.036    0.179      0.092
+     Scale Error (%)         1.1       1.5      1.4       1.4        0.1     1.1        1.5      0.8       0.5      1.7        1.11
+
+
+Table 2. Comparison with traditional CPU-based monocular vi-            Table 3. CPU-side breakdown per keyframe on EuRoC. BA/VIBA
+sual–inertial odometry systems on the TUM-VI dataset. We report         runs on CPU for all methods.
+SE(3)-aligned RMSE ATE (m). For each scene type, the value
+is the average over the three corresponding sequences (1–3); full                              ORB-SLAM3          DM-VIO              Ours
+per-sequence results are provided in the Appendix D.
+                                                                        Tracking               23.22 (CPU)      10.34 (CPU)     9.83 (GPU)
+                                                                        BA/VIBA (CPU)             121.09           26.49           12.77
+   Seq             VINS      OKVIS      DM-VIO         Ours             Mapping excl. BA       70.41(CPU)       27.18(CPU)      32.15(GPU)
+   Corr(1-3)        1.05      0.46         0.30        0.38             Total (ms)               214.72            64.01            54.75
+   Mag(1-3)         1.90      2.48         2.09        1.96             %BA of total              56%              41%              23%
+   Room(1-3)       0.083      0.24        0.083        0.10
+   Slide(1-3)       0.74      1.86         0.59        0.74
+   Avg              0.94      1.22        0.77         0.80               LAM and DPVO. These serve as our direct peers, as they
+                                                                          operate on the same GPU hardware. This comparison is
+                                                                          benchmark for evaluating overall performance, including
+• Accuracy: We report the Absolute Trajectory Error                       accuracy, throughput, and resource consumption.
+  (ATE) in meters. This is computed after aligning the es-              All baseline results are obtained by running their publicly
+  timated trajectory with the ground truth using an SE(3)               available, open-source implementations on our evaluation
+  similarity transformation. We also report the final Scale             hardware to ensure a consistent and fair comparison.
+  Error to evaluate the accuracy of our initialization.                 Hardware. All experiments are conducted on a uniform
+• Efficiency: We report the average Throughput (FPS),                   platform. GPU-based methods are benchmarked on an
+  this metric is computed as the total number of image                  NVIDIA RTX 3090 GPU. CPU-based methods are bench-
+  frames divided by the total runtime (in seconds).                     marked on dual Intel Xeon Platinum 8260 processors. Anal-
+• Resources: For our method and other deep learning-                    ysis of deployment feasibility in Appendix C.
+  based baselines, we report the peak GPU Memory
+  (VRAM) usage in Gigabytes. This is a critical metric                  4.2. Accuracy and Computational Analysis
+  for evaluating the feasibility of deployment on resource-             We first evaluate the final trajectory accuracy of our frame-
+  constrained edge devices.                                             work to demonstrate that our decoupled architecture can
+Baselines. We evaluate our method against two distinct cat-             compete with state-of-the-art (SOTA) classical VIO meth-
+egories of state-of-the-art baselines, each serving a specific          ods. In Table 1 and 8, we compare the Absolute Trajectory
+evaluation purpose:                                                     Error (ATE) [m] of our method against the baselines on the
+• Classical VIO (CPU-based):              We select high-               EuRoC and TUM-VI dataset.
+  performance, CPU-based methods such as VINS-Mono                         The results clearly indicate that our framework’s accu-
+  and ORB-SLAM3. Our comparison is intended to                          racy significantly surpasses filter-based approaches. Crit-
+  benchmark our final accuracy and honestly evaluate the                ically, when compared against optimization-based SOTA,
+  trade-offs made to achieve high efficiency.                           our method makes a clear trade-off: it does not match the
+• GPU-Based VIO (Learning-based): We compare                            gold-standard precision of systems like ORB-SLAM3, but
+  against leading deep learning-based methods, such as iS-              it achieves an accuracy level comparable to other estab-
+
+
+                                                                    6
+lished optimization methods like DM-VIO. This demon-
+strates that our decoupled architecture, which mitigates the
+monolithic VIBA, can achieve a robust and effective level of
+accuracy, positioning it as a strong candidate for high-speed
+applications.
+    To examine the bottleneck fairly, we separate CPU and
+GPU timings. For all methods, BA/VIBA is measured on
+CPU only under the same CPU setup. Our approach uses                               (a)                              (b)
+a GPU front-end, which is reported separately. Table 3 re-
+ports the CPU-side breakdown: compared to ORB-SLAM3                  Figure 4. Ablation study for the IMU Bias Estimator. (a) Com-
+and DM-VIO, our method lowers the CPU BA/VIBA time                   pares final ATE with different bias components enabled. (b) Com-
+from 121.09→12.77 ms and 26.49→12.77 ms. This indi-                  pares ATE for different bias output strategies.
+cates a structural reduction in optimization load. The to-
+tal time includes GPU front-end where applicable; a device
+ledger is provided to keep the accounting transparent.
+
+4.3. Efficiency and Resource Comparison
+To conduct a fair evaluation of our system’s efficiency, we
+now benchmark our framework against leading GPU-based
+VIO/VO methods. Several recent methods [12, 37, 42]
+                                                                         Figure 5. Training curve of the Select Agent using PPO.
+are trained and evaluated primarily on large-scale driving
+benchmarks with ground-vehicle motion priors, and their
+released models are tailored to those settings. In our prelim-       relies on high-fidelity IMU predictions , we first validate our
+inary test, directly applying the official VS-VIO model [42]         IMU Bias Estimator (Sec. 3.3). We created a test set of 100
+to EuRoC caused much larger ATE than both classical VIO              5-second trajectory segments from EuRoC. In Figure 4a, we
+and our method (see Appendix D), highlighting the severe             compare four estimator configurations on two metrics: pure
+domain gap. We treat these driving-focused methods as                IMU strapdown ATE (on the 5s clips) and final framework
+conceptually related but do not include them as main nu-             ATE. The No Bias Est baseline suffers from severe drift,
+merical baselines on EuRoC/TUM-VI.                                   while our full model (Omega + Accel) achieves the low-
+   Among the GPU-based methods we re-evaluate on Eu-                 est ATE in both tests. This confirms that estimating both
+RoC, our approach achieves the best average accuracy,                gyro and accelerometer biases is necessary for high-fidelity
+the highest throughput, and the lowest VRAM usage Ta-                prediction and final system accuracy. We also validate our
+ble 4. Our framework delivers a significantly higher aver-           design choice of estimating a Fixed Bias (Sec. 3.3) versus a
+age throughput of 39 FPS, which is 1.77 times faster than            general Random Noise model. As shown in Figure 4b, the
+DPVO. This comprehensive improvement that achieves                   Fixed Bias model yields a lower final framework ATE.
+higher accuracy and higher speed simultaneously is a direct          Ablation on RL-based Computational Scheduling. As
+consequence of our Select Agent. Unlike methods that pro-            shown in Fig. 5, the PPO-trained Select Agent converges
+cess every incoming frame or use a fixed skip-rate, our RL           stably, with the mean episodic reward improving consis-
+policy learns to avoid redundant computation. This drasti-           tently over 1M timesteps. We analyze our Select Agent with
+cally improves the average frame processing time without             two studies and introduce a strong RL baseline.
+sacrificing trajectory accuracy. Furthermore, this efficiency            (1) Policy vs. Fixed/Heuristic vs. RL-gating (KF).
+extends to resource consumption. Our method consumes                 Beyond fixed-step skipping and heuristic gating, we imple-
+only 4.37GB of VRAM, representing a 45.2% reduction                  ment an RL-gating(KF) baseline that uses IMU+visual in-
+compared to the memory-intensive DROID-VO.                           puts (I+V) to decide keyframe updates, mirroring keyframe-
+   These results indicate that our RL-based architecture             scheduling ideas in prior work. For fairness, all sched-
+offers a favorable accuracy–throughput–memory trade-                 ulers operate at similar average skip ratios (∼50%, ∼75%,
+off, making it a promising candidate for deployment on               ∼87.5%) by adjusting the reward coefficients in Eq. 1,
+resource-constrained platforms.                                      and are trained under the same budget. As shown in
+                                                                     Fig. 6a, accuracy at 50% skip is comparable across learned
+4.4. Ablation Study
+                                                                     policies, but with aggressive skipping (75–87.5%) our
+We now perform a series of ablation studies to validate the          IMU-only prior scheduling maintains a flatter degradation
+design choices of our framework.                                     curve than heuristic gating and remains competitive with
+Validation of IMU Bias Estimator. As our RL framework                RL-gating(KF). This indicates the learned policy captures
+
+
+                                                                 7
+Table 4. Efficiency and resource comparison with SOTA GPU-based VO/VIO methods on the EuRoC MAV dataset. We report SE(3)-
+aligned RMSE ATE (m) for VIO, Sim(3) for VO, average throughput (FPS), and peak GPU VRAM usage (GB).
+
+Method          MH2      MH3       MH4      MH5        V11      V12        V13      V21       V22       V23      Avg      FPS      VRAM
+DPVO[36]        0.055    0.158     0.137    0.114     0.050    0.140      0.086    0.057     0.049     0.211    0.106      22       4.92
+iSLAM[18]       0.460    0.363     0.936    0.478     0.355    0.391      0.301    0.452     0.416     1.133    0.529      31       6.47
+DROID[35]       0.121    0.242     0.399    0.270     0.103    0.165      0.158    0.102     0.115     0.204    0.188      14       8.63
+Ours            0.064    0.119     0.112    0.112     0.047    0.125      0.073    0.055     0.036     0.179    0.092      39       4.37
+
+
+                                                                             Table 5. Ablation study on the Adaptive Fusion Agent.
+
+                                                                         Experiment                        Method            ATE (m) ↓
+                                                                                                       Heuristic Fusion           0.143
+                                                                         Strategy Comparison             EKF Fusion               0.127
+                                                                                                       Ours (RL Agent)            0.112
+                                                                                                     DROID-VO (Baseline)          0.399
+                                                                         Generalization
+                                                                                                      DROID-VO + Ours             0.237
+              (a)                               (b)
+
+Figure 6. Ablation study for the Select Agent (a) ATE vs. skip          Table 6. Robustness to visual degradations on EuRoC MH 04. 5%
+ratio comparing our IMU-only prior scheduling, fixed skipping,          / 10% of images are replaced by blurred, noise-corrupted versions.
+heuristic gating, and the RL-gating(KF) baseline (b) Throughput
+under a 50% skip target: IMU-only prior scheduling attains higher              Method          Clean     +5% blur       +10% blur
+FPS than RL-gating(KF) with only a marginal ATE increase.
+                                                                               DPVO [36]       0.137       0.174          0.192
+                                                                               Ours            0.112       0.138          0.153
+
+motion-dependent uncertainty and selectively activates VO
+without relying on visual features at decision time.
+                                                                        4.5. Robustness to Visual Degradations
+   (2) IMU-only vs.RL-gating (KF)[25] efficiency.
+Fig. 6b compares throughput under a 50% average skip                    To assess robustness under visual quality deterioration, we
+target. Our IMU-only policy yields substantially higher                 synthetically corrupt the EuRoC MH 04 sequence by ran-
+FPS because it avoids feature extraction during scheduling,             domly replacing 5% and 10% of images with blurred ver-
+while its ATE increase remains marginal (< 3% in our                    sions with added Gaussian noise, while keeping the IMU
+setting). Thus, adding visual inputs provides limited incre-            stream unchanged. The same corruption pattern is used for
+mental information for long-horizon scheduling yet incurs               both methods. As reported in Table 6, the ATE of DPVO in-
+nontrivial compute, whereas IMU-only prior decisions                    creases from 0.137 m on the clean sequence to 0.174 m and
+preserve accuracy–latency trade-offs more efficiently.                  0.192 m under 5% and 10% blur, respectively. Our method
+                                                                        also experiences some degradation, but consistently main-
+Ablation on RL-based Adaptive Fusion.
+                                                                        tains lower absolute error, indicating that the learned Se-
+    On MH 04, we ablate the Fusion Agent by comparing                   lect and Fusion agents help the system remain accurate even
+three strategies: (i) a Heuristic Fusion baseline with a fixed          when a fraction of visual observations becomes unreliable.
+0.9 weight on VO, (ii) an EKF Fusion baseline, and (iii) our
+RL-trained agent. As shown in Table 5, the RL agent con-
+sistently yields the lowest ATE, suggesting that PPO fine-
+                                                                        5. Conclusion
+tuning by directly optimizing the long-horizon drift reward             We presented a dual-agent RL-based VIO framework that
+in Eq. 7 learns context-dependent fusion weights that adapt             reduces reliance on VIBA through learned VO scheduling
+to motion and VO confidence.                                            and adaptive visual–inertial fusion. Evaluations on EuRoC
+   We further reuse the same Fusion Agent with a different              and TUM-VI show that our method maintains competi-
+VO frontend, DROID-VO, and again observe a substantial                  tive accuracy while achieving higher throughput (1.77× vs.
+ATE reduction (Table 5). This indicates that the learned                DPVO) and a 9.5× reduction in average backend cost com-
+policy generalizes across VO backends, as its state–action              pared to ORB-SLAM3. Future work will further weaken
+definition depends only on physical quantities rather than              the dependence on optimization backends and study robust-
+architecture-specific features.                                         ness under extrinsic miscalibration and severe VO outages.
+
+
+                                                                    8
+References                                                                      sequence-to-sequence learning problem. In Proceedings of
+                                                                                the AAAI conference on artificial intelligence, 2017. 1, 2
+ [1] Yasin Almalioglu, Mehmet Turan, Muhamad Risqi U Sa-
+                                                                           [15] Shaveta Dargan, Shally Bansal, Munish Kumar, Ajay Mittal,
+     putra, Pedro PB De Gusmão, Andrew Markham, and Niki
+                                                                                and Krishan Kumar. Augmented reality: A comprehensive
+     Trigoni. Selfvio: Self-supervised deep monocular visual–
+                                                                                review. Archives of Computational Methods in Engineering,
+     inertial odometry and depth estimation. Neural Networks,
+                                                                                30(2), 2023. 1
+     150:119–136, 2022. 1, 2
+                                                                           [16] Christian Forster, Matia Pizzoli, and Davide Scaramuzza.
+ [2] Hujun Bao, Weijian Xie, Quanhao Qian, Danpeng Chen,
+                                                                                Svo: Fast semi-direct monocular visual odometry. In 2014
+     Shangjin Zhai, Nan Wang, and Guofeng Zhang. Robust
+                                                                                IEEE International Conference on Robotics and Automation
+     tightly-coupled visual-inertial odometry with pre-built maps
+                                                                                (ICRA), pages 15–22, 2014. 3
+     in high latency situations. IEEE Transactions on Visualiza-
+                                                                           [17] Christian Forster, Luca Carlone, Frank Dellaert, and Davide
+     tion and Computer Graphics, 28(5):2212–2222, 2022. 3
+                                                                                Scaramuzza. Imu preintegration on manifold for efficient
+ [3] R Bellman. A markovian decision process. Indiana Univer-                   visual-inertial maximum-a-posteriori estimation. Robotics:
+     sity Mathematics Journal, 6(4):15, 1957. 3                                 Science and Systems (RSS) conference, 2015. 3
+ [4] Michael Bloesch, Sammy Omari, Marco Hutter, and Roland                [18] Taimeng Fu, Shaoshu Su, Yiren Lu, and Chen Wang. islam:
+     Siegwart. Robust visual inertial odometry using a direct ekf-              Imperative slam. IEEE Robotics and Automation Letters, 9
+     based approach. IEEE, pages 298–304, 2015. 1, 2, 6                         (5):4607–4614, 2024. 1, 2, 8
+ [5] Michael Bloesch, Jan Czarnowski, Ronald Clark, Stefan                 [19] Liming Han, Yimin Lin, Guoguang Du, and Shiguo Lian.
+     Leutenegger, and Andrew J Davison. Codeslam—learning                       Deepvio: Self-supervised deep learning of monocular vi-
+     a compact, optimisable representation for dense visual slam.               sual inertial odometry using 3d geometric constraints. 2019
+     In Proceedings of the IEEE conference on computer vision                   IEEE/RSJ International Conference on Intelligent Robots
+     and pattern recognition, pages 2560–2568, 2018. 2                          and Systems (IROS), pages 6906–6913, 2019. 2
+ [6] Michael Burri, Janosch Nikolic, Pascal Gohl, Thomas                   [20] R. E. Kalman. New results in linear filtering and prediction
+     Schneider, Joern Rehder, Sammy Omari, Markus Achte-                        theory. J.basic Eng.asme Trans.ser.d, 83(83):109, 1961. 1
+     lik, and Roland Siegwart. The euroc micro aerial vehicle              [21] Stefan Leutenegger, Paul Timothy Furgale, Vincent Rabaud,
+     datasets. The International Journal of Robotics Research,                  Margarita Chli, Kurt Konolige, and Roland Y. Siegwart.
+     35, 2016. 5                                                                Keyframe-based visual-inertial slam using nonlinear opti-
+ [7] Carlos Campos, Richard Elvira, Juan J Gómez Rodrı́guez,                   mization. In Robotics: Science and Systems, 2013. 6
+     José MM Montiel, and Juan D Tardós. Orb-slam3: An                   [22] Mingyang Li and Anastasios I. Mourikis. High-precision,
+     accurate open-source library for visual, visual–inertial, and              consistent ekf-based visual–inertial odometry. International
+     multimap slam. IEEE transactions on robotics, 37(6):1874–                  Journal of Robotics Research, 32(6):690–711, 2013. 1, 2, 6
+     1890, 2021. 1, 2, 6                                                   [23] Feng Liu, Hongyu Ge, Dan Tao, Ruipeng Gao, and Zhang
+ [8] Yuhong Cao, Rui Zhao, Yizhuo Wang, Bairan Xiang, and                       Zhang.      Smartphone-based pedestrian inertial tracking:
+     Guillaume Sartoretti. Deep reinforcement learning-based                    Dataset, model, and deployment. IEEE Transactions on In-
+     large-scale robot exploration. IEEE Robotics and Automa-                   strumentation and Measurement, 73:1–13, 2024. 3
+     tion Letters, 9(5):4631–4638, 2024. 2                                 [24] Moritz Menze and Andreas Geiger. Object scene flow for
+ [9] Devendra Singh Chaplot, Dhiraj Gandhi, Saurabh Gupta,                      autonomous vehicles. In Conference on Computer Vision
+     Abhinav Gupta, and Ruslan Salakhutdinov.             Learning              and Pattern Recognition (CVPR), 2015. 2
+     to explore using active neural slam.          arXiv preprint          [25] Nico Messikommer, Giovanni Cioffi, Mathias Gehrig, and
+     arXiv:2004.05155, 2020. 3                                                  Davide Scaramuzza. Reinforcement learning meets visual
+[10] Changhao Chen and Xianfei Pan. Deep learning for iner-                     odometry. In European Conference on Computer Vision,
+     tial positioning: A survey. IEEE Transactions on Intelligent               pages 76–92. Springer, 2024. 3, 8
+     Transportation Systems, 25(9):10506–10523, 2024. 1                    [26] Feiyang Pan, Shenghe Zheng, Chunyan Yin, and Guang-
+[11] Changhao Chen, Xiaoxuan Lu, Andrew Markham, and Niki                       bin Dou. Moe-gyro: Self-supervised over-range reconstruc-
+     Trigoni. Ionet: learning to cure the curse of drift in inertial            tion and denoising for mems gyroscopes. arXiv preprint
+     odometry. AAAI Press, 2018. 3                                              arXiv:2506.06318, 2025. 3
+[12] Danpeng Chen, Nan Wang, Runsen Xu, Weijian Xie, Hu-                   [27] Youqi Pan, Wugen Zhou, Yingdian Cao, and Hongbin Zha.
+     jun Bao, and Guofeng Zhang. Rnin-vio: Robust neural iner-                  Adaptive vio: Deep visual-inertial odometry with online
+     tial navigation aided visual-inertial odometry in challenging              continual learning. In 2024 IEEE/CVF Conference on Com-
+     scenes. In 2021 IEEE International Symposium on Mixed                      puter Vision and Pattern Recognition (CVPR), pages 18019–
+     and Augmented Reality (ISMAR), pages 275–283, 2021. 2, 7                   18028. IEEE, 2024. 1, 2
+[13] Reinis Cimurs, Il Hong Suh, and Jin Han Lee. Goal-driven              [28] Prabin Kumar Panigrahi and Sukant Kishoro Bisoy. Local-
+     autonomous exploration through deep reinforcement learn-                   ization strategies for autonomous mobile robots: A review.
+     ing. IEEE Robotics and Automation Letters, 7(2):730–737,                   Journal of King Saud University - Computer and Informa-
+     2021. 3                                                                    tion Sciences, 34(8, Part B):6019–6039, 2022. 1
+[14] Ronald Clark, Sen Wang, Hongkai Wen, Andrew Markham,                  [29] Tong Qin, Peiliang Li, and Shaojie Shen. Vins-mono: A
+     and Niki Trigoni. Vinet: Visual-inertial odometry as a                     robust and versatile monocular visual-inertial state estimator.
+
+
+                                                                       9
+     IEEE transactions on robotics, 34(4):1004–1020, 2018. 1, 2,
+     6
+[30] Tong Qin, Shaozu Cao, Jie Pan, and Shaojie Shen. A gen-
+     eral optimization-based framework for global pose estima-
+     tion with multiple sensors. arXiv preprint arXiv:1901.03642,
+     2019. 1, 2
+[31] D. Schubert, T. Goll, N. Demmel, V. Usenko, J. Stueck-
+     ler, and D. Cremers. The tum vi benchmark for evaluating
+     visual-inertial odometry. In International Conference on In-
+     telligent Robots and Systems (IROS), 2018. 5
+[32] John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Rad-
+     ford, and Oleg Klimov. Proximal policy optimization algo-
+     rithms, 2017. 4
+[33] E Jared Shamwell, Kyle Lindgren, Sarah Leung, and
+     William D Nothwang. Unsupervised deep visual-inertial
+     odometry with online error correction for rgb-d imagery.
+     IEEE transactions on pattern analysis and machine intelli-
+     gence, 42(10):2478–2493, 2019. 1
+[34] Ken Shoemake. Animating rotation with quaternion curves.
+     Proceedings of the 12th annual conference on Computer
+     graphics and interactive techniques, 1985. 5
+[35] Zachary Teed and Jia Deng. Droid-slam: Deep visual slam
+     for monocular, stereo, and rgb-d cameras. Advances in neu-
+     ral information processing systems, 34:16558–16569, 2021.
+     2, 8
+[36] Zachary Teed, Lahav Lipson, and Jia Deng. Deep patch vi-
+     sual odometry. Advances in Neural Information Processing
+     Systems, 36:39033–39051, 2023. 2, 4, 8
+[37] Niclas Vödisch, Daniele Cattaneo, Wolfram Burgard, and
+     Abhinav Valada. Covio: Online continual learning for
+     visual-inertial odometry. In Proceedings of the IEEE/CVF
+     Conference on Computer Vision and Pattern Recognition
+     (CVPR) Workshops, pages 2464–2473, 2023. 2, 7
+[38] Lukas Von Stumberg and Daniel Cremers. Dm-vio: Delayed
+     marginalization visual-inertial odometry. IEEE Robotics and
+     Automation Letters, 7(2):1408–1415, 2022. 1, 2, 6
+[39] Lukas Von Stumberg, Vladyslav Usenko, and Daniel Cre-
+     mers. Direct sparse visual-inertial odometry using dynamic
+     marginalization. In 2018 IEEE International Conference on
+     Robotics and Automation (ICRA), pages 2510–2517. IEEE,
+     2018. 2, 6
+[40] Wenshan Wang, Delong Zhu, Xiangwei Wang, Yaoyu Hu,
+     Yuheng Qiu, Chen Wang, Yafei Hu, Ashish Kapoor, and Se-
+     bastian Scherer. Tartanair: A dataset to push the limits of
+     visual slam, 2020. 5
+[41] Wenhui Wei, Yangfan Zhou, Yimin Hu, Zhi Li, Sen Wang,
+     Xin Liu, and Jiadong Li. Botvio: A lightweight transformer-
+     based visual–inertial odometry for robotics. IEEE Transac-
+     tions on Robotics, 41:3760–3778, 2025. 2
+[42] Mingyu Yang, Yu Chen, and Hun-Seok Kim. Efficient deep
+     visual and inertial odometry with adaptive visual modality
+     selection. arXiv preprint arXiv:2205.06187, 2022. 2, 7
+[43] Yuxuan Zhou, Xingxing Li, Shengyu Li, Xuanbin Wang,
+     Shaoquan Feng, and Yuxuan Tan. Dba-fusion: tightly in-
+     tegrating deep dense visual bundle adjustment with multi-
+     ple sensors for large-scale localization and mapping. IEEE
+     Robotics and Automation Letters, 9(7):6138–6145, 2024. 2
+
+
+                                                                    10
+           Dual-Agent Reinforcement Learning for Adaptive and Cost-Aware
+                              Visual–Inertial Odometry
+                                                   Supplementary Material
+A. Training Details                                                   • Fusion Agent: We utilize a Curriculum Learning ap-
+                                                                        proach. Before RL training, MLP1 undergoes supervised
+A.1. Bias Encoder Training                                              pre-training. This provides robust velocity priors, avoid-
+Our training process is staged, following the kinematic de-             ing the instability often associated with end-to-end rein-
+pendencies.                                                             forcement learning from scratch.
+                                                  g
+Stage 1: Gyro Bias Training. We first train fbias      to cor-
+                                                 g                    Table 7. PPO hyperparameters used for Select and Fusion Agents.
+rect the raw angular velocity: ω̂(k) = ω̃(k) − fbias (Ω̃, ng ).
+The corrected ω̂(τ ) is integrated to predict orientation q̂t ,
+starting from q̂0 (⊗ is quaternion multiplication):                       Parameter                Select Agent   Fusion Agent
+
+                          Z t                                           Environment steps             1M             1M
+                          1              0                                Learning rate              3 × 10−4       5 × 10−4
+            q̂t = q̂0 +     q̂(τ ) ⊗           dτ          (8)
+                        0 2            ω̂(τ )                             Discount factor γ            0.99           0.99
+                                                                          GAE λ                        0.95           0.95
+Supervision is applied via the orientation error: Lgyro =                 Clip ratio                    0.2            0.2
+               2
+∥q̂t ⊖ qGT
+        t ∥ (⊖ denotes quaternion error)
+                                                                          Batch size                    64             64
+Stage 2: Accel Bias Training. After Lgyro converges, we                   Epochs per update             10             10
+        g
+freeze fbias              a
+               and train fbias to correct acceleration: â(k) =           Entropy coefficient          0.05           0.02
+         a                                                                Value loss coefficient        0.5            0.5
+ã(k)−fbias (Ã, na ). Using the accurate rotation R̂(τ ) from
+Stage 1, we integrate â(τ ) in the world frame to predict
+velocity v̂t :
+                                                                      A.3 Reward Design
+                          Z t                                       Select reward Recall that the Select Agent receives a ter-
+            v̂t = v̂0 +          R̂(τ )â(τ ) − g dτ       (9)
+                           0                                          minal, episode-level reward Eq 1. The scalars A, B, and ϵ
+                                                                      control the trade-off between accuracy and computation.
+Supervision is applied via the velocity L2 loss: Laccel =                 Choice of ϵ, A, and B. On EuRoC, running DPVO
+∥v̂t − vtGT ∥2 . All reinforcement learning experiments were          with either no skipping or fixed-ratio skipping (50%,
+implemented using a custom Gym-style environment that                 75%, 87.5%) yields ATE values typically in the range
+simulates both the Select and Fusion Agents’ decision pro-            [0.05, 0.2] m. We set ϵ = 0.05, so that for “reasonable”
+cesses within a differentiable VIO pipeline. The PPO algo-            trajectories the accuracy term
+rithm from the stable-baselines3 library was used for both
+agents, with separate replay buffers and reward normal-                                                A
+                                                                                            Racc =
+ization. Each agent interacts with the environment in an                                             ATE + ϵ
+episodic fashion until convergence.
+                                                                      falls roughly between 4A and 10A. For the same sequences,
+A.2. PPO Hyperparameter Summary                                       a full run contains about 4,000 frames, while 50%, 75%,
+                                                                      and 87.5% skipping lead to approximately Nf ≈ 2,000,
+The main hyperparameters used for PPO training are sum-               1,000, and 500 VO calls, respectively, so the cost term
+marized in Table 7. Values were selected empirically for              Rcost = −BNf lies in [−4000B, −2000B] for typical poli-
+stable convergence across both agents.                                cies.
+   The training stability of our dual-agent system is ensured             Under these simplified assumptions, the reward differ-
+through specific strategies tailored to each agent’s reward           ence between each skipping policy and the full-frame base-
+structure:                                                            line reduces to a linear function of (A, B). Figure 7 visu-
+• Select Agent: Due to sparse rewards and high penal-                 alizes these boundaries and the corresponding heatmap of
+  ties for incorrect skipping, the training process is natu-          ∆R over (A, B), showing which regions of the parameter
+  rally sensitive. We stabilized convergence by employing             space favor aggressive skipping versus dense VO updates.
+  a higher entropy coefficient to encourage exploration and           We deliberately set (A, B) slightly in favour of computa-
+  a conservative learning rate, preventing premature con-             tion, since the dense per-step shaping term is already bi-
+  vergence to sub-optimal policies.                                   ased toward accuracy.We also clip the episode reward to a
+
+
+                                                                  1
+                                                                      Figure 8. Reward preference over the accuracy weight A and VO-
+                                                                      cost weight B on a EuRoC example.
+
+
+
+
+             Figure 7. Fusion Agent training curve.
+
+
+bounded range to avoid extreme outliers caused by occa-
+sional tracking failures.
+   Dense per-step shaping. In addition to the terminal re-
+ward, we provide a dense shaping signal at each time step t
+based on the instantaneous pose error:
+
+                   rtshape = −s · RMSEt ,
+
+where RMSEt denotes the per-step position RMSE with re-
+spect to ground truth. This current-step RMSE acts as a
+low-variance shaping signal correlated with the final ATE,            Figure 9. Visualization of learned fusion weights on EuRoC
+                                                                      (MH2–MH5).
+stabilizing PPO training, while the terminal reward enforces
+the desired long-horizon trade-off between trajectory accu-
+racy and VO call frequency.                                           variance, the loss steadily decreases and stabilizes as train-
+                                                                      ing progresses (up to ∼ 1M steps), indicating that PPO con-
+Fusion reward and uncertainty regularization. For the                 verges without noticeable divergence or oscillation.
+Fusion Agent, the reward has the same two-part structure:                Figure 9 visualizes the learned fusion weights on sev-
+the first term directly rewards accuracy (low pose error) and         eral EuRoC sequences (MH2–MH5). For each sequence,
+is defined analogously to the Select Agent, so we omit de-            we show the average weights for position, orientation, and
+tails here. The second term penalizes the predicted uncer-            velocity (wp , wq , wv ), aggregated over all time steps. The
+tainty of the fused state. Concretely, we construct a diagonal        agent assigns different weight patterns across sequences, re-
+covariance proxy Σk from the IMU noise statistics and the             flecting how it adapts the relative contribution of each state
+VO confidence weights (as defined in the main text), and              component to the fused estimate under varying motion and
+add a penalty proportional to tr(Σk ) to the reward. This un-         visual conditions. This behaviour illustrates that the Fu-
+certainty term can be interpreted as a regularizer: it discour-       sion Agent learns a context-dependent policy that adapts
+ages the policy from relying too heavily on sensor modal-             the IMU–visual weighting to the underlying motion and vi-
+ities in regions where their confidence is low. In particu-           sual conditions, rather than using a fixed, hand-tuned fusion
+lar, when training on sequences without ground-truth tra-             scheme.
+jectories, the uncertainty penalty becomes the main shaping
+signal, pushing the Fusion Agent toward conservative, low-
+                                                                      B. IMU Pre-integration Details
+uncertainty fusion patterns rather than overfitting to noisy          Between two consecutive camera frames (tk , tk+1 ), we re-
+measurements.                                                         ceive a sequence of raw IMU readings
+                                                                                                  k+1
+A.4 Visualization of the Fusion Agent                                           {(ωim , am
+                                                                                         i , ti )}i=k ,   ∆ti = ti+1 − ti ,
+Figure 8 plots the training loss of the Fusion Agent over en-         where ωim and am  i denote the measured angular velocity
+vironment steps. After an initial warm-up phase with high             and linear acceleration, respectively. At inference time, the
+
+
+                                                                  2
+                           g         a                                 Table 8. Comparison with classical CPU-based monocular visual-
+pre-trained bias networks fbias and fbias output gyro and ac-
+celerometer bias estimates                                             inertial odometry systems on the TUM-VI dataset. We report
+                                                                       SE(3)-aligned RMSE ATE (m).
+                      g
+              b̂gi = fbias (·),    b̂ai = fbias
+                                           a
+                                                (·),
+                                                                          Seq        VINS      OKVIS     DM-VIO        Ours      Length
+which are used to correct the raw measurements:
+                                                                          Corr1        0.63     0.33        0.19       0.23       305
+            ω̂i = ωim − b̂gi ,     âi = am     a
+                                          i − b̂i .        (10)           Corr2        0.95     0.47        0.47       0.39       322
+                                                                          Corr3        1.56     0.57        0.24       0.52       300
+   We follow a standard discrete-time IMU pre-integration                 Mag1         2.19     3.49        2.35       3.12       918
+scheme to obtain the relative motion (∆pk , ∆qk , ∆vk )                   Mag2         3.11     2.73        2.24       2.21       561
+over the interval [tk , tk+1 ]. Let ∆Rk,i ∈ SO(3), ∆vk,i ,                Mag3         0.40     1.22        1.69       0.56       566
+and ∆pk,i denote the pre-integrated rotation, velocity, and               Room1        0.07     0.06        0.03       0.11       146
+                                                                          Room2        0.07     0.11        0.13       0.10       142
+position from tk to ti in the IMU frame. We initialize
+                                                                          Room3        0.11     0.07        0.09       0.09       135
+         ∆Rk,k = I,        ∆vk,k = 0,     ∆pk,k = 0,                      Slide1       0.68     0.86        0.31       0.55       289
+                                                                          Slide2       0.84     2.15        0.87       0.91       299
+and iteratively propagate for i = k, . . . , k + 1:                       Slide3       0.69     2.58        0.60       0.76       383
+                                                                         Avg          0.94     1.22        0.77       0.80      363.8
+ ∆Rk,i+1 = ∆Rk,i Exp ω̂i ∆ti ,
+  ∆vk,i+1 = ∆vk,i + ∆Rk,i âi ∆ti ,             (11)
+                                  1         2                          method achieves accuracy comparable to DM-VIO on aver-
+  ∆pk,i+1 = ∆pk,i + ∆vk,i ∆ti + ∆Rk,i âi ∆ti ,                        age, while clearly outperforming VINS and OKVIS on most
+                                  2
+                                                                       sequences.
+where Exp(·) is the exponential map from so(3) to SO(3).               Cumulative Component Analysis. Finally, to provide a
+At the end of the interval, we obtain                                  holistic view of our contributions, Table 9 reports the cumu-
+∆Rk ≜ ∆Rk,k+1 ,          ∆vk ≜ ∆vk,k+1 ,        ∆pk ≜ ∆pk,k+1 .        lative impact of the three main components (bias encoder,
+                                                                       Fusion Agent, Select Agent) on EuRoC and TUM-VI.
+The rotation ∆Rk is converted to a unit quaternion ∆qk
+(and to axis–angle form when constructing the RL observa-              Table 9. Cumulative contribution of each component. Removing
+tions).                                                                a component from the full system (ALL) degrades accuracy or ef-
+                                                                       ficiency.
+   In summary, for each interval (tk , tk+1 ) the module out-
+puts (∆pk , ∆qk , ∆vk ) and bias estimates b̂k = (b̂gk , b̂ak ),
+                                                                          Component           ATE (EuRoC)      ATE (TUM-VI)        FPS
+which are fed to the Select and Fusion Agents as part of
+their state.                                                              ALL                    0.092             0.80             39
+                                                                          - Bias Encoder         0.279             1.13             40
+C. Analysis of Deployment Feasibility                                     - Fusion Agent         0.133             0.94             39
+                                                                          - Select Agent         0.087             0.76             21
+We analyze our architecture’s feasibility based on two key
+factors: First, we analyze the model size, the total com-                  Removing the bias encoder leads to a large increase in
+bined model size for our entire VIO framework is only 32.1             ATE on both datasets, confirming its importance for stable
+MB, making them trivial to store and load on resource-                 pre-integration. Disabling the Fusion Agent also degrades
+constrained edge devices. Second, these new modules intro-             accuracy, whereas removing the Select Agent mainly hurts
+duce negligible computational overhead. The inference cost             efficiency (FPS drops from 39 to 21), illustrating the com-
+of these small networks is minimal (typically < 1ms), our              plementary roles of the three components.
+framework does not add any new, computationally heavy
+layers to the main loop, and our architecture’s primary ef-            Table 10. Cross-dataset transfer performance of Visual-Selective-
+ficiency gain comes from intelligent computational gating              VIO (VS-VIO) on EuRoC MAV. We report SE(3)-aligned RMSE
+to reduces the total average FLOPs and inference time re-              ATE (m) on four sequences (MH 02–MH 05) using the official
+quired per frame.                                                      KITTI-pretrained model without retraining.
+
+D. Additional Experimental Results                                               Seq          MH2      MH3     MH4        MH5
+
+Comparison with classical CPU-based VIO on TUM-                                  VS-VIO       1.134    1.032   1.029     1.355
+VI. Table 8 reports SE(3)-aligned RMSE ATE on TUM-
+VI for classical CPU-based monocular VIO systems. Our                  Additional baseline: Visual-Selective-VIO on EuRoC.
+
+
+                                                                   3
+To further assess adaptive VIO methods trained on driv-                        Table 12. Scale Robustness Test (ATE [m]).
+ing data, we evaluate Visual-Selective-VIO (VS-VIO) on
+EuRoC without any retraining. We reuse the official                     Method              Nominal     Small Init   Large Init
+KITTI-pretrained model and convert EuRoC sequences                      Ours (Base)           0.092       0.661         0.682
+MH 02–MH 05 into the KITTI-style format used by the                     Ours (+Monitor)       0.096       0.522         0.508
+original code, including nearest-neighbor timestamp align-
+ment between images and ground-truth and IMU interpola-
+tion as described in Sec. 4.1. Table 10 reports the SE(3)-           noise profiles. However, the system successfully completes
+aligned RMSE ATE (m). Compared to both classical VIO                 the trajectory, validating robustness to unseen sensors.
+and our method (see Tables 1 and 8), VS-VIO exhibits sub-
+stantially larger trajectory errors on these aggressive 6-DoF        E. Discussion on Algorithmic Novelty
+MAV sequences, confirming a strong domain gap between
+ground-vehicle training data and EuRoC. We therefore treat           To further clarify our contributions relative to existing RL-
+VS-VIO as a conceptually related method, but do not in-              based Visual Odometry (VO) works, we emphasize two fun-
+clude it as a main numerical baseline in the core results ta-        damental distinctions in our dual-agent architecture:
+bles.                                                                1. Paradigm Shift: “Shift Left” Pre-emptive Gating.
+Evaluation on failure modes. We conduct stress tests on              Traditional RL-based VO methods typically focus on post-
+the EuRoC dataset (MH 04) under three extreme condi-                 processing, such as filtering keyframes or weighting fea-
+tions: (1) VO Outage, (2) Severe Blur, and (3) IMU Noise.            tures after they have been extracted. This represents a sunk
+The results in Table 11 demonstrate that while accuracy de-          cost where significant computation has already been spent.
+grades under extreme stress, our method significantly out-           In contrast, our Select Agent proposes a “Shift Left” strat-
+performs the DPVO baseline. This resilience is primarily             egy: it performs pre-emptive gating on raw sensor data
+attributed to the Fusion Agent, which dynamically detects            streams. By making skipping decisions before the visual
+low visual reliability and suppresses visual weights, effec-         frontend is invoked, we bypass the entire tracking and bun-
+tively leveraging the IMU Bias Estimator as a safety net.            dle adjustment pipeline for redundant frames.
+    Despite the improved robustness, residual drift in VO-           2. First RL-based VIO Fusion. While prior works often
+denied areas suggests two directions for future work: (1)            use RL for visual parameter tuning, our framework is, to the
+incorporating long-range temporal context into confidence            best of our knowledge, the first to employ RL for dynamic
+estimation, and (2) establishing a feedback mechanism to             IMU-Visual fusion. Our Fusion Agent goes beyond simple
+re-initialize the VO backend using IMU states during pro-            weighting; it learns a context-dependent policy that adapts
+longed outages.                                                      the IMU-visual contribution based on motion dynamics and
+                                                                     visual reliability.
+Table 11. Robustness Stress Test under Severe Sensor Degrada-
+tion.                                                                F. Limitations and Future Work
+ Method     Nominal     VO Outage     Severe Blur   IMU Noise        Although our dual-agent framework achieves a favourable
+          (Clean Data) (Blackout 2s) (30% Frames)   (2× Noise)       accuracy–efficiency trade-off across EuRoC and TUM-VI,
+ DPVO        0.106         1.928         1.122          -            several aspects of the current study remain limited in scope
+ Ours        0.092         1.114         0.472        0.128
+                                                                     and open up promising directions for future work.
+Scale Robustness and Monitoring. Regarding scale es-
+timation, we acknowledge that our base MLP1 primarily                Dataset and platform coverage. Our RL policies are
+performs velocity smoothing and has limited authority to             trained and evaluated on EuRoC and TUM-VI using offline,
+correct large initial scale errors. To address this, we inte-        log-driven environments, and thus implicitly adapt to the
+grated a lightweight Online Scale Monitor. This module               motion patterns, sensor characteristics, and visual statistics
+calculates the motion magnitude ratio between IMU pre-               of these datasets. We do not yet explore cross-dataset trans-
+integration and VO over a sliding window (15 frames). If a           fer or deployment on substantially different platforms (e.g.,
+persistent deviation is detected, a correction factor realigns       wheeled robots, handheld AR devices, or cameras/IMUs
+the VO scale with the IMU’s metric reference. As shown in            with different noise profiles), which would be important to
+Table 12, under ±20% initialization error, our system with           fully assess generalization.
+the Monitor effectively mitigates the scale drift.
+Generalization: To assess performance with minimal do-               Dependence on the VO backend and initialization. The
+main adaptation, we evaluated a model fine-tuned only on             framework assumes a reasonably calibrated VO backend
+TUM-VI (Corridor 4) applied to EuRoC (MH 04). ATE in-                and a successful initial scale estimate. In challenging condi-
+creases (0.092m → 0.173m) due to the domain gap in IMU               tions with persistent VO degradation or severe miscalibra-
+
+
+                                                                 4
+tion, the current policies may still fail to recover, as they are
+not explicitly trained to handle hard re-initialization events.
+Designing agents that can detect such failure modes and
+proactively trigger re-initialization or fallback behaviours is
+an interesting extension.
+
+Hardware evaluation. All experiments are conducted on
+a desktop-class CPU/GPU platform. While we show that
+the proposed scheduling reduces the load on the bundle ad-
+justment module and improves throughput, we have not yet
+performed a systematic study on embedded or low-power
+hardware, nor an explicit analysis of latency, energy, and
+memory footprints. A more comprehensive hardware evalu-
+ation would be needed to fully validate the benefits for real-
+world onboard systems.
+
+Future work. A natural next step is to push the frame-
+work towards real edge deployment. On the algorithmic
+side, we aim to incorporate hardware constraints such as
+latency, power, and memory directly into the reward de-
+sign, and to train and evaluate the policies on embedded
+platforms (e.g., Jetson-class devices) under realistic com-
+pute budgets. On the system side, extending the scheduling
+mechanism to coordinate multiple perception modules (VO,
+mapping, semantics) sharing the same edge device, and de-
+veloping even lighter-weight agent variants that can run at
+high frequency on low-power hardware, are promising di-
+rections. Ultimately, our goal is to turn the proposed dual-
+agent controller into a drop-in, resource-aware VIO front-
+end for mobile robots, drones, and AR devices operating
+under tight real-time and power constraints.
+
+
+
+
+                                                                    5
+

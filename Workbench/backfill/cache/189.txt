@@ -1,0 +1,1235 @@
+                                                             Open-ended Hierarchical Streaming Video Understanding
+                                                                         with Vision Language Models
+
+                                                         Hyolim Kang∗         Yunsu Park∗
+                                                                        Youngbeom Yoo Yeeun Choi Seon Joo Kim
+                                                                       Yonsei University
+                                          {hyolimkang,ysp7954,youngbeom.yoo,yeeun-choi,seonjookim}@yonsei.ac.kr
+                                                                     https://sites.google.com/view/yunsupark/projects/openhouse
+
+
+
+
+arXiv:2509.12145v1 [cs.CV] 15 Sep 2025
+                                                                                                               Streaming Video
+                                                                   Abstract
+                                                                                                                                                           …                       …
+                                         We introduce Hierarchical Streaming Video Understanding,
+                                         a task that combines online temporal action localization
+                                         with free-form description generation. Given the scarcity                                                                                          Time(s)
+
+                                         of datasets with hierarchical and fine-grained temporal an-                                                                              “Current”
+                                         notations, we demonstrate that LLMs can effectively group                         Generate           Generate               Generate
+                                                                                                                          Description        Description            Description
+                                         atomic actions into higher-level events, enriching existing
+                                         datasets. We then propose OpenHOUSE (Open-ended Hi-                           Lifting a wheel Tightening a bolt        Connecting brake
+                                                                                                             Substep
+                                         erarchical Online Understanding System for Events), which
+                                         extends streaming action perception beyond action classifi-                          Changing the wheel                Repairing the brake
+                                                                                                             Step
+                                         cation. OpenHOUSE features a specialized streaming mod-
+                                                                                                                                           Repairing the bike
+                                         ule that accurately detects boundaries between closely ad-          Goal
+                                         jacent actions, nearly doubling the performance of direct                                                                                 : Action Instance
+                                         extensions of existing methods. We envision the future of
+                                         streaming action perception in the integration of powerful          Figure 1. Illustration of the Hierarchical Streaming Video Under-
+                                         generative models, with OpenHOUSE representing a key                standing task. When action instances are detected, the correspond-
+                                         step in that direction.                                             ing hierarchical descriptions are generated instantly. The hierarchy
+                                                                                                             consists of three levels: Goal, Step, and Substep. The Goal de-
+                                                                                                             scription can be generated before the entire video concludes.
+                                         1. Introduction
+                                                                                                             challenges beyond standard offline video understanding
+                                         Imagine a cyclist wearing an egocentric camera while re-
+                                                                                                             [27, 32]. First, the model must determine “when” to gen-
+                                         pairing a bicycle. If we are designing a system to assist
+                                                                                                             erate output within the task hierarchy. Continuously call-
+                                         the cyclist, it must not only recognize the fine-grained ac-
+                                                                                                             ing the VLM is computationally expensive, and generat-
+                                         tion of “tightening a bolt,” but also understand that it is a
+                                                                                                             ing descriptions for every frame would result in excessive,
+                                         substep of “changing the wheel,” which in turn contributes
+                                                                                                             fragmented, and inaccurate descriptions. Second, given the
+                                         to the larger goal of “repairing the bike.” Recognizing the
+                                                                                                             untrimmed, extensive nature of the video, the model must
+                                         importance of the hierarchical structure, we argue that such
+                                                                                                             determine which segment is relevant to the ongoing action,
+                                         understanding must be acquired instantaneously for effec-
+                                                                                                             as processing the entire history is impractical. Finally, using
+                                         tive real-time assistance. Given this complexity, relying on
+                                                                                                             this information, the model should provide an immediate
+                                         predefined class categories is suboptimal, as their limited
+                                                                                                             description of the ongoing action.
+                                         expressiveness restricts the system’s ability to capture the
+                                         hierarchical structure in detail.                                      Rather than devising a single model, we decouple the
+                                                                                                             task into two parts: (i) a lightweight “streaming” perception
+                                            This highlights the need for an instantaneous, open-
+                                                                                                             module that processes each frame and performs hierarchy-
+                                         ended and hierarchical understanding of streaming input
+                                                                                                             aware action detection in real time, calling the VLM only
+                                         (Figure 1). Large-scale Vision Language Models (VLMs)
+                                                                                                             when needed, and (ii) a VLM that generates descriptions
+                                         [1, 30, 31], with their powerful reasoning capabilities, are
+                                                                                                             only when called by the perception module. This disen-
+                                         well-suited for handling this challenge. However, apply-
+                                                                                                             tanglement offers distinct advantages over a single model
+                                         ing VLMs to continuous visual streams presents unique
+                                                                                                             approach. First, it enables efficient operation by continu-
+                                           * Equal contribution.                                             ously running the lightweight module and sparingly acti-
+
+
+                                                                                                         1
+vating the computationally expensive VLM. Second, sep-               score compared to conventional actionness-based methods
+arating streaming perception tasks from caption genera-              [2, 54] in the OpenHOUSE framework.
+tion allows the VLM to function as originally trained, en-           Our contributions can be summarized as follows:
+abling zero-shot inference. By avoiding fine-tuning or task-            • We introduce the new, practical problem of Open-
+specific adaptation, we preserve the VLM’s generalization                 ended Hierarchical Streaming Video Understanding
+ability and avoid the degradation typically caused by tuning              and propose OpenHOUSE as a solution.
+on relatively small custom datasets.                                    • We validate the capability of LLMs to group atomic
+    The proposed system, Open-ended Hierarchical Online                   actions into higher-level annotations, addressing the
+Understanding System for Events (OpenHOUSE), is an                        scarcity of hierarchical temporal data.
+approach that bridges the gap between established online                • We propose a novel strategy for detecting action
+action detection methods and large-scale VLMs. Without                    boundaries, capable of handling instances that are
+compromising the strict online nature of existing online ac-              strictly adjacent without background frames.
+tion detection formulation, we effectively incorporate the              • We conduct extensive experiments including the cross-
+generative capabilities of large-scale VLMs by employing a                dataset evaluation, which demonstrates the generaliz-
+lightweight online model as a VLM caller and an online hi-                ability and scalability of our approach.
+erarchical action segmentor to determine both which parts
+of the streaming video should be processed and their hier-           2. Related Work
+archical structure. This design distinguishes our approach
+from previous methods that adopted VLMs for streaming                2.1. Streaming Action Perception
+perception, such as relying on fixed decoding points [55] or         Online Action Detection (OAD) [9] is a well-established
+invoking the VLM for every incoming frame [5].                       task in streaming video understanding that involves iden-
+    However, a straightforward integration of existing online        tifying the action class of the current frame in a stream-
+modules with large-scale VLMs proves insufficient due to             ing setting. While extensive research has focused on OAD
+the following challenges:                                            [2, 4, 10, 43, 46, 47, 49, 53, 54], its frame-centric approach
+Scarcity of hierarchical annotations: While VLMs do not              falls short for real-world streaming video analysis, which
+require fine-tuning to grasp hierarchical structures, detailed       requires event-level recognition.
+temporal annotations that include hierarchical relationships             Conversely, Online Temporal Action Localization (On-
+are essential for training a streaming module to under-              TAL) [18–20, 33, 38, 40], the task recently introduced in
+stand action hierarchies. However, although many datasets            [17], targets real-time event detection. Beyond the con-
+[3, 8, 13, 34] offer atomic action annotations, hierarchical         straint of unobserved future frames, On-TAL requires im-
+annotations remain scarce. To address this, we propose a             mediate responsiveness, producing detection results as soon
+dataset generation pipeline that leverages the reasoning ca-         as an event terminates. This unique requirement makes the
+pacity of LLMs to group atomic actions into higher-level             problem more challenging, preventing the naive extension
+hierarchical structures. Notably, experiments on Ego4D-              of previous approaches to On-TAL.
+GoalStep [37], which has ground-truth hierarchical anno-             Our Work Targeting practical online scenarios, we adopt
+tations, show that models trained on the generated dataset           the OAD-based On-TAL setting [17]. While a relevant re-
+perform competitively with those trained on ground truth,            cent study [53] explores VLMs for per-frame action classifi-
+confirming the reliability of our dataset generation pipeline.       cation, we focus on leveraging VLMs’ free-form generation
+By training the streaming module with these annotations,             and reasoning capabilities to capture the hierarchical struc-
+our dataset pipeline effectively distills LLM’s hierarchical         ture of ongoing actions.
+awareness to the streaming module.
+                                                                     2.2. Streaming Open-ended Video Understanding
+Class-agnostic action boundary modeling: Similar to
+class-agnostic object detectors in open-vocabulary recog-            Video Captioning Many works have focused on generat-
+nition [7, 12, 39], the streaming module in Open-                    ing captions that describe video content. Notably, SDVC
+HOUSE operates without predefined class labels. However,             [55] adopted the concept of a “decoding point,” which en-
+previous class-agnostic action boundary detection strat-             ables captions to be generated without observing the full
+egy—based on detecting transitions from background to ac-            video. However, unlike OAD or On-TAL, SDVC is not de-
+tion frames—significantly struggles in procedural videos             signed for prompt responses in online scenarios. Its primary
+due to the lack of sufficient background frames between              innovation lies in enabling caption generation without full
+actions. To address this, we propose a new strategy that             video access, rather than recognizing ongoing actions and
+combines estimated action presence (or “actionness”) with            responding in real time.
+progression to identify action start and end points. This ap-        Video Question Answering (VQA) The application of
+proach has proven highly effective, nearly doubling the F1           VLMs for VQA [27] has gained increasing attention due
+
+
+                                                                 2
+    D1 T1                      D2       T2                D3                
+
+                                                                             Goal                      [I1 ~ I5] Repairing a bike
+                                                                             Step       [I1 ~ I3] Changing the Wheel      [I4 ~ I5] Tighten the brake
+                  Action Instance               Delay
+Figure 2. In the SDVC setting, action instances are generated at
+fixed decoding points (e.g., D3), which occur at regular intervals,
+inevitably introducing a delay (D3 - T2). In contrast, the On-TAL
+                                                                           
+formulation requires action instance detection at T2, ensuring real-
+time responsiveness. A systematic analysis of this delay is pro-             Goal                  [I1 ~ I5] Repairing a bike
+vided in Sec. 4.2.                                                           Step [I1 ~ I2] Changing the Wheel        [I4 ~ I5] Checking a bike
+to their strong reasoning abilities. While many studies ad-
+dress conventional, “offline” VQA, the streaming VQA sce-
+nario—despite its practical importance—has been relatively
+underexplored. Recent works [5, 44] have enabled stream-
+                                                                                                                  LLM
+ing VQA by fine-tuning VLMs with timestamp-aligned cus-                                          Given substeps [start, end, description],
+tom VQA datasets. However, these frameworks require the                                           cluster them consecutively to create
+fine-tuned VLM to perform inference on every incoming                                               higher-level annotations. (Steps)
+                                                                                                 Generate a goal label representing the
+frame and to handle all temporal recognition tasks and text                                             video's overall objective.
+generation by one model.
+Our Work Following the On-TAL problem definition [17],                                      I1        I2           I3                I4      I5
+our approach runs in a strict online setting: open-ended de-
+scriptions must be generated instantly in response to the                    Substep Checking axel Tighten      Connect      Checking the Tightening the
+                                                                                       with hands   the bolts   the brake     brake pad      brake pad
+current action status, whereas in [55], decoding points are
+not required to align with ongoing actions (Figure 2). Fur-
+                                                                           Figure 3. Dataset generation pipeline. Given substep instances
+thermore, by decoupling temporal understanding from text                   from I1 to I5, the LLM clusters these substeps into three steps,
+generation, OpenHOUSE achieves a more sophisticated, hi-                   generating step descriptions, timestamps, and a goal description.
+erarchical temporal comprehension, enabling it to capture                  Afterward, human validation is conducted to include the missing
+structured action intervals rather than aligning predictions               annotation I3 into the step annotations of I1 to I2, and to revise
+to single points in time [5, 44].                                          the step description for I4 to I5.
+
+2.3. Hierarchical Video Understanding                                      ensure immediate action recognition, the system must re-
+                                                                           spond promptly to action termination. We therefore adopt
+Hierarchical video understanding seeks to recognize actions
+                                                                           the OAD based On-TAL formulation [17, 18, 40] for this
+across multiple levels of granularity, from fine-grained ac-
+                                                                           task. Note that recent TAL-based On-TAL formulations
+tions to higher-level activities. Although this hierarchical
+                                                                           [19, 33, 38] relax online constraints through anchor-based
+structure aligns with natural action dynamics, few recent
+                                                                           boundary regression, allowing some flexibility in the tim-
+works address this topic [15, 37].
+                                                                           ing of action instance generation, which can result in either
+Our Work To the best of our knowledge, OpenHOUSE is
+                                                                           early or delayed predictions. In contrast, the OAD-based
+the first framework to explore hierarchical understanding in
+                                                                           formulation adheres to a per-frame grouping paradigm that
+a streaming setting. Unlike [15], which focuses on gen-
+                                                                           strictly aligns action termination with the current frame,
+erating high-quality captions for a given clip or segment by
+                                                                           which is why we opted for this setting.
+recurrently leveraging low-level captions, our approach em-
+                                                                               Our objective is to generate and accumulate action pro-
+phasizes identifying the “temporal boundaries” of action in-
+                                                                           posals ψ as soon as each action completes, reconstructing Ψ
+stances across different hierarchical levels.
+                                                                           without retrospective modification to any ψ. This work fo-
+                                                                           cuses on a three-level hierarchy: substep, step, goal, cor-
+3. Target Task and Our Approach
+                                                                           responding to h = 1, 2, 3 respectively. substep and step
+3.1. Hierarchical Streaming Video Understanding                            are defined at the instance level with temporal annotations,
+                                                                           while the goal applies to the entire video.
+Consider an untrimmed video V = {xτ }τT=1 with
+M hierarchical action instances Ψ = {ψm }M         m=1 =                   3.2. Dataset Pipeline
+{(tsm , tem , dm , hm )}M
+                        m=1 provided in a streaming format.
+Here, xτ denotes the τ th frame; tsm ∈ R, tem ∈ R are                      To enable the streaming module to recognize hierarchical
+the start and the end timestep; and dm and hm ∈ N rep-                     structures, both hierarchical action annotations and fine-
+resent the (possibly free-form) description and hierarchi-                 grained temporal annotations are essential. While some
+cal level of the mth action instance ψm respectively. To                   datasets offer either fine-grained atomic action annotations
+
+
+                                                                       3
+ (a)                           Substep             Step              Substep               Substep         Step       (b)                                  “Cut carrot”    “Add to soup”   “Grind pepper”
+                               “Loosen          “Remove               “Tighten         “Connect “Reinstall
+                               the bolt”       the wheel”            the bolts”        the brake” the wheel”                 Ground                         Ins1               Ins2            Ins3
+                                                                                                                              Truth
+                                                                                                                                                             Action Detected               Action Detected
+
+                                                                                                                               W/O                               [T1 ~ T3]                    [T4 ~ T5]
+                                                                                                                             Progress
+                                                                                                                                                             Action Detected               Action Detected
+  Context
+                                                                                                                            W/ Progress                    [T1 ~ T2]       [T2 ~ T3]          [T4 ~ T5]
+  Memory
+                                                                                                                              (Ours)
+                                                        Save frame                                                                                    T1                  T2          T3 T4                 T5 Time (s)
+Module output
+                                                                                                                                         Actionness
+                                                                                                                                           Score
+                                                                                                                                                          Start             Start     Start
+                                                                                                                                                        Detected!         Detected! Detected!
+   Subtep                                                                                                                                     1
+                                                                                                                            Actionness
+                       Start       End                                   Start       End     Start        End
+                                                                                                                              Head
+       Step
+                       Start                 End                         Start                            End                                 0
+                                                                                                                                                                                                                Time (s)
+                                                                                                                                +
+                   Streaming                                Streaming                                Streaming                           Progress (%)
+                                                                                                                                                              End                End                 End
+                    Module                                   Module                                   Module
+                                                                                                                                                            Detected!          Detected!           Detected!
+                                                                                                                                           100
+                                                                                                                             Progress
+                                                                                                                              Head
+                                                                                                                                              0
+                                                                                                                                                                                                                Time (s)
+
+
+   T =1            2           3         4          5       6        7           8          9        10
+                                               Streaming Video                                                               Hybrid    Action
+                                                                                                                            Detection Start/End
+              : No Event       : Step        : Step & Substep    : Call VLM          : Prediction         : VLM                                                           Start     End
+                                                                                                                                                        Start             End          Start                End Time (s)
+
+
+Figure 4. (a) Illustration of OpenHOUSE. The lightweight Streaming module processes every frame, while VLM inference is triggered
+selectively at T = 3, 4, 8, 10, indicated by the yellow bell icon. (b) Diagram depicting how our hybrid action boundary detection works.
+For instance, at T 2, a sudden drop in the progression signals the action end, marking the current frame as a background frame. In the next
+timestep, a high actionness score (= 1.0) classifies the frame as an action frame, resulting in a background-to-action transition and marking
+it as the start of Ins2.
+
+[8, 13] or hierarchical captions [15], very few provide both.                                                         In the human validation stage, generated annotations are
+To the best of our knowledge, the Ego-4D Goalstep [37]                                                            evaluated and adjusted across two aspects: temporal consis-
+dataset is the only hierarchical action recognition dataset                                                       tency and caption quality. Temporal consistency involves
+with sufficiently fine-grained temporal annotations. To ad-                                                       checking missing instances, as well as addressing abnor-
+dress this limitation, we leverage the reasoning capacity of                                                      mally long or short temporal annotations. For caption qual-
+LLMs. Just as humans can intuitively group atomic action                                                          ity, human evaluators revise step-level captions that fail to
+annotations into higher-level categories, we utilize an LLM                                                       adequately reflect the content of their substeps, fill in miss-
+to perform this hierarchical grouping automatically.                                                              ing captions, and adjust goal captions when they do not ac-
+                                                                                                                  curately convey the video’s overall purpose. Empirically,
+   Figure 3 illustrates the overall framework of our dataset
+                                                                                                                  we found that minimal adjustment is needed in this stage
+generation pipeline, which consists of two main stages:
+                                                                                                                  due to the powerful reasoning capabilities of LLMs.
+clustering substeps and human validation. In the cluster-
+ing substeps stage, we employ an LLM to group atomic ac-                                                              Using this pipeline, we successfully augmented the Ego-
+tions, or substeps, into meaningful clusters, referred to as                                                      Exo4D Keystep [13] dataset and the Epic-Kitchens 100 [8]
+steps. After this initial clustering, a post-processing step is                                                   dataset into hierarchical formats, thereby addressing the
+applied to further refine the results. Subsequently, the LLM                                                      scarcity of hierarchical annotations. In Section 4, we fur-
+generates appropriate summaries for each set of substeps                                                          ther demonstrate the validity of our generated annotations.
+to form the step-level annotations, and also produces goal-                                                       These annotations will be made public along with the code.
+level annotations that best capture the overall purpose of
+                                                                                                                  3.3. Approach: OpenHOUSE
+the video. For more organized descriptions, we applied K-
+means clustering to group similar steps (200 for Ego-Exo4D                                                        Overview Figure 4 (a) illustrates the schematic diagram
+Keystep [13] and 500 for Epic-Kitchens 100 [8]). The LLM                                                          of Open-ended Hierarchical Online Understanding System
+then generated representative captions for each group to cat-                                                     for Events (OpenHOUSE), which consists of three main
+egorize the step annotations.                                                                                     components: the Streaming module, Context memory, and
+
+
+                                                                                                            4
+the frozen VLM. The Streaming module processes each in-              (e.g., if an action occurs between 2s and 4s, the timestamp at
+coming frame, performing class-agnostic On-TAL based on              3s corresponds to 50% progress), and it is used for training
+OAD [18]. As an extended OAD model, this module also                 progression heads. Unlike prior methods that use progress
+tracks ongoing action instances at different hierarchical lev-       as auxiliary information [35], we explicitly leverage the es-
+els, determining whether to store the incoming frame in the          timated progress score for action boundary detection.
+context memory.                                                         However, using progress alone for action boundary de-
+    When the module detects the termination of an action in-         tection is not feasible, as it increases gradually at the start,
+stance, it returns a class-agnostic action instance along with       providing no distinctive signal for detecting action start.
+its hierarchy level. This action instance serves as a “query”        Thus, we adopt a hybrid approach: action starts are detected
+to retrieve relevant information from the context memory,            using conventional actionness-based methods, while action
+such as frames and previous predictions. The retrieved in-           ends are identified by monitoring progress drops.
+formation, consisting of relevant frames and previous text-             Figure 4 (b) illustrates our action boundary detection al-
+based predictions, is then passed to the frozen VLM, along           gorithm within a single hierarchy. Action starts and ends
+with prompts tailored to the action instance’s hierarchy             are detected separately by the actionness head and progress
+level, to generate an open-ended description of the seg-             head, respectively. For multiple hierarchies, this approach
+ment. The generated prediction is subsequently added to              can be extended by assigning additional progress head to
+the context memory for future reference. The key feature             each hierarchy and incorporating a state-emitting head [18]
+is that the lightweight Streaming module processes every             instead of binary actionness head.
+frame, while the computationally heavy VLM is used spar-             Implementation Details Following recent OAD literature
+ingly—resulting in an efficient setup for online scenarios.          [2], we use a simple RNN backbone shared across three
+3.3.1. Streaming Module                                              heads: a state-emitting head, a progression head for steps,
+                                                                     and a progression head for substeps. The state-emitting
+Motivation The Streaming module in OpenHOUSE per-                    head is trained using standard cross-entropy loss, as in [18].
+forms class-agnostic On-TAL, but faces unique challenges             Although the progression heads are essentially regression
+in identifying step and substep boundaries. Prior ap-                tasks, we apply histogram loss [11, 14] to transform them
+proaches for class-agnostic On-TAL [17, 18] detect action            into classification problems, allowing all heads to be trained
+instances by grouping action frames—a straightforward                with cross-entropy loss.
+method when action instances are sparsely distributed with
+sufficient background frames naturally separating them               3.3.2. VLM
+(Ins2 and Ins3 in Figure 4 (b)). By simply detecting                 Exploiting the fact that our Streaming module sparingly
+transitions between background frame and action frames,              generates action instances, we use each instance generation
+these methods can identify action boundaries effectively.            as a signal to call the VLM, enabling occasional VLM in-
+   Nevertheless, in procedural videos, which are the pri-            ference. In this setup, the VLM is solely responsible for
+mary focus of our work, action instances often occur in              generating captions based on provided frames and text, with
+close succession with minimal or no background frames                no special online behavior required. This allows us to lever-
+in between (Ins1 and Ins2 in Figure 4 (b)). Following                age the VLM’s strong zero-shot inference capability, which
+prior methods in this context leads to a monotonous se-              enables the VLM to remain frozen throughout training. Ad-
+quence of action frames, interpreting multiple instances as          ditionally, inspired by RAG [23], we incorporate informa-
+a single continuous instance (w/o Progress in Figure                 tion from previous predictions instead of relying solely on
+4 (b)). Even when few background frames exist between                the current action instance, assuming a context memory that
+action instances, distinguishing them is still challenging.          stores relevant past frames and predictions.
+Ideally, both action ends and starts should be marked as                 For example, assume that the Streaming module detects
+action frames, with only the short background marked as              the end of a step. Then, the module will provide the action
+background—a distinction that is theoretically possible but          start and current timestamps along with the corresponding
+extremely difficult in practice. This issue is unique to the         hierarchy level: step. Using these, relevant data—such as
+class-agnostic setting; in class-aware settings, boundaries          previous step predictions and frames of detected substeps
+can be clearly marked by changes in action labels [35], but          within that interval—is retrieved from the context memory.
+such cues are absent in the class-agnostic setting.                  Substep frames are sampled from these relevant substeps
+Hybrid action boundary detection To address this issue,              instead of using uniform sampling, which could overlook
+we introduce a novel strategy for determining action bound-          important details. This, along with a customized prompt
+aries. In addition to measuring actionness, we also measure          for the step hierarchy, is passed to the VLM, producing ap-
+the “progress” of action instances and detect sudden drops           propriate description. The prediction is then added to the
+in this progress to signify action ends. Note that ground-           context memory for future use. Exact prompts and other
+truth progress can be derived from temporal annotations              details are provided in the supplementary materials.
+
+                                                                 5
+4. Experiment and Analysis                                                                    F1 (loc.) ↑             F1 (loc. + desc.) ↑
+                                                                                                                                               GPT
+                                                                                       0.3       0.5         0.7      0.3      0.5     0.7    Score ↑
+                                                                      Annotation
+4.1. Experimental Setup                                               EgoGs Pseudo     64.7      56.1       42.8     34.04    30.87   26.10    2.98
+                                                                      Train
+Datasets We begin our evaluation with Ego4D-GoalStep                   EgoGS GT       51.58     39.70       24.76    15.23    12.67   8.68     2.96
+(EgoGS) [37], which includes ground truth hierarchical                EgoGS Pseudo    50.65     38.24       23.48    14.30    11.63   7.66     3.02
+
+temporal annotations. After validating our dataset gener-            Table 1. Evaluation of pseudo-labels from our dataset pipeline. All
+ation pipeline, we extend our experiments to Ego-Exo4D               F1 scores are calculated using the ground truth step labels from the
+Keystep (EgEx) [13] and Epic-Kitchens 100 (EK100) [8].               EgoGS dataset.
+Detailed dataset analyses, including statistics, are provided          Dataset       Annotation              Hier.          Hybrid     F1 (loc.) ↑
+in the supplementary materials. Unless specified, hereafter                                                                   ✗          16.78
+“EgEx” refers to Ego-view in Ego-Exo4D Keystep dataset.                                                      Step
+                                                                                                                              ✔          39.35
+                                                                                        GT
+Features Following established conventions in video tem-                                                                      ✗          22.48
+                                                                       EgoGS                            Substep
+poral understanding [9, 24, 33, 38, 51], we use a pretrained                                                                  ✔          44.79
+                                                                                                                              ✗          25.34
+vision encoder to extract features from raw frames. Except                             Pseudo                Step
+                                                                                                                              ✔          37.65
+for the exo view of EgoExo4D, which uses the official fea-
+                                                                                                                              ✗           8.42
+tures, we use the Egovideo [29] encoder. All experiments,                               GT              Substep
+                                                                                                                              ✔           52.2
+except for the exo view of EgoExo4D, are carried out with               EgEx
+                                                                                                                              ✗           6.12
+the same features to ensure fair comparison. Note that fea-                            Pseudo                Step
+                                                                                                                              ✔          46.33
+tures are extracted online, and we take this into account                                                                     ✗          31.46
+when measuring inference speed.                                                         GT              Substep
+                                                                                                                              ✔          48.95
+                                                                       EK100
+Evaluation Metric Our evaluation protocol focuses on                                                                          ✗          19.91
+                                                                                       Pseudo                Step
+three aspects: (i) class-agnostic localization ability of the                                                                 ✔          34.17
+Streaming module, (ii) quality and alignment of generated            Table 2. Ablation study of Hybrid Action Boundary Detection.
+descriptions, and (iii) joint assessment of both criteria.           Since EgEx and EK100 lack ground truth step labels, experiments
+                                                                     are conducted using pseudo-step labels.
+   Based on the problem formulation (Section 3.1), our
+method is an open-ended extension of OAD based On-TAL.               4.2. Results and Analysis
+Instead of simply predicting class indices, it evolves to gen-
+erate open-ended descriptions of the target action instance.         Validating Dataset Pipeline Table 1 presents the validation
+Thus, following a recent work [18, 48, 55], we opt for               of our dataset pipeline. Since the Ego4D-Goalstep dataset
+F1@tIOU as our main metric to evaluate the class-agnostic            contains both substep and step annotations, we compare
+localization performance of the Streaming module.                    the generated pseudo step labels from our pipeline with the
+                                                                     ground truth step labels. The results in the first row show
+    For description quality and alignment, we use GPT-               that the LLM effectively groups atomic actions, leading to
+Score, a standard GPT-assisted evaluation for open-ended             a reasonable approximation of the original step annotations.
+VLM outputs [16, 25, 26, 36, 45]. Following [27], we score           However, due to the inherent subjectivity in action temporal
+all true positive predictions on a 1–5 scale across multiple         boundaries, perfect recovery is obviously impossible.
+criteria and report the average GPT-Score in experiments.               More importantly, we assess whether these pseudo-
+As noted in [56], we also found that conventional N-gram             labels provide meaningful learning signals for step-level
+metrics (e.g., CIDEr [41]) are not the optimal choice for            hierarchy training. Surprisingly, models trained with our
+zero-shot VLM evaluation.                                            pseudo-labels performed competitively with those trained
+   To jointly evaluate localization ability and description          on the actual ground truth labels. This suggests that even
+alignment, we adopt a zero-shot evaluation strategy from             though the generated step labels do not exactly match the
+CLIP [30], encoding the predicted and all ground truth de-           originals, they do not contain critical errors but instead pro-
+scriptions into vectors with the GPT-4 text encoder [1] and          vide a plausible alternative. Just as different human anno-
+ranking them by pairwise cosine similarity; a prediction is a        tators might produce varying temporal boundaries, the gen-
+true positive only if it exceeds the tIOU threshold AND its          erated labels still offer a valid interpretation rather than a
+corresponding ground truth description appears in the top-           completely incorrect one.
+k matches. Hereafter, we refer to the F1 metric for class-           Hybrid Action Boundary Detection Table 2 demonstrates
+agnostic localization as F1 (loc.), and top-k F1 metric as F1        the effectiveness of our hybrid action boundary detection
+(loc.+desc.). Detailed evaluation steps, full GPT-Score re-          method. Across all configurations and datasets, incorporat-
+sults without averaging, and failure cases of N-gram-based           ing our hybrid method yields significant gains. It highlights
+metrics are provided in the supplementary materials.                 the critical importance of our approach in processing proce-
+
+
+                                                                 6
+                                                                 F1 (loc.) ↑                 F1 (loc. + desc.) ↑
+                                                                                                                          GPT         Goal
+     Method          Train          Valid       Hier.
+                                                          0.3       0.5         0.7       0.3       0.5         0.7      Score ↑     Acc. ↑
+                                                Step       -         -            -      28.68     28.68       28.68      2.96
+   GT Proposal         -            EgoGS                                                                                            47.01
+                                               Substep     -         -            -      33.12     33.12       33.12      2.77
+                                                Step     18.27     12.51        7.08      4.21      3.12        2.19      2.79
+    TeSTra [54]                                                                                                                      37.31
+                                               Substep   22.56     15.85       9.55      6.84       4.81        2.72      2.74
+                                                Step     19.23     12.46        6.56      4.26      2.81        1.79      2.73
+   MiniROAD [2]                                                                                                                      38.31
+                                               Substep   32.12     21.90       12.88     9.77       7.05        4.14      2.77
+                                                Step     18.36     12.34        7.00      4.01      3.01        1.98      2.82
+     MAT [42]        EgoGS                                                                                                           40.30
+                                               Substep   26.22     18.91       11.28     7.32       5.13        3.21      2.74
+                                                Step     22.23     10.43        3.06      2.61      1.32        0.57      2.12
+    SDVC [55]                       EgoGS                                                                                              -
+                                               Substep   17.81     7.79        2.30      2.28       0.80        0.22      1.76
+                                                Step     22.23     10.43        3.06      6.20      3.25        0.79      2.45
+   SDVC* [55]                                  Substep   17.81     7.79        2.30      5.73       2.57        0.93      2.18
+                                                                                                                                       -
+                                                Step     51.58     39.70       24.76     15.23     12.67        8.68      2.96
+                     EgoGS                                                                                                           47.76
+                                               Substep   55.17     43.71       28.83     19.79     16.11       10.89      2.78
+   OpenHOUSE
+                                                Step     50.65     38.24       23.48     14.30     11.63        7.66      3.02
+                     EgoGS†                    Substep   55.75     43.88       29.38     19.80     16.42       11.71      2.79
+                                                                                                                                     45.52
+                                                Step     62.85     45.75       26.15     19.99     14.76        9.87      3.18
+                     EgEx†          EgEx†      Substep   63.42     51.12       34.36     23.22     19.53       14.03      2.56
+                                                                                                                                     90.66
+                                                Step     55.32     34.48       15.91     14.13      9.04        4.35      3.24
+   OpenHOUSE         EK100†         EK100†     Substep   65.98     48.01       25.73     13.54     10.51        6.09      2.64
+                                                                                                                                     29.71
+                                                Step     62.03     39.73       19.73     12.91      9.18        4.99      2.80
+                     Exo.†          Exo.†      Substep   57.33     40.29       21.35     10.06      7.60        4.50      1.96
+                                                                                                                                     79.12
+
+Table 3. Comparison with baseline methods and results in various datasets. † indicates datasets with “step pseudo-label” from our pipeline,
+and “Exo.” denotes EgEx’s Exo view. “GT proposal” refers to experiments using ground truth action proposals as VLM input, without class
+information. Zero-shot VLM inference achieves around 30% accuracy in matching ground truth labels. InternVL2-40B-AWQ [6] is used
+as the frozen VLM. Following the original implementation, YT-Temporal [50] pretrained Vid2Seq [48] weights are used for initialization
+of SDVC, and fine-tuned using EgoGS annotations, with separate training for each hierarchy. We used the default configuration on SDVC.
+
+                                                                 F1 (loc.) ↑                      F1 (loc. + desc.) ↑
+                                                                                                                                    Goal
+        Train               Valid            Hier.
+                                                          0.3        0.5          0.7         0.3           0.5        0.7         Acc. ↑
+                                             Step        55.32      34.48        15.91       14.13         9.04        4.35
+      EK100†               EK100†           Substep      65.98      48.01        25.73       13.54         10.51       6.09
+                                                                                                                                   29.71
+                                             Step        42.49      25.62        12.21       11.24         7.48        3.98
+       EgoGS                                                                                                                       28.26
+                                            Substep      44.91      26.09        11.39       9.81          6.08        2.72
+                                             Step        44.39      26.22        10.50       11.43         7.15        3.29
+       EgEx†               EK100†           Substep      50.75      30.74        13.82       10.68         6.80        3.29
+                                                                                                                                   25.36
+                                             Step        51.64      32.47        13.84       12.52          8.84       4.26
+   EgoGS + EgEx†                            Substep      53.67      33.98        15.98       11.97         8.11        4.24
+                                                                                                                                   29.71
+
+Table 4. Cross-validation results. The EK100-trained model serves as the upper bound, while the EgoGS + EgEx-trained model yields
+comparable results, demonstrating scalability when merging multiple datasets.
+
+dural videos, where many instances are strictly adjacent.                  both baselines across all metrics, yet comparing the base-
+Comparison with Other Methods As the first work in                         lines provides additional insights. The higher F1 (loc.)
+Hierarchical Streaming Video Understanding, we establish                   of the OAD extension (TeSTra, MiniROAD, MAT) over
+two baseline approaches: (i) We extend recent OAD meth-                    SDVC suggests OAD-based approaches are more effective
+ods by training class-agnostic variants of [2, 42, 54] us-                 for online localization, supporting our choice of extend-
+ing temporal annotations. For detected action instances,                   ing OAD-based On-TAL in OpenHOUSE. Additionally, the
+we apply the same description generation process as Open-                  better performance of SDVC* over SDVC indicates that, for
+HOUSE. (ii) We compare against SDVC [55], treating the                     relatively small-scale datasets, leveraging a powerful pre-
+task as an extension of streaming dense video caption-                     trained VLM may be more effective than full fine-tuning.
+ing. We introduce two SDVC variants: fine-tuned one                            Moreover, the goal accuracy gap between baselines and
+(SDVC) following the original implementation and another                   our method demonstrates that accurate lower-hierarchy ac-
+(SDVC*) that uses only the action proposals from the fine-                 tion predictions are crucial for identifying high-level se-
+tuned model while following OpenHOUSE’s description                        mantics, as they provide relevant information. Additionally,
+generation process with a frozen large-scale VLM.                          experiments on the exo-view in EgoExo4D show that Open-
+   Table 3 shows OpenHOUSE significantly outperforms                       HOUSE is not limited to egocentric views, though third-
+
+
+                                                                      7
+                                  SDVC [55]                                 1                    2                     3
+                    Hier.                          OpenHOUSE
+                                 70       105
+                    Step        36.36    64.84            4.94
+  AEDT (s) ↓
+                   Substep      43.95    52.64             1.82
+    F1@0.3          Step         9.85    14.12            51.58                                                                            Time
+
+    (loc.) ↑       Substep       5.48     8.55            55.17                   [04:57 ~ 05:27] “Cutting broccoli into smaller pieces”
+
+Table 5. Comparison of prediction delay (AEDT [19]) and F1                  1
+                                                                                  [05:07 ~ 05:33] “Slice broccoli”
+(loc.) between SDVC [55] and OpenHOUSE in EgoGS [37]. The
+numbers 70 and 105 denote the decoding points interval of SDVC.                   [05:27 ~ 06:13] “The person is washing the broccoli
+                                                                                  florets under running water”
+   Num.        Frames       Previous           F1            GPT            2
+                                                                                  [05:33 ~ 06:15] “Wash broccoli”
+  Frames        Hier.       Output      (loc. + desc.)↑      Score
+   59385          ✗            ✗             13.08            2.59                [06:13 ~ 06:19] “The person is placing the steamer
+   22770         ✔             ✗             10.96            2.42                basket with the rinsed broccoli onto the stove”
+                                                                            3
+   22770         ✔             ✔             13.05            2.76                [06:15 ~ 06:18] “Place broccoli strainer in pot”
+Table 6. Ablation study on different uses of context memory for
+generating EgoGS step captions. “Frames Hier.” refers to the                      [04:57 ~ 06:19] “The person is steaming broccoli
+                                                                            1     on the stove”
+hierarchical-aware frame sampling strategy, while “Previous Out-            2
+put” refers to using previous predictions as auxiliary information.         3     [05:07 ~ 06:18] “Prepares the broccoli”
+InternVL2-76B [6] is used across all the experiments.
+person view is not the primary focus of this paper.                              Substep :       Step :       Ours :        GT :
+
+Cross-Dataset Evaluation Thanks to “class-agnostic”                       Figure 5. Qualitative results. For the GT substep caption ”Place
+streaming module and VLM’s “zero-shot” inference strat-                   broccoli strainer in pot”, OpenHOUSE provides ”The person
+egy, OpenHOUSE can be trained on a merged dataset and                     is placing the steamer basket with the rinsed broccoli onto the
+evaluated across different datasets.                                      stove.”, which aligns better with the actual visual content.
+    For the experiment, we fixed the validation dataset to                ture improves performance while requiring only 40% of the
+EK100 while varying the training datasets. Table 4 shows                  frames. This reduction in frame usage significantly lowers
+the cross-dataset evaluation results. Comparing the EK100-                the computational complexity of VLM inference.
+trained configuration with others, OpenHOUSE demon-                       Inference speed We evaluated the inference efficiency on a
+strates strong performance even in cross-dataset scenarios.               46-minute video at 16 fps (totaling 2758 * 16 frames) us-
+Notably, we observe scalability: training on the merged                   ing four RTX 3090 GPUs with the VLM model InternVL2-
+dataset (EgoGS + EgoEx) yields the highest F1 score. This                 40B-AWQ [6]. OpenHOUSE achieves an average process-
+indicates that OpenHOUSE can be further extended with                     ing speed of 24 fps, which is 16 times faster compared to
+more training videos, highlighting the strong scalability and             using the VLM for every frame in the same environment.
+potential of the framework.                                               This shows that our framework significantly improves the
+Prediction Delay To quantitatively assess the promptness                  efficiency of VLM utilization given the same input.
+of OpenHOUSE, we compare its prediction delay with                        Qualitative results Figure 5 shows the qualitative results
+SDVC using the AEDT metric from [19], which measures                      of our OpenHOUSE framework. The video is processed
+the time gap between when a true positive prediction is                   in an online manner, generating both substep and step cap-
+generated and when it should ideally be produced. Table                   tions. We observed that the generated captions exhibit high
+5 presents the results, showing that SDVC [55] introduces                 semantic similarity to the ground truth (GT) captions, pro-
+significant delays compared to our strictly online approach.              viding even more detailed descriptions.
+Moreover, simply shortening the interval between decoding                 Additional experiments Experiments on various VLMs,
+points significantly degrades localization performance, as                description generation for incomplete action instances, ad-
+noted in [55], making it unsuitable for online approaches.                ditional details on the mentioned experiments, and demo
+Utilization of Context Memory As discussed in Section                     videos are provided in the supplementary materials.
+3.3.2, we leverage context memory during VLM inference.
+The key information in the context memory includes hierar-                5. Conclusion
+chical frame membership (e.g., used when selecting frames
+within the substeps of the current step for VLM infer-                    With advancing VLMs, we see their integration into stream-
+ence) and previous text-based predictions. Table 6 presents               ing settings as the next step for online action perception. In
+the results of these experiments, showing that incorporat-                this context, OpenHOUSE is a key step, laying the founda-
+ing context memory that leverages the hierarchical struc-                 tion for future research.
+
+
+                                                                      8
+                   Open-ended Hierarchical Streaming Video Understanding
+                               with Vision Language Models
+                                                    Supplementary Material
+
+
+ (a)                                                                                       (b)
+
+                                                                                                                                        ity
+                                                                                                                                                 “Wash vegetables”
+                                                                                                                                    r
+                                                                                                                                ila
+            “Turn on faucet”   “Rinse vegetables”            “Hold knife”                                                   m
+                                                                                                                          Si
+ Pred                                                                                                                ne                          “Grip knife”
+                                                                                                                   si
+                                                                                                                Co
+                                                tIoU based
+                                                                                           “Rinse vegetables”                                    “Peel onion”
+                                            Hungarian Matching
+
+ tIoU             0.3                0.45                         0.8
+ GT
+                        “Wash vegetables”                       “Grip knife”                                                                     “Open fridge”
+                                                                                    Time
+                                                                                                                                              All GT Descriptions
+
+
+Figure 6. (a) tIoU -based Hungarian matching. Hungarian matching provides optimal one-to-one matching in terms of maximizing
+tIoU, unlike greedy matching which allows duplication. Here, the algorithm selects ”Rinse vegetables” as the best match for the GT
+”Wash vegetables”. With a predefined tIoU threshold of 0.3, ”Rinse vegetables” is considered a True Positive (TP), while the unmatched
+prediction ”Turn on faucet” is classified as a False Positive (FP). If no prediction matches the GT or fails to meet the threshold, the
+instance is counted as a False Negative (FN). (b) The description ”Rinse vegetables”, initially marked as a TP in F1 (loc.), is encoded into
+an embedding vector. Similarly, all GT descriptions in the test split are encoded, and pairwise cosine similarities are computed. If ”Wash
+vegetables” appears among the top 5 most similar GT descriptions, ”Rinse vegetables” is confirmed as a TP.
+
+
+A. Details of Metrics                                                           ule. This metric employs the Hungarian matching algo-
+                                                                                rithm [22], which provides optimal bipartite matching be-
+This section provides detailed explanations of the evalua-                      tween class-agnostic ground truth {(tsm , tem )}Mm=1 and the
+tion metrics presented in the main text.
+                                                                                model’s predictions {(t̂sm , t̂em )}M̂
+                                                                                                                    m=1 in terms of tIoU . A
+                                                                                prediction is considered a true positive if the overlap with
+Algorithm 1 get hungarian score in Python.
+                                                                                the matched GT exceeds a predefined tIoU (in our paper,
+def get_hungarian_score(answer:list, prediction:list                            tIoU ∈ {0.3, 0.5, 0.7}) threshold. Figure 6 (a) illustrates
+    , iou_threshold=0.5):
+   ’’’                                                                          tIoU-based Hungarian matching and Algorithm 1 presents
+    IN: answer[[st,ed],[st,ed]...],                                             a brief Python implementation for calculating F1 (loc.).
+    prediction[[st,ed],[st,ed]...]
+    OUT: f1_score (float)
+    ’’’                                                                         Top-k F1 [F1 (loc. + desc.)] While F1 (loc.) only mea-
+   profit = np.zeros((len(answer), len(prediction)))                            sures class-agnostic action proposals, our final output in-
+   #calculate pairwise iou
+   for i in range(len(answer)):                                                 cludes free-form descriptions of action instances. To ac-
+       for j in range(len(prediction)):                                         count for this, we extend F1 (loc.) to define F1 (loc. +
+          profit[i][j] = calculate_iou(answer[i],
+              prediction[j])                                                    desc.), adding a semantic relevance constraint for True Pos-
+   #perform Hungarian Matching
+   r, c = optimize.linear_sum_assignment(profit,                                itives (TP) beyond the tIoU condition. First, tIoU-based
+        maximize=True)                                                          Hungarian matching is performed, identical to F1 (loc.).
+   tp = np.sum(np.where(profit[r, c] >=
+        iou_threshold, 1, 0))                                                   Predictions that pass the tIoU threshold are considered can-
+   a = answer.shape[0]                                                          didates. Each candidate prediction {sp , ep , dp } is matched
+   p = prediction.shape[0]
+   #return F1 score                                                             to a ground truth (GT) instance {sgt , egt , dgt } where s and e
+   return 2*tp/(a+p)
+                                                                                are the start and end times, and d represents the description.
+                                                                                (Section 3.1)
+Class-agnostic F1 [F1 (loc.)] Previous work [18] con-                              The final step is to determine whether dp and dgt match
+ducted an in-depth study on appropriate metrics for eval-                       or not. Since dp is a free-form output from a powerful
+uating class-agnostic action proposals in a streaming set-                      large-scale VLM, it tends to be highly detailed, making
+ting, revealing that Hungarian F1 is an effective measure                       semantic relevance crucial—something traditional N-gram-
+of performance. Accordingly, we use Hungarian F1 (here-                         based metrics fail to capture. To effectively evaluate the se-
+after, F1 (loc.)) to evaluate the streaming perception mod-                     mantic relevance of the matched prediction, we use a zero-
+
+                                                                            9
+ (a)                                                                                  (b)
+
+
+
+            “Turn on faucet”    “Rinse vegetables”       “Hold knife”                  “Turn on faucet”
+Pred                                                                                                                     “Wash vegetables”
+
+                          tIoU based                                                  “Rinse vegetables”
+                        Greedy Matching
+                                                                                                                         “Grip knife”
+ tIoU             0.3                  0.45                   0.8
+ GT
+                                                                                            “Hold knife”
+                          “Wash vegetables”                 “Grip knife”
+                                                                               Time                                       Matched GT
+                                                                                                                          Descriptions
+
+
+Figure 7. An example of calculating GPT, or BERTscore. With a tIoU threshold of 0.3, the predictions ”Turn on faucet” and ”Rinse
+vegetables” are matched with the GT ”Wash vegetables”, while ”Hold knife” is matched with ”Grip knife”. This duplicated matching
+with ”Wash vegetables” highlights a key difference from the Hungarian F1 metric. After matching, GPT-Score or BERTscore is computed
+for each matched pair, and the final score is obtained by averaging all pair scores.
+
+
+   Example 1              CIDEr : 0/10        GPT-score : 3.5/5                  Method             Heir.      CIDEr        METEOR
+                               GT :                                                                 Step      17.7739         8.4363
+                                                                              GT Proposal
+                               pour chili flakes                                                   Substep    32.8570        10.7680
+                                                                                                    Step      7.1885          4.1640
+                                                                              OpenHOUSE
+                               OpenHOUSE :                                                         Substep    14.3946         5.5151
+                               The person adds seasoning                   Table 7. CIDEr, METEOR in EgoGS using evaluation tool [21].
+                               to the vegetables in the
+                               pan                                         ity is then calculated between dp and all GT descriptions,
+                                                                           which are subsequently ranked by similarity. If the matched
+   Example 2              CIDEr : 0/10        GPT-score : 5.0/5            dgt appears in the top-k rankings, the prediction is finally
+                                                                           classified as a TP. Figure 6 (b) provides an example of this
+                               GT :
+                                                                           process. For all experiment, we choose k = 5 as we empir-
+                               peels onions
+                                                                           ically found that at least five ground truth descriptions often
+                                                                           share near-identical semantics.
+                               OpenHOUSE :                                 Description Quality Metrics In addition to the main met-
+                               peel the onion                              rics, we use another metrics to evaluate the generated de-
+                                                                           scriptions: GPT-Score [27] and BERTscore [52], as intro-
+                                                                           duced in Section 4 of the main text. For GPTScore, we
+   Example 3              CIDEr : 0/10 GPT-score : 4.75/5                  follow [27], scoring all true positive predictions on a 1–5
+                                                                           scale across the CI (Correctness of Information), DO (De-
+                               GT :
+                                                                           tailed Orientation), CU (Contextual Understanding), and
+                               Operates phone                              TU (Temporal Understanding) categories using GPT-3.5.
+                                                                           The CO (Consistency) category is excluded as it is not suit-
+                               OpenHOUSE :                                 able for evaluating hierarchical action descriptions. De-
+                               The person is using their                   tailed prompts used for evaluating the CI, DO, CU, and
+                               smartphone                                  TU categories can be found in Prompt 1, 2, 3, 4. Un-
+                                                                           like F1 (loc.), which identifies optimal one-to-one match-
+                                                                           ing between ground truth and predictions, these metrics use
+Figure 8. Examples of CIDEr [41] and GPT-Score [27] results
+                                                                           greedy matching, allowing multiple predictions to match the
+from EgoGS dataset. Each score was computed at tIoU 0.3. GPT-
+                                                                           same ground truth. A predefined tIoU threshold is applied
+Score reflects the average of four semantic dimensions: CU, CO,
+DO, and TU.                                                                to filter predictions before calculating the scores.
+                                                                           N-gram based metric We found that popular N-gram-
+shot evaluation approach inspired by CLIP [30]. For each                   based methods (e.g. CIDEr [41]) are not suitable for eval-
+matched prediction, we encode the candidate description dp                 uating the caption quality of OpenHOUSE. Since we use a
+and all GT descriptions {dm }M                                             powerful VLM in a zero-shot setting, it often produces de-
+                               m=1 using a GPT-4 [1] text
+encoder, where M represents the total number of GT de-                     tailed descriptions that may align even better with the actual
+scriptions in the whole test split. Pairwise cosine similar-               action than the ground truth, but may not share the exact
+
+
+                                                                    10
+Prompt 1 CI Prompt for Evaluation.
+                                                                     Prompt 3 CU Prompt for Evaluation.
+role: system,
+content:
+   You are an intelligent chatbot designed for evaluating            role: system,
+         the factual accuracy of generative outputs for video        content:
+         -based question-answer pairs.                                  You are an intelligent chatbot designed for evaluating
+   Your task is to compare the predicted answer with the                      the contextual understanding of generative outputs
+         correct answer and determine if they are factually                   for video-based question-answer pairs.
+         consistent. Here’s how you can accomplish the task:            Your task is to compare the predicted answer with the
+   ------                                                                     correct answer and determine if the generated
+   ##INSTRUCTIONS:                                                            response aligns with the overall context of the
+   - Focus on the factual consistency between the predicted                   video content. Here’s how you can accomplish the
+         answer and the correct answer. The predicted answer                  task:
+         should not contain any misinterpretations or                   ------
+         misinformation.                                                ##INSTRUCTIONS:
+   - The predicted answer must be factually accurate and                - Evaluate whether the predicted answer aligns with the
+         align with the video content.                                        overall context of the video content. It should not
+   - Consider synonyms or paraphrases as valid matches.                       provide information that is out of context or
+   - Evaluate the factual accuracy of the prediction                          misaligned.
+         compared to the answer.                                        - The predicted answer must capture the main themes and
+                                                                              sentiments of the video.
+role: user,                                                             - Consider synonyms or paraphrases as valid matches.
+content:                                                                - Provide your evaluation of the contextual understanding
+   Please evaluate the following video-based question-answer                   of the prediction compared to the answer.
+          pair:"
+   Question: {question}                                              role: user,
+   Correct Answer: {answer}                                          content:
+   Predicted Answer: {pred}                                             Please evaluate the following video-based question-answer
+   Provide your evaluation only as a factual accuracy score                    pair:
+         where the factual accuracy score is an integer value           Question: {question}
+          between 0 and 5, with 5 indicating the highest                Correct Answer: {answer}
+         level of factual consistency.                                  Predicted Answer: {pred}
+   Please generate the response in the form of a Python                 Provide your evaluation only as a contextual
+         dictionary string with keys ’score’, where its value                 understanding score where the contextual
+          is the factual accuracy score in INTEGER, not                       understanding score is an integer value between 0
+         STRING.                                                              and 5, with 5 indicating the highest level of
+   DO NOT PROVIDE ANY OTHER OUTPUT TEXT OR EXPLANATION. Only                  contextual understanding.
+          provide the Python dictionary string.                         Please generate the response in the form of a Python
+   For example, your response should look like this: {’’                      dictionary string with keys ’score’, where its value
+         score’: 4.8}.                                                         is contextual understanding score in INTEGER, not
+                                                                              STRING.
+                                                                        DO NOT PROVIDE ANY OTHER OUTPUT TEXT OR EXPLANATION. Only
+                                                                               provide the Python dictionary string.
+                                                                        For example, your response should look like this: {’’
+                                                                              score’: 4.8}.
+Prompt 2 DO Prompt for Evaluation.
+role: system,
+content:
+   You are an intelligent chatbot designed for evaluating
+         the detail orientation of generative outputs for            Prompt 4 TU Prompt for Evaluation.
+         video-based question-answer pairs.
+   Your task is to compare the predicted answer with the
+         correct answer and determine its level of detail,           role: system,
+         considering both completeness and specificity. Here’        content:
+         s how you can accomplish the task:                             You are an intelligent chatbot designed for evaluating
+   ------                                                                     the temporal understanding of generative outputs for
+   ##INSTRUCTIONS:                                                             video-based question-answer pairs.
+   - Check if the predicted answer covers all major points              Your task is to compare the predicted answer with the
+         from the video. The response should not leave out                    correct answer and determine if they correctly
+         any key aspects.                                                     reflect the temporal sequence of events in the video
+   - Evaluate whether the predicted answer includes specific                   content. Here’s how you can accomplish the task:
+          details rather than just generic points. It should            ------
+         provide comprehensive information that is tied to              ##INSTRUCTIONS:
+         specific elements of the video.                                - Focus on the temporal consistency between the predicted
+   - Consider synonyms or paraphrases as valid matches.                        answer and the correct answer. The predicted answer
+   - Provide a single evaluation score that reflects the                       should correctly reflect the sequence of events or
+         level of detail orientation of the prediction,                       details as they are presented in the video content.
+         considering both completeness and specificity.                 - Consider synonyms or paraphrases as valid matches, but
+                                                                              only if the temporal order is maintained.
+role: user,                                                             - Evaluate the temporal accuracy of the prediction
+content:                                                                      compared to the answer.
+   Please evaluate the following video-based question-answer
+          pair:                                                      role: user,
+   Question: {question}                                              content:
+   Correct Answer: {answer}                                             Please evaluate the following video-based question-answer
+   Predicted Answer: {pred}                                                    pair:
+   Provide your evaluation only as a detail orientation                 Question: {question}
+         score where the detail orientation score is an                 Correct Answer: {answer}
+         integer value between 0 and 5, with 5 indicating the           Predicted Answer: {pred}
+          highest level of detail orientation.                          Provide your evaluation only as a temporal accuracy score
+   Please generate the response in the form of a Python                        where the temporal accuracy score is an integer
+         dictionary string with keys ’score’, where its value                 value between 0 and 5, with 5 indicating the highest
+          is the detail orientation score in INTEGER, not                      level of temporal consistency.
+         STRING.                                                        Please generate the response in the form of a Python
+   DO NOT PROVIDE ANY OTHER OUTPUT TEXT OR EXPLANATION. Only                  dictionary string with keys ’score’, where its value
+          provide the Python dictionary string.                                is the temporal accuracy score in INTEGER, not
+   For example, your response should look like this: {’’                      STRING.
+         score’: 4.8}.                                                  DO NOT PROVIDE ANY OTHER OUTPUT TEXT OR EXPLANATION. Only
+                                                                               provide the Python dictionary string.
+                                                                        For example, your response should look like this: {’’
+                                                                              score’: 4.8}.
+
+
+
+
+                                                                11
+    vocabulary with the ground truth. This is not a flaw to pe-           points when each action instance ended, and to predict the
+nalize but rather aligns with our ultimate goal of open-ended             overall goal when the video finished. However, in real
+understanding. However, N-gram-based methods require                      world scenarios, it is crucial to generate predictions even
+exact word matches, which unjustly penalizes our more de-                 when an action instance or video is still in progress.
+tailed descriptions.                                                          Thus, in this section, we present the prediction results for
+    Figure 8 illustrates some examples of this. Unlike N-                 substep instances, step instances, and the entire video at var-
+gram based method (CIDEr [41]), we found that the met-                    ious completion stages: 25%, 50%, 75%, and 100%. This
+rics that leverage large-scale language models, such as GPT-              analysis aims to demonstrate the OpenHOUSE’s ability to
+based scoring (GPT-Score [27]), offers a more robust evalu-               provide reliable predictions for substeps, steps, and goals
+ation framework for semantic similarity. Note that our main               even before an action instance or the entire video reaches
+metric, F1 (loc. + desc.), also uses a powerful VLM’s text                completion.
+encoder [1] for encoding the descriptions into vector repre-                  Table 8 presents the VLM inference results on both
+sentations, effectively capturing semantic correspondence.                ground truth (GT) temporal annotations and those generated
+For completeness, we provide results of N-gram based met-                 by the OpenHOUSE streaming module at different comple-
+ric in Table 7.                                                           tion stages. While there is a clear trend of improved perfor-
+                                                                          mance with increased observation, the results at 50% com-
+B. Utilization of Different VLMs                                          pletion show only slight degradation compared to full ob-
+                                                                          servation. Note that we only have 134 test samples for goal
+One of the key components of our system is the VLM,
+                                                                          accuracy, so a single correct or incorrect prediction can lead
+which generates free-form descriptions. Table 9 shows the
+                                                                          to approximately a 1% fluctuation in performance, explain-
+variation in caption quality with different VLMs. The re-
+                                                                          ing the observed perturbations.
+sults indicate that while more advanced VLMs generally
+                                                                              These findings highlight that OpenHOUSE can provide
+improve performance, there is a point of diminishing gains
+                                                                          reliable inferences even when only partial information is
+once the VLM is sufficiently powerful. This highlights the
+                                                                          available, emphasizing the potential of OpenHOUSE in
+inherent complexity of Hierarchical Streaming Video Un-
+                                                                          real-world, online scenarios where actions are often incom-
+derstanding; further improvements cannot rely solely on
+                                                                          plete.
+VLM advancements—enhancing the streaming module is
+also crucial for meaningful progress.
+                                                                          D. Dataset Analysis
+C. Generating descriptions for incomplete                                 In Section D, we aim to discuss the comparison between
+    action instances                                                      the Ego4D GoalStep (EgoGS) dataset and the Ego4D Goal-
+                                                                          Step pseudo (EgoGS pseudo) dataset generated through
+In Section 4, we reported results where the streaming mod-                our dataset generation pipeline. Additionally, we provide
+ule invoked the VLM to predict substeps and steps at the                  statistics on the reconstructed hierarchical datasets, includ-
+                                    F1 (loc. + desc.) ↑                   ing Ego-Exo4D Keystep (EgEx) and Epic-Kitchens 100
+                                                            Goal          (EK100).
+ Method    Completion    Hier.
+                                   0.3     0.5       0.7    Acc. ↑
+                                                                          Comparison between EgoGS and EgoGS pseudo Figure
+                         Step     18.93   18.93     18.93
+              25%                                           39.55         9 (a) illustrates a comparison of step segment durations be-
+                        Substep   23.66   23.66     23.66
+                         Step     24.56   24.56     24.56
+                                                                          tween EgoGS and EgoGS pseudo. The step segment du-
+              50%                                           45.52         ration for EgoGS averages 50.69 seconds, slightly differ-
+                        Substep   28.52   28.52     28.52
+   GT                                                                     ing from the original value reported in the Ego4D Goal-
+                         Step     26.53   26.53     26.53
+              75%                                           47.76         Step dataset [37] because only the train and validation data,
+                        Substep   31.78   31.78     31.78
+                         Step     28.68   28.68     28.68                 excluding the test dataset, were used for this calculation.
+             100%                                           47.01
+                        Substep   33.12   33.12     33.12                 EgoGS pseudo has an average step segment duration of
+                         Step      9.68   7.86       5.36                 46.08 seconds, which is similar to EgoGS. Additionally,
+              25%                                           44.03
+                        Substep   13.55   11.14      8.05                 the overall distribution of step segment durations for EgoGS
+              50%
+                         Step     12.84   10.66      7.45
+                                                            42.54
+                                                                          pseudo aligns well with that of EgoGS. This demonstrates
+ OpenHouse
+                        Substep   16.99   13.93      9.91                 that the dataset generated through our pipeline effectively
+                         Step     14.36   12.02      8.38                 approximates the original dataset.
+              75%                                           45.52
+                        Substep    18.8   15.41     10.66                 Dataset Statistics Figure 9 (b), (c), (d) respectively illus-
+                         Step     15.23   12.67     8.680                 trate the distributions of goal, step, and substep segment
+             100%                                           47.76
+                        Substep   19.79   16.11     10.89
+                                                                          durations for EgoGS pseudo, EgEx, and EK100. The goal,
+Table 8. Experiments on EgoGS validating description generation           step, and substep segments of EgoGS pseudo have aver-
+for incomplete action instances.                                          age durations of 1532.32 seconds, 46.08 seconds, and 22.44
+
+
+                                                                     12
+                                            F1 (loc. + cap.) ↑                      GPT-Score ↑ [27]
+           Model               Hier.                                                                           BERTScore ↑ [52]
+                                        0.3         0.5       0.7             CI      DO      CU        TU
+                                Step   15.53       12.65    8.59             3.33    2.688   3.559     2.852          0.857
+        GPT-4o [28]
+                               Substep 19.51       16.15    11.19           3.027    2.595   3.336     2.706          0.866
+                                Step   15.23       12.67    8.68            3.192    2.606   3.381     2.670          0.858
+  InternVL2-40B-AWQ [6]
+                               Substep 19.79       16.11    10.89           2.869    2.559   3.164     2.543          0.873
+                                Step   10.01        8.21    5.49            2.791    2.374   3.053     2.222          0.843
+     InternVL2-8B [6]
+                               Substep 13.09       10.65     7.57           2.245    2.248   2.644     1.978          0.862
+Table 9. Experimental results on the EgoGS dataset using different VLMs. Here, CI, DO, CU, TU in GPT-Score refer to “Correctness of
+Information”, “Detail Orientation”, “Contextual Understanding”, “Temporal Understanding” respectively.
+          (a)                                                         (b)
+
+
+
+
+          (c)                                                         (d)
+
+
+
+
+                                                    Figure 9. Dataset statistics
+
+
+seconds, respectively. For EgEx, the goal, step, and substep           hours of work and was compensated $200.
+segments have average durations of 308.09 seconds, 32.69
+seconds, and 11.21 seconds, respectively. The goal, step,              E. VLM inference details
+and substep segments of EK100 have average durations of
+                                                                       In section E, we describe the details of the inference process
+499.92 seconds, 22.66 seconds, and 3.03 seconds, respec-
+                                                                       for each level in the hierarchy: substep, step, and goal, us-
+tively.
+                                                                       ing VLM. Additionally, we provide comprehensive details
+Human Validators in Dataset Generation Five human an-                  regarding inference speed measurement
+notators participated in the dataset annotation and valida-            Substep Inference Each substep is inferred using the fol-
+tion process. Each annotator contributed approximately 20              lowing inputs: (i) video frames sampled at 1-second inter-
+
+
+                                                                 13
+Prompt 5 Goal Prompt for VLM inference.                             Prompt 7 Substep Prompt for VLM inference.
+I am planning to add annotations to a video. The annotations        I am planning to add annotations to a video. The annotations
+       form a three-level hierarchy: goal, steps, and                      form a three-level hierarchy: goal, steps, and
+     substeps. Here are the specific requirements:                       substeps. Here are the specific requirements:
+1. Goal Annotation: There is only one goal annotation for           1. Goal Annotation: There is only one goal annotation for
+     the entire video.                                                   the entire video.
+2. Step Annotations: Each step annotation is ordered                2. Step Annotations: Each step annotation is ordered
+     chronologically and must follow the completion of all               chronologically and must follow the completion of all
+     substeps within the previous step. For example, Step 2              substeps within the previous step. For example, Step 2
+     cannot begin until all substeps of Step 1 are completed             cannot begin until all substeps of Step 1 are completed
+     .                                                                   .
+3. Substep Annotations: These are specific parts of the             3. Substep Annotations: These are specific parts of the
+     video that detail the actions within each step.                     video that detail the actions within each step.
+
+Given an image sequence extracted from a video, predict the         Given an image sequence extracted from a video clip, predict
+     most appropriate goal for the video based on the frames              the most appropriate substep occurring in the clip
+      from each step and the short form responses for each               based on the sequence and the previous substeps of the
+     step.                                                               current step.
+The short form responses of the steps are provided as a time        The previous substeps are provided as a time-ordered list of
+     -ordered list in text format, where the 0th index is                 long form responses in text format, where the 0th
+     the earliest step and higher indices represent more                 index is the earliest substep and higher indices
+     recent steps.                                                       represent more recent substeps.
+Utilize this context to predict the overall goal of the             If there are no previous substeps, the list will be empty.
+     video.                                                              Utilize this context to improve the prediction for the
+                                                                         current substep.
+Generate a response:
+The response should consist of a single sentence that               First, Generate two types of responses:
+     succinctly describes the goal.                                 Short form response: A single sentence that succinctly
+Use the following list of short form responses for each step             describes the substep.
+      (in text format and time-ordered):                            Long form response: A detailed and accurate description of
+Short form response of step: {short_form_step}                           the substep based on the image sequence, considering
+                                                                         the previous substeps if provided.
+Output format must be:
+Answer: (goal)                                                      After generating the responses, revise the long form
+                                                                         response to ensure it aligns with the short form
+                                                                         response for consistency.
+                                                                    Use the following list of previous long form responses in
+Prompt 6 Step Prompt for VLM inference.                                  text format to ensure continuity and logical
+                                                                         progression (the list may be empty if there are no
+                                                                         prior substeps):
+I am planning to add annotations to a video. The annotations        Previous long form response: {prediction_list}
+       form a three-level hierarchy: goal, steps, and
+     substeps. Here are the specific requirements:                  Output format must be:
+1. Goal Annotation: There is only one goal annotation for           Answer:
+     the entire video.                                              short form response: (response)
+2. Step Annotations: Each step annotation is ordered                long form response (before revision): (response)
+     chronologically and must follow the completion of all          long form response (after revision): (response)
+     substeps within the previous step. For example, Step 2
+     cannot begin until all substeps of Step 1 are completed
+     .
+3. Substep Annotations: These are specific parts of the
+     video that detail the actions within each step.
+Given an image sequence extracted from a video clip, predict        vals from the corresponding substep instance, and (ii) text
+      the most appropriate step occurring in the clip based
+     on the sequence and the previous steps.                        predictions from prior substeps within the same step. With
+The previous steps are provided as a time-ordered list of
+     long form responses in text format, where the 0th index        these inputs, predictions are made using the prompt 7. The
+      is the earliest step and higher indices represent more
+      recent steps.                                                 generated short form response serves as the prediction re-
+If there are no previous steps, the list will be empty. If          sult, while the long form response (after revision) is used as
+     there are more than 10 previous steps, only the 10 most
+      recent responses will be provided. Utilize this
+     context to improve the prediction for the current step.
+                                                                    input for predicting the next substep.
+First, Generate two types of responses:                             Step Inference For step-level inference, the input consists
+Short form response: A single sentence that succinctly
+     describes the step.
+                                                                    of: (i) images sampled from the substep instances within the
+Long form response: A detailed and accurate description of          given step at 3.3-second intervals, and (ii) text predictions
+     the step based on the image sequence, considering the
+     previous steps if provided.                                    from up to 10 previous steps. With these inputs, predictions
+After generating the responses, revise the long form                are made using the prompt 6. Again, the short form re-
+     response to ensure it aligns with the short form
+     response for consistency.                                      sponse represents the prediction result, while the long form
+Use the following list of previous long form responses in           response (after revision) is employed to predict the subse-
+     text format to ensure continuity and logical                   quent step.
+     progression (the list may be empty if there are no
+     prior steps, and a maximum of the 10 most recent
+     responses will be provided):                                   Goal Inference Goal inference utilizes: (i) a single image
+Previous long form response: {prediction_list}
+                                                                    per step, and (ii) text predictions from all the steps. With
+Output format must be:
+Answer:
+                                                                    these inputs, predictions are made using the prompt 5.
+short form response: (response)
+long form response (before revision): (response)                    Inference Speed Measurement Details As discussed in
+long form response (after revision): (response)                     Section 4.2, we evaluated the inference speed of a video
+                                                                    with 2758 * 16 frames (46 minutes at 16 fps) using the In-
+                                                                    tern VL2-40B-AWQ [6] model. The measurement was con-
+                                                                    ducted utilizing 4 * RTX 3090 GPUs. The measured FPS
+                                                                    represents the model’s average processing FPS.
+
+
+                                                               14
+   Following the technical details in [2], the reported 24                    In European Conference on Computer Vision (ECCV), 2022.
+FPS includes the entire OpenHOUSE pipeline, encompass-                        2
+ing: (i) online feature extraction from raw frames, (ii)                  [4] Junwen Chen, Gaurav Mittal, Ye Yu, Yu Kong, and Mei
+Streaming Module inference, and (iii) VLM inference.                          Chen. Gatehub: Gated history unit with background sup-
+                                                                              pression for online action detection. In IEEE/CVF Confer-
+F. Implementation Details                                                     ence on Computer Vision and Pattern Recognition (CVPR),
+                                                                              2022. 2
+As discussed in Section 3.3.1 of the main paper, our Stream-              [5] Joya Chen, Zhaoyang Lv, Shiwei Wu, Kevin Qinghong Lin,
+ing Module consists of three heads: a state-emitting head, a                  Chenan Song, Difei Gao, Jia-Wei Liu, Ziteng Gao, Dongxing
+progression head for steps, and a progression head for sub-                   Mao, and Mike Zheng Shou. Videollm-online: Online video
+steps. Each head shares an RNN backbone comprising three                      large language model for streaming video. In Proceedings of
+recurrent layers with a hidden state size of 768.                             the IEEE/CVF Conference on Computer Vision and Pattern
+                                                                              Recognition, pages 18407–18418, 2024. 2, 3
+   The state-emitting head is trained using the standard
+                                                                          [6] Zhe Chen, Weiyun Wang, Hao Tian, Shenglong Ye, Zhang-
+cross-entropy loss, following the approach in [18]. The pro-
+                                                                              wei Gao, Erfei Cui, Wenwen Tong, Kongzhi Hu, Jiapeng
+gression heads for both steps and substeps are trained us-                    Luo, Zheng Ma, et al. How far are we to gpt-4v? closing
+ing the histogram loss described in [11], configured with 10                  the gap to commercial multimodal models with open-source
+bins and a standard deviation (σ) of 0.15.                                    suites. arXiv preprint arXiv:2404.16821, 2024. 7, 8, 13, 14
+   We trained using AdamW optimizer with a learning rate                  [7] Jifeng Dai, Yi Li, Kaiming He, and Jian Sun. R-fcn: Object
+of 3e-4, a batch size of 16, and a weight decay of 0.01. The                  detection via region-based fully convolutional networks. Ad-
+model is trained for a total of 30 epochs.                                    vances in Neural Information Processing Systems (NeurIPS),
+                                                                              2016. 2
+G. Streaming Module Comparison                                            [8] Dima Damen, Hazel Doughty, Giovanni Maria Farinella,
+                                                                              Antonino Furnari, Evangelos Kazakos, Jian Ma, Davide
+Since our streaming module is based on the Action-                            Moltisanti, Jonathan Munro, Toby Perrett, Will Price,
+Switch [18] design, we conducted apple-to-apple evalu-                        et al.      Rescaling egocentric vision.      arXiv preprint
+ations on EK-100 against various class-agnostic On-TAL                        arXiv:2006.13256, 2020. 2, 4, 6
+baselines. (Table 10). Key observations are: (i) Streaming                [9] Roeland De Geest, Efstratios Gavves, Amir Ghodrati,
+Module (SM) without hybrid detection performs compara-                        Zhenyang Li, Cees Snoek, and Tinne Tuytelaars. Online ac-
+bly to ActionSwitch, validating our design choice, (ii) SM                    tion detection. In European Conference on Computer Vision
+with hybrid strategy significantly outperforms prior meth-                    (ECCV), 2016. 2, 6
+ods, setting a new SOTA in class-agnostic On-TAL. These                  [10] Hyunjun Eun, Jinyoung Moon, Jongyoul Park, Chanho Jung,
+results further confirm the effectiveness and superiority of                  and Changick Kim. Learning to discriminate information for
+our hybrid action boundary detection method.                                  online action detection. In IEEE/CVF Conference on Com-
+                                                                              puter Vision and Pattern Recognition (CVPR), 2020. 2
+        Method          F1@0.5     Precision@0.5    Recall@0.5           [11] Jesse Farebrother, Jordi Orbay, Quan Vuong, Adrien Ali
+    CAG-QIL [17]        23.117        21.347          25.206                  Taı̈ga, Yevgen Chebotar, Ted Xiao, Alex Irpan, Sergey
+      SimOn [40]         4.395         2.351          33.481
+                                                                              Levine, Pablo Samuel Castro, Aleksandra Faust, et al. Stop
+  OAD-Grouping [17]     21.416        25.533          18.442
+   ActionSwitch [18]    32.444        29.858          35.519
+                                                                              regressing: Training value functions via classification for
+    SM w/o Hybrid       31.459        38.689          26.506                  scalable deep rl. arXiv preprint arXiv:2403.03950, 2024. 5,
+  SM (OpenHOUSE)         48.954        48.172         49.763                  15
+Table 10. SM(Streaming Module) comparison in EK100 (Class-               [12] Ross Girshick. Fast r-cnn. In IEEE/CVF International Con-
+agnostic metrics)                                                             ference on Computer Vision (ICCV), 2015. 2
+                                                                         [13] Kristen Grauman, Andrew Westbury, Lorenzo Torresani,
+References                                                                    Kris Kitani, Jitendra Malik, Triantafyllos Afouras, Kumar
+                                                                              Ashutosh, Vijay Baiyya, Siddhant Bansal, Bikram Boote,
+ [1] Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ah-                    et al. Ego-exo4d: Understanding skilled human activity from
+     mad, Ilge Akkaya, Florencia Leoni Aleman, Diogo Almeida,                 first-and third-person perspectives. In IEEE/CVF Conference
+     Janko Altenschmidt, Sam Altman, Shyamal Anadkat, et al.                  on Computer Vision and Pattern Recognition (CVPR), 2024.
+     Gpt-4 technical report. arXiv preprint arXiv:2303.08774,                 2, 4, 6
+     2023. 1, 6, 10, 12                                                  [14] Ehsan Imani, Kai Luedemann, Sam Scholnick-Hughes, Es-
+ [2] Joungbin An, Hyolim Kang, Su Ho Han, Ming-Hsuan Yang,                    raa Elelimy, and Martha White. Investigating the histogram
+     and Seon Joo Kim. Miniroad: Minimal rnn framework for                    loss in regression. arXiv preprint arXiv:2402.13425, 2024.
+     online action detection. In IEEE/CVF International Confer-               5
+     ence on Computer Vision (ICCV), 2023. 2, 5, 7, 15                   [15] Md Mohaiminul Islam, Ngan Ho, Xitong Yang, Tushar Na-
+ [3] Siddhant Bansal, Chetan Arora, and C.V. Jawahar. My view                 garajan, Lorenzo Torresani, and Gedas Bertasius. Video re-
+     is the best view: Procedure learning from egocentric videos.             cap: Recursive captioning of hour-long videos. In IEEE/CVF
+
+
+                                                                    15
+     Conference on Computer Vision and Pattern Recognition                   Wang, et al. Egovideo: Exploring egocentric founda-
+     (CVPR), 2024. 3, 4                                                      tion model and downstream adaptation. arXiv preprint
+[16] Peng Jin, Ryuichi Takanobu, Wancai Zhang, Xiaochun Cao,                 arXiv:2406.18070, 2024. 6
+     and Li Yuan. Chat-univi: Unified visual representation em-         [30] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+     powers large language models with image and video un-                   Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+     derstanding. In Proceedings of the IEEE/CVF Conference                  Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learn-
+     on Computer Vision and Pattern Recognition, pages 13700–                ing transferable visual models from natural language super-
+     13710, 2024. 6                                                          vision. In International Conference on Machine Learning
+[17] Hyolim Kang, Kyungmin Kim, Yumin Ko, and Seon Joo                       (ICML), 2021. 1, 6, 10
+     Kim. Cag-qil: Context-aware actionness grouping via q              [31] Hanoona Rasheed, Muhammad Uzair Khattak, Muhammad
+     imitation learning for online temporal action localization.             Maaz, Salman Khan, and Fahad Shahbaz Khan. Fine-
+     In IEEE/CVF International Conference on Computer Vision                 tuned clip models are efficient video learners. In IEEE/CVF
+     (ICCV), 2021. 2, 3, 5, 15                                               Conference on Computer Vision and Pattern Recognition
+[18] Hyolim Kang, Jungsuk Hyun, Joungbin An, Youngjae Yu,                    (CVPR), 2023. 1
+     and Seon Joo Kim. Actionswitch: Class-agnostic detection           [32] Shuhuai Ren, Linli Yao, Shicheng Li, Xu Sun, and Lu
+     of simultaneous actions in streaming videos. In European                Hou. Timechat: A time-sensitive multimodal large language
+     Conference on Computer Vision (ECCV), 2024. 2, 3, 5, 6, 9,              model for long video understanding. In IEEE/CVF Confer-
+     15                                                                      ence on Computer Vision and Pattern Recognition (CVPR),
+[19] Young Hwi Kim, Hyolim Kang, and Seon Joo Kim. A sliding                 2024. 1
+     window scheme for online temporal action localization. In          [33] Sakib Reza, Yuexi Zhang, Mohsen Moghaddam, and Octavia
+     European Conference on Computer Vision (ECCV), 2022. 3,                 Camps. Hat: History-augmented anchor transformer for on-
+     8                                                                       line temporal action localization. In European Conference
+[20] Young Hwi Kim, Seonghyeon Nam, and Seon Joo Kim.                        on Computer Vision (ECCV), 2024. 2, 3, 6
+     2pesnet: Towards online processing of temporal action lo-          [34] F. Sener, D. Chatterjee, D. Shelepov, K. He, D. Singhania,
+     calization. Pattern Recognition, 2022. 2                                R. Wang, and A. Yao. Assembly101: A large-scale multi-
+                                                                             view video dataset for understanding procedural activities.
+[21] Ranjay Krishna, Kenji Hata, Frederic Ren, Li Fei-Fei, and
+                                                                             In IEEE/CVF Conference on Computer Vision and Pattern
+     Juan Carlos Niebles. Dense-captioning events in videos. In
+                                                                             Recognition (CVPR), 2022. 2
+     Proceedings of the IEEE international conference on com-
+     puter vision, pages 706–715, 2017. 10                              [35] Yuhan Shen and Ehsan Elhamifar. Progress-aware online
+                                                                             action segmentation for egocentric procedural task videos.
+[22] Harold W Kuhn. The hungarian method for the assignment
+                                                                             In IEEE/CVF Conference on Computer Vision and Pattern
+     problem. Naval research logistics quarterly, 1955. 9
+                                                                             Recognition (CVPR), 2024. 5
+[23] Patrick Lewis, Ethan Perez, Aleksandra Piktus, Fabio
+                                                                        [36] Enxin Song, Wenhao Chai, Guanhong Wang, Yucheng
+     Petroni, Vladimir Karpukhin, Naman Goyal, Heinrich
+                                                                             Zhang, Haoyang Zhou, Feiyang Wu, Haozhe Chi, Xun Guo,
+     Küttler, Mike Lewis, Wen-tau Yih, Tim Rocktäschel, et al.
+                                                                             Tian Ye, Yanting Zhang, et al. Moviechat: From dense token
+     Retrieval-augmented generation for knowledge-intensive nlp
+                                                                             to sparse memory for long video understanding. In Proceed-
+     tasks. In Advances in Neural Information Processing Sys-
+                                                                             ings of the IEEE/CVF Conference on Computer Vision and
+     tems (NeurIPS), 2020. 5
+                                                                             Pattern Recognition, pages 18221–18232, 2024. 6
+[24] Tianwei Lin, Xiao Liu, Xin Li, Errui Ding, and Shilei Wen.         [37] Yale Song, Eugene Byrne, Tushar Nagarajan, Huiyu Wang,
+     Bmn: Boundary-matching network for temporal action pro-                 Miguel Martin, and Lorenzo Torresani. Ego4d goal-step: To-
+     posal generation. In IEEE/CVF Conference on Computer                    ward hierarchical understanding of procedural activities. Ad-
+     Vision and Pattern Recognition (CVPR), 2019. 6                          vances in Neural Information Processing Systems, 2024. 2,
+[25] Ruyang Liu, Chen Li, Haoran Tang, Yixiao Ge, Ying Shan,                 3, 4, 6, 8, 12
+     and Ge Li. St-llm: Large language models are effective tem-        [38] Youngkil Song, Dongkeun Kim, Minsu Cho, and Suha
+     poral learners. In European Conference on Computer Vision,              Kwak. Online temporal action localization with memory-
+     pages 1–18. Springer, 2024. 6                                           augmented transformer. In European Conference on Com-
+[26] Ye Liu, Zongyang Ma, Zhongang Qi, Yang Wu, Ying Shan,                   puter Vision (ECCV), 2024. 2, 3, 6
+     and Chang W Chen. Et bench: Towards open-ended event-              [39] Mingxing Tan, Ruoming Pang, and Quoc V Le. Efficientdet:
+     level video-language understanding. In Advances in Neural               Scalable and efficient object detection. In IEEE/CVF Confer-
+     Information Processing Systems (NeurIPS), 2024. 6                       ence on Computer Vision and Pattern Recognition (CVPR),
+[27] Muhammad Maaz, Hanoona Rasheed, Salman Khan, and Fa-                    2020. 2
+     had Shahbaz Khan. Video-chatgpt: Towards detailed video            [40] Tuan N Tang, Jungin Park, Kwonyoung Kim, and
+     understanding via large vision and language models. arXiv               Kwanghoon Sohn.         Simon: A simple framework for
+     preprint arXiv:2306.05424, 2023. 1, 2, 6, 10, 12, 13                    online temporal action localization.           arXiv preprint
+[28] OpenAI. Hello gpt-4o, 2024. 13                                          arXiv:2211.04905, 2022. 2, 3, 15
+[29] Baoqi Pei, Guo Chen, Jilan Xu, Yuping He, Yicheng Liu,             [41] Ramakrishna Vedantam, C Lawrence Zitnick, and Devi
+     Kanghua Pan, Yifei Huang, Yali Wang, Tong Lu, Limin                     Parikh. Cider: Consensus-based image description evalu-
+
+
+                                                                   16
+     ation. In IEEE/CVF Conference on Computer Vision and                [55] Xingyi Zhou, Anurag Arnab, Shyamal Buch, Shen Yan,
+     Pattern Recognition (CVPR), 2015. 6, 10, 12                              Austin Myers, Xuehan Xiong, Arsha Nagrani, and Cordelia
+[42] Jiahao Wang, Guo Chen, Yifei Huang, Limin Wang, and                      Schmid. Streaming dense video captioning. In IEEE/CVF
+     Tong Lu. Memory-and-anticipation transformer for online                  Conference on Computer Vision and Pattern Recognition
+     action understanding. In IEEE/CVF International Confer-                  (CVPR), 2024. 2, 3, 6, 7, 8
+     ence on Computer Vision (ICCV), 2023. 7                             [56] Deyao Zhu, Jun Chen, Xiaoqian Shen, Xiang Li, and Mo-
+[43] Xiang Wang, Shiwei Zhang, Zhiwu Qing, Yuanjie Shao,                      hamed Elhoseiny. Minigpt-4: Enhancing vision-language
+     Zhengrong Zuo, Changxin Gao, and Nong Sang. Oadtr: On-                   understanding with advanced large language models. arXiv
+     line action detection with transformers. In IEEE/CVF Inter-              preprint arXiv:2304.10592, 2023. 6
+     national Conference on Computer Vision (ICCV), 2021. 2
+[44] Shiwei Wu, Joya Chen, Kevin Qinghong Lin, Qimeng Wang,
+     Yan Gao, Qianli Xu, Tong Xu, Yao Hu, Enhong Chen, and
+     Mike Zheng Shou. Videollm-mod: Efficient video-language
+     streaming with mixture-of-depths vision computation. arXiv
+     preprint arXiv:2408.16730, 2024. 3
+[45] Lin Xu, Yilin Zhao, Daquan Zhou, Zhijie Lin, See Kiong Ng,
+     and Jiashi Feng. Pllava: Parameter-free llava extension from
+     images to videos for video dense captioning. arXiv preprint
+     arXiv:2404.16994, 2024. 6
+[46] Mingze Xu, Mingfei Gao, Yi-Ting Chen, Larry S Davis, and
+     David J Crandall. Temporal recurrent networks for online
+     action detection. In IEEE/CVF International Conference on
+     Computer Vision (ICCV), 2019. 2
+[47] Mingze Xu, Yuanjun Xiong, Hao Chen, Xinyu Li, Wei Xia,
+     Zhuowen Tu, and Stefano Soatto. Long short-term trans-
+     former for online action detection. Advances in Neural In-
+     formation Processing Systems (NeurIPS), 2021. 2
+[48] Antoine Yang, Arsha Nagrani, Paul Hongsuck Seo, An-
+     toine Miech, Jordi Pont-Tuset, Ivan Laptev, Josef Sivic, and
+     Cordelia Schmid. Vid2seq: Large-scale pretraining of a vi-
+     sual language model for dense video captioning. In Proceed-
+     ings of the IEEE/CVF Conference on Computer Vision and
+     Pattern Recognition, pages 10714–10726, 2023. 6, 7
+[49] Le Yang, Junwei Han, and Dingwen Zhang. Colar: Effec-
+     tive and efficient online action detection by consulting ex-
+     emplars. In IEEE/CVF Conference on Computer Vision and
+     Pattern Recognition (CVPR), 2022. 2
+[50] Rowan Zellers, Jiasen Lu, Ximing Lu, Youngjae Yu, Yan-
+     peng Zhao, Mohammadreza Salehi, Aditya Kusupati, Jack
+     Hessel, Ali Farhadi, and Yejin Choi. Merlot reserve: Neu-
+     ral script knowledge through vision and language and sound.
+     In IEEE/CVF Conference on Computer Vision and Pattern
+     Recognition (CVPR), 2022. 7
+[51] Chen-Lin Zhang, Jianxin Wu, and Yin Li. Actionformer: Lo-
+     calizing moments of actions with transformers. In European
+     Conference on Computer Vision (ECCV), 2022. 6
+[52] Tianyi Zhang, Varsha Kishore, Felix Wu, Kilian Q Wein-
+     berger, and Yoav Artzi. Bertscore: Evaluating text genera-
+     tion with bert. arXiv preprint arXiv:1904.09675, 2019. 10,
+     13
+[53] Qingsong Zhao, Yi Wang, Jilan Xu, Yinan He, Zifan Song,
+     Limin Wang, Yu Qiao, and Cairong Zhao. Does video-
+     text pretraining help open-vocabulary online action detec-
+     tion? In Advances in Neural Information Processing Systems
+     (NeurIPS), 2024. 2
+[54] Yue Zhao and Philipp Krähenbühl. Real-time online video
+     detection with temporal smoothing transformers. In Euro-
+     pean Conference on Computer Vision (ECCV), 2022. 2, 7
+
+
+                                                                    17
+

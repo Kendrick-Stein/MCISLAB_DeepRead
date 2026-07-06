@@ -1,0 +1,623 @@
+                     This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                  Except for this watermark, it is identical to the accepted version;
+                            the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+           Scalable Object Relation Encoding for Better 3D Spatial Reasoning
+                              in Large Language Models
+
+                   Shengli Zhou1 * Minghang Zheng2 Feng Zheng1 Yang Liu2,3B
+ 1
+     Department of Computer Science and Engineering, Southern University of Science and Technology
+                     2
+                       Wangxuan Institute of Computer Technology, Peking University
+               3
+                 State Key Laboratory of General Artificial Intelligence, Peking University
+        zhousl2022@mail.sustech.edu.cn, {minghang, yangliu}@pku.edu.cn, f.zheng@ieee.org
+
+
+
+                            Abstract                                            core step for solving 3D Vision-Language (3D VL) tasks,
+                                                                                including 3D Visual Grounding (3D VG) and 3D Visual
+Spatial reasoning focuses on locating target objects based                      Question-Answering (3D VQA). As the process of spatial
+on spatial relations in 3D scenes, which plays a crucial                        reasoning is based on the spatial relations between objects,
+role in developing intelligent embodied agents. Due to the                      the accurate perception of inter-object spatial relations is a
+limited availability of 3D scene-language paired data, it is                    prerequisite for acquiring a strong spatial reasoning ability.
+challenging to train models with strong reasoning ability                       Thus, a core challenge in spatial reasoning is effectively en-
+from scratch. Previous approaches have attempted to inject                      coding and computing object relations.
+3D scene representations into the input space of Large Lan-
+guage Models (LLMs) and leverage the pretrained compre-                            Due to the scarcity of 3D scene-text paired data, train-
+hension and reasoning abilities for spatial reasoning. How-                     ing a model with a strong spatial reasoning capability from
+ever, models encoding absolute positions struggle to extract                    scratch is challenging. With the development of Large Lan-
+spatial relations from prematurely fused features, while                        guage Models (LLMs), previous works [13, 14, 34] have in-
+methods explicitly encoding all spatial relations (which is                     tegrated point cloud representations with natural language,
+quadratic in the number of objects) as input tokens suffer                      leveraging LLMs’ large-scale pretrained reasoning abilities
+from poor scalability. To address these limitations, we pro-                    to perform spatial reasoning on 3D scenes [21]. In these
+pose QuatRoPE, a novel positional embedding method with                         works, the models represent scene layouts using either ab-
+an input length that is linear to the number of objects, and                    solute or relative object positions. (1) Absolute position
+explicitly calculates pairwise spatial relations through the                    encoding incorporates objects’ 3D coordinates as part of
+dot product in attention layers. QuatRoPE’s holistic vec-                       their features [9, 14, 38]. However, absolute coordinates
+tor encoding of 3D coordinates guarantees a high degree                         carry little inherent meaning since the origin and orienta-
+of spatial consistency, maintaining fidelity to the scene’s                     tion in 3D scenes have no natural physical definition, de-
+geometric integrity. Additionally, we introduce the Iso-                        spite preserving geometric relationships between objects.
+lated Gated RoPE Extension (IGRE), which effectively lim-                       Moreover, since absolute positional encoding does not ex-
+its QuatRoPE’s influence to object-related tokens, thereby                      plicitly represent relative geometry, models must labori-
+minimizing interference with the LLM’s existing positional                      ously learn these relations from limited data. This chal-
+embeddings and maintaining the LLM’s original capabil-                          lenge is further compounded by premature feature fusion,
+ities. Extensive experiments demonstrate the effectiveness                      which obstructs LLMs from extracting positions and com-
+of our approaches. The code and data are available at                           puting pairwise object relationships. (2) For methods that
+https://github.com/oceanflowlab/QuatRoPE.                                       directly encode pair-wise object relations using additional
+                                                                                input tokens, the length of the LLM’s input sequence grows
+                                                                                quadratically with object count, which can easily exceed
+1. Introduction                                                                 the input limits of many LLMs (e.g., the InteriorGS [25]
+                                                                                dataset contains an average of over 554 objects per scene,
+Spatial reasoning refers to the process of locating a target                    yielding over 153,181 relations). While pruning strategies,
+object according to its spatial relations with other objects                    such as 3DGraphLLM’s [34] KNN approach, reduce tokens
+(i.e., anchor objects) in the scene. Such a process is the                      by keeping only nearby objects, this risks omitting critical
+  * Work done as an intern at Peking University. B Corresponding author.        relations since spatial proximity does not ensure relevance,
+
+
+
+                                                                           16758
+                                                                                                                                                                  Larger
+
+
+
+
+                                        in Attention Layer
+                                                                                                                                                                 Attention
+
+
+
+
+                                        Pairwise Dot Product
+                                                                                                                                              Larger
+                                                                                                                                             Attention
+
+
+
+
+        (a) Encode Absolute Positions                          (b) Calculate Pairwise Spatial Relations     (c) Problem of Previous RoPE-based Methods   (d) QuatRoPE: Encode as Holistic Vectors
+
+
+Figure 1. (a) In QuatRoPE, we embed the absolute 3D position of each object to the corresponding token, thus limiting the input length
+linear to object count. (b) By leveraging a dedicated rotation scheme, when tokens with 3D position embedding interact in the attention
+layer of the LLM, the absolute coordinates are transformed into pairwise relative positions, empowering spatial reasoning. (c) In previous
+methods, as the positions are decoupled into individual coordinates, when the coordinate of some axis is close (as marked in green), the
+attention score is incorrectly inflated. (d) QuatRoPE encodes positions as holistic vectors, correctly representing spatial relations.
+
+
+potentially causing errors in spatial reasoning.                                                          guage RoPE. Also, IGRE ensures that attention scores only
+   In contrast to previous approaches, we propose Quat-                                                   adjust to reflect relative positions when two object tokens
+RoPE, which uses only O(n) input tokens while preserv-                                                    interact through the dot product (i.e., gated), preserving the
+ing all O(n2 ) spatial relations (where n is the number of                                                LLM’s original linguistic capabilities.
+objects in the scene), supporting scalability and avoiding                                                    While benchmarks like SQA3D [19], ScanRefer [5],
+erroneous pruning. As shown in Fig. 1 (a) and (b), the                                                    and Multi3DRef [35] evaluate aspects of spatial under-
+core idea of QuatRoPE is to inject explicit absolute posi-                                                standing, they are not designed to—and thus are inherently
+tional encodings for all object-related tokens1 and leverage                                              limited in—purely assessing spatial reasoning. In these
+the Transformer’s attention mechanism to convert abso-                                                    tasks, language descriptions often intertwine spatial rela-
+lute positions into relative relationships during query-key                                               tionships with non-spatial cues, such as object categories
+dot products. Specifically, we apply quaternion rotations to                                              or attributes. This makes it difficult to determine whether a
+query and key vectors based on the corresponding objects’                                                 model’s success stems from true spatial comprehension or
+3D coordinates. By constructing specific mathematical for-                                                from simply recognizing semantic or visual features. To ad-
+mulations for rotation, the dot product (i.e., attention score)                                           dress this deficiency, we introduce a diagnostic benchmark,
+between two rotated vectors depends solely on their rela-                                                 the Attribute-free Spatial Reasoning (ASR) benchmark, to
+tive positions in the 3D scene, efficiently providing pair-                                               isolate and more directly probe a model’s spatial reason-
+wise spatial relations for LLM. Additionally, as shown in                                                 ing capabilities. In our benchmark, we select ScanQA’s [2]
+Fig. 1 (d), QuatRoPE encodes object coordinates as holistic                                               uniquely-answerable object-name questions, filter out those
+vectors (instead of encoding the coordinate on each axis in-                                              revealing target attributes to enforce spatial reasoning, and
+dependently). Such an approach prevents inflated attention                                                convert them into 3D VG format to eliminate language gen-
+scores from small coordinate differences on single axes, ac-                                              eration biases. By such an approach, the ASR benchmark
+curately representing spatial layouts.                                                                    can make a fair and rigorous comparison of spatial reason-
+   The scarcity of 3D scene-text paired data also makes it                                                ing. Across all these benchmarks, our approach consistently
+difficult to train LLMs with dual RoPE (i.e., language RoPE                                               outperforms strong baselines, showing that QuatRoPE pro-
+and QuatRoPE) from scratch. At the same time, when                                                        vides effective positional cues for spatial understanding.
+applying QuatRoPE on LLMs with Language RoPE, both                                                            In summary, our contributions are as follows: (1)
+RoPEs rotate query and key vectors, yielding interference                                                 We propose QuatRoPE, a novel 3D positional encoding
+and hindering position perception for both text and objects.                                              that explicitly models objects’ pairwise relative positions
+   To address this issue, we further propose Isolated Gated                                               through quaternion rotations, enhancing the spatial under-
+RoPE Extension (IGRE). In IGRE, object-related tokens                                                     standing for 3D LLMs. (2) We propose IGRE to combine
+are extended with QuatRoPE-specific dimensions (zero-                                                     QuatRoPE with the language RoPE to reduce interference.
+padded for other tokens), isolating QuatRoPE from lan-                                                    (3) We construct a challenging benchmark ASR for exclu-
+                                                                                                          sively evaluating 3D spatial understanding. (4) We achieve
+    1 Object-related tokens: LLM’s input tokens for objects’ 2D/3D fea-                                   consistent and large-margin gains on ASR and multiple ex-
+tures and identifiers like <obj001>.                                                                      isting 3D VL benchmarks, validating the effectiveness.
+
+
+
+                                                                                                    16759
+2. Related Work                                                   object and its nearest objects. However, this approach
+                                                                  is error-prone as proximity does not always indicate task-
+2.1. 3D VL Tasks on Spatial Reasoning                             relevant importance.
+3D Vision-Language (3D VL) refers to multi-modal tasks                In contrast, we propose QuatRoPE that encodes 3D po-
+that are solved by combining 3D scenes and natural lan-           sitions on each object-related token. Through a dedicated
+guage, such as 3D Visual Grounding (3D VG) [16] and 3D            embedding scheme, it converts absolute coordinates to pair-
+Visual Question-Answering (3D VQA) [18, 33, 36].                  wise relative positions of all objects via query-key dot prod-
+    Previously, ScanRefer [5] introduced the task of single-      ucts in attention layers. Such a method not only ensures
+object 3D VG, where the model finds an object based on a          robustness to global rotations and translations but also mit-
+text description (e.g., locating “the bottle on top of the ta-    igates error-prone pruning.
+ble”); Multi3DRef [35] extended this task to cases where
+the number of ground-truth objects varies, further testing        2.3. Rotary Positional Embeddings
+the model’s spatial reasoning skills. For 3D VQA, ScanQA          Rotary Positional Embedding (RoPE) [26] enhances trans-
+[2] was the first to define the task of answering questions       formers by encoding relative positions through complex ro-
+about 3D scenes (e.g., answering “What color is the object        tations of query/key vector segments of 2 components. Each
+under the chair and next to the lamp?”). SQA3D [19] fur-          segment is rotated by mθi (where m is the absolute position
+ther developed this into situated question-answering, where       and θi is the frequency), making attention scores depend
+models answer questions from a specific viewpoint, which          only on position differences. By this mechanism, the dot
+better aligns with the practical requirements for applications    products of query and key vectors are only related to the dif-
+such as intelligent robots. Other datasets, such as Nr3D and      ference in position, transforming absolute positions into rel-
+Sr3D [1], have also defined variants of these 3D VL tasks.        ative positions. Currently, RoPE has become foundational
+    However, current benchmarks in these tasks fail to di-        in various LLMs, including LLaMA [10] and QWen [3].
+rectly reflect models’ spatial reasoning ability, as objects’         For multi-modal data (e.g., images), M-RoPE [27]
+attributes (e.g., category, color, and shape) in language de-     extends RoPE by grouping segments for multi-position
+scriptions can help models locate target objects without spa-     embedding. Video-RoPE [30] further introduces Low-
+tial reasoning. In contrast, we propose a diagnostic bench-       frequency Temporal Allocation to focus on long-range de-
+mark that omits all attributes of the target objects, thereby     pendencies along the time axis, and Diagonal Layout to
+evaluating models’ spatial reasoning abilities exclusively.       maintain spatial-textual position consistency.
+                                                                      However, 3D scenes pose unique challenges: existing
+2.2. 3D LLMs for Spatial Reasoning                                methods overemphasize proximity along individual axes.
+When solving spatial reasoning tasks, models should be            When two objects have similar coordinates on one axis (de-
+able to precisely perceive the spatial relation between ob-       spite being distant overall), these methods inflate attention
+jects to obtain the correct answer. Due to the scarcity of 3D     scores due to incorrectly amplified dimension-wise prod-
+scene-text paired data, previous works have leveraged the         ucts in segment groups corresponding to the axis. This cre-
+perception and reasoning capabilities of LLMs to enhance          ates false “nearby” associations between objects, impair-
+spatial reasoning. Among these works, 3D-LLM [13] rep-            ing the model’s understanding of spatial relationships. In
+resents the 3D entire scene as a holistic feature. Though         contrast, QuatRoPE encodes coordinates as integrated vec-
+such an encoding approach can preserve the scene layout,          tors by rotating each individual dimension of the query and
+the compact representation loses details and entangles ob-        key vectors according to the corresponding 3D coordinates.
+jects’ features, which requires the model to identify objects     This approach ensures attention scores increase only when
+and impedes object-level spatial reasoning.                       objects are truly proximate in 3D space, effectively repre-
+    To facilitate object-level reasoning, LEO [15] and Chat-      senting scene layouts.
+Scene [14] segment the scene into objects and encode the
+feature of each object as input tokens. Despite their promis-     3. Method
+ing performance, they struggle to extract spatial relations
+                                                                  3.1. Baseline Models Revisited
+between objects from absolute positions that are prema-
+turely fused with geometric features. To solve this prob-         To utilize LLMs for perceiving and reasoning on scene in-
+lem, 3DGraphLLM [34] utilizes additional input tokens to          formation, previous 3D LLMs [14, 34] have aligned and in-
+explicitly represent spatial relations between objects. Addi-     jected point cloud features into LLMs. In these works, the
+tionally, since the number of relations is quadratic to the       pipeline is as follows:
+object count (which can easily exceed LLMs’ input lim-               The model is input with a point cloud and textual instruc-
+its), 3DGraphLLM employs a K-Nearest-Neighbors (KNN)              tions. To begin with, the model utilizes either ground-truth
+strategy, encoding only the spatial relations between each        segmentations or predictions from off-the-shelf segmenta-
+
+
+
+                                                             16760
+tion models [17, 23, 28] to segment the point cloud into a          position p⃗. Since the attention score should only relate to
+series of objects, thereby facilitating the model’s ability to                                   m − ⃗n), the rotation function f
+                                                                    the relative position (i.e., ⃗
+perform object-level reasoning. For each object, its features       should satisfy for some ternary function g:
+(e.g., 3D geometric feature calculated by PointNet++ [22])                                                                                            \label {eq:quat_goal} \left <f(\vec q, \vec m), f(\vec k, \vec n)\right > = g(\vec q, \vec k, \vec m-\vec n) 
+are projected into the input space of LLM through projec-                                                                                                                                                                                                                                                                                                                                                                                                                                                    (1)
+tion layers. Additionally, a set of object identifiers is de-
+fined and trained to fit within the input space of LLMs (e.g.,            When encoding coordinates independently, the proxim-
+<obj005> represents the fifth object in the scene enumer-              ity of coordinates on a single axis can mislead the model
+ation order), helping the model refer to specific objects in           into amplifying attention scores for objects that are indeed
+the scene. Finally, the project features and object identifiers        far away. Thus, QuatRoPE embeds the coordinates as a uni-
+are parsed into LLMs as input tokens (each object-related              fied vector, i.e., the components of the query and key vectors
+token corresponds to a single object), along with other lan-           are adjusted based on the object’s position rather than its
+guage tokens for prompts and questions.                                coordinate along a specific axis. Since coordinates are 3D
+    Inside the LLM, the feature vectors of tokens serve as             vectors, we leverage quaternion rotation with three degrees
+the input embeddings for the first self-attention layer. Thus,         of freedom to embed them. Formally, the rotation function
+when the model calculates attention scores between tokens,             can be expressed via Euler angle decomposition as:
+it also forms attention associations between objects based
+on their features. In previous works that prematurely fuse                    \label {eq:quat_repr} \begin {cases} f(\vec q, \vec m)=Q(\vec m)~\vec q~Q^{-1}(\vec m)\\ Q(\vec m)=Q_z(m_z)~Q_y(m_y)~Q_x(m_x)\\ Q_x(m_x)=\cos \left [\theta _x(m_x)/2\right ]+\hat i\sin \left [\theta _x(m_x)/2\right ]\\ Q_y(m_y)=\cos \left [\theta _y(m_y)/2\right ]+\hat j\sin \left [\theta _y(m_y)/2\right ]\\ Q_z(m_z)=\cos \left [\theta _z(m_z)/2\right ]+\hat k\sin \left [\theta _z(m_z)/2\right ] \end {cases} 
+absolute coordinates into objects’ overall features, the spa-
+tial information in feature vectors is implicit and sparse,
+weakening the relative spatial information in the associa-
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             (2)
+tion. Therefore, in QuatRoPE, we enhance the spatial infor-
+mation by providing an explicit encoding on each object-
+related token, representing its absolute position in the scene.
+When object-related tokens interact in the attention layers
+of the LLM, the absolute positions can be further trans-            where Q’s are rotation matrices and θ’s are unary functions.
+formed into relative spatial cues between objects, empow-              Through Equation (2), we transform the requirement in
+ering the model’s understanding of spatial relations.               QuatRoPE (i.e., converting absolute coordinates to relative
+                                                                    positions via dot products) into deriving θ’s that satisfy
+3.2. QuatRoPE                                                       Equation (1). To solve the equation, we transform the dot
+To provide the LLM with pairwise spatial relations between          product into the real part of the product of the rotation func-
+objects, while constraining the number of input tokens to be        tions to yield a form with multiplication between the rota-
+linear to the number of objects, we propose QuatRoPE. The           tion matrices (i.e., Q−1 ( ⃗
+                                                                                              m) and Q(⃗n)).
+core mechanism of QuatRoPE is to first encode the corre-
+sponding object’s absolute coordinates on object-related to-          \label {eq:quat_exp} \begin {aligned} \left <f(\vec q, \vec m), f(\vec k, \vec n)\right >=&\Re [f(\vec q, \vec m)f^*(\vec k, \vec n)]\\ =&\Re [Q(\vec m)~\vec q~Q^{-1}(\vec m)~Q(\vec n)~\vec k^*~Q^{-1}(\vec n)] \end {aligned} 
+kens, and then calculate pairwise relative positions between
+objects during the dot products for query and key vectors in
+attention layers.                                                                                                            (3)
+    Initially, given that spatial reasoning operates at the ob-     where ⃗k ∗ denotes the conjugate of quaternion ⃗k, and ℜ de-
+ject level, we represent each object’s 3D position through          notes the real part of the quaternion. To pair every Q( ⃗m)
+its bounding box center.                                            with Q(⃗n), according to the real-part invariance of quater-
+    To facilitate relative-position calculation via dot products    nion rotation (i.e., ℜ(Q−1 kQ) = ℜ(k)), left multiplying
+in attention layers, we encode absolute positions using ro-         Q−1 ( ⃗
+                                                                         m) and right multiplying Q( ⃗ m) yields:
+tations. Such an approach transforms absolute coordinates
+into relative positions, since dot products reflect angle dif-        \label {eq:quat_rot_inv} \left <f(\vec q, \vec m), f(\vec k, \vec n)\right >=\Re [\vec q~Q^{-1}(\vec m)~Q(\vec n)~\vec k^*~Q^{-1}(\vec n)~Q(\vec m)] 
+ferences. Specifically, the query vectors and the key vectors
+in self-attention layers are grouped into 3D segments, rep-
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             (4)
+resented each as a pure quaternion (denoted as q⃗ and ⃗k with                                                                                                                                                                                                                                                                                                                                           D                                                                                                     E
+zero real part), and apply quaternion rotation before each                        According to Equation (1), since                                                                                                                                                                                                                                                                                                          m), f (⃗k, ⃗n)
+                                                                                                                                                                                                                                                                                                                                                                                                                     f (⃗q, ⃗
+attention layer. Let ⃗  m and ⃗n be the absolute 3D coordinates     should only relate to ⃗  m − ⃗n, we have Q−1 (⃗n) Q( ⃗    m) =
+of the objects corresponding to query vector q⃗ and key vec-        Q( ⃗m − ⃗n). The equation further yields that unary functions
+tor ⃗k, and f (⃗x, p⃗) be the function for rotating the query or    θx , θy , and θz should be linear (as detailed in the appendix).
+key vector ⃗x according to the corresponding absolute 3D            Thus, an approximate solution for QuatRoPE is:
+
+
+
+                                                               16761
+   \label {eq:quat_final} \begin {cases} f(\vec q, \vec m)=Q(\vec m)~\vec q~Q^{-1}(\vec m)\\ Q(\vec m)=Q_z(m_z)~Q_y(m_y)~Q_x(m_x)\\ Q_x(m_x)=\cos [m_x\theta _x(1)/2]+\hat i\sin [m_x\theta _x(1)/2]\\ Q_y(m_y)=\cos [m_y\theta _y(1)/2]+\hat j\sin [m_y\theta _y(1)/2]\\ Q_z(m_z)=\cos [m_z\theta _z(1)/2]+\hat k\sin [m_z\theta _z(1)/2] \end {cases} 
+
+
+                                                                                                                                                                                                                                                                                                                                                           (5)
+
+
+
+
+where θx (1), θy (1), and θz (1) are frequencies for quater-
+nion rotations. According to Equation (1), as we perform
+rotation by q⃗ := f (⃗q, ⃗m) and ⃗k := f (⃗k, ⃗n) before each
+attention layer, the attention scores between object-related
+tokens reflect their relative positions. By such an approach,
+QuatRoPE can effectively convey relative positional infor-                                                                                                                                                                                                                                                                                                               Figure 2. An illustration of ASR’s construction pipeline.
+mation for LLMs to perform spatial reasoning.
+    Moreover, for objects that are spatially close in a scene,
+their QuatRoPE embeddings are similar, resulting in larger                                                                                                                                                                                                                                                                                                              By this approach, we isolate the components rotated by
+attention scores. This behavior aligns with the human cog-                                                                                                                                                                                                                                                                                                           language RoPE and QuatRoPE, thus reducing the interfer-
+nitive mechanism of Maxim of Relation [11]. For example,                                                                                                                                                                                                                                                                                                             ence between multiple RoPEs. Additionally, as non-object
+when referring to “the window to the left of the door,” if                                                                                                                                                                                                                                                                                                           tokens are zero-padded, the “non-existence” of non-object
+multiple windows exist at varying distances, humans typ-                                                                                                                                                                                                                                                                                                             tokens in the 3D scene can be well-represented. Also, un-
+ically imply the one closest to the door. Such alignment                                                                                                                                                                                                                                                                                                             der such a representation, when a query or key vector that
+consequently enhances the LLM’s ability to comprehend                                                                                                                                                                                                                                                                                                                belongs to a non-object token is involved in the dot product,
+implicit references in natural language.                                                                                                                                                                                                                                                                                                                             the padded zeros ensure that element-wise products in these
+                                                                                                                                                                                                                                                                                                                                                                     dimensions are 0, keeping the attention scores unchanged.
+3.3. Isolated Gated RoPE Extension                                                                                                                                                                                                                                                                                                                                   Thus, IGRE can constrain QuatRoPE’s adjustments on at-
+Although QuatRoPE can effectively provide spatial infor-                                                                                                                                                                                                                                                                                                             tention scores between object-related tokens, maximizing
+mation for LLMs to utilize, training point cloud-based 3D                                                                                                                                                                                                                                                                                                            the retention of the pretrained LLM’s capabilities in under-
+LLMs presents new challenges. Due to the scarcity of                                                                                                                                                                                                                                                                                                                 standing natural language and performing reasoning. Quat-
+3D scene-text paired data, training an LLM with language                                                                                                                                                                                                                                                                                                             RoPE’s adjustments to attention scores are gated within the
+RoPE and QuatRoPE from scratch is impractical. However,                                                                                                                                                                                                                                                                                                              dot products with both query and key vectors from object-
+simply applying QuatRoPE along with language RoPE may                                                                                                                                                                                                                                                                                                                related tokens. Therefore, IGRE can maximally reduce in-
+cause interference as they simultaneously perform rotation                                                                                                                                                                                                                                                                                                           terference and preserve LLM’s ability to understand natural
+on query and key vectors.                                                                                                                                                                                                                                                                                                                                            language and perform reasoning.
+    Meanwhile, directly applying QuatRoPE rotations to
+                                                                                                                                                                                                                                                                                                                                                                     3.4. Attribute-free Spatial Reasoning Benchmark
+query and key vectors also introduces erroneous associa-
+tions between object-related tokens and non-object tokens                                                                                                                                                                                                                                                                                                            Though previous datasets in 3D VL tasks can reflect mod-
+(e.g., tokens for system prompts, questions, instructions,                                                                                                                                                                                                                                                                                                           els’ spatial reasoning abilities, none of them can fully iso-
+and relations). While RoPE-based positional encodings can                                                                                                                                                                                                                                                                                                            late the impact of other model abilities on the final scores.
+represent arbitrary positions or coordinates, they inherently                                                                                                                                                                                                                                                                                                        Under 3D VL tasks, descriptions of object attributes (e.g.,
+cannot express the concept that “non-object tokens do not                                                                                                                                                                                                                                                                                                            category, color, and shape) often entangle with those for
+correspond to a position in the 3D coordinate system.” Even                                                                                                                                                                                                                                                                                                          spatial relations, improperly facilitating the model an un-
+if non-object tokens are left unrotated, it is equivalent to                                                                                                                                                                                                                                                                                                         intended bypass of spatial reasoning. For example, for a
+positioning them at (0, 0, 0). Such a configuration mislead-                                                                                                                                                                                                                                                                                                         3D VG task locating “the red chair under the window and
+ingly biases the model to disproportionately attend to re-                                                                                                                                                                                                                                                                                                           next to the table” while there is only one red chair in the
+lationships between non-object tokens and objects near the                                                                                                                                                                                                                                                                                                           scene, the model can obtain the answer by recognizing the
+coordinate origin.                                                                                                                                                                                                                                                                                                                                                   red chair, rather than locating it through its relations with
+    To address these problems, we introduce Isolated Gated                                                                                                                                                                                                                                                                                                           the window and the table.
+RoPE Extension (IGRE). For an object-related token, we                                                                                                                                                                                                                                                                                                                  To address these problems, we propose the Attribute-
+apply QuatRoPE on a base vector and concatenate it to the                                                                                                                                                                                                                                                                                                            free Spatial Reasoning (ASR) benchmark. First, we se-
+query/key vector. For a non-object token, we concatenate a                                                                                                                                                                                                                                                                                                           lect a series of 3D VQA questions with unique answers in
+zero vector to pad the query/key vector to the same dimen-                                                                                                                                                                                                                                                                                                           ScanQA that ask for the name of the object. Then, we fil-
+sion as object-related tokens.                                                                                                                                                                                                                                                                                                                                       ter out questions that do not provide any other attributes
+
+
+
+                                                                                                                                                                                                                                                                                                                                                             16762
+Table 1. Results for the comparative experiments, the best scores obtained by using ground-truth or predicted segmentation are underlined,
+and the overall best scores are in bold. By applying QuatRoPE, our models have achieved consistent gains under all metrics.
+
+                                            Detector /                      ScanRefer                              Multi3DRef               SQA3D
+ Model
+                                          Segmentation     Acc@0.25     Acc@0.5 Multi@0.25          Multi@0.5   F1@0.25 F1@0.5              EM@1
+ ScanRefer [5]                              VoteNet            39.0       26.1        32.1            21.3            –           –           –
+ 3DJCG [4]                                  VoteNet            49.6       37.3        41.4            30.8            –          26.6         –
+ Vil3DRef [7]                              PointGroup          47.9       37.7        40.3            30.7            –           –           –
+ D3Net [6]                                 PointGroup           –         37.9         –              30.1            –          32.2         –
+ VPP-Net [24]                              Group-free          55.7       43.3        50.3            39.0            –           –           –
+ AugRefer [29]                             Group-free          55.7       44.0        50.0            39.1            –           –           –
+ M3DRef-CLIP [35]                          PointGroup           –         44.7         –              36.8           42.8        38.4         –
+ MA2TransVG [31]                           Group-free          57.9       45.7        53.8            41.4            –           –           –
+ 3D-VisTA [37]                              Mask3D             50.6       45.8        43.7            39.1            –           –          48.5
+ 3DSyn [32]                                 Mask3D             52.3       46.2         –               –              –           –           –
+ TSP3D [12]                                   N/A              56.5       46.7         –               –              –           –           –
+ PQ3D [38]                               PQ3D Promptable        –         51.2         –              46.2            –          50.1        47.1
+ BridgeQA [20]                              VoteNet             –          –           –               –              –           –          52.9
+ Scene-LLM [9]                                N/A               –          –           –               –              –           –          53.6
+ Chat-Scene-1B [14]                            GT              50.7       50.3        42.7            42.3           53.3        52.9        50.7
+ Chat-Scene-1B + QuatRoPE (Ours)               GT              55.4       55.0        47.8            47.4           58.1        57.7        53.1
+ 3DGraphLLM-1B [34]                            GT              55.9       55.8        47.9            47.7           58.6        58.4        51.1
+ 3DGraphLLM-1B + QuatRoPE (Ours)               GT              58.3       58.2        50.8            50.6           60.7        60.5        53.2
+ Chat-Scene-7B [14]                          Mask3D            55.5       50.2        47.8            42.9           57.1        52.4        54.6
+ Chat-Scene-7B + QuatRoPE (Ours)             Mask3D            57.8       52.2        51.1            45.7           59.5        54.8        54.7
+ 3DGraphLLM-7B [34]                          Mask3D            57.0       51.3         –               –             60.1        55.4        53.1
+ 3DGraphLLM-7B + QuatRoPE (Ours)             Mask3D            58.2       52.5        54.3            49.2           60.6        56.0        55.2
+
+
+    Table 2. Results on our spatial reasoning benchmark. Our model achieves significant and consistent gains across various settings.
+
+                       Model                             LLM           Acc @ 0.25            Gain        Acc @ 0.5              Gain
+                 Chat-Scene [14]               Llama-3.2-1B-Instruct      22.92              –               22.92                 –
+          Chat-Scene + QuatRoPE (Ours)         Llama-3.2-1B-Instruct      27.38       4.46 (19.48%)          27.38          4.46 (19.48%)
+               3DGraphLLM [34]                 Llama-3.2-1B-Instruct      25.89              –               25.60                 –
+         3DGraphLLM + QuatRoPE (Ours)          Llama-3.2-1B-Instruct      29.76       3.87 (14.94%)          29.76          4.17 (16.28%)
+               3DGraphLLM [34]                  Llama-3-8B-Instruct       37.50              –               36.90                 –
+         3DGraphLLM + QuatRoPE (Ours)           Llama-3-8B-Instruct       41.96       4.46 (11.90%)          41.96          5.06 (13.71%)
+
+
+
+of the target object, requiring the model to obtain the an-             [14] and model 3DGraphLLM [34] as baselines. All models
+swer through spatial reasoning (e.g., “What is the object in            are trained on a combined dataset composed of ScanRefer
+front of the tall white shelf?”). Finally, we convert these             [5], Multi3DRef [35], ScanQA [2], SQA3D [19], Scan2Cap
+queries into a 3D VG format (e.g., “The object in front                 [8], ReferIt3D [1], and Chat-Scene’s object alignment task.
+of the tall white shelf”), where the model only needs to                During training, LLMs are fine-tuned with LoRA (rank
+perform multiple-choice selection between objects in the                r = 16 and scaling factor α = 16) at a learning rate of
+scene, eliminating the impact of different language genera-             2 × 10−5 . For the 3DGraphLLM baseline, we adopt the
+tion abilities between models. The pipeline for constructing            same setting, pruning scene graphs using KNN with k = 2.
+our ASR benchmark is illustrated in Fig. 2.                             To evaluate spatial reasoning ability, we test models on 3D
+   Through attribute-free questions and the 3D VG format                VG benchmarks, including ScanRefer and Multi3DRef (as
+setting of our benchmark, we ensure fair and rigorous com-              they involve precise perception of objects’ spatial relations
+parisons of models’ spatial reasoning capabilities.                     and locating objects according to instructions), and Situated
+                                                                        3D VQA benchmark SQA3D.
+4. Experiments
+                                                                        4.2. Comparative Experiments
+4.1. Experimental Settings
+                                                                        In this experiment, we aim to verify the effectiveness and
+We validate the effectiveness of our method through experi-             generalizability of the proposed methods. We utilize Llama-
+ments using strong point cloud-based 3D LLM Chat-Scene                  3.2-1B-Instruct and Vicuna-7B-v1.5 as the LLM for Chat-
+
+
+
+                                                                  16763
+      Table 3. Results for ablation study on different composition approaches, the best scores of each baseline are marked in bold.
+
+                                                                         ScanRefer                               SQA3D
+               RoPE Composition Approach
+                                                  Acc @ 0.25      Acc @ 0.5 Multi @ 0.25         Multi @ 0.5     EM @ 1
+               Baseline: Chat-Scene [14]
+                           None                      50.72          50.33           42.69           42.29           50.72
+                       Trans-Additive                53.12          52.79           45.48           45.14           52.96
+                       IGRE (Ours)                   55.44          55.00           47.81           47.36           53.14
+               Baseline: 3DGraphLLM [34]
+                           None                      55.92          55.75           47.92           47.74           51.09
+                       Trans-Additive                53.68          53.38           45.94           45.64           51.55
+                       IGRE (Ours)                   58.30          58.15           50.77           50.60           53.20
+
+          Table 4. Results for ablation study on different RoPE methods, the best scores of each baseline are marked in bold.
+
+                                                                              ScanRefer                                SQA3D
+          Explicit Positional Encoding Approach
+                                                       Acc @ 0.25      Acc @ 0.5 Multi @ 0.25         Multi @ 0.5      EM @ 1
+          Baseline: Chat-Scene [14]
+                          None                            50.72           50.33          42.69           42.29          50.72
+                      Raw Coordinates                     52.26           52.01          44.41           44.17          51.40
+                         M-RoPE                           54.30           53.92          46.44           46.10          51.55
+                     QuatRoPE (Ours)                      55.44           55.00          47.81           47.36          53.14
+          Baseline: 3DGraphLLM [34]
+                          None                            55.92           55.75          47.92           47.74          51.09
+                      Raw Coordinates                      3.60            3.44           3.57            3.46          35.50
+                         M-RoPE                           57.69           57.48          50.07           49.83          53.14
+                     QuatRoPE (Ours)                      58.30           58.15          50.77           50.60          53.20
+
+
+Scene and 3DGraphLLM baselines, and apply QuatRoPE                     ent experimental settings, directly verifying that the pro-
+through IGRE to these models. Finally, we compare their                posed method can enhance models’ performance in spa-
+performance with specialist and generalist models on mul-              tial reasoning. The results further indicate that our method
+tiple datasets to evaluate the gain for spatial reasoning.             can effectively provide useful relative spatial information to
+    The results in Table 1 demonstrate that our method out-            LLMs for solving 3D VL tasks.
+performs baselines across all metrics, particularly on 3D
+VG tasks that require higher spatial reasoning abilities. The          4.4. Ablation Study
+results further indicate that QuatRoPE can effectively con-
+vey spatial information by providing relative object posi-             To compare different RoPE settings, including composi-
+tions, verifying the correctness of our approaches.                    tion approaches (i.e., IGRE and traditional additive ap-
+                                                                       proach) and RoPE methods, we perform an ablation study
+4.3. Spatial Reasoning Ability Verification                            on these factors. Specifically, we utilize baseline mod-
+                                                                       els with Llama-3.2-1B-Instruct as the LLM. Then, we ap-
+In the previous experiment, the improved scores across                 ply QuatRoPE via different composition methods, namely,
+datasets generally indicate that the proposed methods can              Trans-Additive (where QuatRoPE and language RoPE si-
+enhance models’ spatial reasoning abilities. To exclusively            multaneously rotate query/key vectors, but with inverse
+demonstrate QuatRoPE’s effectiveness in enhancing mod-                 frequencies to lower interference) and IGRE. Results are
+els’ spatial reasoning ability, we utilize our ASR benchmark           shown in Table 3. The results demonstrate that among dif-
+for further evaluation. We conduct zero-shot comparisons               ferent composition methods, IGRE surpasses the baseline
+between models with and without QuatRoPE. The results                  and the model using the Trans-Additive approach under all
+are shown in Table 2.                                                  metrics. Particularly, IGRE has obtained significant im-
+   The results in the table demonstrate that our model has             provements on the 3D VG dataset ScanRefer, where spatial
+achieved consistent and substantial gains throughout differ-           reasoning is the key to locating objects based on spatial rela-
+
+
+
+                                                                  16764
+     Table 5. Verification of advantage in holistic encoding.           (a) This is a brown table. It is surrounded by quite a few matching chairs.
+                                                                        QuatRoPE:                               Chat-Scene:
+        δ       3DGraphLLM-1B         + QuatRoPE      Gain
+      1 (All)         93.72               94.65        0.93
+        0.5           92.28               94.21        1.93
+        0.3           91.47               94.31        2.84
+        0.2           93.21               96.30        3.09
+        0.1           92.39               96.74        4.35
+       0.05           84.62               92.31        7.69             (b) There is an office chair. Placed next to the heating of the room.
+                                                                        QuatRoPE:                              Chat-Scene:
+
+
+tions. The results verify that IGRE can separate QuatRoPE
+from language RoPE better and minimize interference.
+   Moreover, we also compare the performance of different
+positional encoding approaches (i.e., without explicit en-
+coding, directly adding raw (x, y, z) coordinates to feature
+                                                                        (c) This is a tan wood door. ... It is to the right of a snack machine.
+vectors, M-RoPE [27], and QuatRoPE) using IGRE. The re-                            QuatRoPE:                        Chat-Scene:
+sults are shown in Table 4. Models with explicit positional
+encoding outperform baseline models in most cases, sug-
+gesting that explicit positional encoding generally improves
+scene understanding. However, adding raw coordinates in-
+troduces absolute positions into the feature vectors and pre-
+vents them from being transformed into relative positions
+during the attention mechanism. Thus, such an approach
+disrupts models’ understanding of scene layouts, especially
+in models like 3DGraphLLM that rely heavily on input to-             Figure 3. Qualitative results on the ScanRefer dataset. Target ob-
+kens to understand them. Among RoPE-based approaches,                jects are correctly grounded by QuatRoPE (green), whereas the
+QuatRoPE outperforms M-RoPE across all metrics, demon-               baseline Chat-Scene produces incorrect predictions (red).
+strating that encoding coordinates as holistic vectors can
+convey spatial relations between objects and represent scene
+layout more effectively.                                             tion with descriptions like “surrounded by” and “next to”.
+                                                                     Notably, in Case (c), while both doors are to the machine’s
+4.5. Verification of Advantage in Holistic Encoding                  right, the correct one is closer (which can be explained by
+                                                                     humans’ preference for the “Maxim of Relation” [11] in lin-
+In previous RoPE, each axis is treated independently, caus-          guistics). Such a case also indicates that, as QuatRoPE cor-
+ing close coordinates on a single axis to falsely appear             rectly increases attention scores for proximate objects, mod-
+“nearby” and disrupt attention. To address this issue, Quat-         els can align with human implication better, enabling mod-
+RoPE encodes positions as holistic vectors.                          els to understand and predict human-like spatial reasoning
+   To verify the effectiveness of such a design, we re-split         patterns across multimodal tasks.
+the ScanRefer [5] dataset according to the severity of the
+“false nearby” issue. Since such an issue occurs when the            5. Conclusion
+coordinate difference is small on some axis, severity is de-
+                          min{∆x,∆y}                                 In this paper, we propose QuatRoPE, a positional embed-
+fined by the aspect ratio max{∆x,∆y}   < δ for anchor-target
+object position differences (∆x, ∆y, ∆z), with lower δ de-           ding that encodes objects’ positions to tokens and leverages
+noting more severe cases. As in Tab. 5, QuatRoPE outper-             the attention mechanism to transform absolute positions
+forms the 3DGraphLLM baseline in all cases, and its ad-              into objects’ pairwise spatial relations. To minimize Qua-
+vantage increases with severity, verifying the effectiveness.        tRoPE’s interference with language RoPE, we further pro-
+                                                                     pose IGRE for separating dimensions for RoPEs and con-
+4.6. Qualitative Results                                             straining QuatRoPE’s effect to object-related tokens. Ex-
+                                                                     tensive experiments demonstrate the effectiveness of Quat-
+Finally, we visualize several cases in ScanRefer to demon-
+                                                                     RoPE and IGRE. Moreover, through our ASR benchmark,
+strate the effectiveness of our approach. The qualitative re-
+                                                                     we verify that our method can achieve large gains in spatial
+sults are illustrated in Fig. 3.
+                                                                     reasoning across various baselines, offering a solution for
+   In these cases, as relative positions between objects are
+                                                                     enhancing the spatial reasoning ability of 3D LLMs.
+well represented, models can better align spatial informa-
+
+
+
+                                                                16765
+Acknowledgements. This work was supported by the                                        reasoning. In Proceedings of the Winter Conference on Ap-
+grants from the Beijing Natural Science Foundation                                      plications of Computer Vision (WACV), pages 2195–2206,
+4252040, the Beijing Nova Program, and the National Nat-                                2025. 1, 6
+ural Science Foundation of China 62372014.                                         [10] Aaron Grattafiori, Abhimanyu Dubey, Abhinav Jauhri, et al.
+                                                                                        The llama 3 herd of models, 2024. 3
+References                                                                         [11] H. Paul Grice. Logic and conversation. Syntax and Seman-
+                                                                                        tics, 3:41–58, 1975. 5, 8
+ [1] Panos Achlioptas, Ahmed Abdelreheem, Fei Xia, Mohamed                         [12] Wenxuan Guo, Xiuwei Xu, Ziwei Wang, Jianjiang Feng, Jie
+     Elhoseiny, and Leonidas J. Guibas. ReferIt3D: Neural lis-                          Zhou, and Jiwen Lu. Text-guided sparse voxel pruning for
+     teners for fine-grained 3d object identification in real-world                     efficient 3d visual grounding. In Proceedings of the Com-
+     scenes. In 16th European Conference on Computer Vision                             puter Vision and Pattern Recognition Conference (CVPR),
+     (ECCV), 2020. 3, 6                                                                 pages 3666–3675, 2025. 6
+ [2] Daichi Azuma, Taiki Miyanishi, Shuhei Kurita, and Motoaki                     [13] Yining Hong, Haoyu Zhen, Peihao Chen, Shuhong Zheng,
+     Kawanabe. Scanqa: 3d question answering for spatial scene                          Yilun Du, Zhenfang Chen, and Chuang Gan. 3d-llm: Inject-
+     understanding. In Proceedings of the IEEE/CVF Conference                           ing the 3d world into large language models. NeurIPS, 2023.
+     on Computer Vision and Pattern Recognition (CVPR), 2022.                           1, 3
+     2, 3, 6                                                                       [14] Haifeng Huang, Yilun Chen, Zehan Wang, Rongjie Huang,
+ [3] Jinze Bai, Shuai Bai, Yunfei Chu, Zeyu Cui, Kai Dang, Xi-                          Runsen Xu, Tai Wang, Luping Liu, Xize Cheng, Yang Zhao,
+     aodong Deng, Yang Fan, Wenbin Ge, Yu Han, Fei Huang,                               Jiangmiao Pang, et al. Chat-scene: Bridging 3d scene and
+     Binyuan Hui, Luo Ji, Mei Li, Junyang Lin, Runji Lin, Day-                          large language models with object identifiers. Proceedings
+     iheng Liu, Gao Liu, Chengqiang Lu, Keming Lu, Jianxin                              of the Advances in Neural Information Processing Systems,
+     Ma, Rui Men, Xingzhang Ren, Xuancheng Ren, Chuanqi                                 Vancouver, BC, Canada, 2024. 1, 3, 6, 7
+     Tan, Sinan Tan, Jianhong Tu, Peng Wang, Shijie Wang, Wei                      [15] Jiangyong Huang, Silong Yong, Xiaojian Ma, Xiongkun
+     Wang, Shengguang Wu, Benfeng Xu, Jin Xu, An Yang,                                  Linghu, Puhao Li, Yan Wang, Qing Li, Song-Chun Zhu,
+     Hao Yang, Jian Yang, Shusheng Yang, Yang Yao, Bowen                                Baoxiong Jia, and Siyuan Huang. An embodied generalist
+     Yu, Hongyi Yuan, Zheng Yuan, Jianwei Zhang, Xingxuan                               agent in 3d world. In Proceedings of the International Con-
+     Zhang, Yichang Zhang, Zhenru Zhang, Chang Zhou, Jingren                            ference on Machine Learning (ICML), 2024. 3
+     Zhou, Xiaohuan Zhou, and Tianhang Zhu. Qwen technical                         [16] Xiaoqi Li, Jiaming Liu, Yandong Guo, Hao Dong, and Yang
+     report, 2023. 3                                                                    Liu. 3d weakly supervised visual grounding at category and
+ [4] Daigang Cai, Lichen Zhao, Jing Zhang, Lu Sheng, and Dong                           instance levels. In Proceedings of the International Confer-
+     Xu. 3djcg: A unified framework for joint dense captioning                          ence on Robotics and Automation, 2025. 3
+     and visual grounding on 3d point clouds. In Proceedings of                    [17] Jun Luo, Zijing Zhao, and Yang Liu. Zero shot domain adap-
+     the IEEE/CVF Conference on Computer Vision and Pattern                             tive semantic segmentation by synthetic data generation and
+     Recognition (CVPR), pages 16464–16473, 2022. 6                                     progressive adaptation. In Proceedings of the International
+ [5] Dave Zhenyu Chen, Angel X Chang, and Matthias Nießner.                             Conference on Intelligent Robots and Systems, 2025. 4
+     Scanrefer: 3d object localization in rgb-d scans using natural                [18] Yana Lyu, Xutong Qin, Xiuli Du, et al. Multi-path reason-
+     language. In Computer Vision–ECCV 2020: 16th European                              ing for multi-hop question answering over knowledge graph.
+     Conference, Glasgow, UK, August 23–28, 2020, Proceed-                              Chinese Journal of Electronics, 34(2):642–648, 2025. 3
+     ings, Part XX 16, pages 202–221. Springer, 2020. 2, 3, 6,                     [19] Xiaojian Ma, Silong Yong, Zilong Zheng, Qing Li, Yitao
+     8                                                                                  Liang, Song-Chun Zhu, and Siyuan Huang. Sqa3d: Situated
+ [6] Dave Zhenyu Chen, Qirui Wu, Matthias Nießner, and An-                              question answering in 3d scenes. In International Confer-
+     gel X. Chang. D{}^{\mbox {3}} net: A unified speaker-listener architecture         ence on Learning Representations, 2023. 2, 3, 6
+     for 3d dense captioning and visual grounding. In Computer                     [20] Wentao Mo and Yang Liu. Bridging the gap between 2d
+     Vision - ECCV 2022 - 17th European Conference, Tel Aviv,                           and 3d visual question answering: A fusion approach for 3d
+     Israel, October 23-27, 2022, Proceedings, Part XXXII, pages                        vqa. In Proceedings of the AAAI Conference on Artificial
+     487–505. Springer, 2022. 6                                                         Intelligence, 2024. 6
+ [7] Shizhe Chen, Makarand Tapaswi, Pierre-Louis Guhur,                            [21] Yuxin Peng, Zishuo Wang, Geng Li, et al. A survey on fine-
+     Cordelia Schmid, and Ivan Laptev. Language conditioned                             grained multimodal large language models. Chinese Journal
+     spatial relation reasoning for 3d object grounding. In                             of Electronics, 2026. In press. 1
+     NeurIPS, 2022. 6                                                              [22] Charles R. Qi, Li Yi, Hao Su, and Leonidas J. Guibas. Point-
+ [8] Zhenyu Chen, Ali Gholami, Matthias Niessner, and Angel X.                          net++: deep hierarchical feature learning on point sets in
+     Chang. Scan2cap: Context-aware dense captioning in rgb-d                           a metric space. In Proceedings of the 31st International
+     scans. In Proceedings of the IEEE/CVF Conference on Com-                           Conference on Neural Information Processing Systems, page
+     puter Vision and Pattern Recognition (CVPR), pages 3193–                           5105–5114, Red Hook, NY, USA, 2017. Curran Associates
+     3203, 2021. 6                                                                      Inc. 4
+ [9] Rao Fu, Jingyu Liu, Xilun Chen, Yixin Nie, and Wenhan                         [23] Jonas Schult, Francis Engelmann, Alexander Hermans, Or
+     Xiong. Scene-llm: Extending language model for 3d visual                           Litany, Siyu Tang, and Bastian Leibe. Mask3D: Mask
+
+
+
+
+                                                                              16766
+     Transformer for 3D Semantic Instance Segmentation. In-                 of the 33rd ACM International Conference on Multimedia,
+     ternational Conference on Robotics and Automation (ICRA),              page 4610–4618, New York, NY, USA, 2025. Association
+     2023. 4                                                                for Computing Machinery. 3
+[24] Xiangxi Shi, Zhonghua Wu, and Stefan Lee. Viewpoint-              [37] Ziyu Zhu, Xiaojian Ma, Yixin Chen, Zhidong Deng, Siyuan
+     aware visual grounding in 3d scenes. In Proceedings of                 Huang, and Qing Li. 3d-vista: Pre-trained transformer for 3d
+     the IEEE/CVF Conference on Computer Vision and Pattern                 vision and text alignment. In Proceedings of the IEEE/CVF
+     Recognition (CVPR), pages 14056–14065, 2024. 6                         International Conference on Computer Vision (ICCV), pages
+[25] Manycore Tech Inc. SpatialVerse Research Team. Interi-                 2911–2921, 2023. 6
+     orgs: A 3d gaussian splatting dataset of semantically la-         [38] Ziyu Zhu, Zhuofan Zhang, Xiaojian Ma, Xuesong Niu, Yixin
+     beled indoor scenes. https://huggingface.co/                           Chen, Baoxiong Jia, Zhidong Deng, Siyuan Huang, and Qing
+     datasets/spatialverse/InteriorGS, 2025. 1                              Li. Unifying 3d vision-language understanding via prompt-
+[26] Jianlin Su, Murtadha Ahmed, Yu Lu, Shengfeng Pan, Wen                  able queries. In Computer Vision – ECCV 2024: 18th Eu-
+     Bo, and Yunfeng Liu. Roformer: Enhanced transformer with               ropean Conference, Milan, Italy, September 29–October 4,
+     rotary position embedding. Neurocomputing, 568:127063,                 2024, Proceedings, Part XLIV, page 188–206, Berlin, Hei-
+     2024. 3                                                                delberg, 2024. Springer-Verlag. 1, 6
+[27] Peng Wang, Shuai Bai, Sinan Tan, Shijie Wang, Zhihao Fan,
+     Jinze Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin
+     Ge, Yang Fan, Kai Dang, Mengfei Du, Xuancheng Ren, Rui
+     Men, Dayiheng Liu, Chang Zhou, Jingren Zhou, and Jun-
+     yang Lin. Qwen2-vl: Enhancing vision-language model’s
+     perception of the world at any resolution, 2024. 3, 8
+[28] Xingmei Wang, Peiran Wu, Chenzhuo Zhang, et al. An ex-
+     tensible hierarchical multimodal semantic segmentation net-
+     work for underwater scenarios. Chinese Journal of Electron-
+     ics, 34(6):1861–1872, 2025. 4
+[29] Xinyi Wang, Na Zhao, Zhiyuan Han, Dan Guo, and Xun
+     Yang. Augrefer: Advancing 3d visual grounding via cross-
+     modal augmentation and spatial relation-based referring.
+     CoRR, abs/2501.09428, 2025. 6
+[30] Xilin Wei, Xiaoran Liu, Yuhang Zang, Xiaoyi Dong, Pan
+     Zhang, Yuhang Cao, Jian Tong, Haodong Duan, Qipeng
+     Guo, Jiaqi Wang, et al. Videorope: What makes for good
+     video rotary position embedding? In International Confer-
+     ence on Machine Learning, 2025. 3
+[31] Can Xu, Yuehui Han, Rui Xu, Le Hui, Jin Xie, and Jian Yang.
+     Multi attributes interactions matters for 3d visual grounding.
+     In CVPR, 2024. 6
+[32] Dejie Yang, Zhu Xu, Wentao Mo, Qingchao Chen, Siyuan
+     Huang, and Yang Liu. 3d vision and language pretraining
+     with large-scale synthetic data. In Proceedings of the Thirty-
+     Second International Joint Conference on Artificial Intelli-
+     gence, IJCAI-24. International Joint Conferences on Artifi-
+     cial Intelligence Organization, 2024. 6
+[33] Jie Yang, Miao Ma, Yutong Li, et al. Vqals: A video ques-
+     tion answering method in low-light scenes based on illumi-
+     nation correction and feature enhancement. Chinese Journal
+     of Electronics, 34(4):1300–1308, 2025. 3
+[34] Tatiana Zemskova and Dmitry Yudin. 3dgraphllm: Combin-
+     ing semantic graphs and large language models for 3d scene
+     understanding, 2024. 1, 3, 6, 7
+[35] Yiming Zhang, ZeMing Gong, and Angel X. Chang.
+     Multi3drefer: Grounding text description to multiple 3d ob-
+     jects. In Proceedings of the IEEE/CVF International Confer-
+     ence on Computer Vision (ICCV), pages 15225–15236, 2023.
+     2, 3, 6
+[36] Shengli Zhou, Yang Liu, and Feng Zheng. Learn 3d vqa
+     better with active selection and reannotation. In Proceedings
+
+
+
+
+                                                                  16767
+

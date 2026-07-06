@@ -1,0 +1,735 @@
+                      This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                   Except for this watermark, it is identical to the accepted version;
+                             the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+                      Vinedresser3D: Towards Agentic Text-guided 3D Editing
+
+                          Yankuan Chi1 *                    Xiang Li2 *        Zixuan Huang2               James M. Rehg2
+                                      1
+                                          The Hong Kong University of Science and Technology
+                                               2
+                                                 University of Illinois Urbana-Champaign
+
+   Change the                                                                             leave-shaped                Ours vs Trellis        Ours vs VoxHammer
+                                  train                plane             submarine
+  toy car to a …                                                                          wooden boat
+                                                                                                                        11.5%                     13.6%
+
+
+
+
+                                                                                                                                88.5%                      86.4%
+
+
+
+                                                                                                                         Ours   Trellis          Ours     VoxHammer
+
+                                                                                                                                User preference
+
+               Remove the                 Add a billboard                  Change the carriage to a                    Add a microwave oven
+            canopy of the cart.            on the cart.                     load of watermelons.                         over the cabinet.
+
+
+
+
+         Add some vegetables                        Change the purple flower             Change the dozer's shovel                        Remove the roof
+            in the basket.                            to a white dandelion.                to be lifted in the air.                       of the horse cart.
+
+
+
+
+Figure 1. We propose Vinedresser3D , an agent that can intelligently perform high-quality text-guided 3D editing. It can handle various
+kinds of edits (addition, modification and deletion), support multi-turn editing and tackle different types of 3D assets (objects and scenes).
+
+
+                             Abstract                                                ing model to obtain visual guidance. Finally, an inversion-
+                                                                                     based rectified-flow inpainting pipeline with an interleaved
+                                                                                     sampling module performs editing in the 3D latent space,
+    Text-guided 3D editing aims to modify existing 3D as-                            enforcing prompt alignment while maintaining 3D coher-
+sets using natural-language instructions. Current meth-                              ence and unedited regions. Experiments on diverse 3D ed-
+ods struggle to jointly understand complex prompts, auto-                            its demonstrate that Vinedresser3D outperforms prior base-
+matically localize edits in 3D, and preserve unedited con-                           lines in both automatic metrics and human preference stud-
+tent. We introduce Vinedresser3D, an agentic framework for                           ies, while enabling precise, coherent, and mask-free 3D
+high-quality text-guided 3D editing that operates directly in                        editing.
+the latent space of a native 3D generative model. Given a
+3D asset and an editing prompt, Vinedresser3D uses a mul-
+timodal large language model to infer rich descriptions of                           1. Introduction
+the original asset, identify the edit region and edit type (ad-
+dition, modification, deletion), and generate decomposed                             Editing 3D assets is a fundamental problem in 3D computer
+structural and appearance-level text guidance. The agent                             vision, with broad applications in digital content creation,
+then selects an informative view and applies an image edit-                          virtual and augmented reality, and robotics. While recent
+
+
+
+                                                                               12673
+text-guided 3D generation methods greatly lower the bar-           desired changes, and produce detailed textual guidance for
+rier to creating 3D content from scratch, in practice, high-       the edit. Then our agent selects a representative view and
+quality 3D editing still relies heavily on professional artists    invokes an image editing model to obtain an edited im-
+and manual tools. This process is labor-intensive, requires        age as visual guidance for 3D editing. To ensure the 3D
+domain expertise, and scales poorly with the growing de-           editing does not make unintended local changes, our agent
+mand for customized 3D content. These limitations mo-              employs a 3D grounding pipeline that automatically detects
+tivate automatic systems that can follow high-level textual        the editing region in the 3D asset based on the text prompt,
+user instructions and perform precise 3D edits in an intelli-      eliminating the need for user-provided 3D masks. Finally,
+gent and reliable way.                                             leveraging the latent space of native 3D generation models
+    Despite this great progress in 3D editing research, cur-       such as Trellis [59], Vinedresser3D performs precise inver-
+rent text-guided 3D editing methods still struggle to se-          sion–based editing in 3D latent space, enabling faithful edit-
+mantically understand complex editing requests, automat-           ing prompt alignment while preserving the geometry and
+ically detect precise 3D editing regions from textual in-          appearance of unedited regions, producing a high-quality
+structions alone, and perform high-quality 3D editing that         and holistic 3D edit.
+both follows prompts closely and preserves unedited re-               In summary, our main contributions are:
+gions. Existing text-guided 3D editing methods can be              • We introduce Vinedresser3D, a 3D editing agent that uses
+broadly grouped into three lines, each with important lim-           an MLLM as its core to intelligently interpret text instruc-
+itations. Score Distillation Sampling-based approaches [9–           tions and coordinate a set of tools for high-quality 3D
+12, 29, 41, 47, 52, 68] optimize a 3D representation un-             editing. Our framework achieves strong text alignment,
+der the guidance of 2D diffusion models, but per-scene op-           robust preservation of unedited parts, and high overall 3D
+timization is computationally expensive and typically re-            quality.
+quires careful tuning to avoid unintended global changes.          • We demonstrate that an MLLM trained primarily on
+A second line follows a “2D editing + 3D reconstruction”             2D image–text data can be integrated into a 3D edit-
+paradigm [5, 7, 14, 17, 26, 43, 54, 56]. These works first           ing pipeline, where it plans editing strategies, generates
+edit rendered views with multi-view diffusion and image              multi-modal guidance, and interacts with 3D segmenta-
+editing models and then reconstructing the edited asset with         tion, image editing, and 3D generation tools, to greatly
+3D reconstruction models. These methods are fundamen-                improve the editing performance.
+tally constrained by multi-view inconsistency and incom-           • We conduct extensive experiments on text-guided 3D
+plete 3D supervision, often struggling with the quality of           editing, showing that Vinedresser3D provides precise, co-
+unobserved regions and preservation of unedited geometry.            herent edits and compares favorably against state-of-the-
+Concurrent to our work, VoxHammer [28] builds on a na-               art 3D editing baselines in both quantitative metrics and
+tive 3D generative model [59] to perform editing directly in         human evaluations.
+3D, but still requiring user-provided 3D masks, and cannot
+follow complex edit requests.                                      2. Related Work
+    Recent advances in multimodal large language models            LLM Agents. LLM Agents are of great research interest in
+(MLLMs) [2], image editing models [1], 3D segmenta-                the AI community in recent years [4, 36, 48, 49, 57, 58, 63],
+tion [31], and strong 3D flow-based native generative mod-         since having an agent to automatically and smartly han-
+els [59] have significantly improved our ability to under-         dle users’ requests would be very convenient and efficient.
+stand text instructions, manipulate images, and operate di-        Moreover, agents can utilize the strong knowledge learned
+rectly in 3D latent space rather than through 2D proxies.          by large AI models to solve users’ problems accurately and
+Building on these developments, we argue that a natu-              effectively. In 3D generation and editing fields, many pre-
+ral next step is to move from single-model methods to a            vious works [6, 8, 16, 18, 22–24, 35, 40, 50, 62, 65, 66]
+3D editing agent that integrates multiple specialized tools.       have tried to develop intelligent agents to tackle the 3D
+Such an agent should (1) understand high-level text instruc-       tasks. However, no powerful agent for 3D editing with a
+tions, (2) automatically localize the intended editing region      text prompt as the pure input exists yet. So we believe de-
+in 3D, and (3) invoke appropriate tools to carry out the edit      veloping an agent to intelligently perform text-guided 3D
+while preserving the geometry and appearance of the rest of        editing is of great importance.
+the asset.                                                         Inversion-based editing. Due to the limited amount of
+    We propose Vinedresser3D, an agent for high-quality            paired training data of editing, many editing pipelines [19,
+text-guided 3D editing (Figure 1). Vinedresser3D is built          27, 33, 37–39, 45, 51, 53] adopt the inversion-editing
+around a core of MLLM (Gemini-2.5-flash [2]). It takes             methodology. It inverses the original object into the ini-
+as input a 3D asset and a textual editing prompt. It first         tial structured noise using a diffusion or flow model. It then
+uses the MLLM to parse the instruction, reason about the           edits the object following the generation process with new
+
+
+
+                                                              12674
+      Pipeline overview
+
+   Change the car to a train                                                   Image
+     editing prompt
+                                                                               editing
+                                                              selected                                      edited
+                                                                view                                        image                       3D editing module
+                                                                         Editing prompt: Change the car to …
+                                                                         Original description: A stylized toy                                     inverse
+                   render                                                features a glossy red and blue car body
+                                                       MLLM              with …
+                                                                         New description: A stylized toy features                                      original 3D asset
+      3D asset
+                                                                         a glossy red and blue locomotive-style
+                                                                         train body with …
+                                                                                                                                      noise
+                                                                         Editing part: car-like body, wheels                                              new 3D asset
+                                                                         Edit type: Modification
+                               multi-view                                ……
+                                                                                                                                                    edit
+                                images                                              prompts
+
+
+                                                                       calculate
+                  PartField                                          editing region
+
+                                        segmentation        preserved
+                                           result             parts                         editing region                                        edited 3D asset
+
+Figure 2. Pipeline overview. Given a 3D asset and an editing prompt, Vinedresser3D uses an MLLM to obtain new text and image guidance,
+automatically detects the intended editing region and then performs precise editing through an inversion-editing module.
+
+
+conditions towards the editing target. The editing process            2D domain and inadequate paired 3D editing data.
+can either inject the features or attention maps of the in-
+version trajectory [19, 51, 53] or inpaint the object [34].           3. Method
+We choose to use inpainting as we believe it can provide
+                                                                      We first provide the preliminaries in Sec. 3.1. Given the
+a greater control over parts we want to alter or preserve.
+                                                                      original 3D asset and the editing prompt as the only input,
+Moreover, most inversion-based methods are for 2D edit-
+                                                                      Vinedresser3D utilizes an MLLM (Gemini-2.5-flash [2])
+ing because there are few powerful 3D diffusion or flow
+                                                                      as its core to obtain new guidance (Sec. 3.2) and detect
+models. However, we want to directly operate in the 3D
+                                                                      the intended editing region (Sec. 3.3). After that, Vine-
+space, so we choose a start-of-the-art flow-based 3D gener-
+                                                                      dresser3D performs 3D editing to get the new asset through
+ation model [59] as our baseline.
+                                                                      an inversion-based Trellis module (Sec. 3.4) with the guid-
+3D editing. Due to the challenges of manipulating the
+                                                                      ance and the editing region. The pipeline overview is in
+3D space and the lack of 3D data, most existing 3D edit-
+                                                                      Fig. 2.
+ing methods actually heavily rely on the 2D domain. One
+stream of methods [9–12, 29, 41, 47, 52, 68] utilizing                3.1. Preliminary
+Score Distillation Sampling [42] to update the 3D asset.
+                                                                      Trellis [59] is a flow-based native 3D generation model. It
+They repeatedly render images and propagate the gradi-
+                                                                      takes either a text prompt or a single image as the condition,
+ents from a 2D diffusion model back to the 3D asset
+                                                                      and generate a corresponding 3D asset. Trellis employs a
+to optimize it. However, this process is time-consuming
+                                                                      structured latent representation (SLAT), which represents a
+and computationally expensive. Another stream of meth-
+                                                                      3D asset as sparse voxels with their latent features. The gen-
+ods [5, 7, 14, 17, 26, 43, 54, 56] render multi-view images
+                                                                      eration pipeline is decomposed into two stages, each utiliz-
+of the original assets and edit the images with multi-view
+                                                                      ing a specialized rectified flow model [32]. The first stage
+diffusion models. They then reconstruct the edited asset
+                                                                      predicts the sparse voxel structure, while the second gener-
+from those images using reconstruction techniques. This
+                                                                      ates the detailed latent features for each voxel. The resulting
+stream of methods usually suffers from multi-view incon-
+                                                                      SLAT can be decoded into 3D Gaussians [25] or meshes.
+sistency and the lose of spatial information due to occlusion
+                                                                      We adopt Trellis as our baseline given its state-of-the-art
+and distortion of rendering. Considering the problems with
+                                                                      performance in high-fidelity 3D generation.
+relying on the 2D domain, some methods [3, 46, 60, 64]
+                                                                      RF-Solver [53] introduces a method for the accurate inver-
+propose to encode the 3D asset into a latent space and per-
+                                                                      sion of rectified flow models in the context of image genera-
+form editing on it. But due to the limitation of available
+                                                                      tion. While standard inversion typically relies on first-order
+paired 3D editing training data, they can not achieve sat-
+                                                                      discretization:
+isfactory results. Recent flow-based native 3D generation
+models [30, 59] provide the potential of directly editing in                                X_{i-1} = X_i + (t_{i-1} - t_i)v_{\theta }(X_i,t_i), \label {eq:vanilla_inv}    (1)
+the 3D space. And we decide to choose one of them [59] as
+our baseline to avoid the problems of heavily relying on the          where Xi represents the noisy state at timestep ti and vθ
+
+
+
+                                                               12675
+                                                                                                                                          identify the specific names of parts targeted for editing, and
+                                                                                                                                          classify the editing operation type (addition, modification,
+                                                      Change the car to a train.
+                                                                                                                                          or deletion). Then, the model is prompted to predict the
+                                                                                                                                          complete description of the asset post-editing. Importantly,
+                                                                                                                                          we constrain the MLLM to maximize semantic preservation
+    Original complete description: A small, stylized toy features a glossy red and                                                        of the original description outside the targeted edit regions
+    blue car-like body with a light tan bottom and a blue '1' marking on its side,
+    supported by four smooth light blue cylindrical wheels with orange circular                                                           to retrain fine-grained details. Next, the MLLM isolates de-
+    centers, carrying a white spherical figure with a yellow beak, black dot eyes,                                                        scriptions specifically for the newly modified target parts.
+    and an orange wavy crest on its head.
+    Names of editing part: car-like body, wheels                                                                                          Finally, to align with our two-stage generation pipeline,
+    Edit type: Modification                                                                                                               the MLLM decomposes these descriptions into structure-
+    New complete description: A small, stylized toy features a glossy red and                                                             related components (for stage 1 geometry) and appearance-
+    blue locomotive-style train body with a light tan bottom and train wheels,                                                            related components (for stage 2 latent features). This multi-
+    carrying a white spherical figure with a yellow beak, black dot eyes, and an
+    orange wavy crest on its head.                                                                                                        stage process provides highly targeted conditioning for sub-
+    New complete description for stage 1: A small, stylized toy features a                                                                sequent modules. As shown in Fig. 3, the MLLM demon-
+    locomotive-style train body with a bottom and train wheels, carrying a
+    spherical figure with a beak, dot eyes, and a wavy crest on its head.                                                                 strates implicit 3D semantic understanding despite its 2D
+    New complete description for stage 2: A toy features a glossy red and blue
+    train body with a light tan bottom and train wheels, carrying a white figure
+                                                                                                                                          training, accurately processing spatial information.
+    with a yellow beak, black eyes, and an orange crest on its head.                                                                          Furthermore, Vinedresser3D generates image guidance
+    New parts description: Locomotive-style train body: a glossy red and blue
+    locomotive-style train body with a light tan bottom. Train wheels: light tan
+                                                                                                                                          through a view-selection and editing pipeline. The MLLM
+    train wheels.                                                                                                                         evaluates the rendered views to identify the candidate that
+    New parts description for stage 1: ……
+    New parts description for stage 2: ……
+                                                                                                                                          maximizes the visibility of the target editing parts and the
+    ……                                                                                                                                    overall asset structure. The selected image is then for-
+                                                                                                                                          warded to an image editing model (Nano Banana [1]). We
+Figure 3. Text guidance output by the MLLM. The modified words                                                                            augment the conditioning of the image editing model by
+between the original complete description and the new complete                                                                            supplying both the editing prompt and the decoupled de-
+description are marked with underlined italics. We highlight the                                                                          scription of the new target parts. This multi-level text con-
+extracted stage 1-related (in cyan) and stage 2-related (in red) in-
+                                                                                                                                          ditioning guides the generation of a high-fidelity reference
+formation.
+                                                                                                                                          image that accurately reflects the desired edits.
+
+denotes the flow velocity field, RF-Solver enhances this by                                                                               3.3. Detect editing region
+incorporating a second-order Taylor expansion term:
+                                                                                                                                         One main advantage of Vinedresser3D over previous work
+                                                                                                                                         is that it can automatically detect the editing region, so users
+  X_{i-1} = X_i + (t_{i-1} - t_i)v_{\theta }(X_i,t_i) + \frac {1}{2}(t_{i-1}-t_i)^2 v_{\theta }^{(1)}(X_i,t_i). \label {eq:RF-solver}    do not need to provide a 3D mask. Since we adopt a voxel-
+                                                                                                                            (2)          based 3D representation, our detection algorithm only needs
+                 (1)
+Here, vθ represents the temporal derivative of the veloc-                                                                                to determine whether each voxel belongs to the editing re-
+ity field. We adopt RF-Solver in our 3D editing module                                                                                   gion. Fig. 2 illustrates this process.
+because this second-order term significantly improves in-                                                                                    For modification and deletion requests, Vine-
+version fidelity.                                                                                                                        dresser3D first identifies which parts of the original
+                                                                                                                                         asset A should be edited and which should be preserved,
+3.2. Multi-modal Guidance Generation                                                                                                     denoted by Pedit and Ppres , respectively. To this end,
+Given the input 3D asset and a user-provided editing                                                                                     it employs PartField [31], a powerful 3D segmentation
+prompt, Vinedresser3D first generates the necessary text                                                                                 model, to decompose A into S semantic parts. The original
+and image guidance to condition downstream modules.                                                                                      3D asset and its segmented colored view (rendered as
+Leveraging the reasoning capabilities of a Multimodal                                                                                    multi-view images), together with text guidance specifying
+Large Language Model (MLLM), the agent semantically                                                                                      the target parts, are then fed into the MLLM, which selects
+understand the editing request to generate guidance signals                                                                              the editing region Pedit and implicitly defines the preserved
+that are both comprehensive and precisely aligned with the                                                                               region as Ppres = A \ Pedit . Since PartField’s segmentation
+target modification.                                                                                                                     granularity depends on S, Vinedresser3D computes seg-
+   Vinedresser3D first generates the text guidance (Fig. 3).                                                                             mentations for multiple values of S and passes all of them
+The process begins with rendering multi-view images of the                                                                               to the MLLM, allowing it to choose the most fine-grained
+original 3D asset. These images, combined with the user’s                                                                                and semantically precise parts.
+editing prompt, are provided as input to the MLLM. We em-                                                                                    After partitioning the original asset A into Pedit and Ppres ,
+ploy a multi-step prompting strategy: first, the MLLM ana-                                                                               Vinedresser3D must determine the corresponding editing
+lyzes the input to output a description of the original asset,                                                                           region Redit (and its complement, the preserved region
+
+
+
+                                                                                                                                  12676
+                                                                                                                                                                                                                                          A stylized toy features a glossy
+                                                                                                                                                                                                                                          red and blue car body with …
+                                                                                                                                                                                                                                original complete description
+                                                                          Inverse
+
+
+
+                                                                              stage1                                                                 RF-Solver                                                                                                  Enc        stage2          RF-Solver          Enc
+                                                                                                                                                      inverse                                    stage1 latent                                                                              inverse SLAT            3D asset
+                                                                          structed noise                                                                                                                                                                              structured noise
+                                                                                                                                                                             replace                                                                                                               replace
+                                                                                                                                                                         preserved region                                                                                                      preserved region
+
+                                                                                    stage1                                                             inpaint                                             stage1                                               Dec       stage2          inpaint    new Dec         edited
+                                                                                   new noise                                                                                                             new latent                                                      new noise                   SLAT           3D asset
+
+
+
+
+                                                                          Edit
+                                                                                                                         A stylized toy features a glossy red and
+                                                                                                                         blue locomotive-style train body with …
+                                                                                                                                                                           new text                                                                                                      edited image
+
+Figure 4. Our native 3D inversion-based editing pipeline. It first invert the original 3D asset back to structured noises using RF-Solver [53]
+and the original complete description as the condition. Then it performs editing through inpainting by denoising with Trellis-text and
+Trellis-image alternatively for all timesteps, using both the new text and edited image as conditions.
+
+
+Rpres = C\Redit , where C denotes the entire voxel grid).                                                                                                                                                                                                                   Vinedresser3D can leverage the world knowledge and com-
+This is straightforward for addition and deletion requests:                                                                                                                                                                                                                 mon sense learnt by the MLLM to understand the user’s in-
+for addition, Redit is all voxels in the 3D space outside the                                                                                                                                                                                                               tention and precisely locate the desired editing region in a
+original asset (C\A), and for deletion, Redit coincides with                                                                                                                                                                                                                complex 3D asset.
+Pedit . In contrast, computing Redit for modification requests
+is non-trivial. We cannot simply treat all voxels outside                                                                                                                                                                                                                   3.4. Inversion-Based 3D Editing
+Ppres as editable, because Trellis may modify a layer of vox-                                                                                                                                                                                                               Given the multi-modal guidance and the 3D mask Redit ,
+els above the preserved geometry, unintentionally altering                                                                                                                                                                                                                  Vinedresser3D performs localized 3D editing via an
+Ppres .                                                                                                                                                                                                                                                                     inversion-inpainting process. The asset is first inverted to its
+   To address this, we introduce the following procedure.                                                                                                                                                                                                                   latent initial noise representation, and then edited through
+We first assign all voxels in Pedit to Redit and all voxels in                                                                                                                                                                                                              inpainting. We implement this through a novel inversion-
+Ppres to Rpres . We then compute a bounding box for each                                                                                                                                                                                                                    based module (Fig. 4) that combines Trellis-text and Trellis-
+preserved semantic part and denote the union of these boxes                                                                                                                                                                                                                 image models to achieve both high-fidelity detail and com-
+as bboxpres . All empty voxels outside bboxpres are also as-                                                                                                                                                                                                                prehensive structural coherence in the edited results.
+signed to Redit . Next, for each empty voxel v inside bboxpres ,                                                                                                                                                                                                               We employ RF-Solver [53] for accurate inversion in the
+we find its k-nearest voxels belonging to the original asset                                                                                                                                                                                                                3D flow models. Conditioned on the complete description
+and compute the fraction of those lying in Pedit , denoted as                                                                                                                                                                                                               of the original asset, the process begins with Stage 2 inver-
+PropKNN(v). If this proportion exceeds a threshold τ , we                                                                                                                                                                                                                   sion to derive the structured noise for the SLATs. Then,
+classify v as editable; otherwise, it is preserved. Formally,                                                                                                                                                                                                               the sparse voxel structure is encoded into the Stage 1 la-
+the editing region is defined as:                                                                                                                                                                                                                                           tent space for Stage 1 inversion, yielding the corresponding
+                                                                                                                                                                                                                                                                            noise. Empirically, we observed through grid search that
+                                                                                                                                                                                                                                                                            setting the Classifier-Free Guidance (CFG) [21] strength to
+     R_{\text {edit}} = \begin {cases} C \backslash A & \text {addition}\\ P_{\text {edit}} & \text {deletion}\\ P_{\text {edit}} \cup (C \backslash bbox_{\text {pres}}) \cup V & \text {modification}\\ \end {cases} \\ \label {eq:compute_editing_region}      (3)       0 significantly stabilizes the inversion trajectory and mini-
+                                                                                                                                                                                                                                                                            mizes reconstruction error. Therefore, we use a CFG scale
+                                                                                                                                                                                                                                                                            of 0 for all inversion steps. Given the inverted noises, we
+where V = {v|v ∈ bboxpres \A, PropKNN(v) > τ }.                                                                                                                                                                                                                             implement a mask-guided inpainting strategy to synthesize
+  This automatic localizing pipeline equips our agent with                                                                                                                                                                                                                  the edited asset while preserving the identity of unedited
+some spatial reasoning ability. As we can see in Fig. 5,                                                                                                                                                                                                                    regions. Specifically, at each timestep of the denoising pro-
+
+
+
+                                                                                                                                                                                                                                                                      12677
+                                                            Text Align.           Unedited Preservation           3D Quality
+                      Method               Human Mask        CLIP-T↑      CD↓      PSNR↑     SSIM↑    LPIPS↓        FID↓
+                      Instant3dit [5]            ✓            0.227       0.027     20.86    0.851        0.153     80.35
+                      VoxHammer [28]             ✓            0.235       0.027     24.36    0.890        0.087     34.95
+                      Trellis [59]               ✓            0.247       0.010     37.35    0.984        0.017     31.10
+                      Ours                       ✗            0.252       0.016     29.45    0.953        0.045     29.49
+                      Ours w/ HM                 ✓            0.252       0.008     37.69    0.984        0.015     27.38
+
+Table 1. Quantitative comparison. We include the results of our method with human-provided 3D masks (Ours w/ HM). Best results are
+in bold. Our method with human-provided 3D masks achieves the best results in all metrics. Even though our method without human-
+provided 3D masks does not preserve the unedited parts as well as Trellis, it still closely aligns with the editing prompt and produces
+high-quality outcomes.
+
+
+   Model           Text Align.   Unedited Preservation   3D Quality         gion. For voxels close to the boundary, we compute their
+   vs. Trellis       92.5%              82.0%              90.8%            features as a weighted average of the denoised and inverted
+   vs. VoxHammer     89.8%              79.3%              90.2%            features during editing, rather than directly replacing them
+                                                                            with the inverted ones. We find that this soft masking ef-
+Table 2. User study. We ask the user to select the better one be-
+                                                                            fectively eliminates floating artifacts at the boundary of the
+tween ours and another method in terms of editing prompt align-
+                                                                            preserved region. For deletion requests, we skip Stage 1 in-
+ment, unedited parts preservation and overall 3D quality. We re-
+port the win rates of our methods. Our method achieves high win             version and editing entirely. Instead, we directly remove all
+rates in all perspectives.                                                  voxels in Redit and apply Stage 2 to smooth the boundary.
+
+                                                                            4. Experiment
+cess, the latent features of voxels located outside the edit
+mask Redit are replaced with their spatially corresponding                  4.1. Setup
+features from the original inversion trajectory. Throughout                 Implementation details. We adopt Google Gemini-2.5-
+this generation process, the flow models are conditioned on                 Flash [2] as the MLLM and Nano Banana [1] as the im-
+the decomposed Stage 1 and Stage 2 text guidance, along                     age editing model. We render 8 views of each asset, for
+with the generated image guidance.                                          both the original appearance and the segmentation, as input
+   We observe that directly applying inversion-based edit-                  to the MLLM for text guidance and editing region selec-
+ing with either Trellis-text or Trellis-image alone is insuffi-             tion. We additionally render 24 views from varying rota-
+cient. Trellis-text produces limited generation quality, par-               tions and elevations for the MLLM to select the best view
+ticularly in fine details, due to the scarcity of text-aligned              as image guidance. Since PartField [31] operates on point
+3D training data [59]. Trellis-image is conditioned on a                    clouds for both input and output, we decode each asset into
+single viewpoint, and therefore struggles with occluded re-                 3D Gaussians as point clouds before feeding them into Part-
+gions where visual information is unavailable. To address                   Field, and convert the resulting segmentation back to voxels
+these limitations, we introduce an Interleaved Trellis edit-                via majority voting. The number of semantic parts is set to
+ing Module that leverages the complementary strengths of                    S ∈ [3, 8]. We follow Trellis’s [59] configuration for the
+both modalities. We construct the denoising trajectory by                   3D editing module. During editing, the agent explores dif-
+alternating between one timestep of Trellis-text denoising                  ferent combinations of positive and negative prompts as text
+and one timestep of Trellis-image denoising, interleaving                   conditions and selects the best result.
+the vector fields of the two models. This design combines                   Dataset. We collect high-quality and diverse 3D assets
+the broad semantic alignment and prompt adherence from                      from both model-generated and human-created sources.
+the text branch with the high-fidelity detail from the image                Specifically, we gather 24 assets from Trellis generation
+branch, leading to improved overall generation quality.                     results and 33 assets from GSO [13] and PartObjaverse-
+   We now describe additional design details for mask han-                  Tiny [61]. For each asset, we carefully design an editing
+dling across stages. Note that Trellis produces the final as-               prompt that aligns with common sense. Our prompts cover
+set at 643 voxel resolution, while Stage 1 operates in a 163                a wide range of editing categories and difficulty levels.
+latent space. We downscale the editing mask accordingly                     Baselines. We compare our method with three state-of-
+via proportion thresholding to obtain the Stage 1 mask. For                 the-art 3D editing pipelines: Trellis [59] editing, VoxHam-
+Stage 2 editing, inspired by [28], we adopt a soft mask in-                 mer [28], and Instant3dit [5]. Trellis supports 3D edit-
+stead of a hard mask. Specifically, for each voxel in the                   ing through human-provided 3D masks combined with Re-
+preserved region, we compute its distance to the editing re-                paint [34]. VoxHammer builds on Trellis-image by render-
+
+
+
+                                                                       12678
+                       Change the bathtub to   Change the sunshade      Change the chair to a Change the normal     Change the little      Change the car on the
+                            a bucket.          on the left to a water     human riding the    peashooter to a snow girl to a teddy bear.    back to a pumpkin.
+                                                     fountain.               elephant.            peashooter.
+
+
+
+
+       Original
+
+
+
+
+     Instant3dit
+
+
+
+
+    VoxHammer
+
+
+
+
+        Trellis
+
+
+
+
+         Ours
+
+
+
+
+Figure 5. Qualitative comparison of different methods. We can see that our method surpasses all the others by smartly interpreting the
+editing intention of the user, closely following the editing prompt, precisely locating the intended editing region and generating high-fidelity
+results.
+
+
+ing an image, applying image inpainting to obtain a new                                validating the editing region detection pipeline. The overall
+condition, and performing inversion-based 3D editing, but                              quality of the assets is also well preserved, confirming the
+it still requires a human-provided 3D mask. Instant3dit                                competence of the inversion-based Trellis editing module.
+is a multi-view diffusion and reconstruction-based editing
+model.                                                                                 4.3. Quantitative Results
+Metrics. We use CLIP-T [44] to measure alignment                                       We present quantitative comparisons in Tab. 1. Since all
+with the editing prompt, Chamfer Distance [15], PSNR,                                  baselines require human-provided 3D masks, we also in-
+SSIM [55], and LPIPS [67] to assess preservation of                                    clude results of our method with human-provided masks
+unedited regions, and FID [20] to evaluate overall 3D qual-                            for fair comparison. Both variants of our method, with and
+ity. We also conduct a user study to evaluate human prefer-                            without human-provided masks, achieve the best CLIP-T
+ence.                                                                                  score. This validates the benefit of leveraging an MLLM to
+                                                                                       produce detailed text guidance. For unedited region preser-
+4.2. Qualitative Results                                                               vation metrics (i.e. CD, PSNR, SSIM, LPIPS), our method
+We present qualitative comparisons in Fig. 5, where our                                remains competitive even without human provided masks.
+method surpasses all baselines. It accurately interprets the                           Given human-provided masks, our approach achieves the
+user’s editing intention and faithfully follows the editing                            best results. Finally, both settings of our method outper-
+prompt to produce expected outcomes, demonstrating the                                 form all baselines in overall 3D quality (FID).
+effectiveness of the MLLM and the guidance it generates.                                  We also conduct a user study to evaluate human prefer-
+Additionally, our method precisely localizes the target edit-                          ence across methods. Users are asked to choose the better
+ing region within complex assets given only text prompts,                              output between two results from three perspectives: editing
+
+
+
+                                                                              12679
+                    Change the toy car to a                                                                      Change the three colorful
+                  leave-shaped wooden boat.                                                                        balls to three apples.
+
+
+
+
+                                                                                                                     Change the little girl
+                                                                                                                       to a teddy bear.
+                     Change the turtle's
+                    head to a cat's head.
+
+
+
+
+       Original                             Interleaved Trellis      Trellis-image only                   Original                        Ours w/ 3D mask   Ours w/o 3D mask
+
+
+
+Figure 6. Qualitative ablation of interleaved Trellis vs Trellis-                              Figure 7. Qualitative ablation of our method with and without the
+image only. The outputs of Trellis-image only editing may be dis-                              detected editing region as the 3D mask. Our method without the
+torted or unreasonable.                                                                        detected editing region may alter the intended preserved parts or
+                                                                                               produce distorted outputs.
+                                       Unedited Preservation               3D Quality
+   Methods                         PSNR↑         SSIM↑            LPIPS↓       FID↓
+                                                                                               in Tab. 3). It also plays an important role in maintaining the
+   Ours                             29.45         0.953           0.045        29.49
+                                                                                               overall quality of the edited asset (the second example in
+   Ours w/o Trellis-text            28.06         0.943           0.054        30.59           Fig. 7 and FID in Tab. 3). Without a mask, the interleaved
+   Ours w/o Redit                   25.65         0.921           0.068        33.95
+                                                                                               Trellis editing can fail to handle the asset properly and pro-
+                                                                                               duce distorted outputs. Providing a 3D mask and injecting
+Table 3. Quantitative results of the ablation study. We compare
+our method with the Trellis-image only 3D editing design and
+                                                                                               preserved-region features during editing regularizes the de-
+ours without the detected editing region. We use PSNR, SSIM and                                noising process and helps maintain overall quality.
+LPIPS to measure unedited parts preservation and FID to measure
+the overall 3D quality. We can see that our method outperforms                                 5. Limitation
+both of the ablated ones on all metrics.
+                                                                                               While Vinedresser3D can produce impressive results, it still
+                                                                                               has several limitations. First, the underlying MLLM does
+prompt alignment, unedited region preservation, and overall                                    not accept native 3D input. We expect that enabling the
+3D quality. The win rates are reported in Tab. 2. The results                                  MLLM to directly consume 3D inputs and perform 3D rea-
+clearly show that our method consistently outperforms both                                     soning could further improve the results. Second, the ex-
+Trellis and VoxHammer across all perspectives.                                                 ternal tools invoked by Vinedresser3D are imperfect. For
+                                                                                               example, PartField [31] can produce unreasonable part seg-
+4.4. Ablation Study                                                                            mentations. We anticipate that future advances in these 3D
+                                                                                               models will further improve the overall performance of our
+We conduct two ablation experiments to validate key com-
+                                                                                               agent.
+ponents of our agent. The first ablation uses only Trellis-
+image in the editing module, verifying the effect of the inter-
+leaved Trellis design. The second ablation removes the edit-                                   6. Conclusion
+ing region mask (i.e., performing purely interleaved Trellis                                   We develop an agent that is capable of intelligently and
+generation instead of inpainting), verifying the necessity of                                  efficiently performing high-quality text-guided 3D editing.
+the editing region detection module.                                                           Using an MLLM as its core, it smartly makes use of
+    When using only Trellis-image, the editing module re-                                      an image editing model, a 3D segmentation model and
+ceives limited information due to occlusion and deforma-                                       a 3D generation baseline. It intelligently interprets the
+tion during rendering, which can lead to distorted or unrea-                                   editing request, generates detailed and comprehensive
+sonable outputs. We provide qualitative examples in Fig. 6                                     guidance, automatically detects the intended editing region
+                                                                                               and performs precise editing. It produce high-quality
+and report FID scores in Tab. 3, demonstrating the impor-
+                                                                                               results in terms of editing prompt alignment, unedited
+tance of interleaving Trellis-text and Trellis-image for over-                                 parts preservation and overall 3D quality. Also, we
+all 3D quality.                                                                                show the potential of integrating 2D MLLMs into 3D
+    In the second ablation, we verify that providing the edit-                                 pipelines. We believe our work will promote the 3D editing
+ing region to the editing module helps preserve unedited                                       field towards an agentic, high-quality and smart future.
+parts (the first example in Fig. 7 and PSNR, SSIM, LPIPS
+
+
+
+                                                                                          12680
+References                                                                   and Vincent Vanhoucke. Google scanned objects: A high-
+                                                                             quality dataset of 3d scanned household items. In 2022 In-
+ [1] Introducing gemini 2.5 flash image, our state-of-the-art im-            ternational Conference on Robotics and Automation (ICRA),
+     age model. https://developers.googleblog.                               pages 2553–2560. IEEE, 2022.
+     com / en / introducing - gemini - 2 - 5 - flash -
+                                                                        [14] Ziya Erkoç, Can Gümeli, Chaoyang Wang, Matthias
+     image/, 2025. Google Developers Blog.
+                                                                             Nießner, Angela Dai, Peter Wonka, Hsin-Ying Lee, and
+ [2] Gemini-2.5-flash.     https : / / deepmind . google /                   Peiye Zhuang. Preditor3d: Fast and precise 3d shape editing.
+     models/gemini/flash/, 2025. Google DeepMind.                            In Proceedings of the Computer Vision and Pattern Recogni-
+ [3] Panos Achlioptas, Ian Huang, Minhyuk Sung, Sergey                       tion Conference, pages 640–649, 2025.
+     Tulyakov, and Leonidas Guibas. Shapetalk: A language               [15] Haoqiang Fan, Hao Su, and Leonidas J Guibas. A point set
+     dataset and framework for 3d shape edits and deformations.              generation network for 3d object reconstruction from a single
+     In Proceedings of the IEEE/CVF conference on computer vi-               image. In Proceedings of the IEEE conference on computer
+     sion and pattern recognition, pages 12685–12694, 2023.                  vision and pattern recognition, pages 605–613, 2017.
+ [4] Akari Asai, Zeqiu Wu, Yizhong Wang, Avirup Sil, and Han-           [16] Weixi Feng, Wanrong Zhu, Tsu-jui Fu, Varun Jampani, Ar-
+     naneh Hajishirzi. Self-rag: Learning to retrieve, generate,             jun Akula, Xuehai He, Sugato Basu, Xin Eric Wang, and
+     and critique through self-reflection. In Proceedings of the In-         William Yang Wang. Layoutgpt: Compositional visual plan-
+     ternational Conference on Learning Representations, 2024.               ning and generation with large language models. In Ad-
+ [5] Amir Barda, Matheus Gadelha, Vladimir G Kim, Noam                       vances in Neural Information Processing Systems, pages
+     Aigerman, Amit H Bermano, and Thibault Groueix. In-                     18225–18250, 2023.
+     stant3dit: Multiview inpainting for fast editing of 3d objects.    [17] Will Gao, Dilin Wang, Yuchen Fan, Aljaz Bozic, Tuur
+     In Proceedings of the Computer Vision and Pattern Recogni-              Stuyck, Zhengqin Li, Zhao Dong, Rakesh Ranjan, and Niko-
+     tion Conference, pages 16273–16282, 2025.                               laos Sarafianos. 3d mesh editing using masked lrms. In
+ [6] Siyuan Bian, Chenghao Xu, Yuliang Xiu, Artur Grigorev,                  Proceedings of the IEEE/CVF International Conference on
+     Zhen Liu, Cewu Lu, Michael J Black, and Yao Feng. Chat-                 Computer Vision, pages 7154–7165, 2025.
+     garment: Garment estimation, generation and editing via            [18] Zeqi Gu, Yin Cui, Zhaoshuo Li, Fangyin Wei, Yunhao
+     large language models. In Proceedings of the Computer Vi-               Ge, Jinwei Gu, Ming-Yu Liu, Abe Davis, and Yifan Ding.
+     sion and Pattern Recognition Conference, pages 2924–2934,               Artiscene: Language-driven artistic 3d scene generation
+     2025.                                                                   through image intermediary. In Proceedings of the Computer
+ [7] Hansheng Chen, Ruoxi Shi, Yulin Liu, Bokui Shen, Ji-                    Vision and Pattern Recognition Conference, pages 2891–
+     ayuan Gu, Gordon Wetzstein, Hao Su, and Leonidas Guibas.                2901, 2025.
+     Generic 3d diffusion adapter using controlled multi-view           [19] Amir Hertz, Ron Mokady, Jay Tenenbaum, Kfir Aberman,
+     editing. arXiv preprint arXiv:2403.12032, 2024.                         Yael Pritch, and Daniel Cohen-Or. Prompt-to-prompt im-
+ [8] Junlong Chen, Jens Grubert, and Per Ola Kristensson. Ana-               age editing with cross attention control. arXiv preprint
+     lyzing multimodal interaction strategies for llm-assisted ma-           arXiv:2208.01626, 2022.
+     nipulation of 3d scenes. In 2025 IEEE Conference Virtual           [20] Martin Heusel, Hubert Ramsauer, Thomas Unterthiner,
+     Reality and 3D User Interfaces (VR), pages 206–216. IEEE,               Bernhard Nessler, and Sepp Hochreiter. Gans trained by a
+     2025.                                                                   two time-scale update rule converge to a local nash equilib-
+ [9] Minghao Chen, Junyu Xie, Iro Laina, and Andrea Vedaldi.                 rium. In Advances in neural information processing systems,
+     Shap-editor: Instruction-guided latent 3d editing in seconds.           2017.
+     In Proceedings of the IEEE/CVF conference on computer vi-          [21] Jonathan Ho and Tim Salimans. Classifier-free diffusion
+     sion and pattern recognition, pages 26456–26466, 2024.                  guidance. arXiv preprint arXiv:2207.12598, 2022.
+[10] Yige Chen, Teng Hu, Yizhe Tang, Siyuan Chen, Ang Chen,             [22] Yining Hong, Haoyu Zhen, Peihao Chen, Shuhong Zheng,
+     and Ran Yi. Plasticine3d: 3d non-rigid editing with text                Yilun Du, Zhenfang Chen, and Chuang Gan. 3d-llm: Inject-
+     guidance by multi-view embedding optimization. arXiv                    ing the 3d world into large language models. In Advances
+     preprint arXiv:2312.10111, 2023.                                        in Neural Information Processing Systems, pages 20482–
+[11] Dale Decatur, Itai Lang, Kfir Aberman, and Rana Hanocka.                20494, 2023.
+     3d paintbrush: Local stylization of 3d shapes with cascaded        [23] Ziniu Hu, Ahmet Iscen, Aashi Jain, Thomas Kipf, Yisong
+     score distillation. In Proceedings of the IEEE/CVF con-                 Yue, David A Ross, Cordelia Schmid, and Alireza Fathi.
+     ference on computer vision and pattern recognition, pages               Scenecraft: An llm agent for synthesizing 3d scenes as
+     4473–4483, 2024.                                                        blender code. In Proceedings of the International Confer-
+[12] Shaocong Dong, Lihe Ding, Zhanpeng Huang, Zibin Wang,                   ence on Machine Learning, 2024.
+     Tianfan Xue, and Dan Xu. Interactive3d: Create what                [24] Ian Huang, Guandao Yang, and Leonidas Guibas. Blender-
+     you want by interactive 3d generation. In Proceedings of                alchemy: Editing 3d graphics with vision-language models.
+     the IEEE/CVF Conference on Computer Vision and Pattern                  In European Conference on Computer Vision, pages 297–
+     Recognition, pages 4999–5008, 2024.                                     314. Springer, 2024.
+[13] Laura Downs, Anthony Francis, Nate Koenig, Brandon Kin-            [25] Bernhard Kerbl, Georgios Kopanas, Thomas Leimkühler,
+     man, Ryan Hickman, Krista Reymann, Thomas B McHugh,                     and George Drettakis. 3d gaussian splatting for real-time
+
+
+
+
+                                                                   12681
+     radiance field rendering. ACM Transactions on Graphics, 42            tions. In Proceedings of the International Conference on
+     (4):139–1, 2023.                                                      Learning Representations, 2022.
+[26] Umar Khalid, Hasan Iqbal, Azib Farooq, Jing Hua, and Chen        [38] Daiki Miyake, Akihiro Iohara, Yu Saito, and Toshiyuki
+     Chen. 3dego: 3d editing on the go! In European Conference             Tanaka. Negative-prompt inversion: Fast image inversion
+     on Computer Vision, pages 73–89. Springer, 2024.                      for editing with text-guided diffusion models. In 2025
+[27] Gwanghyun Kim, Taesung Kwon, and Jong Chul Ye. Diffu-                 IEEE/CVF Winter Conference on Applications of Computer
+     sionclip: Text-guided diffusion models for robust image ma-           Vision (WACV), pages 2063–2072. IEEE, 2025.
+     nipulation. In Proceedings of the IEEE/CVF conference on         [39] Ron Mokady, Amir Hertz, Kfir Aberman, Yael Pritch, and
+     computer vision and pattern recognition, pages 2426–2435,             Daniel Cohen-Or. Null-text inversion for editing real im-
+     2022.                                                                 ages using guided diffusion models. In Proceedings of
+[28] Lin Li, Zehuan Huang, Haoran Feng, Gengxiong Zhuang,                  the IEEE/CVF conference on computer vision and pattern
+     Rui Chen, Chunchao Guo, and Lu Sheng. Voxhammer:                      recognition, pages 6038–6047, 2023.
+     Training-free precise and coherent 3d editing in native 3d       [40] Başak Melis Öcal, Maxim Tatarchenko, Sezer Karaoğlu, and
+     space. arXiv preprint arXiv:2508.19247, 2025.                         Theo Gevers. Sceneteller: Language-to-3d scene generation.
+[29] Yuhan Li, Yishun Dou, Yue Shi, Yu Lei, Xuanhong Chen, Yi              In European Conference on Computer Vision, pages 362–
+     Zhang, Peng Zhou, and Bingbing Ni. Focaldreamer: Text-                378. Springer, 2024.
+     driven 3d editing via focal-fusion assembly. In Proceed-         [41] Francesco Palandra, Andrea Sanchietti, Daniele Baieri, and
+     ings of the AAAI conference on artificial intelligence, pages         Emanuele Rodola. Gsedit: Efficient text-guided edit-
+     3279–3287, 2024.                                                      ing of 3d objects via gaussian splatting. arXiv preprint
+[30] Yangguang Li, Zi-Xin Zou, Zexiang Liu, Dehu Wang, Yuan                arXiv:2403.05154, 2024.
+     Liang, Zhipeng Yu, Xingchao Liu, Yuan-Chen Guo, Ding             [42] Ben Poole, Ajay Jain, Jonathan T Barron, and Ben Milden-
+     Liang, Wanli Ouyang, et al. Triposg: High-fidelity 3d shape           hall. Dreamfusion: Text-to-3d using 2d diffusion. In Pro-
+     synthesis using large-scale rectified flow models. arXiv              ceedings of the International Conference on Learning Rep-
+     preprint arXiv:2502.06608, 2025.                                      resentations, 2023.
+[31] Minghua Liu, Mikaela Angelina Uy, Donglai Xiang, Hao Su,         [43] Zhangyang Qi, Yunhan Yang, Mengchen Zhang, Long Xing,
+     Sanja Fidler, Nicholas Sharp, and Jun Gao. Partfield: Learn-          Xiaoyang Wu, Tong Wu, Dahua Lin, Xihui Liu, Jiaqi Wang,
+     ing 3d feature fields for part segmentation and beyond. In            and Hengshuang Zhao. Tailor3d: Customized 3d assets edit-
+     Proceedings of the IEEE/CVF International Conference on               ing and generation with dual-side images. arXiv preprint
+     Computer Vision, pages 9704–9715, 2025.                               arXiv:2407.06191, 2024.
+[32] Xingchao Liu, Chengyue Gong, and Qiang Liu. Flow                 [44] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+     straight and fast: Learning to generate and transfer data with        Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+     rectified flow. In Proceedings of the International Confer-           Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learn-
+     ence on Learning Representations, 2023.                               ing transferable visual models from natural language super-
+[33] Andreas Lugmayr, Martin Danelljan, Andres Romero, Fisher              vision. In Proceedings of the International conference on
+     Yu, Radu Timofte, and Luc Van Gool. Repaint: Inpainting               machine learning, pages 8748–8763. PmLR, 2021.
+     using denoising diffusion probabilistic models. In Proceed-      [45] Litu Rout, Yujia Chen, Nataniel Ruiz, Constantine Carama-
+     ings of the IEEE/CVF conference on computer vision and                nis, Sanjay Shakkottai, and Wen-Sheng Chu. Semantic im-
+     pattern recognition, pages 11461–11471, 2022.                         age inversion and editing using rectified stochastic differen-
+[34] Andreas Lugmayr, Martin Danelljan, Andres Romero, Fisher              tial equations. In Proceedings of the International Confer-
+     Yu, Radu Timofte, and Luc Van Gool. Repaint: Inpainting               ence on Learning Representations, 2025.
+     using denoising diffusion probabilistic models. In Proceed-      [46] Aadarsh Sahoo, Vansh Tibrewal, and Georgia Gkioxari.
+     ings of the IEEE/CVF conference on computer vision and                Aligning text, images, and 3d structure token-by-token.
+     pattern recognition, pages 11461–11471, 2022.                         arXiv preprint arXiv:2506.08002, 2025.
+[35] Xianzheng Ma, Yash Bhalgat, Brandon Smart, Shuai Chen,           [47] Etai Sella, Gal Fiebelman, Peter Hedman, and Hadar
+     Xinghui Li, Jian Ding, Jindong Gu, Dave Zhenyu Chen,                  Averbuch-Elor. Vox-e: Text-guided voxel editing of 3d ob-
+     Songyou Peng, Jia-Wang Bian, et al. When llms step                    jects. In Proceedings of the IEEE/CVF international confer-
+     into the 3d world: A survey and meta-analysis of 3d tasks             ence on computer vision, pages 430–440, 2023.
+     via multi-modal large language models. arXiv preprint            [48] Yijia Shao, Yucheng Jiang, Theodore Kanell, Peter Xu,
+     arXiv:2405.10255, 2024.                                               Omar Khattab, and Monica Lam. Assisting in writing
+[36] Aman Madaan, Niket Tandon, Prakhar Gupta, Skyler Hal-                 wikipedia-like articles from scratch with large language
+     linan, Luyu Gao, Sarah Wiegreffe, Uri Alon, Nouha Dziri,              models. In Proceedings of the 2024 Conference of the North
+     Shrimai Prabhumoye, Yiming Yang, et al. Self-refine: Iter-            American Chapter of the Association for Computational Lin-
+     ative refinement with self-feedback. In Advances in Neural            guistics: Human Language Technologies (Volume 1: Long
+     Information Processing Systems, pages 46534–46594, 2023.              Papers), pages 6252–6278, 2024.
+[37] Chenlin Meng, Yutong He, Yang Song, Jiaming Song, Jiajun         [49] Noah Shinn, Federico Cassano, Beck Labash, Ashwin
+     Wu, Jun-Yan Zhu, and Stefano Ermon. Sdedit: Guided im-                Gopinath, Karthik Narasimhan, and Shunyu Yao. Reflex-
+     age synthesis and editing with stochastic differential equa-          ion: Language agents with verbal reinforcement learning,
+
+
+
+
+                                                                  12682
+     2023. In Advances in neural information processing systems,        [62] Kaixin Yao, Longwen Zhang, Xinhao Yan, Yan Zeng, Qix-
+     2023.                                                                   uan Zhang, Lan Xu, Wei Yang, Jiayuan Gu, and Jingyi Yu.
+[50] Chunyi Sun, Junlin Han, Weijian Deng, Xinlong Wang, Zis-                Cast: Component-aligned 3d scene reconstruction from an
+     han Qin, and Stephen Gould. 3d-gpt: Procedural 3d model-                rgb image. ACM Transactions on Graphics (TOG), 44(4):
+     ing with large language models. In 2025 International Con-              1–19, 2025.
+     ference on 3D Vision (3DV), pages 1253–1263. IEEE, 2025.           [63] Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran,
+[51] Narek Tumanyan, Michal Geyer, Shai Bagon, and Tali                      Karthik R Narasimhan, and Yuan Cao. React: Synergizing
+     Dekel. Plug-and-play diffusion features for text-driven                 reasoning and acting in language models. In Proceedings of
+     image-to-image translation. In Proceedings of the IEEE/CVF              the International Conference on Learning Representations,
+     conference on computer vision and pattern recognition,                  2022.
+     pages 1921–1930, 2023.                                             [64] Junliang Ye, Zhengyi Wang, Ruowen Zhao, Shenghao Xie,
+[52] Junjie Wang, Jiemin Fang, Xiaopeng Zhang, Lingxi Xie, and               and Jun Zhu. Shapellm-omni: A native multimodal llm for
+     Qi Tian. Gaussianeditor: Editing 3d gaussians delicately                3d generation and understanding. In Advances in neural in-
+     with text instructions. In Proceedings of the IEEE/CVF con-             formation processing systems, 2025.
+     ference on computer vision and pattern recognition, pages          [65] Fukun Yin, Xin Chen, Chi Zhang, Biao Jiang, Zibo Zhao,
+     20902–20911, 2024.                                                      Wen Liu, Gang Yu, and Tao Chen. Shapegpt: 3d shape gen-
+[53] Jiangshan Wang, Junfu Pu, Zhongang Qi, Jiayi Guo, Yue Ma,               eration with a unified multi-modal language model. IEEE
+     Nisha Huang, Yuxin Chen, Xiu Li, and Ying Shan. Taming                  Transactions on Multimedia, 2025.
+     rectified flow for inversion and editing. In Proceedings of the    [66] Qihang Zhang, Chaoyang Wang, Aliaksandr Siarohin, Peiye
+     International Conference on Machine Learning, 2025.                     Zhuang, Yinghao Xu, Ceyuan Yang, Dahua Lin, Bolei Zhou,
+[54] Yuxuan Wang, Xuanyu Yi, Zike Wu, Na Zhao, Long Chen,                    Sergey Tulyakov, and Hsin-Ying Lee. Towards text-guided
+     and Hanwang Zhang. View-consistent 3d editing with gaus-                3d scene composition. In Proceedings of the IEEE/CVF Con-
+     sian splatting. In European conference on computer vision,              ference on Computer Vision and Pattern Recognition, pages
+     pages 404–420. Springer, 2024.                                          6829–6838, 2024.
+[55] Z Wang. Image quality assessment: Form error visibility to         [67] Richard Zhang, Phillip Isola, Alexei A Efros, Eli Shecht-
+     structural similarity. IEEE Transactions on Image Process-              man, and Oliver Wang. The unreasonable effectiveness of
+     ing, 13(4):604–606, 2004.                                               deep features as a perceptual metric. In Proceedings of the
+[56] Zhenwei Wang, Tengfei Wang, Zexin He, Gerhard Hancke,                   IEEE conference on computer vision and pattern recogni-
+     Ziwei Liu, and Rynson WH Lau. Phidias: A generative                     tion, pages 586–595, 2018.
+     model for creating 3d content from text, image, and 3d condi-      [68] Jingyu Zhuang, Di Kang, Yan-Pei Cao, Guanbin Li, Liang
+     tions with reference-augmented diffusion. In Proceedings of             Lin, and Ying Shan. Tip-editor: An accurate 3d editor fol-
+     the International Conference on Learning Representations,               lowing both text-prompts and image-prompts. ACM Trans-
+     2025.                                                                   actions on Graphics (TOG), 43(4):1–12, 2024.
+[57] Shirley Wu, Shiyu Zhao, Qian Huang, Kexin Huang, Michi-
+     hiro Yasunaga, Kaidi Cao, Vassilis Ioannidis, Karthik Sub-
+     bian, Jure Leskovec, and James Y Zou. Avatar: Optimiz-
+     ing llm agents for tool usage via contrastive reasoning. In
+     Advances in Neural Information Processing Systems, pages
+     25981–26010, 2024.
+[58] Shirley Wu, Michel Galley, Baolin Peng, Hao Cheng, Gavin
+     Li, Yao Dou, Weixin Cai, James Zou, Jure Leskovec, and
+     Jianfeng Gao. Collabllm: From passive responders to active
+     collaborators. In Proceedings of the International Confer-
+     ence on Machine Learning, 2025.
+[59] Jianfeng Xiang, Zelong Lv, Sicheng Xu, Yu Deng, Ruicheng
+     Wang, Bowen Zhang, Dong Chen, Xin Tong, and Jiaolong
+     Yang. Structured 3d latents for scalable and versatile 3d gen-
+     eration. In Proceedings of the Computer Vision and Pattern
+     Recognition Conference, pages 21469–21480, 2025.
+[60] Jiale Xu, Xintao Wang, Yan-Pei Cao, Weihao Cheng, Ying
+     Shan, and Shenghua Gao. Instructp2p: Learning to edit
+     3d point clouds with text instructions. arXiv preprint
+     arXiv:2306.07154, 2023.
+[61] Yunhan Yang, Yukun Huang, Yuan-Chen Guo, Liangjun Lu,
+     Xiaoyang Wu, Edmund Y Lam, Yan-Pei Cao, and Xihui Liu.
+     Sampart3d: Segment any part in 3d objects. arXiv preprint
+     arXiv:2411.07184, 2024.
+
+
+
+
+                                                                   12683
+

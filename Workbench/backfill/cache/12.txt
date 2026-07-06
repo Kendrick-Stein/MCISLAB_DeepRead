@@ -1,0 +1,943 @@
+                                                                Visual Test-time Scaling for GUI Agent Grounding
+
+                                                 Tiange Luo1,2     Lajanugen Logeswaran2,†    Justin Johnson1,†     Honglak Lee1,2,†
+                                                                                                          †
+                                                          University of Michigan1    LG AI Research2        equal advising
+
+
+                                                                 Abstract                                                Initial        Trigger      Region      Predict action      Predict
+                                                                                                         UI Image                      condition
+                                                                                                                       Prediction                    focus      for each region    next action
+
+
+
+
+arXiv:2505.00684v2 [cs.CV] 14 Jul 2025
+                                         We introduce RegionFocus, a visual test-time scaling ap-
+                                         proach for Vision Language Model Agents. Understand-
+                                         ing webpages is challenging due to the visual complex-                                                                                      2
+
+
+
+                                         ity of GUI images and the large number of interface ele-                                                                                        1
+
+
+
+                                         ments, making accurate action selection difficult. Our ap-
+                                         proach dynamically zooms in on relevant regions, reducing
+                                                                                                        1) Propose a focal point and   2) Region action predictions   3) RegionFocus history encoded
+                                         background clutter and improving grounding accuracy. To         regions; then zoom in over    encoded as landmarks in UI         as landmarks in UI image
+                                         support this process, we propose an image-as-map mech-                 each region.              image (Image-as-Map).                (Image-as-Map).
+
+                                         anism that visualizes key landmarks at each step, provid-      Figure 1. Overview. When GUI agents encounter execution er-
+                                         ing a transparent action record and enables the agent to       rors, we instruct the model to focus on a specific point of interest
+                                         effectively choose among action candidates. Even with          and extract multiple sub-regions around this focal point (1). The
+                                         a simple region selection strategy, we observe significant     agent then independently generates candidate actions for each sub-
+                                                                                                        region. Actions that interact with a specific coordinate are marked
+                                         performance gains of 28+% on Screenspot-pro and 24+%
+                                                                                                        with pink-star landmarks (e.g., “click”) to visually indicate the rel-
+                                         on WebVoyager benchmarks on top of two state-of-the-art        evant location (2). We retain the pink-star landmarks to track in-
+                                         open vision language model agents, UI-TARS and Qwen2.5-        teraction history of RegionFocus for diverse exploration (3).
+                                         VL, highlighting the effectiveness of visual test-time scal-
+                                         ing in interactive settings. We achieve a new state-of-the-
+                                         art grounding performance of 61.6% on the ScreenSpot-
+                                                                                                        such low-level mistakes accumulate and ultimately result in
+                                         Pro benchmark by applying RegionFocus to a Qwen2.5-
+                                                                                                        higher failure rates and poorer overall performance.
+                                         VL-72B model. Our code will be released publicly at
+                                         https://github.com/tiangeluo/RegionFocus.                          Recent research on GUI agents typically falls into two
+                                                                                                        main categories: those relying on textual cues for planning
+                                                                                                        and reasoning, and those incorporating visual information
+                                                                                                        through VLMs. Text-based approaches often generate text
+                                         1. Introduction                                                labels or bounding boxes for each visual element to guide
+                                         Graphical user interface (GUI) agents have become increas-     agent actions [22, 46]. However, they can struggle with vi-
+                                         ingly pivotal in modern computing, powering applications       sually entangled tasks where textual descriptions are am-
+                                         ranging from automated web browsing to intuitive oper-         biguous, incomplete, or fail to capture crucial visual fea-
+                                         ating system navigation [1, 21]. With the proliferation        tures (e.g., floating windows), even when using accessibil-
+                                         of large-scale vision-language models (VLMs), researchers      ity trees. On the other hand, vision-based pipelines [11, 28]
+                                         have sought to harness both textual and visual informa-        often rely heavily on the VLM’s ability to ground visual
+                                         tion to build more capable interactive systems [2]. While      elements. We observe that many errors arise from inad-
+                                         many existing frameworks rely heavily on text-based rea-       vertently clicking empty or incorrect interface components,
+                                         soning [39, 46] or simple visual grounding [11, 22], real-     underscoring the limitations of existing single-inference vi-
+                                         world GUIs often contain a substantial number of irrel-        sual grounding methods using VLMs. Once an error occurs,
+                                         evant elements—such as menu bars, ads, and extraneous          there is no feedback loop to correct it, causing mistakes to
+                                         buttons—that can overwhelm purely textual or naive visual      compound throughout the process.
+                                         approaches. This mismatch between text-heavy inference             Motivated by these shortcomings, we propose a visual
+                                         and the visual complexity of GUIs leads to frequent errors     test-time scaling framework, RegionFocus, designed to nar-
+                                         (e.g., clicking the wrong button or navigating to an unin-     row the GUI model’s attention to salient interface regions
+                                         tended section). Since these tasks are typically high-level,   when execution errors occur or other conditions are trig-
+gered (e.g., VLM self-judgment). Specifically, as illustrated    2. Related Work
+in Figure 1(1), we leverage the VLM’s capability to identify
+points of interest and combine this with bounding-box pro-       2.1. GUI Agents
+posals generated either from fixed-ratio masks or segmen-        Recent advancements in Large Language Models (LLMs)
+tation models such as SAM [16]. For each sub-region, the         and Vision Language Models (VLMs) have significantly en-
+agent independently predicts actions based solely on the lo-     hanced GUI automation, enabling agents to effectively in-
+cal context (Figure 1(2)), subsequently aggregating the top      teract with diverse graphical environments through textual
+candidate actions to form a refined, single-step response.       and visual modalities [8, 11, 15, 21, 24, 27, 31, 33, 34, 38,
+Furthermore, interactions with web or OS interfaces allow        40]. Prior studies generally adopt two distinct approaches:
+our method to zoom into targeted areas, enhancing the res-       (1) text-based reasoning, which leverages structured repre-
+olution of selected regions for more careful examination.        sentations such as HTML or accessibility trees [5, 17, 47],
+RegionFocus works as a modular plug-in for GUI agents            extracting structured interface information [22, 43] and sup-
+without affecting the original workflow.                         plementary textual details for input into LLMs/VLMs [46];
+    In order to keep track of regions visited by RegionFocus,    and (2) vision-based inference, relying on VLMs to di-
+we introduce an image-as-map mechanism to record tempo-          rectly interpret GUI elements [11, 28]. While text-based
+ral information. In this approach, elements previously con-      techniques efficiently handle structured information, they
+sidered by the agent are annotated in the UI screenshot with     often struggle with visually complex or ambiguous inter-
+visual landmarks (e.g., the pink-stars in Figure 1 (3)). These   faces [13, 18, 36], resulting in inaccuracies and reduced re-
+landmarks prevent the agent from revisiting regions it has       liability. Similar observations have been reported in [39].
+already examined and guide the agent towards unexplored          Conversely, visual grounding approaches may inadvertently
+areas. These markers do not interfere with the model’s reg-      interact with irrelevant or empty regions due to overly broad
+ular inference process which leverages unaltered webpage         visual attention. In contrast to prior methods using entire
+screenshots, and are only used in the RegionFocus compo-         interface screens as input [6, 14, 29], our approach explic-
+nent. Once the agent navigates to a new page, all landmarks      itly separates planning from visual grounding via a novel
+are refreshed to have a new RegionFocus history.                 visual test-time scaling framework. This framework selec-
+    In addition to representing RegionFocus history, we also     tively targets salient GUI regions through precise bounding-
+leverage image-as-map in the action aggregation process          box proposals and integrates an innovative “image-as-map”
+(Figure 1 (2)), where candidate actions are represented us-      strategy, maintaining contextual coherence throughout in-
+ing landmarks for selecting an optimal action. We find           teractions.
+image-as-map to be highly effective in representing both
+                                                                 2.2. Test-Time Scaling in AI Agents
+temporal information (e.g., previously visited regions) and
+spatial information (e.g., multiple action candidates) com-      Test-time scaling involves dynamically adjusting computa-
+pared to alternative representations such as element coordi-     tional resources during inference to enhance model perfor-
+nates represented in the form of text alone. This is particu-    mance [32, 35, 41, 42]. This approach allows AI agents to
+larly crucial for distinguishing between screen elements in      allocate additional processing power to challenging tasks,
+close proximity, which is challenging to reason about based      thereby improving decision-making and accuracy. Inspired
+on a text representation of the coordinates alone.               by advancements in test-time scaling for LLMs, several
+    With our proposed visual test-time scaling framework,        studies have extended similar principles to GUI agents. For
+we help existing models—such as UI-TARS [28] and                 example, during the inference, [45] leverages intermediate
+QWen2.5-VL [3] —achieve better performance in both               action histories, [25] collects external information during
+web-based and desktop interfaces. In particular, we demon-       inference, and [44] incorporates reflection mechanisms into
+strate substantial performance gains on benchmarks includ-       AI agents. Despite their success in improving performance,
+ing ScreenSpot-Pro [18] for OS-level GUI navigation, as          these methods do not utilize the unique advantages of visual
+well as WebVoyager [13] for browser automation. Through          information. In this paper, we propose a preliminary ap-
+our experiments, we show that even a simple fixed-ratio          proach toward visual test-time scaling, dynamically adjust-
+bounding-box generation approach yields pronounced im-           ing the image focus region and employing an “image-as-
+provements over baseline systems, underscoring the effi-         map” technique to encode historical information for more
+cacy of focusing the model’s attention on visually relevant      effective GUI agent inference.
+regions. Our empirical studies further indicate that image-
+                                                                 2.3. Visual Image Attention
+as-map consistently outperforms text-based representations
+for VLM agents. Overall, our findings highlight the value of     Visual image attention mechanisms have a rich history of
+visual test-time scaling as a simple yet powerful extension      enabling AI models to selectively focus on pertinent regions
+to existing VLM-based GUI agents.                                within visual inputs [9, 12, 20, 37]. Such mechanisms are
+  1) Agent makes initial prediction on full screenshot                              4) Examine region-based predictions and determine final action
+
+
+
+
+                                      2) Identify regions for focused examination   3) Examine each region in high resolution and predict action
+
+
+
+
+               Trigger
+              condition
+
+     - Interact with empty region?
+     - Repeated actions?
+     - Action parsing error?
+     - Action flagged by VLM judge?
+     - ...
+
+Figure 2. Overview of integrating RegionFocus into GUI agent pipelines. The standard inference process (blue arrow) takes input
+information and continuously predicts subsequent actions. When the GUI agent encounters errors, RegionFocus (green arrow) activates,
+proposing focal points to extract targeted sub-regions. Actions are then predicted individually for these sub-regions and aggregated into a
+single refined action for standard inference.
+
+
+especially critical for GUI-based agents, where accurately                          ence time, enabling straightforward integration into exist-
+identifying and interacting with interface elements amidst                          ing VLM agents without requiring retraining or architec-
+visually cluttered environments is essential. Our proposed                          tural modifications. In the following sections, we first de-
+approach introduces a region-focused mechanism utilizing                            scribe the integration process for our pipeline with existing
+predefined bounding boxes that progressively refine their at-                       GUI agents, followed by a detailed explanation of the de-
+tention through historical recording, incrementally concen-                         sign principles and implementation of each component.
+trating focus more precisely on target elements. This it-
+erative refinement shares conceptual similarities with prior                        3.1. Overview
+recurrent models [4, 23]; however, our method leverages
+VLMs to achieve refinement [26], uniquely integrating this                          Figure 2 illustrates our proposed pipeline. On top of the
+process directly into GUI agents’ test-time scaling. Accu-                          standard interaction pipeline, our approach introduces an
+rately generating these attention regions directly via VLMs                         error-triggered refinement mechanism. Specifically, when
+remains an open direction for future research.                                      the agent encounters a trigger condition—such as clicking
+                                                                                    on non-interactive elements (e.g., selecting empty space in-
+                                                                                    stead of the intended date option) or repeating unsuccess-
+3. Method
+                                                                                    ful actions (e.g., repeatedly typing “Los Angeles” without
+To address the limitations of current GUI agent frameworks,                         successfully clicking the correct button)—the RegionFocus
+we propose a visual test-time scaling approach that en-                             component is activated.
+hances the robustness and accuracy of VLM agents inter-                                During this refinement stage, the agent initially predicts
+acting with complex graphical user interfaces. Unlike tra-                          a focal point near the intended target element. Based on this
+ditional methods, which uniformly treat all interface ele-                          approximate location, it generates a bounding box likely
+ments, our method dynamically adjusts the model’s focus                             to encapsulate the target element (Section 3.2). For each
+by selectively emphasizing visually salient regions when-                           region defined by the bounding boxes, the agent indepen-
+ever potential errors are detected. This approach signifi-                          dently predicts candidate actions. Finally, the agent aggre-
+cantly reduces misclicks and navigation mistakes.                                   gates a single action to be executed based on the predictions
+    Crucially, our framework operates entirely at infer-                            for each region.
+   Additionally, we maintain an annotated history of pre-                     1
+                                                                                                  2
+                                                                                                        1
+                                                                                                                            1
+
+viously examined focal points on the same UI image using
+an image-as-map representation (Section 3.3). This visual
+history guides the agent in avoiding redundant searches and
+helps it progressively focus on the correct target. Interac-
+tive predictions involving specific coordinates are visually
+marked (e.g., using pink-star landmarks) to help the model
+                                                                                  Add RegionFocus History   Create a new history entry
+verify the correctness of its selections.
+3.2. Visual Region Focus                                            Figure 3. Image-as-Map records temporal information. We
+                                                                    place numbered pink stars in the image as visual landmarks to in-
+The core of our pipeline is a dynamic visual adaptation             dicate previously focused points for the GUI agent. Each time a
+mechanism activated during inference. When initial ac-              RegionFocus attempt fails (i.e., no action takes effect), we add a
+tion predictions result in errors—such as clicks on non-            new pink star at the attempted location. Once an action success-
+interactive or empty regions—the model dynamically ad-              fully takes effect, we refresh the history and remove any existing
+justs its visual attention. Specifically, it refines attention by   landmarks.
+generating bounding-box proposals around visually salient
+regions, leading to more precise single-step actions.
+                                                                    agent can interact with the environment (e.g., in the case of
+                                                                    a webpage), a zoomed-in, high resolution view of the re-
+Trigger Condition We define two primary types of trig-
+                                                                    gion is provided to the agent. In this case, at least one side
+gering conditions. The first relies on environmental feed-
+                                                                    of the region can be made to match the original full image
+back obtained from direct interaction with dynamic GUI
+                                                                    resolution via zooming in. If environment interaction is not
+environments, such as interactive webpages. Errors, like
+                                                                    possible, we simply crop the region from the initial image
+clicks on non-interactive elements, can be easily detected
+                                                                    and upsample it for prediction.
+based on environment feedback (e.g., webpage change).
+The second type of trigger occurs in cases where envi-
+ronmental interaction isn’t possible and we are dealing             Action Aggregation After the GUI agent independently
+with static screenshots (e.g., ScreenSpot-Pro [19] scenario).       analyzes each bounding-box proposal and generates candi-
+Here, the VLM evaluates predicted actions, shifting its             date actions, we select a single action to serve as the next
+role from merely making predictions to explicitly evaluat-          step in the inference pipeline based on these candidates. For
+ing the correctness of actions. Although the VLM’s judg-            coordinate-based actions (e.g., “Click (x, y)” or “Scroll (x,
+ments aren’t always perfectly accurate, they significantly          y) down”), we visually mark the candidate action coordi-
+help identify and mitigate errors shown in our experiments.         nates on the snapshot, as shown in Figure 1 (2).1 This pro-
+                                                                    cess significantly reduces the model’s workload by simpli-
+Bounding-box Proposal Empirically, VLM agents reli-                 fying how textual coordinates are mapped and interpreted
+ably produce focal points near target elements but struggle         on the image. Empirically, we observe that incorporating
+to directly predict accurate bounding boxes [10]. Instead,          these visual markers leads the model to select action candi-
+we derive bounding boxes from these focal points rather             dates more accurately.
+than predicting them directly. Although advanced segmen-            3.3. Image-as-Map
+tation models (e.g., SAM [16]) could provide more precise
+bounding boxes, we currently focus exclusively on leverag-          When RegionFocus is triggered multiple times for a given
+ing the GUI agent itself. This ensures that future enhance-         UI image, it is important for the agent to generate diverse fo-
+ments in GUI agents directly benefit our approach.                  cal points and avoid revisiting previously explored regions.
+    We employ a heuristic approach, defining bounding               Initially, we attempted to represent the region focus history
+boxes with fixed dimensions and aspect ratios (e.g., 0.5            using textual coordinates but found this approach ineffec-
+width by 0.5 height) centered around the focal point. If a          tive, as the agent often revisited similar focal points despite
+bounding box exceeds the image boundary, it is adjusted to          explicit prompts to avoid them.
+remain fully within the screenshot. This simple yet effec-              To address this, we propose an image-as-map represen-
+tive strategy strikes a good balance between accuracy and           tation, where we visually encode previously examined focal
+computational efficiency.                                           points as landmarks (e.g., pink stars) directly onto UI snap-
+                                                                    shots (Figure 3) to record past action points. Unlike text-
+Action Candidate Prediction Given the regions identi-               based histories, this visual representation more effectively
+fied by the bounding boxes extracted from the previous                 1 Landmark annotations are only used for actions that involve interact-
+
+stage, the agent predicts an action for each region. If the         ing with a specific point and element in the current view.
+ Agent Model       Development          Creative               CAD            Scientific               Office               OS                 Avg
+                  text icon avg text icon avg text icon avg text icon avg text icon avg text icon avg text icon avg
+ QwenVL-7B       0.0     0.0    0.0 0.0     0.0     0.0 0.0    0.0     0.0 0.7     0.0    0.4   0.0    0.0       0.0 0.0    0.0 0.0 0.1        0.0     0.1
+ GPT-4o          1.3     0.0    0.7 1.0     0.0     0.6 2.0    0.0     1.5 2.1     0.0    1.2   1.1    0.0       0.6 0.0    0.0 0.0 1.3        0.0     0.8
+ SeeClick        0.6     0.0    0.3 1.0     0.0     0.6 2.5    0.0     1.9 3.5     0.0    2.0   1.1    0.0       0.5 2.8    0.0 1.5 1.8        0.0     1.1
+ Qwen2-VL-7B     2.6     0.0    1.3 1.5     0.0     0.9 0.5    0.0     0.4 6.3     0.0    3.5   3.4    1.9       3.0 0.9    0.0 0.5 2.5        0.2     1.6
+ OS-Atlas-4B     7.1     0.0    3.7 3.0     1.4     2.3 2.0    0.0     1.5 9.0     5.5    7.5   5.1    3.8       4.4 5.6    0.0 3.1 5.0        1.7     3.7
+ ShowUI-2B       16.9    1.4     9.4 9.1    0.0     5.3 2.5    0.0     1.9 13.2   7.3    10.6   15.3    7.5     13.5 10.3   2.2 6.6 10.8       2.6    7.7
+ CogAgent-18B    14.9    0.7     8.0 9.6    0.0     5.6 7.1    3.1     6.1 22.2   1.8    13.4   13.0    0.0      6.5 5.6    0.0 3.1 12.0       0.8    7.7
+ Aria-UI         16.2    0.0     8.4 23.7   2.1    14.7 7.6    1.6     6.1 27.1   6.4    18.1   20.3    1.9     16.1 4.7    0.0 2.6 17.1       2.0    11.3
+ UGround-7B      26.6    2.1    14.7 27.3   2.8    17.0 14.2   1.6    11.1 31.9   2.7    19.3   31.6   11.3     27.9 17.8   0.0 9.7 25.0       2.8    16.5
+ Claude Comp.Use 22.0    3.9    12.6 25.9   3.4    16.8 14.5   3.7    11.9 33.9   15.8   25.8   30.1   16.3     26.2 11.0   4.5 8.1 23.4       7.1    17.1
+ OS-Atlas-7B     33.1    1.4    17.7 28.8   2.8    17.9 12.2   4.7    10.3 37.5   7.3    24.4   33.9    5.7     27.4 27.1   4.5 16.8 28.1      4.0    18.9
+ UGround-V1-7B    -       -     35.5 -       -     27.8 -       -     13.5 -        -    38.8    -       -      48.8 -       - 26.1 -           -     31.1
+ UI-TARS-7B       58.4   12.4   36.1 50.0    9.1   32.8 20.8    9.4   18.0 63.9   31.8   50.0   63.3   20.8     53.5 30.8   16.9   24.5 47.8   16.2   35.7
+ + RegionFocus    59.7   15.9   38.5 59.6   11.9   39.6 30.5    7.8   24.9 67.4   30.0   51.2   69.5   30.2     60.4 45.8   21.3   34.7 55.2   18.7   41.2
+ UI-TARS-72B      63.0   17.3   40.8 57.1   15.4   39.6 18.8   12.5   17.2 64.6   20.9   45.7   63.3   26.4     54.8 42.1   15.7   30.1 50.9   17.5   38.1
+ + RegionFocus    72.1   26.9   50.2 68.7   22.4   49.3 35.5   25.0   33.0 77.1   30.9   57.1   72.9   45.3     66.5 63.6   27.0   46.9 64.0   28.0   50.2
+ Qwen2.5-VL-7B    45.5    1.4   24.1 32.8    6.3   21.7 22.3    6.2   18.4 50.7   7.3    31.9   52.5   15.1     43.9 36.4   10.1   24.5 39.3    6.6   26.8
+ + RegionFocus    53.2    3.4   29.1 42.9    4.9   27.0 28.4    3.1   22.2 56.9   10.9   37.0   59.9   24.5     51.7 41.1   15.7   29.6 46.6    8.8   32.1
+ Qwen2.5-VL-72B   66.2   13.8   40.8 64.6   15.4   44.0 47.7   12.5   39.1 78.5   29.1   57.1   74.6   37.7     66.1 60.7   22.5   43.4 64.9   20.2   47.8
+ + RegionFocus    75.3   25.5   51.2 76.3   30.8   57.2 71.6   28.1   60.9 87.5   39.1   66.5   87.0   60.4     80.9 74.8   36.0   57.1 78.6   34.1   61.6
+Table 1. Comparison of various models on ScreenSpot-Pro. [19]. Our proposed RegionFocus helps the UI-TARS-72B [28] model
+achieve a 31.8% improvement, while Qwen2.5-VL-72B [3] sees a 28.9% gain, thereby achieving state-of-the-art performance. Addition-
+ally, integrating RegionFocus into UI-TARS-7B allows it to surpass the performance of the substantially larger UI-TARS-72B model.
+
+
+conveys temporal information, allowing the agent to rea-                    4.1. ScreenSpot-Pro
+son directly over the image and avoid revisiting the same
+                                                                            ScreenSpot-Pro [19] is a recently introduced benchmark
+areas. Note that the visual landmark annotation process
+                                                                            specifically designed to evaluate GUI grounding capabil-
+used for action aggregation is also a form of the image-
+                                                                            ities in complex, high-resolution professional desktop en-
+as-map strategy, capturing spatial information. Landmark-
+                                                                            vironments. These environments typically involve screen-
+annotated snapshots are used only in the RegionFocus pro-
+                                                                            shots larger than 3k × 2k (see Figure1(b) in their paper
+cess, whereas the original inference pipeline (e.g., for the
+                                                                            for specific configuration details). The benchmark’s em-
+initial action prediction) receives unaltered UI images. We
+                                                                            phasis on intricate, large-scale interfaces makes it an ideal
+maintain these highlighted landmarks on the page until an
+                                                                            platform for assessing our proposed pipeline, which incor-
+action takes effect (i.e., causes a meaningful state change),
+                                                                            porates a mechanism to zoom into local regions for more
+at which point the history is refreshed. Our empirical re-
+                                                                            detailed analysis.
+sults show that this image-as-map strategy consistently out-
+performs text-based methods, especially in more complex,                        Specifically,    ScreenSpot-Pro comprises expert-
+multi-step GUI tasks. We also observe that it helps the agent               annotated tasks across 23 applications spanning five
+distinguish between two GUI elements that are very close to                 domains and three operating systems, thereby providing
+each other, as shown in Figure 8 (2).                                       an extensive assessment of model performance. Tasks
+                                                                            are categorized by functional domains, including Devel-
+4. Experiments                                                              opment, Creative, CAD, Scientific, Office, and Operating
+In the experimental sections below, we integrate our pro-                   Systems, and are further divided into text-based and
+posed pipeline with UI-TARS [28] and Qwen2.5-VL [3],                        icon/widget-based grounding challenges. This structure
+two recently proposed GUI agent models that autonomously                    facilitates a nuanced evaluation of grounding capabilities,
+interacts with GUI screenshots, which have demonstrated                     particularly in tasks that require precise localization and
+exceptional performance in various GUI tasks. We evaluate                   interaction with small or visually similar GUI elements.
+our pipeline across both OS operation tasks and Web Inter-                  The benchmark enforces stringent metrics, measuring
+action. For our main experiments, we adopt a fixed bound-                   grounding accuracy based on whether the model-predicted
+ing box approach (Section 3.2), using only the agent model                  location falls within the bounding box of the target element.
+itself. We also include ablation studies using SAM [16],                        Because ScreenSpot-Pro only provides static screen-
+which provides more accurate bounding boxes. Additional                     shots—without an OS environment for interaction—we em-
+experimental details are provided in Appendix A.                            ploy a VLM-based judge to trigger RegionFocus. Specifi-
+Agent Model        Allrecipes     Amazon          Apple           ArXiv         GitHub                Booking       ESPN                    Coursera
+Claude             45.9%±3.4%    58.6%±4.2%     58.1%±4.0%       55.0%±7.0%    56.9%±1.4%            19.0%±1.3%    46.2%±1.3%              68.2%±1.3%
+GPT-4o              56.3%±1.3%   53.7%±2.5%     56.6%±1.3%       60.5%±0.0%    57.7%±3.7%            43.9%±3.5%    44.0%±2.7%              65.1%±2.8%
+WebVoyager          51.1%±2.2%   52.9%±1.4%     62.8%±2.3%       52.0%±1.3%    59.3%±3.7%            32.6%±2.7%    47.0%±1.3%              57.9%±2.7%
+Qwen2.5-VL-7B      47.2%±4.4%    49.1%±7.5%     47.3%±2.5%       14.9%±2.1%    23.9%±4.8%            10.0%±0.9%    39.2%±7.2%              46.4%±0.3%
++ RegionFocus      49.2%±7.2%    53.6%±4.4%     67.1%±3.6%       51.7%±1.3%    35.0%±0.3%            30.0%±0.%     39.6%±6.4%              71.1%±4.8%
+Qwen2.5-VL-72B     28.6%±1.5%    56.2%±4.3%     53.0%±0.9%       32.6%±2.4%    61.5%±4.3%            24.8%±2.9%    49.8%±3.8%              72.9%±1.9%
++ RegionFocus      43.4%±1.3%    60.6%±1.5%     69.7%±4.0%       45.4%±2.0%    67.3%±3.8%            37.3%±2.9%    59.8%±1.4%              78.2%±1.4%
+UI-TARS-7B         17.8%±1.3%    30.9%±1.4%     17.1%±1.3%       20.9%±2.3%    32.5%±2.5%             7.6%±1.3%    45.0%±1.3%              70.7%±1.2%
++ RegionFocus      35.6%±2.2%    39.0%±2.4%     31.8%±2.7%       37.2%±0.0%    58.1%±1.5%            15.2%±1.3%    62.8%±0.0%              74.2%±1.4%
+UI-TARS-72B        16.2%±2.6%    38.6%±2.0%     45.9%±1.2%       64.9%±4.1%    43.2%±2.0%            40.2%±2.3%    47.2%±3.8%              58.9%±1.6%
++ RegionFocus      57.5%±1.1%    55.8%±1.4%     52.6%±1.3%       50.3%±3.6%    58.9%±3.7%            44.7%±2.6%    69.7%±1.3%              82.2%±1.5%
+                   Cambridge        BBC          Google           Google        Google                             Wolfram
+Agent Model                                                                                          Huggingface                              Overall
+                   Dictionary       News         Flights           Map          Search                              Alpha
+Claude             71.3%±3.6%    66.7%±4.8%     15.1%±5.5%       55.3%±1.4%    72.9%±1.3%            53.5%±4.7%    51.5%±5.4%              52.8%±1.4%
+GPT-4o             82.2%±1.3%    54.8%±2.4%     28.6%±0.0%       56.9%±2.8%    63.6%±1.3%            42.6%±3.6%    65.2%±2.2%              55.5%±0.8%
+WebVoyager         71.3%±1.3%    60.3%±2.8%     51.6%±1.4%       64.3%±2.8%    77.5%±2.7%            55.8%±2.3%    60.9%±2.2%              57.1%±0.2%
+Qwen2.5-VL-7B      21.1%±4.8%    45.1%±3.0%     10.0%±0.9%       30.2%±1.5%    10.0%±1.3%            41.4%±0.3%    51.3%±3.8%              32.5%±1.3%
++ RegionFocus      17.3%±0.3%    52.9%±0.9%     12.8%±4.8%       17.1%±1.2%    18.3%±2.4%            60.0%±2.8%    40.8%±1.2%              41.1%±1.2%
+Qwen2.5-VL-72B     63.7%±1.3%    45.9%±1.6%     17.7%±1.5%       31.2%±1.5%    11.5%±0.0%            38.3%±2.9%    48.9%±2.5%              42.4%±0.5%
++ RegionFocus      68.9%±1.3%    54.4%±2.9%     34.6%±4.4%       42.2%±1.5%    20.3%±0.0%            51.5%±4.9%    56.0%±1.1%              52.7%±1.1%
+UI-TARS-7B         57.1%±1.3%    41.3%±2.7%     10.3%±1.4%       17.5%±0.0%    49.6%±1.3%            40.7%±1.4%    38.4%±1.3%              33.2%±0.5%
++ RegionFocus      55.8%±0.0%    52.4%±2.4%     28.6%±4.8%       29.3%±2.4%    60.5%±2.3%            45.7%±1.3%    44.2%±1.3%              44.7%±0.5%
+UI-TARS-72B        72.9%±1.4%    39.3%±3.4%     33.9%±2.1%       27.2%±5.2%    60.6%±1.2%            24.9%±1.6%    48.3%±2.3%              44.1%±0.5%
++ RegionFocus      75.9%±1.3%    49.8%±3.6%     49.9%±2.1%       59.9%±1.4%    65.8%±1.2%            59.6%±1.3%    60.2%±1.3%              59.5%±0.1%
+
+Table 2. Comparison of various models on WebVoyager [13]. For each automatic evaluation, we run GPT evaluator three times to
+calculate the performance mean and standard deviation. We evaluated our method on UI-TARS [28] and Qwen2.5-VL [3], consistently
+observing performance improvements.
+
+
+                                                                                    Initial Action
+cally, when the agent predicts a point, we will highlight that
+point in the input screenshot with pink-star landmarks and
+ask the model itself to assess the correctness of that point.
+If deemed incorrect, we initiate the RegionFocus process.
+
+Results In Table 1, we summarize the reported ground-
+                                                                                    RegionFocus
+ing accuracy of various methods evaluated on ScreenSpot-                                                               1) Objective: on the input screenshot
+                                                                                                                       to ground “validate parameters”
+Pro. For fair comparisons, we employ the official test code
+                                                                                                                       2) Judge: the initial action clicks on
+released by ScreenSpot-Pro for evaluation. We report the                                                               the empty arena, which is clearly not
+                                                                                                                       “validate parameters”.
+original numbers from the UI-TARS paper in Table 1.                                                                         Judgement: INCORRECT
+
+                                                                                                                       Then, we initiate RegionFocus by first
+   From Table 1, we can see that RegionFocus consistently                                                              proposing a focal point. We use this
+                                                                                                                       focal point as a center to generate
+improves performance across all categories for both text                                                               several potential regions.
+
+and icon grounding when compared to the base model.                                                                    One of these regions is shown on the
+                                                                                                                       left, and the agent correctly identifies
+                                                                                                                       target element position.
+UI-TARS-72B + RegionFocus achieves a 31.7% improve-
+ment over the base UI-TARS-72B model. Moreover, the
+                                                                      Figure 4. Qualitative results - Screenspot-Pro. In one example
+UI-TARS-7B + RegionFocus variant outperforms the UI-
+                                                                      from our evaluation, the agent successfully rejects the initial ac-
+TARS-72B model overall, demonstrating the effectiveness               tion via self-VLM-judge and proposes a correct grounding point
+of our approach. Furthermore, RegionFocus further helps               based on the zoomed-in view. More qualitative results are listed in
+QWen2.5-VL-72B achieve the state-of-the-art performance,              Appendix B.
+61.6%.
+   Figure 4 illustrates how our pipeline works in
+ScreenSpot-Pro: we first ask the agent to judge the initial           gating all actions into a single outcome. Because we used
+action prediction. If it is incorrect, we initiate RegionFo-          the agent model itself to judge whether a prediction is cor-
+cus by zooming into the regions predicted by the agent,               rect or incorrect, our results show that although the VLM
+predicting actions within each region, and finally aggre-             may generate incorrect coordinates initially, it can still reli-
+            Initial Action                             RegionFocus                                Initial Action                           RegionFocus
+
+
+
+
+            Initial Action                             RegionFocus                                Initial Action                           RegionFocus
+
+
+
+
+  Task: Find a Popular recipe for a chocolate chip cookie and list the ingredients     Task: Check the Dataset Viewer for ai2lumos/lumos_complex_qa_plan_onetime
+  and preparation steps.                                                               on Hugging face. what is the content corresponding to user in the first message?
+
+Figure 5. Qualitative Results - RegionFocus. In these two examples, we illustrate how RegionFocus reduces background noise by
+emphasizing salient regions of an image. The mouse pointer indicates the agent’s initial action prediction, which is suboptimal in both
+            Initial Action                            Action Aggregation                         Initial Action                           Action Aggregation
+cases.  Leftapair
+  Task: Find   Popularofrecipe
+                         images:
+                               for a The  green
+                                     chocolate    windowand
+                                               chip cookie  inlist
+                                                                thethesecond   image marks
+                                                                       ingredients    Task: the zoomed-in
+                                                                                            Check the          region.forBy focusing on this
+                                                                                                       Dataset Viewer                             region, we naturally
+                                                                                                                          ai2lumos/lumos_complex_qa_plan_onetime
+cutand preparation
+    out the         steps. portion of the first image. Right pair of images:onThe
+              distracting                                                                Hugging  face. what
+                                                                                              second    imageis the
+                                                                                                                 is content corresponding
+                                                                                                                    zoomed in,            to user in the
+                                                                                                                                  significantly          first message?
+                                                                                                                                                   reducing     distracting
+details. This allows the agent to focus on the relevant information—even though the distracting region from the first image is still visible.
+
+            Initial Action                           Action Aggregation                           Initial Action                          Action Aggregation
+
+
+
+
+ Task: Search the latest article about space exploration on BBC News and             Task: Compare the prices and flight durations for economy class flights from Oslo to
+ summarize its key points.                                                           Dubai, departing on March 8, 2025, and show options with no more than two layovers.
+
+
+
+
+ Task: Search the latest article about space exploration on BBC News and             Task: Compare the prices and flight durations for economy class flights from Oslo to
+ summarize its key points.                                                           Dubai, departing on March 8, 2025, and show options with no more than two layovers.
+
+Figure 6. Qualitative results - image-as-map. These examples demonstrate how action aggregation, enhanced by the proposed image-as-
+map, helps distinguish subtle coordinate differences between target elements. The mouse pointer indicates the agent’s initial predictions,
+which were incorrect in both cases. Each star-like landmark is generated during the RegionFocus process before action aggregation. Left
+pair of images: The two landmarks at the top left correspond to the home and search buttons. Right pair of images: the landmarks
+correspond to different options in a dropdown menu.
+
+
+ably judge whether those click points are correct with the                               flecting everyday web browsing scenarios. Tasks in Web-
+help of image-as-map. Then, such an incorrect predic-                                    Voyager require agents to process visual information from
+tion can be corrected by the RegionFocus process. This                                   rendered screenshots and textual cues from web elements,
+generation-verification gap has also been noted in recent lit-                           enabling nuanced evaluation of multimodal reasoning and
+erature [7, 30].                                                                         navigation skills. Furthermore, the benchmark introduces
+                                                                                         an automatic evaluation protocol utilizing GPT-4V, achiev-
+4.2. WebVoyager                                                                          ing 85.3% agreement with human judgment, thereby offer-
+                                                                                         ing a reliable assessment of agent performance.
+WebVoyager [13] is a benchmark designed to evalu-
+ate autonomous web agents’ capabilities in performing                                       In this scenario, the agent actively interacts with the web
+complex, open-ended tasks through multimodal interac-                                    environment. We employ a Playwright-controlled Chrome
+tions with real-world websites. Distinct from previous                                   browser to navigate webpages, with the VLM agent de-
+web agent benchmarks, WebVoyager comprises 643 semi-                                     termining the appropriate action based on each webpage
+automatically generated tasks across 15 popular, real-world                              screenshot. After task execution, we use the official eval-
+websites such as Amazon, Apple, ArXiv, and Google Maps.                                  uation setting, where a GPT-based judge reviews the last 15
+This selection ensures a diverse range of interactions re-                               screenshots along with an optional textual response to deter-
+                                                                                                                             If recoding in text solely:
+
+                                                                                                                             {Instruction}
+                                                                                                                             Select one action point
+                                                                                                                             from the blew options
+
+                                                                                                                             - Click-Point 1: (671, 291)
+                                                                                                                             - Click-Point 2: (671, 295)
+
+
+                                                                 1) SAM provides Bounding Box   2) Image-as-Map tells small coordinates difference
+
+                                                                 Figure 8. Ablation studies. (1) RegionFocus can natively use the
+                                                                 SAM to generate bounding boxes. (2) how image-as-map helps
+                                                                 highlight subtle differences of different GUI elements.
+
+
+                                                                 cus approach and the BaseModel alone over 400 trajecto-
+Figure 7. Histogram of step differences: BaseModel + Region-     ries. Only the actual browser-interactive steps are counted,
+Focus vs. BaseModel alone. BaseModel is UI-TARS-72B.             excluding RegionFocus overhead. Here the BaseModel is
+                                                                 UI-TARS-72B. As shown, BaseModel + RegionFocus gen-
+                                                                 erally yields more steps on average (19.74% steps), corre-
+mine whether the task has been successfully accomplished.
+                                                                 lating with a overall 34.3% higher success rate. On aver-
+                                                                 age, RegionFocus is triggered 5.8 times per Web Browsing
+Results For comparative analysis, Table 2 presents the           trajectory. Furthermore, in 32.3% of cases RegionFocus is
+task success rates of various web agents evaluated on the        triggered only once, yet a single trigger yields an impressive
+WebVoyager benchmark. RegionFocus consistently im-               83.7% increase in the success of those trajectories.
+proves performance across all types of websites—including
+“Booking” and “Search”—highlighting the effectiveness of         4.3. Ablation Studies
+integrating RegionFocus into the GUI agent for web brows-        We conduct ablation studies
+ing. It also brings consistent improvements over two open-       on the entire pipeline, in-      Agent Model        Overall
+source model, UI-TARS and Qwen2.5-VL. Please note that           cluding our “image-as-map”
+our model performance was impacted by online interaction         design choice and the use of     image-as-map        43.2
+constraints—such as bot blocking and intermittent VPN is-        a predefined bounding box        Text-as-History     37.2
+sues. By resolving these factors, we can further boost the       based on the point predicted     Fixed-BBox          43.2
+model’s overall performance.                                     by the agent.      We also       Predict-Region      28.1
+   We present several qualitative examples of WebVoy-            demonstrate that by leverag-     SAM                 46.5
+ager’s performance in Figures 5, 6. In Figure 5 left,            ing SAM [16] and increas-
+the agent initially fails by clicking the ‘ingredients’ but-     ing the number of trajec-       Table 3. Ablation study
+ton, which appears in the search bar despite being on the        tory steps, performance can     results. We tested on a sub-
+correct page. By highlighting the relevant region with a         be further improved. For        set of WebVoyager, and the
+green bounding box, RegionFocus naturally filters out back-                                      score is higher the better.
+                                                                 the sake of computation, we
+ground noise and draws attention to the primary content. In      employed the UI-TARS-7B-
+Figure 5 right, RegionFocus zooms in on the sub-region of        DPO model for these ablation studies on a subset of the
+interest, enlarging key content and making it easier for the     WebVoyager benchmark. The results are shown in Ta-
+agent to locate the target content. Figure 6 left shows a case   ble 3, where “image-as-map” and “Fixed-BBox” refers to
+where the agent initially clicks an unrelated element. Our       our same 7B model configuration with RegionFocus en-
+pipeline then corrects this mistake by proposing two closely     abled and a maximum limit of 100 action steps.
+positioned buttons. The image-as-map mechanism allows
+the agent to distinguish between these nearly identical ele-     Text-based RegionFocus History Representation By
+ments, even when their coordinates differ only slightly. Fi-     using image-as-map, we can directly provide visual location
+nally, Figure 6 right illustrates a scenario where the agent     information to the agent, helping it distinguish even minor
+mistakenly clicks on an empty area close to the desired ele-     differences and thereby enhancing its perception. For in-
+ment. Once again, RegionFocus highlights the correct but-        stance, as shown in Figure 8 (2), we color-code click points
+ton, helping the agent choose it accurately.                     in the image to denote the image-as-map mechanism, while
+                                                                 the corresponding coordinates are listed in the text box on
+More Analysis Figure 7 shows the distribution of step            the right. Notably, although the textual coordinate differ-
+differences between the combined BaseModel + RegionFo-           ence is within only five pixels, the resulting action can vary
+                                                                   further performance gains. Here, inference steps refer to
+                                                                   actual browser-interactive actions, excluding RegionFocus
+                                                                   overhead. Due to computational constraints, we extended
+                                                                   the limit to 300 steps and also evaluated lower bounds of
+                                                                   10 and 50 steps. All the experiments are conducted with
+                                                                   the UI-TARS-7B model. As shown in Figure 9, increas-
+                                                                   ing the maximum to 300 steps improved the 7B model’s
+                                                                   performance from 43.2 to 45.3, although most trajectories
+                                                                   terminated before reaching the 300-step ceiling. Moreover,
+                                                                   the incremental benefit gradually decays as the maximum
+                                                                   inference-step threshold grows.
+
+                                                                   4.4. More Analysis
+                                                                   Runtime Analysis For each trigger, the VLM performs
+                                                                   one inference for focal-point proposal, four inferences for
+Figure 9. Ablation study – inference steps: higher limits yield    region action prediction (which can be executed in parallel),
+further improvements, though the benefits gradually decay.         and one inference for action aggregation. The four region
+                                                                   action prediction inferences result from adopting four pre-
+                                                                   defined bounding boxes around each predicted focal point,
+significantly. In this ablation study, we use a text representa-   a hyper-parameter. For the interactive environment (Web-
+tion for both history tracking and action aggregation, which       Voyager), RegionFocus occurs in 61.7% of all trajectories;
+leads to significant degradation compared to our image-as-         among these, it is triggered an average of 5.84 times, incur-
+map representation.                                                ring an average overhead of 66.8% per trajectory. Notably,
+                                                                   32.3% of triggered cases occur only once, with this single
+Proposing regions directly In our pipeline (Section 3),            trigger yielding an 83.7% improvement in success. For the
+rather than having the agent model directly propose a              static environment (ScreenSpot-Pro), RegionFocus occurs
+bounding box, we first prompt it to identify a point of inter-     in 60.2% and 33% of cases for the 72B and 7B models, re-
+est and then generate a predefined bounding box around that        spectively. The 72B model incurs overheads of 180% when
+point. This design choice stems from the observation that          region predictions are executed in parallel, and 360% if exe-
+agent models often struggle to accurately predict bounding         cuted sequentially. Regarding memory usage, RegionFocus
+boxes on their own. To validate this, we conducted an ex-          requires no additional GPU memory if region predictions
+periment in which the model was required to predict both           are performed sequentially without employing SAM [16].
+the upper-left and bottom-right corner coordinates, which          Whether region action predictions should be executed se-
+were then used to crop the UI image. As shown by the               quentially or in parallel, the number of regions to zoom into,
+“Predict-Region” results, this approach led to a marked de-        and whether to utilize SAM depend on the specific use case.
+crease in performance.
+                                                                   Failure Case Analysis According to our observations, we
+SAM As discussed in Section 3, our pipeline can natu-              summarize the main causes of failures as follows: (1) El-
+rally leverage segmentation models that take point inputs          ement not visible: In cases where the correct element is
+as indicator, such as SAM [16]. For example, in Figure 8           not visible on the current page (e.g., requires scrolling ac-
+(1), we provide a point generated by the model for Region-         tions), zooming in on the current page is not beneficial.
+Focus, despite the fact that the point itself is referring to      (2) Non-interactable elements: Some webpages contain
+a non-interactive empty area. Nevertheless, SAM is able            extensive text that appears relevant but is not clickable,
+to produce a bounding box that includes the correct region,        causing RegionFocus to zoom into these regions and sub-
+showcasing its suitability in such cases. The effectiveness        sequently fail to proceed due to the lack of interactable
+of incorporating point-based segmentation models into Re-          elements. For instance, on the Hugging Face homepage
+gionFocus is further validated by the results in Table 3.          (https://huggingface.co/), there is abundant relevant text
+                                                                   such as “Image-to-Text” and “Sentence Similarity,” which
+Test-time Thinking Budget Our quantitative analysis in             relates to agent tasks but is non-clickable. (3) Wrong fo-
+Figure 7 shows that incorporating RegionFocus naturally            cal points: In some rare cases, RegionFocus proposes the
+increases the number of steps taken by the agent. Moti-            wrong focal point, directing attention to irrelevant regions.
+vated by this, we investigate whether raising the inference-       (4) Action prediction failure: Occasionally, despite iden-
+step limit beyond 100—or removing it altogether—yields             tifying the correct focal point, all regional action predic-
+tions fail; our observations suggest that employing SAM
+[14] could alleviate this issue as it further reduces the back-
+ground clutter. (5) Action aggregation failure: Among
+the regional actions, the selected one may not be optimal.
+(6) Others: Other errors arise from general reasoning fail-
+ures, bot detection, or reaching the maximum step limit.
+
+5. Conclusion
+We introduced RegionFocus, a visual test-time scaling ap-
+proach that dynamically zooms in on relevant interface re-
+gions to address the clutter and ambiguity of modern GUIs.
+By integrating an image-as-map mechanism that marks key
+landmarks, our method provides transparent action records
+and improves coordinate-based action predictions. Experi-
+ments on Screenspot-pro and WebVoyager show substantial
+performance gains—even with a simple fixed-ratio bound-
+ing box strategy—highlighting the power of visual test-time
+scaling in enhancing interactive AI systems.
+
+6. Acknowledgment
+The work was completed during Tiange’s part-time intern-
+ship at LG AI Research and was supported by an LG AI Re-
+search grant awarded through University of Michigan. We
+thank Jaekyeom Kim and Sungryull Sohn for their discus-
+sions and contributions to the codebase.
+References                                                           [13] Hongliang He, Wenlin Yao, Kaixin Ma, Wenhao Yu, Yong
+                                                                          Dai, Hongming Zhang, Zhenzhong Lan, and Dong Yu. We-
+ [1] Peter Anderson, Qi Wu, Damien Teney, Jeffrey Bruce,                  bvoyager: Building an end-to-end web agent with large mul-
+     Mark Johnson, Stephen Gould, and Anton van den Hen-                  timodal models. arXiv preprint arXiv:2401.13919, 2024. 2,
+     gel. Vision-and-language navigation: Interpreting visually-          6, 7
+     grounded navigation instructions in real environments. In       [14] Wenyi Hong, Weihan Wang, Qingsong Lv, Jiazheng Xu,
+     Proceedings of the IEEE Conference on Computer Vision                Wenmeng Yu, Junhui Ji, Yan Wang, Zihan Wang, Yuxiao
+     and Pattern Recognition (CVPR), pages 3674–3683, 2018.               Dong, Ming Ding, et al. Cogagent: A visual language model
+     1                                                                    for gui agents. In Proceedings of the IEEE/CVF Conference
+ [2] Anthropic. Developing a computer use model. https:                   on Computer Vision and Pattern Recognition, pages 14281–
+     / / www . anthropic . com / news / developing -                      14290, 2024. 2
+     computer-use, 2024. Accessed: 2025-03-02. 1                     [15] Geunwoo Kim, Pierre Baldi, and Stephen McAleer. Lan-
+ [3] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin              guage models can solve computer tasks. Advances in Neural
+     Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun                 Information Processing Systems, 36:39648–39677, 2023. 2
+     Tang, Humen Zhong, Yuanzhi Zhu, Mingkun Yang, Zhao-             [16] Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hans Marx,
+     hai Li, Jianqiang Wan, Pengfei Wang, Wei Ding, Zheren                Carl Rolland, Laura Gustafson, Tsung-Yi Xiao, Spencer
+     Fu, Yiheng Xu, Jiabo Ye, Xi Zhang, Tianbao Xie, Zesen                Whitehead, Alexander C. Berg, Wan-Yen Lo, Piotr Dollár,
+     Cheng, Hang Zhang, Zhibo Yang, Haiyang Xu, and Jun-                  and Ross Girshick. Segment anything. arXiv preprint
+     yang Lin. Qwen2.5-vl technical report. arXiv preprint                arXiv:2304.02643, 2023. 2, 4, 5, 8, 9
+     arXiv:2502.13923, 2025. 2, 5, 6                                 [17] Jing Yu Koh, Robert Lo, Lawrence Jang, Vikram Duvvur,
+ [4] Zhaowei Cai and Nuno Vasconcelos. Cascade r-cnn: Delv-               Ming Chong Lim, Po-Yu Huang, Graham Neubig, Shuyan
+     ing into high quality object detection. In Proceedings of the        Zhou, Ruslan Salakhutdinov, and Daniel Fried. Visualwe-
+     IEEE conference on computer vision and pattern recogni-              barena: Evaluating multimodal agents on realistic visual web
+     tion, pages 6154–6162, 2018. 3                                       tasks. arXiv preprint arXiv:2401.13649, 2024. 2
+ [5] Ruisheng Cao, Fangyu Lei, Haoyuan Wu, Jixuan Chen,              [18] Kaixin Li, Ziyang Meng, Hongzhan Lin, Ziyang Luo,
+     Yeqiao Fu, Hongcheng Gao, Xinzhuang Xiong, Hanchong                  Yuchen Tian, Jing Ma, Zhiyong Huang, and Tat-Seng
+     Zhang, Wenjing Hu, Yuchen Mao, et al. Spider2-v: How                 Chua. Screenspot-pro: Gui grounding for professional high-
+     far are multimodal agents from automating data science and           resolution computer use, 2025. 2
+     engineering workflows? Advances in Neural Information           [19] Kaixin Li, Ziyang Meng, Hongzhan Lin, Ziyang Luo,
+     Processing Systems, 37:107703–107744, 2025. 2                        Yuchen Tian, Jing Ma, Zhiyong Huang, and Tat-Seng
+ [6] Kanzhi Cheng, Qiushi Sun, Yougang Chu, Fangzhi Xu, Yan-              Chua. Screenspot-pro: Gui grounding for professional high-
+     tao Li, Jianbing Zhang, and Zhiyong Wu. Seeclick: Har-               resolution computer use. arXiv preprint arXiv:2504.07981,
+     nessing gui grounding for advanced visual gui agents. arXiv          2025. 4, 5
+     preprint arXiv:2401.10935, 2024. 2                              [20] Drew Linsley, Dan Shiebler, Sven Eberhardt, and Thomas
+ [7] Stephen A Cook. The complexity of theorem-proving pro-               Serre. Learning what and where to attend. arXiv preprint
+     cedures. In Logic, automata, and computational complexity:           arXiv:1805.08819, 2018. 2
+     The works of Stephen A. Cook, pages 143–152. 2023. 7            [21] Xiao Liu, Tianjie Zhang, Yu Gu, Iat Long Iong, Yifan Xu,
+ [8] Xiang Deng, Yu Gu, Boyuan Zheng, Shijie Chen, Sam                    Xixuan Song, Shudan Zhang, Hanyu Lai, Xinyi Liu, Han-
+     Stevens, Boshi Wang, Huan Sun, and Yu Su. Mind2web:                  lin Zhao, et al. Visualagentbench: Towards large multi-
+     Towards a generalist agent for the web. Advances in Neural           modal models as visual foundation agents. arXiv preprint
+     Information Processing Systems, 36:28091–28114, 2023. 2              arXiv:2408.06327, 2024. 1, 2
+ [9] António Farinhas, André F. T. Martins, and Pedro M. Q.        [22] Yadong Lu, Jianwei Yang, Yelong Shen, and Ahmed
+     Aguiar. Multimodal continuous visual attention mecha-                Awadallah. Omniparser for pure vision based gui agent,
+     nisms, 2021. 2                                                       2024. 1, 2
+[10] Yongchao Feng, Yajie Liu, Shuai Yang, Wenrui Cai, Jinqing       [23] Volodymyr Mnih, Nicolas Heess, Alex Graves, et al. Recur-
+     Zhang, Qiqi Zhan, Ziyue Huang, Hongxi Yan, Qiao Wan,                 rent models of visual attention. Advances in neural informa-
+     Chenguang Liu, et al. Vision-language model for object de-           tion processing systems, 27, 2014. 3
+     tection and segmentation: A review and evaluation. arXiv        [24] Shikhar Murty, Hao Zhu, Dzmitry Bahdanau, and Christo-
+     preprint arXiv:2504.09480, 2025. 4                                   pher D. Manning. Nnetnav: Unsupervised learning of
+[11] Boyu Gou, Ruohan Wang, Boyuan Zheng, Yanan Xie, Cheng                browser agents through environment interaction in the wild,
+     Chang, Yiheng Shu, Huan Sun, and Yu Su. Navigating the               2025. 2
+     digital world as humans do: Universal visual grounding for      [25] Reiichiro Nakano, Jacob Hilton, Suchir Balaji, Jeff Wu,
+     gui agents. arXiv preprint arXiv:2410.05243, 2024. 1, 2              Long Ouyang, Christina Kim, Christopher Hesse, Shantanu
+[12] Meng-Hao Guo, Tian-Xing Xu, Jiang-Jiang Liu, Zheng-                  Jain, Vineet Kosaraju, William Saunders, et al. Webgpt:
+     Ning Liu, Peng-Tao Jiang, Tai-Jiang Mu, Song-Hai Zhang,              Browser-assisted question-answering with human feedback.
+     Ralph R Martin, Ming-Ming Cheng, and Shi-Min Hu. At-                 arXiv preprint arXiv:2112.09332, 2021. 2
+     tention mechanisms in computer vision: A survey. Compu-         [26] Soroush Nasiriany, Fei Xia, Wenhao Yu, Ted Xiao, Jacky
+     tational visual media, 8(3):331–368, 2022. 2                         Liang, Ishita Dasgupta, Annie Xie, Danny Driess, Ayzaan
+     Wahid, Zhuo Xu, et al. Pivot: Iterative visual prompt-               multimodal models for zero-shot smartphone gui navigation.
+     ing elicits actionable knowledge for vlms. arXiv preprint            arXiv preprint arXiv:2311.07562, 2023. 2
+     arXiv:2402.07872, 2024. 3                                       [39] Ke Yang, Yao Liu, Sapana Chaudhary, Rasool Fakoor, Pratik
+[27] Vardaan Pahuja, Yadong Lu, Corby Rosset, Boyu Gou,                   Chaudhari, George Karypis, and Huzefa Rangwala. Agen-
+     Arindam Mitra, Spencer Whitehead, Yu Su, and Ahmed                   toccam: A simple yet strong baseline for llm-based web
+     Awadallah. Explorer: Scaling exploration-driven web tra-             agents, 2024. 1, 2
+     jectory synthesis for multimodal web agents, 2025. 2            [40] Shunyu Yao, Howard Chen, John Yang, and Karthik
+[28] Yujia Qin, Yining Ye, Junjie Fang, Haoming Wang, Shihao              Narasimhan. Webshop: Towards scalable real-world web in-
+     Liang, Shizuo Tian, Junda Zhang, Jiahao Li, Yunxin Li, Shi-          teraction with grounded language agents. Advances in Neu-
+     jue Huang, et al. Ui-tars: Pioneering automated gui inter-           ral Information Processing Systems, 35:20744–20757, 2022.
+     action with native agents. arXiv preprint arXiv:2501.12326,          2
+     2025. 1, 2, 5, 6                                                [41] Shunyu Yao, Dian Yu, Jeffrey Zhao, Izhak Shafran, Tom
+[29] Peter Shaw, Mandar Joshi, James Cohan, Jonathan Berant,              Griffiths, Yuan Cao, and Karthik Narasimhan. Tree of
+     Panupong Pasupat, Hexiang Hu, Urvashi Khandelwal, Ken-               thoughts: Deliberate problem solving with large language
+     ton Lee, and Kristina N Toutanova. From pixels to ui ac-             models. Advances in neural information processing systems,
+     tions: Learning to follow instructions via graphical user in-        36:11809–11822, 2023. 2
+     terfaces. Advances in Neural Information Processing Sys-        [42] Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran,
+     tems, 36:34354–34370, 2023. 2                                        Karthik Narasimhan, and Yuan Cao. React: Synergizing rea-
+[30] Gokul Swamy, Sanjiban Choudhury, Wen Sun, Zhi-                       soning and acting in language models. In International Con-
+     wei Steven Wu, and J Andrew Bagnell. All roads lead to like-         ference on Learning Representations (ICLR), 2023. 2
+     lihood: The value of reinforcement learning in fine-tuning.     [43] Wenwen Yu, Zhibo Yang, Jianqiang Wan, Sibo Song, Jun
+     arXiv preprint arXiv:2503.01067, 2025. 7                             Tang, Wenqing Cheng, Yuliang Liu, and Xiang Bai. Om-
+[31] Brandon Trabucco, Gunnar Sigurdsson, Robinson Pira-                  niparser v2: Structured-points-of-thought for unified visual
+     muthu, and Ruslan Salakhutdinov. Towards internet-scale              text parsing and its generality to multimodal large language
+     training for agents, 2025. 2                                         models. arXiv preprint arXiv:2502.16161, 2025. 2
+[32] Hieu Tran Bao, Nguyen Cong Dat, Nguyen Duc Anh, and             [44] Xiao Yu, Baolin Peng, Vineeth Vajipey, Hao Cheng, Michel
+     Hoang Thanh-Tung. Learning to stop overthinking at test              Galley, Jianfeng Gao, and Zhou Yu. Exact: Teaching ai
+     time. arXiv e-prints, pages arXiv–2502, 2025. 2                      agents to explore with reflective-mcts and exploratory learn-
+[33] Junyang Wang, Haiyang Xu, Haitao Jia, Xi Zhang, Ming                 ing. arXiv preprint arXiv:2410.02052, 2024. 2
+     Yan, Weizhou Shen, Ji Zhang, Fei Huang, and Jitao Sang.         [45] Zhuosheng Zhang and Aston Zhang. You only look at
+     Mobile-agent-v2: Mobile device operation assistant with ef-          screens: Multimodal chain-of-action agents. arXiv preprint
+     fective navigation via multi-agent collaboration. In Advances        arXiv:2309.11436, 2023. 2
+     in Neural Information Processing Systems (NeurIPS), 2024.       [46] Boyuan Zheng, Boyu Gou, Jihyung Kil, Huan Sun, and Yu
+     2                                                                    Su. Gpt-4v (ision) is a generalist web agent, if grounded.
+[34] Junyang Wang, Haiyang Xu, Jiabo Ye, Ming Yan, Weizhou                arXiv preprint arXiv:2401.01614, 2024. 1, 2
+     Shen, Ji Zhang, Fei Huang, and Jitao Sang. Mobile-agent:        [47] Shuyan Zhou, Frank F Xu, Hao Zhu, Xuhui Zhou, Robert
+     Autonomous multi-modal mobile device agent with visual               Lo, Abishek Sridhar, Xianyi Cheng, Yonatan Bisk, Daniel
+     perception. arXiv preprint arXiv:2401.16158, 2024. 2                 Fried, Uri Alon, et al. Webarena: A realistic web environ-
+[35] Xuezhi Wang, Jason Wei, Dale Schuurmans, Quoc Le, Ed                 ment for building autonomous agents. ICLR, 2024. 2
+     Chi, Sharan Narang, Aakanksha Chowdhery, and Denny
+     Zhou. Self-consistency improves chain of thought reason-
+     ing in language models. arXiv preprint arXiv:2203.11171,
+     2022. 2
+[36] Tianbao Xie, Danyang Zhang, Jixuan Chen, Xiaochuan Li,
+     Siheng Zhao, Ruisheng Cao, Jing Hua Toh, Zhoujun Cheng,
+     Dongchan Shin, Fangyu Lei, et al. Osworld: Benchmark-
+     ing multimodal agents for open-ended tasks in real computer
+     environments. Advances in Neural Information Processing
+     Systems, 37:52040–52094, 2025. 2
+[37] Kelvin Xu, Jimmy Ba, Ryan Kiros, Kyunghyun Cho, Aaron
+     Courville, Ruslan Salakhudinov, Rich Zemel, and Yoshua
+     Bengio. Show, attend and tell: Neural image caption gen-
+     eration with visual attention. In International conference on
+     machine learning, pages 2048–2057. PMLR, 2015. 2
+[38] An Yan, Zhengyuan Yang, Wanrong Zhu, Kevin Lin, Lin-
+     jie Li, Jianfeng Wang, Jianwei Yang, Yiwu Zhong, Julian
+     McAuley, Jianfeng Gao, et al. Gpt-4v in wonderland: Large
+A. More experimental details
+
+
+
+
+In this section, we provide more details about our experimental settings. In our main paper, we examined both the UI-
+TARS-7B-DPO and UI-TARS-72B-DPO models, as well as Qwen2.5-VL-7B-Instruct and Qwen2.5-VL-72B-Instruct. For
+WebVoyager, we used a screen resolution of 1440 × 1440 pixels for the UI-TARS models and 2240 × 1260 for the Qwen
+models. For both ScreenSpot-Pro and WebVoyager, our predefined bounding boxes were defined as ratios of the input image
+size, specifically [0.5, 0.5], [0.3, 0.3], [0.4, 0.8], and [0.8, 0.4]. Some of the prompts we used are listed below.
+
+
+
+
+      Prompt for Region Focus
+
+      You are a GUI agent. You are given a task, a current web screenshot, and a history of your previous focused
+           points on the same page (indicated by pink stars in the screenshot). Your job is to output the most
+           relevant point in the screenshot corresponding to the objective. You must avoid the pink-starred
+           coordinates and choose a valid clickable area.
+
+      ## Other Information
+      OBJECTIVE: {objective}
+      URL: {url}
+
+      ## Output Format
+      ‘‘‘
+      (x1, y1)
+      ‘‘‘
+      where x1, y1 are the coordinates of the target element, and must differ from any pink-starred coordinates.
+
+      ## Note
+      - Ensure the chosen coordinate is a valid clickable area not visibly covered by pink stars in the screenshot.
+
+
+
+
+      Prompt for Action Prediction – UI-TARS
+
+      You are a GUI agent. You are given a task and your action history, with screenshots.
+      You need to perform the next action to complete the task.
+
+      ## Other Information
+      OBJECTIVE: {objective}
+      URL: {url}
+
+      ## Output Format
+      ‘‘‘\nThought: ...
+      Action: ...\n‘‘‘
+
+      ## Action Space
+      click(start_box=’<|box_start|>(x1,y1)<|box_end|>’)
+      left_double(start_box=’<|box_start|>(x1,y1)<|box_end|>’)
+      right_single(start_box=’<|box_start|>(x1,y1)<|box_end|>’)
+      drag(start_box=’<|box_start|>(x1,y1)<|box_end|>’, end_box=’<|box_start|>(x3,y3)<|box_end|>’)
+      hotkey(key=’’)
+      type(content=’’) #If you want to submit your input, use "\" at the end of ‘content‘.
+      scroll(start_box=’<|box_start|>(x1,y1)<|box_end|>’, direction=’down or up or right or left’)
+      wait() #Sleep for 5s and take a screenshot to check for any changes.
+      finished()
+      call_user() # Submit the task and call the user when the task is unsolvable, or when you need the user’s help.
+
+      ## Note
+      - Use English in ‘Thought‘ part.
+      - Summarize your next action (with its target element) in one sentence in ‘Thought‘ part.
+Prompt for Action Prediction – QWen2.5-VL (part 1)
+
+You are a helpful assistant.
+
+# Tools
+
+You may call one or more functions to assist with the user query.
+
+You are provided with function signatures within <tools></tools> XML tags:
+<tools>
+{
+   "type": "function",
+   "function": {
+      "name": "computer_use",
+      "description": """Use a mouse and keyboard to interact with a computer, and take screenshots.
+         * This is an interface to a desktop GUI. You do not have access to a terminal or applications menu.
+              You must click on desktop icons to start applications.
+         * Some applications may take time to start or process actions, so you may need to wait and take
+              successive screenshots to see the results of your actions. E.g. if you click on Firefox and a
+              window doesn’t open, try wait and taking another screenshot.
+         * The screen’s resolution is {self.display_width_px}x{self.display_height_px}.
+         * Whenever you intend to move the cursor to click on an element like an icon, you should consult a
+              screenshot to determine the coordinates of the element before moving the cursor.
+         * If you tried clicking on a program or link but it failed to load, even after waiting, try adjusting
+               your cursor position so that the tip of the cursor visually falls on the element that you want
+              to click.
+         * Make sure to click any buttons, links, icons, etc with the cursor tip in the center of the element.
+               Don’t click boxes on their edges unless asked."""
+      "parameters": {
+         "properties": {
+            "action": {
+               "description": """
+                  The action to perform. The available actions are:
+                  * ‘key‘: Performs key down presses on the arguments passed in order, then performs key
+                        releases in reverse order.
+                  * ‘type‘: Type a string of text on the keyboard.
+                  * ‘mouse_move‘: Move the cursor to a specified (x, y) pixel coordinate on the screen.
+                  * ‘left_click‘: Click the left mouse button.
+                  * ‘left_click_drag‘: Click and drag the cursor to a specified (x, y) pixel coordinate on the
+                         screen.
+                  * ‘right_click‘: Click the right mouse button.
+                  * ‘middle_click‘: Click the middle mouse button.
+                  * ‘double_click‘: Double-click the left mouse button.
+                  * ‘scroll‘: Performs a scroll of the mouse scroll wheel.
+                  * ‘wait‘: Wait specified seconds for the change to happen.
+                  * ‘terminate‘: Terminate the current task and report its completion status.
+                  """,
+               "enum": [
+                  "key",
+                  "type",
+                  "mouse_move",
+                  "left_click",
+                  "left_click_drag",
+                  "right_click",
+                  "middle_click",
+                  "double_click",
+                  "scroll",
+                  "wait",
+                  "terminate",
+               ],
+               "type": "string",
+            },
+            "keys": {
+               "description": "Required only by ‘action=key‘.",
+               "type": "array",
+            },
+            "text": {
+               "description": "Required only by ‘action=type‘.",
+               "type": "string",
+            },
+            "coordinate": {
+               "description": "(x, y): The x (pixels from the left edge) and y (pixels from the top edge)
+                    coordinates to move the mouse to. Required only by ‘action=mouse_move‘ and ‘action=
+                    left_click_drag‘.",
+               "type": "array",
+            },
+Prompt for Action Prediction – QWen2.5-VL (part 2)
+
+             "pixels": {
+                "description": "The amount of scrolling to perform. Positive values scroll up, negative values
+                     scroll down. Required only by ‘action=scroll‘.",
+                "type": "number",
+             },
+             "time": {
+                "description": "The seconds to wait. Required only by ‘action=wait‘.",
+                "type": "number",
+             },
+             "status": {
+                "description": "The status of the task. Required only by ‘action=terminate‘.",
+                "type": "string",
+                "enum": ["success", "failure"],
+             },
+          },
+          "required": ["action"],
+          "type": "object",
+      }
+  }
+}
+For each function call, return a json object with function name and arguments within <tool_call></tool_call>
+     XML tags:
+<tool_call>
+{"name": <function-name>, "arguments": <args-json-object>}
+</tool_call>
+B. More qualitative results
+
+                            Initial Action
+
+
+
+
+                            Region Action Prediction
+                                                                                         1) Objective: on the input screenshot to
+                                                                                         ground “mirror the selection”
+
+                                                                                         2) Judge: the initial action clicks on the
+                                                                                         empty arena, which is clearly not
+                                                                                         correct.
+                                                                                              Judgement: INCORRECT
+
+                                                                                         Then, we initiate RegionFocus by first
+                                                                                         proposing a focal point. We use this
+                                                                                         focal point as a center to generate
+                                                                                         several potential regions.
+
+                                                                                         One of these regions is shown on the
+                                                                                         left, and the agent correctly identifies
+                                                                                         target element position, which is
+                                                                                         “Mirror”.
+
+Figure 10. Qualitative results - Screenspot-Pro. In one example from our evaluation, the system successfully rejects the initial action
+and proposes a correct grounding point based on the zoomed-in view.
+                             Initial Action
+
+
+
+
+                             Region Action Prediction
+                                                                                        1) Objective: on the input screenshot to
+                                                                                        ground “draw a point”
+
+                                                                                        2) Judge: the initial action clicks on the
+                                                                                        arena, which is unrelated to point drawing
+                                                                                             Judgement: INCORRECT
+
+                                                                                        Then, we initiate RegionFocus and predict
+                                                                                        action based on the sub-region, which is
+                                                                                        the correct output.
+
+Figure 11. Qualitative results - Screenspot-Pro. In one example from our evaluation, the system successfully rejects the initial action
+and proposes a correct grounding point based on the zoomed-in view.
+                                         Initial Action
+
+
+
+
+                                         Region Action Prediction
+                                                                                           1) Objective: on the input screenshot
+                                                                                           to ground “cut code in 1.xdc in vivado”
+
+                                                                                           2) Judge: the initial action clicks on
+                                                                                           the delete, which is clearly not “cut”.
+                                                                                                Judgement: INCORRECT
+
+                                                                                           Then, we initiate RegionFocus by first
+                                                                                           proposing a focal point. We use this
+                                                                                           focal point as a center to generate
+                                                                                           several potential regions.
+
+                                                                                           One of these regions is shown on the
+                                                                                           left, and the agent correctly identifies
+                                                                                           target element position.
+
+Figure 12. Qualitative results - Screenspot-Pro. In one example from our evaluation, the system successfully rejects the initial action
+and proposes a correct grounding point based on the zoomed-in view.
+

@@ -1,0 +1,843 @@
+                    This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                 Except for this watermark, it is identical to the accepted version;
+                           the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+ UZ3DVG: Unaided Zero-Shot 3D Visual Grounding with Generated Language
+                              Conditions
+
+                    Wenbin Tan1, 2 , Jiawen Lin1 , Yuan Xie3 , Yachao Zhang1 *, Yanyun Qu1 *
+  1
+      Key Laboratory of Multimedia Trusted Perception and Efficient Computing, Ministry of Education
+                    of China, School of Informatics, Xiamen University, Xiamen, China
+                         2
+                           School of Big Data, Tongren University, Tongren, China
+       3
+         School of Computer Science and Technology, East China Normal University, Shanghai, China
+                       wbtan@stu.xmu.edu.cn, yachaozhang@xmu.edu.cn, yyqu@xmu.edu.cn
+
+
+                                                                                                              Previous Works                      VS             Ours
+                            Abstract                                                                       Loop
+
+
+                                                                                                                                                                SpConv
+
+    Zero-Shot 3D Visual Grounding (Zero-Shot 3DVG) aims
+                                                                                                                  Slow...                                        Fast!
+to localize target objects in 3D scenes from natural lan-                                                             (a) Comparison of inference paradigms.
+guage descriptions without relying on instance-wise de-                                                                                                          Ours2
+                                                                                                 10        Fully Supervised                                                 Ours1       TSP3D
+scription annotations. Existing methods rely on extra
+                                                                                                           Zero-Shot
+2D images during inference and/or require multi-turn in-                                                   Our Methods                                              BUTD-DETR          MCLN
+
+
+
+
+                                                                     Speed (frames per second)
+teractions with large language models (LLMs) or vision-                                                                                                            3D-SPS        EDA
+                                                                                                                                                                                    3D-VisTA
+language models (VLMs), which increase latency, compu-
+                                                                                                  1
+tational cost, and deployment complexity. To overcome
+these limitations, we propose Unaided Zero-shot 3D Visual
+                                                                                                                            OpenScene                                 SeeGround
+Grounding with generated language conditions (UZ3DVG),                                                 LERF                                              ZSVG3D (run 1)
+                                                                                                                                        ZSVG3D (run 2)
+which is fed with 3D point clouds and textual descriptions                                       0.1
+only during inference and does not depend on external
+models. This is a new training paradigm: a VLM is em-
+                                                                                                                                                          VLM-Grounder
+ployed solely to produce object-wise descriptions (pseudo
+                                                                                                       0                       10                20       30                40
+labels) and reasoning chains for training a lightweight
+                                                                                                                             Accuracy (Acc@0.5)
+3DVG model with robust spatial reasoning. Specifically, the
+                                                                                                              (b) Comparison of inference speed and accuracy.
+introduced Open-Vocabulary Multi-Source Spatial Annota-
+                                                                        Figure 1. Comparison with zero-shot 3DVG methods on ScanRe-
+tion and Reasoning Chain Generator processes RGB-D im-                  fer [4]. UZ3DVG surpasses existing approaches in accuracy and
+ages or 3D-projected 2D images from open-world scenes                   inference speed, and is the first zero-shot 3DVG framework to rely
+to generate spatial pseudo-labels and reasoning chains for              solely on 3D point clouds at inference, without 2D images or VLM
+training. Then, we propose Reasoning Chain Distillation,                interaction. Inference speed is measured following TSP3D [10].
+which transfers reasoning knowledge extracted by a large
+teacher network to a lightweight student network. To rep-
+resent both global and local geometric relationships, the               1. Introduction
+Geometry-Aware Spatial Modeling (GeoSM) module is in-
+troduced to align textual reasoning with 3D spatial struc-              3D visual grounding (3DVG)[32, 40, 46, 51, 57] aims to lo-
+tures. Experiments show that UZ3DVG achieves SOTA                       calize target objects in 3D scenes based on natural language
+zero-shot performance on ScanRefer and NR3D, with infer-                descriptions. This task holds broad application potential in
+ence speeds up to 7.69 FPS, approximately 38 times faster               domains such as indoor robotic visual navigation[42], vir-
+than SOTA methods. The code is available at https:                      tual reality (VR)[44], and augmented reality (AR)[7].
+//github.com/tanwb/UZ3DVG.                                                 Existing 3DVG methods, such as EDA[45], MCLN[28],
+                                                                        and TSP3D[10], primarily focus on the closed-set setting[2,
+                                                                        4, 15, 23, 34, 49, 50, 58]. Although these methods have
+  * Corresponding Author.                                               achieved significant performance improvements, their train-
+
+
+
+                                                              9547
+ing heavily relies on large-scale human-annotated paired                SeeGround [17] by 1.32%/1.68%. On the more challeng-
+data (i.e., language descriptions and 3D objects) [2, 4]. This          ing Multiple subset of ScanRefer, it achieves Acc@0.25/0.5
+high annotation cost severely limits the generalization abil-           of 40.49%/36.33%, outperforming SeeGround [17] by
+ity and deployment of these models in novel scenes.                     6.49%/6.33%. The inference speed reaches 7.69 FPS,
+    Recent studies explore zero-shot 3DVG [17, 19, 47, 51],             about 38 times faster than SeeGround’s 0.2 FPS. These re-
+including ZSVG3D [51] and SeeGround [17]. These meth-                   sults confirm UZ3DVG’s robustness in complex scenes as
+ods integrate large language models (LLMs) [25] or vision-              well as its superior accuracy and efficiency.
+language models (VLMs) [12] into the 3DVG inference                        In summary, our contributions are:
+pipeline, leveraging their semantic understanding and rea-              • We propose a novel zero-shot 3DVG paradigm that, at in-
+soning capabilities. However, they often call LLMs or                     ference, relies solely on 3D point clouds as input, without
+VLMs during inference or perform multi-round interac-                     using 2D images or interacting with VLMs, and employs
+tions, as illustrated in Fig. 1, leading to high latency, com-            an efficient network, retaining high speed and flexible de-
+putational overhead, increased costs, and deployment diffi-               ployment.
+culties. Current zero-shot 3DVG methods typically run at                • To address the gap between 2D foundation models and 3D
+less than the real-time threshold of 6 FPS [10].                          pseudo labels, we design the MSAG-RC to embed multi-
+    To address these challenges in zero-shot 3DVG, we pro-                modal information from RGB and depth into 3D space,
+pose Unaided Zero-shot 3D Visual Grounding with gen-                      and leverage the zero-shot capability of a VLM to gener-
+erated language conditions (UZ3DVG). To the best of our                   ate spatial pseudo labels and reasoning chains. We further
+knowledge, UZ3DVG is the first zero-shot 3DVG model                       introduce Reasoning Chain Distillation (RCD) to allevi-
+that, during inference, uses only 3D point cloud inputs with-             ate the inherent shift between foundation model knowl-
+out 2D imagery or external LLMs/VLMs. Its core idea com-                  edge and 3D visual grounding.
+prises two components: (i) constructing high-quality 3D                 • UZ3DVG achieves state-of-the-art performance on both
+pseudo-labels, and (ii) supervising a lightweight model with              the ScanRefer and NR3D, with an inference speed ap-
+pseudo-labels and reasoning chains generated by a VLM.                    proximately 38 times faster than that of existing methods.
+    We design the Open-Vocabulary Multi-Source Spatial
+Annotation and Reasoning Chain Generator (MSAG-RC) to                   2. Related Work
+extract RGB images and depth information, enabling effec-               3D Visual Grounding. Most current 3DVG research[13,
+tive transformation from 2D imagery to 3D spatial annota-               18, 27, 28, 43, 46, 55] follows supervised paradigms, requir-
+tions. MSAG-RC uses open-vocabulary 2D detectors (e.g.,                 ing large-scale manual 3D labels from densely annotated
+Grounding DINO [20]) and segmentation models such as                    datasets such as ScanRefer[4] and ReferIt3D[2], which
+SAM2 [29] to obtain object masks and categories. By com-                align language descriptions with target objects in 3D scenes.
+bining these with depth maps and camera parameters, the                    Representative works[5, 6, 10] address challenges in-
+2D segmentation results are back-projected into 3D space                cluding text–point cloud alignment[33, 45], geometric fea-
+to recover object-scale information. The projected 3D data              ture extraction[39, 40], and contextual cue modeling[57],
+is encoded and fed into a VLM via prompt engineering to                 using approaches such as Transformer-based attention[11,
+generate spatial pseudo-labels and reasoning chains, which              57, 58], contrastive learning[1], graph-based relational
+serve as supervision to address the absence of spatial anno-            modeling[9, 13, 36, 50], and text-guided voxel pruning[10],
+tations and reasoning guidance in zero-shot training.                   generally improving accuracy via manual 3D label supervi-
+    To transfer reasoning knowledge and logical structures              sion. Weak supervision was also explored[54, 56], but not
+within the chains to a compact model, we employ Reason-                 in 3D visual grounding.
+ing Chain Distillation (RCD). A large teacher network ex-                  However, reliance on manual annotation limits general-
+tracts such knowledge from the generated chains and dis-                ization to unseen environments. To address this, we propose
+tills it into a lightweight student network. Due to the multi-          a zero-shot open-vocabulary 3DVG paradigm that uses au-
+relational complexity of the chains, mapping target infor-              tomatically generated 3D pseudo labels to enhance adapt-
+mation to sparse point clouds remains challenging. To mit-              ability and robustness in diverse 3D scenes.
+igate this, we propose the Geometry-Aware Spatial Mod-                  Zero-Shot Open-Vocabulary 3DVG. Advances in large
+eling (GeoSM) module, which encodes global context and                  language models (LLMs) [25] and vision–language mod-
+local geometric relationships. GeoSM processes aligned vi-              els (VLMs) [12, 31, 35] have greatly improved multimodal
+sual features to provide positional references at both levels,          reasoning and scene understanding in images [6, 8, 14, 37].
+thereby enhancing the correspondence between textual rea-               However, existing LLMs/VLMs cannot directly process raw
+soning chains and 3D spatial structures.                                3D point clouds, making zero-shot 3DVG inefficient and
+    Experimental results show that UZ3DVG achieves                      costly. Recent efforts integrate LLMs or VLMs into 3DVG
+Acc@0.25/0.5 of 45.42%/41.08% on ScanRefer, surpassing                  inference, such as ZSVG3D [51], Agent3D-Zero [53], See-
+
+
+
+                                                                 9548
+                                                                                                                                                                   Reasoning Chain Distillation
+
+
+                                                    ❄️                                              FSvis
+                                                                                                               Loss
+
+                                                                                                                                                    FTvis
+                                                                                                                                                                                                           ❄️               this is a blue chair. it
+                                                                                                                                                                                                                            is at a brown table
+                                                                                                                                                                                                                            and near a brown chair.
+
+
+                                                         RoBERT                          Student                                                                    Teacher                       RoBERT
+                                                                                                                                                                                 .
+                                                                                                                                                                                 .
+                                                                                                                                                                                 .
+
+                                                                                                               Loss                         Vis
+                                                                                                                                                                                 .
+                                                                                                                                                                                 .
+                                                                                                                                                                                 .
+
+
+                                                                                                    FStext                                          FTtext                       .
+                                                                                                                                                                                 .
+                                                                                                                                                                                 .
+                                                                                                                                                                                                                                 Reasoning Chain
+                                                                                                                                                                                                                               (e.g., Anchor, References)
+                Train: this is a blue chair.
+                                                                                                                                                                                 .
+                                                                                                                                                                                 .
+                                                                                                                                                                                 .
+
+
+                it is at a brown table and                               .                                                                  Text                                 .
+                                                                                                                                                                                 .
+                                                                                                                                                                                 .
+                                                                         .
+                near a brown chair.                                      .
+
+
+     Text                                                                                                                                                Geometry-Aware Spatial Modeling
+  Description                                                                    FPS                                                       BiCA
+                Val: The blue chair sits                                                                                                                            Distance↓
+                beside a brown table,
+                                                                                                                                                                                               Head
+                near another brown chair.
+
+                                                      Down
+
+                                                                               TSVDE                                                        BiCA
+    Point
+    Cloud
+                                                      Down
+                                                                                                                                                                                                                           Objective Function
+                                                                               TSVDE                                                        BiCA
+                              Voxelization                                                                                                                                                                             Lclass Lbbox Laux
+
+                                                                   Open-Vocabulary Multi-Source Spatial Annotation and Reasoning Chain Generator
+                                                                                                                Prompt Template
+
+                                                             ❄️
+                                                                                                                   Spatial Description
+                                                                                                                  Reasoning Generation
+    Depth                                                                                                             3D Box Info
+                                                                                    Projection
+                                                                  SAM2                                           [1.4, 2.4, 0.4, 0.7, 0.8, 0.9]
+
+
+                                                                                                                                                                                                                ...     Spatial Description
+
+
+                                                             ❄️Open-Vocabulary Detector
+                                                                                                                                                                                                                      - A chair to the right . . .
+                                                                                                                                                                                                                      - The chair to the left . . .
+    RGB
+                                                                                                                                                                                                                         Reasoning Generation
+                                                                                                                                                                                                                ...
+                                                                                                                                                                                                                      - ANCHOR: chair
+                                                                                                                                                                                                                      - REFERENCES: right . . .
+
+
+
+    Train Phase              Test Phase        ❄️   Frozen Module            BiCA Bidirectional Cross-Attention               FPS        Farthest Point Sampling              TSVDE Text-Semantic-Guided Visual Detail Enhancement
+
+Figure 2. Overview of the UZ3DVG framework with training and inference phases. In training, MSAG-RC converts RGB-D images into
+spatial description pseudo-labels and reasoning chains to guide 3DVG model training, and RCD distills reasoning knowledge and logic
+from a teacher network to a lightweight student network head. Reasoning-enhanced text features are aligned with 3D backbone features
+(SpConv) and augmented via TSVDE, then processed by GeoSM to model global context and local geometry before the prediction head
+outputs localization results. During inference, only point clouds and text inputs are used, without MSAG-RC and RCD-teacher.
+
+
+Ground [17], VLM-Grounder [47], and OpenEQA [24],                                                                        work to extract reasoning knowledge and logic, which are
+which employ strategies like 3D-to-2D rendering, multi-                                                                  then transferred to a lightweight student network through
+view projection, and embodied-agent interaction.                                                                         Reasoning Chain Distillation (RCD). The spatial descrip-
+   Although effective, these methods rely on VLM-based                                                                   tion pseudo-labels undergo feature extraction before enter-
+inference, causing high latency and computational over-                                                                  ing the student network, while the Text-Semantic-guided
+head. Our work aims to address these speed and deploy-                                                                   Visual Detail Enhancement (TSVDE) module samples and
+ment challenges with UZ3DVG, which relies solely on 3D                                                                   augments details related to textual semantics from low-
+point clouds during inference, without VLM interaction.                                                                  level visual features to help the model locate representa-
+                                                                                                                         tions of reasoning logic. Following cross-modal text-visual
+                                                                                                                         alignment, the aligned visual features are passed to the
+3. Methodology
+                                                                                                                         Geometry-Aware Spatial Modeling (GeoSM) module to ex-
+3.1. Overview                                                                                                            plicitly model global information and local geometric rela-
+                                                                                                                         tionships within the 3D scene, assisting the student model
+To tackle slow inference, and deployment complexity                                                                      in reasoning and improving its localization performance.
+caused by 2D reliance and multi-turn LLM/VLM inter-                                                                      Notably, the pseudo-labels, 3D information, and reasoning
+actions in zero-shot 3DVG, we introduce UZ3DVG. The                                                                      chains generated by MSAG-RC are used exclusively during
+network architecture, illustrated in Figure 2, consists of                                                               training, whereas in the inference phase only the actual lo-
+a training phase and an inference phase. During the                                                                      calization descriptions and 3D point clouds are required to
+training phase, both branches operate simultaneously, be-                                                                achieve 3D visual localization.
+ginning with RGB-depth images processed by the Open-
+Vocabulary Multi-Source Spatial Annotation and Reason-
+                                                                                                                         3.2. Multi-Source Annotation and Reasoning Chain
+ing Chain Generator (MSAG-RC) to produce spatial de-
+scription pseudo-labels and corresponding reasoning chains                                                               To address annotation scarcity and insufficient structured
+for guiding the 3DVG model. To enhance spatial reason-                                                                   reasoning supervision in zero-shot 3D localization, and to
+ing ability and accelerate inference, these pseudo-labels                                                                effectively bridge the representational gap between 2D im-
+and reasoning chains are first fed into a larger teacher net-                                                            age inputs and 3D spatial localization annotations, we pro-
+
+
+
+                                                                                                             9549
+pose the Open-Vocabulary Multi-Source Spatial Annota-                       that instruct the VLMs to emulate a robot localizing tar-
+tion and Reasoning Chain Generator (MSAG-RC). This ap-                      gets from object relationships in the pseudo 3D scene. No-
+proach relies solely on 2D inputs obtained from RGB-depth                   tably, this pseudo 3D scene is the same one used to generate
+images or projected 3D point clouds, enabling the joint gen-                di,j . After generating the description, the VLM is imme-
+eration of 3D semantic labels and spatial reasoning chains                  diately prompted to produce the corresponding reasoning
+without manual annotations.                                                 chain. The predefined template requires the reasoning chain
+Open-Vocabulary 3D Bounding Box Generation. Given                           to contain the structured components Anchor, References,
+an RGB-D video sequence, we uniformly sample frames at                      and Reasoning. To further improve pseudo-label quality,
+a fixed interval to obtain the i-th RGB image Ii ∈ RH×W ×3                  prompt engineering requires the VLM to verify that Ri,j is
+and its corresponding depth map Di ∈ RH×W . We first ap-                    consistent with di,j while correcting localization failures in
+ply an open-vocabulary 2D object detector (e.g., Grounding                  both. After self-verification, the VLM returns:
+DINO [20]) to predict coarse 2D bounding boxes b2D      i,j ∈
+                                                                                     (di,j , Ri,j , γi,j ) = G(I˜i,j , b3D
+                                                                                                                        i,j , κi,j , Ci,j ),   (6)
+R4 . To obtain more accurate object boundaries, we further
+employ SAM2 [29] to convert each valid b2D   i,j into a pixel-              where G denotes the prompt-constrained VLM generation
+level segmentation mask:                                                    function, Ri,j is the structured reasoning chain, and γi,j is
+                                                                            the self-assigned confidence score; see Suppl. for details.
+          Mi,j = SAM2(Ii , b2D
+                            i,j ) ∈ {0, 1}
+                                           H×W
+                                               .              (1)              The final outputs are 3D spatial semantic labels, reason-
+  After filtering invalid or noisy depth values, the valid                  ing chains, and confidence scores. The entire process is
+masked pixel set is defined as                                              automated through prompt engineering, requiring no man-
+                                                                            ual labeling and enabling 3D localization annotation from
+    Ωi,j = {(u, v) | Mi,j [u, v] = 1, Di [u, v] ∈ R},         (2)           RGB-D sequences in open environments.
+
+where R denotes the valid depth range after outlier removal.                3.3. Reasoning Chain Distillation
+For all valid pixels (u, v) ∈ Ωi,j , the corresponding depth                To efficiently transfer reasoning chain knowledge from the
+values are given by zi (u, v) = Di [u, v]. We back-project                  teacher model to the student model while maintaining fast
+all such pixels into 3D with the depth intrinsic matrix Kd                  inference speed, we design the Reasoning Chain Distilla-
+                    (i)
+and camera pose Tc2w , and further transform them into the                  tion module (RCD). This module adopts a dual path distil-
+axis-aligned scene coordinate system with A:                                lation scheme, in which the teacher network simultaneously
+                                                                            guides the student network with textual and visual features
+                      (i)
+         Pi,j = A Tc2w Di [u, v] Kd−1 [u, v, 1]⊤ .
+                                                  
+         e                                               (3)                enhanced by reasoning chains. Under distillation loss con-
+                                                                            straints, the reasoning logic embedded in the chain is inter-
+    An axis-aligned 3D pseudo box b3D
+                                    i,j = [ci,j , si,j ] ∈ R
+                                                             6
+                                                                            nalized into the student’s spatial reasoning capability.
+                                                        min
+is computed from the aligned point cloud extrema pi,j =                     RCD-Teacher. The teacher network consists of three
+     Pi,j ) and pmax
+min( e           i,j = max(Pi,j ) as
+                             e                                              tightly connected layers: (i) reasoning chain parsing and
+                                                                            encoding, (ii) noise filtering and feature enhancement, and
+               pmax    min
+                i,j + pi,j                                                  (iii) cross-modal alignment and distillation output.
+      ci,j =               ,       sraw    max    min
+                                    i,j = pi,j − pi,j .       (4)
+                    2                                                           First, given a reasoning chain R and its corresponding
+                                                                            open-vocabulary spatial annotation text features Tovsd , the
+Multi-Source Spatial Annotation. After obtaining object-
+                                                                            teacher network begins by extracting the Anchor, Refer-
+level 3D geometry, we design a symbolic-logic-based spa-
+                                                                            ence, and Reasoning components from the structured rea-
+tial prompt constructor to transform geometric attributes
+                                                                            soning chain. These components are separately encoded
+into structured prompts for a VLM. For the j-th valid ob-
+                                                                            by a frozen RoBERTa encoder [21] and yield the initial
+ject in frame i, let its category be κi,j , its 3D pseudo box be
+                                                                            component-level representation Ctea   chain , which constitutes
+b3D
+  i,j = [ci,j , si,j ], and its target-specific spatial context be          the reasoning chain parsing and encoding stage.
+Ci,j . Together with the annotated RGB image I˜i,j , the VLM                    This is followed by the noise filtering and feature en-
+generates a natural language spatial description:                           hancement stage. To suppress noisy components while re-
+                                                                            taining those semantically aligned with Tovsd , the teacher
+           di,j = VLM(I˜i,j ; ci,j , si,j , κi,j , Ci,j ),    (5)
+                                                                            applies a quality gating mechanism to Ctea   chain conditioned on
+where I˜i,j is the RGB image with the target object high-                   the global text context, yielding the gated component repre-
+lighted by a 2D bounding box and identifier, and di,j is a                  sentation
+                                                                                            Cfilt             tea
+                                                                                                                             
+human readable room-level spatial description.                                                chain = Gate Cchain , Tovsd .               (7)
+Reasoning Chain Generation. To produce structured su-                          To model logical dependencies among the gated compo-
+pervision for lightweight model reasoning, we craft prompts                 nents, we apply self-attention: Htea         filt
+                                                                                                             c = SAc (Cchain ). The
+
+
+
+
+                                                                     9550
+resulting component features are first grounded to the orig-                 and align them via
+inal text features through cross-attention, and are then in-
+                                                                                             Lg = Lcos + Lmse + Lmag ,                (11)
+jected back into the textual stream through a cross-attention
+module followed by gated fusion, producing the enhanced                      where Lcos , Lmse , and Lmag respectively constrain gain di-
+textual representation Ttea fus .                                            rection, normalized gain magnitude, and overall enhance-
+   Finally, in the cross-modal alignment and distillation                    ment strength. Additionally, visual features are distilled
+output stage, the fused textual representation Ttea fus is aligned           with a foreground-background hybrid loss:
+with teacher visual features Vtea , which are derived from                                   stu    tea           stu    tea
+                                                                                  Lv = Lfg (Vout , Vout ) + Lbg (Vout , Vout ),       (12)
+the same source visual input as the student features, through
+three layers of bidirectional cross-modal attention. Specifi-                where Lfg and Lbg denote foreground matching and back-
+cally, self-attention is first applied to both streams, followed             ground matching, respectively.
+by cross-attention:                                                             Collectively, the above losses enable efficient reasoning
+           tea                                                               chain distillation.
+               , Ttea                    tea         tea
+                                                          
+       (Vout      out ) = CA SAv (V ), SAt (Tfus ) .            (8)
+                                                                             Text-Semantic-Guided Visual Detail Enhancement. To
+                                        tea
+    The resulting aligned features (Vout    , Ttea
+                                               out ) serve as the            enrich visual features with fine-grained details from text-
+distillation targets for guiding the student network.                        relevant regions and improve reasoning performance, we in-
+RCD-Student. Under the guidance of the teacher, the stu-                     troduce the Text-Semantic-Guided Visual Detail Enhance-
+dent network is designed to identify reasoning-relevant fea-                 ment module (TSVDE). During upsampling, the module
+tures in localization descriptions, extract the underlying rea-              leverages textual semantics and reasoning-enhanced visual
+soning logic, and improve localization accuracy through a                    features to guide feature refinement. Specifically, it applies
+lightweight pseudo reasoning mechanism. It is structurally                   similarity-based sampling to emphasize regions closely
+analogous to the teacher but has reduced capacity, compris-                  aligned with textual semantics, thereby enhancing the fine-
+ing three stages: (i) pseudo reasoning signal generation, (ii)               grained details required by the reasoning chain (see Suppl.
+reasoning aware feature enhancement, and (iii) cross modal                   Sec. 1.1 for details).
+alignment.
+                                                                             3.4. Geometry-Aware Spatial Modeling
+    Given the language spatial description features Tovsd ,
+we apply masked global average pooling to obtain a global                    Reasoning chains often contain spatial predicates (e.g., “left
+context: tstu
+            pool = GAP(Tovsd ). This pooled feature is fed
+                                                                             of”, “above”) relying on geometric relationships. However,
+into a lightweight query generator and an attention-based                    visual features from sparse convolutions (SpConv) lack ex-
+extractor to produce three pseudo reasoning components                       plicit spatial-relation modeling, which limits reasoning-to-
+Rstu
+   comp , which mimic the three components in the teacher
+                                                                             visual mapping.
+reasoning chain, namely Anchor, Reference, and Reason-                          To address this limitation, we propose Geometry-Aware
+ing. These components are further aggregated into a global                   Spatial Modeling (GeoSM) to integrate global and local ge-
+student reasoning representation Rstu .                                      ometry. First, to capture the global 3D spatial context, we
+    To align the student representation with the teacher rep-                normalize the coordinates pi corresponding to the aligned
+resentation, we apply a reasoning distillation objective that                visual features, following ideas from 3DGraphLLM [52],
+enforces consistency at both the component and global lev-                   and compute absolute positional embeddings via sinusoidal
+els, defined as                                                              encoding:
+                    Lr = Lcomp + Lglobal ,                     (9)                                      pi − pmin
+                          r       r                                                         p̂i = 2 ·                  − 1,           (13)
+                                                                                                      pmax − pmin + ε
+where Lcomp
+         r      and Lglobal
+                     r      denote student-teacher alignment
+                                                                             where pmin and pmax are point cloud bounds, and ε ensures
+over the reasoning components and the aggregated global
+                                                                             stability. The encoded positions capture global layout cues,
+representations, respectively.
+                                                                             yielding the positional feature fipos after linear projection.
+   The student then enhances its textual representation by
+                                                                                 For local geometry, we build K-nearest-neighbor neigh-
+concatenating Rstu with Tovsd , transforming the fused fea-
+                                                                             borhoods. For each point pi , the relative displacement is
+tures with an MLP, and injecting the result into the origi-
+                                                                             defined as ∆pij = pj − pi . We aggregate neighbor fea-
+nal textual stream with confidence weighted residual fusion.
+                                                                             tures, concatenate them with ∆pij , and pass the combined
+The enhanced textual features are subsequently aligned with
+                                                                             representation through an MLP followed by a max pooling
+visual features through a lightweight bidirectional cross
+                                             stu                             layer to obtain local relational feature firel .
+modal encoder with two layers, yielding Vout     and Tstu
+                                                       out .
+                                                                                 Finally,  concatenating fipos and firel yields gi =
+   To transfer the teacher’s reasoning dynamics, we define                    pos
+                                                                               fi , firel , which is then added back to the original vi-
+reasoning gains as
+                                                                             sual feature through a residual connection, thereby provid-
+   Gtea = Ttea
+           out − Tovsd ,        Gstu = Tstu
+                                        out − Tovsd ,         (10)           ing comprehensive spatial context for reasoning.
+
+
+
+                                                                      9551
+Table 1. Evaluation of 3DVG methods on the ScanRefer [4] validation set. Results marked with †† are computed on a subset of 250 samples
+(250/9508 ≈ 2.6%) from the validation set. Inference speed follows TSP3D [10] (batch size = 1, NVIDIA 3090 GPU). NR: Not Released.
+
+ Method                     Venue       Supervision            Unique                    Multiple              Overall           FPS
+                                                       Acc@0.25 Acc@0.5 Acc@0.25 Acc@0.5 Acc@0.25 Acc@0.5
+ 3D-SPS [23]              CVPR’22          Fully         84.12       66.72         40.32       29.82      48.82       36.98     3.17
+ BUTD-DETR [15]           ECCV’22          Fully         82.88       64.98         44.73       33.97      50.42       38.60     3.33
+ EDA [45]                 CVPR’23          Fully         85.76       68.57         49.13       37.64      54.59       42.26     3.34
+ 3D-VisTA [58]            ICCV’23          Fully         81.60       75.10         43.70       39.10      50.60       45.80     2.03
+ VPP-Net [32]             CVPR’24          Fully         86.05       67.09         50.53       39.03      55.65       43.29     NR
+ G3-LQ [40]               CVPR’24          Fully         88.59       73.28         50.23       39.72      55.95       44.72     NR
+ MCLN [28]                ECCV’24          Fully         86.89       72.73         51.96       40.76      57.17       45.53     3.17
+ TSP3D [10]               CVPR’25          Fully           –           –             –           –        56.45       46.71     12.43
+ PC-CrossDiff [33]        AAAI’26          Fully         86.28       75.08         53.59       43.12      58.47       47.89     4.07
+ WS-3DVG [41]             ICCV’23         Weakly           –              –          –              –     27.40       22.00      NR
+ Mask3D-Based
+ ZSVG3D [51]              CVPR’24        Zero-Shot       63.80       58.40         27.70       24.60      36.40       32.70     0.14
+ SeeGround [17]           CVPR’25        Zero-Shot       75.70       68.90         34.00       30.00      44.10       39.40     0.20
+ Ours                        –           Zero-Shot       73.57       68.15         40.49       36.33      45.42       41.08     7.69
+ Non-Mask3D
+ VLM-G [47]††             CORL’24        Zero-Shot       66.00       29.80         48.30       33.50      51.60       32.80     0.02
+ LERF [16]                ICCV’23        Zero-Shot         –           –             –            –        4.80        0.90     0.13
+ OpenScene [26]           CVPR’23        Zero-Shot       20.10       13.10         11.10        4.40      13.20        6.50     0.24
+ LLM-G [48]               ICRA’24        Zero-Shot         –           –             –            –       17.10        5.30     0.05
+ ZSVG3D [51]              CVPR’24        Zero-Shot       32.50       27.80         16.10       14.60      20.00       17.60     0.21
+ Ours                        –           Zero-Shot       69.62       56.94         38.48       31.21      43.13       35.05     9.43
+
+
+3.5. Objective Function                                                  “Unique” and “Multiple” cases. To avoid data leakage, all
+                                                                         RGB-D images in our experiments come from scenes dis-
+Following previous works [10, 22, 28, 45], the overall loss
+of UZ3DVG consists of the referring localization loss Lrec               joint from those in the ScanRefer validation set. NR3D, a
+and the distillation losses, where Lrec includes the bounding            subset of ReferIt3D [2], contains 7,904 validation samples,
+box regression loss Lbbox and the classification loss Lcls .             with evaluation distinguishing “Easy” and “Hard”, and an-
+   The teacher warm-up loss is provided in the Suppl. The                notations further labeling references as “View-Dependent”
+term Lrec guides the learning of the referring localization              (Dep.) or “View-Independent” (Indep.).
+task in the main model, while the distillation losses super-                Without loss of generality, in the MSAG-RC branch, we
+vise the distillation of the reasoning chain. The total loss is          employ Qwen3-VL-Plus [3, 35] and Doubao-seed-1.6 [31]
+defined as                                                               as VLMs. Details are provided in Suppl. Sec. S1.2. Dur-
+                                                                         ing inference, for a fair comparison with ZSVG3D [51]
+     Ltotal = λrec Lrec + λg Lg + λv Lv + λr Lr ,          (14)          and SeeGround [17] when using Mask3D [30], we use
+                                                                         Mask3D [30] only for post hoc bounding box refinement;
+where λ∗ denotes the balance coefficients.                               more details are provided in Suppl. Sec. S1.3. The ac-
+                                                                         curacies of LERF [16] and OpenScene [26] are taken from
+4. Experiments                                                           ZSVG3D [51] and SeeGround [17], and their speeds are
+4.1. Experimental Setup and Datasets                                     evaluated using the official code.
+To ensure fairness in comparative evaluation, we assess
+                                                                         4.2. Results and Analysis
+model accuracy on two widely used benchmark datasets:
+ScanRefer [4] and NR3D [2]. ScanRefer comprises 800                      Performance on ScanRefer. Table 1 presents a comparison
+ScanNet scenes and a validation set of 9,508 natural lan-                between our method, UZ3DVG, and state-of-the-art zero-
+guage descriptions, each specifying a target object and                  shot 3DVG approaches on the ScanRefer [4] validation set,
+its spatial context. Results are reported separately for                 including the “Unique” subset, the “Multiple” subset, and
+
+
+
+                                                                  9552
+Table 2. Nr3D [2] val (††: 250-query subset): direct inference          Performance on NR3D. Table 2 demonstrates that
+with the same Table 1 checkpoint (trained on ScanRefer pseudo-          UZ3DVG achieves competitive performance on the
+labels), without Nr3D fine-tuning. Evaluation protocols follow          NR3D [2], with an overall accuracy of 46.5%, surpassing
+ReferIt3D [2] and MCLN [28], with Mask3D refinement.
+                                                                        ZSVG3D [51] by 7.5% and SeeGround [17] by an addi-
+                                                                        tional 0.4%. Furthermore, UZ3DVG exhibits remarkable
+   Method                   Easy Hard Dep. Indep.Overall                results in both the Hard and View-Independent categories.
+   Supervision: Fully Supervised                                        In the Hard setting, it achieves an accuracy of 40.8%, out-
+   ReferIt3DNet [2]         43.6   27.9   32.5   37.1   35.6            performing ZSVG3D [51] by 9.1% and SeeGround [17] by
+   TGNN [13]                44.2   30.6   35.8   38.0   37.3            2.5%. These improvements clearly demonstrate the robust-
+   InstanceRefer [50]       46.0   31.8   34.5   41.9   38.8            ness and strong generalization ability of our method.
+   3DVG-Trans [57]          48.5   34.8   34.8   43.7   40.8
+   BUTD-DETR[15]             –      –      –      –     43.3            Table 3. Ablation of the main modules on ScanRefer [4] dataset.
+   AugRefer [38]             –      –      –      –     48.4
+   TSP3D [10]                –      –      –      –     48.7             TSVDE      RCD       GeoSM       Acc@0.25        Acc@0.50
+   MCLN [28]                 –      –      –      –     59.8              w/o        w/o        w/o         40.75           37.18
+   PC-CrossDiff [33]        62.2   57.5   60.6   59.6   59.9              ✓          w/o        w/o         41.83           38.21
+   Supervision: Weakly Supervised                                         ✓          ✓          w/o         43.26           39.65
+   WS-3DVG [41]             27.3 18.0 21.6 22.9         22.5              ✓          w/o        ✓           43.15           39.47
+                                                                          ✓          ✓          ✓           45.42           41.08
+   Supervision: Zero-Shot
+   VLM-G†† [47]             55.2   39.5   45.8   49.4   48.0
+   ZSVG3D [51]              46.5   31.7   36.8   40.0   39.0            4.3. Ablation Studies
+   SeeGround [17]           54.5   38.3   42.3   48.2   46.1
+   Ours                     52.2   40.8   39.3   50.1   46.5            Effectiveness of the Proposed Components. We evaluate
+                                                                        the contributions of TSVDE, RCD, and GeoSM to localiza-
+                                                                        tion accuracy on the ScanRefer [4] dataset through ablation
+                                                                        studies (Table 3), progressively removing each component
+the overall results. Under the zero-shot setting, UZ3DVG                from the full model. Without TSVDE, random sampling
+achieves notable gains in localization accuracy and infer-              serves as the baseline; adding TSVDE improves IoU@0.25
+ence speed, outperforming the weakly supervised method                  by 1.08% and IoU@0.50 by 1.03%, showing that semanti-
+WS-3DVG [41] in accuracy while remaining competitive                    cally guided point cloud sampling effectively supplements
+with fully supervised approaches.                                       text-relevant visual details and facilitates the model’s local-
+   Without Mask3D-based boundary refinement, some                       ization reasoning. Incorporating RCD, which distills the
+methods (e.g., SeeGround [17]) cannot operate due to re-                reasoning logic of a vision-language model into the student
+liance on Mask3D segmentation outputs for bounding in-                  network, yields gains of 2.51% and 2.47%, demonstrating
+formation. We thus compare UZ3DVG with ZSVG3D [51],                     effective integration of spatial reasoning knowledge for bet-
+the best-performing zero-shot method under non-Mask3D                   ter understanding of spatial relations in text. Integrating
+settings.    UZ3DVG obtains 43.13% and 35.05% on                        GeoSM on top of TSVDE increases IoU@0.25 by 2.40%
+Acc@0.25 and Acc@0.50, surpassing ZSVG3D by 23.13%                      and IoU@0.50 by 2.29%, confirming that its fused global
+and 17.45%, respectively, and reaching 9.43 FPS versus                  and local geometric representations strengthen spatial rea-
+0.21 FPS (∼45× speedup).                                                soning. Combining all three components results in overall
+   With Mask3D-based boundary refinement (Supplemen-                    improvements of 4.67% and 3.90%, highlighting their com-
+tary Sec. S1.3), UZ3DVG further improves to 45.42%                      plementary effects and effectiveness.
+and 41.08% in Acc@0.25 and Acc@0.5, exceeding See-                      Impact of Different VLMs Choice. Figure 3a shows that
+Ground [17] by 1.32% and 1.68%, with 7.69 FPS compared                  the use of different VLMs for generating open-vocabulary
+to 0.20 FPS (∼38×). On the more challenging “Multi-                     descriptions for model training results in variations in per-
+ple” subset, which requires stronger spatial discrimination,            formance on the ScanRefer [4] dataset. With Qwen3-
+UZ3DVG scores 40.49% and 36.33%, outperforming See-                     VL-Plus [3], localization accuracies reach 43.87% for
+Ground by 6.49% and 6.33%. Although certain fully super-                Acc@0.25 and 39.62% for Acc@0.50, while the Doubao-
+vised methods (e.g., MCLN [28] and TSP3D [10]) attain                   seed-1.6 [31] achieves 45.42% and 41.08%, respectively,
+marginally higher accuracy due to extensive annotations,                which are slightly higher. These results show that spatial-
+UZ3DVG delivers competitive zero-shot performance with                  description label quality directly governs the model’s spatial
+substantial speed advantages, making it highly scalable for             reasoning learning and overall accuracy.
+large-scale 3DVG tasks without manual labels.                           Effect of Pseudo-Label Quantity. Figure 3b shows the
+
+
+
+                                                                 9553
+                     48
+                                   Acc@0.25     Acc@0.5
+                                                                                  50                                                                                  (a) the table is black   (b) the cabinet is in the   (c) the door is right
+                                                                                               ACC@0.25                                                               and against the back     middle of the room. the     of the purple chair.
+                                                                                               ACC@0.50                                  45.42          Description
+                     46                                                           45                                             43.36
+                                                                                                                                                                      right wall. there are    cabinet is a white box      the door is a brown
+                                              45.42
+                                                                                                                                         41.08                        chairs around it.        with a blue top.            rectangle.
+                           43.87                                                                                                 39.52
+                     44                                                           40
+
+                                                                                                          36.88
+
+
+
+
+      Accuracy (%)                                                Accuracy (%)
+                     42
+                                                      41.08                       35
+                                                                                                                                                           GT
+                                                                                                          30.65
+                     40            39.62
+                                                                                  30
+
+
+                     38                                                                25.71
+
+                                                                                  25
+
+
+                     36                                                                21.14
+
+
+                          Qwen3-VL-Plus       DouBao-1.6                          20
+                                                                                       10K                20K                    30K     40K             ZSVG3D
+                                     VLM Model                                                                    Dataset Size
+
+ (a) Accuracy for Different VLMs.                                                (b) Effect of training data amount.
+Figure 3. Comparison of localization accuracy under different
+VLMs and training data scales.
+                                                                                                                                                        SeeGround
+
+
+effect of varying the number of open-vocabulary spatial
+description pseudo-labels on ScanRefer [4] performance.
+Starting from 10K pseudo-labels, increasing the number                                                                                                    Ours
+to 20K improves Acc@0.25 by 11.17% and Acc@0.50 by
+9.51%, showing clear gains in the limited-label regime. Ex-
+panding to 30K brings further improvements of 6.48% and                                                                                                 Figure 4.  Qualitative comparison of our UZ3DVG with
+8.87%. However, at 40K, the gains drop to 2.06% and                                                                                                     ZSVG3D [51] and the baseline SeeGround [17].
+1.56%, suggesting that pseudo-label noise reduces the ben-
+efit of further increasing the number of labels.
+                                                                                                                                                        these methods can identify the category but fail to deter-
+Table 4. Comparison of accuracy on the ScanRefer [4] dataset                                                                                            mine the correct target. In contrast, our method accurately
+using spatial descriptions generated directly from 2D boxes or                                                                                          localizes the intended target, demonstrating robust spatial
+enhanced by our MSAG-RC module, with or without reasoning                                                                                               reasoning. This capability stems from RCD, which trans-
+chains. RC: Reasoning chains.                                                                                                                           fers spatial reasoning logic, and the GeoSM module, which
+                                                                                                                                                        models both global scene context and local geometric in-
+ Module                                                        Acc@0.25                                            Acc@0.50                             formation. They strengthen the mapping between reasoning
+ 2D Info                                                          34.16                                           22.83                                 chains and 3D structures, improving localization accuracy.
+ MSAG-RC w/o RC                                               43.15 (+8.99)                                   39.47 (+16.64)
+ MSAG-RC                                                      45.42 (+2.27)                                   41.08 (+1.61)                             5. Conclusion
+                                                                                                                                                        In this paper, we present Unaided Zero-shot 3D Visual
+Comparison of Different Spatial Descriptions. Table 4                                                                                                   Grounding with generated language conditions (UZ3DVG),
+compares spatial descriptions generated directly from 2D                                                                                                a paradigm that performs inference solely from 3D point
+boxes with those enhanced by our MSAG-RC module. The                                                                                                    clouds, removing dependence on 2D inputs and external
+2D-only approach has limited ability to capture spatial re-                                                                                             LLMs/VLMs that cause high latency, heavy computation,
+lationships, leading to lower localization accuracy. By con-                                                                                            and deployment difficulties. To address the gap between
+trast, our MSAG-RC module projects 2D boxes into 3D and                                                                                                 2D foundation models and 3D pseudo labels, we design the
+strengthens contextual information around the target, im-                                                                                               MSAG-RC to embed multi-modal information from RGB
+proving Acc@0.25 by 8.99% and Acc@0.50 by 16.64%.                                                                                                       and depth into 3D space, and leverage the zero-shot ca-
+When reasoning chains are added to the paired spatial de-                                                                                               pability of a VLM to generate spatial pseudo labels and
+scriptions used for distillation, accuracy further increases by                                                                                         reasoning chains. To further enhance reasoning, the RCD
+2.27% and 1.61%, demonstrating that our MSAG-RC mod-                                                                                                    module distills chain knowledge into a student network in
+ule facilitates better 3D visual grounding training.                                                                                                    zero-shot settings. The GeoSM module captures global lay-
+                                                                                                                                                        outs and local geometric relations, thereby enhancing the
+4.4. Qualitative Analysis                                                                                                                               correspondence between textual reasoning chains and 3D
+From the first and second columns in Fig. 4, when the                                                                                                   spatial structures, further improving localization accuracy.
+input description contains complex spatial relations, both                                                                                              Experiments show that UZ3DVG achieves SOTA on Scan-
+ZSVG3D [51] and SeeGround [17] mislocalize the target.                                                                                                  Refer and NR3D, runs at 7.69 FPS, and supports fully local-
+In scenarios where multiple same-category instances are                                                                                                 ized deployment, establishing a new paradigm for zero-shot
+present and referenced in the description (third column),                                                                                               3DVG in open-world scenes.
+
+
+
+                                                                                                                                                 9554
+6. Acknowledgements                                                            Network for Object Grounding in Point Cloud. In Proceed-
+                                                                               ings of the IEEE/CVF International Conference on Com-
+This work was supported by the National Natural Science                        puter Vision, pages 3722–3731, 2021. 2
+Foundation of China under Grant 62306165, the Science                     [10] Wenxuan Guo, Xiuwei Xu, Ziwei Wang, Jianjiang Feng,
+and Technology on Sonar Laboratory under Grant 2024-                           Jie Zhou, and Jiwen Lu. Text-guided Sparse Voxel Prun-
+JCJQ-LB-32/07, the State Grid Corporation Headquarters                         ing for Efficient 3D Visual Grounding. In Proceedings of
+Technology Project under Grant 52120025004V-463-FGS,                           the IEEE/CVF Conference on Computer Vision and Pattern
+the Fundamental Research Funds for the Central Universi-                       Recognition, pages 3666–3675, 2025. 1, 2, 6, 7
+ties under Grant 20720250031, the Guizhou Provincial De-                  [11] Dailan He, Yusheng Zhao, Junyu Luo, Tianrui Hui, Shaofei
+partment of Science and Technology under Grant Qian Ke                         Huang, Aixi Zhang, and Si Liu. TransRefer3D: Entity-
+He QN [2025] 337, the Guizhou Provincial Basic Research                        and-Relation Aware Transformer for Fine-Grained 3D Vi-
+                                                                               sual Grounding. In Proceedings of the 29th ACM Interna-
+Program (Natural Science) under Grant NO.MS (2026) 814,
+                                                                               tional Conference on Multimedia, pages 2344–2352, New
+and the Tongren Municipal Science and Technology Bureau                        York, NY, USA, 2021. Association for Computing Machin-
+under Grant Tongshi [2025] 54.                                                 ery. 2
+                                                                          [12] Wenyi Hong, Weihan Wang, Ming Ding, Wenmeng Yu,
+References                                                                     Qingsong Lv, Yan Wang, Yean Cheng, Shiyu Huang, Junhui
+ [1] Ahmed Abdelreheem, Ujjwal Upadhyay, Ivan Skorokhodov,                     Ji, Zhao Xue, Lei Zhao, Zhuoyi Yang, Xiaotao Gu, Xiaohan
+     Rawan Al Yahya, Jun Chen, and Mohamed Elhoseiny.                          Zhang, Guanyu Feng, Da Yin, Zihan Wang, Ji Qi, Xixuan
+     3DRefTransformer: Fine-Grained Object Identification in                   Song, Peng Zhang, Debing Liu, Bin Xu, Juanzi Li, Yuxiao
+     Real-World Scenes Using Natural Language. In Proceed-                     Dong, and Jie Tang. CogVLM2: Visual Language Models
+     ings of the IEEE/CVF Winter Conference on Applications of                 for Image and Video Understanding, 2024. 2
+     Computer Vision, pages 3941–3950, 2022. 2                            [13] Pin-Hao Huang, Han-Hung Lee, Hwann-Tzong Chen, and
+ [2] Panos Achlioptas, Ahmed Abdelreheem, Fei Xia, Mohamed                     Tyng-Luh Liu. Text-Guided Graph Neural Networks for
+     Elhoseiny, and Leonidas Guibas. ReferIt3D: Neural Listen-                 Referring 3D Instance Segmentation. Proceedings of the
+     ers for Fine-Grained 3D Object Identification in Real-World               AAAI Conference on Artificial Intelligence, 35(2):1610–
+     Scenes. In Computer Vision – ECCV 2020, pages 422–440,                    1618, 2021. 2, 7
+     Cham, 2020. Springer International Publishing. 1, 2, 6, 7            [14] Zhening Huang, Xiaoyang Wu, Xi Chen, Hengshuang Zhao,
+ [3] Shuai Bai, Yuxuan Cai, Ruizhe Chen, and et al. Qwen3-VL                   Lei Zhu, and Joan Lasenby. OpenIns3D: Snap and Lookup
+     Technical Report, 2025. 6, 7                                              for 3D Open-Vocabulary Instance Segmentation. In Com-
+ [4] Dave Zhenyu Chen, Angel X. Chang, and Matthias Nießner.                   puter Vision – ECCV 2024, pages 169–185, Cham, 2025.
+     ScanRefer: 3D Object Localization in RGB-D Scans Using                    Springer Nature Switzerland. 2
+     Natural Language. In Computer Vision – ECCV 2020, pages              [15] Ayush Jain, Nikolaos Gkanatsios, Ishita Mediratta, and
+     202–221, Cham, 2020. Springer International Publishing. 1,                Katerina Fragkiadaki. Bottom Up Top Down Detection
+     2, 6, 7, 8                                                                Transformers for Language Grounding in Images and Point
+ [5] Qi Chen, Changli Wu, Jiayi Ji, Yiwei Ma, Danni Yang, and                  Clouds. In Computer Vision – ECCV 2022, pages 417–433,
+     Xiaoshuai Sun. IPDN: Image-enhanced Prompt Decoding                       Cham, 2022. Springer Nature Switzerland. 1, 6, 7
+     Network for 3D Referring Expression Segmentation. Pro-               [16] Justin Kerr, Chung Min Kim, Ken Goldberg, Angjoo
+     ceedings of the AAAI Conference on Artificial Intelligence,               Kanazawa, and Matthew Tancik. LERF: Language Embed-
+     39(2):2132–2140, 2025. 2                                                  ded Radiance Fields. In Proceedings of the IEEE/CVF In-
+ [6] Runnan Chen, Youquan Liu, Lingdong Kong, Xinge Zhu,                       ternational Conference on Computer Vision, pages 19729–
+     Yuexin Ma, Yikang Li, Yuenan Hou, Yu Qiao, and Wenping                    19739, 2023. 6
+     Wang. CLIP2Scene: Towards Label-Efficient 3D Scene Un-               [17] Rong Li, Shijie Li, Lingdong Kong, Xulei Yang, and Jun-
+     derstanding by CLIP. In Proceedings of the IEEE/CVF Con-                  wei Liang. SeeGround: See and Ground for Zero-Shot
+     ference on Computer Vision and Pattern Recognition, pages                 Open-Vocabulary 3D Visual Grounding. In Proceedings of
+     7020–7030, 2023. 2                                                        the IEEE/CVF Conference on Computer Vision and Pattern
+ [7] Shaveta Dargan, Shally Bansal, Munish Kumar, Ajay Mittal,                 Recognition, pages 3707–3717, 2025. 2, 3, 6, 7, 8
+     and Krishan Kumar. Augmented Reality: A Comprehensive                [18] Haojia Lin, Yongdong Luo, Xiawu Zheng, Lijiang Li, Fei
+     Review. Archives of Computational Methods in Engineering,                 Chao, Taisong Jin, Donghao Luo, Yan Wang, Liujuan Cao,
+     30(2):1057–1080, 2023. 1                                                  and Rongrong Ji. A Unified Framework for 3D Point Cloud
+ [8] Yue Fan, Xiaojian Ma, Rujie Wu, Yuntao Du, Jiaqi Li, Zhi                  Visual Grounding, 2023. 2
+     Gao, and Qing Li. VideoAgent: A Memory-Augmented                     [19] Jiawen Lin, Shiran Bian, Yihang Zhu, Wenbin Tan, Yachao
+     Multimodal Agent for Video Understanding. In Computer                     Zhang, Yuan Xie, and Yanyun Qu. SeqVLM: Proposal-
+     Vision – ECCV 2024, pages 75–92, Cham, 2025. Springer                     Guided Multi-View Sequences Reasoning via VLM for
+     Nature Switzerland. 2                                                     Zero-Shot 3D Visual Grounding. In Proceedings of the 33rd
+ [9] Mingtao Feng, Zhen Li, Qi Li, Liang Zhang, XiangDong                      ACM International Conference on Multimedia, pages 3094–
+     Zhang, Guangming Zhu, Hui Zhang, Yaonan Wang, and Aj-                     3103, New York, NY, USA, 2025. Association for Comput-
+     mal Mian. Free-Form Description Guided 3D Visual Graph                    ing Machinery. 2
+
+
+
+
+                                                                   9555
+[20] Shilong Liu, Zhaoyang Zeng, Tianhe Ren, Feng Li, Hao                 [30] Jonas Schult, Francis Engelmann, Alexander Hermans, Or
+     Zhang, Jie Yang, Qing Jiang, Chunyuan Li, Jianwei Yang,                   Litany, Siyu Tang, and Bastian Leibe. Mask3D: Mask Trans-
+     Hang Su, Jun Zhu, and Lei Zhang. Grounding DINO: Mar-                     former for 3D Semantic Instance Segmentation. In 2023
+     rying DINO with Grounded Pre-training for Open-Set Object                 IEEE International Conference on Robotics and Automation
+     Detection. In Computer Vision – ECCV 2024, pages 38–55,                   (ICRA), pages 8216–8223, 2023. 6
+     Cham, 2025. Springer Nature Switzerland. 2, 4                        [31] ByteDance Seed, Jiaze Chen, Tiantian Fan, Xin Liu, and et
+[21] Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Mandar                     al. Seed1.5-Thinking: Advancing Superb Reasoning Models
+     Joshi, Danqi Chen, Omer Levy, Mike Lewis, Luke Zettle-                    with Reinforcement Learning, 2025. 2, 6, 7
+     moyer, and Veselin Stoyanov. RoBERTa: A Robustly Opti-               [32] Xiangxi Shi, Zhonghua Wu, and Stefan Lee. Viewpoint-
+     mized BERT Pretraining Approach, 2019. 4                                  Aware Visual Grounding in 3D Scenes. In Proceedings of
+[22] Ze Liu, Zheng Zhang, Yue Cao, Han Hu, and Xin Tong.                       the IEEE/CVF Conference on Computer Vision and Pattern
+     Group-Free 3D Object Detection via Transformers. In                       Recognition, pages 14056–14065, 2024. 1, 6
+     Proceedings of the IEEE/CVF International Conference on              [33] Wenbin Tan, Jiawen Lin, Fangyong Wang, Yuan Xie, Yong
+     Computer Vision, pages 2949–2958, 2021. 6                                 Xie, Yachao Zhang, and Yanyun Qu. PC-CrossDiff: Point-
+[23] Junyu Luo, Jiahui Fu, Xianghao Kong, Chen Gao, Haibing                    Cluster Dual-Level Cross-Modal Differential Attention for
+     Ren, Hao Shen, Huaxia Xia, and Si Liu. 3D-SPS: Single-                    Unified 3D Referring and Segmentation. Proceedings of
+     Stage 3D Visual Grounding via Referred Point Progressive                  the AAAI Conference on Artificial Intelligence, 40(11):9332–
+     Selection. In Proceedings of the IEEE/CVF Conference on                   9340, 2026. 2, 6, 7
+     Computer Vision and Pattern Recognition, pages 16454–                [34] Ozan Unal, Christos Sakaridis, Suman Saha, and Luc
+     16463, 2022. 1, 6                                                         Van Gool. Four Ways to Improve Verbo-visual Fusion
+                                                                               for Dense 3D Visual Grounding. In Computer Vision –
+[24] Arjun Majumdar, Anurag Ajay, Xiaohan Zhang, Pranav
+                                                                               ECCV 2024, pages 196–213, Cham, 2025. Springer Nature
+     Putta, Sriram Yenamandra, Mikael Henaff, Sneha Sil-
+                                                                               Switzerland. 1
+     wal, Paul Mcvay, Oleksandr Maksymets, Sergio Arnaud,
+                                                                          [35] Peng Wang, Shuai Bai, Sinan Tan, and et al. Qwen2-VL: En-
+     Karmesh Yadav, Qiyang Li, Ben Newman, Mohit Sharma,
+                                                                               hancing Vision-Language Model’s Perception of the World
+     Vincent Berges, Shiqi Zhang, Pulkit Agrawal, Yonatan
+                                                                               at Any Resolution, 2024. 2, 6
+     Bisk, Dhruv Batra, Mrinal Kalakrishnan, Franziska Meier,
+                                                                          [36] Sai Wang, Yutian Lin, and Yu Wu. Omni-Q: Omni-
+     Chris Paxton, Alexander Sax, and Aravind Rajeswaran.
+                                                                               Directional Scene Understanding for Unsupervised Visual
+     OpenEQA: Embodied Question Answering in the Era of
+                                                                               Grounding. In Proceedings of the IEEE/CVF Conference
+     Foundation Models. In Proceedings of the IEEE/CVF Con-
+                                                                               on Computer Vision and Pattern Recognition, pages 14261–
+     ference on Computer Vision and Pattern Recognition, pages
+                                                                               14270, 2024. 2
+     16488–16498, 2024. 3
+                                                                          [37] Xiaohan Wang, Yuhui Zhang, Orr Zohar, and Serena Yeung-
+[25] OpenAI, Josh Achiam, Steven Adler, and et al. GPT-4 Tech-
+                                                                               Levy.     VideoAgent: Long-Form Video Understanding
+     nical Report, 2024. 2
+                                                                               with Large Language Model as Agent. In Computer Vision
+[26] Songyou Peng, Kyle Genova, Chiyu “Max” Jiang, An-                         – ECCV 2024, pages 58–76, Cham, 2025. Springer Nature
+     drea Tagliasacchi, Marc Pollefeys, and Thomas Funkhouser.                 Switzerland. 2
+     OpenScene: 3D Scene Understanding With Open Vocabular-               [38] Xinyi Wang, Na Zhao, Zhiyuan Han, Dan Guo, and Xun
+     ies. In Proceedings of the IEEE/CVF Conference on Com-                    Yang. AugRefer: Advancing 3D Visual Grounding via
+     puter Vision and Pattern Recognition, pages 815–824, 2023.                Cross-Modal Augmentation and Spatial Relation-based Re-
+     6                                                                         ferring. Proceedings of the AAAI Conference on Artificial
+[27] Zhipeng Qian, Yiwei Ma, Jiayi Ji, and Xiaoshuai Sun. X-                   Intelligence, 39(8):8006–8014, 2025. 7
+     RefSeg3D: Enhancing Referring 3D Instance Segmentation               [39] Yue Wang, Yongbin Sun, Ziwei Liu, Sanjay E. Sarma,
+     via Structured Cross-Modal Graph Neural Networks. Pro-                    Michael M. Bronstein, and Justin M. Solomon. Dynamic
+     ceedings of the AAAI Conference on Artificial Intelligence,               Graph CNN for Learning on Point Clouds. ACM Trans.
+     38(5):4551–4559, 2024. 2                                                  Graph., 38(5):146:1–146:12, 2019. 2
+[28] Zhipeng Qian, Yiwei Ma, Zhekai Lin, Jiayi Ji, Xiawu Zheng,           [40] Yuan Wang, Yali Li, and Shengjin Wang. Gˆ3-LQ: Marrying
+     Xiaoshuai Sun, and Rongrong Ji. Multi-branch Collaborative                Hyperbolic Alignment with Explicit Semantic-Geometric
+     Learning Network for 3D Visual Grounding. In Computer                     Modeling for 3D Visual Grounding. In Proceedings of
+     Vision – ECCV 2024, pages 381–398, Cham, 2025. Springer                   the IEEE/CVF Conference on Computer Vision and Pattern
+     Nature Switzerland. 1, 2, 6, 7                                            Recognition, pages 13917–13926, 2024. 1, 2, 6
+[29] Nikhila Ravi, Valentin Gabeur, Yuan-Ting Hu, Ronghang                [41] Zehan Wang, Haifeng Huang, Yang Zhao, Linjun Li, Xize
+     Hu, Chaitanya Ryali, Tengyu Ma, Haitham Khedr, Roman                      Cheng, Yichen Zhu, Aoxiong Yin, and Zhou Zhao. Distilling
+     Rädle, Chloe Rolland, Laura Gustafson, Eric Mintun, Junt-                Coarse-to-Fine Semantic Matching Knowledge for Weakly
+     ing Pan, Kalyan Vasudev Alwala, Nicolas Carion, Chao-                     Supervised 3D Visual Grounding. In Proceedings of the
+     Yuan Wu, Ross Girshick, Piotr Dollar, and Christoph Feicht-               IEEE/CVF International Conference on Computer Vision,
+     enhofer. SAM 2: Segment Anything in Images and Videos.                    pages 2662–2671, 2023. 6, 7
+     In The Thirteenth International Conference on Learning               [42] Abdelrhman Werby, Chenguang Huang, Martin Büchner,
+     Representations, 2024. 2, 4                                               Abhinav Valada, and Wolfram Burgard. Hierarchical Open-
+
+
+
+
+                                                                   9556
+     Vocabulary 3D Scene Graphs for Language-Grounded Robot                    Agent for Zero-Shot 3D Understanding. In Computer Vision
+     Navigation. In First Workshop on Vision-Language Models                   – ECCV 2024, pages 186–202, Cham, 2025. Springer Nature
+     for Navigation and Manipulation at ICRA 2024, 2024. 1                     Switzerland. 2
+[43] Changli Wu, Yiwei Ma, Qi Chen, Haowei Wang, Gen Luo,                 [54] Yachao Zhang, Yanyun Qu, Yuan Xie, Zonghao Li, Shan-
+     Jiayi Ji, and Xiaoshuai Sun. 3D-STMN: Dependency-                         shan Zheng, and Cuihua Li. Perturbed Self-Distillation:
+     Driven Superpoint-Text Matching Network for End-to-End                    Weakly Supervised Large-Scale Point Cloud Semantic Seg-
+     3D Referring Expression Segmentation. Proceedings of                      mentation. In Proceedings of the IEEE/CVF International
+     the AAAI Conference on Artificial Intelligence, 38(6):5940–               Conference on Computer Vision, pages 15520–15528, 2021.
+     5948, 2024. 2                                                             2
+[44] Dapeng Wu, Zhigang Yang, Puning Zhang, Ruyan Wang,                   [55] Yachao Zhang, Runze Hu, Ronghui Li, Yanyun Qu, Yuan
+     Boran Yang, and Xinqiang Ma. Virtual-Reality Interpromo-                  Xie, and Xiu Li. Cross-Modal Match for Language Condi-
+     tion Technology for Metaverse: A Survey. IEEE Internet of                 tioned 3D Object Grounding. Proceedings of the AAAI Con-
+     Things Journal, 10(18):15788–15809, 2023. 1                               ference on Artificial Intelligence, 38(7):7359–7367, 2024. 2
+[45] Yanmin Wu, Xinhua Cheng, Renrui Zhang, Zesen Cheng,                  [56] Yachao Zhang, Yuxiang Lan, Yuan Xie, Cuihua Li, and
+     and Jian Zhang. EDA: Explicit Text-Decoupling and Dense                   Yanyun Qu. Cross-Cloud Consistency for Weakly Super-
+     Alignment for 3D Visual Grounding. In Proceedings of                      vised Point Cloud Semantic Segmentation. IEEE Trans-
+     the IEEE/CVF Conference on Computer Vision and Pattern                    actions on Neural Networks and Learning Systems, 36(8):
+     Recognition, pages 19231–19242, 2023. 1, 2, 6                             14452–14463, 2025. 2
+[46] Can Xu, Yuehui Han, Rui Xu, Le Hui, Jin Xie, and Jian Yang.          [57] Lichen Zhao, Daigang Cai, Lu Sheng, and Dong Xu. 3DVG-
+     Multi-Attribute Interactions Matter for 3D Visual Ground-                 Transformer: Relation Modeling for Visual Grounding on
+     ing. In Proceedings of the IEEE/CVF Conference on Com-                    Point Clouds. In Proceedings of the IEEE/CVF International
+     puter Vision and Pattern Recognition, pages 17253–17262,                  Conference on Computer Vision, pages 2928–2937, 2021. 1,
+     2024. 1, 2                                                                2, 7
+[47] Runsen Xu, Zhiwei Huang, Tai Wang, Yilun Chen, Jiang-                [58] Ziyu Zhu, Xiaojian Ma, Yixin Chen, Zhidong Deng, Siyuan
+     miao Pang, and Dahua Lin. VLM-Grounder: A VLM Agent                       Huang, and Qing Li. 3D-VisTA: Pre-trained Transformer
+     for Zero-Shot 3D Visual Grounding. In Proceedings of                      for 3D Vision and Text Alignment. In Proceedings of the
+     The 8th Conference on Robot Learning, pages 3961–3985.                    IEEE/CVF International Conference on Computer Vision,
+     PMLR, 2025. 2, 3, 6, 7                                                    pages 2911–2921, 2023. 1, 2, 6
+[48] Jianing Yang, Xuweiyi Chen, Shengyi Qian, Nikhil Madaan,
+     Madhavan Iyengar, David F. Fouhey, and Joyce Chai. LLM-
+     Grounder: Open-Vocabulary 3D Visual Grounding with
+     Large Language Model as an Agent. In 2024 IEEE Inter-
+     national Conference on Robotics and Automation (ICRA),
+     pages 7694–7701, 2024. 6
+[49] Zhengyuan Yang, Songyang Zhang, Liwei Wang, and Jiebo
+     Luo. SAT: 2D Semantics Assisted Training for 3D Visual
+     Grounding. In Proceedings of the IEEE/CVF International
+     Conference on Computer Vision, pages 1856–1866, 2021. 1
+[50] Zhihao Yuan, Xu Yan, Yinghong Liao, Ruimao Zhang,
+     Sheng Wang, Zhen Li, and Shuguang Cui. InstanceRefer:
+     Cooperative Holistic Understanding for Visual Grounding on
+     Point Clouds Through Instance Multi-Level Contextual Re-
+     ferring. In Proceedings of the IEEE/CVF International Con-
+     ference on Computer Vision, pages 1791–1800, 2021. 1, 2,
+     7
+[51] Zhihao Yuan, Jinke Ren, Chun-Mei Feng, Hengshuang
+     Zhao, Shuguang Cui, and Zhen Li. Visual Programming for
+     Zero-shot Open-Vocabulary 3D Visual Grounding. In Pro-
+     ceedings of the IEEE/CVF Conference on Computer Vision
+     and Pattern Recognition, pages 20623–20633, 2024. 1, 2, 6,
+     7, 8
+[52] Tatiana Zemskova and Dmitry Yudin. 3DGraphLLM: Com-
+     bining Semantic Graphs and Large Language Models for 3D
+     Scene Understanding. In Proceedings of the IEEE/CVF In-
+     ternational Conference on Computer Vision, pages 8885–
+     8895, 2025. 5
+[53] Sha Zhang, Di Huang, Jiajun Deng, Shixiang Tang, Wanli
+     Ouyang, Tong He, and Yanyong Zhang. Agent3D-Zero: An
+
+
+
+
+                                                                   9557
+

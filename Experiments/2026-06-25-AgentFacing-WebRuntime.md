@@ -101,3 +101,9 @@ date_completed:
   - insight「Verifier/环境 oracle 正从 evaluator-only 扩展为 agent-facing runtime affordance」([[Workbench/memory/insights]]) — 直接支撑核心假设
   - insight「真实长程工作流远未饱和」([[Workbench/memory/insights]]) — 动机：runtime levers 是提升长程可靠性的杠杆
   - [[Ideas/AgentFacing-WebRuntime]] 自带 Risk Analysis（prompt-only baseline、RPA、verifier leak）已并入上方 Risk & Mitigation
+
+### 2026-06-26 证据更新（daily-papers 折叠）
+
+- **`observe_state()` / C3 Observe affordance 的工程参照**：[[Papers/2606-OpenRath]] 的 "Session-as-first-class-value"——把碎片化 runtime state（transcript / tool effects / sandbox / lineage / memory events）统一为可随程序值流动的 observable `Session`，正是 AFE "observe" affordance 在框架层的具体实现。可借其 `forward(session)->session` 契约设计 `observe_state()` 的返回 schema 与 state-diff；但 OpenRath 仅 technical report、无 benchmark，恰恰说明"暴露 observable state 的因果收益"尚未被实证——即本实验要回答的问题。
+- **memory affordance 的空白佐证**：[[Papers/2606-AgentMemorySystem]] 系统评测 12 个 agent memory 系统，但 workload 全为文本/DB、**完全无 GUI/CUA visual memory 场景**——反向印证 agent-facing memory/state 在 computer-use 环境仍是空白，强化本方向的 motivation。若 C3 Observe 成立，可考虑把 state-diff 记忆作为后续独立 affordance 扩展。
+- **不改主设计**：以上为 C3 Observe 的实现参照与 motivation 补强，C0–C7 对照结构与 falsification 检查（C2 dynamic-prompt / C2.5 evaluator-only）保持不变。

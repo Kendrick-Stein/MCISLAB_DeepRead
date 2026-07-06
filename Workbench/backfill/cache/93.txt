@@ -1,0 +1,1250 @@
+                                           HiF-VLA: Hindsight, Insight and Foresight through Motion Representation
+                                                            for Vision-Language-Action Models
+
+                                            Minghui Lin1 , Pengxiang Ding1,2† , Shu Wang1 , Zifeng Zhuang1,2 , Yang Liu1 , Xinyang Tong1 ,
+                                                        Wenxuan Song3 , Shangke Lyu4 , Siteng Huang2†B , Donglin Wang1,5B ,
+                                         1
+                                           Westlake University 2 Zhejiang University 3 HKUST(GZ) 4 Nanjing University 5 Westlake Robotics
+                                                                        linminghui@westlake.edu.cn,      siteng.huang@gmail.com
+                                                       https://hifvla.github.io           § https://github.com/OpenHelix-Team/HiF-VLA
+
+
+
+
+arXiv:2512.09928v2 [cs.RO] 9 Apr 2026
+                                                                                                       VLAs [19, 20, 35] implicitly assume a Markov property,
+                                                                   Abstract                            predicting actions solely from the current observation with-
+                                                                                                       out explicitly modeling temporal dependencies. This sim-
+                                        Vision-Language-Action (VLA) models have recently en-          plification leads to a form of temporal myopia. However,
+                                        abled robotic manipulation by grounding visual and lin-        long-horizon manipulation requires reasoning that extends
+                                        guistic cues into actions. However, most VLAs assume           beyond the present, maintaining temporal continuity across
+                                        the Markov property, relying only on the current observa-      visual, language, and motor modalities. Without such tem-
+                                        tion and thus suffering from temporal myopia that degrades     poral reasoning, dependencies between consecutive actions
+                                        long-horizon coherence. In this work, we view motion as a      deteriorate, resulting in fragmented trajectories and dimin-
+                                        more compact and informative representation of temporal        ished task-level coherence.
+                                        context and world dynamics, capturing inter-state changes
+                                        while filtering static pixel-level noise. From this perspec-       Recent efforts [26, 35, 54] have sought to alleviate this
+                                        tive, HiF-VLA equips a motion-centric world model for the      temporal myopia by incorporating historical context, most
+                                        VLA, enabling agents to reason about temporal dynam-           commonly by stacking multiple past observation frames.
+                                        ics for future evolution during action generation. Build-      However, this approach is fundamentally limited. Stack-
+                                        ing on this idea, we propose HiF-VLA (Hindsight, Insight,      ing raw frames is not only computationally prohibitive and
+                                        and Foresight for VLAs), a unified framework that lever-       increases inference latency, hindering real-time control (see
+                                        ages motion for bidirectional temporal reasoning. HiF-         Tab. 3), but it also introduces substantial pixel-level redun-
+                                        VLA encodes past dynamics through hindsight priors, antic-     dancy. This deluge of static information often obscures the
+                                        ipates future motion via foresight reasoning, and integrates   salient, task-relevant dynamics, making it difficult for the
+                                        both through a hindsight-modulated joint expert to enable      model to distinguish meaningful changes from background
+                                        a “think-while-acting” paradigm for long-horizon manip-        noise. We argue that a more precise and efficient represen-
+                                        ulation. As a result, HiF-VLA surpasses strong baselines       tation of history is not the raw visual content of the past, but
+                                        on LIBERO-Long and CALVIN ABC-D benchmarks, while              the motion that transpired between states. Motion serves as
+                                        incurring negligible additional inference latency. Further-    a direct and compact proxy for temporal memory and en-
+                                        more, HiF-VLA achieves substantial improvements in real-       vironment dynamics, faithfully capturing the dynamics of
+                                        world long-horizon manipulation tasks, demonstrating its       interactions (such as an object being moved or a drawer be-
+                                        broad effectiveness in practical robotic settings.             ing closed), while discarding redundant static information.
+                                                                                                       This makes motion an ideal primitive for representing his-
+                                                                                                       tory in a way that is both expressive and computationally
+                                        1. Introduction                                                efficient.
+                                                                                                          Building on the principle of motion as a compact repre-
+                                        Vision-Language-Action models (VLAs) [4, 15, 16, 19, 53,
+                                                                                                       sentation of history, we argue that robust decision-making
+                                        56] have emerged as a promising framework for robotic
+                                                                                                       requires bidirectional temporal reasoning, connecting the
+                                        manipulation, leveraging powerful Vision-Language Mod-
+                                                                                                       past to the future. An intelligent agent must possess hind-
+                                        els (VLMs) [1, 2, 10, 18, 34] to map visual and language
+                                                                                                       sight, the ability to interpret recent dynamics that led to its
+                                        representations to the action space. Despite progress, most
+                                                                                                       current state, grounding its decisions in verified past out-
+                                           † Project leads. B Corresponding authors.                   comes. At the same time, it must exhibit foresight, the
+                                                                                                        Ours
+                                                                                       Past
+                                                                                       Work
+
+
+          (a) Comparison with Existential Methods                                                                                              (b) Inference Process
+                                                                                                                          Input                                                     Output
+                             Chunk i-1         Chunk i            Chunk i+1                                   History Frames                   Current Observation      Predicted Subgoal         Actions
+                                                                                                frame t-3        frame t-2         frame t-1          frame t               frame t+n            𝑎𝑡 : 𝑎𝑡+𝑛       Redundancy
+                 T      O                  O                  O
+     Vanilla                                                                                                                                                                                                     Inefficiency
+      VLA
+ (e.g. OpenVLA-OFT)     A     A   A    A   A    A   A    A    A    A      A        A                                                                                                                             Unclear Structure
+                                                                                                               𝑯×𝑾×𝟑                                                                          [∆𝑥, ∆𝜃, ∆𝐺𝑟𝑖𝑝]
+                                                                                                            Video Encoding (e.g. H.264,MPEG-4)
+        VLA     T       O                  O                  O                                                                                                                                   𝑎𝑡 : 𝑎𝑡+𝑛
+   with History                                                                                                                                                                                                  Conciseness
+      Frames            A     A   A    A   A    A   A    A    A    A      A        A
+  (e.g. RoboVLMs)                                                                                                                                                                                                Efficiency
+                                                                                                    (𝑯//𝟏𝟔) × (𝑾//𝟏𝟔) × 𝟐                                                                     [∆𝑥, ∆𝜃, ∆𝐺𝑟𝑖𝑝]
+                                                                                                                                                                                                                 Clear Structure
+                 T      O                  O                  O                                               Hindsight                               Insight           𝑀𝑉𝑡:𝑡+𝑛
+       VLA
+  with Subgoal
+                                                                                                                                                                        Foresight        Joint
+  (e.g. CoT-VLA)        A     A   A    A   A    A   A    A    A     A     A        A                                                                     Hindsight
+                                                                                                                                                                         Action         Expert
+
+                            Hindsight + Insight + Foresight                                                                                (c) Strong Performance
+    HiF-VLA      T      O                  O                  O                                  Inference Latency                              LIBERO-Long                    Calvin ABC-D                       Real-world
+                                                                                                                       8×History                            96.4                            4.35                   (cover&stack)
+     (Ours)                                                                                                                                                                            4.28
+                                                                                                                                                       94.0                                                                57.9
+                        A     A   A    A   A    A   A    A    A    A      A        A
+                                                                                                  4×History                   -58.3%                                                    4.1
+                                                                                                              -29.3%                                  89.2                                                          33.3
+                          Current                                                                                                              87.7                           3.92
+          Task                                    Hindsight             Predicted
+      T                 O Observation                              A
+          Instruction                             or Foresight          Actions
+                          i.e. Insight                                                        Multi-frames History           HiF-VLA                                 OpenVLA-OFT
+                                                                                                                                                  Seer                                          𝝅𝟎              HiF-VLA (Ours)
+
+
+
+Figure 1. (a-b) Comparison with existing methods:系列VLAs      1    系列 2
+                                                                      rely on instantaneous observations [19, 20] (a-top), stack multiple past
+frames [26, 37] (a-second), or generate pixel-level subgoals
+                                                          2002/1/5 [49, 52] (a-third), suffering from redundancy, high inference cost, and weak
+                                                          80
+structure. In contrast, HiF-VLA (a-bottom) jointly models 60 Hindsight, Insight, and Foresight, expanding the temporal receptive field bidirec-
+
+tionally for compact, structured, and efficient reasoning.40 (c) HiF-VLA reduces inference latency and achieves state-of-the-art performance
+                                                          20
+on LIBERO-Long and CALVIN ABC-D, significantly outperforming
+                                                           0                the baseline in real-world experiments.
+                                                                        2002/1/7                   2002/1/6
+capability to anticipate plausible future dynamics, enabling                                                        Our main contributions are summarized as follows:
+proactive, goal-directed behavior rather than purely reac-                                                       • We propose HiF-VLA, a VLA framework endowed with
+tive responses. Such bidirectional reasoning over past and                                                         bidirectional spatio-temporal completion. By incorporat-
+future dynamics is also central to world models. We iden-                                                          ing motion vectors as structured, low-dimensional tempo-
+tify motion as the natural bridge unifying these two tem-                                                          ral primitives, HiF-VLA explicitly expands the temporal
+poral dimensions. Consequently, we propose HiF-VLA                                                                 receptive field, enabling temporally consistent and effi-
+(Hindsight, Insight, and Foresight for VLA Models), a                                                              cient action prediction while reducing redundancy.
+unified framework that leverages motion to structure this                                                        • We propose a hindsight-modulated joint expert that
+reasoning process. As detailed in Fig. 2, HiF-VLA com-                                                             unifies temporal and action representations within a uni-
+prises three components: 1) Hindsight prior acquisition:                                                           fied space, enabling a “think-while-acting” paradigm for
+encodes historical frames into structured, low-dimensional                                                         causally consistent and temporally coherent long-horizon
+motion vectors [17] as hindsight, preserving dynamics with-                                                        motion generation.
+out redundant pixels. 2) Foresight reasoning with in-                                                            • Extensive experiments demonstrate that our approach
+sight: interprets task instructions and current observations                                                       achieves substantial performance gains on widely
+to anticipate plausible foresight motions and latent action                                                        adopted long-horizon benchmarks, while exhibiting
+tokens. 3) Hindsight-modulated joint expert: applies                                                               strong temporal scalability and high inference efficiency.
+hindsight as a top-down constraint on foresight and action
+streams, which interact within the expert decoder to gen-                                                        2. Related Work
+erate temporally coherent actions. As shown in Fig. 1,
+                                                                                                                 Vision-Language-Action Models. VLA models learn end-
+compared to methods that rely solely on frame stacking
+                                                                                                                 to-end mappings from language instructions and visual ob-
+or subgoal prediction, HiF-VLA more effectively bridges
+                                                                                                                 servations to low-level actions. Prior works can be broadly
+perception, dynamics, and control within a unified repre-
+                                                                                                                 grouped by their action policies. Diffusion-based methods
+sentational space, forming a motion-centric World Action
+                                                                                                                 such as RDT-1B [27], CogACT [23], and DexVLA [40]
+Model [46]. This design enables an embodied “think-while-
+                                                                                                                 employ iterative denoising to synthesize continuous con-
+acting” paradigm, enhancing robustness, temporal continu-
+                                                                                                                 trol trajectories; autoregressive approaches like RT-2 [56]
+ity, and causal consistency in long-horizon manipulation
+                                                                                                                 and OpenVLA [19] discretize continuous actions into to-
+tasks.
+                                                                                                                 kens and predict them sequentially using VLM backbones;
+regression-oriented systems such as OpenVLA-OFT [20],                                                              During training, we augment the input with historical infor-
+VLA-Adapter [38] and SF [22] adopt bidirectional attention                                                         mation and jointly predict both the future n-step motion and
+to directly learn continuous actions via L1 regression. How-                                                       the corresponding actions. During inference, motion de-
+ever, most VLA models do not explicitly model temporal                                                             coding is optional and can be omitted depending on down-
+dependencies. They often neglect the importance of histor-                                                         stream task requirements.
+ical information and reasoning capabilities through VLMs,
+both of which have been shown to substantially improve
+                                                                                                                   3.2. Hindsight Prior Acquisition
+performance in long-horizon video tasks [9, 12, 32].
+Temporal Modeling and Inference in Robotics. Tem-                                                                  Relying solely on instantaneous visual observations for ac-
+poral modeling and foresight reasoning have been exten-                                                            tion decision-making often fails to provide stable percep-
+sively studied in long video understanding and generation,                                                         tion, especially under challenging conditions such as occlu-
+but remain relatively underexplored in robotic manipula-                                                           sion or repeated executions. Hence, capturing consistent
+tion. Existing approaches largely focus on one-sided rea-                                                          dynamic patterns of the manipulator from historical states
+soning. One line of work incorporates historical frames                                                            is critical. Existing approaches [8, 35, 37] typically main-
+as visual prompts within the VLM input context, as in                                                              tain a sliding window of past observations and concatenate
+TraceVLA [54], Octo [35], GR-2 [8], RoboVLMs [26]. An-                                                             them with the current observation to form a global repre-
+other emphasizes foresight by predicting future visual sub-                                                        sentation. However, this frame-stacking strategy introduces
+goals to guide action generation, such as CoT-VLA [52],                                                            significant redundancy: the high similarity between adja-
+Seer [37], UniVLA [39], and UP-VLA [49], which typically                                                           cent frames makes it difficult for the model to focus on task-
+condition an inverse dynamics model (IDM) on predicted                                                             relevant dynamics, potentially dispersing its attention.
+future subgoals to infer actions. However, frame-level his-
+                                                                                                                      To address this, we introduce a compressed historical
+torical encoding and pixel-level future prediction introduce
+                                                                                                                   prior: Motion Vectors (MVs) [17]. In video codec stan-
+substantial computational overhead and redundancy, while
+                                                                                                                   dards like H.264 [42] and MPEG-4 [21], MVs predict the
+failing to capture the importance of bidirectional tempo-
+                                                                                                                   displacements of macroblocks between adjacent frames to
+ral information. To address these, we propose HiF-VLA,
+                                                                                                                   avoid pixel-wise redundancy. Importantly, MVs are not a
+which efficiently unifies hindsight, insight, and foresight
+                                                                                                                   coarse approximation: combined with keyframes, they en-
+within a single framework, enabling temporally coordinated
+                                                                                                                   able near-lossless video reconstruction and maintain high
+decision-making for action generation.
+                                                                                                                   compression. This property provides a natural, efficient,
+3. Method                                                                                                          and faithful solution for capturing historical dynamics. For-
+                                                                                                                   mally, let (x, y) denote the position of a macroblock in an
+3.1. Preliminary                                                                                                   image (size H × W × 3). The motion vector is defined as:
+We begin by defining the setting and notation for VLA
+reasoning. Robot expert demonstrations are denoted as                                                                         MV_{t-1:t}(x,y)=(x_t-x_{t-1},y_t-y_{t-1}),     (3)
+Dr = (l, a1...T , o1...T ). At each time step t, the model re-
+ceives an observation ot and a textual instruction l, and the
+                                                                                                                   where (xt , yt ) and (xt−1 , yt−1 ) denote the positions of
+objective is to predict an action chunk at:t+n over a hori-
+                                                                                                                   the macroblock in consecutive frames ot and ot−1 . We
+zon of length n. A vanilla VLA Pθ [20] builds on vision-
+                                                                                                                   adopt MPEG-4 to extract keyframes and motion informa-
+language models (VLMs), learning from diverse manipula-
+                                                                                                                   tion, regarding the current observation ot at time step t
+tion demonstrations to transfer vision-language understand-
+                                                                                                                   as the keyframe, while maintaining a historical window of
+ing and generation capabilities to embodied scenarios. For-
+                                                                                                                   length m, forming GOP (Group of Pictures) units, GOP =
+mally:
+                                                                                                                   [M Vt−m:t−m+1 , ..., M Vt−2:t−1 , M Vt−1:t , ot ]. Here, MVs
+                  \tilde {a}_{t:t+n} \sim P_\theta \big (a_{t:t+n}\mid o_t, l\big ).  (1)
+                                                                                                                   follow the MPEG-4 16×16 macroblock layout and are rep-
+Our key insight is to expand the temporal receptive field                                                          resented as a tensor of size h × (H//16) × (W//16) × 2,
+available prior to action execution by compensating sparse                                                         compactly encoding the historical motion trajectories of en-
+visual observations. To this end, we propose HiF-VLA, as                                                           tities in the scene. Compared to raw frames, this representa-
+illustrated in Fig. 2, a unified framework built upon a vanilla                                                    tion significantly reduces redundancy while retaining task-
+VLA architecture, which incorporates compact historical                                                            relevant dynamics, thereby providing structured spatiotem-
+information prior mhis t−h:t of length h and additionally pre-                                                     poral priors to the decision layer.
+dicts future motion mt:t+n conditioned on the current in-
+                                                                                                                      Then, we adopt a lightweight ViT-based [11] hind-
+sight. Formally, the inference process can be expressed as:
+                                                                                                                   sight encoder, combined with shallow 3D convolutions, to
+                                                                                                                   encode hindsight motions into compact hindsight tokens
+     (\tilde {a}_{t:t+n},\tilde {m}_{t:t+n}){\sim }P_\theta '(a_{t:t+n},m_{t:t+n}|o_t,l,m_{t-h:t}^{his}).    (2)   Mh ∈ RKh ×d .
+                                  History Mvs    Current Observation              History Frames           Current
+                                                                                                           Observation         (c) Hindsight-Modulated
+                                                                                                                                      Joint Expert
+   (a) Hindsight
+                                                              Video Encoding                                                     Motions         Actions
+       Prior                                                   (e.g. H.264,
+                                                                 MPEG-4)
+    Acquisition
+                                                                                                                                   MLP             MLP
+                                                                                                                                 Modulation     Modulation
+                                 Task          Current       Foresight         Action                    Capture
+                             Instructions Observation/Insight Tokens           Tokens                    Observations
+                                                                                                                                      Joint Attention
+                                                                                                                                      Q      K     V
+  (b ) Foresight
+ Reasoning with                                                                                                                   Linear          Linear
+      Insight                                       VLM                                                                          Modulation     Modulation
+
+
+
+
+                                                                                                         Execute
+                                                                                                         Actions
+                                                                                                                                AdaLN             AdaLN
+ (c) Hindsight-                                              Action Prediction                     𝑎𝑡 : 𝑎𝑡+𝑛
+  Modulated                    Visual Hindsight                                                                      details           Hindsight
+  Joint Expert
+                                                              Visual Foresight                                                         Encoder
+                                                                                         𝑀𝑉𝑡:𝑡+𝑛
+
+
+Figure 2. HiF-VLA Pipeline. (a) In Hindsight Prior Acquisition (see Sec. 3.2), HiF-VLA encodes dense historical frame sequences into
+compact Motion Vector (MV) streams, forming structured hindsight primitives that capture temporal dynamics without pixel redundancy.
+(b) In Foresight Reasoning with Insight (see Sec. 3.3), the VLM interprets the task instruction and current observation to infer plausible
+foresight motions and corresponding latent action tokens. (c) Finally, the Hindsight-Modulated Joint Expert (see Sec. 3.4) fuses hindsight,
+foresight, and action representations within a unified latent space, producing temporally consistent and causally coherent action predictions.
+
+3.3. Foresight Reasoning with Insight                                          in foresight motion tokens Mf ∈ RKf ×d and action latent
+                                                                               tokens Af ∈ RKa ×d . Formally, the reasoning process can
+Beyond historical cues, foresight is equally critical for robot
+                                                                               be expressed as: (Mf , Af ) = Fθ (ot , l).
+tasks. It allows the agent to evaluate the consequences of
+                                                                                   We aim for the model to reason about visual foresight
+its actions before execution, promoting more reliable ac-
+                                                                               and action execution in parallel, and subsequently inte-
+tion decision-making. Existing approaches, such as CoT-
+                                                                               grate and refine information from these distinct reasoning
+VLA [52] and UP-VLA [49], achieve visual CoT reason-
+                                                                               streams. This design enriches the diversity of the VLM’s
+ing by generating future visual subgoals. However, these
+                                                                               internal thought process and unlocks the potential of paral-
+approaches depend on pixel-level predictions prone to lo-
+                                                                               lel reasoning.
+cal distortions and semantic drift. The resulting dense and
+redundant subgoals obscure task-relevant dynamics, while                       3.4. Hindsight-Modulated Joint Expert
+the reliance on discrete frame prediction (without continu-
+                                                                               Conventionally, the action expert receives high-level repre-
+ous temporal modeling) further undermines temporal con-
+                                                                               sentations from the VLM and translates them into low-level
+sistency in complex environments.
+                                                                               control signals. However, predicting actions in isolation
+    To address these limitations, we propose an efficient                      lacks reasoning about the future dynamics. Motion, as the
+foresight reasoning mechanism guided by current insight, as                    physical manifestation of actions in the visual space, pro-
+shown in Fig. 2(b). Instead of predicting raw future pixels,                   vides complementary information: jointly predicting both
+we employ more general and structured MVs as spatiotem-                        motion and actions enables VLA models to better align se-
+poral targets for future action execution. MVs compactly                       mantic understanding with underlying dynamics.
+encode the trajectory evolution of the manipulator within                         To achieve such synergistic reasoning, we propose the
+the scene, effectively reducing pixel redundancy while pro-                    Hindsight-Modulated Joint Expert, which jointly models
+viding a structured spatial prior.                                             action and motion as two complementary streams within
+    Specifically, we introduce Kf learnable foresight query                    a shared temporal latent space and where historical infor-
+                          f
+tokens {q1f , q2f , ..., qK f
+                              }, together with Ka empty action                 mation is introduced as a conditional prior to guide future
+           a a            a
+tokens {q1 , q2 , ..., qKa }, into the VLM embedding space.                    inference and suppress erroneous replay of historical trajec-
+These tokens are concatenated with the original inputs (in-                    tories. Importantly, we integrate historical motion priors as
+cluding the task instruction l, the current observation ot ),                  adaptive temporal conditions, rather than embedding them
+and then fed into VLM Fθ , enabling parallel reasoning over                    directly into the VLM input. Injecting extra history motion
+continuous visual dynamics and action generation, resulting                    into the VLM risks disrupting the established alignment be-
+tween visual and language modalities [51] (see Fig. 4). In-                                           tokens (hindsight, foresight, predicted action) are then fused
+stead, historical motion tokens Mh are encoded into a com-                                            via the Hindsight-Modulated Joint Expert.
+pact conditional representation and modulate the joint rea-                                           Training Objective. We now describe in detail how we
+soning process via Adaptive Layer Normalization (AdaLN)                                               train the model to predict both actions and motion. To
+conditioning, where layered modulation and regularization                                             ensure both action and motion predictions remain well-
+jointly constrain future motion-action patterns.                                                      calibrated, we define two L1-loss objectives:
+    Formally, we define three types of sequence represen-
+tations: hindsight motion tokens Mh ∈ RKh ×d (used
+                                                                                                        \mathcal {L}_{MV}=\frac {1}{n}\sum _{j=1}^n | m_{t+j}-\tilde {m}_{t+j}|, \mathcal {L}_{A}=\frac {1}{n}\sum _{j=1}^n |a_{t+j}-\tilde {a}_{t+j} |. 
+only as conditional input), foresight motion latent tokens
+Mf ∈ RKf ×d , and action tokens Af ∈ RKa ×d . As shown                                                                                                                                                                                           (6)
+in Fig. 2(c), the foresight motion tokens and action tokens                                                  The overall loss combines the two objectives:
+form two parallel streams, which interact via cross-stream
+joint attention while retaining separate FFNs to ensure com-                                                                                       \mathcal {L}_{all}=\mathcal {L}_A+\lambda \cdot \mathcal {L}_{MV},                            (7)
+plementary yet disentangled representations. The hindsight
+tokens Mh are projected through a linear layer to obtain the                                          where λ is a balancing factor between action accuracy and
+conditioning vectors hc , which is then injected into each                                            motion reconstruction quality, set to 0.01.
+joint expert module via AdaLN to modulate both foresight
+and action representations z ∈ {Mf , Af }:                                                            4. Experiments
+                \tilde {M}_f,\tilde {A}_f=\mathrm {Joint}\mathrm {Expert}(M_f,A_f\mid h_c),     (4)   In this section, we design experiments to address the fol-
+                                                                                                      lowing research questions (RQs):
+                                                                                                      RQ1: How does HiF-VLA perform compared to SOTA
+         \mathrm {AdaLN}(z;h_c)=\gamma (h_c)\cdot \frac {z-\mu (z)}{\sigma (z)}+\beta (h_c),    (5)   methods on challenging long-horizon benchmarks?
+                                                                                                      RQ2: Does HiF-VLA effectively mitigate the redundancy
+where σ(z) and µ(z) are the mean and standard deviation of                                            and inefficiency issues in conventional approaches?
+z, γ(hc ) and β(hc ) are modulation parameters from hc . The                                          RQ3: How well does HiF-VLA maintain inference scala-
+Joint Attention employs non-causal self-attention over a se-                                          bility as the temporal horizon increases?
+quence formed by concatenating Mf and Af , from which                                                 RQ4: Through ablation studies, how do different compo-
+Q, K, and V are jointly projected.                                                                    nents contribute to HiF-VLA’s overall performance?
+   Finally, the fused motion and action representations are                                           RQ5: Can HiF-VLA successfully handle long-horizon
+projected through their respective heads to generate the fu-                                          tasks on real-world robotic platforms?
+ture motions m̃t:t+n and the actions ãt:t+n . In general, the
+hindsight-modulated joint expert not only explicitly models                                           4.1. Overall Performance
+the complementary relationship between action and motion,                                             Experimental Setups. We evaluate HiF-VLA on two
+but also employs historical conditioning regularization to                                            long-horizon benchmarks. LIBERO-Long [25] comprises
+guide temporally consistent and physically plausible behav-                                           ten multi-subgoal manipulation tasks across diverse scenes.
+iors, thereby enhancing the stability and causal consistency                                          CALVIN ABC-D [28] includes four indoor environments
+of action.                                                                                            (A-D); policies are trained on A-C and evaluated on the un-
+                                                                                                      seen D to assess generalization on consecutive tasks. All ex-
+3.5. Unified HiF-VLA Model                                                                            periments are conducted under two settings following [20]:
+Input Representation. Following OpenVLA-OFT [20],                                                     a third-view setup using the primary camera, or a multi-
+we feed the current observation into both the DINOv2 [29]                                             view setup using both the primary and wrist cameras.
+and SigLIP [47] visual encoders to obtain a hybrid vi-                                                Implementation Details. We adopt Prismatic-7B [18] as
+sual embedding. At the same time, we initialize a set of                                              the VLM backbone, and initialize it with weights from
+learnable foresight motion queries and empty action tokens.                                           OpenVLA [19], which were pretrained on OXE [30]. All
+These tokens are concatenated with the instruction embed-                                             other modules are randomly initialized. Training is per-
+ding and the current observation embedding to form the                                                formed on 8 NVIDIA A100 GPUs with a global batch size
+multi-modal input sequence. In parallel, the historical mo-                                           of 64. A fixed temporal chunk of n=8 is adopted for both
+tion sequence is compressed via spatial-temporal convolu-                                             action and foresight modeling, while the hindsight window
+tion, aggregated by a ViT encoder, and projected into the                                             is variable (default 8). Fine-tuning is conducted for 150k
+latent space of the joint expert as the hindsight prior.                                              steps on LIBERO and 80k on CALVIN. The main baseline
+Parallel Decoding and Joint Expert. The VLM adopts a                                                  is OpenVLA-OFT [20], which shares the same pretrained
+non-causal attention mask, enabling joint prediction of fu-                                           initialization. Additional comparisons include Seer [37],
+ture motion latents and action latents. The three streams of                                          VPP [13], and π0 [4], etc.
+                                                                               Put mugs                Put mug                             Put mug
+                                Put soup     Put box    Turn on    Put bowl              Pick book                 Put soup     Put both
+                      Avg.                                                      on left                on plate,                              in
+Method                           and box    and butter stove and   in drawer             and place                 and sauce    pots on
+                      SR                                                       and right               pudding                             microwave
+                                in basket   in basket   put pot    and close             it in back                in basket     stove
+                                                                                plates                   right                             and close
+Policy inputs: third-view image, language instruction
+OpenVLA [19]          54.0        35.0        95.0       65.0        45.0        40.0       80.0           60.0      45.0        20.0        55.0
+UniVLA* [24]          63.0        64.0        82.0       76.0        96.0        58.0       98.0           24.0      74.0        32.0        26.0
+MemoryVLA [31]        93.4        92.0        96.0       96.0        100         100        100            96.0      96.0        62.0        96.0
+OpenVLA-OFT* [20]     91.0        82.0        96.0       96.0        94.0        90.0       96.0           92.0      100         70.0        94.0
+HiF-VLA(Ours)         94.4        94.0        98.0       100         100         94.0       100            90.0      98.0        76.0        94.0
+Policy inputs: third-person image, wrist-view image, language instruction
+Seer (scratch) [37]   78.7        80.0        90.0       91.7        81.7        85.0       65.0           86.7      88.3        51.7        66.7
+Seer [37]             87.7        91.7        90.0       98.3        100         91.7       93.3           85.0      88.3        61.7        71.7
+UniVLA* [24]          90.0        100         92.0       94.0        98.0        86.0       100            80.0      100         70.0        82.0
+OpenVLA-OFT* [20]     94.0        90.0        98.0       98.0        98.0        96.0       100            92.0      100         72.0        96.0
+HiF-VLA(Ours)         96.4        88.0        98.0       100         100         100        100            96.0      100         82.0        100
+
+Table 1. Performance comparison on the LIBERO-Long benchmark. We report the average success rate (%) across 10 tasks with “Avg.
+SR”. Results marked with “∗” were reproduced using the official open-source code. Bold indicates the best performance.
+
+Result Analysis. 1) LIBERO-Long: As shown in Tab. 1,                        Method                     1      2     3       4     5     Avg. Len. ↑
+we present the detailed performance of HiF-VLA across 10
+                                                                            Policy inputs: third-view image, instruction
+tasks in the LIBERO-Long benchmark. We evaluate both
+third-view and multi-view inputs over 500 trials. Compared                  SuSIE [5]                 87.0 69.0 49.0 38.0 26.0             2.69
+to the baseline third-view method, our approach achieves a                  OpenVLA [19]              91.3 77.8 62.0 52.1 43.5             3.27
+94.4% success rate, representing a 3.4% absolute improve-                   CLOVER [6]                96.0 83.5 70.8 57.5 45.4             3.53
+ment. Notably, our third-view variant performs on par with                  VPP [13]                  90.9 81.5 71.3 62.0 51.8             3.58
+multi-view baselines, underscoring HiF-VLA’s robust tem-                    π0 [4]                    93.7 83.2 74.0 62.9 51.0             3.65
+poral reasoning capability. Moreover, our method achieves                   UniVLA [7]                95.5 85.8 74.8 66.9 56.5             3.80
+a 96.4% success rate under the multi-view setting, con-                     HiF-VLA(Ours)             93.5 87.4 81.4 75.9 69.4             4.08
+sistently outperforming other state-of-the-art VLA models.
+                                                                            Policy inputs: third-person and wrist-view image, instruction
+2) CALVIN-ABC-D: We further evaluate the generaliza-
+tion capability of HiF-VLA, which was trained on the ABC                    GR-1 [44]        85.4 71.2 59.6 49.7 40.1                      3.06
+dataset and evaluated in the D environment. As shown in                     Vidman [41]      91.5 76.4 68.2 59.2 46.7                      3.42
+Tab. 2, our method surpasses the baseline by 0.25 in terms                  π0 [4]           93.8 85.0 76.7 68.1 59.9                      3.92
+of the average task length metric and achieves superior per-                UP-VLA [49]      92.8 86.5 81.5 76.9 69.9                      4.08
+formance under both third-view and multi-view settings.                     OpenVLA-OFT [20] 96.3 89.1 82.4 75.8 66.5                      4.10
+These results clearly answer RQ1. This improvement can                      RoboVLMs [26]    98.0 93.6 85.4 77.8 70.4                      4.25
+be attributed to the bidirectional temporal perception and                  Seer [37]        96.3 91.6 86.1 80.3 74.0                      4.28
+reasoning architecture incorporated in our model, which en-                 VPP [13]         96.5 90.9 86.6 82.0 76.9                      4.33
+ables a more effective understanding of long-term action de-                HiF-VLA(Ours)    98.5 94.1 88.1 81.4 73.1                      4.35
+pendencies and consequently leads to enhanced adaptability
+and robustness in complex long-horizon tasks.                               Table 2. Performance comparison on the CALVIN ABC-D bench-
+                                                                            marks. We report the average number of successfully completed
+4.2. Efficiency and Redundancy Analysis                                     tasks across five consecutive instructions. Bold indicates the best
+                                                                            performance.
+Experimental Setup. We conduct experiments exclusively
+on LIBERO-Long to evaluate the efficiency and redundancy                    based foresight and historical information, respectively. (6)
+aspects, and the results are presented in Tab. 3. For the base-             “+ Hindsight + Foresight (Ours)” integrates both types of
+line (1), we adopt the method proposed by [20]. (2) “+ Sub-                 Motion-based information simultaneously. Note that we
+goal” and (4) “+ History Frames” correspond to variants                     used third-person input, a hindsight length of 4, and a batch
+that incorporate RGB-based prediction and historical infor-                 size of 4 in all experiments.
+mation following [8, 52]. (3) “+ Foresight (Ours)” and (5)                  Result Analysis. As shown in Tab. 3(2) and (3), incor-
+“+ Hindsight (Ours)” denote variants that introduce Motion-                 porating subgoal or foresight prediction improves task suc-
+                                                                                                                                    94                          93.6                                               1500     Baseline+H-F-frames
+
+
+            Success R
+                                                                                                                       Success
+                        94                           93.6                                                                                93.2                              93.4
+
+                                                                                                                                                                                                                                                     Success R
+                                                                                                                                                                                                      Latency (m
+                                                                                                                                                                                                                                                                                                                                         Latency (
+                             93.2                               93.4                                                                                                                                                                                             94                                93.6
+                                                                                                                                                                                                                                                                                                                                                     1000
+                                                                                                                                    93                                                                                                                                     93.2                               93.4
+                        93                                                                                                                                                                                         1000
+                                                                                                                                                                                                                                                                 93
+                                                                                                                                    92
+                        92                                                                                                                                                                                                                                       92                                                                                  500
+                                                                                                                                                   Thrid-view     Multi-view                                       500
+                                        Thrid-view     Multi-view                                                                   91                                                                                                                                                Thrid-view     Multi-view
+                        91                                                                                                                  4          8           16          32                                                                                91
+                                4           8           16          32                                                                          Length of Hindsight                                                                                                           4           8           16          32                                   0
+                                                                                                                                                                                                                     0
+                                     Length of Hindsight                                                                                                                                                                                                                           Length of Hindsight                                                        0      4                 8         16   32
+                                                                                                                                                                                                                               0      4           8                   16          32
+                                                                                                                                                                                                                                                                                                                                                                     Length of Hindsight
+                                                                                                                                                                                                                                      Length of Hindsight
+
+
+
+
+                                                            Put the black bowl in the bottom drawer
+er
+                        98                                          of the cabinet and close it
+                                                                                                                                 98
+                                                                                                                                 2000                                                                                 2000
+                                                                                                                                                                                                                Decoder
+                                                                                                                                                                                                                Decoder
+                                                                                                                                                                          Put the black bowl in the bottom drawer Decoder                                        98                               Decoder
+                                                                                                                                                                                                                                                                                      HiF-VLA(ours)
+                                                                                                                                                                                                                                                                                                           Decoder
+                                                                                                                                                                                                                                                                                                           Decoder
+                                                                                                                                                                                                                                                                                                                                                                                        2000
+                                                      Third-view               Multi-view                                                                 Third-view of the
+                                                                                                                                                    HiF-VLA(ours)         Multi-view
+                                                                                                                                                                            cabinet and close
+                                                                                                                                                                                        OOMit                                                                                                Third-view    Multi-view                                OOM                                               HiF-VLA(o
+                                                                                                                                                    Baseline+His.-frames                                                                                                              Baseline+His.-frames                                                                                             Baseline+H
+                                         96.2                       96.4
+                                                                                                       96.0                                         96.2        96.4                     VLM
+                                                                                                                                                                                          VLM
+                                                                                                                                                                                           VLM
+                                                                                                                                                                                             96.0                                                                                      VLM
+                                                                                                                                                                                                                                                                                        VLM
+                                                                                                                                                                                                                                                                                         VLM
+                                                                                                                                                                                                                                                                                      96.2         96.4
+                                                                                                                                                                                                                                                                                      Baseline+His.+Subg.-frames
+                        96                                                         95.8                                          96
+                                                                                                                                 1500               Baseline+His.+Subg.-frames95.8                                                                       1500                                                                95.8                           96.0                                       Baseline+H
+                                                                                                                                                                                                                                                          96                                                                                                                            1500
+
+
+                                                                                                                  Success Rate(%)                                                                                                               Latency  (ms)
+     Success Rate(%)
+                                                                                                                                                                                                                                                                                                                                                                            Latency (ms)
+                                                                                                                                                                                                                                             Success Rate(%)
+                                                            94.4                                                                                                       94.4                                                                   94.4
+
+
+                                                                                                                     Latency (ms)
+                                                                                                                                 94                                                         Instruction
+                                                                                                                                                                                             Instruction 𝑀𝑀
+                                                                                                                                                                                                         𝑀
+                                                                                                                                                                                               Instruction      RGB 𝑀
+                                                                                                                                                                                                           ℎℎℎ RGB
+                                                                                                                                                                                                               RGB      𝐴𝑓
+                                                                                                                                                                                                                     𝑓𝑓𝑓𝐴
+                                                                                                                                                                                                                    𝑀𝑀       Instruction
+                                                                                                                                                                                                                         𝐴𝑓𝑓94
+                                                                                                                                                                                                                          1000Instruction  RGB 𝑀
+                                                                                                                                                                                                                               InstructionRGB
+                                                                                                                                                                                                                                          RGB  𝑀𝑀𝑓𝑓𝑓𝐴     𝑀
+                                                                                                                                                                                                                                                    𝐴𝐴𝑓𝑓𝑓 𝑀
+                                                                                                                                                                                                                                                          𝑀 ℎℎℎ
+                        94                                                     93.6
+                                                                                              93.4
+                                                                                                                                 1000 93.2                                                  93.6
+                                                                                                                                                                                                           93.4                                            93.6                                                                                                                         1000
+                                    93.2                                                                                                                                                                                            93.2                                                                                                         93.4
+                                                                    t-32                      t-16                                                                                    t-32                                t-16
+                        92                                                                                                       92
+                                                                                                                                  500                                                                                                                            500
+                                                                                                                                                                                                                                                                 92                                                                                                                            500
+                                                                                                                                                                                             To
+                                                                                                                                                                                             To
+                                                                                                                                                                                              ToVLM
+                                                                                                                                                                                                VLM
+                                                                                                                                                                                                 VLM                                                                                     92.8
+                                                                                                                                                                                                                                                                                         92.8
+                                                                                                                                                                                                                                                                                          92.8
+
+                        90                                                                                                       90 0                                                                                                                            90 0                                                                                                                            0
+                                         4                          8             16               32                                               40                     48                8To
+                                                                                                                                                                                              To
+                                                                                                                                                                                               16
+                                                                                                                                                                                               ToExpert
+                                                                                                                                                                                                 Expert
+                                                                                                                                                                                                    16 3232
+                                                                                                                                                                                                  Expert                                                                               40                    48        94.4
+                                                                                                                                                                                                                                                                                                                       94.4
+                                                                                                                                                                                                                                                                                                                         8
+                                                                                                                                                                                                                                                                                                                        94.416      16                  32 32                                              0
+                                                         Length of Hindsight                                                                                          Length
+                                                                                                                                                                    Length of of Hindsight
+                                                                                                                                                                              Hindsight                                                                                                                 Length
+                                                                                                                                                                                                                                                                                                       Length of of Hindsight
+                                                                                                                                                                                                                                                                                                                 Hindsight                                                                                         L
+                                                                    t-8                            t                                                                                  t-8                                  t
+                                                             (a) Historical Frame Example                                                                   (b) Inference Efficiency                                                                                                          (c) Effect of Hindsight
+
+                                            Figure 3. Effect of hindsight length on performance and Put         efficiency.     (a) Example of historical frames. (b) HiF-VLA maintains low inference
+er                       98                      Put the black bowl in the bottom drawer        2000
+                                                                                                98                  the black bowl in the bottom drawer
+                                                                                                         HiF-VLA(ours) of                                      98
+                                                                                                                                                              2000     HiF-VLA(ours)
+                                                                                                                                                                                                      2000                                                                                                                                                                                                 HiF-VLA
+                                            latency as of the
+                                                         hindsight      length
+                                                               cabinet and close itincreases. (c) Performance of  hindsight     of and
+                                                                                                                          the cabinetdifferent
+                                                                                                                                          close it lengths in third-view and multi-view perspectives.
+                                                                                                                                                       Baseline+H-frames                                                                                                                 Baseline+H-frames                                                                                                 Baseline+
+                                             96.2                       96.4                                                                                        96.4                                                                                                                  96.2        96.4
+                                                                                                        96.0                                           96.2
+                                                                                                                                                       Baseline+H-F-frames                                                     96.0                                                      Baseline+H-F-frames                                                 96.0 94.4
+                                                                                                                                                                                                                                                                                                                                                                  94.4
+                                                                                                                                                                                                                                                                                                                                                                   94.4                                    Baseline+
+                         96                                                            95.8                          96              1500                                                          95.8                                                           96
+                                                                                                                                                                                                                                                                 1500                                                             95.8                                                         1500
+                                                                                                               Peak GPU                                    Latency                    Avg.
+
+
+
+
+                                                                                                                                                                                                                                                                                                                                                                             Success Rate(%)
+                                                                                                                    SuccessRate(%)
+                                                                                                                   Success
+                                                                                                                                                                                                                                              Success Rate(%)
+                                                                                                                                                                                                                                              Success
+      Success Rate(%)
+                                                             Methods
+                                                                                                              Memory(GB) ↓                                  (ms) ↓                    SR↑                                                                              Decoder
+                                                                                                                                                                                                                                                                       Decoder
+                                                                                                                                                                                                                                                                        Decoder                                           Decoder
+                                                                                                                                                                                                                                                                                                                          Decoder
+                                                                                                                                                                                                                                                                                                                           Decoder
+
+
+
+
+                                                                                                                                                                                                                                                      Rate(%)
+                                                              94.4                                                                                                      94.4                                                                                                                               94.4                                              92.8
+                                                                                                                                                                                                                                                                                                                                                             92.8
+                                                                                                                                                                                                                                                                                                                                                              92.8
+
+
+
+                                                                                                                           Rate(%)
+                         94                     (1)          Baseline    93.6                                          1000 72.9 (1.00×)
+                                                                                                                        94
+                                                                                                               30.8 (1.00×)                                                            91.0 93.6                                               94
+                                                                                                                                                                                                                                              1000                                                                         93.6                                                                1000
+                                     93.2                                                     93.4                                                                                                                                                                                  93.2                                                             93.4
+                                                (2)          + Subgoal                                         38.2 (1.24×) 93.2
+                                                                                                                             115.9 (1.59×)                                             91.8                         93.4                  VLM
+                                                                                                                                                                                                                                          VLM
+                                                                                                                                                                                                                                           VLM                                                                    VLM
+                                                                                                                                                                                                                                                                                                                  VLM
+                                                                                                                                                                                                                                                                                                                   VLM                                                                                             T
+                                                                 t-32 (Ours)                  t-16                                                                                    t-32                            t-16
+                                                (3)          + Foresight                                       31.8 (1.03×)   82.7 (1.13×)                                             92.2
+                         92                                                                                                           500
+                                                                                                                                     92                                                                                                                           92
+                                                                                                                                                                                                                                                                  500                                                                                                                          500                 T
+                                                (4)          + History frames                                  63.6 (2.06×)                        229.5 (3.15×)                      90.4
+                                                (5)          + Hindsight (Ours)                                31.4 (1.02×)                        117.7 (1.61×)                      92.2                   Instruction
+                                                                                                                                                                                                              Instruction 𝑀
+                                                                                                                                                                                                                          𝑀𝑀
+                                                                                                                                                                                                                Instruction      RGB 𝑀
+                                                                                                                                                                                                                                RGB
+                                                                                                                                                                                                                            ℎℎℎ RGB  𝑀𝑓𝑓𝑓𝐴
+                                                                                                                                                                                                                                      𝑀  𝐴𝐴                  RGB 𝑀
+                                                                                                                                                                                                                                                Instruction RGB
+                                                                                                                                                                                                                                          𝑓𝑓𝑓 Instruction
+                                                                                                                                                                                                                                               Instruction  RGB  𝑀
+                                                                                                                                                                                                                                                                 𝑀   𝐴𝐴𝑓𝑓𝑓 𝑀
+                                                                                                                                                                                                                                                                  𝑓𝑓𝑓𝐴     𝑀
+                                                                                                                                                                                                                                                                           𝑀ℎℎℎ                                                                                      (b)
+                                                                                                                                                                                                                                                                                                                                                                (a) (b)
+                                                                                                                                                                                                                                                                                                                                                               (a)
+                                                                                                                                                                                                                                                                                                                                                              (a)     (b)
+                                                               Thrid-view             Multi-view                                                                          Thrid-view            Multi-view                                                                                                   Thrid-view      Multi-view
+                         90                                                                                             90 0                                                                                                              90 0                                                                                                                                                    0
+                                             4(6) + Hindsight
+                                                      8           16
+                                                              + Foresight     32
+                                                                          (Ours)                               32.2 (1.05×)                           0 (1.67×)4
+                                                                                                                                                   121.6
+                                                                                                                                                        4                         8
+                                                                                                                                                                                      93.2 8
+                                                                                                                                                                                                16 16
+                                                                                                                                                                                                                           (a)32
+                                                                                                                                                                                                                           32
+                                                                                                                                                                                                                               Injecting VLM
+                                                                                                                                                                                                                                                                                                    48       8 16 16
+                                                                                                                                                                                                                                                                                           40 (b) Conditioning Decoder                                      32
+                                                                                                                                                                                                                                                                                                                                                            (c) Results
+                                                                                                                                                                                                                                                                                                                                                               32                                           0
+                                                            Length of Hindsight                                                                                         Lengthof
+                                                                                                                                                                               ofHindsight
+                                                                                                                                                                                  Hindsight      t                       Length
+                                                                                                                                                                                                                         Length of Hindsight                                                                                                                                                                      L
+                                                      t-8
+                                            Table 3. Performance        t
+                                                                    comparison   between multi-frame baselines
+                                                                                                                                                                       Length t-8
+                                                                                                                                                                                            Figure 4. Performance comparison onofdifferent
+                                                                                                                                                                                                                                   Hindsighthindsight embed-
+
+                                            variants and HiF-VLA variants. Peak GPU memory (GB) during                                                                                                ding locations. (a) represents direct injection into the VLM, and
+                                            training and inference latency (ms) are reported. The history and                                                                                         (b) represents conditional embedding as an expert decoder. (c)
+                                            hindsight lengths are fixed to 4 for a fair and computationally fea-                                                                                      shows the performance of both on LIBERO-Long. Mh denotes
+                                            sible comparison across all methods.                                                                                                                      the hindsight tokens, Mf represents the foresight tokens and Af
+                                                                                                                                                                                                      is the action tokens.
+                                            cess rates; however, subgoal-based methods incur substan-
+                                            tial latency overhead (1.59× slower than the baseline). In                                                                                                inference runs on an NVIDIA A100 GPU and report the av-
+                                            contrast, our foresight head introduces negligible additional                                                                                             erage latency (defined as the time required to generate one
+                                            cost (0.13× latency and 0.03× GPU Memory). Moreover,                                                                                                      action chunk) in the LIBERO-Long simulation.
+                                            as illustrated in Tab. 3(4), dense multi-frame inputs signif-                                                                                             Results Analysis. As shown in Fig. 3b, the latency of
+                                            icantly slow down inference (229.5 ms, 3.15× slower than                                                                                                  multi-frame baselines increases almost linearly with the
+                                            the baseline) and even degrade performance, suggesting that                                                                                               length of history, reflecting their high computational sensi-
+                                            redundant pixel information dilutes task-relevant temporal                                                                                                tivity to frame stacking. For instance, at a history length
+                                            cues and may cause overfitting to visually irrelevant details.                                                                                            of 8, the baseline incurs over 4.5× higher latency com-
+                                            To address this, HiF-VLA replaces dense RGB inputs with                                                                                                   pared to the vanilla VLA. In contrast, HiF-VLA maintains
+                                            compact motion representations, allowing the model to fo-                                                                                                 a consistently low computational overhead across all con-
+                                            cus on dynamic and task-relevant cues, thereby improving                                                                                                  text lengths, with latency increasing only marginally as his-
+                                            both efficiency and accuracy. Furthermore, unified integra-                                                                                               tory grows, demonstrating superior scalability with respect
+                                            tion of hindsight and foresight further enhances overall per-                                                                                             to temporal context length, thereby directly addresses RQ3.
+                                            formance. These results highlight HiF-VLA’s clear advan-
+                                            tages in reducing redundancy and improving inference effi-                                                                                                4.4. Ablation Studies
+                                            ciency, effectively addressing RQ2.                                                                                                                       Experimental Setup. To address RQ4 regarding the opti-
+                                                                                                                                                                                                      mal integration of historical information, the effects of hind-
+                                            4.3. Inference Scalability                                                                                                                                sight length and historical embedding positions are investi-
+                                            Experimental Setup. We evaluate the inference efficiency                                                                                                  gated on the LIBERO-Long.
+                                            of HiF-VLA against two multi-frame baselines [20]: (i)                                                                                                    Hindsight Length. We examine the impact of hindsight
+                                            multi-frame extension with stacked past observations, and                                                                                                 length in both third-view and multi-view settings. As il-
+                                            (ii) multi-frame history combined with single-frame sub-                                                                                                  lustrated in Fig. 3c, the model achieves peak performance
+                                            goal prediction. For each model variant, we conduct 100                                                                                                   94.4% and 96.4% when the hindsight length is set to 8.
+                                               Place blocks on the plates.          Cover block and stack bowls.                 Press buttons in order.
+                           AgileX PiPER
+     Realsense D435        Robotic Arm
+     Scene Camera
+
+     USB Wrist
+     Camera
+
+
+                                                                                                                
+                                                                                                                                                       
+                                                                                                                                                
+                                                      62.5                                       33.3                                       17.4
+                                                                        65                                   57.9                                             34.2
+
+                                          61     62       63   64      65    66 0        20       40         60       80 0   5    10   15   20     25   30   35   40
+
+   (a) Robotic Arm Platform                                         (b) Performance of OpenVLA-OFT vs. HiF-VLA
+Figure 5. Real-world long-horizon tasks. (a) We deploy our system on the AgileX Piper robotic arm equipped with an external scene
+camera (Intel RealSense D435) and a wrist-mounted camera. (b) We design three long-horizon tasks covering diverse primitives such as
+                               Pick up the white block.
+pick, put, cover, stack, and press, emphasizing
+                               Put it on the        temporal consistency in action generation.
+                                              white plate.
+                                                
+                            Pick up the pink block.                          Pick up the green bowl.
+                            Put it on the pink plate.                        Cover the white block.
+                                                
+We believe, in the LIBERO-Long benchmark, most manip-                           ciate
+                                                                              Pick      time
+                                                                                    up the           As shown Press
+                                                                                                 states.
+                                                                                            pink bowl.                 the yellow button.
+                                                                                                                 in Fig.
+                                                                                                                Press        5(b),
+                                                                                                                       the blue  button.the baseline
+                                                                              Stack it on the green bowl.
+ulation sequences exhibit moderate temporal dependencies,                       model (OpenVLA-OFT) performs    Press the
+                                                                                                                     poorlypurple  button.these long-
+                                                                                                                                across
+where 8 hindsight lengths are sufficient to capture meaning-                    horizon tasks — for example, achieving only 17.4% success
+ful causal cues without introducing redundant information.                      on Press-Buttons-Order, often failing to complete required
+Hindsight Embedding Position. We study how the embed-                           button presses. This is likely due to the minimal visual dif-
+ding strategy of hindsight information affects model perfor-                    ference between pressed and unpressed states, making it
+mance. Specifically, we compare two variants: (i) naı̈vely                      difficult for the baseline to detect successful actuation. In
+concatenating hindsight with language and vision as direct                      contrast, HiF-VLA benefits from its broad temporal recep-
+inputs to the VLM, and (ii) conditioning hindsight within                       tive field, enabling reliable detection of subtle state transi-
+the expert module, which is adopted in our implementa-                          tions and robust execution of long-horizon tasks, resulting
+tion. As shown in Fig. 4, the expert-conditioned embedding                      in superior performance across real-world tasks.
+consistently achieves higher success rates than VLM-based
+embeddings. We attribute this to the fact that motion-based                     5. Conclusion
+hindsight may interfere with the pretrained alignment be-
+tween visual and language representations. In contrast, in-                     This work introduces HiF-VLA, an efficient and unified
+jecting hindsight at the decoding stage provides a more di-                     framework for temporal perception and reasoning built
+rect, residual-like path for motion information. This allows                    upon low-dimensional, structured motion vectors. By
+the low-level dynamics encoded in the hindsight to guide                        integrating hindsight, insight, and foresight cues, HiF-
+future action prediction without passing through, and poten-                    VLA establishes a bidirectional temporal expansion over a
+tially being corrupted by the VLM’s semantic fusion layers.                     sparse visual receptive field, enabling the robot to capture
+                                                                                task-critical dynamics at minimal computational cost and
+4.5. Real-world Experiments                                                     thereby improving temporal consistency and causal coher-
+                                                                                ence in long-horizon tasks. Across both simulated and real-
+Experiment setups. To evaluate the effectiveness of our                         world long-horizon manipulation benchmarks, HiF-VLA
+approach in real-world applications, we conduct real-world                      demonstrates strong performance. Limitations. The cur-
+experiments using the AgileX Piper robot. As shown in                           rent motion representation remains dependent on estima-
+Fig. 5(a), a RealSense D435 camera captures the scene from                      tion accuracy and may be sensitive to noise in highly dy-
+a third-view, while an additional USB camera is mounted                         namic scenes. We leave the exploration of large-scale pre-
+on the robot’s wrist for egocentric observations. We col-                       training on internet videos to enhance motion understanding
+lect three long-horizon tasks, each with 100 demonstrations                     and generation capabilities for future work.
+involving diverse manipulation primitives, including pick,
+place, stack, cover, and press.
+                                                                                Acknowledgements
+Real-world evaluation. For real-world environments, we
+train each model separately for every task and evalu-                           This work was supported by the National Science and Tech-
+ate performance by averaging success rates over 20 trials                       nology Major Project (Grant No. 2022ZD0208800) and the
+per task. These long-horizon tasks require the model to                         National Natural Science Foundation of China General Pro-
+maintain action consistency across stages, correctly asso-                      gram (Grant No. 62573362).
+References                                                              at scale. In Proceedings of the International Conference on
+                                                                        Learning Representations, 2021. 3, 1
+ [1] Jinze Bai, Shuai Bai, Yunfei Chu, Zeyu Cui, Kai Dang,         [12] Yuwei Guo, Ceyuan Yang, Ziyan Yang, Zhibei Ma, Zhi-
+     Xiaodong Deng, Yang Fan, Wenbin Ge, Yu Han, Fei                    jie Lin, Zhenheng Yang, Dahua Lin, and Lu Jiang. Long
+     Huang, et al. Qwen technical report. arXiv preprint                context tuning for video generation.         arXiv preprint
+     arXiv:2309.16609, 2023. 1                                          arXiv:2503.10589, 2025. 3
+ [2] Lucas Beyer, Andreas Steiner, André Susano Pinto, Alexan-    [13] Yucheng Hu, Yanjiang Guo, Pengchao Wang, Xiaoyu Chen,
+     der Kolesnikov, Xiao Wang, Daniel Salz, Maxim Neumann,             Yen-Jen Wang, Jianke Zhang, Koushil Sreenath, Chaochao
+     Ibrahim Alabdulmohsin, Michael Tschannen, Emanuele                 Lu, and Jianyu Chen. Video prediction policy: A generalist
+     Bugliarello, et al. PaliGemma: A versatile 3B VLM for              robot policy with predictive visual representations. In Pro-
+     transfer. arXiv preprint arXiv:2407.07726, 2024. 1                 ceedings of the International Conference on Machine Learn-
+ [3] Johan Bjorck, Fernando Castañeda, Nikita Cherniadev,              ing, 2025. 5, 6, 1
+     Xingye Da, Runyu Ding, Linxi Fan, Yu Fang, Dieter Fox,        [14] Chi-Pin Huang, Yueh-Hua Wu, Min-Hung Chen, Yu-
+     Fengyuan Hu, Spencer Huang, et al. Gr00t n1: An open               Chiang Frank Wang, and Fu-En Yang. ThinkAct: Vision-
+     foundation model for generalist humanoid robots. arXiv             language-action reasoning via reinforced visual latent plan-
+     preprint arXiv:2503.14734, 2025. 2                                 ning. In Proceedings of the Advances in Neural Information
+ [4] Kevin Black, Noah Brown, Danny Driess, Adnan Esmail,               Processing Systems, 2025. 2
+     Michael Equi, Chelsea Finn, Niccolo Fusai, Lachy Groom,       [15] Physical Intelligence, Kevin Black, Noah Brown, James
+     Karol Hausman, Brian Ichter, et al. π0 : A vision-language-        Darpinian, Karan Dhabalia, Danny Driess, Adnan Esmail,
+     action flow model for general robot control. arXiv preprint        Michael Equi, Chelsea Finn, Niccolo Fusai, et al. π0.5 : a
+     arXiv:2410.24164, 2024. 1, 5, 6, 2                                 vision-language-action model with open-world generaliza-
+ [5] Kevin Black, Mitsuhiko Nakamoto, Pranav Atreya,                    tion. arXiv preprint arXiv:2504.16054, 2025. 1
+     Homer Rich Walke, Chelsea Finn, Aviral Kumar, and Sergey      [16] Yuming Jiang, Siteng Huang, Shengke Xue, Yaxi Zhao,
+     Levine. Zero-shot robotic manipulation with pre-trained            Jun Cen, Sicong Leng, Kehan Li, Jiayan Guo, Kexiang
+     image-editing diffusion models. In Proceedings of the              Wang, Mingxiu Chen, Fan Wang, Deli Zhao, and Xin Li.
+     International Conference on Learning Representations,              RynnVLA-001: Using human demonstrations to improve
+     2024. 6                                                            robot manipulation. arXiv preprint arXiv:2509.15212, 2025.
+ [6] Qingwen Bu, Jia Zeng, Li Chen, Yanchao Yang, Guyue                 1
+     Zhou, Junchi Yan, Ping Luo, Heming Cui, Yi Ma, and            [17] Yang Jin, Zhicheng Sun, Kun Xu, Liwei Chen, Hao Jiang,
+     Hongyang Li. Closed-loop visuomotor control with gener-            Quzhe Huang, Chengru Song, Yuliang Liu, Di Zhang, Yang
+     ative expectation for robotic manipulation. In Proceedings         Song, et al. Video-LaVIT: Unified video-language pre-
+     of the Advances in Neural Information Processing Systems,          training with decoupled visual-motional tokenization. In
+     pages 139002–139029, 2024. 6                                       Proceedings of the International Conference on Machine
+ [7] Qingwen Bu, Yanting Yang, Jisong Cai, Shenyuan Gao,                Learning, 2024. 2, 3
+     Guanghui Ren, Maoqing Yao, Ping Luo, and Hongyang Li.         [18] Siddharth Karamcheti, Suraj Nair, Ashwin Balakrishna,
+     UniVLA: Learning to act anywhere with task-centric latent          Percy Liang, Thomas Kollar, and Dorsa Sadigh. Pris-
+     actions. arXiv preprint arXiv:2505.06111, 2025. 6, 2               matic VLMs: Investigating the design space of visually-
+ [8] Chi-Lam Cheang, Guangzeng Chen, Ya Jing, Tao Kong,                 conditioned language models. In Proceedings of the Inter-
+     Hang Li, Yifeng Li, Yuxiao Liu, Hongtao Wu, Jiafeng Xu,            national Conference on Machine Learning, 2024. 1, 5
+     Yichu Yang, et al. GR-2: A generative video-language-         [19] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao,
+     action model with web-scale knowledge for robot manipu-            Ashwin Balakrishna, Suraj Nair, Rafael Rafailov, Ethan Fos-
+     lation. arXiv preprint arXiv:2410.06158, 2024. 3, 6, 1             ter, Grace Lam, Pannag Sanketi, et al. OpenVLA: An
+ [9] Boyuan Chen, Diego Martı́ Monsó, Yilun Du, Max Sim-               open-source vision-language-action model. arXiv preprint
+     chowitz, Russ Tedrake, and Vincent Sitzmann. Diffusion             arXiv:2406.09246, 2024. 1, 2, 5, 6
+     Forcing: Next-token prediction meets full-sequence diffu-     [20] Moo Jin Kim, Chelsea Finn, and Percy Liang. Fine-tuning
+     sion. Proceedings of the Advances in Neural Information            vision-language-action models: Optimizing speed and suc-
+     Processing Systems, 37:24081–24125, 2024. 3                        cess. arXiv preprint arXiv:2502.19645, 2025. 1, 2, 3, 5, 6,
+[10] Xi Chen, Josip Djolonga, Piotr Padlewski, Basil Mustafa,           7
+     Soravit Changpinyo, Jialin Wu, Carlos Riquelme Ruiz, Se-      [21] Didier Le Gall. MPEG: A video compression standard for
+     bastian Goodman, Xiao Wang, Yi Tay, et al. On scaling up           multimedia applications. Communications of the ACM, 34
+     a multilingual vision and language model. Proceedings of           (4):46–58, 1991. 3
+     the IEEE/CVF Conference on Computer Vision and Pattern        [22] Fuhao Li, Wenxuan Song, Han Zhao, Jingbo Wang,
+     Recognition, pages 14432–14444, 2023. 1                            Pengxiang Ding, Donglin Wang, Long Zeng, and Haoang
+[11] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov,             Li. Spatial Forcing: Implicit spatial representation align-
+     Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner,                ment for vision-language-action model. arXiv preprint
+     Mostafa Dehghani, Matthias Minderer, Georg Heigold, Syl-           arXiv:2510.12276, 2025. 3, 2
+     vain Gelly, Jakob Uszkoreit, and Neil Houlsby. An image       [23] Qixiu Li, Yaobo Liang, Zeyu Wang, Lin Luo, Xi Chen,
+     is worth 16x16 words: Transformers for image recognition           Mozheng Liao, Fangyun Wei, Yu Deng, Sicheng Xu,
+     Yizhong Zhang, et al. CogACT: A foundational vision-          [35] Octo Model Team, Dibya Ghosh, Homer Walke, Karl
+     language-action model for synergizing cognition and action         Pertsch, Kevin Black, Oier Mees, Sudeep Dasari, Joey
+     in robotic manipulation. arXiv preprint arXiv:2411.19650,          Hejna, Tobias Kreiman, Charles Xu, et al.                Octo:
+     2024. 2                                                            An open-source generalist robot policy. arXiv preprint
+[24] Shuang Li, Yihuai Gao, Dorsa Sadigh, and Shuran                    arXiv:2405.12213, 2024. 1, 3, 2
+     Song.     Unified video action model.        arXiv preprint   [36] Zachary Teed and Jia Deng. Raft: Recurrent all-pairs field
+     arXiv:2503.00200, 2025. 6                                          transforms for optical flow. In Proceedings of the European
+[25] Bo Liu, Yifeng Zhu, Chongkai Gao, Yihao Feng, Qiang Liu,           Conference on Computer Vision, pages 402–419. Springer,
+     Yuke Zhu, and Peter Stone. LIBERO: Benchmarking knowl-             2020. 3
+     edge transfer for lifelong robot learning. In Proceedings     [37] Yang Tian, Sizhe Yang, Jia Zeng, Ping Wang, Dahua Lin,
+     of the Advances in Neural Information Processing Systems,          Hao Dong, and Jiangmiao Pang. Predictive inverse dynam-
+     pages 44776–44791, 2023. 5, 2                                      ics models are scalable learners for robotic manipulation.
+[26] Huaping Liu, Xinghang Li, Peiyan Li, Minghuan Liu, Dong            In Proceedings of the International Conference on Learning
+     Wang, Jirong Liu, Bingyi Kang, Xiao Ma, Tao Kong, and              Representations, 2025. 2, 3, 5, 6
+     Hanbo Zhang. Towards generalist robot policies: What          [38] Yihao Wang, Pengxiang Ding, Lingxiao Li, Can Cui, Zirui
+     matters in building vision-language-action models. arXiv           Ge, Xinyang Tong, Wenxuan Song, Han Zhao, Wei Zhao,
+     preprint arXiv:2412.14058, 2025. 1, 2, 3, 6                        Pengxu Hou, et al. VLA-Adapter: An effective paradigm for
+[27] Songming Liu, Lingxuan Wu, Bangguo Li, Hengkai Tan,                tiny-scale vision-language-action model. In Proceedings of
+     Huayu Chen, Zhengyi Wang, Ke Xu, Hang Su, and Jun Zhu.             the AAAI Conference on Artificial Intelligence, 2025. 3
+     RDT-1B: a diffusion foundation model for bimanual manip-      [39] Yuqi Wang, Xinghang Li, Wenxuan Wang, Junbo Zhang,
+     ulation. In Proceedings of the International Conference on         Yingyan Li, Yuntao Chen, Xinlong Wang, and Zhaoxi-
+     Learning Representations, 2025. 2                                  ang Zhang. Unified vision-language-action model. arXiv
+[28] Oier Mees, Lukas Hermann, Erick Rosete-Beas, and Wol-              preprint arXiv:2506.19850, 2025. 3
+     fram Burgard. CALVIN: A benchmark for language-               [40] Junjie Wen, Yichen Zhu, Jinming Li, Zhibin Tang, Chaomin
+     conditioned policy learning for long-horizon robot manip-          Shen, and Feifei Feng. DexVLA: Vision-language model
+     ulation tasks. IEEE Robotics and Automation Letters, 7(3):         with plug-in diffusion expert for general robot control. arXiv
+     7327–7334, 2022. 5                                                 preprint arXiv:2502.05855, 2025. 2
+[29] Maxime Oquab, Timothée Darcet, Théo Moutakanni, Huy         [41] Youpeng Wen, Junfan Lin, Yi Zhu, Jianhua Han, Hang Xu,
+     Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez,             Shen Zhao, and Xiaodan Liang. VidMan: Exploiting implicit
+     Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, et al.         dynamics from video diffusion model for effective robot ma-
+     DINOv2: Learning robust visual features without supervi-           nipulation. Proceedings of the Advances in Neural Informa-
+     sion. Transactions on Machine Learning Research, 2024. 5,          tion Processing Systems, 37:41051–41075, 2024. 6, 1
+     1                                                             [42] Thomas Wiegand, Gary J Sullivan, Gisle Bjontegaard, and
+[30] Abby O’Neill, Abdul Rehman, Abhiram Maddukuri, Ab-                 Ajay Luthra. Overview of the H. 264/AVC video coding
+     hishek Gupta, Abhishek Padalkar, Abraham Lee, Acorn Poo-           standard. IEEE Transactions On Circuits and Systems For
+     ley, Agrim Gupta, Ajay Mandlekar, Ajinkya Jain, et al. Open        Video Technology, 13(7):560–576, 2003. 3
+     X-Embodiment: Robotic learning datasets and RT-X models       [43] Hongtao Wu, Ya Jing, Chilam Cheang, Guangzeng Chen,
+     : Open X-Embodiment collaboration. In 2024 IEEE Interna-           Jiafeng Xu, Xinghang Li, Minghuan Liu, Hang Li, and
+     tional Conference on Robotics and Automation, pages 6892–          Tao Kong. Unleashing large-scale video generative pre-
+     6903. IEEE, 2024. 5                                                training for visual robot manipulation. arXiv preprint
+[31] Hao Shi, Bin Xie, Yingfei Liu, Lin Sun, Fengrong Liu, Tian-        arXiv:2312.13139, 2023. 1
+     cai Wang, Erjin Zhou, Haoqiang Fan, Xiangyu Zhang, and        [44] Hongtao Wu, Ya Jing, Chilam Cheang, Guangzeng Chen, Ji-
+     Gao Huang. MemoryVLA: Perceptual-cognitive memory                  afeng Xu, Xinghang Li, Minghuan Liu, Hang Li, and Tao
+     in vision-language-action models for robotic manipulation.         Kong. Unleashing large-scale video generative pre-training
+     arXiv preprint arXiv:2508.19236, 2025. 6, 2                        for visual robot manipulation. In Proceedings of the Interna-
+[32] Kiwhan Song, Boyuan Chen, Max Simchowitz, Yilun Du,                tional Conference on Learning Representations, 2024. 6
+     Russ Tedrake, and Vincent Sitzmann. History-guided video      [45] Jingjing Xu, Xu Sun, Zhiyuan Zhang, Guangxiang Zhao, and
+     diffusion. arXiv preprint arXiv:2502.06764, 2025. 3                Junyang Lin. Understanding and improving layer normaliza-
+[33] Jianlin Su, Murtadha Ahmed, Yu Lu, Shengfeng Pan, Wen              tion. Advances in neural information processing systems, 32,
+     Bo, and Yunfeng Liu. RoFormer: Enhanced transformer with           2019. 1
+     rotary position embedding. Neurocomputing, 568:127063,        [46] Seonghyeon Ye, Yunhao Ge, Kaiyuan Zheng, Shenyuan
+     2024. 1                                                            Gao, Sihyun Yu, George Kurian, Suneel Indupuru,
+[34] Gemini Team, Rohan Anil, Sebastian Borgeaud, Jean-                 You Liang Tan, Chuning Zhu, Jiannan Xiang, Ayaan Malik,
+     Baptiste Alayrac, Jiahui Yu, Radu Soricut, Johan Schalkwyk,        Kyungmin Lee, William Liang, Nadun Ranawaka, Jiasheng
+     Andrew M Dai, Anja Hauth, Katie Millican, et al. Gemini: a         Gu, Yinzhen Xu, Guanzhi Wang, Fengyuan Hu, Avnish
+     family of highly capable multimodal models. arXiv preprint         Narayan, Johan Bjorck, Jing Wang, Gwanghyun Kim, Dan-
+     arXiv:2312.11805, 2023. 1                                          tong Niu, Ruijie Zheng, Yuqi Xie, Jimmy Wu, Qi Wang,
+     Ryan Julian, Danfei Xu, Yilun Du, Yevgen Chebotar, Scott
+     Reed, Jan Kautz, Yuke Zhu, Linxi ”Jim” Fan, and Joel Jang.
+     World action models are zero-shot policies. arXiv preprint
+     arXiv:2602.15922, 2026. 2
+[47] Xiaohua Zhai, Basil Mustafa, Alexander Kolesnikov, and
+     Lucas Beyer. Sigmoid loss for language image pre-training.
+     In Proceedings of the IEEE/CVF International Conference
+     on Computer Vision, pages 11975–11986, 2023. 5, 1
+[48] Jiahui Zhang, Yurui Chen, Yueming Xu, Ze Huang, Yanpeng
+     Zhou, Yu-Jie Yuan, Xinyue Cai, Guowei Huang, Xingyue
+     Quan, Hang Xu, et al. 4d-vla: Spatiotemporal vision-
+     language-action pretraining with cross-scene calibration. In
+     Proceedings of the Advances in Neural Information Process-
+     ing Systems. 2
+[49] Jianke Zhang, Yanjiang Guo, Yucheng Hu, Xiaoyu Chen, Xi-
+     ang Zhu, and Jianyu Chen. UP-VLA: A unified understand-
+     ing and prediction model for embodied agent. arXiv preprint
+     arXiv:2501.18867, 2025. 2, 3, 4, 6
+[50] Wenyao Zhang, Hongsi Liu, Zekun Qi, Yunnan Wang,
+     Xinqiang Yu, Jiazhao Zhang, Runpei Dong, Jiawei He,
+     He Wang, Zhizheng Zhang, et al. DreamVLA: a vision-
+     language-action model dreamed with comprehensive world
+     knowledge. arXiv preprint arXiv:2507.04447, 2025. 2
+[51] Zongzheng Zhang, Haobo Xu, Zhuo Yang, Chenghao Yue,
+     Zehao Lin, Huan-ang Gao, Ziwei Wang, and Hao Zhao. Ta-
+     vla: Elucidating the design space of torque-aware vision-
+     language-action models. arXiv preprint arXiv:2509.07962,
+     2025. 5
+[52] Qingqing Zhao, Yao Lu, Moo Jin Kim, Zipeng Fu, Zhuoyang
+     Zhang, Yecheng Wu, Zhaoshuo Li, Qianli Ma, Song Han,
+     Chelsea Finn, Ankur Handa, Tsung-Yi Lin, Gordon Wet-
+     zstein, Ming-Yu Liu, and Donglai Xiang. CoT-VLA: Visual
+     chain-of-thought reasoning for vision-language-action mod-
+     els. In Proceedings of the IEEE/CVF Conference on Com-
+     puter Vision and Pattern Recognition, pages 1702–1713,
+     2025. 2, 3, 4, 6
+[53] Haoyu Zhen, Xiaowen Qiu, Peihao Chen, Jincheng Yang,
+     Xin Yan, Yilun Du, Yining Hong, and Chuang Gan. 3D-
+     VLA: A 3D vision-language-action generative world model.
+     In Proceedings of the International Conference on Machine
+     Learning, 2024. 1
+[54] Ruijie Zheng, Yongyuan Liang, Shuaiyi Huang, Jianfeng
+     Gao, Hal Daumé III, Andrey Kolobov, Furong Huang, and
+     Jianwei Yang. TraceVLA: Visual trace prompting enhances
+     spatial-temporal awareness for generalist robotic policies. In
+     Proceedings of the International Conference on Learning
+     Representations, 2025. 1, 3, 2
+[55] Zhide Zhong, Haodong Yan, Junfeng Li, Xiangchen Liu,
+     Xin Gong, Wenxuan Song, Jiayi Chen, and Haoang Li.
+     FlowVLA: Thinking in motion with a visual chain of
+     thought. arXiv preprint arXiv:2508.18269, 2025. 2
+[56] Brianna Zitkovich, Tianhe Yu, Sichun Xu, Peng Xu, Ted
+     Xiao, Fei Xia, Jialin Wu, Paul Wohlhart, Stefan Welker,
+     Ayzaan Wahid, et al. RT-2: Vision-language-action models
+     transfer web knowledge to robotic control. In Proceedings of
+     the Conference on Robot Learning, pages 2165–2183, 2023.
+     1, 2
+   HiF-VLA: Hindsight, Insight and Foresight through Motion Representation
+                    for Vision-Language-Action Models
+                                             Supplementary Material
+6. More Implementation Details                                       Motions         Actions
+
+Beyond the SigLIP [47] and DINOv2 [29] image encoders                  MLP             MLP
+
+and the Prismatic VLM [18] backbone described in the main            Modulation     Modulation
+
+
+text, we provide further additional implementation details                                                       Self-Attention
+                                                                          Joint Attention
+for the two core modules used in HiF-VLA: the Hindsight                   Q      K     V
+                                                                                                     q   q            k   k           v   v
+Encoder and the Hindsight-Modulated Joint Expert. These               Linear          Linear
+details complement the high-level description given in the           Modulation     Modulation
+                                                                                                                              RoPE
+                                                                                                      RoPE
+main text.
+                                                                                                     q       k    v           q   k       v
+
+6.1. Hindsight Encoder                                             AdaLN              AdaLN
+
+We employ a 4-layer Vision Transformer (ViT) [11] as the                   Hindsight             Hindsight-Modulated Joint
+hindsight motion encoder. The hindsight motion sequence                    Encoder                         Expert
+of length h is first partitioned into (h//2) × (H//2) ×
+(W//2) spatiotemporal blocks using a 3D convolution,
+which simultaneously reduces temporal redundancy and            Figure 6. Architecture of the hindsight-modulated joint expert.
+preserves local motion continuity. These blocks, together
+with an additional [CLS] token that aggregates global tem-
+poral context, are fed into the Transformer. The resulting
+historical features are subsequently projected via a linear    7. Comparison with Video-Generation VLAs
+layer into the joint expert embedding space, ensuring di-
+mensional compatibility with the foresight and action path-
+ways. This design allows the hindsight encoder to provide      Compared to VLA approaches that rely on video genera-
+structured historical priors that can effectively regularize   tion [8, 13, 41, 43], our method differs fundamentally in
+downstream decision-making.                                    how it models temporal dynamics. A large body of recent
+                                                               work [8, 13, 41, 43] employs general-purpose video genera-
+6.2. Hindsight-Modulated Joint Expert                          tive models to predict future frames, using these predictions
+                                                               either for inverse dynamics computation or as conditional
+The hindsight-modulated joint expert serves as the fusion      representations to assist action policy generation. While
+module that integrates hindsight, foresight, and action rep-   these approaches have made substantial progress, they face
+resentations. All tokens are projected into a shared embed-    some limitations when contrasted with HiF-VLA, which
+ding dimension of 1024, including: hindsight motion to-        leverages sparse motion representations.
+kens from the hindsight encoder, foresight motion tokens
+and latent action tokens produced by the VLM backbone.             Specifically, video-generation-based methods typically
+Within this space, the hindsight tokens serve as adaptive      require multi-frame historical input and high-resolution fu-
+conditioning signals that modulate both foresight and ac-      ture video synthesis, resulting in substantial computational
+tion streams via AdaLN [45] scaling and shifting. This         overhead. Moreover, pixel-level prediction is prone to local
+conditioning mechanism allows the model to dynamically         artifacts and distortions, introducing uncontrollable noise.
+adjust its predictions based on temporally grounded histor-    In contrast, HiF-VLA replaces video-level temporal mod-
+ical cues, enabling causal alignment between past observa-     eling with low-dimensional, structured motion representa-
+tions and future behavior. Positional information is pro-      tions, enabling a more efficient and stable way to encode
+vided through Rotary Positional Embedding (RoPE) [33],         historical visual states and predict future dynamics. In ad-
+allowing efficient encoding of both spatial and temporal or-   dition, HiF-VLA, by jointly predicting foresight motion
+dering. The joint expert consists of 6 Transformer layers,     and action trajectories as two complementary information
+each capable of cross-stream attention, enabling the model     streams, allows the model to anticipate how the physical
+to capture complementary relationships between predicted       world may evolve while generating the corresponding ac-
+dynamics and actions.                                          tions—effectively enabling thinking while acting.
+            Methods            LIBERO-Spatial         LIBERO-Object        LIBERO-Goal        LIBERO-Long         Average
+        TraceVLA [54]                  84.6                  85.2                75.1               54.1            74.8
+           Octo [35]                   78.9                  85.7                84.6               51.1            75.1
+        CoT-VLA [52]                   81.1                  87.5                91.6               87.6            69.0
+       SpatialVLA [22]                 88.2                  89.9                78.6               55.5            78.1
+        ThinkAct [14]                  88.3                  91.4                87.1               70.9            84.4
+           Seer [37]                    -                     -                   -                 87.7            87.7
+        FlowVLA [55]                   93.2                  95.0                91.6               72.6            88.1
+         4D-VLA [48]                   88.9                  95.2                90.9               79.1            88.6
+       DreamVLA [50]                   97.5                  94.0                89.5               89.5            92.6
+         CogACT [23]                   97.2                  08.0                90.2               88.8            93.2
+            π0 [4]                     96.8                  98.8                95.8               85.2            94.2
+        GR00T N1 [3]                   94.4                  97.6                93.0               90.6            93.9
+          UniVLA [7]                   96.5                  96.8                95.6               92.0            95.2
+       MemoryVLA [31]                  98.4                  98.4                96.4               93.4            96.5
+      OpenVLA-OFT [20]                 97.6                  98.4                97.9               94.5            97.1
+       HiF-VLA(ours)                   98.8                  99.4                97.4               96.4            98.0
+
+Table 4. Performance on the LIBERO benchmark. The table compares our method against a wide range of state-of-the-art approaches,
+with the best performance highlighted in bold.
+
+
+          Ablation                   Parameters       SR            ness and general applicability across diverse task scenarios.
+                                          0.1        94.4
+          Foresight Motion               0.05        95.2           8.2. More Hyper-parameters Ablation
+    (a)
+          Loss Weight λ                  0.01*       96.4           The Impact of Weight Factor λ. The hyperparameter λ
+                                         0.001       95.6           balances the contributions between foresight motion pre-
+                                           2         95.2           diction and action prediction. To systematically investigate
+                                           4         95.6           this trade-off, we evaluate a range of λ values. Our anal-
+    (b)   Joint Expert Depth
+                                          6*         96.4           ysis reveals that an appropriate weighting allows the mo-
+                                           8         95.2           tion prediction to effectively support the model’s reason-
+                                                                    ing, thereby enhancing planning capabilities; however, an
+                                         (8,8)*      96.4
+          Length:                                                   unsuitable value destabilizes the VLA architecture and im-
+    (c)                                  (8,16)      94.6
+          (Hindsight, Foresight)                                    pedes policy generation. Our results in Tab. 5(a) identify an
+                                        (16,16)      95.2
+                                                                    optimal performance point at λ = 0.01. This key finding
+                                                                    indicates that a modest, well-calibrated contribution from
+Table 5. Ablation on hyper-parameters. * denotes the submission
+setting. (multi-view)
+                                                                    the motion-prediction branch is essential for achieving bal-
+                                                                    anced and robust model behavior.
+                                                                       Depth of the Joint Expert. We investigated the opti-
+8. More Experimental Results                                        mal interaction depth within the Joint Expert by performing
+                                                                    an ablation study over depths of {2, 4, 6, 8} (see Tab. 5(b)).
+8.1. Comprehensive Evaluation on the LIBERO                         We observed that a depth of 6 yields the best performance.
+     Benchmark                                                      Shallower networks facilitate the interaction between mo-
+We report detailed evaluation results on all four suites of the     tion and action modalities, whereas increasing the depth fur-
+LIBERO benchmark [25] and compare our method against                ther yields negligible performance gains, indicating depth is
+a broad set of baseline models, as summarized in Tab. 4.            not highly critical beyond moderate depth.
+While achieving its greatest margin of superiority under the           Foresight and Foresight Horizon. In Tab. 5 bottom,
+most challenging LIBERO-Long suite, HiF-VLA also de-                increasing foresight to n = 16 hurts performance due to
+livers competitive or superior performance across the re-           error accumulation in long-term prediction. In contrast, ex-
+maining three suites when compared to prior state-of-the-art        tending hindsight to 16 (keeping foresight at 16) improves
+approaches. As a result, HiF-VLA attains the best average           results by providing richer context, supporting our choice to
+performance over all four suites, demonstrating its robust-         decouple hindsight and foresight lengths.
+         Ablation                        Variant        SR         We further investigate whether the ordering of motion and
+                                                                   action tokens affects performance. Since bidirectional at-
+                                         S+M            92.6       tention provides a global receptive field within each seg-
+         Motion or State as
+   (a)                                    S+S           92.0       ment, the token order should not influence the learned rep-
+         (Hindsight+Foresight)
+                                         M+M*           94.4       resentation. Consistent with this expectation, swapping the
+                                     Causal-[M|A]       87.4       token order (M|A → A|M) results in less than 0.5% perfor-
+   (b)   Causal or Bidirectional      Bi-[A|M]          94.0       mance change.
+                                      Bi-[M|A]*         94.4
+                                                                      Different Motion Representations. We further study
+                                          Flow          94.2
+   (c)   Motion Representation                                     the impact of different motion representations by replac-
+                                          MVs           94.4
+                                                                   ing motion vectors (MVs) with optical flow, as reported
+                                                                   in Tab. 6(c). Optical flow provides dense motion estima-
+Table 6. Ablation on different variants. M: Motion, S: State, A:
+                                                                   tion and serves as a commonly used alternative motion cue.
+Action. * denotes the submission setting. (third view)
+                                                                   Specifically, optical flow is estimated using RAFT [36]. The
+                                                                   results show that both representations achieve nearly iden-
+8.3. More Variants Ablation                                        tical success rates, indicating that the HiF architecture is
+                                                                   robust to the specific choice of motion representation. This
+State replaces motion. To better understand the role               suggests that the performance gains primarily stem from the
+of motion representations, we conduct an ablation study            proposed modeling framework rather than a particular mo-
+replacing codec motion vectors (M) with robot proprio-             tion signal. However, the two representations differ signifi-
+ceptive states (S). This experiment is motivated by the            cantly in computational cost. Computing optical flow intro-
+observation that motion vectors might appear to primar-            duces substantial preprocessing overhead. With a 4-frame
+ily reflect robot arm movement. If this were the case,             history, flow-based inference requires 186.8 ms, whereas
+robot states—which explicitly encode the robot config-             our MV-based approach takes only 121.6 ms. The efficiency
+uration—should provide similar information and lead to             gap becomes larger when the history length increases, re-
+comparable performance. However, motion vectors de-                sulting in up to a 78% reduction in latency overhead with
+scribe inter-frame visual changes and therefore capture not        MVs for 8-frame histories. These results indicate that mo-
+only robot motion but also the visual consequences of in-          tion vectors provide a more efficient motion representation
+teractions with the environment, such as object displace-          while maintaining comparable performance.
+ment, contact-induced motion, or changes in scene struc-
+ture. These effects are not fully observable from proprio-
+ceptive signals alone. As shown in Tab. 6(a), replacing mo-
+tion vectors with robot states (M+M → S+S) leads to a clear                  0.06
+                                                                                                                 w/o action prediction
+performance drop. This result indicates that motion vectors
+                                                                                                                 w/ action prediction
+provide complementary dynamic information beyond robot                       0.05
+states and play an important role in capturing interaction-
+                                                                             0.04
+
+                                                                   L1 Loss
+driven visual dynamics.
+   Bidirectional Interaction vs. Causal Separation. To                       0.03
+evaluate the benefit of joint foresight–action modeling, we
+compare our design with a decoupled variant that removes                     0.02
+the bidirectional interaction between motion and action to-
+                                                                             0.01
+kens. In this variant, motion and action tokens are processed
+using causal attention and decoded with separate predic-
+                                                                                    0   5k          10k          15k            20k
+tion heads. This modification preserves parallel computa-
+                                                                                                 Training Step
+tion but prevents motion and action representations from
+interacting during inference. In contrast, our Joint Expert        Figure 7. Convergence of the foresight-motion L1 loss during
+employs bidirectional attention to model motion and ac-            training. The curve “w/o action prediction” corresponds to a vari-
+tion synchronously, allowing the two representations to in-        ant where the action-prediction branch is removed and only the
+fluence each other during the forward pass. As shown in            foresight-motion pathway is trained. The curve “w/ action pre-
+Tab. 6(b), the decoupled causal variant achieves a success         diction” represents the full HiF-VLA architecture, where both
+rate of 87.4%, whereas our joint formulation improves per-         streams in the joint expert (foresight motion and action) are re-
+formance to 94.4%. This result suggests that enabling bidi-        tained.
+rectional interaction between foresight motion and action
+representations is important for effective decision making.
+8.4. Analysis of “Think-while-Acting” Paradigm                   ity in multi-step sequential reasoning, spatial relation un-
+                                                                 derstanding, and long-horizon dependency modeling. The
+Foresight Motion Prediction. To more comprehen-
+                                                                 explicit hierarchical dependency structure (cover −  → stack)
+sively evaluate the interaction between foresight motion
+                                                                 makes it an effective test for the model’s capacity to handle
+and action prediction, we additionally removed the action-
+                                                                 layered object interactions and long-term constraints.
+prediction branch and trained the model using only the mo-
+                                                                    Press buttons in order. The robot must press three col-
+tion prediction pathway. We then compared the evolution of
+                                                                 ored buttons in a specified order. This task assesses the
+the motion L1 loss during training, as shown in Fig. 7. The
+                                                                 model’s ability to distinguish visually similar states, main-
+results indicate that incorporating action prediction leads
+                                                                 tain correct action ordering, and perform time-sensitive de-
+to faster convergence and a noticeably more stable train-
+                                                                 cision making. Because pre-press and post-press observa-
+ing curve for motion prediction. This indicates that the ac-
+                                                                 tions can look visually similar, the task naturally introduces
+tion branch provides effective complementary information
+                                                                 visual ambiguity and demands strong historical information
+to the motion branch, enabling a synergistic interaction be-
+                                                                 integration and temporal reasoning.
+tween the two. Such coupling supports the model’s ability
+to reason about future dynamics while simultaneously mak-        9.3. Real-World Execution Visualization
+ing action decisions—thereby achieving a genuine “think-
+while-acting” capability.                                        Fig. 9 provides visualizations of HiF-VLA’s rollout across
+    Foresight and Action Prediction Visualization. We            the real-world tasks. The figure presents the model’s gener-
+present qualitative visualizations of the foresight motion       ated actions at key time steps. As shown, HiF-VLA demon-
+predictions and action predictions across several tasks in       strates stable behavior planning capabilities in real oper-
+the LIBERO-Long dataset, as shown in Fig. 8. The vi-             ation: in the block-grasping task, the robot consistently
+sualizations demonstrate how our model’s anticipated mo-         maintains reliable object recognition and performs precise
+tion sequences closely align with its generated action plans.    grasp-and-place actions; in the multi-step bowl covering
+Across diverse long-horizon tasks, this close alignment en-      and stacking task, the system robustly executes cross-object
+sures that the agent’s actions are consistently grounded in a    sequential operations and preserves coherent action struc-
+coherent forecast of future states. This visually corroborates   ture throughout stages with clear hierarchical dependen-
+that HiF-VLA maintains temporal coherence and success-           cies; in the button-pressing task, the model correctly distin-
+fully executes the proposed “think-while-acting” paradigm        guishes between visually similar states and adheres to the
+by dynamically adapting its policy based on foresighted rea-     required action order. These visualizations illustrate that
+soning.                                                          HiF-VLA exhibits robust visual understanding, coherent ac-
+                                                                 tion organization, and strong execution of long-horizon task
+9. Real-World Experiments                                        structures in real scenarios, thereby validating its reliability
+                                                                 in performing complex manipulation tasks.
+9.1. Real-World Experimental Setup
+                                                                 9.4. Failure Cases
+We evaluate our method on a series of long-horizon real-
+world tasks using an AgileX Piper robot, which is equipped       Despite HiF-VLA outperforming in both simulation bench-
+with a 6-DoF manipulator and a 1-DoF gripper. A single In-       marks and real-world experiments, several failure cases still
+tel RealSense D435 camera provides third-person observa-         occur, as shown in Fig. 10. In the first task, the model pre-
+tions, while an additional USB wrist-mounted camera pro-         maturely opened the gripper based on an incorrect spatial
+vides egocentric input. Data are collected at 20 Hz. All         judgment, resulting in a placement failure. In the second
+models are trained under the standard HiF-VLA configura-         task, the stacking failed because the robotic arm did not lift
+tion and deployed on a single NVIDIA RTX 4090 GPU.               the bowl to an appropriate height. In the third task, an erro-
+                                                                 neous depth estimation caused the gripper to descend insuf-
+9.2. Task Descriptions                                           ficiently, leading to an incomplete button press.
+                                                                     These failure modes highlight the critical role of spatial
+Place blocks on the plates. The robot must place the white
+                                                                 geometry and 3D perception. They suggest that future work
+block onto the white tray and the pink block onto the pink
+                                                                 may benefit from integrating richer 3D representations into
+tray. This task primarily evaluates the model’s basic visual
+                                                                 our framework to further enhance robustness in real-world
+recognition ability and precise object placement. Its clear
+                                                                 manipulation.
+goal structure and low action complexity make it suitable
+for assessing whether the model can reliably establish accu-
+rate observation–action mappings in simple environments.
+   Cover block and stack bowls. The robot first covers a
+white block with a green bowl and then stacks a pink bowl
+on top of the green one. This task stresses the model’s abil-
+           Task: put both the alphabet soup and the cream cheese box in the basket.
+
+
+
+
+  (a)
+
+
+
+
+           Task: put the white mug on the plate and put the chocolate pudding to the right of the plate.
+
+
+
+
+  (b)
+
+
+
+
+           Task: put both moka pots on the stove.
+
+
+
+
+  (c)
+
+
+
+
+Figure 8. Example rollouts of three tasks in LIBERO-Long, illustrating the close alignment between the predicted foresight motion and
+the observed action execution over a short inference window.
+          (a) Place blocks on the plates.
+
+
+
+
+        (b) Cover block and stack bowls.
+
+
+
+
+                             Failed to place!
+           (c) Press buttons in order.
+Figure 9. Example rollouts of real-world tasks.
+
+
+
+
+                             Failed to place!     Failed to press!
+
+
+
+
+          (a) Place blocks on the plates.
+
+                              Failedto
+                                     toplace!
+                                       stack!     Failed to press!
+                             Failed
+
+
+
+
+        (b) Cover block and stack bowls.
+                              Failed to stack!
+                                                  Failed to press!
+
+
+
+
+           (c) Press buttons in order.
+ Figure 10. Failure cases of real-world tasks.
+                             Failed to stack!
+

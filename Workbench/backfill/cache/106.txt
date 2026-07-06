@@ -1,0 +1,1044 @@
+                                                 Spatial-Temporal Graph Diffusion Policy with Kinematic Modeling for
+                                                                   Bimanual Robotic Manipulation
+
+                                                      Qi Lv1,2,3      Hao Li1,3 Xiang Deng1† Rui Shao1 Yinchuan Li3 Jianye Hao3
+                                                                       Longxiang Gao4 Michael Yu Wang2 Liqiang Nie1†
+                                                               1
+                                                                 Harbin Institute of Technology (Shenzhen) 2 Greate Bay University
+                                                                  3
+                                                                    Huawei Noah’s Ark Lab 4 Shandong Computer Science Center
+
+
+
+
+arXiv:2503.10743v1 [cs.RO] 13 Mar 2025
+                                                                     lvqi@stu.hit.edu.cn, dengxiang@hit.edu.cn
+
+
+
+                                                                    Abstract
+
+                                         Despite the significant success of imitation learning in
+                                         robotic manipulation, its application to bimanual tasks
+                                         remains highly challenging. Existing approaches mainly
+                                         learn a policy to predict a distant next-best end-effector
+                                         pose (NBP) and then compute the corresponding joint rota-
+                                         tion angles for motion using inverse kinematics. However,
+                                                                                                                                       Self-Collision
+                                         they suffer from two important issues: (1) rarely consider-
+                                         ing the physical robotic structure, which may cause self-
+                                         collisions or interferences, and (2) overlooking the kine-            Figure 1. The self-collision problem in bimanual manipulation
+                                         matics constraint, which may result in the predicted poses            tasks due to overlooking the robotic structure.
+                                         not conforming to the actual limitations of the robot joints.
+                                         In this paper, we propose Kinematics enhanced Spatial-                plex tasks requiring two-arm coordination. While imitation
+                                         TemporAl gRaph Diffuser (KStar Diffuser). Specifically,               learning has demonstrated remarkable success in single-arm
+                                         (1) to incorporate the physical robot structure information           manipulation [6, 7, 34, 37? ], its extension to bimanual
+                                         into action prediction, KStar Diffuser maintains a dynamic            scenarios faces unique challenges as robots need to coor-
+                                         spatial-temporal graph according to the physical bimanual             dinate dual-arm movements while conforming to physical
+                                         joint motions at continuous timesteps. This dynamic graph             constraints. These challenges significantly impact the reli-
+                                         serves as the robot-structure condition for denoising the ac-         ability and feasibility of predicted actions in real-world ap-
+                                         tions; (2) to make the NBP learning objective consistent              plications.
+                                         with kinematics, we introduce the differentiable kinematics               A straightforward approach [9, 10, 13, 60, 61, 65] would
+                                         to provide the reference for optimizing KStar Diffuser. This          be to learn the entire motion trajectory by predicting joint
+                                         module regularizes the policy to predict more reliable and            positions at consecutive timesteps. However, this poses sig-
+                                         kinematics-aware next end-effector poses. Experimental re-            nificant challenges as trajectories are typically long and dif-
+                                         sults show that our method effectively leverages the physi-           ficult to learn. Therefore, mainstream approaches [15, 17,
+                                         cal structural information and generates kinematics-aware             35, 49] typically adopt a two-stage pipeline: first predict-
+                                         actions in both simulation and real-world.                            ing the next-best end-effector pose (NBP), then computing
+                                                                                                               joint rotations through inverse kinematics [21, 26]. How-
+                                                                                                               ever, the dominant NBP-based approaches, though simplify
+                                         1. Introduction                                                       the learning process, often lead to unreliable motion gener-
+                                                                                                               ation. Concretely, the predicted poses may violate physical
+                                         Bimanual manipulation [38, 40, 47, 50] represents a fun-
+                                                                                                               structure constraints [27, 48], causing potential arm colli-
+                                         damental capability for robotic systems to perform com-
+                                                                                                               sions, or exceeding joint limits due to inadequate consider-
+                                            ∗ This work was done when Qi Lv and Hao Li were intern at Huawei   ation of kinematic feasibility, as Figure 1 illustrated.
+                                         Noah’s Ark Lab. † Corresponding author                                    In real-world bimanual manipulation tasks, existing ap-
+proaches [9, 15, 17, 49, 64] exhibit significant limitations      to guide the diffusion process, ensuring that the generated
+in motion execution despite their promising performance in        motions satisfy both structural and kinematic constraints.
+trajectory prediction. Empirical observations indicate that       Our main contributions are as follows:
+while individual end-effector poses are feasible in isola-        • Different from existing approaches that optimize end-
+tion, their concurrent execution frequently results in inter-       effector poses solely in Cartesian space, we propose a
+arm collisions [48] and kinematically infeasible configura-         novel spatial-temporal robot graph that explicitly models
+tions [35, 39]. The fundamental challenge lies in the op-           the robot physical configuration to guide the generative
+timization of end-effector poses exclusively in Cartesian           action denoising procedure.
+space, which introduces a substantial discrepancy between         • We introduce a kinematics regularizer that augments the
+motion prediction and physical constraints. Existing ap-            NBP learning objective by introducing joint-space su-
+proaches [9, 10, 17] incorporate proprioception information         pervision. This regularizer leverages forward kinematics
+in a simplistic manner, (e.g., gripper rotation angles [17, 49]     to provide kinematically-feasible reference poses, effec-
+and end-effector poses [53]), but disregarding the robot’s          tively guiding the diffusion process to conform to kine-
+intrinsic structural properties e.g., the kinematic chain and       matic constraints.
+joint configurations during the prediction phase. This over-      • Extensive experiments show that our proposed KStar Dif-
+simplified representation fails to capture the crucial spatial      fuser is superior in both simulation and real-world scenar-
+correlations between robotic arms, joint links, and their po-       ios, surpassing baselines more than 10% in success rate.
+tential interactions. Consequently, the predicted dual-arm
+trajectories may satisfy task objectives in Cartesian space       2. Related Work
+while violating crucial spatial constraints during execution.     Diffusion Models in Bimanual Robotic Controls. Dif-
+   Moreover, the conventional paradigm [17, 24, 49, 51] of        fusion models such as Denoising Diffusion Probabilistic
+treating inverse kinematics as a post-processing procedure        Models (DDPM) [19] have achieved great success in the
+introduces additional complexities. The disjunction be-           fields of image generation [43, 44, 46] and video genera-
+tween kinematic constraints and the pose prediction learn-        tion [41, 55, 66]. Thus, recent work [8, 45, 52, 57, 67] has
+ing objective often yields solutions that exhibit apparent        been devoted to applying its powerful generation capabili-
+smoothness in Cartesian space while manifesting discon-           ties to action generation for robotic manipulation tasks in
+tinuous or mechanically infeasible trajectories in the joint      a imitation learning mode. With the 2D images [9, 30–
+space. This limitation becomes particularly pronounced in         32, 35, 45, 52, 54, 62, 63] or 3D point cloud observa-
+configurations approaching kinematic singularities or joint       tions [8, 20, 23, 60, 61], the policy is trained to output the
+limits, where the mapping between Cartesian and joint             action sequence of joint positions or end-effector poses by
+spaces becomes ill-conditioned. These inherent limitations        iterative denoising process.
+necessitate the integration of both structural and kinematic          Bimanual manipulation tasks, which resemble human-
+constraints into the policy learning framework.                   like actions more closely, have garnered increasing atten-
+    To address the above issues, we propose Kinematics            tion [10, 14, 17, 33, 65]. However, existing research pri-
+enhanced Spatial-TemporAl gRaph Diffuser (KStar Dif-              marily extends single-arm manipulation methods to dual-
+fuser), a novel framework that explicitly incorporates both       arm tasks [10, 65], without considering about the distinct
+robot structures and kinematics into the bimanual motion          challenges specific to bimanual settings. The relative inde-
+generation process. Our key insight is that the physi-            pendence of the two arms makes it essential to consider self-
+cal structure and kinematic properties of the robot should        collision avoidance [1, 3] when predicting actions. In prac-
+guide the learning process of pose prediction, rather than be     tice, the robot’s structure significantly influences its motion
+treated as independent post-processing constraints. Specif-       since the joint types determine movement directions and
+ically, (1) to incorporate structural awareness, we con-          joint angles constrain the range of motion. Although some
+struct a dynamic spatial-temporal graph from the robot’s          studies [15, 49, 53] integrate proprioception in robotic con-
+URDF specifications, where nodes represent joint prop-            trol, they often use simply low-dimensional vectors to rep-
+erties and edges capture both spatial relations and tem-          resent body information, lacking depth in structural explo-
+poral dependencies. This graph structure is encoded via           ration and overlooking critical spatial relationships between
+Graph Convolutional Network (GCN) [25] to provide ex-             dual arms. Therefore, we study the physical structure infor-
+plicit physical constraints for the diffusion process; (2)        mation of the dual-arm robot system, and improve both the
+for kinematic feasibility, we regularize the NBP learn-           accuracy and adaptability of robotic movements.
+ing objective by incorporating joint-space prediction, where      Robotic Kinematics Modeling. Robotic kinematics
+the predicted joint positions are mapped to reference end-        modeling [2, 16, 35, 58, 59] is a classic problem in the
+effector poses through differentiable forward kinematics.         robotic control [4, 18, 36, 56] where inverse kinematics
+These kinematically-feasible poses then serve as conditions       (IK) presents a fundamental challenge, i.e., deriving the
+joint configuration given the end-effector pose. The inher-        Robotic Kinematics. Robotics kinematics describes the
+ent non-uniqueness of IK solutions as a significant obstacle       relationship between the robot joints and its end-effector. It
+for learning algorithms [12, 22], often produce inaccurate         can be divided into forward kinematics and inverse kinemat-
+models by averaging over nonconvex feasible sets. Recent           ics for controlling robot movements.
+advancements integrate neural solutions [11, 28, 29]                   (1) Forward Kinematics (FK): Given a specific configu-
+to enhance the adaptability and precision of kinematic             ration of joint angles, i.e., θ = [θ1 , θ2 , . . . , θn ] ∈ Θ, it aims
+models. Bócsi et al. [5] leveraged support vector machines        to construct a function fFK : Rn → SE(3), computing the
+to parameterize quadratic programs, aligning solutions             end-effector position and orientation that are represented as
+with IK in specific workspace regions. Current data-driven         a pose matrix T ∈ SE(3).
+imitation learning approaches [10, 13, 15, 17, 65] primarily                                                    Yn
+                                                                          F K(θ) = T ∈ T , where T =                       Ti (θi ), (5)
+rely on probabilistic modeling of action distributions to pre-                                                      i=1
+dict subsequent actions, but lack the reliability guarantees       where Ti (θi ) is the homogeneous transformation matrix for
+from the aspect of kinematics. In this paper, we construct a       joint i, and T means the task space. Θ ∈ Rn denotes the
+spatial-temporal graph to learn the robot physical represen-       configuration space, while the configuration refers to the
+tation, and provide a kinematics-awared latent end-effect          specific arrangement of the robotic joints in a given pose.
+embedding for diffusion policy as guidance. In this way,              (2) Inverse Kinematics (IK): In contrast, IK aims to
+o‘ur approach enhances the robot’s ability to perform tasks        find the joint configurations which achieve a desired end-
+with superious precision and adaptability.                         effector pose. It is defined as a mapping fIK : SE(3) → Rn
+                                                                   from the task space T to the set of possible configurations
+3. Method                                                          Θ that satisfy the given pose matrix T:
+3.1. Preliminary                                                                  IK(T ) = {θ ∈ Θ|F K(θ) = T}.                       (6)
+Diffusion Policy. Chi et al. [9] propose the diffusion pol-        It is noted that this mapping is often non-unique, especially
+icy which represents a robot’s visuomotor policy as a condi-       for redundant manipulators with more than 6 DoF.
+tional denoising diffusion process. It learns a model distri-
+                                                                   3.2. Task Definition
+bution πϕ (a0 |o) conditioned on observation o to approxi-
+mate joint distribution q(a0 ). The whole procedure consists       Given the dataset D with language instructions l and the
+of a forward process and a reverse process.                        RGB-D observations o, we aim to learn a policy πϕ (a|o, l)
+   (1) Forward Process: For the Markov chain with Gaus-            which predicts actions a. Here, a is composed of a tra-
+sian transitions parameterized, the policy πϕ (a0 |o) learns a     jectory ajoint = {a0 , a1 , . . . , aT } and gripper opening
+fixed inference procedure q(ak |a0 ):                              or closing action agripper , where T denotes the trajectory
+                           Z                                       length and ai ∈ Rn . n represents the number of robot
+                                                                   joints. In the bimanual manipulation, n is usually to be 12
+            q(ak |a0 ) =    q(a1:k |a0 )da1:(k−1)
+                                                            (1)    or 14 as each robot arm has 6 or 7-DoF. Referring to prior
+                            √                                      works [15, 17, 49, 64], it is inefficient to train the policy on
+                   = N (ak ; αk a0 , (1 − αk )I)
+                                                                   all trajectory points. Thus, a keyframe discovery method is
+                                                                                                                           Kξ
+Thus, ak can be expressed as a linear combination of a0 and        used to extract a set of Kξ keyframe indices {ki }i=0        and
+a noise variable ϵ:                                                the prediction actions are the key set of end-effector poses
+                        √             √                            aEE .
+                 ak =       αk a0 +       1 − αk ϵ          (2)
+                                                                   3.3. KStar Diffuser
+The training loss is obtained:                                     3.3.1. Overview
+                                                                   Mainstream methods [17, 23, 65] train a policy to predict
+ L = Ea0 ∼q(a0 ),ϵk ∼N (0,I),k ||ϵk , πϕ (a0 + ϵk , o, k)||2
+                                                            
+                                                                   actions, but take little consideration about the mechanical
+                                                             (3)   robot structure which determines its motion. We thus pro-
+where ϵk is the random noise sampling at k iteration.              pose a spatial-temporal graph to model both the static phys-
+   (2) Reverse Process: Starting from a sample aK ∼                ical structure and dynamic history movement information.
+N (0, I), the reverse steps are:                                   In addition, to reduce kinematically infeasible predictions
+                p                            p                     for the end-effector pose, we introduce a differentiable kine-
+       ak−1 =       αk−1 πϕ (ak , k, o) +     1 − αk−1 ϵ.   (4)    matics module that provides kinematics-aware references to
+                                                                   the policy network. The overview of our proposed Kine-
+By the iterative denoising process, the policy generates a0        matics enhanced Spatial-TemporAl gRaph Diffuser (KStar
+as its next action. The continuous predicted action sequence       Diffuser) is shown in Figure B.
+forms the complete action trajectory.
+                                                                                                                                                    J14                         J12
+                                                                                                                                                                  J13
+
+
+
+
+ Robot Architecture
+                                                             J13                                                                              J5                                      J11
+                                                      J14                 J12                                                  J3
+                                                                                                                                                                          J10
+                                                                                  J11
+                                                                                                                          J2
+                                                                                                                                         J4          J6                                                                      t=1
+
+                                                                                                                                                                                                                                         Spatial-Temporal
+                                                                                                                                                                               J9
+                                       J5
+
+                                                                                         Spatial Graph
+                            J3                                           J10                                                   J1                     J7
+                                                                                                                                                                               J8
+                                  J4        J6                                                                                                                                                              𝑓$!
+                       J2                                           J9                                                                                     …                                            …                    …
+                                                                                         Construction
+                                                                                                                                                                                                                                          Graph Encoder
+                                                 J7                                                                                                                      J12          J11
+                             J1                                    J8                                                                                              J13
+                                                                                                                                               J5
+                                                                                                                                    J3
+                                                                                                                                         J4           J6                              J10                                    t=n
+                                  𝒥𝑜𝑖𝑛𝑡𝑠 = joint!, joint", …                                                              J2                                       J14
+                                                                                                                                                                                J9
+                      ℒ𝑖𝑛𝑘𝑠 = { joint#, joint! , joint!, joint" , … }                                                           J1                   J7
+                                                                                                                                                                                J8                      𝑓$%
+                                                                                                                                                                                                                                                                     layer 1                     …          layer m
+
+
+                                                                                                                                                                                                                                                                                      𝐇%                               ℒ &&
+                                                                                                                                                                                                                                        left                                                         right ee pose
+
+
+
+
+ Multiview RGB-D
+                                                                         Lx                                                                                                                                             𝜃%
+
+                                                                                                                                                                                                 𝜃#                                                                  𝐇$
+
+
+
+
+                                                                                                                                                     Differentiable FK
+                                                                                                                                                                                                                                 𝜃'
+                                                                                                                                                                                                                                                              MLP
+                                                                         Conv2D
+                                                        Image
+                                                                                                                                                                                                       𝜃$
+
+
+
+
+                                                                                                         Joint Decoder
+                                                                                                                                                                                                                                                                             Diffusion head
+                                                                                  FiLM
+                                                                                                                                                                           𝜃"
+                                                                                                                                                                                                                        𝜃&
+                                                       Encoder
+                                                                                                                                                                                            𝜃!
+                                                                                                                                                                                                                                                            𝑎" ∼
+                                                                                                                                                                                                                                                            𝒩(0,1)
+
+                                                                                                                                                                                                                                                                          with Cross Attention
+                                                                                                                                                                                                             𝜃!"
+                                                                                                                                                                                                                                                                                                     left ee pose
+                                                                                                                                                                                             𝜃!$                                 𝜃!*
+                                                             Text                                                                                                                                                        𝜃!!
+                                                            Encoder                                                      ℒ !"#$%                                                                                  𝜃!#
+                                                                                                                                                                                                                                          𝜃)
+                                                                                                                                                                                                                                                                                                         transition token
+                                                                                                                                                                                                                                                                                                         rotation token
+                                                                                                                                                                 right                                                             𝜃(
+Instruction:                           pick up the laptop                                                                                                                                                                                                                             𝐇#                 gripper open token
+
+
+Figure 2. Overview of KStar Diffuser. The top part presents the spatial-temporal graph which is constructed according to the robot
+architecture. The bottom part shows our backbone and the proposed kinematics regularizer. For the backbone, it extracts the multimodal
+information which consists of multiview RGB-D observations and language instruction, and then generates bimanual 6D end-effector
+poses. The kinematics regularizer enhances pose learning by incorporating joint-level predictions, which are mapped to reference end-
+effector poses through differentiable forward kinematics (FK).
+
+3.3.2. Backbone                                                                                                                                                                                       3.3.3. Spatial-Temporal Robot Graph
+Given the language instruction l and multiview RGB-D ob-                                                                                                                                              The physical architecture impacts the motion of the whole
+servation images o, we first adopt the Transformer-based                                                                                                                                              robot, determining whether it can complete the task. Mean-
+encoders to extract their features EI and ET , respectively.                                                                                                                                          while, the historical spatial information is also important
+Then the features are fused with the lFiLM -layers FiLM                                                                                                                                               to future movements. Thus, we propose a spatial-temporal
+block [42] to obtain the hidden states HB . Each layer is                                                                                                                                             graph method to model the robot architecture at each step
+combined with an up-sampling 2D convolution layer:                                                                                                                                                    and the robot motion at continuous timesteps, representing
+                                                                                                                                                                                                      the static spatial information and dynamic motion features.
+                                                 HiB = Conv2D(HiB ),                                                                                                     (7)
+                 Hi+1  = FiLMi (HiB , ET ),                                                                                                                              (8)                          Spatial Structure Graph Construction. To represent the
+                  B
+                                                                                                                                                                                                      robot structure, we first parse the Unified Robot Description
+where i ∈ [0, lFiLM ) and the H0B is initialized with EI .                                                                                                                                            Format (URDF) file which is usually used to describe the
+    Our backbone πϕ uses the last hidden states HB as the                                                                                                                                             static physical structure of robot such as joint types, joint
+condition to guide a diffusion head to denoise and generate                                                                                                                                           limits, and link lengths. Then, we define a dual-arm system
+the bimanual end-effector pose. It is noted that we attach                                                                                                                                            as an undirected graph GS = ⟨VS , ES ⟩ based on the joint
+the n historical observation images to provide more infor-                                                                                                                                            and link configuration. Here, VS = {v j1 , v j2 , . . . , v jm } and
+mation for capturing the motion tendency. Following Chi et                                                                                                                                            ES = {eij |(jointi , jointj ) ∈ links} represents the node set
+al. [9], we let the policy predict next m actions during train-                                                                                                                                       of joints and edge set of links respectively, where m denotes
+ing to alleviate multimodal problems. Here, we set both n                                                                                                                                             the number of joint. We use f i ∈ RD to denote the value of
+and m to 2. The action prediction is as follows:                                                                                                                                                      i-th node feature. It consists of three attributes as follows:
+                                       aEE         EE    EE
+                                        k−1 ∼ πϕ (ak−1 |ak , HB ),                                                                                                       (9)                          • Joint Coordinate: we use a vector in Cartesian coordinate
+                                                                                                                                                                                                        system, f JC
+                                                                                                                                                                                                                   i   = [xi , y i , z i ] ∈ R3 , to denote the absolute
+      πϕ (aEE    EE
+           k−1 |ak , HB )                                                                                                                                                                               coordinates of the i-th joint. The vector is normalized
+                                                         (10)
+      = N (aEE        αk−1 πϕ (aEE                                                                                                                                                                      according to the workspace boundary for stable conver-
+                    p
+              k−1 ;             k , HB ); (1 − αk−1 )I).
+                                                                                                                                                                                                        gence of model training.
+The learning objective is:
+                                                                                                                                                                                                      • Joint Distance: To measure the spatial relationship be-
+                                                                      πϕ (aEE
+                                                                                     
+                                                                           0:K |HB )                                                                                                                    tween the node v i and the other nodes v j , we compute
+           LEE = Eq log                                                                 .                                                                            (11)
+                                                                    q(aEE    EE
+                                                                       1:K |a0 , HB )
+                                                                                                                                                                                                        the Euclidean Distance between v i and v j :
+                         f JD
+                           i  = ||v i − v j ||2 ,          (12)    represented as a mapping f (Θ) : Rn → SE(3). This
+                                                                   mapping from joint space to end-effector space is differen-
+  where f JD
+           i  ∈ Rm and || · ||2 means the Euclidean norm.          tiable, namely Differentiable Forward Kinematics (DFK),
+• Body Label: To discriminate the source of node v i , we          enabling the use of gradients to optimize our control policy.
+  use a one-hot vector f BL
+                          i   = [0, 1] as one of its features.     Leveraging DFK, our policy learns to predict the next joint
+  It can also help the policy capture the motion modes of          configuration âjoint , from which we compute an interme-
+  different robot arms such as the symmetry.                       diate end-effector pose HR . By using HR as a reference,
+We concatenate f JC      JD        BL
+                   i , f i , and f i  to form the completed        we guide a denoising process to generate a precise and exe-
+feature f i ∈ RDf , where Df demotes the dimension of              cutable end-effector pose.
+node features.                                                        Specifically, we combine structure features HG with the
+Spatial-Temporal Graph Learning. Given the same in-                last hidden state HB , projecting to the joint space and using
+struction and observation, different historical robot poses        the DFK to obtain reference as HR follows:
+result in different predictions. Thus, we build the spa-
+                                                                     âjoint = Proj([HB , HG ]), HR = DFK(âjoint ).         (15)
+tial structure graph with the temporal motion information.
+Specifically, we build a spatial-temporal graph GST =              To ensure the consistency between predicted and actual
+                                                −1
+⟨VST , EST ⟩ by combining {GiS = ⟨VSi , ESi ⟩}Ti=0 from his-       joint angles, we minimize the joint loss:
+torical timesteps, where T denotes the number of history
+steps. In GST , the node set VST contains VSi from historical
+                                                                                                 h                      i
+                                                                         Ljoint = Eajoint ∼q(a0 ) ||ajoint − âjoint ||2 . (16)
+static spatial graph. Additionally, we add edges E ′ linking
+the same joint node jointti at different timesteps, in order
+to establish the correlation of joint motions at continuous        Conditioning Diffusion Process on Kinematics. To en-
+times. It can be formulated as follows:                            force kinematic consistency, we condition the diffusion pro-
+                                                                   cess on the reference representation HR , an auxiliary input
+                   −1                  −1
+    VST = ∪{VSi }Ti=0 , EST = ∪{ESi }Ti=0 ∪ E′,            (13)    encoding kinematic constraints. This allows the predicted
+                                                                   pose trajectory to stay within feasible space. Given the dif-
+                     ′
+         E ′ = {et,t    ′                            ′
+                 i |t, t ∈ {0, 1, . . . , T }, t ̸= t }.   (14)    fusion steps from Eq.(9) and Eq.(10), we have:
+   In this way, we obtain the whole spatial-temporal graph.                     aEE         EE EE
+                                                                                 k−1 ∼ πϕ (ak |ak−1 , HB , HR ),             (17)
+A Graph Convolutional Network (GCN) is then adopted
+to propagate and aggregate node features across the graph.            πϕ (aEE     EE
+                                                                           k−1 |ak , HB , HR ) =
+The GCN layer updates each node feature f i by aggregat-
+                                                                      N (aEE       αk−1 πϕ (aEE
+                                                                                 p
+ing the features of its neighboring nodes, thereby capturing               k−1 ;             k , HB , HR ); (1 − αk−1 )I).
+
+the relational and structural information of the robotic arms.                                                           (18)
+We use the node feature HG of the last encoder layer as the        Incorporating DFK into the diffusion process allows gradi-
+representation of the robot structure to condition the denois-     ents from the pose loss to propagate back through the kine-
+ing process.                                                       matic function, ensuring that each denoising step maintains
+3.3.4. Kinematics Regularizer                                      compliance with joint constraints, thereby optimizing the
+                                                                   end-effector’s control accuracy and robustness.
+To control the end-effector effectively, the generated pose
+trajectory must be processed by an Inverse Kinematics (IK)         3.4. Training and Inference
+solver, which calculates the joint configurations to achieve
+                                                                   Training. We use the conditional action generation mode
+the specified poses. However, because the predicted trajec-
+                                                                   to train KStar Diffuser, which is formulated as a condi-
+tory is generated without considering the robot kinematic
+                                                                   tional denoising diffusion. The loss function is defined as
+constraints, it often falls outside the IK solver’s feasible
+                                                                   the Mean Square Error (MSE) as follows:
+range, resulting in high failure rates during execution. To
+                                                                                         √         √
+address this limitation, we propose a kinematics regularizer                      ak = αk a0 + 1 − αk ϵ,                  (19)
+into the end-effector pose learning objective. This regu-
+                                                                                             EE
+                                                                                             ||a0 − πϕ (aEE          2
+                                                                                                                       
+larizer aligns the predicted poses with the robot kinematic           LEE = EaEE                          k , k, C)|| , (20)
+                                                                                0 ∼q(a0 ),k
+constraints, ensuring that the generated trajectory remains
+within the solvable space of the IK solver, thus enhancing           Ljoint = Eajoint ∼q(a0 ) [||ajoint
+                                                                                                  0     − πϕ (HB , HG )||2 ], (21)
+                                                                                  0
+then reliability of trajectory execution.
+                                                                                  L = λ LEE + (1 − λ)Ljoint ,                (22)
+Differentiable Kinematics. Given a joint configuration
+Θ = [θ1 , θ2 , . . . , θn ], the corresponding end-effector pose   where ak is obtained by the forward diffusion process and
+T ∈ SE(3) can be computed using forward kinematics,                C is the combination of HB , HG , HR . λ is the trade-off
+                                                                   coefficient.
+Inference. Sampling from a Gaussian noise ϵk , the pol-                     Transformer-based methods: (1) Action Chunking with
+icy πϕ performs K iterations to gradually denoise a random                  Transformers (ACT) [65] employs a Conditional VAE ar-
+noise ϵk into the noise-free action a0 :                                    chitecture, consisting of an encoder-decoder framework
+                                  p                                         for joint angle sequence prediction; (2) Robotic View
+  aEE       αk−1 πϕ (aEE
+           p
+   k−1 =              k , k, C) +   1 − αk−1 ϵk . (23)                      Transformer Leader Following (RVT-LF) [17] leverages
+                                                                            RVT [15] as its backbone, incorporating a multi-view trans-
+We use the predicted aEE
+                      0 as the final action to control robot                former for cross-view information aggregation and image
+execution.                                                                  re-rendering, coupled with a leader following mechanism
+                                                                            for action prediction; (3) Perceiver-Actor Leader Follow-
+4. Experiment                                                               ing (PerAct-LF) [17] adopts the leader following paradigm
+                                                                            based on PerAct [49], utilizing a perceiver Transformer to
+4.1. Dataset and Evaluation Settings                                        encode both instructions and voxel observations for optimal
+                                                                            voxel action generation; (4) PerAct2 [17] enhances PerAct
+Dataset. Bimanual manipulation tasks demand high lev-
+                                                                            by implementing a unified feature space for dual-arm ac-
+els of coordination, synchronization, and symmetry aware-
+                                                                            tions and employing combined self-attention for synchro-
+ness between the two robotic arms, making them inherently
+                                                                            nized bimanual action prediction.
+more challenging than single-arm tasks. To assess the ca-
+pabilities of KStar Diffuser in these areas, we conducted                   Diffusion-based methods: (1) Joint-based Diffusion Pol-
+comprehensive experiments using the RLBench2 bench-                         icy (DP-J) [9] adopts a diffusion model to robotic manipu-
+mark [17], an extended version of RLBench tailored for bi-                  lation within an imitation learning framework, focusing on
+manual manipulation and comprising tasks closely resem-                     joint angle prediction; (2) EndEffector-based Diffusion Pol-
+bling real-world scenarios. Please refer to Appendix A for                  icy (DP-EE) is a DP variant which we reimplement Dif-
+more details about RLBench2 and real-world tasks.                           fusion Policy to predict end-effector poses instead of joint
+                                                                            angles, offering an alternative control paradigm; (3) 3D Dif-
+Evaluation Settings. To evaluate the policy performance,                    fusion Policy (DP3) [61] enhances 3D perception by incor-
+we employ success rate as the primary metric. Although                      porating point clouds for joint angle prediction.
+the policy generates multiple sequential actions during ex-
+ecution, we primarily focus on the final goal achievement                   4.3. Comparison Results with SOTA Methods
+rather than intermediate steps. Each task is associated with                Experimental Results on RLBench2. As shown in Ta-
+a specific success criterion defined by its target state. To                ble 1, the KStar Diffuser significantly outperforms other
+comprehensively assess the policy’s capability, we conduct                  state-of-the-art baselines, achieving more than 20% higher
+experiments with varying numbers of demonstrations (20                      overall performance with both 20 and 100 training demon-
+and 100) during training. Figure 3 illustrates our exper-                   strations. We found that:
+imental setup, including both the simulation environment                        (1) Similar to learning a single-arm policy, the pro-
+and the Cobot Agilex ALOHA robot. Detailed descriptions                     cess of learning a bimanual policy can adapt quickly and
+of simulation tasks and real-world experimental settings are                achieve a high success rate, given a relatively consistent
+provided in the Appendix B.                                                 distribution of task trajectories. In push box, where the
+                                                        Right Wrist
+                                                        Camera
+                                                                            objective is for both arms to push a box toward a specified
+                                                                            target along fixed trajectories, our KStar Diffuser and other
+                                                             Left Gripper
+                                                                            baseline models perform well. However, as task complex-
+                                                                            ity increases, success rates decrease. For example, in the
+                                                             Left Wrist     lift ball task, both arms must lift a large ball simulta-
+                                                             Camera
+                                                                            neously to complete the task. Any asynchrony in movement
+                                                        Left Gripper        can cause instability, leading to the ball slipping and ulti-
+                                              Front Camera
+                                                                            mately resulting in task failure. Our KStar Diffuser achieves
+                                                                            its robust performance on such bimanual tasks by explicitly
+                                                                            modeling the spatial and motion relationships between
+                                                                            the two arms, surpassing other methods more than 6%.
+Figure 3. The left: the simulation environment of pick laptop                   (2) Distinct from single-arm systems, bimanual robotic
+task. The right: the ALOHA device used in the real-world tasks.             systems possess the capability for collaborative manipula-
+                                                                            tion. Methods which are directly adapted from single-arm
+4.2. Baselines                                                              to bimanual manipulation exhibit high failure rates in tasks,
+                                                                            e.g., pick laptop, as they lack consideration of the spa-
+We systematically evaluate KStar Diffuser against state-of-                 tial and motion relationships between the arms. Specifi-
+the-art methods in two major categories:
+Table 1. The experimental result on simulated tasks. We train the policy with the setting of different training demonstrations, i.e. [20, 100],
+to test its capability comprehensively with 100 times each task. The best results are in bold. Each result is reported with three seeds on
+average.
+
+                                                     Push          Lift        Handover           Pick         Sweep
+         Method                    Backbone                                                                                  Overall
+                                                     Box           Ball       Item (easy)        Laptop        Dustpan
+         20 demos
+         ACT [65]                 Transformer     26.0 ±4.6      17.3 ±5.8       0.0 ±0.0      0.0 ±0.0        0.0 ±0.0       8.7 ±1.6
+         RVT-LF [17]              Transformer     44.0 ±1.0      12.3 ±6.7       0.0 ±0.0      2.0 ±1.7        0.0 ±0.0      11.7 ±1.5
+         PerAct-LF [17]           Transformer     63.7 ±3.1      42.3 ±8.1       3.3 ±0.6      7.0 ±2.7        4.7 ±0.6      24.2 ±1.6
+         PerAct2 [17]             Transformer     59.7 ±7.6      37.7 ±4.7       8.0 ±1.0     17.3 ±0.6        1.7 ±1.5      24.9 ±2.1
+         DP-J [9]                  Diffusion      30.0 ±3.6      19.7 ±2.1       0.0 ±0.0      0.0 ±0.0        0.0 ±4.0      10.0 ±1.0
+         DP-EE [9]                 Diffusion      34.7 ±2.5      34.3 ±7.4       0.7 ±0.6      1.3 ±0.6       14.0 ±1.7      17.0 ±1.6
+         DP3 [61]                  Diffusion      25.3 ±4.0      34.3 ±7.6       0.0 ±0.0      2.7 ±2.9        0.0 ±0.0      12.5 ±1.3
+         KStar Diffuser (Ours)     Diffusion      79.3 ±3.5      87.0 ±2.7      23.7 ±0.6     17.0 ±2.0       83.0 ±4.4      58.0 ±1.4
+         100 demos
+         ACT [65]                 Transformer     48.7 ±6.8      40.7 ±2.1       0.0 ±0.0      0.0 ±0.0        0.0 ±0.0      17.9 ±1.0
+         RVT-LF [17]              Transformer     76.3 ±1.5      28.7 ±1.0       0.0 ±0.0      1.3 ±1.2        2.3 ±3.2      21.7 ±0.7
+         PerAct-LF [17]           Transformer     66.3 ±3.1      68.3 ±6.1       7.3 ±2.1     14.3 ±3.8        8.0 ±2.7      32.9 ±2.5
+         PerAct2 [17]             Transformer     77.0 ±3.0      47.7 ±3.2      10.3 ±0.6     34.3 ±4.0        6.7 ±2.1      33.9 ±1.0
+         DP-J [9]                  Diffusion      62.7 ±7.6      43.3 ±2.1       0.0 ±0.0      1.3 ±0.6        0.0 ±4.0      21.5 ±1.6
+         DP-EE [9]                 Diffusion      61.0 ±2.0      59.7 ±3.5       2.0 ±1.0     10.3 ±3.1       69.7 ±2.5      40.5 ±1.2
+         DP3 [61]                  Diffusion      56.0 ±3.6      64.0 ±2.7       0.0 ±0.0      6.3 ±3.1        1.7 ±2.1      25.6 ±1.4
+         KStar Diffuser (Ours)     Diffusion      83.0 ±1.7      98.7 ±1.5      27.0 ±1.7     43.7 ±4.5       89.0 ±5.2      68.2 ±2.1
+
+
+cally, as shown in Figure 4, this task involves picking up                constraints and kinematic relationships within the biman-
+a notebook lying flat on a cabinet surface. Given that the                ual robotic system. In contrast, KStar Diffuser achieves su-
+notebook rests fully against the tabletop, direct grasping by             perior bimanual coordination, surpassing other methods by
+the robotic arm is not possible. Instead, an effective strategy           over 10%, as it successfully captures the motion patterns
+is to control one arm to push the notebook outward from the               between dual arms and predicts feasible end-effector poses.
+cabinet by a short distance, allowing the other arm to pick
+it up. KStar Diffuser achieves a success rate approximately               Table 2. The result of real-world tasks. We train all policies with
+9% higher than other methods, demonstrating its ability to                100 demostrations and test 15 times. The best result are in bold.
+capture the coordinated motion patterns required for col-
+laborative object manipulation between two arms.                              Methods                   Lift Plate    Handover     Overall
+                                                                              ACT [65]                  37.8 ±8.3      0.0 ±0.0   18.9 ±11.2
+Real-world Experimental Results. To comprehensively                           DP [9]                    42.1 ±6.5      0.0 ±0.0   21.1 ±12.5
+evaluate the policy’s effectiveness, we build 2 tasks in real-                DP3 [61]                  44.0 ±8.3      0.0 ±0.0   22.0 ±13.4
+                                                                              PerAct2 [17]              51.1 ±6.3      8.8 ±3.0   29.9 ±10.2
+world based on the simulation benchmark. The perfor-
+                                                                              KStar Diffuser (Ours)     66.7 ±5.3     19.7 ±5.3   43.1 ±17.8
+mances on real-world tasks are illustrated in Table 2.
+    Similar to the simulation results, we observe that poli-
+cies which do not consider about bimanual scenarios, i.e.,                          Table 3. Ablation study of model components.
+ACT, DP, and DP3, demonstrate limited capability across
+all bimanual tasks, achieving around 20% success ratio on                      ST Graph     KR     Handover-S        Handover-R    Overall
+average. Although PerAct2 is designed for bimanual tasks
+via mapping bimanual actions into a shared learning space,                         ✓        ✓         27.0 ±1.7       19.7 ±5.3   23.4 ±5.2
+it fails to capture the spatial structure of the bimanual sys-                     ✓        ×         18.3 ±1.5       15.3 ±3.3   16.8 ±2.1
+                                                                                   ×        ×         16.3 ±3.1       13.3 ±9.4   14.8 ±2.1
+tem, leading to ineffective arm coordination during execu-
+tion. Furthermore, we also found PerAct2 faces significant
+inverse kinematics issues with its predicted end-effector
+poses, including joint configuration conflicts and unreach-
+                                                                          4.4. Ablation Studies
+able positions which are shown in Figure 4. It is likely due              Effects of Model Components. To systematically evalu-
+to PerAct2’s limited ability to capture the complex spatial               ate the contribution of each component in KStar Diffuser,
+                  Instruction: pick the laptop                                                                                Simulation
+
+
+
+ KStar Diffuser
+                                                                   grasp
+
+
+                                                           push
+
+
+
+                                                                                                                                Obstruction
+                                                                   grasp
+ DP3
+                                                            push
+
+
+
+
+                  Instruction: handover the item                                                                             Real-world
+
+
+
+ KStar Diffuser
+                                                                                                              open
+                                                                           open
+
+                                           grasp
+
+
+
+                                                                                             collision        collision          collision
+
+
+ PerAct2                                           grasp
+
+
+
+
+Figure 4. The visualization of bimanual manipulation on simulated RLBench2 and real-world tasks. The blue annotations represent the
+motion of the robot’s left arm, while the green annotations indicate the motion of the right arm.
+
+
+we conduct ablation experiments on the handover item                        history lengths and trade-off coefficient, please refer to Ap-
+task in both simulated and real-world environments. We                      pendix C for more details.
+design a progressive ablation process by first removing the
+Differential Forward Kinematics module while retaining the                  4.5. Qualitative Analysis
+Spatial-Temporal Graph (ST Graph), and then completely
+                                                                            We further present qualitative analysis in Figure 4. We com-
+disabling both ST Graph and Kinematics Regularizer (KR).
+                                                                            pare the performance of KStar Diffuser with DP3 and Per-
+    The experimental results in Table 3 demonstrate the cru-                Act2 in executing bimanual manipulation tasks within both
+cial role of each component. The removal of KR leads to a                   simulated and real-world environments, respectively.
+significant decrease in success rate, particularly pronounced                   In the simulation task, since the laptop rests flat on the
+in real-world scenarios. This performance degradation can                   cabinet, direct lifting is not feasible. One robotic arm ini-
+be attributed to the fundamental differences between sim-                   tiates a forward push, creating space, while the other arm
+ulated and real environments. While simulated environ-                      concurrently grasps and elevates the laptop. KStar Diffuser
+ments maintain consistent and noise-free inputs, real-world                 effectively models this dual-arm coordination, generating
+scenarios introduce various perturbations, e.g., sensor noise               a precise trajectory of synchronized actions. Conversely,
+and light reflection, making the policy more susceptible to                 DP3, adapted from a single-arm policy to a dual-arm config-
+kinematic constraint violations without the regularization                  uration, fails to achieve effective coordination. Concretely,
+effect of KR. Further ablation by removing both ST Graph                    after executing the push motion, the right arm does not halt,
+and KR results in a substantial performance drop across                     obstructing the left arm’s lifting process.
+all experimental settings. This observation illustrates two                     In the real-world task, KStar Diffuser generates an ex-
+key aspects: First, the ST Graph effectively captures the                   ecutable item transfer trajectory between the left and right
+spatial-temporal dependencies among joints, which is es-                    arms, with no collisions throughout the task, reflecting its
+sential for coordinating the relative positioning and interac-              strong environmental adaptability and collision avoidance
+tions between robotic arms. Second, the graph structure’s                   capabilities. Conversely, PerAct2 encounters collisions dur-
+explicit encoding of the robotic physical architecture en-                  ing the handover process (marked in red), indicating less
+hances the policy’s robustness against unexpected pertur-                   effective handling of dynamic real-world variables and a
+bations by maintaining spatial and temporal coherence. We                   lack of kinematic awareness on the robot movements. More
+conduct extensive ablation studies of action chunking size,                 qualitative analysis can be found in Appendix D.
+5. Conclusion                                                            Danny Driess, Avinava Dubey, Chelsea Finn, et al. Rt-2:
+                                                                         Vision-language-action models transfer web knowledge to
+In this paper, we have proposed a novel Kinematics en-                   robotic control. arXiv preprint arXiv:2307.15818, 2023. 1
+hanced Spatial-TemporAl gRaph Diffuser (KStar Diffuser)              [8] Shizhe Chen, Ricardo Garcia, Cordelia Schmid, and Ivan
+that explicitly incorporates both robot structures and kine-             Laptev. Polarnet: 3d point clouds for language-guided
+matics into the bimanual motion generation process. It con-              robotic manipulation. arXiv preprint arXiv:2309.15596,
+sists of a spatial-temporal robot graph that explicitly models           2023. 2
+the robot physical configuration to guide the generative ac-         [9] Cheng Chi, Zhenjia Xu, Siyuan Feng, Eric Cousineau, Yilun
+tion denoising procedure, and a kinematics regularizer that              Du, Benjamin Burchfiel, Russ Tedrake, and Shuran Song.
+augments the NBP learning objective by introducing joint-                Diffusion policy: Visuomotor policy learning via action dif-
+space supervision. Extensive experiments demonstrate that                fusion. The International Journal of Robotics Research, page
+                                                                         02783649241273668, 2023. 1, 2, 3, 4, 6, 7, 14
+KStar Diffuser outperforms the baselines by a large margin
+                                                                    [10] Cheng Chi, Zhenjia Xu, Chuer Pan, Eric Cousineau, Ben-
+on both simulation and real-world tasks.
+                                                                         jamin Burchfiel, Siyuan Feng, Russ Tedrake, and Shu-
+Limitations and Future Directions. While we explored                     ran Song. Universal manipulation interface: In-the-wild
+robot structure impacts through GNN modeling and kine-                   robot teaching without in-the-wild robots. arXiv preprint
+matic constraints, the core control logic of end-effector pose           arXiv:2402.10329, 2024. 1, 2, 3
+prediction and inverse kinematics remains. In the future,           [11] Akos Csiszar, Jan Eilers, and Alexander Verl. On solving
+we aim to leverage neural networks to directly model joint               the inverse kinematics problem using neural networks. In
+movements, aligning the robot motion space with the Carte-               2017 24th International Conference on Mechatronics and
+sian space of the human world.                                           Machine Vision in Practice (M2VIP), pages 1–6, 2017. 3
+                                                                    [12] Aaron D’Souza, Sethu Vijayakumar, and Stefan Schaal.
+                                                                         Learning inverse kinematics. In Proceedings 2001 IEEE/RSJ
+References
+                                                                         International Conference on Intelligent Robots and Systems.
+ [1] Lucia Angelini, Manuela Uliano, Angela Mazzeo, Mattia               Expanding the Societal Role of Robotics in the the Next
+     Penzotti, and Marco Controzzi. Self-collision avoidance in          Millennium (Cat. No. 01CH37180), pages 298–303. IEEE,
+     bimanual teleoperation using collisionik: algorithm revision        2001. 3
+     and usability experiment. In 2022 IEEE-RAS 21st Interna-       [13] Zipeng Fu, Tony Z Zhao, and Chelsea Finn. Mobile aloha:
+     tional Conference on Humanoid Robots (Humanoids), pages             Learning bimanual mobile manipulation with low-cost
+     112–118, 2022. 2                                                    whole-body teleoperation. arXiv preprint arXiv:2401.02117,
+ [2] Andreas Aristidou, Joan Lasenby, Yiorgos Chrysanthou, and           2024. 1, 3
+     Ariel Shamir. Inverse kinematics techniques in computer        [14] Jianfeng Gao, Xiaoshu Jin, Franziska Krebs, Noémie
+     graphics: A survey. In Computer graphics forum, pages 35–           Jaquier, and Tamim Asfour. Bi-kvil: Keypoints-based visual
+     58. Wiley Online Library, 2018. 2                                   imitation learning of bimanual manipulation tasks. In 2024
+ [3] Weibang Bai, Ningshan Zhang, Baoru Huang, Ziwei Wang,               IEEE International Conference on Robotics and Automation
+     Francesco Cursi, Ya-Yen Tsai, Bo Xiao, and Eric M Yeat-             (ICRA), pages 16850–16857. IEEE, 2024. 2
+     man. Dual-arm coordinated manipulation for object twist-       [15] Ankit Goyal, Jie Xu, Yijie Guo, Valts Blukis, Yu-Wei Chao,
+     ing with human intelligence. In 2021 IEEE International             and Dieter Fox. Rvt: Robotic view transformer for 3d object
+     Conference on Systems, Man, and Cybernetics (SMC), pages            manipulation. In Conference on Robot Learning, pages 694–
+     902–908. IEEE, 2021. 2                                              710. PMLR, 2023. 1, 2, 3, 6
+ [4] Aaron M Bestick, Samuel A Burden, Giorgia Willits, Nikhil      [16] Reinhard Grassmann, Vincent Modes, and Jessica Burgner-
+     Naikal, S Shankar Sastry, and Ruzena Bajcsy. Personal-              Kahrs. Learning the forward and inverse kinematics of a
+     ized kinematics for human-robot collaborative manipulation.         6-dof concentric tube continuum robot in se (3). In 2018
+     In 2015 IEEE/RSJ International Conference on Intelligent            IEEE/RSJ International Conference on Intelligent Robots
+     Robots and Systems (IROS), pages 1037–1044. IEEE, 2015.             and Systems (IROS), pages 5125–5132. IEEE, 2018. 2
+     2                                                              [17] Markus Grotz, Mohit Shridhar, Tamim Asfour, and Dieter
+ [5] Botond Bócsi, Duy Nguyen-Tuong, Lehel Csató, Bernhard             Fox. Peract2: A perceiver actor framework for bimanual
+     Schoelkopf, and Jan Peters. Learning inverse kinematics             manipulation tasks. arXiv preprint arXiv:2407.00278, 2024.
+     with structured prediction. In 2011 IEEE/RSJ International          1, 2, 3, 6, 7, 13
+     Conference on Intelligent Robots and Systems, pages 698–       [18] Abdullah Aamir Hayat, Ratan OM Sadanand, and Subir K
+     703. IEEE, 2011. 3                                                  Saha. Robot manipulation through inverse kinematics. In
+ [6] Anthony Brohan, Noah Brown, Justice Carbajal, Yevgen                Proceedings of the 2015 conference on advances in robotics,
+     Chebotar, Joseph Dabis, Chelsea Finn, Keerthana Gopalakr-           pages 1–6, 2015. 2
+     ishnan, Karol Hausman, Alex Herzog, Jasmine Hsu, et al.        [19] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising dif-
+     Rt-1: Robotics transformer for real-world control at scale.         fusion probabilistic models. Advances in neural information
+     arXiv preprint arXiv:2212.06817, 2022. 1                            processing systems, 33:6840–6851, 2020. 2
+ [7] Anthony Brohan, Noah Brown, Justice Carbajal, Yevgen           [20] Binghao Huang, Yixuan Wang, Xinyi Yang, Yiyue Luo, and
+     Chebotar, Xi Chen, Krzysztof Choromanski, Tianli Ding,              Yunzhu Li. 3d-vitac: Learning fine-grained manipulation
+     with visuo-tactile sensing. arXiv preprint arXiv:2410.24091,         Advances in Neural Information Processing Systems, pages
+     2024. 2                                                              22827–22849. Curran Associates, Inc., 2024. 1
+[21] Kenneth H Hunt. Structural kinematics of in-parallel-           [35] Xiao Ma, Sumit Patidar, Iain Haughton, and Stephen James.
+     actuated robot-arms. 1983. 1                                         Hierarchical diffusion policy for kinematics-aware multi-
+[22] Michael I Jordan and David E Rumelhart. Forward models:              task robotic manipulation. In Proceedings of the IEEE/CVF
+     Supervised learning with a distal teacher. In Backpropaga-           Conference on Computer Vision and Pattern Recognition,
+     tion, pages 189–236. Psychology Press, 2013. 3                       pages 18081–18090, 2024. 1, 2
+[23] Tsung-Wei Ke, Nikolaos Gkanatsios, and Katerina Fragki-         [36] Matthew T Mason. Mechanics of robotic manipulation. MIT
+     adaki. 3d diffuser actor: Policy diffusion with 3d scene rep-        press, 2001. 2
+     resentations. arXiv preprint arXiv:2402.10885, 2024. 2, 3       [37] Yao Mu, Qinglong Zhang, Mengkang Hu, Wenhai Wang,
+[24] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao,           Mingyu Ding, Jun Jin, Bin Wang, Jifeng Dai, Yu Qiao, and
+     Ashwin Balakrishna, Suraj Nair, Rafael Rafailov, Ethan               Ping Luo. Embodiedgpt: Vision-language pre-training via
+     Foster, Grace Lam, Pannag Sanketi, et al. Openvla: An                embodied chain of thought. Advances in Neural Information
+     open-source vision-language-action model. arXiv preprint             Processing Systems, 36, 2024. 1
+     arXiv:2406.09246, 2024. 2                                       [38] Yoshihiko Nakamura, Kiyoshi Nagai, and Tsuneo
+[25] Thomas N Kipf and Max Welling. Semi-supervised classi-               Yoshikawa. Dynamics and stability in coordination of
+     fication with graph convolutional networks. arXiv preprint           multiple robotic mechanisms. The International Journal of
+     arXiv:1609.02907, 2016. 2                                            Robotics Research, 8(2):44–61, 1989. 1
+[26] CS George Lee. Robot arm kinematics, dynamics, and con-         [39] Valerio Ortenzi, Naresh Marturi, Michael Mistry, Jef-
+     trol. Computer, 15(12):62–80, 1982. 1                                frey Kuo, and Rustam Stolkin. Vision-based framework
+[27] Maolin Lei, Ting Wang, Chen Yao, Huan Liu, Zhi Wang, and             to estimate robot configuration and kinematic constraints.
+     Yongsheng Deng. Real-time kinematics-based self-collision            IEEE/ASME Transactions on Mechatronics, 23(5):2402–
+     avoidance algorithm for dual-arm robots. Applied Sciences,           2412, 2018. 2
+     10(17):5893, 2020. 1                                            [40] Eric Paljug, Xiaoping Yun, and Vijay Kumar. Control of
+[28] Jiefeng Li, Chao Xu, Zhicun Chen, Siyuan Bian, Lixin Yang,           rolling contacts in multi-arm manipulation. IEEE Transac-
+     and Cewu Lu. Hybrik: A hybrid analytical-neural inverse              tions on Robotics and Automation, 10(4):441–452, 1994. 1
+     kinematics solution for 3d human pose and shape estimation.     [41] William Peebles and Saining Xie. Scalable diffusion models
+     In Proceedings of the IEEE/CVF Conference on Computer                with transformers. In Proceedings of the IEEE/CVF Inter-
+     Vision and Pattern Recognition (CVPR), pages 3383–3393,              national Conference on Computer Vision, pages 4195–4205,
+     2021. 3                                                              2023. 2
+[29] Jiefeng Li, Chao Xu, Zhicun Chen, Siyuan Bian, Lixin Yang,      [42] Ethan Perez, Florian Strub, Harm De Vries, Vincent Du-
+     and Cewu Lu. Hybrik: A hybrid analytical-neural inverse              moulin, and Aaron Courville. Film: Visual reasoning with a
+     kinematics solution for 3d human pose and shape estimation.          general conditioning layer. In Proceedings of the AAAI con-
+     In Proceedings of the IEEE/CVF conference on computer vi-            ference on artificial intelligence, 2018. 4
+     sion and pattern recognition, pages 3383–3393, 2021. 3          [43] Dustin Podell, Zion English, Kyle Lacey, Andreas
+[30] Xiaojie Li, Shaowei He, Jianlong Wu, Yue Yu, Liqiang Nie,            Blattmann, Tim Dockhorn, Jonas Müller, Joe Penna, and
+     and Min Zhang. Mask again: Masked knowledge distilla-                Robin Rombach. Sdxl: Improving latent diffusion mod-
+     tion for masked video modeling. In Proceedings of the ACM            els for high-resolution image synthesis. arXiv preprint
+     International Conference on Multimedia, page 2221–2232.              arXiv:2307.01952, 2023. 2
+     ACM, 2023. 2                                                    [44] Aditya Ramesh, Prafulla Dhariwal, Alex Nichol, Casey Chu,
+[31] Xiaojie Li, Jianlong Wu, Shaowei He, Shuo Kang, Yue Yu,              and Mark Chen. Hierarchical text-conditional image gener-
+     Liqiang Nie, and Min Zhang. Fine-grained key-value mem-              ation with clip latents. arXiv preprint arXiv:2204.06125, 1
+     ory enhanced predictor for video representation learning. In         (2):3, 2022. 2
+     Proceedings of the ACM International Conference on Multi-       [45] Allen Z Ren, Justin Lidard, Lars L Ankile, Anthony
+     media, page 2264–2274. ACM, 2023.                                    Simeonov, Pulkit Agrawal, Anirudha Majumdar, Ben-
+[32] Xiaojie Li, Yibo Yang, Xiangtai Li, Jianlong Wu, Yue Yu,             jamin Burchfiel, Hongkai Dai, and Max Simchowitz.
+     Bernard Ghanem, and Min Zhang. Genview: Enhanc-                      Diffusion policy policy optimization.        arXiv preprint
+     ing view quality with pretrained generative model for self-          arXiv:2409.00588, 2024. 2
+     supervised learning. In Proceedings of the European Con-        [46] Robin Rombach, Andreas Blattmann, Dominik Lorenz,
+     ference on Computer Vision. Springer, 2024. 2                        Patrick Esser, and Björn Ommer. High-resolution image
+[33] I Liu, Chun Arthur, Sicheng He, Daniel Seita, and Gau-               synthesis with latent diffusion models. In Proceedings of
+     rav Sukhatme. Voxact-b: Voxel-based acting and stabi-                the IEEE/CVF conference on computer vision and pattern
+     lizing policy for bimanual manipulation. arXiv preprint              recognition, pages 10684–10695, 2022. 2
+     arXiv:2407.04152, 2024. 2                                       [47] Nilanjan Sarkar, Xiaoping Yun, and Vijay Kumar. Dy-
+[34] Qi Lv, Xiang Deng, Gongwei Chen, Michael Yu Wang, and                namic control of 3-d rolling contacts in two-arm manipula-
+     Liqiang Nie. Decision mamba: A multi-grained state space             tion. IEEE Transactions on Robotics and Automation, 13(3):
+     model with self-evolution regularization for offline rl. In          364–376, 1997. 1
+[48] Youshik Shin and Zeungnam Bien. Collision–free trajectory         [62] Haoyu Zhang, Meng Liu, Yuhong Li, Ming Yan, Zan Gao,
+     planning for two robot arms. Robotica, 7(3):205–212, 1989.             Xiaojun Chang, and Liqiang Nie. Attribute-guided collab-
+     1, 2                                                                   orative learning for partial person re-identification. IEEE
+[49] Mohit Shridhar, Lucas Manuelli, and Dieter Fox. Perceiver-             Transactions on Pattern Analysis and Machine Intelligence,
+     actor: A multi-task transformer for robotic manipulation.              45(12):14144–14160, 2023. 2
+     In Conference on Robot Learning, pages 785–799. PMLR,             [63] Haoyu Zhang, Meng Liu, Zixin Liu, Xuemeng Song, Yaowei
+     2023. 1, 2, 3, 6, 13                                                   Wang, and Liqiang Nie. Multi-factor adaptive vision selec-
+[50] Christian Smith, Yiannis Karayiannidis, Lazaros Nalpan-                tion for egocentric video question answering. In Proceedings
+     tidis, Xavi Gratal, Peng Qi, Dimos V Dimarogonas, and Dan-             of the 41st International Conference on Machine Learning,
+     ica Kragic. Dual arm manipulation—a survey. Robotics and               pages 59310–59328. PMLR, 2024. 2
+     Autonomous systems, 60(10):1340–1353, 2012. 1                     [64] Junjie Zhang, Chenjia Bai, Haoran He, Wenke Xia, Zhigang
+[51] Octo Model Team, Dibya Ghosh, Homer Walke, Karl                        Wang, Bin Zhao, Xiu Li, and Xuelong Li. Sam-e: Lever-
+     Pertsch, Kevin Black, Oier Mees, Sudeep Dasari, Joey                   aging visual foundation model with sequence imitation for
+     Hejna, Tobias Kreiman, Charles Xu, et al.                 Octo:        embodied manipulation. arXiv preprint arXiv:2405.19586,
+     An open-source generalist robot policy. arXiv preprint                 2024. 2, 3
+     arXiv:2405.12213, 2024. 2                                         [65] Tony Z Zhao, Vikash Kumar, Sergey Levine, and Chelsea
+[52] Vitalis Vosylius, Younggyo Seo, Jafar Uruç, and Stephen               Finn. Learning fine-grained bimanual manipulation with
+     James. Render and diffuse: Aligning image and action                   low-cost hardware. arXiv preprint arXiv:2304.13705, 2023.
+     spaces for diffusion-based behaviour cloning. arXiv preprint           1, 2, 3, 6, 7, 14
+     arXiv:2405.18196, 2024. 2                                         [66] Zangwei Zheng, Xiangyu Peng, Tianji Yang, Chenhui
+[53] Lirui Wang, Xinlei Chen, Jialiang Zhao, and Kaiming He.                Shen, Shenggui Li, Hongxin Liu, Yukun Zhou, Tianyi
+     Scaling proprioceptive-visual learning with heterogeneous              Li, and Yang You. Open-sora: Democratizing efficient
+     pre-trained transformers. arXiv preprint arXiv:2409.20537,             video production for all, march 2024. URL https://github.
+     2024. 2                                                                com/hpcaitech/Open-Sora, 1(3):4. 2
+[54] Yixiao Wang, Yifei Zhang, Mingxiao Huo, Ran Tian, Xi-             [67] Minjie Zhu, Yichen Zhu, Jinming Li, Junjie Wen, Zhiyuan
+     ang Zhang, Yichen Xie, Chenfeng Xu, Pengliang Ji, Wei                  Xu, Ning Liu, Ran Cheng, Chaomin Shen, Yaxin Peng,
+     Zhan, Mingyu Ding, et al. Sparse diffusion policy: A                   Feifei Feng, et al. Scaling diffusion policy in transformer to
+     sparse, reusable, and flexible policy for robot learning. arXiv        1 billion parameters for robotic manipulation. arXiv preprint
+     preprint arXiv:2407.01531, 2024. 2                                     arXiv:2409.14411, 2024. 2
+[55] Zhengyi Wang, Cheng Lu, Yikai Wang, Fan Bao, Chongxuan
+     Li, Hang Su, and Jun Zhu. Prolificdreamer: High-fidelity and
+     diverse text-to-3d generation with variational score distilla-
+     tion. Advances in Neural Information Processing Systems,
+     36, 2024. 2
+[56] Chris Welman. Inverse kinematics and geometric constraints
+     for articulated figure manipulation. 1993. 2
+[57] Kun Wu, Yichen Zhu, Jinming Li, Junjie Wen, Ning Liu,
+     Zhiyuan Xu, Qinru Qiu, and Jian Tang. Discrete policy:
+     Learning disentangled action space for multi-task robotic
+     manipulation. arXiv preprint arXiv:2409.18707, 2024. 2
+[58] Wenke Xia, Dong Wang, Xincheng Pang, Zhigang Wang,
+     Bin Zhao, Di Hu, and Xuelong Li. Kinematic-aware prompt-
+     ing for generalizable articulated object manipulation with
+     llms. In 2024 IEEE International Conference on Robotics
+     and Automation (ICRA), pages 2073–2080. IEEE, 2024. 2
+[59] Andrea Maria Zanchettin, Paolo Rocco, Luca Bascetta, Ioan-
+     nis Symeonidis, and Steffen Peldschus. Kinematic analysis
+     and synthesis of the human arm motion during a manipula-
+     tion task. In 2011 IEEE international conference on robotics
+     and automation, pages 2692–2697. IEEE, 2011. 2
+[60] Yanjie Ze, Zixuan Chen, Wenhao Wang, Tianyi Chen, Xialin
+     He, Ying Yuan, Xue Bin Peng, and Jiajun Wu. Generalizable
+     humanoid manipulation with improved 3d diffusion policies.
+     arXiv preprint arXiv:2410.10803, 2024. 1, 2
+[61] Yanjie Ze, Gu Zhang, Kangning Zhang, Chenyuan Hu,
+     Muhan Wang, and Huazhe Xu. 3d diffusion policy. arXiv
+     preprint arXiv:2403.03954, 2024. 1, 2, 6, 7
+        Spatial-Temporal Graph Diffusion Policy with Kinematic Modeling for
+                          Bimanual Robotic Manipulation
+                                                         Supplementary Material
+   We provide a more comprehensive tasks descriptions                            a single arm to manage effectively. Notably, this task ne-
+in Section A, encompassing both simulated environments                           cessitates the use of both arms simultaneously, as a single
+and real-world scenarios. In Section B, we elaborate on                          robot is incapable of accomplishing it independently.
+the implementation details, including code base of base-                         lift ball. As depicted in Figure A(b), the task en-
+line methods, and hyperparameter configurations for the                          tails the robot using both arms to lift a large ball, achieving
+backbone, graph encoder modules and optimization pro-                            a minimum height of 0.95 meters to meet the success cri-
+cess. Notably, to thoroughly validate efficacy of KStar Dif-                     teria. The object in this task is the large ball, presenting
+fuser, we conduct extensive ablation studies analyzing the                       a significant coordination challenge. Due to the ball’s size
+impact of demonstration quantity, action chunking size, ob-                      and the inability of the gripper to securely grasp it, the op-
+servation history length, and the control learning objective                     eration relies on coordinated non-prehensile manipulation,
+coefficient λ. The result is presented in Section C. Finally,                    demanding precise synchronization of the arms during the
+we present more qualitative analysis in Section D.                               lifting process. This task cannot be accomplished by a sin-
+                                                                                 gle robot because of the object’s dimensions.
+A. Task Descriptions
+                                                                                 handover item easy. The task requires the robot to
+We conduct extensive experiments on both simulated tasks                         handover a red item by utilizing one arm to securely grasp
+and real-world tasks to evaluate the effectiveness of our                        and lift the item to a height of 80 cm while ensuring the
+proposed KStar Diffuser. Specifically, we selected five                          other arm remains idle and unengaged, as shown in Fig-
+tasks from RLBench2, ranging from basic symmetrical                              ure A(c). The object involved is a single red block, and
+tasks to advanced coordination-requiring tasks, includ-                          the key challenge lies in coordinating the handover process
+ing push box, lift ball, handover item easy,                                     effectively. Successful completion is determined when the
+sweep dustpan, and pick laptop. For real-world                                   item is accurately identified, grasped, and positioned at the
+evaluations, we created a similar setup with two bimanual                        required height with no actions performed by the idle arm.
+tasks: lift plate and handover item easy. We
+present the details about both simulated and real-world                          sweep dustpan. It is shown in Figure A(d) that the
+tasks in Table A. For each simulated task, we evaluate the                       task involves the robot using a broom to sweep dust into
+model 100 times, whereas for each real-world task, we con-                       a dust pan, requiring precise coordination of the sweeping
+duct 15 evaluations.                                                             motion to effectively collect the dust. The objects involved
+                      Table A. Tasks Details.                                    include a broom, a dust pan, supporting objects, and the
+                                                                                 dust itself. Successful completion is defined as all the dust
+ Task                 Duration   # Keyframes   Instruction                       being gathered inside the dust pan. The primary challenge
+ Simulated Tasks                                                                 lies in the accuracy and control of the sweeping motion to
+ push box               4.33s        2.1       “Push the box to the red area.”
+ lift ball              4.40s        4.0       “Lift the ball.”
+                                                                                 ensure that the dust is properly directed into the pan.
+ handover item easy     7.17s        7.5       “Handover the item.”
+ sweep dustpan          4.93s        7.3       “Sweep the dust to the pan.”      pick laptop. As illustrated in Figure A(e), the task
+ pick laptop            3.97s        7.2       “Pick up the notebook.”           requires the robot to pick up a notebook placed on top of
+ Real-world Tasks                                                                a block by first manipulating it into a position suitable for
+ lift plate             6.37s        3.4       “Lift the plate.”
+ handover item easy     9.52s        8.6       “Handover the item.”              grasping. This involves performing non-prehensile actions,
+                                                                                 such as pushing or sliding, to adjust the notebook’s orien-
+                                                                                 tation before securely grasping and lifting it off the block.
+A.1. Simulated Tasks                                                             The objects involved are a notebook and a block. Successful
+push box. As illustrated in Figure A(a), the task re-                            completion is defined as the robot lifting the notebook off
+quires the robot to utilize both arms to push a heavy box,                       the block. Although the task can be performed with a single
+weighing 50 kg, and transport it to a designated target area                     robotic arm, precise coordination is essential for effective
+through a fix trajectory. The completion of the task is de-                      manipulation.
+fined as successfully moving the box to the specified loca-
+tion. The scenario involves two key elements: a large box
+                                                                                 A.2. Real-world Tasks
+and a target area, with the primary challenge being the con-                     lift plate. As shown in Figure A(f), the task in-
+siderable weight of the box, which exceeds the capacity of                       volves the robot using both arms to lift a plate, maintaining
+         (a) push_box                       (b) lift_ball                  (c) handover_item_easy                    (d) sweep_dustpan
+
+
+
+
+                         (e) pick_laptop                    (f) lift_plate (R)              (g) handover_item_easy (R)
+
+          Figure A. The visualization of simulated tasks and real-world tasks. The task with “(R)” means the real-world tasks.
+
+
+an elevated position for over 3 seconds to meet the success             Language Branch. For the language instruction, we
+criteria. The target object is a plate requiring coordinated            encode the instruction with CLIP’s language encoder1 .
+manipulation. Due to the plate’s width and the need for sta-            Specifically, the input sentence is preprocessed by the
+ble control, the operation demands precise bimanual manip-              CLIP’s tokenizer and then encoded to a sequence of di-
+ulation, requiring synchronized lifting motions from both               mensions R77×512 . We use its hidden state of “[CLS]” as
+arms. This task cannot be accomplished by a single robot                the textual feature. It is worth noting that we extracted all
+arm given the plate’s dimensions and stability requirements.            text features in advance. Therefore, throughout the training
+                                                                        phase, the weights of the text encoder do not participate in
+handover item easy. Similar to the corresponding                        the gradient calculation of backpropagation.
+simulated task, this task requires the robot to handover a
+blue item by utilizing one arm to securely grasp and lift               Fusion Module. The fusion module begins with upsam-
+the item as shown in Figure A(g). However, the robot do                 pling the visual features, followed by feature-wise modu-
+not need to lift the item to a height of 80 cm, but 30cm                lation (FiLM) to integrate textual features, projecting them
+instead considering the security, while ensuring the other              into a high-dimensional semantic space. This hierarchical
+arm remains idle and unengaged, The object involved is a                fusion process is performed iteratively lFiLM times, where
+blue block, and the key challenge is as the same as that of in          we empirically set lFiLM to 3.
+simulation. Successful completion is determined when the                    The relevant hyperparameters of the backbone are pre-
+item is accurately identified, grasped, and positioned at the           sented in Table B.
+required height with no actions performed by the idle arm.                          Table B. The hyperparameters of Backbone.
+
+B. Implementation Details                                                                                  Vision                  Text
+B.1. Details of KStar Diffuser                                                   patch size                  16               N/A
+                                                                                 hidden size                 64                512
+B.1.1. Backbone                                                                  # layers                     6                 12
+Vision Branch. Following the existing work [17, 49],                             # heads                      8                  8
+we employ multiview RGB-D observation as visual input,                           intermediate size           64               2048
+where the resolution of RGB images is 3×256×256 and                              dropout ratio              0.1                0.0
+the depth data is processed into point clouds (65536×3)                          activation              lrelu         quick gelu
+using the camera’s intrinsic and extrinsic parameters. The                       trainable                   ✓                  ×
+camera views contain front, overhead, right over shoulder,
+left over shoulder, right wrist, left wrist. We uniformly use
+a Vision Transformer which is trained from scratch as the                  1 https://huggingface.co/openai/clip-vit-base-patch32
+
+vision encoder.
+B.1.2. Spatial-Temporal Graph                                   • PerAct-LF: https://github.com/markusgrotz/peract bimanual
+We construct the spatial graph based on the URDF file of        • PerAct2: https://github.com/markusgrotz/peract bimanual
+robotic arms. In the simulation setup, we use two Franka        • DP-J: https://github.com/real-stanford/diffusion policy
+Panda arms, each with 7 joints, resulting in a total of 14      • DP3: https://github.com/YanjieZe/3D-Diffusion-Policy
+joints. In the real-world setup, we employ a bimanual
+ALOHA device, which has 12 joints, with 6 joints per arm.       C. Extensive Ablation Studies
+Therefore, the number of nodes and edges in the spatial         To evaluate KStar Diffuser more comprehensively, we con-
+graph is set to 14 and 12 for the simulation, respectively,     duct following extensive experiments.
+and 12 and 10 for the real-world setup.
+    For the dynamic spatio-temporal graph, we combine the       (1) The Effects of Demonstration Quantity. Given the
+spatial graphs of three consecutive timesteps and add inter-    critical role of demonstration quantity in imitation learning,
+timestep edges connecting the same joint node across dif-       we conduct an ablation study by training the KStar diffuser
+ferent timesteps. In simulated tasks, this results in a graph   with 50 demonstrations, with results reported in Table E.
+with 42 nodes and 33 edges. In real-world tasks, the graph      Additionally, we provide a comparative analysis of policy
+has 36 nodes and 28 edges.                                      performance across varying numbers of demonstrations (20,
+    We use the Graph Convolutional Graph (GCN) encoder          50, and 100), as shown in Figure 5. The results demon-
+to obtain the spatial-temporal graph representation. The de-    strate a clear positive correlation between demonstration
+tailed hyperparameters are presented in Table C.                quantity and policy performance. With 20 demonstra-
+                                                                tions, the policy achieves basic task completion capabilities.
+        Table C. The hyperparameters of GCN Encoder.            Increasing to 50 demonstrations yields significant perfor-
+                                                                mance improvements, with success rates rising by around
+                            Simulation      Real-world          4.5% across the task suite. The upward trend continues as
+                                                                we scale to 100 demonstrations, indicating that the policy
+       # nodes                      42                36        benefits from larger demonstration sets. These findings sug-
+       # edges                      36                28        gest that expanding the demonstration dataset consistently
+       node dimension               19                19        enhances the policy’s ability to learn and generalize manip-
+       hidden size                 128               128        ulation tasks.
+       intermediate size           128               128
+       # layers                      4                 4                                                Comparison of Different Demonstrations
+                                                                                                        98.7                                                             20 Demo
+                                                                                    100          94.3
+                                                                                                                                            89.0                         50 Demo
+B.1.3. Optimization Details                                                               87.0                                  83.0 85.0                                100 Demo
+                                                                                                               79.3 81.0 83.0
+During training, we follow the setup of Diffusion Policy, us-                       80
+
+
+
+                                                                Success Ratio (%)
+ing the DDPM scheduler to forward and denoise, where the
+step of forward process and reverse process is set to 100 and
+                                                                                    60
+1, respectively. Table D shows the training hyperparamters.
+                                                                                                                                                                 43.7
+            Table D. The training hyperparameters.
+                                                                                    40
+                                                                                                                                                          27.7
+                                   Values                                                                                                                                      24.3 27.0
+                                                                                                                                                                        23.7
+                                                                                                                                                   17.0
+                 batch size          64                                             20
+                 learning rate     2e − 4                                                    Box                   Ball         Handover            Laptop                Sweep
+                 warmup step         5k                                                                                           Tasks
+                 weight decay      1e − 6
+                                                                 Figure B. The comparison of different number of demonstrations.
+                 lr scheduler     cosine
+                 training step      150 k
+                 Optimizer         AdamW                        (2) The Effects of Action Chunking Size. As mentioned
+                                                                in previous work [9, 65], action chunking prediction serves
+                                                                as an effective approach to address the multimodality chal-
+                                                                lenges inherent in robotic manipulation tasks. To empiri-
+B.2. Code Base                                                  cally verify this mechanism within our framework, we con-
+The code bases employed for our evaluations are detailed as     ducted an evaluation of the KStar Diffuser under various ac-
+follows:                                                        tion chunking size configurations. Our experimental setup
+• ACT: https://github.com/markusgrotz/peract bimanual           explores three distinct action chunking strategies: 1) single-
+• RVT-LF: https://github.com/markusgrotz/peract bimanual        step prediction where only the next optimal pose is gen-
+Table E. The experimental result on simulated tasks. We train the policy with the setting of different training demonstrations, i.e. [20, 100],
+to test its capability comprehensively. The best results are in bold. Each result is reported with three seeds on average.
+
+                                                  Push           Lift         Handover           Pick          Sweep
+                                                                                                                              Overall
+                                                  Box            Ball        Item (easy)        Laptop         Dustpan
+     Demonstration Quantity
+     KStar Diffuser (num demos=20)             79.3 ±3.5      87.0 ±2.7        23.7 ±0.6      17.0 ±2.0       83.0 ±4.4       58.0 ±1.4
+     KStar Diffuser (num demos=50)             81.0 ±3.6      94.3 ±2.5        24.3 ±3.1      27.7 ±3.2       85.0 ±2.7       62.5 ±1.4
+     KStar Diffuser (num demos=100)            83.0 ±1.7      98.7 ±1.5        27.0 ±1.7      43.7 ±4.5       89.0 ±5.2       68.2 ±2.1
+     Action Chunking Length
+     KStar Diffuser (chunking=1)               92.0 ±1.7      98.7 ±0.6        23.7 ±5.9      16.0 ±5.2       12.3 ±4.2       48.5 ±0.6
+     KStar Diffuser (chunking=2)               83.0 ±1.7      98.7 ±1.5        27.0 ±1.7      43.7 ±4.5       89.0 ±5.2       68.2 ±2.1
+     KStar Diffuser (chunking=5)               81.3 ±1.5      97.7 ±2.5         1.7 ±1.2      14.3 ±3.2       99.3 ±1.2       58.9 ±1.4
+     Historical Observation Length
+     KStar Diffuser (history=0)                86.3 ±3.5      99.7 ±0.6         9.7 ±2.1       0.0 ±0.0        0.0 ±0.0       39.1 ±1.1
+     KStar Diffuser (history=1)                87.7 ±4.0      28.3 ±2.5        10.3 ±7.4      36.3 ±8.5       92.7 ±1.5       51.1 ±1.5
+     KStar Diffuser (history=2)                83.0 ±1.7      98.7 ±1.5        27.0 ±1.7      43.7 ±4.5       89.0 ±5.2       68.2 ±2.1
+     Coefficient λ
+     KStar Diffuser (λ=0.1)                    84.3 ±4.9      99.3 ±1.2        12.7 ±2.3      19.7 ±4.7       89.7 ±2.5       61.1 ±1.1
+     KStar Diffuser (λ=0.5)                   83.7 ±11.6      98.3 ±1.5         3.3 ±1.2      36.3 ±6.8       93.7 ±3.8       63.1 ±4.5
+     KStar Diffuser (λ=0.9)                    83.0 ±1.7      98.7 ±1.5        27.0 ±1.7      43.7 ±4.5       89.0 ±5.2       68.2 ±2.1
+
+
+
+
+Figure C. The left: The result of different action chunking size. The middle: The result of history lengths. The right: The result of different
+coefficient λ.
+
+erated (action chunk = 1), 2) two-step prediction of con-                 gests that when predicting next best pose, extended predic-
+secutive optimal poses (action chunk = 2), and 3) five-step               tion horizons introduce excessive complexity into the learn-
+prediction of sequential optimal poses (action chunk = 5).                ing problem, making it challenging for the policy to cap-
+    The results presented in Table E reveal an interesting                ture and generate accurate action sequences. As shown in
+trade-off between prediction horizon and model per-                       Figure C, we present the variation in the success ratio for
+formance. While single-step prediction (action chunk =                    the handover item easy task, under different action
+1) provides basic capabilities, it usually meets the multi-               chunking size configurations as the number of training steps
+modal problem. The two-step prediction strategy (action                   increases.
+chunk = 2) emerges as the optimal configuration, demon-
+strating superior success rates and motion quality across                 (3) The Effects of Historical Observation Length. Dur-
+all tasks. Notably, attempting to predict longer sequences                ing our experiments, we found that the historical informa-
+(action chunk = 5) leads to decreased performance, with                   tion plays an important role in action prediction quality.
+success rates dropping by around 10% compared to the                      We conduct an ablation study across three history lengths:
+two-step configuration. This performance degradation sug-                 0 (current observation only), 1, and 2 steps. The results
+  Instruction: Lift the ball.
+
+
+
+
+  Instruction: Push the box to the red.
+ area.
+
+
+
+
+ Instruction: Handover the item.
+
+
+
+
+  Instruction: Sweep the dust to the pan.
+
+
+
+
+   Figure D. The visualization of simulated tasks, including push box, lift ball, handover item easy, sweep dustpan.
+
+
+are shown in Table E. With no historical information (0-          and motion constrains. The regularization strength is con-
+step), the policy fails to learn effective policies, as it can-   trolled by the coefficient λ, which determines the extent
+not capture the temporal dependencies crucial for manipu-         of kinematic constraints imposed on the learning process.
+lation tasks. Adding one historical step enables basic learn-     The choice of λ significantly influences policy performance.
+ing capabilities, with the model achieving preliminary suc-       Larger values of λ (approaching 1.0) correspond to weaker
+cess in simpler tasks. Further extending to two histori-          kinematic constraints, enabling more flexible motion pat-
+cal steps yields optimal performance, showing an approx-          terns. Conversely, smaller values of λ (e.g., 0.1) impose
+imately 17% improvement over the single-step configura-           stricter kinematic constraints, yielding more conservative
+tion and demonstrating enhanced stability across all tasks.       policies that emphasize motion smoothness over task effi-
+While longer history lengths might provide more temporal          ciency. Empirical results, as shown in Table E, demonstrate
+context, they risk introducing redundant information that         that policy performance reaches its optimum at λ = 0.9.
+could potentially obscure relevant features, as observed in       For smaller values of λ, the learned policies exhibit overly
+our preliminary experiments. These findings suggest that          cautious behavior, manifesting in trajectories that prioritize
+while temporal context is essential for understanding the         smoothness at the expense of task efficiency and optimal
+current state and predicting actions, an appropriate his-         path planning. Conversely, as λ approaches 1.0, the di-
+tory window, e.g., 2 steps, provides an optimal balance           minished kinematic constraints result in less regulated mo-
+between capturing necessary temporal dependencies and             tion patterns, potentially compromising trajectory natural-
+maintaining computational efficiency. As shown in Fig-            ness and precision. These findings indicate that λ = 0.9
+ure C, we present the variation in the success ratio for          achieves a better trade-off between preserving natural mo-
+the handover item easy task, under different history              tion characteristics and ensuring efficient task execution.
+length configurations as the number of training steps in-         This configuration effectively minimizes the adverse effects
+creases.                                                          of both excessive motion constraints and insufficient regu-
+                                                                  lation, ultimately yielding superior performance across our
+(4) The Effects of Coefficient λ. In policy learning, a
+                                                                  task suite. As shown in Figure C, we present the variation
+kinematic regularization term is incorporated into the next
+                                                                  in the success ratio for the handover item easy task,
+best pose learning objective to balance task effectiveness
+under different coefficient λ configurations as the number
+of training steps increases.
+
+D. Qualitative Analysis
+We show more qualitative result in Figure D. Through the
+novel approach of encoding robotic arm structural infor-
+mation as graph representations and explicitly incorporat-
+ing kinematic constraints, our model demonstrates excep-
+tional performance in motion symmetry, synchronization,
+and coordination across dual-arm manipulation tasks. In the
+lift ball experiment, the model achieves precise bilat-
+eral symmetry in spatial positioning through learned struc-
+tured representations. The dual arms maintain stable sym-
+metric configurations while preventing object instability
+through synchronized force application patterns, highlight-
+ing the efficacy of our structure-aware control paradigm.
+Furthermore, in the push box task, the model exhibits re-
+markable geometric symmetry in motion planning and ex-
+ecution. By leveraging embedded kinematic information,
+the robotic arms consistently maintain equidistant position-
+ing relative to the target object’s center of mass while exe-
+cuting synchronized trajectories along parallel paths. This
+precise symmetrical control not only ensures operational
+stability during object manipulation but also establishes a
+robust framework for dual-arm cooperative control in com-
+plex manipulation scenarios.
+

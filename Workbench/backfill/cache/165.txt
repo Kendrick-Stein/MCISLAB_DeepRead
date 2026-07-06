@@ -1,0 +1,880 @@
+                                              VLM-Loc: Localization in Point Cloud Maps via Vision-Language Models
+
+                                                     Shuhao Kang1 Youqi Liao2 Peijie Wang3 Wenlong Liao4 Qilin Zhang5,6
+                                                                  Benjamin Busam5,6 Xieyuanli Chen7† Yun Liu1,8,9†
+                                                     1
+                                                       VCIP, CS, Nankai University 2 Wuhan University 3 CASIA 4 COWAROBOT
+                                                 5
+                                                   TUM 6 MCML 7 NUDT 8 AAIS, Nankai University 9 NKIARI, Shenzhen Futian
+
+
+
+
+arXiv:2603.09826v1 [cs.CV] 10 Mar 2026
+                                                                                                                I am locating on top of
+                                                                       Abstract                                  a gray road, east of a
+                                                                                                                                                                                    I can’t locate you yet.
+                                                                                                                                                                                      Could you describe
+                                                                                                                gray sidewalk, south of                                            your position precisely?
+                                                                                                                  a black vegetation …
+
+                                         Text-to-point-cloud (T2P) localization aims to infer precise
+                                         spatial positions within 3D point cloud maps from natural
+                                                                                                                                            Target Location
+                                         language descriptions, reflecting how humans perceive and                                                           (a)
+                                         communicate spatial layouts through language. However,                 Text2Loc                                       VLM-Loc
+                                         existing methods largely rely on shallow text-point cloud              Input                                                      BEV Image           Scene Graph
+                                         correspondence without effective spatial reasoning, limit-                   Query                  3D Objects
+
+                                         ing their accuracy in complex environments. To address                 Model                                              Query
+
+                                         this limitation, we propose VLM-Loc, a framework that                    Text Encoder            Instance Encoder
+
+                                         leverages the spatial reasoning capability of large vision-                            Transformer                             Vision-Language Model
+                                         language models (VLMs) for T2P localization. Specifically,                                  MLP
+                                                                                                                                                                    Partial Node
+                                         we transform point clouds into bird’s-eye-view (BEV) im-                                                                                             Location
+                                                                                                                Output             Location                         Assignment
+                                         ages and scene graphs that jointly encode geometric and se-
+                                                                                                                                     (b)                                              (c)
+                                         mantic context, providing structured inputs for the VLM to
+                                         learn cross-modal representations bridging linguistic and             Figure 1. (a) illustrates the human-like logic behind text-to-point
+                                         spatial semantics. On top of these representations, we in-            cloud localization, where spatial descriptions are used to infer the
+                                         troduce a partial node assignment mechanism that explicitly           target position. (b) and (c) show the architectures of a typical
+                                         associates textual cues with scene graph nodes, enabling in-          method, Text2Loc [57], and our proposed VLM-Loc, respectively.
+                                         terpretable spatial reasoning for accurate localization. To
+                                                                                                               pickup spot. In such scenarios, passengers can naturally
+                                         facilitate systematic evaluation across diverse scenes, we
+                                                                                                               describe their surroundings using language, providing ad-
+                                         present CityLoc, a benchmark built from multi-source point
+                                                                                                               ditional spatial cues for localization without relying on any
+                                         clouds for fine-grained T2P localization. Experiments on
+                                                                                                               visual sensors. Since point cloud maps offer detailed geo-
+                                         CityLoc demonstrate VLM-Loc achieves superior accuracy
+                                                                                                               metric representations of urban scenes, they are well-suited
+                                         and robustness compared to state-of-the-art methods. Our
+                                                                                                               for aligning these textual cues with the physical environ-
+                                         code, model, and dataset are available at repository.
+                                                                                                               ment. This motivates the task of text-to-point-cloud (T2P)
+                                                                                                               localization, which bridges language understanding and 3D
+                                                                                                               spatial perception, paving the way for future human-robot
+                                         1. Introduction                                                       interactive localization systems, as shown in Fig. 1(a).
+                                         Estimating the spatial position with natural language is a                Existing T2P localization approaches focus on localiz-
+                                         fundamental task in embodied intelligence [22, 53, 64, 65]            ing in city-scale point cloud maps using textual descrip-
+                                         and autonomous vehicles [12, 21, 28, 29]. In real-world               tions. Text2Pos [25] introduced the KITTI360Pose bench-
+                                         scenarios such as autonomous robotaxi services, vehicles              mark and employed a coarse-to-fine strategy, retrieving can-
+                                         typically rely on the Global Navigation Satellite System              didate submaps before refining the position estimation. Fol-
+                                         (GNSS) for approximate passenger localization. However,               lowing this paradigm, subsequent works [33, 52, 57, 58] in-
+                                         GNSS localization often suffers from degraded accuracy                troduced more effective model designs to improve T2P lo-
+                                         in urban environments due to multipath effect and atmo-               calization. However, these approaches still face several lim-
+                                         spheric delay [49], making it difficult to identify the precise       itations: (1) during the fine localization stage, their submaps
+                                                                                                               are typically restricted to small and relatively simple regions
+                                            † corresponding authors.                                           (e.g., 30m × 30m), where the limited spatial extent inher-
+
+
+                                                                                                           1
+ently simplifies matching. This assumption oversimplifies             • We transform 3D point clouds into BEV images aug-
+real-world conditions and fails to capture the complexity               mented with scene graphs, bridging the modality gap be-
+of large-scale urban scenes; and (2) despite architectural              tween 3D point clouds and 2D VLMs and enabling effec-
+improvements, these methods adopt an end-to-end posi-                   tive multi-modal alignment for accurate T2P localization.
+tion prediction paradigm without explicit reasoning, which            • We design a partial node assignment mechanism to ex-
+makes structured spatial modeling challenging and limits                plicitly align textual hints with graph nodes, enhancing
+localization accuracy, especially in complex environments.              the spatial understanding and reasoning.
+    To better understand and address these challenges, we
+consider what capabilities fine-grained T2P localization re-          2. Related Work
+quires. Humans can naturally perceive and describe spa-
+tial layouts spanning tens of meters [37, 45, 60], indicat-           2.1. Localization in Point Cloud
+ing that robust localization should operate over larger and           Localization within point cloud maps has been extensively
+more complex regions rather than being limited to small,              studied in recent years. Existing approaches mainly adopt
+simplified submaps. Furthermore, overcoming the absence               point clouds or images as query modalities. Pioneer-
+of explicit reasoning requires models that can interpret spa-         ing point-cloud-to-point-cloud (P2P) localization methods,
+tial relations expressed in language and connect them to              such as PointNetVLAD [50], combine PointNet [43] with
+the environment. Vision-language models (VLMs) offer a                NetVLAD [4] for global descriptor learning. Subsequent
+promising foundation for this goal. Equipped with strong              transformer-based approaches further improve performance
+multimodal reasoning capabilities [9], they can parse com-            by modeling long-range geometric dependencies [17, 41,
+plex spatial descriptions and effectively align linguistic cues       56, 62]. More recently, methods like BEVPlace++ [40]
+with visual inputs, making them suitable for fine-grained             and RING# [39] enhance robustness through rotation-
+T2P localization in complex environments.                             equivariant architectures in BEV representations. Image-
+    Motivated by these insights, we propose VLM-Loc, a                to-point-cloud (I2P) localization methods instead align im-
+novel VLM-based framework for fine-grained localization               age features with 3D representations through shared embed-
+in complex local point cloud maps. As illustrated in Fig. 1           dings [10, 31] or implicit reconstruction [24]. In contrast,
+(b) and (c), unlike prior approaches [25, 57] that directly           our approach employs natural language as the query modal-
+learn correspondences between textual descriptions and 3D             ity, enabling intuitive and interpretable localization without
+objects, VLM-Loc leverages the inherent spatial reasoning             relying on additional sensor observations, facilitating flexi-
+capability of large VLMs to align linguistic cues with struc-         ble interaction in real-world applications.
+tured map representations, achieving more interpretable and
+accurate localization. The point cloud map is transformed             2.2. 3D Vision and Language
+into a bird’s-eye-view (BEV) image to provide dense and               Recent years have seen increasing interest in grounding nat-
+structured spatial representations, while a scene graph is            ural language in 3D point cloud scenes. Early works [5,
+simultaneously constructed to capture higher-level seman-             18, 23] explored text-guided 3D detection and segmenta-
+tic relations among objects. Building upon these repre-               tion, aiming to associate linguistic expressions with corre-
+sentations, we introduce Partial Node Assignment (PNA)                sponding geometric structures. Following this line, a series
+mechanism that explicitly supervises the VLM to associate             of studies [2, 3, 11, 46] advanced 3D language grounding
+textual cues with their corresponding spatial nodes, thereby          through contrastive learning and transformer-based cross-
+guiding interpretable spatial understanding and improving             modal reasoning. These methods mainly focus on object-
+position estimation. To comprehensively evaluate T2P lo-              level grounding, e.g., identifying the referred objects or re-
+calization, we establish CityLoc, a new benchmark specif-             gions within a local 3D scene, thus forming the foundation
+ically designed for fine-grained T2P localization in com-             for higher-level spatial understanding tasks.
+plex and diverse environments. Experimental results on                    Extending beyond language-driven 3D perception tasks,
+CityLoc show that the proposed VLM-Loc achieves state-                T2P localization requires holistic scene understanding of
+of-the-art (SOTA) performance, outperforming the previous             spatial layouts and relationships to infer specific target po-
+best method, CMMLoc [58], by 14.20% at Recall@5m on                   sitions from textual descriptions. This task, first intro-
+CityLoc-K test set, demonstrating the effectiveness of our            duced by Text2Pos [25], aims to predict a 2-degree-of-
+framework for accurate localization.                                  freedom (DoF) location corresponding to the described
+    Overall, our contributions are concluded as follows:              scene context. Text2Pos formulates the problem as cell-
+• We introduce VLM-Loc, a VLM-based framework for ac-                 level retrieval followed by position regression, using the
+   curate T2P localization, together with CityLoc, a bench-           KITTI360Pose dataset for evaluation. Subsequent works
+   mark designed to systematically evaluate performance in            improved this paradigm by enhancing cross-modal rep-
+   complex 3D scenes.                                                 resentations: RET [52] and Text2Loc [57] leveraged
+
+                                                                  2
+transformer-based [36, 48, 51] encoders for text and point            DAR scans, is used to validate the model design and assess
+cloud alignment, MNCL [33] employed multi-level con-                  localization performance. In contrast, CityLoc-C is built
+trastive learning to improve boundary perception, and                 from unmanned aerial vehicle (UAV)–based photogram-
+CMMLoc [58] modeled 3D objects using Cauchy Mixture                   metric point clouds [20] and is used to evaluate cross-
+Model priors with integrated cardinal direction cues for fine         domain generalization to unseen urban scenes with different
+localization. Nevertheless, existing approaches operate on            sensing modalities and semantic distributions. Such a dual-
+small and relatively simple submaps whose limited spatial             source design enables a more comprehensive evaluation of
+extent simplifies localization, and they rely on direct feature       model robustness across diverse point cloud scenes.
+matching without explicit spatial reasoning, limiting their               The CityLoc benchmark targets fine-grained T2P lo-
+performance in complex environments.                                  calization in complex environments with broader visible
+                                                                      ranges and more diverse spatial structures, which present
+2.3. Vision-Language Models                                           significant challenges for accurate pose estimation. We de-
+VLMs are designed to capture holistic visual and spatial              tail the construction process of CityLoc-K in this section,
+relationships across objects, scene layouts, and abstract             while CityLoc-C follows the same pipeline but adopts a tai-
+semantic concepts. Early works such as CLIP [44] and                  lored sampling strategy to fit its aerial viewpoint and seman-
+ALIGN [26] pioneered contrastive learning between image-              tic distribution. Additional details of CityLoc are provided
+text pairs, enabling robust zero-shot recognition and re-             in the supplementary material.
+trieval. Subsequently, VLMs evolved beyond static con-                Map construction.         KITTI-360 [32] provides city-scale
+trastive pre-training toward richer multimodal reasoning              point cloud scenes annotated with semantic labels, instance
+and grounded visual understanding. Models like BLIP-                  IDs, and color information. Along the vehicle trajectory, we
+2 [27] and InstructBLIP [14] bridge frozen visual encoders            perform distance-based sampling to generate point cloud
+with large language models via lightweight query trans-               submaps for localization experiments. For each sampled
+formers, achieving efficient multimodal alignment and in-             position, a local map M of size S × S m is obtained by
+struction following. More recent systems, including LLaVA             cropping all points within the corresponding spatial win-
+series [34, 35] and the Qwen-VL family [6–8, 54], fur-                dow centered at the sampling location. Following KITTI-
+ther enhance spatial reasoning and dense region ground-               360 [32], all instances are divided into “stuff” and “object”
+ing through large-scale instruction tuning and unified mul-           categories. For “stuff” categories, points within each map
+timodal architectures. Despite these advances, most exist-            are grouped into discrete instances using DBSCAN [16].
+ing efforts focus on perceiving and grounding real, phys-             For “object” categories, an instance is kept only if at least
+ically present objects rather than estimating a virtual loca-         one-third of its points lie inside the map, ensuring sufficient
+tion described through language. Motivated by this gap, our           completeness and recognizability. After processing, each
+work investigates how to utilize large VLMs for text-guided           local map M contains a set of discrete object instances,
+localization in 3D environments, leveraging their inherent            each associated with semantic labels, instance identifiers,
+spatial reasoning abilities for accurate localization.                per-point coordinates, and color attributes.
+3. The CityLoc Benchmark                                              Text query generation.          Around each sampled vehi-
+                                                                      cle pose, we randomly sample multiple nearby positions to
+The T2P localization is formulated on local maps for prac-            serve as query locations. Each query location defines a pose
+ticality. However, existing benchmark does not reflect the            cell, which represents the local region visible from that po-
+scale and complexity of real-world environments. The most             sition. For each pose cell, all objects within S × S meters
+widely used T2P localization benchmark, KITTI360Pose,                 area centered at the query location are collected, following
+was designed for large-scale point cloud localization, yet            the same procedure used in map construction. A subset of
+its submaps cover only small areas and contain a limited              Nt objects is then randomly selected to form the textual de-
+number of simple objects. This substantially simplifies the           scription. For each selected object, its semantic label, color,
+fine localization stage by restricting the search space and           and orientation relative to the pose cell are inserted into a
+reducing scene clutter, yet diverges from the scenarios in            predefined template to generate the natural language query.
+which humans typically perceive and describe much larger
+and more complex surroundings [37, 60].                               4. Methodology
+    To systematically evaluate existing frameworks and our
+proposed method under a more realistic setting, we intro-             Problem formulation. Given a textual description T of
+duce the CityLoc benchmark, constructed from the LiDAR                a target position ξ, the goal of T2P localization is to es-
+point cloud of KITTI-360 [32] and the photogrammetric                 timate the 2D coordinates ξ = (x, y) ∈ R2 within the
+point cloud of CityRefer [42], referred to as CityLoc-K and           point cloud map M on the ground plane. The text query
+CityLoc-C. CityLoc-K, derived from vehicle-mounted Li-                T = {hi }N  i=1 consists of Nt linguistic hints describing
+                                                                                    t
+
+
+
+
+                                                                  3
+Figure 2. Overview of VLM-Loc. In the data generation stage, the point cloud map is converted into a BEV image and a scene graph,
+where each node encodes semantic and spatial information. During training, the BEV image is used as the visual input, and the text input
+includes the scene graph, system prompt, and text query. These inputs are fed into a VLM for fine-tuning, enabling it to perform partial
+node assignment and position estimation in an autoregressive manner.
+
+the semantics, colors, and directions of surrounding objects           RGB values of all points:
+relative to ξ. Following [47], we assume a locally planar
+ground surface, which is a reasonable approximation for ur-                                    \label {eq:color} \bar {\mathbf {c}}_i = \frac {1}{N_i} \sum _{j=1}^{N_i} \mathbf {c}_{ij}.    (1)
+ban environments at this scale.
+   Fig. 2 presents an overview of VLM-Loc. Given a point                  Next, the entire point cloud map is projected onto
+cloud map, we first convert it into two complementary rep-             the ground plane and rasterized into a BEV image I ∈
+resentations: a BEV image and a scene graph that capture               RH×W ×3 , covering a spatial range of S × S meters. Each
+the dense geometric layout and object-level semantics of the           pixel in the BEV image is assigned the color c̄i of the object
+environment (Sec. 4.1). During localization, these repre-              whose projected footprint occupies that grid cell. When a
+sentations serve as map inputs, while the text query T is              pixel contains both “stuff” and “object” categories, the “ob-
+prepended with a system prompt s to guide the spatial rea-             ject” category is rendered with higher priority to ensure that
+soning process of the VLM. To improve spatial understand-              foreground regions are preserved without being overwritten.
+ing, we introduce the PNA mechanism (Sec. 4.2), which
+identifies valid textual hints and grounds them to corre-              Scene graph generation.            The BEV image I provides
+sponding nodes in the scene graph. Based on the grounded               a top-down visual representation of the point cloud map
+nodes, the model predicts the target position through an au-           M. Although it captures the overall scene layout, it lacks
+toregressive decoding procedure (Sec. 4.3).                            explicit semantics and makes it difficult to model spatial
+                                                                       relationships among objects. To enable more structured
+                                                                       scene understanding for VLMs, we construct a scene graph
+4.1. BEV Rendering and Scene Graph Generation                          G = (V, E). Here, V denotes the set of object nodes
+BEV image rendering. Since VLMs are mainly pre-                        and E represents the pairwise spatial relations among them.
+trained on RGB images, we generate a BEV image by pro-                 Each object oi is represented as a node ni ∈ V, defined as
+jecting the points of M onto the ground plane. This al-                ni = (i, li , ui ), where i is the node index, li is the seman-
+lows the models to leverage their spatial reasoning capabil-           tic label, and ui = (ui , vi ) is the centroid pixel coordinates
+ity within a 2D layout. The map M contains an object set               of the object on the BEV image. Since the BEV-projected
+O = {oi }N  i=1 , where No denotes the number of objects.
+              o                                                        coordinates ui already encode relative spatial relations, we
+Each object oi is represented by Ni 3D points with RGB                 omit explicit edges E in practice for simplicity. This rep-
+colors, Pi = {(pij , cij )}N                     3
+                            j=1 , where pij ∈ R is the per-
+                             i                                         resentation provides both semantic and geometric structure
+                                   3
+point coordinates and cij ∈ R denotes the correspond-                  that aligns well with VLMs for cross-modal reasoning.
+ing color, and li is its object-level semantic label. To ob-           Remark. Transforming the point cloud map into a BEV
+tain a compact appearance representation for each object,              image provides a dense, rasterized representation of the en-
+we compute the representative color of oi by averaging the             vironment that aligns naturally with off-the-shelf VLMs.
+
+
+                                                                   4
+                                                                       Remark. PNA enables the VLM to perform interpretable
+                                                                       localization by determining whether objects mentioned in
+                                                                       the textual query that are visible in the map and establish-
+                                                                       ing correspondences between textual query and map ob-
+                                                                       jects. This mechanism helps the model focus on relevant
+                                                                       surrounding objects and understand the spatial distribution
+                                                                       described in the text relative to the map, thereby improving
+Figure 3. Illustration of the node assignment process. PNA de-         localization accuracy.
+termines whether a textual object is groundable by comparing the
+distance between points A and B with the threshold τ .                 4.3. Position Estimation
+In parallel, the scene graph serves as a structured repre-             After obtaining the node–text correspondences by the PNA
+sentation that connects semantic labels to pixel locations             module, VLM-Loc estimates the 2-DoF position ξ in pixel
+and captures the relative spatial relationships among ob-              coordinates. We incorporate position prediction into the
+jects, thereby bridging the BEV image and textual instruc-             autoregressive decoding, allowing the model to output the
+tions. Together, the BEV image and scene graph allow the               corresponding 2D location on BEV image in the same se-
+VLMs to exploit both fine-grained geometric cues and high-             quence of generation steps. This unified decoding strategy
+level semantic relationships, facilitating precise spatial un-         allows the model to reason consistently from correspon-
+derstanding and localization.                                          dences to spatial coordinates. The predicted pixel location
+                                                                       is then converted to world coordinate system.
+4.2. Partial Node Assignment
+                                                                       4.4. Loss function
+Although BEV images and scene graphs provide struc-
+tured and complementary representations of the environ-                Following the autoregressive prediction paradigm of VLMs,
+ment, T2P localization still faces two inherent challenges.            we train VLM-Loc by maximizing the likelihood of gener-
+First, directly regressing coordinates from these inputs does          ating the correct text–node alignments and position predic-
+not fully leverage the structured reasoning capability of              tions, both of which are expressed entirely in text form. For
+VLMs, often resulting in ambiguous spatial interpretations.            each output token yt in the generated sequence, the training
+Second, the map M covers only a limited region, some ob-               objective is the standard cross-entropy loss:
+jects mentioned in the textual query may fall outside the
+mapped area. As a result, only part of the mentioned ob-                          \mathcal {L} = -\sum _{t=1}^{T} \log P\!\left (y_t \mid y_{<t},\, s,\, \mathcal {T},\, I,\, \mathcal {G}\right ), \label {eq:loss}    (2)
+jects can be grounded, which leads to a partial matching
+problem that further complicates accurate pose estimation.
+                                                                       where T denotes the number of tokens in the pre-
+   To address this issue, we introduce the PNA mechanism,
+                                                                       dicted sequence. After generating the token sequence
+which provides supervision by explicitly aligning visible
+                                                                       {y1 , y2 , . . . , yT }, the model outputs a JSON-formatted
+textual objects with nodes in the scene graph. For each
+                                                                       string, which we parse into structured predictions, includ-
+hint hi in the textual query T , we determine for every men-
+                                                                       ing matched text–node pairs and the 2D pixel position.
+tioned object whether it can be matched to a node n ∈ V in
+the scene graph. As illustrated in Fig. 3, consider a vegeta-
+                                                                       5. Experiments
+tion object whose projected center A is computed from the
+points of this object that fall inside the map region, and let B       5.1. Experimental Setup
+denote the center computed from the points of the pose cell
+                                                                       Baselines. In experiments, we adopt representative
+that lie inside the region visible to the query location ξ. We
+                                                                       T2P localization methods, including Text2Pos [25],
+compute the distance between A and B. If this distance is
+                                                                       Text2Loc [57], MNCL [33], and CMMLoc [58] as base-
+smaller than a threshold τ , the textual object is considered
+                                                                       lines. For fair comparison, all baselines are retrained on
+valid, labeled as True, and linked to the corresponding node
+                                                                       CityLoc-K using only the localization modules, with offi-
+in G. Otherwise, it is considered invalid, labeled as False,
+                                                                       cial implementations and identical training configurations.
+and the assignment for this object is set to null.
+   During training, ground-truth (GT) assignments are used             Evaluation metrics.           Following prior localization
+to supervise the model in determining whether each textual             works [25, 47], we evaluate localization performance using
+object lies inside the map M and in establishing textual-              Recall@K m, which measures the percentage of samples
+object correspondences. During inference, the model pre-               whose predicted positions are within K meters of the GT
+dicts these partial correspondences autonomously, which                location. Results are reported for K ∈ {5, 10, 15}.
+enables robust reasoning even when the description includes            Implementation details.      We employ Qwen3-VL-
+only a subset of the objects in the scene.                             8B-Instruct [59] as the base model for the VLM-Loc
+
+
+                                                                   5
+          Input       Output    CityLoc-K Val     CityLoc-K Test                                    CityLoc-K Val      CityLoc-K Test
+ #                                                                        Model
+       BEV SG         PNA        R@5/10/15m        R@5/10/15m                                       R@5/10/15 m         R@5/10/15 m
+ (a)     ✓     ✗        ✗      13.04/32.79/52.31 13.21/33.86/51.40        Qwen3-VL-2B-Instr. 35.78/64.22/79.97 34.70/63.19/76.49
+ (b)     ✗     ✓        ✗      26.75/52.94/71.67 24.62/51.25/69.46        Qwen3-VL-4B-Instr. 35.50/64.28/80.76 34.23/61.37/75.18
+ (c)     ✗     ✓        ✓      33.69/59.48/75.51 32.34/61.34/74.94
+                                                                          Qwen3-VL-32B-Instr. 39.84/67.72/82.05 41.05/67.47/79.39
+ (d)     ✓     ✓        ✗      29.06/59.37/77.01 29.79/57.57/73.78
+                                                                          InternVL3.5-8B [55] 38.32/65.41/81.21 38.14/63.66/77.25
+ (e)     ✓     ✓        ✓      36.23/63.66/77.77 35.91/63.81/76.79
+                                                                          Qwen3-VL-8B-Instr.      36.23/63.66/77.77 35.91/63.81/76.79
+Table 1. Ablation study on each component. Input: BEV = BEV
+image, SG = scene graph. Output: PNA = partial node assignment.          Table 4. Ablation study on the effect of different VLM backbones.
+Best results are in bold, and second-best results are underlined.
+                                                                         Effect of components.        We conduct ablation studies to
+                        CityLoc-K Val       CityLoc-K Test               assess the contribution of each component in VLM-Loc, in-
+          Strategy                                                       cluding the BEV image, scene graph (SG), coordinate pre-
+                        R@5/10/15 m          R@5/10/15 m                 diction (C), and the proposed PNA mechanism, as summa-
+          Full         18.23/44.70/63.10 17.81/41.55/60.67               rized in Tab. 1. Variant (a), which uses only the BEV im-
+          Partial      36.23/63.66/77.77 35.91/63.81/76.79               age, performs poorly, showing that dense appearance cues
+                                                                         alone cannot capture object relationships and support ac-
+     Table 2. Ablation study on partial and full node assignment.        curate localization. Variant (b), which relies solely on the
+                                                                         SG, significantly outperforms (a), indicating that relational
+           Components            CityLoc-K Val     CityLoc-K Test        structure is more effective for position estimation. Introduc-
+ #
+       Sem. Color Dire.          R@5/10/15m         R@5/10/15m           ing PNA on top of SG, as in (c), further boosts performance,
+                                                                         improving Recall@5m by 6.94% on the validation set and
+ (a)     ✓        ✗      ✗     18.74/43.17/63.15 16.93/40.81/60.22
+                                                                         7.72% on the test set. This confirms that explicit node-level
+ (b)     ✓        ✓      ✗     18.28/43.96/64.50 18.01/42.95/61.47
+                                                                         grounding strengthens the reliability of coordinate predic-
+ (c)     ✓        ✓      ✓     36.23/63.66/77.77 35.91/63.81/76.79       tion. Variant (d), which combines the BEV image with the
+                                                                         scene graph, further improves performance by 2.31% and
+         Table 3. Ablation study on text query components.
+                                                                         5.17% at Recall@5m over the SG-only baseline. This im-
+framework.       Training is performed using the Swift                   provement indicates that integrating dense visual cues with
+framework [63] with LoRA-based parameter-efficient tun-                  relational structure provides the model with more complete
+ing [19]. We insert LoRA adapters with rank r=8 and scal-                spatial information. Finally, the full model (e), integrating
+ing factor α=16 into all linear layers. The parameters of                BEV, SG, and PNA, achieves the best overall performance,
+the vision encoder, vision adapters and language backbone                demonstrating the synergy between multimodal inputs and
+remain frozen, and only LoRA parameters are updated dur-                 explicit grounding for T2P localization.
+ing training, preserving pretrained cross-modal alignment                Comparison between partial and full node assignment.
+while adapting the model to the domain gap between ren-                  In our PNA strategy, an object mentioned in a hint h is
+dered BEV and natural images. The model is trained for 2                 considered groundable when the distance between the cen-
+epochs with a global batch size of 4 on 8 NVIDIA RTX                     troid of its visible region in the map M and the centroid of
+4090 GPUs. We use the AdamW optimizer [38] with a                        its visible region in the pose cell is smaller than a thresh-
+learning rate of 1 × 10−4 and a warm-up ratio of 0.05. All               old τ . Otherwise, the object is treated as not groundable.
+experiments are conducted in bfloat16 precision.                         To evaluate its effectiveness, we compare PNA with a full
+   For each BEV image I, the resolution is set to H = W =                node assignment variant. For this variant, any object men-
+224, corresponding to a spatial coverage of S = 50. Each                 tioned in the textual query is always assigned to a node in
+textual query T contains Nt = 6 hints. A dynamic thresh-                 the scene graph as long as there exists at least one node
+old τ is used for different semantic categories: 5 m for “ob-            with the same semantic label. In particular, the object is
+ject” classes and 15 m for “stuff” classes.                              forced to match the nearest node with the same label, even
+                                                                         when their centroid distance exceeds τ , rather than being
+5.2. Ablation Study                                                      left unassigned. As shown in Tab. 2, the proposed partial
+This section provides ablation studies to evaluate: (1) the ef-          node assignment consistently outperforms the full assign-
+fectiveness of each component in VLM-Loc; (2) the impact                 ment on both the validation and test sets. Specifically, it
+of the PNA mechanism; (3) the effect of different text query             improves Recall@5m by 18.00% and 18.10%, respectively,
+construction strategies; and (4) the effect of various VLM               demonstrating that explicitly accounting for partial visibil-
+backbones. Ablation studies are conducted on CityLoc-K.                  ity allows the model to focus on truly observable objects,
+
+
+                                                                     6
+                                              CityLoc-K Val                                          CityLoc-K Test
+                 Method
+                                   R@5 m          R@10 m        R@15 m                    R@5 m           R@10 m        R@15 m
+                 Text2Pos [25]      16.48          40.69          62.92                    14.62           38.27         59.55
+                 Text2Loc [57]      18.91          45.26          64.28                    17.97           41.22         61.50
+                 MNCL [33]          19.30          45.94          64.50                    18.76           42.63         62.58
+                 CMMLoc [58]        20.77          48.65          67.89                    21.71           46.67         66.00
+                 VLM-Loc         36.23 (+15.46) 63.66 (+15.01) 77.77 (+9.88) 35.91 (+14.20) 63.81 (+17.14) 76.79 (+10.79)
+
+  Table 5. Localization results of VLM-Loc and baseline methods on CityLoc-K. Green numbers indicate improvements over baselines.
+
+
+thereby enhancing node grounding and ultimately benefit-                                 1400                                            70
+                                                                                                    Sample Count
+
+
+
+
+                                                                                                                                         Localization Error (m)
+ing position estimation.                                                                 1200       Error IQR Box                        60
+
+
+
+                                                                          Sample Count
+Effect of text query components. As shown in Tab. 3,                                     1000                                            50
+we analyze the contribution of semantic, color, and direc-                                800                                            40
+tional cues in the text queries. Removing both color and di-                              600                                            30
+rectional information (Variant (a)) leads to a severe perfor-                             400                                            20
+mance drop, reducing Recall@5m from 36.23% to 18.74%                                      200                                            10
+on the validation set and from 35.91% to 16.93% on the
+                                                                                            0                                            0
+test set. When keeping color but removing directional cues                                      0     1      2      3    4       5   6
+(Variant (b)), the performance remains significantly lower                          Number of Correct Node Assignments per Sample
+than the full setting, with Recall@5m of 18.28% on valida-             Figure 4. Relationship between localization error and the number
+tion and 18.01% on test. These results show that directional           of correctly assigned nodes on the CityLoc-K test set. More correct
+cues play the dominant role in spatial reasoning, as remov-            node assignments correspond to lower localization errors.
+ing them nearly halves the performance even when color
+information is preserved, while color provides complemen-              the error distribution decrease substantially, with notably
+tary appearance grounding that further enhances localiza-              stable performance once four or more nodes are correctly
+tion when combined with directional cues.                              grounded. This strong correlation highlights the importance
+                                                                       of accurate node assignment, as reliable grounding of tex-
+Effect of VLM backbones.         We evaluate the impact of
+                                                                       tual descriptions directly leads to precise localization.
+different VLM architectures and model sizes on localiza-
+tion performance, as summarized in Tab. 4. By leverag-                 Localization accuracy. Localization results of the base-
+ing either InternVL3.5 [55] or the Qwen3-VL-Instruct mod-              line methods and our proposed VLM-Loc are presented
+els [7], VLM-Loc achieves strong performance, showing                  in Tab. 5. On CityLoc-K, VLM-Loc achieves the best lo-
+that diverse VLM architectures are compatible with and ef-             calization performance and significantly outperforms the
+fective for VLM-Loc. Within the Qwen3-VL family, the                   strongest baseline CMMLoc, with improvements of 15.46%
+2B, 4B, and 8B variants achieve comparable results, while              and 14.20% in Recall@5m on the validation and test sets,
+the 32B model shows a significant gain, reaching 39.84%                respectively. Qualitative examples in Fig. 5 further show
+Recall@5m on the validation set. This scaling trend in-                that VLM-Loc consistently surpasses all baselines across
+dicates that VLM-Loc consistently benefits from the en-                diverse scenes. Results show that VLM-Loc attains strong
+hanced multimodal reasoning capacity of larger models.                 spatial understanding through BEV and scene graph repre-
+                                                                       sentations, and performs structured reasoning via the PNA
+5.3. Results                                                           mechanism, yielding more accurate and interpretable local-
+                                                                       ization than existing baselines. More qualitative results are
+Node assignment results.         Fig. 4 presents the distribu-
+                                                                       available in the supplementary material.
+tion of samples according to the number of correctly as-
+signed nodes on the CityLoc-K. Most samples achieve three              Generalization ability.    To evaluate cross-domain gen-
+or more correct assignments, indicating that VLM-Loc is                eralization, we directly transfer the models trained on
+generally effective at grounding textual cues to correspond-           CityLoc-K to the CityLoc-C split and assess their localiza-
+ing scene graph nodes. On the right, the interquartile range           tion accuracy without extra fine-tuning. The point cloud
+(IQR) [15] illustrates the distribution of localization errors.        data of CityLoc-C originates from the SensatUrban [20]
+A clear trend emerges: as the number of correctly assigned             dataset, which contains photogrammetric point clouds cap-
+nodes increases, both the median error and the spread of               tured by drones and thus exhibit characteristics markedly
+
+
+                                                                   7
+Figure 5. Qualitative results of VLM-Loc and baseline methods on the CityLoc-K. Each example visualizes the predicted and GT positions
+on colorized BEV maps rendered with semantic labels. The red circles ● and black circles ● denote the GT and predicted positions,
+respectively. The localization error is shown below each image, and green/red borders indicate localization error below/above 5 m.
+
+                                   CityLoc-C                          By leveraging the visual and textual understanding and the
+        Method
+                                                                      strong spatial reasoning capability of VLMs, our approach
+                         R@5 m     R@10 m      R@15 m
+                                                                      enables accurate localization from language cues in com-
+        Text2Pos [25]     8.11       27.21      50.01                 plex environments. VLM-Loc converts point cloud maps
+        Text2Loc [57]     9.45       29.44      51.17                 into BEV images and scene graphs, and introduces a par-
+        MNCL [33]         13.68      35.93      53.78
+                                                                      tial node assignment mechanism that explicitly aligns tex-
+        CMMLoc [58]       11.68      34.79      54.71
+                                                                      tual cues with spatial nodes. We also establish the CityLoc
+        VLM-Loc           21.37      49.12      68.26                 benchmark to evaluate fine-grained T2P localization. Ex-
+                                                                      periments on CityLoc demonstrate that VLM-Loc achieves
+  Table 6. Generalization results on the CityLoc-C benchmark.         substantial improvements in localization accuracy and ro-
+different from the vehicle-mounted LiDAR data used in                 bustness over existing baselines.
+CityLoc-K. As shown in Tab. 6, VLM-Loc achieves substan-
+tially higher recall across all thresholds (21.37%, 49.12%,
+and 68.26% at 5/10/15m), significantly outperforming prior            Future work. We believe that this work paves the way for
+methods. These results demonstrate that VLM-Loc general-              two promising research directions: (1) Strengthening multi-
+izes effectively to unseen environments and heterogeneous             step reasoning and scene understanding so that models can
+point cloud sources.                                                  handle longer and more compositional textual descriptions
+                                                                      in complex outdoor environments. (2) Building upon the
+6. Conclusion                                                         CityLoc benchmark to move from passive localization to-
+                                                                      ward an active agent [30] that unifies localization with plan-
+In this paper, we present VLM-Loc, a VLM-based frame-                 ning and navigation in unseen environments, improving the
+work for localization in point cloud maps using text queries.         ability to interact effectively with its surroundings.
+
+
+                                                                  8
+Acknowledgements                                                         [11] Dave Zhenyu Chen, Angel X Chang, and Matthias Nießner.
+                                                                              Scanrefer: 3d object localization in rgb-d scans using natu-
+This work is supported in part by the Fundamental Research                    ral language. In European Conference on Computer Vision
+Funds for the Central Universities (Nankai University, No.                    (ECCV), pages 202–221, 2020. 2
+070-63253235) and in part by NSFC (No. 62576176).                        [12] Xieyuanli Chen, Thomas Läbe, Andres Milioto, Timo
+                                                                              Röhling, Olga Vysotska, Alexandre Haag, Jens Behley, and
+References                                                                    Cyrill Stachniss. Overlapnet: Loop closing for lidar-based
+                                                                              slam. arXiv preprint arXiv:2105.11344, 2021. 1
+ [1] Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ah-               [13] Meng Chu, Zhedong Zheng, Wei Ji, Tingyu Wang, and
+     mad, Ilge Akkaya, Florencia Leoni Aleman, Diogo Almeida,                 Tat-Seng Chua. Towards natural language-guided drones:
+     Janko Altenschmidt, Sam Altman, Shyamal Anadkat, et al.                  Geotext-1652 benchmark with spatial relation matching. In
+     Gpt-4 technical report. arXiv preprint arXiv:2303.08774,                 European Conference on Computer Vision, pages 213–231.
+     2023. 2                                                                  Springer, 2024. 2
+ [2] Panos Achlioptas, Ahmed Abdelreheem, Fei Xia, Zhen                  [14] Wenliang Dai, Junnan Li, Dongxu Li, Anthony Tiong, Junqi
+     Chen, Mohamed Elhoseiny, and Leonidas Guibas. Referit3d:                 Zhao, Weisheng Wang, Boyang Li, Pascale N Fung, and
+     Neural listeners for fine-grained 3d object identification in            Steven Hoi. Instructblip: Towards general-purpose vision-
+     real-world scenes. In European Conference on Computer Vi-                language models with instruction tuning. Advances in neural
+     sion (ECCV), pages 422–440, 2020. 2                                      information processing systems, 36:49250–49267, 2023. 3
+ [3] Zhaochong An, Guolei Sun, Yun Liu, Runjia Li, Junlin                [15] Frederik Michel Dekking. A Modern Introduction to Proba-
+     Han, Ender Konukoglu, and Serge Belongie. Generalized                    bility and Statistics: Understanding why and how. Springer
+     few-shot 3d point cloud segmentation with vision-language                Science & Business Media, 2005. 7
+     model. In Proceedings of the Computer Vision and Pattern            [16] Martin Ester, Hans-Peter Kriegel, Jörg Sander, Xiaowei Xu,
+     Recognition Conference, pages 16997–17007, 2025. 2                       et al. A density-based algorithm for discovering clusters in
+ [4] Relja Arandjelovic, Petr Gronat, Akihiko Torii, Tomas Pa-                large spatial databases with noise. In kdd, pages 226–231,
+     jdla, and Josef Sivic. Netvlad: Cnn architecture for weakly              1996. 3
+     supervised place recognition. In Proceedings of the IEEE            [17] Zhaoxin Fan, Zhenbo Song, Hongyan Liu, Zhiwu Lu, Jun
+     conference on computer vision and pattern recognition,                   He, and Xiaoyong Du. Svt-net: Super light-weight sparse
+     pages 5297–5307, 2016. 2                                                 voxel transformer for large scale place recognition. In Pro-
+ [5] Syed Hesham Syed Ariff, Yun Liu, Guolei Sun, Jing Yang,                  ceedings of the AAAI conference on artificial intelligence,
+     Henghui Ding, Xue Geng, and Xudong Jiang. Evaluating                     pages 551–560, 2022. 2
+     sam2 for video semantic segmentation. Machine Intelligence          [18] Mingtao Feng, Zhen Li, Qi Li, Liang Zhang, XiangDong
+     Research, 2026. 2                                                        Zhang, Guangming Zhu, Hui Zhang, Yaonan Wang, and Aj-
+ [6] Jinze Bai, Shuai Bai, Yunfei Chu, Zeyu Cui, Kai Dang,                    mal Mian. Free-form description guided 3d visual graph net-
+     Xiaodong Deng, Yang Fan, Wenbin Ge, Yu Han, Fei                          work for object grounding in point cloud. In Proceedings of
+     Huang, et al. Qwen technical report. arXiv preprint                      the IEEE/CVF international conference on computer vision,
+     arXiv:2309.16609, 2023. 3                                                pages 3722–3731, 2021. 2
+ [7] Shuai Bai, Yuxuan Cai, Ruizhe Chen, Keqin Chen, Xionghui            [19] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-
+     Chen, Zesen Cheng, Lianghao Deng, Wei Ding, Chang Gao,                   Zhu, Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen, et al.
+     Chunjiang Ge, et al. Qwen3-vl technical report. arXiv                    Lora: Low-rank adaptation of large language models. ICLR,
+     preprint arXiv:2511.21631, 2025. 7                                       1(2):3, 2022. 6
+ [8] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin             [20] Qingyong Hu, Bo Yang, Sheikh Khalid, Wen Xiao, Niki
+     Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun                     Trigoni, and Andrew Markham. Sensaturban: Learning
+     Tang, et al. Qwen2. 5-vl technical report. arXiv preprint                semantics from urban-scale photogrammetric point clouds.
+     arXiv:2502.13923, 2025. 3                                                International Journal of Computer Vision, 130(2):316–343,
+ [9] Zhongang Cai, Yubo Wang, Qingping Sun, Ruisi Wang,                       2022. 3, 7, 1
+     Chenyang Gu, Wanqi Yin, Zhiqian Lin, Zhitao Yang, Chen              [21] Yufan Hu, Longhui Hu, Qingqun Kong, and Bin Fan. A sur-
+     Wei, Oscar Qian, Hui En Pang, Xuanke Shi, Kewang Deng,                   vey on end-to-end perception and prediction for autonomous
+     Xiaoyang Han, Zukai Chen, Jiaqi Li, Xiangyu Fan, Hanming                 driving. Machine Intelligence Research, 22(6):999–1030,
+     Deng, Lewei Lu, Bo Li, Ziwei Liu, Quan Wang, Dahua Lin,                  2025. 1
+     and Lei Yang. Holistic evaluation of multimodal llms on             [22] Physical Intelligence, Kevin Black, Noah Brown, James
+     spatial intelligence, 2025. 2                                            Darpinian, Karan Dhabalia, Danny Driess, Adnan Esmail,
+[10] Daniele Cattaneo, Matteo Vaghi, Simone Fontana, Au-                      Michael Equi, Chelsea Finn, Niccolo Fusai, et al. π0.5 : a
+     gusto Luis Ballardini, and Domenico G Sorrenti. Global                   vision-language-action model with open-world generaliza-
+     visual localization in lidar-maps through shared 2d-3d em-               tion. arXiv preprint arXiv:2504.16054, 2025. 1
+     bedding space. In 2020 IEEE International Conference on             [23] Ayush Jain, Nikolaos Gkanatsios, Ishita Mediratta, and Kate-
+     Robotics and Automation (ICRA), pages 4365–4371. IEEE,                   rina Fragkiadaki. Bottom up top down detection transform-
+     2020. 2                                                                  ers for language grounding in images and point clouds. In
+
+
+                                                                     9
+     European Conference on Computer Vision, pages 417–433.                     erarchical attention. Machine intelligence research, 21(4):
+     Springer, 2022. 2                                                          670–683, 2024. 3
+[24] Joshua Knights, Sebastián Barbas Laina, Peyman                       [37] Jack M Loomis and Joshua M Knapp. Visual perception of
+     Moghadam, and Stefan Leutenegger.            Solvr: Submap                 egocentric distance in real and virtual environments. In Vir-
+     oriented lidar-visual re-localisation. In 2025 IEEE Inter-                 tual and adaptive environments, pages 21–46. CRC Press,
+     national Conference on Robotics and Automation (ICRA),                     2003. 2, 3
+     pages 6387–6393. IEEE, 2025. 2                                        [38] Ilya Loshchilov and Frank Hutter. Decoupled weight decay
+[25] Manuel Kolmet, Qunjie Zhou, Aljoša Ošep, and Laura Leal-                 regularization. arXiv preprint arXiv:1711.05101, 2017. 6
+     Taixé. Text2pos: Text-to-point-cloud cross-modal localiza-           [39] Sha Lu, Xuecheng Xu, Dongkun Zhang, Yuxuan Wu, Hao-
+     tion. In Proceedings of the IEEE/CVF Conference on Com-                    jian Lu, Xieyuanli Chen, Rong Xiong, and Yue Wang.
+     puter Vision and Pattern Recognition, pages 6687–6696,                     Ring#: Pr-by-pe global localization with roto-translation
+     2022. 1, 2, 5, 7, 8, 3                                                     equivariant gram learning. IEEE Transactions on Robotics,
+[26] Junnan Li, Ramprasaath Selvaraju, Akhilesh Gotmare,                        2025. 2
+     Shafiq Joty, Caiming Xiong, and Steven Chu Hong Hoi.                  [40] Lun Luo, Si-Yuan Cao, Xiaorui Li, Jintao Xu, Rui Ai, Zhu
+     Align before fuse: Vision and language representation learn-               Yu, and Xieyuanli Chen. Bevplace++: Fast, robust, and
+     ing with momentum distillation. Advances in neural infor-                  lightweight lidar global localization for unmanned ground
+     mation processing systems, 34:9694–9705, 2021. 3                           vehicles. IEEE Transactions on Robotics, 2025. 2
+[27] Junnan Li, Dongxu Li, Silvio Savarese, and Steven Hoi.                [41] Junyi Ma, Jun Zhang, Jintao Xu, Rui Ai, Weihao Gu, and
+     Blip-2: Bootstrapping language-image pre-training with                     Xieyuanli Chen. Overlaptransformer: An efficient and yaw-
+     frozen image encoders and large language models. In In-                    angle-invariant transformer network for lidar-based place
+     ternational conference on machine learning, pages 19730–                   recognition. IEEE Robotics and Automation Letters, 7(3):
+     19742. PMLR, 2023. 3                                                       6958–6965, 2022. 2
+[28] Shijie Li, Xieyuanli Chen, Yun Liu, Dengxin Dai, Cyrill               [42] Taiki Miyanishi, Fumiya Kitamori, Shuhei Kurita, Jungdae
+     Stachniss, and Juergen Gall. Multi-scale interaction for real-             Lee, Motoaki Kawanabe, and Nakamasa Inoue. Cityrefer:
+     time lidar data segmentation on an embedded platform. IEEE                 geography-aware 3d visual grounding dataset on city-scale
+     Robotics and Automation Letters, 7(2):738–745, 2022. 1                     point cloud data. arXiv preprint arXiv:2310.18773, 2023. 3,
+[29] Wen Li, Yuyang Yang, Shangshu Yu, Guosheng Hu, Chenglu                     1
+     Wen, Ming Cheng, and Cheng Wang. Diffloc: Diffusion                   [43] Charles R Qi, Hao Su, Kaichun Mo, and Leonidas J Guibas.
+     model for outdoor lidar localization. In Proceedings of                    Pointnet: Deep learning on point sets for 3d classification
+     the IEEE/CVF Conference on Computer Vision and Pattern                     and segmentation. In Proceedings of the IEEE conference
+     Recognition, pages 15045–15054, 2024. 1                                    on computer vision and pattern recognition, pages 652–660,
+[30] Xiyun Li, Tielin Zhang, Chenghao Liu, Shuang Xu, and Bo                    2017. 2
+     Xu. Theory of mind inspired large reasoning language model            [44] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+     improved multi-agent reinforcement learning algorithm for                  Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+     robust and adaptive partner modelling. Machine Intelligence                Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning
+     Research, pages 1–14, 2025. 8                                              transferable visual models from natural language supervi-
+[31] Yun-Jin Li, Mariia Gladkova, Yan Xia, Rui Wang, and                        sion. In International conference on machine learning, pages
+     Daniel Cremers. Vxp: Voxel-cross-pixel large-scale image-                  8748–8763. PmLR, 2021. 3
+     lidar place recognition. arXiv preprint arXiv:2403.14594,             [45] Rebekka S Renner, Boris M Velichkovsky, and Jens R
+     2024. 2                                                                    Helmert. The perception of egocentric distances in virtual
+[32] Yiyi Liao, Jun Xie, and Andreas Geiger. Kitti-360: A novel                 environments-a review. ACM Computing Surveys (CSUR),
+     dataset and benchmarks for urban scene understanding in 2d                 46(2):1–40, 2013. 2
+     and 3d. IEEE Transactions on Pattern Analysis and Machine             [46] Junha Roh, Karthik Desingh, Ali Farhadi, and Dieter
+     Intelligence, 45(3):3292–3310, 2022. 3, 1, 2                               Fox. Languagerefer: Spatial-language model for 3d visual
+[33] Dunqiang Liu, Shujun Huang, Wen Li, Siqi Shen, and Cheng                   grounding. In Conference on Robot Learning, pages 1046–
+     Wang. Text to point cloud localization with multi-level neg-               1056. PMLR, 2022. 2
+     ative contrastive learning. In Proceedings of the AAAI Con-           [47] Paul-Edouard Sarlin, Daniel DeTone, Tsun-Yi Yang, Armen
+     ference on Artificial Intelligence, pages 5397–5405, 2025. 1,              Avetisyan, Julian Straub, Tomasz Malisiewicz, Samuel Rota
+     3, 5, 7, 8                                                                 Bulo, Richard Newcombe, Peter Kontschieder, and Vasileios
+[34] Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee.                   Balntas. Orienternet: Visual localization in 2d public maps
+     Visual instruction tuning, 2023. 3                                         with neural matching. In Proceedings of the IEEE/CVF Con-
+[35] Haotian Liu, Chunyuan Li, Yuheng Li, and Yong Jae Lee.                     ference on Computer Vision and Pattern Recognition, pages
+     Improved baselines with visual instruction tuning. In Pro-                 21632–21642, 2023. 4, 5
+     ceedings of the IEEE/CVF conference on computer vision                [48] Guolei Sun, Yun Liu, Thomas Probst, Danda Pani Paudel,
+     and pattern recognition, pages 26296–26306, 2024. 3                        Nikola Popovic, and Luc Van Gool. Rethinking global con-
+[36] Yun Liu, Yu-Huan Wu, Guolei Sun, Le Zhang, Ajad                            text in crowd counting. Machine Intelligence Research, 21
+     Chhatkuli, and Luc Van Gool. Vision transformers with hi-                  (4):640–651, 2024. 3
+
+
+                                                                      10
+[49] Peter JG Teunissen, Oliver Montenbruck, et al. Springer                    cloud retrieval via a visually consistent registration evalu-
+     handbook of global navigation satellite systems. Springer,                 ation. IEEE Transactions on Visualization and Computer
+     2017. 1                                                                    Graphics, 29(9):3840–3854, 2022. 2
+[50] Mikaela Angelina Uy and Gim Hee Lee. Pointnetvlad: Deep               [63] Yuze Zhao, Jintao Huang, Jinghan Hu, Xingjun Wang, Yun-
+     point cloud based retrieval for large-scale place recognition.             lin Mao, Daoze Zhang, Zeyinzi Jiang, Zhikai Wu, Baole Ai,
+     In Proceedings of the IEEE conference on computer vision                   Ang Wang, et al. Swift: a scalable lightweight infrastructure
+     and pattern recognition, pages 4470–4479, 2018. 2                          for fine-tuning. In Proceedings of the AAAI Conference on
+[51] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszko-                    Artificial Intelligence, pages 29733–29735, 2025. 6
+     reit, Llion Jones, Aidan N Gomez, Łukasz Kaiser, and Illia            [64] Ying Zheng, Lei Yao, Yuejiao Su, Yi Zhang, Yi Wang,
+     Polosukhin. Attention is all you need. Advances in neural                  Sicheng Zhao, Yiyi Zhang, and Lap-Pui Chau. A survey of
+     information processing systems, 30, 2017. 3                                embodied learning for object-centric robotic manipulation.
+[52] Guangzhi Wang, Hehe Fan, and Mohan Kankanhalli. Text to                    Machine Intelligence Research, 22(4):588–626, 2025. 1
+     point cloud localization with relation-enhanced transformer.          [65] Gengze Zhou, Yicong Hong, Zun Wang, Chongyang Zhao,
+     In Proceedings of the AAAI Conference on Artificial Intelli-               Mohit Bansal, and Qi Wu. Same: Learning generic
+     gence, pages 2501–2509, 2023. 1, 2                                         language-guided visual navigation with state-adaptive mix-
+[53] Liuyi Wang, Zongtao He, Ronghao Dang, Mengjiao Shen,                       ture of experts. In Proceedings of the IEEE/CVF Interna-
+     Chengju Liu, and Qijun Chen. Vision-and-language naviga-                   tional Conference on Computer Vision, pages 7794–7807,
+     tion via causal learning. In Proceedings of the IEEE/CVF                   2025. 1
+     conference on computer vision and pattern recognition,
+     pages 13139–13150, 2024. 1
+[54] Peng Wang, Shuai Bai, Sinan Tan, Shijie Wang, Zhihao Fan,
+     Jinze Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin
+     Ge, et al. Qwen2-vl: Enhancing vision-language model’s
+     perception of the world at any resolution. arXiv preprint
+     arXiv:2409.12191, 2024. 3
+[55] Weiyun Wang, Zhangwei Gao, Lixin Gu, Hengjun Pu, Long
+     Cui, Xingguang Wei, Zhaoyang Liu, Linglin Jing, Shenglong
+     Ye, Jie Shao, et al. Internvl3. 5: Advancing open-source
+     multimodal models in versatility, reasoning, and efficiency.
+     arXiv preprint arXiv:2508.18265, 2025. 6, 7
+[56] Yan Xia, Mariia Gladkova, Rui Wang, Qianyun Li, Uwe
+     Stilla, Joao F Henriques, and Daniel Cremers. Casspr: Cross
+     attention single scan place recognition. In Proceedings of
+     the IEEE/CVF international conference on computer vision,
+     pages 8461–8472, 2023. 2
+[57] Yan Xia, Letian Shi, Zifeng Ding, Joao F Henriques, and
+     Daniel Cremers. Text2loc: 3d point cloud localization from
+     natural language. In Proceedings of the IEEE/CVF con-
+     ference on computer vision and pattern recognition, pages
+     14958–14967, 2024. 1, 2, 5, 7, 8
+[58] Yanlong Xu, Haoxuan Qu, Jun Liu, Wenxiao Zhang, and
+     Xun Yang. Cmmloc: Advancing text-to-pointcloud localiza-
+     tion with cauchy-mixture-model based framework. In Pro-
+     ceedings of the Computer Vision and Pattern Recognition
+     Conference, pages 6637–6647, 2025. 1, 2, 3, 5, 7, 8
+[59] An Yang, Anfeng Li, Baosong Yang, Beichen Zhang,
+     Binyuan Hui, Bo Zheng, Bowen Yu, Chang Gao, Chengen
+     Huang, Chenxu Lv, et al. Qwen3 technical report. arXiv
+     preprint arXiv:2505.09388, 2025. 5
+[60] Zhiyong Yang and Dale Purves. A statistical explanation of
+     visual space. Nature neuroscience, 6(6):632–640, 2003. 2, 3
+[61] Junyan Ye, Honglin Lin, Leyan Ou, Dairong Chen, Zihao
+     Wang, Qi Zhu, Conghui He, and Weijia Li. Where am i?
+     cross-view geo-localization with natural language descrip-
+     tions. In Proceedings of the IEEE/CVF International Con-
+     ference on Computer Vision, pages 5890–5900, 2025. 2
+[62] Wenxiao Zhang, Huajian Zhou, Zhen Dong, Qingan Yan,
+     and Chunxia Xiao. Rank-pointretrieval: Reranking point
+
+
+                                                                      11
+     VLM-Loc: Localization in Point Cloud Maps via Vision-Language Models
+                                              Supplementary Material
+                                                                     B.1. CityLoc-K Construction
+                                                                     Data source.       CityLoc-K is constructed based on the
+                                                                     KITTI-360 dataset1 , which contains large-scale LiDAR
+                                                                     point clouds collected by vehicle-mounted sensors along ur-
+                                                                     ban roads in Karlsruhe. We use 5 training sequences (00,
+                                                                     02, 04, 06, 07), 1 validation sequence (10), and 3 testing
+                                                                     sequences (03, 05, 09).
+                                                                     Map center sampling. When constructing the maps, we
+                                                                     sample map centers from the vehicle trajectory. Specifi-
+                            (a)                                      cally, we perform distance-based subsampling along the tra-
+                                                                     jectory to ensure that any two selected centers are at least
+                                                                     10 m apart. This ensures that sampling remains evenly dis-
+                                                                     tributed across the entire trajectory, preventing points from
+                                                                     clustering in specific regions and avoiding biased localiza-
+                                                                     tion outcomes.
+                                                                     Query location sampling. For each sampled map center,
+                                                                     we further generate four query positions by randomly per-
+                                                                     turbing its horizontal coordinates within ±15 m along both
+                                                                     the East and North directions, thereby expanding the num-
+                                                                     ber of query samples and positional diversity.
+                            (b)                                      B.2. CityLoc-C Construction
+Figure 6. Example point clouds from the CityLoc benchmark. (a)       Data source.         CityLoc-C is derived from SensatUr-
+A roadside LiDAR scene from KITTI-360 [32]. (b) A photogram-         ban [20] and CityRefer [42]2 . For convenience, we denote
+metric urban block from CityRefer [42].                              blocks in Birmingham and Cambridge as B# and C#, re-
+                                                                     spectively. The dataset contains high-resolution photogram-
+A. Overview                                                          metric point clouds with nearly three billion points collected
+                                                                     across three UK cities, covering an area of 7.6 km2 . We use
+In the supplementary material, we provide additional                 the validation and test splits from Birmingham and Cam-
+benchmark construction and statistics (Sec. B), implemen-            bridge, selecting 4 blocks in Birmingham (B0, B5, B6, B12)
+tation details of textual query and system prompt (Sec. C),          and 7 blocks in Cambridge (C2, C3, C8, C10, C14, C21,
+and further visualization results (Sec. E).                          C26) for cross-city generalization analysis.
+                                                                     Map center sampling.         CityRefer does not provide the
+B. The CityLoc Benchmark Details                                     sensor trajectory of the data acquisition process. Therefore,
+                                                                     for map center sampling, we perform grid sampling on each
+Our CityLoc benchmark consists of two subsets, including             point cloud block and retain maps that contain more than six
+CityLoc-K for training, validation and testing, CityLoc-C            objects. For query location sampling, we follow the same
+for cross-domain testing, as shown in Fig. 6. The two splits         strategy used for CityLoc-K, as described in Sec. B.1.
+differ significantly in semantic composition, sensing modal-
+ity, point cloud characteristics, and geographic region, of-
+                                                                     B.3. Benchmark Statistics
+fering a diverse and challenging setting for evaluating the          Dataset-Level Statistics. CityLoc-K contains 2,767, 300,
+generalization ability of T2P localization models.                   and 1,027 maps, together with 16,113, 1,772, and 6,109
+   In this section, we provide additional details that com-          queries for training, validation, and testing, respectively.
+plement the description in Sec. 3. We first describe the             These maps span areas of 1.66, 0.19, and 0.60 km2 .
+construction procedures of CityLoc-K and CityLoc-C in                   1 Available under the Creative Commons Attribution-NonCommercial-
+Sec. B.1 and Sec. B.2, respectively. In Sec. B.3 we then             ShareAlike 3.0 license.
+present the statistics of the proposed CityLoc benchmark.               2 Both datasets are released under the MIT License.
+
+
+
+
+                                                                 1
+               CityLoc-K: Semantic Instance Distribution                    the textual description, we first project all its 3D points onto
+       vegetation                                                           the horizontal plane and identify the closest point pclose ∈
+          building                                                          R2 to the query position ξ. If the distance between pclose
+               pole                                                         and ξ is below δ = 2.5 m, the direction is assigned as “on-
+         sidewalk
+           garage                                                           top”. Otherwise, we determine the relative orientation by
+      traffic sign                                                          comparing the horizontal offsets dx and dy between ξ and
+                wall
+         trash bin                                                          the centroid of o, as summarized in Eq. (3).
+           terrain
+               road
+              lamp
+        smallpole
+             fence
+                box
+          parking
+     traffic light                                                             \text {Direction}(\xi ,o)= \begin {cases} \text {``on-top''}, & \|(\xi -\mathbf {p}_{\text {close}})\|_2 < \delta , \\[5pt] \text {``east''}, & |dx| \ge |dy|\ \text {and}\ dx \ge 0, \\[3pt] \text {``west''}, & |dx| \ge |dy|\ \text {and}\ dx < 0, \\[3pt] \text {``north''}, & |dx| < |dy|\ \text {and}\ dy \ge 0, \\[3pt] \text {``south''}, & |dx| < |dy|\ \text {and}\ dy < 0, \end {cases} \label {eq:direction} 
+        guard rail
+               stop
+vending machine
+            tunnel                                     "stuff"
+            bridge                                     "object"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             (3)
+                        0      5000      10000     15000      20000
+                                  Number of Objects                         Color mapping.        Each object in the map is already
+                                                                            associated with an RGB color c̄ (as described in Eq. (1)
+      Figure 7. Semantic instance distribution in CityLoc-K.                in the main paper). To obtain its textual color attribute,
+                                                                            we map the object’s RGB value to the nearest entry
+               CityLoc-C: Semantic Instance Distribution                    in a predefined discrete color palette COLOR NAMES =
+high vegetation                                                             {dark-green, gray, gray-green, bright-gray, black, green, beige}
+    traffic road
+         ground                                                             as in KITTI360Pose [25], using the corresponding template
+street furniture
+        building                                                            RGB centers C = {c1 , . . . , cK } for nearest-neighbor
+        footpath
+         parking                                           "stuff"          assignment. The assigned textual label is obtained by
+             wall
+           water                                           "object"
+          bridge
+                    0       500 1000 1500 2000 2500 3000                                         \label {eq:color_selection} \text {color}(o)=\texttt {COLOR\_NAMES}\!\left [\arg \min _{k}\|\bar {\mathbf {c}}-\mathbf {c}_k\|\right ].                                                                                                                                                                                                                                                     (4)
+                                  Number of Objects
+                                                                            where k ∈ {1, . . . , K}.
+      Figure 8. Semantic instance distribution in CityLoc-C.
+                                                                                Constructing large-scale, free-form textual descriptions
+CityLoc-C includes 875 maps and 4,487 queries, covering                     from point cloud data is highly challenging and costly. Due
+0.90 km2 for cross-domain testing. The reported map area                    to the complexity of real-world point cloud scenes, manu-
+is computed as the union of the minimum bounding boxes                      ally extracting scene information to compose detailed de-
+of all maps.                                                                scriptions is prohibitively expensive. Although some recent
+                                                                            methods [13, 61] attempt to generate text by first extract-
+Distribution of semantic instances. For all semantic in-
+                                                                            ing keywords and then prompting a large language model
+stances contained in the point cloud maps, we compute their
+                                                                            (LLM) (e.g., GPT-4 [1]). This process is generally not free
+distribution, as shown in Fig. 7 and Fig. 8. Here, “object”
+                                                                            and still requires manual verification, making it unsuitable
+and “stuff” follow the definitions in KITTI-360 [32], refer-
+                                                                            for scalable dataset construction.
+ring to countable and uncountable instances, respectively,
+                                                                                For these reasons, we follow prior work [25] and adopt a
+and are rendered in orange and blue.
+                                                                            rule-based template to encode the essential object-level cues
+                                                                            for localization, including color, semantic category, and rel-
+C. Implementation Details                                                   ative direction. This approach allows us to construct infor-
+C.1. Textual Query Generation                                               mative and scalable textual descriptions at minimal cost. It
+                                                                            is fully free to generate, requires no LLMs, and avoids any
+Components.      Each textual query T contains Nt hints.                    manual post-verification, while still preserving the key in-
+Each hint h describes an object by specifying its color,                    formation necessary for fine-grained localization.
+semantic category, and its directional relation with re-
+spect to the query location, following the template for-                    C.2. System Prompt
+mat: "The pose is <direction> of <color>                                    Our system prompt consists of six components designed to
+<semantic>."                                                                guide the VLM in performing the T2P localization task, as
+Direction computation.                For each object o referenced in       detailed in Tab. 7. The prompt could be formulated as :
+
+
+                                                                        2
+                                               Table 7. System prompt for VLM-Loc.
+
+ You are a helpful assistant for spatial reasoning and grounding in BEV (bird’s-eye-view) images. You are also given
+ a scene graph describing the environment as: {node id, label, pixel center}, where: - label = semantic label (e.g., “road”,
+ “vegetation”, “building”, “pole”, etc.) - pixel center = pixel coordinates [x, y] (origin at top-left, x→right, y→down).
+
+ COORDINATE & DIRECTION RULES: In BEV pixel coordinates: Up = North = y decreases; Down = South = y
+ increases; Left = West = x decreases; Right = East = x increases.
+
+ GOAL: (1) Parse the user’s natural-language description of a target location. (2) Extract all mentioned object phrases
+ (e.g., “terrain”, “parking”) in order of appearance. (3) For each object phrase: Find the matching node in the given scene
+ graph, determine whether grounding is successful (boolean), and record the matched node’s ID if grounded; otherwise
+ set it to None. (4) Finally, infer the 2D pixel coordinate of the target location based on the described spatial relations
+ (north/south/east/west/on-top).
+
+ RULES: All reasoning and distance computation MUST be in pixel coordinates. Length of assignments MUST equal
+ the number of mentioned objects in the user’s text. Each matched node id must exist in the scene graph; if not found or
+ out of context, set ”grounded”: false and ”matched node”: None. Output exactly ONE JSON object in the schema below
+ — no explanations, no extra text.
+
+ OUTPUT FORMAT (STRICT): { ”assignments”: [ ”object label”: <string>, ”grounded”: <bool>, ”matched node”:
+ <int|None>, ...], ”point 2d”: [<int>, <int>] }
+
+ EXAMPLE (ILLUSTRATION ONLY): OUTPUT: { ”assignments”: [ ”object label”: ”parking”, ”grounded”: true,
+ ”matched node”: 0, ”object label”: ”terrain”, ”grounded”: true, ”matched node”: 8, ”object label”: ”road”, ”grounded”:
+ true, ”matched node”: 4, ”object label”: ”vegetation”, ”grounded”: true, ”matched node”: 11], ”point 2d”: [45, 135] }
+
+
+
+• Role: specifies the localization task for the VLM and               • Example: provides a concrete example that illustrates the
+  clearly defines the expected input structure, including the           predefined output format for the model to follow. Specif-
+  types of information provided, their format, and the order            ically, the output should first present the visibility and as-
+  in which they are supplied.                                           signment status for each textual hint, followed by the es-
+• Coordinate system: provides the correspondence be-                    timated 2D pixel coordinates.
+  tween the pixel coordinate system and the geospatial co-
+  ordinate system, which is essential for enabling the model          D. Additional Experiments
+  to interpret directional cues in the text and map them to
+  the correct orientation on the map.                                 D.1. Results on KITTI360Pose
+• Goal: guides the model in estimating the current pose               To enable a fair comparison on KITTI360Pose [25], we
+  step-by-step. The procedure is: 1) comprehend the input             follow its retrieval-then-localization protocol and adopt
+  text description; 2) extract the textual cues by sequentially       the same Top-1 retrieval results from CMMLoc [58] for
+  processing each mentioned object; 3) assess the visibility          localization. We retrain VLM-Loc for localization on
+  of described elements and form text-node matching pairs             KITTI360Pose and evaluate it on the test set. Other
+  for valid entries; 4) estimate the target location based on         methods perform localization using their pretrained mod-
+  the aggregated geographic information.                              els (Text2Pos [25] is not available). Results are reported
+• Rules: specifies the constraints for the model’s output,            in Tab. 8. Under same retrieval protocol, VLM-Loc
+  e.g., that distances should be measured in pixel coordi-            achieves competitive localization performance compared to
+  nates. These rules ensure that the pose estimation adheres          CMMLoc.
+  to a parsable format and avoids invalid results.
+• Output format: defines the required output structure,               D.2. Inference Analysis
+  mandating that the model presents its results for node as-
+                                                                      Inference analysis is conducted on two RTX 4090 GPUs
+  signment and pose estimation in a predefined format.
+                                                                      with the batch size of 1, and results are reported in Tab. 9.
+
+
+                                                                  3
+ Method      R@5 R@10 R@15 Method         R@5 R@10 R@15
+ Text2Pos   /     /     / MNCL 33.71 50.33 54.69
+ Text2Loc 37.27 51.32 54.79 CMMLoc 37.81 51.84 55.02
+ VLM-Loc 40.36 51.69 54.74
+Table 8. Localization on KITTI360Pose test set (11404 samples).
+
+  Backbone                FPS Peak Mem. (GB) Params (B)
+  Qwen-VL-2B-Instruct 0.36            8.50           2.14
+  Qwen-VL-8B-Instruct 0.23           33.65           8.79
+
+Table 9. Inference analysis of VLM-Loc on the CityLoc-K val set.
+
+
+The latency is acceptable for the T2P localization setting.
+Moreover, the inference cost can be significantly reduced
+via quantization, smaller backbones, and optimized deploy-
+ment frameworks, making VLM-Loc more practical for
+real-world systems.
+
+E. Qualitative Results
+Additional qualitative results of our approach and baselines
+on the CityLoc-K and CityLoc-C splits are shown in Fig. 9
+and Fig. 10. The results demonstrate the superior perfor-
+mance of the proposed method over baselines across diverse
+scenes, validating its robustness and accuracy.
+
+
+
+
+                                                                   4
+Figure 9. Qualitative results of VLM-Loc and baseline methods on the CityLoc-K. Each example visualizes the predicted and GT positions
+on colorized BEV maps rendered with semantic labels. The red circles ● and black circles ● denote the GT and predicted positions,
+respectively. The localization error is shown below each image, and green/red borders indicate localization error below/above 5 m.
+
+
+
+                                                                  5
+Figure 10. Qualitative results of VLM-Loc and baseline methods on the CityLoc-C. Each example visualizes the predicted and GT positions
+on colorized BEV maps rendered with semantic labels. The red circles ● and black circles ● denote the GT and predicted positions,
+respectively. The localization error is shown below each image, and green/red borders indicate localization error below/above 5 m.
+
+
+
+                                                                  6
+

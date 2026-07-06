@@ -52,7 +52,7 @@
 ### [2026-06-25] 真实长程/组合工作流远未饱和，frontier model 成功率极低
 
 - **claim**: 在真实、长程、可执行的专业/组合工作流上，frontier model 的端到端成功率远低于 curated benchmark——多数场景 <30%，最难场景接近个位数；真实场景的难度被静态 benchmark 系统性低估
-- **evidence**: [[Workbench/logs/2026-05-03]] (Claw-Eval-Live 66.7%), [[Workbench/logs/2026-04-28]] (Odysseys 44.5%), [[Workbench/logs/2026-05-25]] (CHIBench 28.0% pass@1), [[Workbench/logs/2026-06-10]] (SpatialWorld GPT-5 17.4%, SWEExplore line-recall 0.14-0.19), [[Workbench/logs/2026-06-24]] (SaaSBench resolved 3.8%)
+- **evidence**: [[Workbench/logs/2026-05-03]] (Claw-Eval-Live 66.7%), [[Workbench/logs/2026-04-28]] (Odysseys 44.5%), [[Workbench/logs/2026-05-25]] (CHIBench 28.0% pass@1), [[Workbench/logs/2026-06-10]] (SpatialWorld GPT-5 17.4%, SWEExplore line-recall 0.14-0.19), [[Workbench/logs/2026-06-24]] (SaaSBench resolved 3.8%), [[Workbench/logs/2026-06-29]] (OSWorld 2.0: 108 个人类小时级工作流上最强 Claude Opus 4.8 仅 20.6% binary completion，瓶颈为隐式状态维护/动态约束/验证/自我修复)
 - **confidence**: medium
 - **source**: cross-validation
 - **impact**: Agent benchmark 设计（应转向真实长程组合任务）、Agent-Facing Environment Runtime 方向（执行期可观测/可恢复/可验证能力是提升长程可靠性的杠杆）、问题 framing（成功率天花板说明这是 capability gap 而非评测噪声）
@@ -61,11 +61,11 @@
 ### [2026-06-25] Verifier/环境 oracle 正从 evaluator-only 扩展为 training supervision 与 agent-facing runtime affordance
 
 - **claim**: programmatic verifier / environment oracle 的价值不止于事后判分——它可作为高质量训练监督来源，并可（在 non-oracle 边界内）暴露为 agent-facing runtime affordance；这一角色迁移是 GUI/CUA environment 研究从 benchmark construction 转向 runtime infrastructure 的核心
-- **evidence**: [[Workbench/logs/2026-05-22]] (OpenComputer verifier 94.1% vs LLM judge 79.2%), [[Workbench/logs/2026-06-22]] (GUI-Environment-Survey: Verification 作为组织原则), [[Workbench/logs/2026-06-23]] (AgentFriendlyEnvironment-Proposal), [[Workbench/logs/2026-06-24]] (ENVS: 环境 oracle → SFT 监督)
+- **evidence**: [[Workbench/logs/2026-05-22]] (OpenComputer verifier 94.1% vs LLM judge 79.2%), [[Workbench/logs/2026-06-22]] (GUI-Environment-Survey: Verification 作为组织原则), [[Workbench/logs/2026-06-23]] (AgentFriendlyEnvironment-Proposal), [[Workbench/logs/2026-06-24]] (ENVS: 环境 oracle → SFT 监督), [[Workbench/logs/2026-07-03]] (Dockerless: evidence-grounded verifier 同时做 SFT filter 与 GRPO reward，接近 test-execution RL; PolicyGuard: pre-execution sub-agent verifier 作为 runtime affordance，Pass⁴ +6~12pp)
 - **confidence**: medium
 - **source**: cross-validation
 - **impact**: Agent-Facing Environment Runtime 方向（直接是其核心假设的证据基础）、[[Ideas/AgentFacing-WebRuntime]]、[[Ideas/HybridVerifier-GUIRuntime]]、verifier leak 边界设计（evaluator-only vs agent-safe probe vs hidden verifier 三层分离）
-- **status**: provisional
+- **status**: validated (2026-07-03 升级：Dockerless 在 SWE 域实证 training supervision 角色、PolicyGuard 在 dialogue/tool-call 域实证 runtime affordance 角色，两个新域独立复现角色迁移)
 
 ### [2026-06-25] Agent skill 正成为可治理/可训练/可执行/可编译的一等对象
 
@@ -74,4 +74,44 @@
 - **confidence**: medium
 - **source**: cross-validation
 - **impact**: training-free agent improvement 路径、skill 治理与负迁移风险（ColleagueSkill 警示）、与 Agent-Facing Environment Runtime 的连接（skill 作为可执行 affordance 的一种形式）
+- **status**: provisional
+
+---
+
+*Last distilled: 2026-07-03 (period 2026-06-26 ~ 2026-07-03)*
+
+### [2026-07-03] 多模态表观能力需 counterfactual/intervention 诊断，accuracy 与 probe/steering 均会高估 grounding
+
+- **claim**: 评测 accuracy、linear probing、steering recovery 都会系统性高估多模态模型对感知证据的真实依赖；只有 counterfactual/intervention 对照（音频置换、图像 ablation、灰图 arbiter）能区分 grounded / prior / inverted 三种 regime——其中 inverted（可解码但符号用反、低于 chance）是 probing 和 steering 结构性看不见的失败模式
+- **evidence**: [[Workbench/logs/2026-05-25]] (VisionSpeaksSound: 视频模型"音频理解"实为视觉驱动，Thud 反事实诊断), [[Workbench/logs/2026-06-24]] (VisualFLIP: 评估从单点 accuracy 转向 counterfactual evidence dependence), [[Workbench/logs/2026-07-03]] (DecodableNotGrounded: 灰图 arbiter 揭示 vertical 是 prior、depth inverted，training-free "recovery" 是 prior amplification)
+- **confidence**: low
+- **source**: cross-validation
+- **impact**: [[Ideas/EvidenceDependence-GUIGrounding]]（Action Collapse Rate 即 GUI 版 arbiter，可升级为三 regime 分类 + 五 ablation protocol）、GUI Grounding Robustness 评估协议（分辨率鲁棒性可分解为 evidence loss vs prior reliance）、对一切 "unlocked latent capability" claim 的默认审查要求
+- **status**: provisional
+
+### [2026-07-03] 小型专门化模型可达大模型级 GUI grounding
+
+- **claim**: GUI grounding 不需要通用大规模 VLM 的推理容量：0.2B–4B 的专门化模型（GoClick 230M encoder-decoder、ZonUI-3B 3B+LoRA+24K 样本、AFRAgent 4B feature renormalization）通过数据多样性、分辨率专门化和架构适配即可达到或接近大模型 grounding accuracy，且推理成本显著更低
+- **evidence**: [[Workbench/logs/2026-04-28]] (GoClick 230M), [[Workbench/logs/2026-06-26]] (ZonUI-3B ScreenSpot 84.9 单卡可训; AFRAgent 低 FLOPs/latency 强 action prediction)
+- **confidence**: low
+- **source**: cross-validation
+- **impact**: GUI Grounding Robustness 方向的实验预算假设（原型验证可用 3B 级模型）、grounding 与 reasoning 的能力分解（与 AutoGUI-v2 dichotomy insight 互证）、production 部署成本 pattern
+- **status**: provisional
+
+### [2026-07-03] Read-only evidence sub-agent 成为 agent 系统的通用模块原语
+
+- **claim**: 把 exploration/verification 拆给 read-only sub-agent 生成结构化中间证据（file-line evidence、verification QA、checklist 判定），再由主模型/judge 聚合，能同时降低主模型 token 成本并提升可靠性；verifier 的可靠性来自 evidence decomposition 而非端到端模型能力
+- **evidence**: [[Workbench/logs/2026-06-29]] (FastContext: read-only 小模型 subagent 返回 file-line evidence，SWE 成功率升 + token 降), [[Workbench/logs/2026-07-03]] (Dockerless: verification questions → read-only repo sub-agents → judge，81.0 AUC 超最强 frontier LLM judge; PolicyGuard: checklist 逐条判定 + remediation，recall 100% 且 block rate 减半)
+- **confidence**: low
+- **source**: cross-validation
+- **impact**: [[Ideas/HybridVerifier-GUIRuntime]] 与 AFE-MiniSuite 的 verify affordance 设计（verifier 子代理回答固定类别问题再聚合，而非直接给 success label）、与 "Verifier 角色迁移" validated insight 互补（那条讲角色，这条讲实现形态）
+- **status**: provisional
+
+### [2026-07-03] Agent runtime state 正被提升为有类型契约的一等对象
+
+- **claim**: agent 的 runtime state（session、context、memory、UI semantic state、research state）正从隐式 prompt 内容收敛为一等、可编程、有类型契约的对象——typed、bounded、可重放、可随程序值流动；这为 agent-facing observable affordance 提供了工程收敛证据
+- **evidence**: [[Workbench/logs/2026-06-26]] (OpenRath: Session as first-class runtime value; MemGUI: Context-as-Action), [[Workbench/logs/2026-06-29]] (ArborHTR: hypothesis/artifact/evidence/insight 持久研究状态), [[Workbench/logs/2026-07-01]] (LUMOS: UIA/DOM → semantic blueprint + stable element id), [[Workbench/logs/2026-07-03]] (AgenticSTS: memory as bounded typed contract)
+- **confidence**: medium
+- **source**: cross-validation
+- **impact**: Agent-Facing Environment Runtime 的 observe/map affordance 设计（state contract 是 affordance 的接口形式）、[[Ideas/AgentFacing-WebRuntime]]、agent memory 研究（[[Papers/2606-AgentMemorySystem]] 显示 GUI/CUA visual memory 仍空白）
 - **status**: provisional

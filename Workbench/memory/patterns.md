@@ -64,9 +64,10 @@
 ### [2026-04-28] Small specialized models can match large models on GUI grounding
 
 - **observation**: GoClick (230M parameters, encoder-decoder architecture) achieves grounding accuracy comparable to much larger VLMs, suggesting grounding may not require general-purpose reasoning capacity
-- **occurrences**: [[Workbench/logs/2026-04-28]]
+- **occurrences**: [[Workbench/logs/2026-04-28]], [[Workbench/logs/2026-06-26]] (ZonUI-3B: 3B+LoRA+24K 样本达 ScreenSpot 84.9，数据多样性+分辨率专门化可部分替代规模; AFRAgent: 4B feature renormalization 达强 GUI action prediction 且 FLOPs/latency 显著低于 CogAgent)
 - **confidence**: low
 - **needs_verification**: yes
+- **status**: → promoted to insight ([2026-07-03])
 
 ---
 *Last distilled: 2026-05-03*
@@ -122,9 +123,10 @@
 ### [2026-06-25] 多模态模型的表观能力常由 spurious shortcut 驱动，需 counterfactual/intervention 诊断真实 evidence dependence
 
 - **observation**: 评测中"看起来会"的多模态能力可能是 Clever Hans 式捷径：VisionSpeaksSound 揭示视频模型的"音频理解"实为视觉驱动，并用 Thud 反事实框架诊断；VisualFLIP / 近期 GUI grounding 讨论把评估从单点 accuracy 转向 counterfactual evidence dependence（grounding 是否真正依赖视觉证据）。说明诊断真实能力需要反事实/干预而非单点正确率
-- **occurrences**: [[Workbench/logs/2026-05-25]] (VisionSpeaksSound, Thud 反事实诊断), [[Workbench/logs/2026-06-24]] (VisualFLIP: accuracy → counterfactual evidence dependence)
+- **occurrences**: [[Workbench/logs/2026-05-25]] (VisionSpeaksSound, Thud 反事实诊断), [[Workbench/logs/2026-06-24]] (VisualFLIP: accuracy → counterfactual evidence dependence), [[Workbench/logs/2026-07-03]] (DecodableNotGrounded: 灰图 vision-ablation arbiter 推翻 probe+steering 验证的 latent-knowledge 结论，grounded/prior/inverted 三 regime)
 - **confidence**: low
 - **needs_verification**: yes
+- **status**: → promoted to insight ([2026-07-03])
 
 ### [2026-06-25] Personal/professional CUA 的隐私风险主要来自 normal-use 的 contextual disclosure 而非 adversarial attack
 
@@ -132,3 +134,22 @@
 - **occurrences**: [[Workbench/logs/2026-06-24]] (MyPCBench, BraveGuard), [[Workbench/logs/2026-06-25]] (AgentCIBench leakage 67.9%)
 - **confidence**: low
 - **needs_verification**: yes
+
+---
+*Last distilled: 2026-07-03 (period 2026-06-26 ~ 2026-07-03)*
+
+### [2026-07-03] Read-only evidence sub-agent 成为 agent 系统的通用模块原语
+
+- **observation**: 多篇工作把 exploration/verification 拆给 read-only sub-agent 生成结构化中间证据，再由主模型/judge 聚合：FastContext 用 read-only 小模型 subagent 返回 file-line evidence 做 repository exploration（降 token 且提升 SWE 成功率）；Dockerless 派 read-only repository sub-agents 回答 verification questions 产出 evidence-backed answer，judge 聚合成 correctness score（SFT filter + RL reward）；PolicyGuard 用 sub-agent verifier 对 per-tool checklist 逐条判定 Met/Not Met 再决定 PASS/BLOCK+remediation。共同信号：verifier/context 的可靠性来自 evidence decomposition（结构化中间证据 + 聚合判断），而非端到端模型能力
+- **occurrences**: [[Workbench/logs/2026-06-29]] (FastContext), [[Workbench/logs/2026-07-03]] (Dockerless, PolicyGuard)
+- **confidence**: low
+- **needs_verification**: yes
+- **status**: → promoted to insight ([2026-07-03]，3 篇独立论文即达阈值)
+
+### [2026-07-03] Agent runtime state 正被提升为有类型契约的一等对象
+
+- **observation**: session / context / memory / UI semantic state 正从隐式 prompt 内容升级为一等、可编程、有 contract 的对象：OpenRath 把 Session 做成可随程序值流动的 first-class runtime value；MemGUI 的 Context-as-Action 把上下文压缩管理内化为与 UI 操作同策略的 first-class action；ArborHTR 用 Hypothesis Tree 维护 hypothesis/artifact/evidence/insight 的持久研究状态；LUMOS 把 UIA/DOM/accessibility tree 抽象成 semantic blueprint（stable element id + constrained action）；AgenticSTS 把 long-horizon memory 定义为 bounded typed contract。共同信号：runtime state 的显式对象化（typed、bounded、可重放）是 agent 基础设施的收敛方向
+- **occurrences**: [[Workbench/logs/2026-06-26]] (OpenRath, MemGUI), [[Workbench/logs/2026-06-29]] (ArborHTR), [[Workbench/logs/2026-07-01]] (LUMOS), [[Workbench/logs/2026-07-03]] (AgenticSTS)
+- **confidence**: medium
+- **needs_verification**: no
+- **status**: → promoted to insight ([2026-07-03]，4 个独立日期 5 篇论文即达阈值)

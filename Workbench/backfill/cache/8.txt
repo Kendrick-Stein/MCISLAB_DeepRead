@@ -1,0 +1,1003 @@
+                                               iSHIFT              : Lightweight Slow-Fast GUI Agent with Adaptive Perception
+
+                                                              Sarthak Mehrotra                                         Sairam VC Rebbapragada
+                                                  Indian Institute of Technology, Bombay                       Indian Institute of Technology, Hyderabad
+                                                      sarthak2002.mehrotra@gmail.com                                   ai20resch13001@iith.ac.in
+
+                                                       Mani Hemanth Reddy Bonthu                                       Vineeth N Balasubramanian
+
+
+
+
+arXiv:2512.22009v1 [cs.CV] 26 Dec 2025
+                                                 Indian Institute of Technology, Hyderabad                      Indian Institute of Technology, Hyderabad
+                                                          cs22btech11013@iith.ac.in                                      vineethnb@cse.iith.ac.in
+
+
+
+
+                                         Figure 1. Left: Compared to recent state-of-the-art methods on Android In The Wild Benchmark [23], our approach achieves a competitive
+                                         performance despite smaller size. Right: iSHIFT achieves this by adaptively switching between slow and fast modes based on task needs.
+
+                                                                  Abstract                                     to reason and where to focus. Despite its compact 2.5B size,
+                                                                                                               iSHIFT matches state-of-the-art performance on multiple
+                                                                                                               benchmark datasets.
+                                         Multimodal Large Language Models (MLLMs) show strong
+                                         potential for interpreting and interacting with complex,
+                                         pixel-rich Graphical User Interface (GUI) environments.               1. Introduction
+                                         However, building agents that are both efficient for high-
+                                         level tasks and precise for fine-grained interactions remains         Agents capable of understanding and operating Graphical
+                                         challenging. GUI agents must perform routine actions effi-            User Interfaces (GUIs) are emerging as a pragmatic ap-
+                                         ciently while also handling tasks that demand exact visual            proach for automating everyday digital tasks. Acting as
+                                         grounding, yet existing approaches struggle when accuracy             virtual intermediaries, such agents can mitigate user ef-
+                                         depends on identifying specific interface elements. These             fort, orchestrate complex workflows, and enhance accessi-
+                                         MLLMs also remain large and cannot adapt their reason-                bility across mobile, desktop, and web platforms [14, 15,
+                                         ing depth to the task at hand. In this work, we introduce             23, 24]. Initial research efforts converged on language-
+                                         iSHIFT: Implicit Slow–fast Hybrid Inference with Flexible             driven pipelines contingent upon structural oracles such as
+                                         Tokens, a lightweight agent that integrates latent thinking           HTML, Document Object Model (DOM), or accessibility
+                                         (implicit chain-of-thought) with a perception control mod-            trees (AXTree) [8, 43]. While effective under ideal con-
+                                         ule. iSHIFT enables an MLLM to switch between a slow                  ditions, these methodologies suffer from poor generaliza-
+                                         mode, which leverages detailed visual grounding for high              tion, as they are often tied to platform-specific inconsisten-
+                                         precision and a fast mode that uses global cues for effi-             cies and require complex preprocessing heuristics [18, 21].
+                                         ciency. Special perception tokens guide attention to rele-            Moreover, the frequent unavailability or the need for special
+                                         vant screen regions, allowing the model to decide both how            permissions to access this structural information at runtime
+
+                                                                                                           1
+curtails their practical deployment.                                  ones. As depicted in Figure 1, our framework enables
+    These constraints prompted a shift towards vision-based           a compact agent to achieve state-of-the-art performance-
+and vision-language agents that operate directly upon                 to-size trade-off (Fig. 1 left), by adaptively switching be-
+screenshot-derived pixel data, mirroring human perceptual             tween fast and slow reasoning modes during action episodes
+input, to generate grounded actions [5, 16, 35]. Neverthe-            (Fig. 1 right).
+less, engineering reliable agents from raw pixels remains a              Our main contributions are as follows:
+challenge. GUIs contain fine-grained text, icons, and inter-          1. We introduce iSHIFT, a unified multimodal agent that
+active elements within highly variable layouts, demanding                integrates intrinsic slow-fast control. It leverages latent
+both meticulous perception and robust contextual reason-                 thinking tokens to implicitly and on-demand trigger a
+ing. Many existing approaches mitigate this by employing                 lightweight visual perception module, thereby eliminat-
+resource-intensive perception stacks, incorporating Optical              ing external controllers and intermediate representations.
+Character Recognition (OCR), segmentation, or specialized             2. We propose a novel training strategy for instilling adap-
+backbones to enhance accuracy. This strategy, however, im-               tive control. By programmatically annotating training
+poses a significant computational burden, as heavy percep-               data to conditionally include perception tokens for high-
+tion modules remain constantly active, incurring undue la-               precision tasks, the model learns to correlate task com-
+tency and cost even for trivial actions [10, 22, 26, 37].                plexity with its implicit slow-fast mechanisms.
+    Additionally, a central limitation pervading the GUI              3. We demonstrate that our agent achieves state-of-the-
+agents is their absence of adaptive resource allocation.                 art performance-to-compute trade-off. Across multiple
+While slow-fast paradigms are studied in general-purpose                 benchmarks, iSHIFT either surpasses or matches sub-
+visual agents [6, 27], their application to GUI navigation               stantially larger models in performance while utilizing
+remains nascent. Consequently, most GUI agents process                   much fewer parameters.
+all actions uniformly, disregarding the natural dichotomy
+within UI interactions between fast actions (e.g., swiping)           2. Related Work
+executable with global context, and slow actions (e.g., find-         Vision-Based GUI Agent Architectures. Early GUI au-
+ing a small button) that necessitate deliberate reasoning or          tomation efforts often relied on structured interface repre-
+enhanced visual precision. This uniform treatment compro-             sentations like Document Object Model (DOM) trees or
+mises the balance between efficiency and reliability: mod-            platform-specific accessibility data [1, 8]. While effective
+els either expend excessive computation on simple tasks or            in constrained environments like web pages, these meth-
+fail to allocate sufficient reasoning for difficult ones. A re-       ods lack generality, as such structural information is of-
+cent work [28] attempts to make GUI automation adaptive,              ten unavailable or inconsistent across arbitrary desktop and
+however, it relies on generating explicit intermediate repre-         mobile applications. The rise of powerful vision-language
+sentations (e.g., icon captions) to improve grounding. For            models (VLMs) has enabled agents that operate directly
+complex tasks, its slow path activates a text-generation loop,        from pixel-level observations, closely mirroring human per-
+forcing the model to generate interface summaries and vi-             ception [5, 7, 10, 11, 13, 22, 25, 35, 40]. To improve
+sual analyses before it can act. This approach incurs gener-          UI understanding, [5] introduces grounding-based pretrain-
+ative latency and couples grounding accuracy to the quality           ing, while subsequent work highlights a core challenge:
+of the generated text. This multi-stage process trades one            GUIs are high-resolution and densely populated with small
+set of problems for another and highlights the need for a             but crucial elements (e.g., icons, text fields) that are easily
+more integrated solution.                                             lost under naive downsampling. To preserve fine-grained
+    To address these limitations, we introduce iSHIFT                 details, several methods employ high-resolution encoders
+(Implicit Slow–fast Hybrid Inference with Flexible                    [10, 22], improving grounding at the cost of significant
+Tokens), a ∼ 2.5B-parameter multimodal GUI agent that                 computational overhead. [11] addresses locational ambigu-
+natively integrates both compute and perception adaptivity            ity in dynamic high-resolution interfaces through Universal
+within a unified model. iSHIFT is founded on the principle            Block Parsing (UBP), enhancing GUI element localization.
+that the model itself should implicitly determine when to             Meanwhile, [13] mitigates token inefficiency by introduc-
+engage in deeper, slow reasoning. It achieves this through            ing UI-guided visual token selection, grouping visually sim-
+two complementary mechanisms: latent thinking tokens,                 ilar regions to reduce the processing burden.
+which facilitate non-verbal internal deliberation, and a per-         Slow-Fast Approaches. To mitigate the trade-off between
+ception token, which on-demand activates a lightweight,               efficiency and fidelity, a slow-fast paradigm has emerged.
+localized visual perception module. This co-design obvi-              These methods explicitly acknowledge that not all tasks re-
+ates the need for external controllers, tightly couples rea-          quire the same level of computation. However, existing im-
+soning depth with selective visual acuity, and achieves both          plementations introduce new architectural complexities that
+efficiency on simple interactions and precision on complex            undermine their benefits. For example, [27] proposes a sys-
+
+                                                                  2
+tem that arbitrates between a fast and slow path, but it relies       2, our model always begins with the computationally effi-
+on an external controller to make this decision. This dis-            cient Fast Path, which processes a given user instruction and
+jointed design introduces modular complexity, adds latency,           a UI screenshot. The model then performs implicit delibera-
+and creates a new potential point of failure. Similarly, GUI-         tion using the Latent Thinking Tokens (<bot>...<eot>),
+specific work like [28] improves precision by generating ex-          inspired by [9], that are detailed in §3.2. This step serves as
+plicit intermediate representations (e.g., icon captions) as a        the model’s internal assessment phase, where it evaluates
+prerequisite slow grounding step. This approach, while ef-            the task’s requirements based on the given context.
+fective, exacerbates system complexity and inference time
+by forcing the model to generate verbose text before it can           Step 2: The Implicit Shift Decision. Following the initial
+act. Both methods validate the need for adaptive computa-             deliberation, the model makes a critical decision implicitly:
+tion but highlight a research gap: the lack of a unified and          “Is the current information sufficient to act?” This decision
+implicit control mechanism.                                           is not made by an external controller, but via tokenization
+Thought-Based GUI Agents. Another line of research en-                on the model’s next generative step.
+hances agent reliability by incorporating explicit cognitive          • Stay on Fast Path: If the deliberation concludes that the
+loops, often inspired by Chain-of-Thought (CoT) reason-                  task is simple (e.g., a swipe), the model proceeds to gen-
+ing [32]. Agents such as [30] adopt prompt frameworks                    erate the action directly, bypassing step 3.
+like ReAct [36], interleaving reasoning steps with actions to         • Activate Slow Path: If the deliberation concludes that the
+form explicit plans and reflect on intermediate observations.            task requires high precision (e.g., click on a small icon),
+[33] strengthens action prediction by generating thoughts                the model instead generates special Latent Perception
+that analyze instructions, screenshots, and interaction his-             Tokens: <bop>, <ctrl>, <eop>, similar to [38], to
+tory. Similarly, [34] leverages structured reasoning to de-              invoke the Visual Perception Module detailed in §3.2.
+compose complex tasks, adapt to new scenarios, and plan               Step 3 (Optional): Conditional Activation (Slow Path).
+actions more effectively. However, a key limitation of these          The generation of the <bop> token provides an explicit
+approaches is their dependence on explicit natural language           signal that activates the Slow Path. This is not a restart but
+generation. This verbosity incurs substantial inference la-           rather a conditional detour for feature enhancement. This
+tency, which is problematic for interactive GUI tasks where           token triggers the Visual Perception Module, which uses
+rapid responses are essential.                                        a DINO [20] encoder to extract localized, fine-grained fea-
+3. iSHIFT: Methodology                                                tures zp from the screen. These new features are then in-
+We now describe our iSHIFT methodology, which is cen-                 jected back into the model’s sequence.
+tered on the core principles of implicit thinking and adap-           Step 4: Final Action Generation. The model, now armed
+tive resource allocation. We begin by explaining the pri-             with the initial global features and optionally the aug-
+mary contribution: the iSHIFT Slow-Fast Approach (§3.1),              mented, fine-grained features (from the Slow Path) gener-
+which forms the operational core of our agent. This mecha-            ates the action.
+nism allows the model to implicitly shift between a compu-
+tationally efficient Fast Path for simple actions and a high-         Training the Implicit Shift. This entire conditional pro-
+precision Slow Path for complex ones. We then detail the              cess is learned end-to-end. We teach the model this ability
+two key Architectural Components that enable this adapt-              through a dataset enhancement step, where we programmat-
+ability: the Latent Thinking Tokens for general delibera-             ically categorize the action space of our datasets based on
+tion, and the Visual Perception Module which provides the             their perception requirements to include our latent thinking
+localized features for the slow path.                                 tokens and latent perception tokens, as required. This en-
+                                                                      ables the model to learn a direct association between the
+3.1. The iSHIFT Slow-Fast Approach
+                                                                      contextual scenario and the correct execution path. Any
+The central innovation of iSHIFT is an adaptive processing
+                                                                      action that requires the prediction of precise coordinates
+mechanism that addresses the dichotomy in UI tasks: sim-
+                                                                      (e.g., clicking on a UI element) is labeled as a Slow Action.
+ple actions (e.g., swipe left) can be executed with global            Prompt labels for such actions are annotated to include the
+context, while complex actions (e.g., tap tiny icon) demand           latent perception tokens (<bop>, <ctrl> and <eop>).
+precise, localized visual processing. Our model addresses
+                                                                      Observing this token sequence prompts the model to engage
+this by following a sequential process detailed in Algorithm
+                                                                      the Visual Perception Module to acquire additional context
+1. Our process uses a Fast Path by default and allows the
+                                                                      required for more precise grounding. All other actions that
+model to conditionally activate a Slow Path for added preci-
+                                                                      can be inferred from global context (e.g., swiping) are la-
+sion only when necessary. We briefly describe our process             beled as Fast Actions. They are modeled to follow the Fast
+herein, and then detail the components later in this section.         Path, bypassing the Visual Perception Module. This map-
+Step 1: Implicit Thinking (Fast Path). As shown in Figure             ping provides the necessary supervision to enable the model
+
+                                                                  3
+Figure 2. Overview of our proposed method. The MLLM takes a screenshot and task query as input and begins with the Fast Path. It
+utilizes the Latent Thinking Tokens (<bot>...<eot>) for implicit thinking to assess if the context is sufficient for direct action. If not, it
+switches to the Slow Path by generating Latent Perception Tokens (<bop>, <ctrl>, <eop>). This invokes the Visual Perception Module
+which extract localized image features (zp ) for precise and grounded action generation.
+
+to learn the association between task types (inferred from                Algorithm 1 Slow–Fast Adaptive Control in iSHIFT
+the instruction and screen) and the capability to generate                Require: Input context C = {I, T }, where I is the UI screenshot and T
+the <bop> token to activate the Slow Path.                                    is the textual instruction
+    In contrast to prior work which use an explicit exter-                Ensure: Predicted action A
+                                                                           1: Initialize token sequence S ← [<bot>]
+nal controller, our iSHIFT framework embeds this critical                  2: Initialize latent hidden state h0
+decision-making step implicitly within our unified MLLM                    3: while not end of sequence do
+architecture. As shown in Figure 2, this implicit mecha-                   4:      ht ← Transformer(ht−1 , St )
+nism allows the model to perform internal, non-linguistic                  5:
+                                                                           6:      while t within <bot> and <eot> do
+deliberation and decide whether sufficient context exists or               7:          xt ← g(ht−1 [t − 1, :])
+if additional visual information is required. This eliminates              8:          Model performs implicit reasoning over context
+reliance on external components, keeping the model’s ra-                   9:      end while
+tionale embedded in its hidden states and providing it with               10:      Predict internal control decision dt ∈ {Fast, Slow}
+                                                                          11:      if dt = Slow then
+context-awareness.                                                        12:          Generate latent control sequence:
+3.2. Architecture Components
+                                                                                             Sctrl = {<bop>, <ctrl>, <eop>}
+The Slow-Fast approach is enabled by two key architectural
+                                                                          13:       Add latent control sequence S ← Sctrl
+additions to the Qwen2-VL 2B [31] base model.                             14:       Extract control state hctrl ← ht [<ctrl>]
+Latent Thinking Tokens. We integrate a continuous la-                     15:       Fimg ← DINOEncoder(I)
+tent thinking mechanism, to enable the model to perform                   16:       zp ← CrossAttention(Fimg , hctrl )
+                                                                          17:       S ← S + zp
+introspection without generating explicit language tokens.
+                                                                          18:    end if
+As mentioned in §3.1, this mechanism introduces special                   19: end while
+tokens, <bot> and <eot>, which indicate the beginning                     20: Generate final action A ← LM(hT )
+and end of a continuous thought block. Using these tokens,
+the model develops its reasoning in the latent space, without
+decoding intermediate language outputs.
+   This operation transforms the hidden state directly into               when extended reasoning is required, ensuring resource-
+the next input embedding, bypassing the vocabulary layer                  efficient yet contextually adaptive action generation.
+entirely. By operating fully within this latent space, the                    The model learns to use these latent tokens via a spe-
+model achieves a deeper representational flow that captures               cific training methodology. Initially, the model is trained
+implicit reasoning with significantly fewer steps compared                on a smaller dataset where the thought token positions
+to explicit Chain-of-Thought (CoT) generation. The result-                (<bot>...<eot>) are populated with explicit thoughts in
+ing latent thinking process governs the model’s internal de-              natural language. This phase is crucial because it teaches
+liberation and is responsible for triggering the Slow Path                the model the correct generation process and the expected
+
+
+                                                                      4
+  Method                         Base Model   Size   Vision Only       General   Install   Google Apps   Single   WebShop    Avg.
+                                               Models with parameter count above 5B
+  LLaMa 2 [29] (arxiv’23)        LLaMa 2       7B         ✗             28.56    35.18        30.99      27.35     19.92     28.40
+  CoCo-Agent [17] (arxiv’24)     LLaMa 2       7B         ✗             69.92    80.60        75.76      88.81     74.02     77.82
+  MobileAgent [30] (ICLR’24 w)   LLaMa         7B         ✗             55.80    74.98        63.95      76.27     63.61     66.92
+  GPT-4o [19] (arxiv’24)         –              –         ✓             47.06    49.12        52.30      80.28     46.42     55.02
+  OmniParser [16] (arxiv’24)     –              –         ✓             48.30    57.80        51.60      77.40     52.90     57.60
+  CogAgent [10] (CVPR’24)        Vicuna 7B    18B         ✓             65.38    78.86        74.95      93.49     71.73     76.88
+  SeeClick [5] (ACL’24)          QwenVL       9.6B        ✓             67.60    79.60        75.90      84.60     73.10     76.16
+  Mobile VLM [7] (EMNLP’24)      QwenVL       9.6B        ✓             69.58    79.87        74.72      81.24     71.70     75.42
+  SphAgent [3] (ACL’25)          InternLM      7B         ✓             68.20    80.50        73.30      85.40     74.00     76.28
+  TongUI [40] (arxiv’25)         Qwen2.5 VL    7B         ✓              67.6     76.3         73.5       79.9      69.1      73.3
+                                               Models with parameter count below 5B
+  AutoGUI [42] (ACL’24)          T5 + ViT     4.5B        ✓             68.24    76.89        71.37      84.58     70.26     74.27
+  Qwen2 VL [31] (arxiv’24)       Qwen2 VL      2B         ✓             61.40    71.80        62.60      73.70     66.70     67.24
+  ShowUI [13] (CVPR’25)          Qwen2 VL      2B         ✓             63.90    72.50        69.70      77.50     66.60     70.04
+  TongUI [40] (arxiv’25)         Qwen2.5 VL    3B         ✓              65.6    75.10        74.50      77.00      65.8      71.6
+  iSHIFT                         Qwen2 VL     2.5B        ✓             70.6     80.82        71.64      86.03     72.60     76.34
+
+Table 1. Evaluation results across various subsets on the Android In The Wild [23] Benchmark, measured by Action Matching Score. Best
+scores in the category < 5B are bolded. Overall best scores are underlined . Cells in the iSHIFT row with a Green fill demonstrate
+SOTA performance parity, meaning the score is within 2.0 points of the column’s maximum value.
+
+content of its internal deliberations. Once this foundation             needed for precise grounding. Crucially, unlike methods
+is learned, the explicit thought tokens are replaced with               such as CogAgent [10] or V-Zen [22], our Visual Percep-
+the final latent thought tokens, giving the model a strong              tion Module is lighter and activated only when necessary.
+prior on the latent structure and the type of information               This allows iSHIFT to achieve superior precision without
+it should process internally. Since thoughts are ultimately             the large increase in parameter count that plagues high-
+represented latently rather than in natural language, no ad-            resolution modules in existing models.
+ditional thought annotations are required when scaling to
+larger datasets (≈ 50×) improving overall scalability. More             4. Experiments
+details about the training and implementation are presented             Datasets, Baselines and Evaluation Metrics. We evalu-
+in the Supplementary.                                                   ate iSHIFT across diverse GUI benchmarks including An-
+Visual Perception Module. The Visual Perception Mod-                    droid In The Wild [23] (AITW), Android Control [12],
+ule serves as the engine for the Slow Path. When acti-                  GUIOdyssey [15], and GUIAct [4]. For comparison, we
+vated by the <bop> token, the image is re-encoded into                  use state-of-the-art GUI agents such as [5, 10, 12, 13, 40]
+information-rich feature maps (Fimg ) using a DINO [20]                 which represent various approaches to high-performance
+vision encoder. These visual features then cross attend with            and high-resolution GUI processing. Our evaluation re-
+the latent perception token’s hidden states (hctrl ) through            ports the Action Matching Score (AMS) for AITW (across
+a cross-attention projector. This allows the model to selec-            General, Single, Install, Web Shopping, Google Apps sub-
+tively attend to and aggregate critical visual details.                 sets) and Android Control (High and Low subsets). For
+   The new context embedding zp is derived via cross-                   GUIOdyssey, we report the Success Rate, and for GUIAct
+attention where the image features act as the Query (Q) and             (Web Single and Phone subsets), we provide both Type ac-
+the latent perception token’s hidden state act as the Key and           curacy and Success Rate metrics. More details related to
+Value (K, V ):                                                          the above are mentioned in the Supplementary.
+                                                                        Results and Observations. The iSHIFT model, built on
+     Q = LinearQ (Fimg ); K, V = LinearK,V (hctrl )                     a compact 2.5B parameter base, achieves an Average Ac-
+                          QK T                                          tion Matching Score (AMS) of 76.34%, establishing it as
+             zp = softmax( √ )V + Fimg                                  the SOTA leader among models under 5B parameters and
+                            dk
+                                                                        reaching near parity with the overall SOTA model, CogA-
+where dk is the dimensionality of the query vector Q.                   gent [10] (18B), with only a 0.54 point difference (76.34%
+   The resulting context embedding zp is injected back into             vs. 76.88%) despite being more than seven times smaller.
+the MLLM sequence, providing the fine-grained control                   Relative to its closest competitor in the small model cat-
+
+
+                                                                   5
+egory, AutoGUI [39] (4.5B), iSHIFT provides a gain of                      ing the much larger GUICourse 9.6B model, which records
+over 2.0 points (76.34% vs. 74.27%) while remaining sig-                   73.0% and 58.1%, respectively. These results highlight
+nificantly smaller in size. Its adaptive processing capability             iSHIFT’s consistent high-fidelity performance across plat-
+is consistently reflected across individual subsets: iSHIFT                forms while maintaining exceptional parameter efficiency.
+sets new SOTA performance on the General and Install sub-                  Qualitative Results We present a qualitative comparison of
+sets with AMS scores of 70.6% and 80.82%, respectively,                    GUI action sequences by evaluating iSHIFT, SeeClick and
+and achieves the highest score in the Single subset within                 ShowUI against Ground Truth, in Figure 3. More qualita-
+the < 5B category (86.03%), highlighting the effective-                    tive results can be found in the Supplementary.
+ness of its adaptive Perception Tokens for precise and effi-
+cient action grounding. On WebShop, it continues to lead                                                         Android Control        GUI
+                                                                              Method                      Size
+its category with 72.60%, demonstrating strong composi-                                                          High     Low          Odyssey
+tional reasoning in structured environments, and it performs                             Models with parameter count above 5B
+competitively on Google Apps with 71.64%, maintaining                         GPT-4o [19] (arxiv’24)        –    28.39     21.17            5.36
+robust generalization across diverse UI layouts and interac-                  See Click [5] (ACL’24)      9.6B    59.1     75.0            53.92
+tion types.                                                                   OS Atlas [33] (ICLR’25)      7B    71.17     85.22           61.98
+    The superior performance-to-size ratio of iSHIFT is                       TongUI [40] (arxiv’25)       7B     38.2      69.3              –
+clearly visualized in Figure 4, which plots the Efficiency                    Aguvis [34] (ICML’25)        7B    61.5       80.5            63.8
+Metric (Accuracy/Parameter Count) for iSHIFT com-                                        Models with parameter count below 5B
+pared to different SOTA models in the respective subsets.                     Qwen2.5-VL [2] (arxiv’25)    3B    58.79     41.22           27.31
+iSHIFT      signif-                                                           OS Atlas[33] (ICLR’25)       4B    67.54     80.64           56.39
+icantly    outper-                                                            TongUI [40] (arxiv’25)       3B    32.0      52.0              –
+forms all other                                                               iSHIFT                      2.5B    65.6      87.7           73.97
+SOTA       models,                                                         Table 2. Evaluation results on Android Control [12] and GUI
+achieving       an                                                         Odyssey [15] benchmarks. Best scores in the category < 5B are
+efficiency      of                                                         bolded. Overall best scores are underlined .
+30.54 on Av-
+erage, which is
+                        Figure 4.           Efficiency comparison                                                 Web Single         Phone
+more than five                                                                Method                      Size
+                        (Accuracy-to-Parameter     ratio) of iSHIFT                                              Type    SR        Type  SR
+times that of the
+                        against subset wise state-of-the-art agents.                     Models with parameter count above 5B
+18B CogAgent
+                                                                              GPT-4o [19] (arxiv’24)      –      77.09 41.84       46.9      28.4
+[10] (which scores ∼ 4.27 on Average). iSHIFT achieves
+                                                                              GUICourse [4] (ACL’25)      9.4B   90.1  63.5        72.1      40.4
+a score of 28.65 in Google Apps, approximately four
+                                                                              GUICourse [4] (ACL’25)      9.6B   90.9  66.7         73       58.1
+times that of the 9.6B SeeClick [5] (which scores ∼ 7.9).
+                                                                              OS-Atlas [33] (ICLR’25)     7B     86.95 57.02         –        –
+This provides concrete evidence that our adaptive token
+                                                                                         Models with parameter count below 5B
+mechanism allows a highly compact 2.5B MLLM to
+                                                                              Qwen2.5-VL [2] (arxiv’25) 3B       56.1    55.61     60.8      35.8
+achieve results comparable to substantially larger agents,
+                                                                              GUICourse [4] (ACL’25)    3.1B     91.8    70.6      71.7      53.3
+setting a new standard for computational efficiency in
+                                                                              OS-Atlas [33] (ICLR’25)   4B       79.22   42.62      –         –
+resource-aware GUI agents.
+                                                                              iSHIFT                      2.5B   93.83   66.38     79.41    60.08
+   The evaluation of iSHIFT on cross-device benchmarks
+such as GUI Odyssey, summarized in Table 2, demonstrates                   Table 3. Evaluation results on Web Single and Phone subset of
+                                                                           GUIAct [4] benchmark. Overall best scores are bolded.
+strong generalization despite its compact 2.5B size, achiev-
+ing the highest overall success rate of 73.97% across sub-                 5. Analysis and Ablation Studies
+sets and outperforming Aguvis (63.8%), which is about
+four times larger. iSHIFT also secures the top score in the                To better understand the effectiveness of our approach, we
+Android Control (Low) subset with 87.7% and maintains                      systematically evaluate different components of the pro-
+competitive performance in the High-level precision sub-                   posed framework as presented in Table 4. We evaluate how
+set with 65.6%, ranking just below OS Atlas (4B), which                    each module and design choice contributes to the overall
+achieves 67.54% in the same category. As shown in Ta-                      performance on AITW [23]. All other settings remain con-
+ble 3, iSHIFT continues to excel on the Web Single subset                  sistent with the full model unless stated otherwise.
+of GUIAct with a Type Accuracy of 93.83%, surpassing                       Impact of Individual Components. The standard Qwen2-
+GUICourse 3.1B (91.8%), while retaining a strong Success                   VL-2B Baseline achieved an AMS of 67.24 on AITW [23]
+Rate of 66.38%. On the Phone subset, it attains 79.41% in                  benchmark (Table 4). Adding Latent Thinking Tokens
+Type Accuracy and 60.08% in Success Rate, outperform-                      (LTT Only) boosts performance by +5.30 to 72.54 (Row
+
+
+                                                                       6
+Figure 3. Qualitative comparison of GUI action sequences. The figure shows step-by-step actions taken SeeClick (red), ShowUI (orange),
+and iSHIFT (blue) in comparison to Ground Truth (green). Each colored hand or arrow represents the predicted interaction, including
+touch and lift points across interface states, and the ROI is highlighted with a yellow bounding box at each step. iSHIFT aligns closely
+with the correct action sequence, demonstrating superior spatial precision and decision accuracy compared to prior methods.
+
+ Variation                   VPM LTT Slow Fast AMS                       path selection. When both slow and fast paths are available,
+ Base Model (Qwen2 VL 2B)     ×   ×   ×    ✓ 67.24                       a non-LTT-based implicit decision process (Row 4, Table 4)
+ w/ Fast Path Only            ×   ✓   ×    ✓ 72.54                       achieves 75.48, a +2.77 increase over the slow-only variant
+ w/ VPM, Slow Path Only       ✓   ×   ✓    × 72.71                       (Row 3, Table 4), confirming the key role of path switching.
+ w/ VPM, Adaptive             ✓   ×   ✓    ✓ 75.48                       Finally, the Full iSHIFT model, combining LTTs with real-
+ w/ VPM + LTT, Slow Path Only ✓   ✓   ✓    × 74.58                       time adaptive control of the VPM, reaches the best AMS of
+ w/o Cross-Attention in VPM   ✓   ✓   ✓    ✓ 73.40                       76.34 (Row 7, Table 4). This LTT-driven decision-making
+ iSHIFT (Ours)                ✓   ✓   ✓    ✓ 76.34
+                                                                         contributes a further +0.86 beyond the non-LTT-based vari-
+Table 4. Ablation study on the AITW benchmark [23] evaluating            ant (Row 4, Table 4). Conversely, forcing iSHIFT to operate
+different components of iSHIFT. VPM denotes the Visual Percep-           only on the slow path lowers performance to 74.58 (Row 5,
+tion Module and LTT refers to Latent Thinking Tokens.                    Table 4), showing that true adaptive switching adds +1.76
+                                                                         and is central to iSHIFT’s superiority.
+                  AITW General            AITW Single
+      Method
+                Runtime (ms) AMS       Runtime (ms) AMS
+                                                                         Why is Adaptive Better than Always Slow? While the
+      Fast         2093      66.64        2046      82.55
+                                                                         iSHIFT (Slow Path Only) variant achieves a strong AMS of
+      Slow         2331       68.2        2323      85.33                74.58, it still lags behind the full adaptive model, suggesting
+      OURS         2229       70.6        2263      86.03                that forced commitment to the slow path limits overall per-
+                                                                         formance. As shown in Table 5, the adaptive iSHIFT model
+Table 5. Comparison of performance and latency between Adap-             not only achieves higher AMS but also executes faster than
+tive iSHIFT and its fixed-path variants, showing that the adaptive
+                                                                         the slow only variant, indicating that more computation
+version delivers higher accuracy with lower runtime.
+                                                                         time does not necessarily translate to better performance.
+2, Table 4), validating the intrinsic benefit of implicit de-               Figure 5 highlights that the adaptive model maintains a
+liberation for general task execution. Similarly, introduc-              much smaller action type divergence from the Ground Truth
+ing the Visual Perception Module (VPM) to the baseline                   across all key actions compared to the slow-only model.
+yields a comparable +5.47 gain, reaching 72.71 (Row 3,                   For example, in complex click actions, its deviation is only
+Table 4). The largest improvement arises from enabling                   2.4% compared to 8.9% for the slow-only model. This dis-
+
+
+                                                                     7
+                                                                            AMS of 73.40 (Row 6, Table 4).
+                                                                            Effect of Number of Latent Tokens. We conducted an
+                                                                            ablation to determine the optimal number of latent tokens
+                                                                            for effective implicit deliberation, since an overly long
+                                                                            thought block increases computation without proportional
+                                                                            gains. As shown in Figure 7, the baseline without la-
+                                                                            tent tokens reached an AMS of 75.48. Adding four la-
+                                                                            tent tokens raised this to 75.72, and using eight tokens
+                                                                            yielded the best performance at 76.34, providing suffi-
+                                                                            cient reasoning depth with minimal overhead. Increas-
+Figure 5. Divergence of distributions of predicted action from
+the Ground Truth across different iSHIFT variants (Smaller bar              ing the sequence further caused clear degradation, drop-
+is better), This demonstrates the adaptive model’s superior action          ping to 74.09 with sixteen tokens and 74.04 with twenty.
+fidelity and significantly lower error rates across all actions.            This non-linear trend shows that the length of the im-
+                                                                            plicit thought block is a sensitive hyperparameter, and
+                                                                            excessive      de-
+                                                                            liberation     can
+                                                                            dilute contextual
+                                                                            focus and hinder
+                                                                            efficient sequence
+                                                                            generation, ulti-
+                                                                            mately reducing
+                                                                            performance.
+                                                                            We present more        Figure 7. Impact of latent token count on
+                                                                            experiments re-        average performance, showing optimal re-
+                                                                                                   sults around 8 tokens.
+                                                                            lated to Latent
+                                                                            Thinking Tokens in the Supplementary.
+                                                                            Effect of Different Encoders in VPM. We con-
+Figure 6. Attention maps from the cross-attention projector and
+                                                                            ducted an ablation on the visual encoder used in
+the actions generated. This illustrates that mandatory localized im-
+age features in iSHIFT (Slow Path) produces diffused and irrele-
+                                                                            the Visual Perception Module (VPM) to evaluate
+vant attention, leading to an incorrect action. In contrast, Adaptive       performance and efficiency, as shown in Figure 8.
+iSHIFT (Ours) selectively attends to the correct target element, en-        The       standard
+suring accurate action execution.                                           Qwen2-VL Im-
+                                                                            age       Encoder
+crepancy arises because the slow path variant processes de-
+                                                                            achieved an AMS
+tailed visual context indiscriminately for every action, even
+                                                                            of 73.52 with
+when such context is unnecessary. As illustrated in Figure
+                                                                            665.3M param-
+6, this leads to diffused and misdirected attention, where
+                                                                            eters. Replacing
+the model struggles to distinguish different actions, often
+                                                                            it with CLIP
+misclassifying actions such as predicting Task Complete in-
+                                                                            improved AMS            Figure 8. Performance of alternative visual
+stead of Click. The continual, unnecessary addition of vi-                                          encoders in the VPM. Circle size reflects en-
+                                                                            to 75.29 while
+sual context for simple actions (e.g., Task Complete) hin-                                          coder parameter count.
+                                                                            reducing parame-
+ders decision clarity and leads to suboptimal behavior. In
+                                                                            ters to 427.6M. Siglip-2 increased accuracy further to 75.75
+contrast, the adaptive iSHIFT selectively retrieves context
+                                                                            but required the largest parameter count at 881.5M. Our
+only when needed, maintaining sharper attention on the true
+                                                                            final choice, the DINO encoder, reached the highest AMS
+target element and ensuring the correct action is executed.
+                                                                            of 76.34 with only 304.4M parameters. This confirms
+Together, these results confirm that iSHIFT’s implicit adap-
+                                                                            that DINO offers the best balance, providing high-quality
+tive control enhances both accuracy and efficiency, elimi-
+                                                                            visual features for adaptive grounding while remaining
+nating unnecessary over-processing on simpler tasks.
+                                                                            computationally lightweight for our iSHIFT agent. We
+Importance of Cross Attention Projector in VPM. Re-                         present more insight into the VPM in Supplementary.
+moving cross-attention prevents the model from accessing
+localized visual features, causing the Slow Path to fall back               6. Conclusion
+to coarse DINO features and rely only on global context.                    We introduced iSHIFT, a compact multimodal GUI agent
+This weakens precise grounding and leads to a reduced                       that integrates implicit slow–fast control with latent rea-
+
+
+                                                                        8
+soning and selective perception. By combining latent                          the IEEE/CVF Conference on Computer Vision and Pattern
+thinking tokens with an on-demand Visual Perception                           Recognition (CVPR), pages 14281–14290, 2024. 2, 5, 6
+Module, iSHIFT allocates resources adaptively, engaging                  [11] Zhiyuan Huang, Ziming Cheng, Junting Pan, et al. Spirit-
+in deeper visual grounding only when necessary. This                          sight agent: Advanced gui agent with one look. In Proceed-
+design removes external controllers and maintains high                        ings of the Computer Vision and Pattern Recognition Con-
+precision across diverse interface layouts.   Extensive                       ference (CVPR), pages 29490–29500, 2025. 2
+experiments on AITW, GUI Odyssey, Android Control,                       [12] Wei Li, William Bishop, Alice Li, et al. On the effects of
+and GUIAct show that iSHIFT matches or surpasses much                         data scale on ui control agents, 2024. 5, 6, 13
+larger models, establishing a new efficiency–accuracy                    [13] Kevin Qinghong Lin, Linjie Li, Difei Gao, et al. Showui:
+trade-off for GUI agents. These results highlight im-                         One vision-language-action model for gui visual agent. In
+plicit adaptive reasoning as a powerful approach for                          Proceedings of the Computer Vision and Pattern Recognition
+building capable and resource-aware multimodal agents.                        Conference (CVPR), pages 19498–19508, 2025. 2, 5, 18
+                                                                         [14] Junpeng Liu, Yifan Song, Bill Yuchen Lin, et al. Visual-
+                                                                              webbench: How far have multimodal LLMs evolved in web
+References                                                                    page understanding and grounding? In First Conference on
+                                                                              Language Modeling, 2024. 1
+ [1] Chongyang Bai, Xiaoxue Zang, Ying Xu, et al. Uibert:                [15] Quanfeng Lu, Wenqi Shao, Zitao Liu, et al. Gui odyssey: A
+     Learning generic multimodal representations for ui under-                comprehensive dataset for cross-app gui navigation on mo-
+     standing. In Proceedings of the Thirtieth International Joint            bile devices. arXiv preprint arXiv:2406.08451, 2024. 1, 5,
+     Conference on Artificial Intelligence, IJCAI-21, pages 1705–             6, 13
+     1712. International Joint Conferences on Artificial Intelli-        [16] Yadong Lu, Jianwei Yang, Yelong Shen, and Ahmed
+     gence Organization, 2021. Main Track. 2                                  Awadallah. Omniparser for pure vision based gui agent,
+ [2] Shuai Bai, Keqin Chen, Xuejing Liu, et al. Qwen2.5-vl tech-              2024. 2, 5
+     nical report. arXiv preprint arXiv:2502.13923, 2025. 6              [17] Xinbei Ma, Zhuosheng Zhang, and Hai Zhao. Compre-
+ [3] Yuxiang Chai, Siyuan Huang, Yazhe Niu, et al. AMEX: An-                  hensive cognitive llm agent for smartphone gui automation.
+     droid multi-annotation expo dataset for mobile GUI agents.               arXiv preprint arXiv:2402.11941, 2024. 5
+     In Findings of the Association for Computational Linguis-           [18] Dang Nguyen, Jian Chen, Yu Wang, et al. Gui agents: A
+     tics: ACL 2025, pages 2138–2156, Vienna, Austria, 2025.                  survey. In Findings of the Association for Computational
+     Association for Computational Linguistics. 5                             Linguistics: ACL 2025, pages 22522–22538, 2025. 1
+ [4] Wentong Chen, Junbo Cui, Jinyi Hu, et al. GUICourse:                [19] OpenAI, :, Aaron Hurst, Adam Lerer, Adam P. Goucher,
+     From general vision language model to versatile GUI agent.               et al. Gpt-4o system card, 2024. 5, 6
+     In Proceedings of the 63rd Annual Meeting of the Associa-           [20] Maxime Oquab, Timothée Darcet, Théo Moutakanni, et al.
+     tion for Computational Linguistics (Volume 1: Long Papers),              DINOv2: Learning robust visual features without supervi-
+     pages 21936–21959, Vienna, Austria, 2025. Association for                sion. Transactions on Machine Learning Research, 2024.
+     Computational Linguistics. 5, 6, 14                                      Featured Certification. 3, 5, 11
+ [5] Kanzhi Cheng, Qiushi Sun, Yougang Chu, et al. SeeClick:             [21] Yujia Qin, Yining Ye, Junjie Fang, et al. Ui-tars: Pioneering
+     Harnessing GUI grounding for advanced visual GUI agents.                 automated gui interaction with native agents. arXiv preprint
+     In Proceedings of the 62nd Annual Meeting of the Associa-                arXiv:2501.12326, 2025. 1
+     tion for Computational Linguistics (Volume 1: Long Papers),         [22] Abdur Rahman, Rajat Chawla, Muskaan Kumar, et al. V-
+     pages 9313–9332, Bangkok, Thailand, 2024. Association for                zen: Efficient gui understanding and precise grounding with
+     Computational Linguistics. 2, 5, 6, 18                                   a novel multimodal llm. arXiv preprint arXiv:2405.15341,
+                                                                              2024. 2, 5
+ [6] Konstantina Christakopoulou, Shibl Mourad, and Maja
+                                                                         [23] Christopher Rawles, Alice Li, Daniel Rodriguez, et al. An-
+     Matarić. Agents thinking fast and slow: A talker-reasoner
+                                                                              droidinthewild: A large-scale dataset for android device con-
+     architecture. arXiv preprint arXiv:2410.08328, 2024. 2
+                                                                              trol. In Advances in Neural Information Processing Systems,
+ [7] Xiangxiang Chu, Limeng Qiao, Xinyang Lin, et al. Mo-                     pages 59708–59728. Curran Associates, Inc., 2023. 1, 5, 6,
+     bilevlm: A fast, reproducible and strong vision language as-             7, 12, 15
+     sistant for mobile devices. arXiv preprint arXiv:2312.16886,
+                                                                         [24] Christopher Rawles, Sarah Clinckemaillie, Yifan Chang,
+     2023. 2, 5
+                                                                              et al. Androidworld: A dynamic benchmarking environment
+ [8] Xiang Deng, Yu Gu, Boyuan Zheng, et al. Mind2web: To-                    for autonomous agents. In The Thirteenth International Con-
+     wards a generalist agent for the web. In Advances in Neural              ference on Learning Representations, 2025. 1
+     Information Processing Systems, pages 28091–28114. Cur-             [25] Peter Shaw, Mandar Joshi, James Cohan, et al. From pixels
+     ran Associates, Inc., 2023. 1, 2                                         to ui actions: Learning to follow instructions via graphical
+ [9] Shibo Hao, Sainbayar Sukhbaatar, DiJia Su, et al. Training               user interfaces. In Advances in Neural Information Process-
+     large language models to reason in a continuous latent space,            ing Systems, pages 34354–34370. Curran Associates, Inc.,
+     2024. 3                                                                  2023. 2
+[10] Wenyi Hong, Weihan Wang, Qingsong Lv, et al. Cogagent:              [26] Huawen Shen, Chang Liu, Gengluo Li, et al. Falcon-ui: Un-
+     A visual language model for gui agents. In Proceedings of                derstanding gui before following user instructions, 2024. 2
+
+
+                                                                     9
+[27] Guangyan Sun, Mingyu Jin, Zhenting Wang, et al. Visual
+     agents as fast and slow thinkers. In The Thirteenth Interna-
+     tional Conference on Learning Representations, 2025. 2
+[28] Fei Tang, Yongliang Shen, Hang Zhang, et al. Think twice,
+     click once: Enhancing gui grounding via fast and slow sys-
+     tems, 2025. 2, 3
+[29] Hugo Touvron, Louis Martin, Kevin Stone, et al. Llama 2:
+     Open foundation and fine-tuned chat models, 2023. 5
+[30] Junyang Wang, Haiyang Xu, Jiabo Ye, et al. Mobile-agent:
+     Autonomous multi-modal mobile device agent with visual
+     perception. arXiv preprint arXiv:2401.16158, 2024. 3, 5
+[31] Peng Wang, Shuai Bai, Sinan Tan, et al. Qwen2-vl: Enhanc-
+     ing vision-language model’s perception of the world at any
+     resolution, 2024. 4, 5, 11
+[32] Jason Wei, Xuezhi Wang, Dale Schuurmans, et al. Chain-of-
+     thought prompting elicits reasoning in large language mod-
+     els. In Advances in Neural Information Processing Systems,
+     pages 24824–24837. Curran Associates, Inc., 2022. 3
+[33] Zhiyong Wu, Zhenyu Wu, Fangzhi Xu, et al. OS-ATLAS:
+     Foundation action model for generalist GUI agents. In The
+     Thirteenth International Conference on Learning Represen-
+     tations, 2025. 3, 6
+[34] Yiheng Xu, Zekun Wang, Junli Wang, et al. Aguvis: Uni-
+     fied pure vision agents for autonomous GUI interaction. In
+     Forty-second International Conference on Machine Learn-
+     ing, 2025. 3, 6
+[35] An Yan, Zhengyuan Yang, Wanrong Zhu, et al. Gpt-4v in
+     wonderland: Large multimodal models for zero-shot smart-
+     phone gui navigation. arXiv preprint arXiv:2311.07562,
+     2023. 2
+[36] Shunyu Yao, Jeffrey Zhao, Dian Yu, et al. React: Synergiz-
+     ing reasoning and acting in language models. arXiv preprint
+     arXiv:2210.03629, 2022. 3
+[37] Keen You, Haotian Zhang, Eldon Schoop, et al. Ferret-ui:
+     Grounded mobile ui understanding with multimodal llms,
+     2024. 2
+[38] Runpeng Yu, Xinyin Ma, and Xinchao Wang. Introducing vi-
+     sual perception token into multimodal large language model,
+     2025. 3
+[39] Zhuosheng Zhan and Aston Zhang. You only look at
+     screens: Multimodal chain-of-action agents. arXiv preprint
+     arXiv:2309.11436, 2023. 6, 12
+[40] Bofei Zhang, Zirui Shang, Zhi Gao, et al. Tongui: Build-
+     ing generalized gui agents by learning from multimodal web
+     tutorials. arXiv preprint arXiv:2504.12679, 2025. 2, 5, 6
+[41] Jiwen Zhang, Jihao Wu, Teng Yihua, et al. Android in the
+     zoo: Chain-of-action-thought for GUI agents. In Findings
+     of the Association for Computational Linguistics: EMNLP
+     2024, pages 12016–12031, Miami, Florida, USA, 2024. As-
+     sociation for Computational Linguistics. 11, 15
+[42] Zhuosheng Zhang and Aston Zhang. You only look at
+     screens: Multimodal chain-of-action agents. In Findings of
+     the Association for Computational Linguistics: ACL 2024,
+     pages 3132–3149, Bangkok, Thailand, 2024. Association for
+     Computational Linguistics. 5
+[43] Boyuan Zheng, Boyu Gou, Jihyung Kil, et al. Gpt-4v(ision)
+     is a generalist web agent, if grounded. In Forty-first Interna-
+     tional Conference on Machine Learning, 2024. 1
+
+
+                                                                       10
+      iSHIFT              : Lightweight slow fast GUI Agent with Adaptive Perception
+
+                                            Supplementary Material
+Contents
+S.1. Dataset Enhancement        ...............................................................................               11
+S.2. Reproducibility and Implementation details    ............................................................               11
+     S.2.1. Computation and Training Details     ..............................................................               11
+     S.2.2. Hyperparameters       .............................................................................               12
+     S.2.3. Prompt Template       .............................................................................               12
+     S.2.4. Dataset Details     ...............................................................................               12
+S.3. Initilization of Latent Tokens   .........................................................................               14
+S.4. Chain of Thought v/s Latent Thinking      ................................................................               15
+S.5. CLIP vs DINO in Visual Perception Module        ..........................................................               15
+S.6. Comparison with RL based methods        ..................................................................               15
+S.7. Not Just Following Instructions: iSHIFT Understands     ..................................................               16
+S.8. Limitations      .........................................................................................               16
+S.9. Qualitative Results and Comparisons      .................................................................               18
+
+
+S.1. Dataset Enhancement
+Algorithm 2 describes how each dataset sample is reformatted to include latent thinking and latent perception tokens. For
+every triplet (I, T, A), we apply a simple rule-based classifier fcat , implemented as an if-else condition, to determine
+whether the action A requires precise visual grounding. If grounding is required, the sample is routed to the slow path;
+otherwise, it follows the fast path.
+    All the instructions are enriched with a short sequence of latent thinking tokens that supervise implicit reasoning. Samples
+assigned to the slow path additionally receive a bounded block of latent perception tokens, encouraging the model to rely
+more heavily on the localized image features. The resulting sequence S, combined with the original image and action label,
+is added to the enhanced dataset D′ .
+    This process transforms the original dataset into a unified format in which all examples contain lightweight latent-thinking
+supervision, while only grounding-critical instances include additional perception cues, enabling the model to learn adaptive
+slow fast reasoning.
+
+S.2. Reproducibility and Implementation Details
+To facilitate reproducibility and provide clarity on our experimental setup, we detail our training pipeline, hyperparameter
+choices, prompt template, and datasets used in iSHIFT. Our goal is to ensure that all implementation decisions including
+model initialization, optimization strategy, action-space normalization, and dataset splits are transparent. All code, configura-
+tion files, and data-processing scripts will be made publicly available upon acceptance. Below, we outline the computation
+setup, phase-wise training procedure, and dataset-specific considerations followed in our experiments.
+
+S.2.1. Computation and Training Details
+Our iSHIFT agent builds on the Qwen2-VL-2B foundation model [31], initialized with its pre-trained weights. The Perception
+Module uses a frozen DINOv2-L encoder [20] for stable and efficient feature extraction. To control computational cost in
+our 2.5B model, the action history is truncated to the two most recent actions. Training is performed on a NVIDIA A100
+(80GB) GPU with AdamW and DeepSpeed ZeRO Stage 2. Our training strategy contains three phases:
+1. Alignment Phase: Only the Visual Perception Module’s cross-attention projector is unfrozen and trained to integrate
+   visual features (learning rate 2 × 10−3 , batch size 32, gradient accumulation 4).
+2. Thought Training Phase: The model learns implicit thought generation using the Android in the Zoo dataset [41] (learn-
+   ing rate 3×10−5 , batch size 16, accumulation 4). Since AITZ provides ground truth thought annotations, we use it exactly
+
+
+                                                               11
+Algorithm 2 Dataset Enhancement and Training Strategy in iSHIFT
+Require: Dataset D = {(I, T, A)} where I is the UI screenshot, T is the textual instruction, and A is the ground truth action
+Ensure: Enhanced dataset D′ with structured latent-token sequences
+ 1: Initialize D ′ ← ∅
+ 2: for each sample (I, T, A) in D do
+ 3:     Determine perception requirement:
+                                                r = fcat (A) ∈ {Low, High}
+ 4:     if r = Low then                                                                                 ▷ Fast Path (Direct Reasoning)
+ 5:          Construct sequence:
+                                            S = [T, <bot>, ⟨z1 ⟩, . . . , ⟨zn ⟩ , <eot>]
+                                                           |       {z        }
+                                                                    latent thinking tokens
+
+ 6:         Each ⟨zi ⟩ represents an implicit thinking step
+ 7:     else                                                                                 ▷ Slow Path (Perception-Aware Reasoning)
+ 8:         Construct sequence:
+
+                             S = [T, <bot>, ⟨z1 ⟩, . . . , ⟨zn ⟩ , <eot>, <bop>, <ctrl>, <eop>]
+                                            |       {z        }
+                                               latent thinking tokens
+
+ 9:     end if
+10:    Add enhanced sample (S, I, A) to D′
+11: end for
+12: return Enhanced dataset D ′
+
+
+
+    as released without any modification. This stage teaches the latent tokens their deliberative role, and we observe that the
+    resulting implicit reasoning generalizes with meaningful thought patterns well beyond the AITZ domain.
+3. Fine-tuning Phase: Using the thought-trained checkpoint, the model learns the full adaptive slow fast strategy on down-
+    stream GUI datasets, with the same batchsize and accumulation settings and a learning rate of 2 × 10−5 .
+Inference: During inference, the model receives both the instruction and the screenshot of the current GUI state along
+with previous actions if any. It then performs implicit task assessment to decide the appropriate reasoning path. If the task
+is simple, the model follows the fast path and directly predicts the action. If the task requires finer visual grounding, it
+selects the slow path and outputs the corresponding perception tokens. These tokens trigger the visual perception module,
+which returns localized features for the queried regions. Using these refined features, the model computes precise grounding
+coordinates and generates the final action.
+S.2.2. Hyperparameters
+Because iSHIFT is built directly on the Qwen2-VL architecture, nearly all architectural and optimization hyperparameters
+are inherited from the base model, leaving only a single meaningful hyperparameter to tune: the number of latent thinking
+tokens. This parameter controls the depth of the model’s implicit deliberation, and as demonstrated in our ablation on latent
+token count (§5) has a tangible impact on performance. Based on this analysis, we set the number of latent tokens to 8, which
+offers the optimal balance between reasoning capacity and efficiency.
+S.2.3. Prompt Template
+We employ a unified prompt template that specifies the instruction, screenshot, previous actions, and the latent tokens ac-
+cording to the Dataset Enhancement strategy (§S.1) described above. As illustrated in Figure S.1, the prompt explicitly
+structures the input into well defined blocks, enabling the model to reason over task goals, past actions, and visual context in
+a predictable format. This prompt formulation is shared across all training phases and benchmarks, ensuring that iSHIFT can
+reliably initiate implicit thinking, activate the slow path when needed, and generate grounded actions with minimal ambiguity.
+S.2.4. Dataset Details
+AITW [23] is a large-scale Android smartphone interaction environment consisting of approximately 30k natural-language in-
+structions and 715k trajectories. We obtain our train, validation, and test splits from the AutoUI [39] benchmark, following the
+
+
+                                                                        12
+  Fast Path
+
+    User:
+    <image>
+    Previous Actions: {previous actions}
+    Goal: {query}
+    Predict the next action to be taken according to the Goal
+    Let’s think step by step.
+    Assistant:
+    <bot><latent><latent><latent><latent><latent><latent><latent><latent><eot>
+    User:
+    Request for additional features if required or answer the question directly based on your
+    observations
+    Assistant:
+    Action Decision:action type:{action type}, touch point:[x1 , y1 ], lift point:[x2 , y2 ],
+    typed text:{text}
+
+
+  Slow Path
+
+    User:
+    <image>
+    Previous Actions: {previous actions}
+    Goal: {query}
+    Predict the next action to be taken according to the Goal
+    Let’s think step by step.
+    Assistant:
+    <bot><latent><latent><latent><latent><latent><latent><latent><latent><eot>
+    User:
+    Request for additional features if required or answer the question directly based on your
+    observations
+    Assistant:
+    <bop><ctrl><eot>
+    User:
+    <detection image>
+    Assistant:
+    Action Decision:action type:{action type}, touch point:[x1 , y1 ], lift point:[x2 , y2 ],
+    typed text:{text}
+
+
+
+
+Figure S.1. slow fast Prompt Formatting. Illustration of how each dataset sample is reformatted into fast and slow path variants. Fast path
+samples receive only latent thinking tokens, whereas Slow path samples additionally include latent perception tokens to support precise
+grounding, following the rule-based classifier described in Algorithm 2.
+
+
+
+standardized partitioning used in prior work to ensure consistent and comparable evaluation across models. The action space
+includes 12 discrete actions: CLICK, TYPE, SELECT, SCROLL UP, SCROLL DOWN, SCROLL LEFT, SCROLL RIGHT,
+PRESS BACK, PRESS HOME, PRESS ENTER, STATUS TASK COMPLETE, and STATUS TASK IMPOSSIBLE.
+   Android Control [12] is an Android UI interaction benchmark that provides 13,604 training episodes (74,722 step-level ac-
+tions) and 2,855 test episodes, offering a controlled environment for evaluating generalization in mobile UI manipulation. We
+use the official train–test splits provided by the benchmark to ensure consistency with prior work. The dataset defines a struc-
+tured action space covering nine interaction types: click, long press, type, directional scroll, navigate home,
+navigate back, open app, wait, and terminate. These actions enable fine-grained control over device navigation,
+text entry, and task completion signaling. We modify this dataset to match the action space of AITW for consistent training.
+   GUI Odyssey [15] is a large-scale benchmark designed to evaluate generalization in multi-device and multi-application
+GUI interaction. The dataset contains 8,334 episodes and provides several standardized train–test configurations. In the
+Random setup, the data is split 80/20, yielding approximately 6,667 training and 1,667 testing episodes. The Task subset
+
+
+                                                                    13
+Figure S.2. Attention map comparison between CLIP and DINO visual encoders. DINO produces more localized and structured attention
+over relevant UI elements, while CLIP exhibits broader, less focused activations.
+
+
+
+allocates data across six task categories in a 6:1 ratio, resulting in roughly 7,144 training and 1,190 test episodes. For
+the Device configuration, all 1,381 episodes collected on the Pixel Tablet are reserved for testing, while the remaining
+6,953 episodes form the training set. Finally, the App subset divides episodes by application frequency with an 85/15
+ratio, producing approximately 7,084 training and 1,250 test samples. GUI Odyssey defines a nine-action interaction space
+consisting of CLICK, LONG PRESS, SCROLL, TYPE, COMPLETE, IMPOSSIBLE, HOME and BACK, each with structured
+arguments specifying positions, gestures, or navigation commands. We modify this dataset to match the action space of
+AITW for consistent training and evaluation across benchmarks.
+   GUIAct [4] is a multi-platform benchmark for evaluating task-oriented GUI agents across web and smartphone environ-
+ments. The dataset provides these standard splits: Web-Single, with 67k training and 1.4k testing samples and Smartphone,
+with 9,157 training and 2k testing samples. The action space is as follows: Click, Hover, Tap, Input, Type, Copy,
+Paste, Scroll, Drag, Swipe, Enter Answer. For consistent evaluation across benchmarks, we normalize this action
+space by merging semantically equivalent operations.
+
+
+S.3. Initialization of Latent Tokens
+To validate the importance of our implicit thought–training stage, we conducted an ablation in which the latent thought to-
+kens were initialized from scratch and trained only during downstream fine-tuning, without exposure to the Android in the
+Zoo thought-supervision phase. As shown in Table S.1, removing the thought pretraining leads to consistent performance
+drops across all evaluation splits, with the largest declines observed in the more open-ended General and G.Apps categories.
+In contrast, equipping the model with thought pretraining exhibit stronger reasoning consistency and improved robustness,
+yielding an absolute average gain of 3.3 points. These results confirm that early alignment of latent tokens toward deliber-
+ative behavior plays a crucial role in enabling the model to effectively leverage the adaptive slow fast strategy during GUI
+interaction.
+
+
+                       Method                        General Install G.Apps WebShop Single                Avg
+                       w/o Thought Pretraining        66.75     78.34     67.80       68.96      83.34 73.04
+                       with Thought Pretraining       70.60     80.82     71.64       72.60      86.03 76.34
+
+Table S.1. Effect of latent-token initialization on adaptive slow fast reasoning. Thought-pretrained latent tokens significantly improve
+performance, confirming their role in enabling reliable slow-path grounding and overall task success.
+
+
+
+
+                                                                  14
+S.4. Chain of Thought v/s Latent Thinking
+To evaluate the effectiveness and generalization ability of our implicit-thinking approach relative to explicit chain-of-thought
+(CoT) reasoning, we train on the Android In The Zoo (AITZ) dataset [41] and assess performance on the diverse test splits
+of Android In The Wild (AITW) [23]. AITZ is constructed from a small subset of AITW and is a publicly available dataset
+that provides ground truth thought annotations. Therefore, for our CoT baseline, we use the dataset exactly as released
+without modifying or augmenting any annotation. AITZ contains approximately 18k training examples with detailed thoughts
+and screen descriptions, while the combined AITW test sets include around 127k samples, forming a challenging out-of-
+distribution benchmark for assessing generalization of the latent tokens. As shown in Table S.2, implicit thinking consistently
+outperforms explicit CoT across all AITW splits, achieving gains of 8–11 points on average despite using nearly 8× fewer
+tokens. Notably, the implicit model delivers the strongest improvements in the most complex domains: General, Google
+Apps, and WebShop, demonstrating that compact latent reasoning not only generalizes better but also provides significantly
+lower inference overhead compared to explicit CoT.
+
+                              Method              General Install G.Apps WebShop Single Avg Tokens
+                              Chain of Thought    46.03    64.97    49.81      49.78     66.57       62
+                              Implicit Thinking   56.54    71.73    60.28      58.75     77.22       8
+
+Table S.2. Implicit thinking vs. chain-of-thought when trained on AITZ and evaluated on AITW. Using AITZ (18k thought annotated
+samples) for training and the full AITW benchmark ( 127k test samples) for evaluation, implicit reasoning delivers consistent improvements
+over explicit CoT across all domains, while operating with an order-of-magnitude fewer tokens.
+
+S.5. CLIP vs DINO in Visual Perception Module
+Figure S.2 compares attention maps of CLIP and DINO on examples from AITW dataset. As observed, CLIP’s heatmaps
+show more diffuse, global attention that loosely corresponds to semantically meaningful areas (like icons or text regions),
+reflecting its image text training objective. In contrast, DINO produces sharper, object centered attention, precisely outlining
+icons, buttons, and text lines, demonstrating its strong spatial and structural awareness learned through self supervised vision
+training. Overall, CLIP captures semantic meaning, while DINO captures visual structure and object boundaries.
+
+S.6. Comparison with RL based Methods
+We additionally compare iSHIFT against recent reinforcement learning based GUI agents across multiple benchmarks to con-
+textualize its performance relative to policy optimization approaches. As shown in Table S.3, iSHIFT matches or surpasses
+strong RL baselines such as DigiRL and DistRL on the custom AITW test subsets, despite using a purely supervised training
+pipeline without any environment rollouts or reward engineering. Notably, our model provides large gains on the Web Shop-
+ping split, highlighting the benefits of adaptive perception in visually dense, multi step tasks. Beyond AITW, iSHIFT also
+achieves substantial improvements on the Android Control and GUI Odyssey benchmarks (Table S.4), outperforming prior
+RL agents including UI-R1, GUI-R1, and SWIRL, by wide margins across both high and low complexity scenarios. These
+results emphasize that our token based slow fast strategy yields stronger generalization and more reliable action grounding
+than methods relying on reinforcement learning.
+
+                                                                                                   Android Control    GUI
+                                                                                       Method
+   Method General Web Shopping         Test Set                                                    High     Low      Odyssey
+   DigiRL  71.90     67.20                                                             UI-R1       45.44   66.44      32.49
+                               First 96 task samples
+   Ours    72.25     72.28                                                             GUI-R1 3B   46.55   64.41      41.33
+   DistRL  73.20     68.50                                                             GUI-R1 7B   51.67   66.52      38.79
+                               First 128 task samples
+   Ours    71.85     73.19                                                             SWIRL       51.24   78.81      51.65
+                                                                                       iSHIFT      65.6     87.7      73.97
+Table S.3. Comparison with RL based agents on AITW. Results
+on the custom AITW test subsets used by DigiRL and DistRL.               Table S.4. Comparison of iSHIFT with prior RL-based GUI
+iSHIFT consistently matches or surpasses RL baselines despite us-        agents on Android Control and GUI Odyssey. iSHIFT achieves
+ing purely supervised training without rollouts or rewards.              the highest performance across all settings, outperforming UI-R1,
+                                                                         GUI-R1 (3B and 7B), and SWIRL in both simple and complex
+                                                                         interaction scenarios.
+
+
+
+                                                                    15
+  Figure S.3. Examples where the ground truth annotations are incorrect, while iSHIFT performs the correct action to achieve the goal.
+
+
+S.7. Not Just Following Instructions: iSHIFT Understands
+This section presents qualitative examples from AITW dataset where iSHIFT’s actions differ from annotated ground truth
+trajectories yet still achieve the intended goal effectively. These examples demonstrate that iSHIFT is not limited to imitating
+annotations but can flexibly adapt its interactions based on visual context and task objectives. We categorize such behaviors
+into three representative types: (i) Cases where the provided annotation is wrong while iSHIFT performs the correct action.
+(ii) iSHIFT takes shorter and more efficient completion routes, and (iii) iSHIFT takes alternate but valid interaction paths that
+reach the goal. Together, these examples highlight iSHIFT’s robustness and ability to generalize beyond the exact sequences
+observed during supervision.
+Handling Annotation Errors Figure S.3 highlights situations where iSHIFT performs the correct interaction even when the
+annotated ground truth is incomplete or inaccurate. In tasks such as “Check battery use,” “Open maps,” and “Delete a single
+message in Gmail,” the annotations specify incorrect or missing actions (e.g., HOME or Click), whereas iSHIFT executes
+valid gestures that reveal the intended interface or open the correct app. Likewise, in “See recent photos,” iSHIFT selects the
+appropriate navigation button, while the annotation prematurely marks the task as complete. These examples suggest that
+minor inconsistencies in GUI annotations do not prevent iSHIFT from executing valid, goal-directed interactions.
+More Efficient Task Completions As shown in Figure S.4, iSHIFT often completes tasks through shorter and more efficient
+action sequences. For instance, in “Turn off JavaScript in Chrome,” it directly clicks the Chrome icon instead of performing
+an intermediate swipe. In “Check the news” examples, it bypasses the step of opening the app drawer and interacts directly
+with the Google search bar, selecting an existing suggestion instead of typing a full query. Such behaviors demonstrate that
+iSHIFT can streamline interactions to minimize unnecessary steps while still reaching the correct goal.
+Alternate but Valid Paths Figure S.5 shows cases where iSHIFT follows a different yet valid sequence of actions to complete
+the task. For “What’s the news in Chile?”, it clicks on a suggested query instead of pressing ENTER, producing the same
+result. For “Open a new tab in Chrome,” it accesses the tabs option from the menu rather than using the menu. Similarly, in the
+Costco and eBay tasks, it selects the search symbol instead of selecting the nearby search suggestions that lead to equivalent
+outcomes. These examples indicate that iSHIFT can flexibly adapt its interaction pattern while remaining consistent with the
+task objective.
+
+S.8. Limitations
+In some cases, iSHIFT performs actions that differ from both the ground truth and the intended goal. These deviations
+typically stem from: (i) the model occasionally selects the fast path when a task benefits from deeper visual reasoning (see
+Figure S.6), (ii) it may opt for the slow path on simpler interactions (see Figure S.7), and (ii) the Visual Perception Module
+
+
+                                                                  16
+Figure S.4. Examples where iSHIFT completes tasks through shorter or more efficient interaction paths than the ground truth trajectories,
+demonstrating its ability to identify faster yet valid routes to achieve the same goals.
+
+
+
+
+Figure S.5. Examples where iSHIFT follows alternate but valid interaction paths that differ from the ground truth actions yet successfully
+achieve the intended goals.
+
+
+may occasionally provide slightly imprecise localized features (see Figure S.8). Nonetheless, as shown in Figure S.9 and
+S.10, such occurrences are rare, indicating that iSHIFT’s adaptive control and perception mechanisms remain stable.
+Choosing the Fast Path instead of Slow and vice-versa. While iSHIFT is designed to dynamically balance between the slow
+and fast reasoning paths, occasional mismatches occur where it selects the fast route for tasks requiring deeper perception
+(see Figure S.6) or the slow route for simpler interactions (see Figure S.7). These cases arise from subtle variations in visual
+complexity estimation or perception cues. However, as shown in Figure S.9 and S.10, such instances are infrequent, iSHIFT
+maintains a nearly even and well-calibrated distribution of slow and fast path usage, closely aligning with the ground truth
+statistics. This indicates that the adaptive control mechanism is generally stable, with only minor room for refinement in
+boundary cases.
+
+
+                                                                   17
+            Figure S.6. Examples where iSHIFT occasionally selects the fast path for tasks that require deeper perception.
+
+
+
+
+                   Figure S.7. Examples where iSHIFT occasionally selects the slow path for simpler interactions.
+
+
+Visual Perception Module. Figure S.8 illustrates cases where iSHIFT’s Visual Perception Module shows minor localization
+differences. In the first example, when opening the Calendar app, iSHIFT’s attention is slightly offset from the target icon,
+leading to a small spatial error. In the second example, when asked to play a YouTube video, it selects one of the two YouTube
+icons present on the screen, different from the annotated ground truth but still a valid choice.
+
+S.9. Qualitative Results and Comparisons
+We provide qualitative examples illustrating how iSHIFT behaves across diverse GUI environments and interaction chal-
+lenges (Figures S.11 - S.19). As shown in our qualitative figures, the model reliably selects between the fast and slow paths
+and produces actions with high spatial precision. We also compare iSHIFT against prior agents such as ShowUI[13] and
+SeeClick[5] highlighting fewer failure modes and more stable behavior in cases involving dense UI elements, ambiguous
+
+
+                                                                 18
+               Figure S.8. Examples showing minor localization variations from iSHIFT’s Visual Perception Module.
+
+
+affordances, or fine-grained interaction requirements (Figures S.20 - S.23). These examples offer an intuitive understanding
+of why our adaptive slow fast strategy yields strong improvements across benchmarks.
+
+
+
+
+                                                              19
+Figure S.9. Action and path distribution on AITW test data. iSHIFT closely matches ground truth action frequencies and accurately
+predicts both slow and fast paths across all task categories.
+
+
+
+                                                               20
+Figure S.10. Action and path distribution on Android Control and GUI odyssey test data. iSHIFT closely matches ground truth action
+frequencies and accurately predicts both slow and fast paths across all task categories.
+
+
+
+                                                               21
+Figure S.11. Episodes from the AITW dataset comparing iSHIFT trajectories with the ground-truth demonstrations. iSHIFT closely
+follows the intended interaction flow, and when deviations occur, the model selects alternative but valid action sequences that still achieve
+the correct task outcome.
+                                                                     22
+Figure S.12. Episodes from the AITW dataset comparing iSHIFT trajectories with the ground-truth demonstrations. iSHIFT closely
+follows the intended interaction flow, and when deviations occur, the model selects alternative but valid action sequences that still achieve
+the correct task outcome.
+                                                                     23
+Figure S.13. Episodes from the AITW dataset comparing iSHIFT trajectories with the ground-truth demonstrations. iSHIFT closely
+follows the intended interaction flow, and when deviations occur, the model selects alternative but valid action sequences that still achieve
+the correct task outcome.
+                                                                     24
+Figure S.14. Episodes from the AITW dataset comparing iSHIFT trajectories with the ground-truth demonstrations. iSHIFT closely
+follows the intended interaction flow, and when deviations occur, the model selects alternative but valid action sequences that still achieve
+the correct task outcome.
+                                                                     25
+Figure S.15. Episodes from the AITW dataset comparing iSHIFT trajectories with the ground-truth demonstrations. iSHIFT closely
+follows the intended interaction flow, and when deviations occur, the model selects alternative but valid action sequences that still achieve
+the correct task outcome.
+                                                                     26
+Figure S.16. Episodes from the AITW dataset comparing iSHIFT trajectories with the ground-truth demonstrations. iSHIFT closely
+follows the intended interaction flow, and when deviations occur, the model selects alternative but valid action sequences that still achieve
+the correct task outcome.
+                                                                     27
+Figure S.17. Episodes from the AITW dataset comparing iSHIFT trajectories with the ground-truth demonstrations. iSHIFT closely
+follows the intended interaction flow, and when deviations occur, the model selects alternative but valid action sequences that still achieve
+the correct task outcome.
+                                                                     28
+Figure S.18. Episodes from the AITW dataset comparing iSHIFT trajectories with the ground-truth demonstrations. iSHIFT closely
+follows the intended interaction flow, and when deviations occur, the model selects alternative but valid action sequences that still achieve
+the correct task outcome.
+                                                                     29
+Figure S.19. Episodes from the AITW dataset comparing iSHIFT trajectories with the ground-truth demonstrations. iSHIFT closely
+follows the intended interaction flow, and when deviations occur, the model selects alternative but valid action sequences that still achieve
+the correct task outcome.
+                                                                     30
+Figure S.20. Qualitative comparison between iSHIFT, ShowUI and SeeClick on the AITW dataset. iSHIFT consistently selects correct
+interaction steps and produces stable trajectories across diverse task scenarios, outperforming competing approaches.
+                                                              31
+Figure S.21. Qualitative comparison between iSHIFT, ShowUI and SeeClick on the AITW dataset. iSHIFT consistently selects correct
+interaction steps and produces stable trajectories across diverse task scenarios, outperforming competing approaches.
+                                                              32
+Figure S.22. Qualitative comparison between iSHIFT, ShowUI and SeeClick on the AITW dataset. iSHIFT consistently selects correct
+interaction steps and produces stable trajectories across diverse task scenarios, outperforming competing approaches.
+                                                              33
+Figure S.23. Qualitative comparison between iSHIFT, ShowUI and SeeClick on the AITW dataset. iSHIFT consistently selects correct
+interaction steps and produces stable trajectories across diverse task scenarios, outperforming competing approaches.
+
+
+
+
+                                                              34
+

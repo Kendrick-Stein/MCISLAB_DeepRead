@@ -63,14 +63,19 @@ mkdir -p website/content/static/presentations/{DomainName}/images
 1. 确认 HTML 文件位于 `website/content/static/presentations/{DomainName}/index.html`
 2. Rebuild 网站: `npx quartz build`
 
-### Step 6 · 创建导航链接
+### Step 6 · 在 queue Review 提建议
 
-在 Domain Map 文件中添加演示链接：
+不直接修改 Domain Map 文件（DomainMaps 的直接编辑仅由 survey-refresh 的 `## 近期格局变化`
+小节或 Human 完成）。用 Edit 将以下条目追加到 `Workbench/queue.md` 的 Review 部分，
+建议 Human 手动补充导航链接：
 
 ```markdown
-## 可视化演示
+### [YYYY-MM-DD] 建议在 DomainMaps/{DomainName}.md 添加可视化演示链接
+- **suggested_map**: DomainMaps/{DomainName}.md
+- **suggested_content**:
+  ## 可视化演示
 
-[🌐 在线浏览 HTML 演示](/static/presentations/{DomainName}/index.html) — 杂志风格翻页展示
+  [🌐 在线浏览 HTML 演示](/static/presentations/{DomainName}/index.html) — 杂志风格翻页展示
 ```
 
 ## 输出位置

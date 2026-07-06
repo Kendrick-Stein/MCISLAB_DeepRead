@@ -1,6 +1,6 @@
 ---
 name: daily-papers
-description: 每日论文总结。抓取 HuggingFace Daily/Trending + arXiv 最新论文，按研究方向打分筛选， 生成论文笔记后基于深度阅读写出有态度的总结锐评。 触发词："今日论文总结""过去3天论文总结""过去一周论文总结""看看最近有什么论文"
+description: 每日论文总结。抓取 HuggingFace Daily/Trending + arXiv + venue 源（OpenAlex 期刊 IJCV/TNNLS/TPAMI、CVF 顶会 CVPR/ICCV/WACV）最新论文，按研究方向打分筛选， 生成论文笔记后基于深度阅读写出有态度的总结锐评。 触发词："今日论文总结""过去3天论文总结""过去一周论文总结""看看最近有什么论文"
 argument-hint: "[今日 / 过去N天 / 过去一周]"
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 ---
@@ -37,6 +37,14 @@ python3 skills/1-literature/daily-papers/fetch_and_score.py \
   --days {DAYS} \
   --output Workbench/daily/.candidates.json
 ```
+
+脚本抓取四类源（均零 token，纯 stdlib，配置见 `config.json`）：
+
+- **HuggingFace Daily/Trending** + **arXiv**：每日预印本主力，`source` 为 `hf-daily`/`hf-trending`/`arxiv`。
+- **OpenAlex 期刊**（`openalex_venues`，按 ISSN）：IJCV/TNNLS/TPAMI 等，`source` 为 `openalex:{Venue}`。期刊出得稀疏，故用独立的 `openalex_lookback_days` 窗口（默认 60 天）而非 `--days`；许多 IEEE/Springer 论文在 OpenAlex 中**无摘要**，此时退化为 title-only 打分，仅标题命中关键词者入选。由于 title 打分（3-7）远低于 HF 高赞（9999）/ CVF（9），会被挤出 top_n，故用 `reserve_per_source`（默认 openalex:5）**保底名额**——保证每次纳入若干篇过 min_score 的期刊论文。
+- **CVF 顶会**（`cvf_proceedings`）：CVPR/ICCV/WACV 论文集，`source` 为 `cvf:{Proc}`，携带 `pdf_url`（免费全文，供 paper-digest 读正文）。listing 页无摘要 → title-only 打分。论文集为一次性发布，"新" = 不在 history；首次启用某 proceeding 会有一批 backlog，由 `max_per_source`（cvf/openalex 每日条数上限）逐日泄洪，避免淹没 arxiv/HF。
+
+跨源去重以稳定主键 `paper_key`（arxiv id → doi → cvf id → 标题哈希）合并：同一论文若 arxiv 与期刊均收录，会归并为一条。
 
 **检查输出**：确认文件存在且包含有效 JSON 数组。如果为空数组，检查 stderr 诊断问题（可能是周末 arXiv 无更新、网络问题等），告知用户原因后停止。
 
@@ -77,7 +85,7 @@ python3 skills/1-literature/daily-papers/queue_ops.py enqueue \
 ### Step 3：每篇要精读论文 → 笔记 + 单篇点评
 
 **每篇要精读论文派发一个 subagent**，指示它：
-1. 调用 `paper-digest` skill 生成笔记；若笔记已存在，则直接读取已有笔记
+1. 调用 `paper-digest` skill 生成笔记；若笔记已存在，则直接读取已有笔记（`paper-digest` 会自动固化 `cite_key` + 缓存权威 BibTeX，无需额外操作）
 2. 基于笔记正文（而非摘要），依照点评原则生成点评，并按点评模版返回点评
 
 **范围控制**：仅对"要精读" 论文执行，"可跳过"不派发 subagent。
@@ -90,7 +98,7 @@ python3 skills/1-literature/daily-papers/queue_ops.py enqueue \
 ### {短标题}
 - **Title**: {完整标题}
 - **Institutes**: {institutes}
-- **Source**: [link]({url})  {来源徽章：📰 HF Daily ⬆️ N / 🔥 HF Trending ⬆️ N / 📄 arXiv}   **📒 论文笔记**: [[{笔记文件名}]]
+- **Source**: [link]({url})  {来源徽章：📰 HF Daily ⬆️ N / 🔥 HF Trending ⬆️ N / 📄 arXiv / 🏛 {Venue}（OpenAlex）/ 🎓 {Proc}}   **📒 论文笔记**: [[{笔记文件名}]]
 - **核心**: 3-5 句，核心 idea + 主要结果，避免黑话
 - **锐评**: 方法有没有硬伤？claim 和证据匹配吗？跟已有工作本质区别在哪？哪些数字亮眼、哪些
   暴露问题？
@@ -106,6 +114,8 @@ python3 skills/1-literature/daily-papers/queue_ops.py enqueue \
   - `hf-daily` → `📰 HF Daily ⬆️ {hf_upvotes}`
   - `hf-trending` → `🔥 HF Trending ⬆️ {hf_upvotes}`
   - `arxiv` → `📄 arXiv`
+  - `openalex:{Venue}` → `🏛 {Venue}（OpenAlex）`，如 `🏛 IJCV（OpenAlex）`
+  - `cvf:{Proc}` → `🎓 {Proc}`，如 `🎓 CVPR2026`
 
 > **重要‼️**：Subagent prompt 必须包含以上完整的`点评模板` 和 `点评原则`，**不要省略**
 

@@ -10,6 +10,25 @@ ReadPaperMachine 是一个基于 Obsidian 的科研知识管理系统。核心�
 - **AI-driven**：AI Agent 作为 Researcher，阅读技能定义（SKILL.md）后直接读写 Markdown 文件执行工作流
 - **Zero backend**：无需 Python 后端、数据库或 API 层。Vault 就是应用状态
 
+## Quick Start（把它变成你自己的 research assistant）
+
+```bash
+git clone <this-repo> && cd ReadPaperMachine
+bash scripts/init.sh --fresh   # 清空示例数据，向导设置你的研究方向与关键词
+```
+
+然后在 Claude Code 中：
+
+- `/daily-papers` — 抓取并锐评最新论文
+- `/paper-digest <arXiv URL>` — 消化一篇论文（自动记账到相关 survey）
+- `/survey-refresh <Survey名>` — 把新读论文增量合并进 survey
+- `/autoresearch` — 自主研究循环（读论文 → 迭代 survey → 生成 idea）
+- `/news-digest` — 非论文信息源摘要（先在 `Workbench/config/team-config.json` 配 `news.sources`）
+- `/related-work <draft.tex>` / `/auto-cite <draft.tex>` — LaTeX 写作链
+
+个性化只需改一个文件：`Workbench/config/team-config.json`（interests + news.sources）。
+不跑 `--fresh` 则保留本库的论文笔记作为参考示例。
+
 ## 目录结构
 
 ```
@@ -24,7 +43,7 @@ ReadPaperMachine/
 │
 ├── Experiments/         # 实验记录
 ├── Templates/           # 笔记模板
-├── skills/              # 科研 Skill 定义（17 个，7 类）
+├── skills/              # 科研 Skill 定义（21 个，7 类）
 ├── references/          # 协议文档
 │
 ├── Workbench/           # Researcher 工作状态
@@ -44,10 +63,10 @@ ReadPaperMachine/
 
 | 类别 | Skills |
 |:-----|:-------|
-| 1-literature | `paper-digest`, `literature-survey`, `daily-papers` |
+| 1-literature | `paper-digest`, `literature-survey`, `daily-papers`, `survey-refresh`, `news-digest` |
 | 2-ideation | `idea-generate`, `idea-evaluate` |
 | 3-experiment | `experiment-design`, `experiment-track`, `result-analysis` |
-| 4-writing | `draft-section`, `writing-refine`, `latex-citation-enhancer` |
+| 4-writing | `draft-section`, `writing-refine`, `latex-citation-enhancer`, `auto-cite`, `related-work` |
 | 5-evolution | `memory-distill`, `agenda-evolve`, `memory-retrieve` |
 | 6-orchestration | `autoresearch`, `research-team` |
 | 7-presentation | `domain-presentation` |

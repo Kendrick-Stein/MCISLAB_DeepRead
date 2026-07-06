@@ -2,7 +2,7 @@
 
 > 本文件是 ReadPaperMachine 的 single source of truth。
 
-**Last updated**: 2026-06-26
+**Last updated**: 2026-07-06（skill 通过 repo 内 `.claude/skills/` 符号链接自动注册，见 §1 Setup）
 
 ---
 
@@ -24,6 +24,12 @@ Insight  — 目标不是论文数量，而是 "我们理解了什么新东西�
 Trust    — 透明 → 可审计 → 信任
 Markdown — 一切皆文件，一切可读，一切有版本控制
 ```
+
+### Setup
+
+Skill 通过 repo 内 `.claude/skills/` 符号链接指向 `skills/<category>/<name>/` 自动注册给 Claude Code；
+`python3 scripts/sync_skills.py --fix` 校验并修复缺失/失效的链接。新环境用 `bash scripts/init.sh`
+（加 `--fresh` 可清空示例论文/idea，走向导设置研究方向与关键词）完成一次性初始化。
 
 ## 2. Architecture
 
@@ -51,9 +57,10 @@ ReadPaperMachine/
 ├── Projects/            # 项目追踪
 ├── Topics/              # 文献调研 / 跨论文分析报告
 ├── Reports/             # 生成的报告
+├── News/                # 非论文信息源摘要（news-digest 产出）
 ├── Meetings/            # 会议记录
 │
-├── DomainMaps/          # 核心认知地图
+├── DomainMaps/          # 核心认知地图（survey-refresh 自动维护"近期格局变化"；结构性内容经 queue Review 由 Human 晋升）
 │   ├── _index.md        #   索引页
 │   └── {Name}.md        #   各 domain 认知地图
 │
@@ -79,6 +86,7 @@ ReadPaperMachine/
 │   ├── memory/          #   蒸馏后的记忆
 │   ├── queue.md         #   待办队列
 │   ├── logs/            #   每日操作日志
+│   ├── survey-updates.json  # digest→survey 记账（paper-digest 写，survey-refresh 消费）
 │   └── evolution/       #   演化记录
 │
 ├── docs/SPEC.md         # 本文件
@@ -92,6 +100,8 @@ ReadPaperMachine/
 | `1-literature` | `paper-digest` | 消化单篇论文 → Paper 笔记 |
 | | `literature-survey` | 主题级调研（搜索 + 批量 digest + 综合） |
 | | `daily-papers` | 抓取 HF Daily/Trending + arXiv，打分筛选 + 锐评 |
+| | `survey-refresh` | 把 digest 积压的新论文增量并入 survey + 刷新 DomainMap |
+| | `news-digest` | 非论文信息源（RSS/Atom 等）摘要 → News/ |
 | `2-ideation` | `idea-generate` | 从知识空白生成研究 idea |
 | | `idea-evaluate` | 评估 idea 可行性和新颖性 |
 | `3-experiment` | `experiment-design` | 设计实验方案 |
@@ -99,7 +109,9 @@ ReadPaperMachine/
 | | `result-analysis` | 分析实验结果，提取 insight |
 | `4-writing` | `draft-section` | 起草论文/报告章节 |
 | | `writing-refine` | 打磨已有文稿 |
-| | `latex-citation-enhancer` | 为 LaTeX 文档自动增强引用（基于 Papers/） |
+| | `latex-citation-enhancer` | 固化 cite_key + 抓权威 BibTeX → 生成 references.bib |
+| | `auto-cite` | 给 LaTeX 草稿逐条判断 + 确认后插入 `\cite{}`（基于 Papers/） |
+| | `related-work` | 起草英文 LaTeX Related Work 章节 |
 | `5-evolution` | `memory-distill` | 从日志蒸馏记忆 |
 | | `agenda-evolve` | 演化研究议程 |
 | | `memory-retrieve` | 从记忆库检索相关经验 |
@@ -133,3 +145,12 @@ ReadPaperMachine/
 
 - 引用论文优先用**纯文件名** `[[2604-GoClick]]`（Obsidian 按文件名解析，不受 Papers/ 还是 Papers/Archive/ 影响），避免写死路径 `[[Papers/2604-GoClick]]`（移动文件即断链）。
 - 文件名含空格/冒号会导致 wikilink 解析失败——引用前确认目标文件名符合 5.1。
+
+### 5.5 引用身份 frontmatter（cite_key / arxiv_id / doi）
+
+- 每篇 `Papers/*.md` 在 digest 时固化三个引用身份字段：
+  - `arxiv_id`：如 `"2606.19409"`（非 arXiv 留空），由 `assign_cite_keys.py` 从 url 自动抽取。
+  - `doi`：期刊/会议 DOI（有则填）。
+  - `cite_key`：LaTeX 引用 key，格式 `{lastname}{year}{firstTitleWord}`（如 `wen2026openrath`）。
+- **不变量**：`cite_key` 一旦写入**永久冻结**——保证已发草稿里的 `\cite{}` 永不失效。改 key 须手动编辑该字段；工具（`assign_cite_keys.py`）只为缺失的论文分配、绝不覆盖。
+- 权威 BibTeX 缓存在 `references/bibtex-cache.bib`（按 cite_key 索引，`source=arxiv|crossref|reconstructed`），由 `fetch_bibtex.py` 维护，勿手改。`references.bib` 由 `generate_bibtex.py` 从缓存 + frontmatter 组装。

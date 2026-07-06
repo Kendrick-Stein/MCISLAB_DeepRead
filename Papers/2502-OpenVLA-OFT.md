@@ -3,6 +3,7 @@ title: "Fine-Tuning Vision-Language-Action Models: Optimizing Speed and Success"
 authors: [Moo Jin Kim, Chelsea Finn, Percy Liang]
 institutes: [Stanford University]
 date_publish: 2025-02-27
+cite_key: kim2025fine
 venue: RSS 2025
 tags: [VLA, imitation-learning, manipulation]
 paper: https://arxiv.org/abs/2502.19645

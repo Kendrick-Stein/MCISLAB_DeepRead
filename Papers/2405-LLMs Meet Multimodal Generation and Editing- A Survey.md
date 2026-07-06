@@ -4,6 +4,8 @@ authors: ['Yingqing He', 'Zhaoyang Liu', 'Jingye Chen', 'Zeyue Tian', 'Hongyu Li
 year: 2024
 venue: "None"
 url: "http://arxiv.org/abs/2405.19334v2"
+cite_key: he2024llms
+arxiv_id: "2405.19334"
 tags: ["Multimodal LLM"]
 status: pending
 date_added: 2026-04-15

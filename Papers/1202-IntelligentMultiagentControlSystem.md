@@ -6,6 +6,7 @@ date_publish: "2012-02-07"
 venue: "IEEE Transactions on Smart Grid"
 tags: []
 url: ""
+cite_key: wang2012intelligent
 code: ""
 rating: "3"
 date_added: "2026-04-21"

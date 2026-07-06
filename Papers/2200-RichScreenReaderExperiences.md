@@ -12,6 +12,8 @@ date_publish: "2022/05/10"
 venue: "arXiv"
 tags: ["navigation", "imitation-learning", "scene-understanding"]
 url: "https://arxiv.org/abs/2205.04917"
+cite_key: zong2022rich
+arxiv_id: "2205.04917"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

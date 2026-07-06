@@ -3,6 +3,7 @@ title: "TinyVLA: Towards Fast, Data-Efficient Vision-Language-Action Models for 
 authors: [Junjie Wen, Yichen Zhu, Jinming Li, Minjie Zhu, Zhibin Tang, Kun Wu, Zhiyuan Xu, Ning Liu, Ran Cheng, Chaomin Shen, Yaxin Peng, Feifei Feng, Jian Tang]
 institutes: [East China Normal University, Midea Group AI Lab, Shanghai University, Syracuse University, Beijing Innovation Center of Humanoid Robotics]
 date_publish: 2024-09-19
+cite_key: wen2024tinyvla
 venue: IEEE RA-L 2025
 tags: [VLA, diffusion-policy, manipulation]
 paper: https://arxiv.org/abs/2409.12514

@@ -6,6 +6,8 @@ date_publish: 2026-05-05
 venue: arXiv
 tags: [computer-use, gui-agent, LLM, task-planning]
 url: "https://arxiv.org/abs/2605.03596v1"
+cite_key: tang2026workspace
+arxiv_id: "2605.03596"
 code:
 rating: "3"
 date_added: 2026-05-06

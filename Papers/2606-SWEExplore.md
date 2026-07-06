@@ -6,6 +6,8 @@ date_publish: 2026-06-05
 venue: arXiv
 tags: [gui-agent, LLM]
 url: https://arxiv.org/abs/2606.07297
+cite_key: zhang2026swe
+arxiv_id: "2606.07297"
 code: https://github.com/Qiushiu-E/SWE-Explore-Bench
 rating: 3
 date_added: 2026-06-10

@@ -6,6 +6,8 @@ date_publish: "2024/12/09"
 venue: "arXiv"
 tags: ["manipulation", "RL", "task-planning"]
 url: "https://arxiv.org/abs/2412.06333"
+cite_key: bredell2024augmenting
+arxiv_id: "2412.06333"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

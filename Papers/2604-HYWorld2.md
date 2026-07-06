@@ -51,6 +51,8 @@ date_publish: "2026-04-15"
 venue: "arXiv"
 tags: ["world-model", "3D-representation", "VLM"]
 url: "https://arxiv.org/abs/2604.14268"
+cite_key: hyworld2026hy
+arxiv_id: "2604.14268"
 code: "https://3d-models.hunyuan.tencent.com/world/"
 rating: "4"
 date_added: "2026-06-26"

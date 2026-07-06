@@ -6,6 +6,8 @@ date_publish: "2024/02/19"
 venue: "arXiv"
 tags: ["web-agent"]
 url: "https://arxiv.org/abs/2402.11941"
+cite_key: ma2024coco
+arxiv_id: "2402.11941"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

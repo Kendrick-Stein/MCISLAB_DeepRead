@@ -6,6 +6,8 @@ date_publish: "2026-05"
 venue: "arXiv"
 tags: [video-LLM, agentic-RL, VLM]
 url: "https://arxiv.org/abs/2605.16079"
+cite_key: zhao2026videoseeker
+arxiv_id: "2605.16079"
 code: ""
 rating: 3
 date_added: "2026-05-25"

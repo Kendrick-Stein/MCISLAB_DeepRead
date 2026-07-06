@@ -14,6 +14,8 @@ tags:
   - "computer-use"
   - "gui-agent"
 url: "https://arxiv.org/abs/2604.24964v1"
+cite_key: jang2026odysseys
+arxiv_id: "2604.24964"
 code: "https://odysseys-website.pages.dev"
 rating: "4"
 date_added: "2026-06-26"

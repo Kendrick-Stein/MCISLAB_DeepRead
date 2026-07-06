@@ -11,6 +11,8 @@ date_publish: "2026-06-05"
 venue: arXiv
 tags: [VLM, spatial-reasoning]
 url: "https://arxiv.org/abs/2606.07872"
+cite_key: zhu2026visualflip
+arxiv_id: "2606.07872"
 code: "https://didizhu-judy.github.io/VisualFLIP/"
 rating: "4"
 date_added: "2026-06-26"

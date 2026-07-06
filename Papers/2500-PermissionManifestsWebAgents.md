@@ -21,6 +21,8 @@ date_publish: "2025/12/07"
 venue: "arXiv"
 tags: ["web-agent"]
 url: "https://arxiv.org/abs/2601.02371"
+cite_key: marro2025permission
+arxiv_id: "2601.02371"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

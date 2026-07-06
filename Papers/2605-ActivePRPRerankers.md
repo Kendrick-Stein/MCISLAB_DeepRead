@@ -6,6 +6,8 @@ date_publish: "2026-05"
 venue: "arXiv"
 tags: ["LLM", "agentic-RL"]
 url: "https://arxiv.org/abs/2605.14236"
+cite_key: paschmann2026active
+arxiv_id: "2605.14236"
 code: ""
 rating: 3
 date_added: "2026-05-25"

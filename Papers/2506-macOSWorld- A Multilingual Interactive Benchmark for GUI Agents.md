@@ -4,6 +4,8 @@ authors: ['Pei Yang', 'Hai Ci', 'Mike Zheng Shou']
 year: 2025
 venue: "None"
 url: "http://arxiv.org/abs/2506.04135v4"
+cite_key: yang2025macosworld
+arxiv_id: "2506.04135"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

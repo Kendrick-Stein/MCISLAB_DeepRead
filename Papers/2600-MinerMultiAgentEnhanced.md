@@ -20,6 +20,8 @@ date_publish: "2026/02/05"
 venue: "arXiv"
 tags: ["imitation-learning", "web-agent"]
 url: "https://arxiv.org/abs/2602.05429"
+cite_key: lv2026miner
+arxiv_id: "2602.05429"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

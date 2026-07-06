@@ -3,6 +3,7 @@ title: "A Comprehensive Survey of Agents for Computer Use: Foundations, Challeng
 authors: [Pascal J. Sager, Benjamin Meyer, Peng Yan, Rebekka von Wartburg-Kottler, Layan Etaiwi, Aref Enayati, Gabriel Nobel, Ahmed Abdulkadir, Benjamin F. Grewe, Thilo Stadelmann]
 institutes: [ZHAW, University of Zurich, ETH AI Center, Polytechnique Montreal, University of Fribourg, AlpineAI, European Centre for Living Technology]
 date_publish: 2026-02-24
+cite_key: sager2026comprehensive
 venue: JAIR vol. 85, 2026
 tags: [computer-use, gui-agent, web-agent]
 paper: https://arxiv.org/abs/2501.16150

@@ -7,6 +7,8 @@ date_publish: "2024-05"
 venue: "arXiv"
 tags: ["lorentz", "graph-neural-network", "equivariant", "hyperbolic"]
 url: "https://arxiv.org/abs/2405.16653"
+cite_key: authors2024lorentz
+arxiv_id: "2405.16653"
 code: ""
 rating: "3"
 date_added: "2026-04-28"

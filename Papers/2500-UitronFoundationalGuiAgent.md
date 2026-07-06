@@ -16,6 +16,8 @@ date_publish: "2025/08/29"
 venue: "arXiv"
 tags: ["VLM", "navigation", "imitation-learning"]
 url: "https://arxiv.org/abs/2508.21767"
+cite_key: zeng2025uitron
+arxiv_id: "2508.21767"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

@@ -4,6 +4,8 @@ authors: ['Liangtai Sun', 'Xingyu Chen', 'Lu Chen', 'Tianle Dai', 'Zichen Zhu', 
 year: 2022
 venue: "None"
 url: "http://arxiv.org/abs/2205.11029v2"
+cite_key: sun2022meta
+arxiv_id: "2205.11029"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

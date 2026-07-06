@@ -3,6 +3,7 @@ title: "OS-Genesis: Automating GUI Agent Trajectory Construction via Reverse Tas
 authors: [Qiushi Sun, Kanzhi Cheng, Zichen Ding, Chuanyang Jin, Yian Wang, Fangzhi Xu, Zhenyu Wu, Chengyou Jia, Liheng Chen, Zhoumianze Liu, Ben Kao, Guohao Li, Junxian He, Yu Qiao, Zhiyong Wu]
 institutes: [Shanghai AI Laboratory, The University of Hong Kong, Johns Hopkins University, Shanghai Jiao Tong University, University of Oxford, Hong Kong University of Science and Technology]
 date_publish: 2024-12-27
+cite_key: sun2024os
 venue: ACL 2025
 tags: [gui-agent, computer-use, VLM]
 paper: https://arxiv.org/abs/2412.19723

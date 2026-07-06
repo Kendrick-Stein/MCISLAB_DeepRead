@@ -3,6 +3,7 @@ title: "NaviTrace: Evaluating Embodied Navigation of Vision-Language Models"
 authors: [Tim Windecker, Manthan Patel, Moritz Reuss, Richard Schwarzkopf, Cesar Cadena, Rudolf Lioutikov, Marco Hutter, Jonas Frey]
 institutes: [ETH Zurich (RSL), KIT (IRL), FZI, Robotics Institute Germany]
 date_publish: 2025-10-30
+cite_key: windecker2025navitrace
 venue: arXiv preprint
 tags: [navigation, VLM, embodied-reasoning]
 paper: https://arxiv.org/abs/2510.26909

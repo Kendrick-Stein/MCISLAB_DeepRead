@@ -16,6 +16,8 @@ date_publish: "2025/04/17"
 venue: "arXiv"
 tags: ["VLM", "navigation", "scene-understanding"]
 url: "https://arxiv.org/abs/2504.12679"
+cite_key: zhang2025tongui
+arxiv_id: "2504.12679"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

@@ -4,6 +4,7 @@ authors: ['Yichun Zhang', 'Xiangwu Guo', 'Yauhong Goh', 'Jessica Hu', 'Zhiheng C
 year: 2026
 venue: "ArXiv.org"
 url: "https://openalex.org/W7124117737"
+cite_key: zhangshowui
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

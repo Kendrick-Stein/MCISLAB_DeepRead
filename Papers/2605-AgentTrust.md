@@ -10,6 +10,8 @@ tags:
   - computer-use
   - agentic-RL
 url: "https://arxiv.org/abs/2605.04785v1"
+cite_key: yang2026agenttrust
+arxiv_id: "2605.04785"
 code: "https://github.com/yangchenglin802/agenttrust"
 rating: 4
 date_added: 2026-05-07

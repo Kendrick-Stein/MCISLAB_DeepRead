@@ -35,6 +35,8 @@ date_publish: "2024/12/03"
 venue: "arXiv"
 tags: []
 url: "https://arxiv.org/abs/2412.02527"
+cite_key: collaboration2024multimodal
+arxiv_id: "2412.02527"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

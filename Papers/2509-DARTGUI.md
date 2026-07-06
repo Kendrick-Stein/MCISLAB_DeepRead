@@ -3,6 +3,7 @@ title: "Efficient Multi-turn RL for GUI Agents via Decoupled Training and Adapti
 authors: [Pengxiang Li, Zechen Hu, Zirui Shang, Jingrong Wu, Yang Liu, Hui Liu, Zhi Gao, Chenrui Shi, Bofei Zhang, Zihao Zhang, Xiaochuan Shi, Zedong Yu, Yuwei Wu, Xinxiao Wu, Yunde Jia, Liuyu Xiang, Zhaofeng He, Qing Li]
 institutes: [Beijing Institute of Technology, BIGAI, DataCanvas, Beijing University of Posts and Telecommunications, Shenzhen MSU-BIT University]
 date_publish: 2025-09-28
+cite_key: li2025efficient
 venue: arXiv
 tags: [agentic-RL, computer-use, gui-agent]
 paper: https://arxiv.org/abs/2509.23866

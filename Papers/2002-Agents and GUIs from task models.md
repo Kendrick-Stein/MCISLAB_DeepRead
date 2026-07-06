@@ -4,6 +4,7 @@ authors: ['Jacob Eisenstein', 'Charles Rich']
 year: 2002
 venue: "None"
 url: "https://openalex.org/W2164631889"
+cite_key: eisensteinagents
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

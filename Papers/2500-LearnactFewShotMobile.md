@@ -15,6 +15,8 @@ date_publish: "2025/04/18"
 venue: "arXiv"
 tags: ["imitation-learning", "web-agent"]
 url: "https://arxiv.org/abs/2504.13805"
+cite_key: liu2025learnact
+arxiv_id: "2504.13805"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

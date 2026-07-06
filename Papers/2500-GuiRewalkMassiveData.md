@@ -15,6 +15,8 @@ date_publish: "2025/09/19"
 venue: "arXiv"
 tags: ["navigation", "imitation-learning", "task-planning"]
 url: "https://arxiv.org/abs/2509.15738"
+cite_key: lin2025gui
+arxiv_id: "2509.15738"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

@@ -30,6 +30,8 @@ date_publish: "2025/07/19"
 venue: "arXiv"
 tags: ["VLM", "imitation-learning", "RL"]
 url: "https://arxiv.org/abs/2508.03700"
+cite_key: tang2025magicgui
+arxiv_id: "2508.03700"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

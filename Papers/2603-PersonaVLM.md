@@ -3,6 +3,7 @@ title: "PersonaVLM: Long-Term Personalized Multimodal LLMs"
 authors: [Chang Nie, Chaoyou Fu, Yifan Zhang, Haihua Yang, Caifeng Shan]
 institutes: [Nanjing University, ByteDance]
 date_publish: 2026-03-20
+cite_key: nie2026personavlm
 venue: CVPR 2026
 tags: [VLM, agentic-RL, LLM]
 paper: https://arxiv.org/abs/2604.13074

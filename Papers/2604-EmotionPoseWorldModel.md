@@ -8,6 +8,8 @@ date_publish: "2026-04-26"
 venue: "arXiv"
 tags: ["world-model", "human-pose", "prediction", "multimodal"]
 url: "http://arxiv.org/abs/2604.23532v1"
+cite_key: huang2026emotion
+arxiv_id: "2604.23532"
 code: ""
 rating: "1"
 date_added: "2026-04-28"

@@ -3,6 +3,7 @@ title: "Reward Hacking in Reinforcement Learning"
 authors: [Lilian Weng]
 institutes: [OpenAI (personal blog)]
 date_publish: 2024-11-28
+cite_key: weng2024reward
 venue: Blog (Lil'Log)
 tags: [agentic-RL, RL, LLM]
 paper:

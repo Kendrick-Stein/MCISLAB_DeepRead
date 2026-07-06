@@ -11,6 +11,8 @@ date_publish: "2026-06-15"
 venue: arXiv
 tags: [computer-use, gui-agent, web-agent]
 url: "https://arxiv.org/abs/2606.16748"
+cite_key: jang2026mypcbench
+arxiv_id: "2606.16748"
 code: "https://mypcbench.com"
 rating: "4"
 date_added: "2026-06-26"

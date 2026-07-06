@@ -10,6 +10,8 @@ date_publish: "2025/07/13"
 venue: "arXiv"
 tags: ["imitation-learning", "scene-understanding", "web-agent"]
 url: "https://arxiv.org/abs/2507.10610"
+cite_key: yan2025lasm
+arxiv_id: "2507.10610"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

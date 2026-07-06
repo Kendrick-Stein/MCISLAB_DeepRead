@@ -3,6 +3,7 @@ title: "Embodied Web Agents: Bridging Physical-Digital Realms for Integrated Age
 authors: [Yining Hong, Rui Sun, Bingxuan Li, Xingcheng Yao, Maxine Wu, Alexander Chien, Da Yin, Ying Nian Wu, Zhecan James Wang, Kai-Wei Chang]
 institutes: [UCLA]
 date_publish: 2025-06
+cite_key: hong2025embodied
 venue: NeurIPS 2025 Datasets and Benchmarks Track (Spotlight)
 tags: [web-agent, navigation, task-planning]
 paper: https://arxiv.org/abs/2506.15677

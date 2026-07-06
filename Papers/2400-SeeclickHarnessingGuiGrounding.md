@@ -13,6 +13,8 @@ date_publish: "2024/01/17"
 venue: "arXiv"
 tags: ["VLM", "imitation-learning", "scene-understanding"]
 url: "https://arxiv.org/abs/2401.10935"
+cite_key: cheng2024seeclick
+arxiv_id: "2401.10935"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

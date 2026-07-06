@@ -3,6 +3,7 @@ title: "SplaTAM: Splat, Track & Map 3D Gaussians for Dense RGB-D SLAM"
 authors: [Nikhil Keetha, Jay Karhade, Krishna Murthy Jatavallabhula, Gengshan Yang, Sebastian Scherer, Deva Ramanan, Jonathon Luiten]
 institutes: [CMU, MIT]
 date_publish: 2023-12-04
+cite_key: keetha2023splatam
 venue: CVPR 2024
 tags: [SLAM, 3D-representation]
 paper: https://arxiv.org/abs/2312.02126

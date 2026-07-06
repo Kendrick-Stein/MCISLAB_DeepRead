@@ -3,6 +3,7 @@ title: "BiCoord: A Bimanual Manipulation Benchmark towards Long-Horizon Spatial-
 authors: [Xingyu Peng, Chen Gao, Liankai Jin, Annan Li, Si Liu]
 institutes: [Beihang University, Zhongguancun Academy, National University of Singapore]
 date_publish: 2026-04-07
+cite_key: peng2026bicoord
 venue: arXiv 2604.05831
 tags: [manipulation, VLA, diffusion-policy]
 paper: https://arxiv.org/abs/2604.05831

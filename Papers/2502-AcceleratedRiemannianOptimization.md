@@ -9,6 +9,8 @@ date_publish: "2025-02"
 venue: "arXiv"
 tags: ["riemannian", "optimization", "manifold", "geometric-constraints"]
 url: "https://arxiv.org/abs/2502.01983"
+cite_key: orizon2025accelerated
+arxiv_id: "2502.01983"
 code: ""
 rating: "3"
 date_added: "2026-04-28"

@@ -16,6 +16,8 @@ tags:
   - imitation-learning
   - manipulation
 url: http://arxiv.org/abs/2605.04678v1
+cite_key: lin2026pixels
+arxiv_id: "2605.04678"
 code: https://github.com/RUCKBReasoning/From_Pixels_to_Tokens
 rating: "4"
 date_added: 2026-05-07

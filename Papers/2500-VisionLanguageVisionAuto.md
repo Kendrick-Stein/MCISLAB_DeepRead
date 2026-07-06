@@ -13,6 +13,8 @@ date_publish: "2025/07/09"
 venue: "arXiv"
 tags: ["VLM", "imitation-learning"]
 url: "https://arxiv.org/abs/2507.07104"
+cite_key: zhang2025vision
+arxiv_id: "2507.07104"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

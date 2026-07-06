@@ -3,6 +3,7 @@ title: "Cosmos-Reason1: From Physical Common Sense To Embodied Reasoning"
 authors: [NVIDIA]
 institutes: [NVIDIA]
 date_publish: 2025-03
+cite_key: nvidia2025cosmos
 venue: arXiv
 tags: [embodied-reasoning, VLM, spatial-reasoning]
 paper: https://arxiv.org/abs/2503.15558

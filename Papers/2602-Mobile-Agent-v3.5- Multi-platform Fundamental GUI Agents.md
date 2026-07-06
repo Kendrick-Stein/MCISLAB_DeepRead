@@ -4,6 +4,8 @@ authors: ['Haiyang Xu', 'Xi Zhang', 'Haowei Liu', 'Junyang Wang', 'Zhaozai Zhu',
 year: 2026
 venue: "None"
 url: "http://arxiv.org/abs/2602.16855v1"
+cite_key: xu2026mobile
+arxiv_id: "2602.16855"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

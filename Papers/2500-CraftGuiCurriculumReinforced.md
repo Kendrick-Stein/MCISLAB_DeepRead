@@ -13,6 +13,8 @@ date_publish: "2025/08/15"
 venue: "arXiv"
 tags: ["imitation-learning", "RL"]
 url: "https://arxiv.org/abs/2508.11360"
+cite_key: nong2025craft
+arxiv_id: "2508.11360"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

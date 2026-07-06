@@ -3,6 +3,7 @@ title: "Agent S2: A Compositional Generalist-Specialist Framework for Computer U
 authors: [Saaket Agashe, Kyle Wong, Vincent Tu, Jiachen Yang, Ang Li, Xin Eric Wang]
 institutes: [Simular Research]
 date_publish: 2025-04-01
+cite_key: agashe2025agent
 venue: COLM 2025
 tags: [computer-use, gui-agent, task-planning]
 paper: https://arxiv.org/abs/2504.00906

@@ -3,6 +3,7 @@ title: "Generative World Renderer"
 authors: [Zheng-Hui Huang, Zhixiang Wang, Jiaming Tan, Ruihan Yu, Yidan Zhang, Bo Zheng, Yu-Lun Liu, Yung-Yu Chuang, Kaipeng Zhang]
 institutes: [Alaya Studio (Shanda AI Research Tokyo), National Taiwan University, The University of Tokyo, National Yang Ming Chiao Tung University]
 date_publish: 2026-04-02
+cite_key: huang2026generative
 venue: arXiv
 tags: [world-model, 3D-representation]
 paper: https://arxiv.org/abs/2604.02329

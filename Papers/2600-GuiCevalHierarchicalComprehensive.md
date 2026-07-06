@@ -17,6 +17,8 @@ date_publish: "2026/03/16"
 venue: "arXiv"
 tags: ["scene-understanding", "task-planning", "web-agent"]
 url: "https://arxiv.org/abs/2603.15039"
+cite_key: li2026gui
+arxiv_id: "2603.15039"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

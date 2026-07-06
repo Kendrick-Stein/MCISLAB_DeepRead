@@ -6,6 +6,8 @@ date_publish: "2023/09/12"
 venue: "arXiv"
 tags: []
 url: "https://arxiv.org/abs/2309.06611"
+cite_key: busch2023enabling
+arxiv_id: "2309.06611"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

@@ -6,6 +6,8 @@ date_publish: "2026/01/23"
 venue: "arXiv"
 tags: []
 url: "https://arxiv.org/abs/2601.16513"
+cite_key: wilfley2026competing
+arxiv_id: "2601.16513"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

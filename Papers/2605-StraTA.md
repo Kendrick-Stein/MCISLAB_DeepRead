@@ -6,6 +6,8 @@ date_publish: 2026-05-07
 venue: arXiv
 tags: ["agentic-RL", "task-planning"]
 url: "https://arxiv.org/abs/2605.06642"
+cite_key: xue2026strata
+arxiv_id: "2605.06642"
 code:
 rating: "3"
 date_added: 2026-05-12

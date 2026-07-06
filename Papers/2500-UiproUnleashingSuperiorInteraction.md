@@ -13,6 +13,8 @@ date_publish: "2025/09/22"
 venue: "arXiv"
 tags: ["VLM", "imitation-learning", "scene-understanding"]
 url: "https://arxiv.org/abs/2509.17328"
+cite_key: li2025uipro
+arxiv_id: "2509.17328"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

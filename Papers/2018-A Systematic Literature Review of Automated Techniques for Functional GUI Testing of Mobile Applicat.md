@@ -4,6 +4,8 @@ authors: ['Yauhen Leanidavich Arnatovich', 'Lipo Wang']
 year: 2018
 venue: "None"
 url: "http://arxiv.org/abs/1812.11470v1"
+cite_key: arnatovich2018systematic
+arxiv_id: "1812.11470"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

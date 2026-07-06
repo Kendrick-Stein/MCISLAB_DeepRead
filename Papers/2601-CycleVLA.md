@@ -3,6 +3,7 @@ title: "CycleVLA: Proactive Self-Correcting Vision-Language-Action Models via Su
 authors: [Chenyang Ma, Guangyu Yang, Kai Lu, Shitong Xu, Bill Byrne, Niki Trigoni, Andrew Markham]
 institutes: [University of Oxford, University of Cambridge]
 date_publish: 2026-01-05
+cite_key: ma2026cyclevla
 venue: arXiv preprint
 tags: [VLA, manipulation, embodied-reasoning]
 paper: https://arxiv.org/abs/2601.02295

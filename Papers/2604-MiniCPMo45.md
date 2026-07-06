@@ -6,6 +6,8 @@ date_publish: 2026-04
 venue: arXiv
 tags: [VLM]
 url: "https://arxiv.org/abs/2604.27393"
+cite_key: minicpm2026
+arxiv_id: "2604.27393"
 code:
 rating: "2"
 date_added: 2026-05-12

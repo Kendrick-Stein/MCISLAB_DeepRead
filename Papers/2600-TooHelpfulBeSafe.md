@@ -10,6 +10,8 @@ date_publish: "2026/01/14"
 venue: "arXiv"
 tags: []
 url: "https://arxiv.org/abs/2601.10758"
+cite_key: chen2026too
+arxiv_id: "2601.10758"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

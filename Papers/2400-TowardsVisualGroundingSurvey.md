@@ -11,6 +11,8 @@ date_publish: "2024/12/28"
 venue: "arXiv"
 tags: ["scene-understanding"]
 url: "https://arxiv.org/abs/2412.20206"
+cite_key: xiao2024visual
+arxiv_id: "2412.20206"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

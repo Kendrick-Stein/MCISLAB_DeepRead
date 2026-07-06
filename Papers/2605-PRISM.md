@@ -26,6 +26,8 @@ tags:
   - VLM
   - agentic-RL
 url: https://arxiv.org/abs/2604.28123
+cite_key: wang2026beyond
+arxiv_id: "2604.28123"
 code: https://github.com/XIAO4579/PRISM
 rating: "4"
 date_added: "2026-05-07"

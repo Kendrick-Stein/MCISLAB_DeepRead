@@ -6,6 +6,8 @@ date_publish: 2026-05
 venue: arXiv
 tags: [world-model, VLM]
 url: https://arxiv.org/abs/2605.18739
+cite_key: chen2026longlive
+arxiv_id: "2605.18739"
 code: https://github.com/NVlabs/LongLive
 rating: 3
 date_added: 2026-05-25

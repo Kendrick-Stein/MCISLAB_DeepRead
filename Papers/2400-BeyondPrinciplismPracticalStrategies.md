@@ -6,6 +6,8 @@ date_publish: "2024/01/27"
 venue: "arXiv"
 tags: []
 url: "https://arxiv.org/abs/2401.15284"
+cite_key: lin2024beyond
+arxiv_id: "2401.15284"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

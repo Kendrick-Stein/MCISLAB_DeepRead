@@ -10,6 +10,8 @@ date_publish: "2025/06/22"
 venue: "arXiv"
 tags: ["navigation", "imitation-learning", "web-agent"]
 url: "https://arxiv.org/abs/2506.18158"
+cite_key: gao2025chain
+arxiv_id: "2506.18158"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

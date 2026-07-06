@@ -3,6 +3,7 @@ title: "Understanding World or Predicting Future? A Comprehensive Survey of Worl
 authors: [Jingtao Ding, Yunke Zhang, Yu Shang, Jie Feng, Yuheng Zhang, Zefang Zong, Yuan Yuan, Hongyuan Su, Nian Li, Jinghua Piao, Yucheng Deng, Nicholas Sukiennik, Chen Gao, Fengli Xu, Yong Li]
 institutes: [Tsinghua University]
 date_publish: "2024-11"
+cite_key: ding2024understanding
 venue: "ACM Computing Surveys"
 tags: [world-model, VLA, RL]
 paper: "https://arxiv.org/abs/2411.14499"

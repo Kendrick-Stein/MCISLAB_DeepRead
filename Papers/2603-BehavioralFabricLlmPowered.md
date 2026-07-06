@@ -16,6 +16,7 @@ date_publish: "2026-03-03"
 venue: "Unknown"
 tags: ["web-agent"]
 url: ""
+cite_key: gebreegziabher2026behavioral
 code: ""
 rating: "3"
 date_added: "2026-04-21"

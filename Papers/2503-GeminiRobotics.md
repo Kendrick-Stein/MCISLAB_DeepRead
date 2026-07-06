@@ -3,6 +3,7 @@ title: "Gemini Robotics: Bringing AI into the Physical World"
 authors: [Gemini Robotics Team]
 institutes: [Google DeepMind]
 date_publish: 2025-03-25
+cite_key: team2025gemini
 venue: arXiv
 tags: [VLA, manipulation, embodied-reasoning]
 paper: https://arxiv.org/abs/2503.20020

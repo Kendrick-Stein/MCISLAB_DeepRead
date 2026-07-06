@@ -6,6 +6,8 @@ date_publish: 2026-05-04
 venue: arXiv
 tags: ["VLA", "embodied-reasoning", "manipulation"]
 url: "https://arxiv.org/abs/2605.02881"
+cite_key: fang2026molmoact2
+arxiv_id: "2605.02881"
 code: "https://github.com/allenai/molmo-act"
 rating: "4"
 date_added: 2026-05-06

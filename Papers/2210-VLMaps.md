@@ -3,6 +3,7 @@ title: "Visual Language Maps for Robot Navigation"
 authors: [Chenguang Huang, Oier Mees, Andy Zeng, Wolfram Burgard]
 institutes: [University of Freiburg, Google Research, University of Technology Nuremberg]
 date_publish: 2022-10-11
+cite_key: huang2022visual
 venue: ICRA 2023
 tags: [semantic-map, navigation, scene-understanding]
 paper: https://arxiv.org/abs/2210.05714

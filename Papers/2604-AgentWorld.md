@@ -10,6 +10,8 @@ date_publish: "2026-04-25"
 venue: "arXiv"
 tags: ["agentic-RL", "web-agent", "world-model"]
 url: "https://arxiv.org/abs/2604.18292"
+cite_key: dong2026agent
+arxiv_id: "2604.18292"
 code: ""
 rating: "3"
 date_added: "2026-06-26"

@@ -4,6 +4,7 @@ authors: ['Yuxi Wei', 'Zi Wang', 'Yifan Lu', 'Chenxin Xu', 'Changxing Liu', 'Hao
 year: 2024
 venue: "None"
 url: "https://openalex.org/W4402753889"
+cite_key: weieditable
 tags: ["LLM agents"]
 status: pending
 date_added: 2026-04-14

@@ -10,6 +10,8 @@ date_publish: "2024/09/03"
 venue: "arXiv"
 tags: ["imitation-learning"]
 url: "https://arxiv.org/abs/2409.01907"
+cite_key: zhang2024focus
+arxiv_id: "2409.01907"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

@@ -3,6 +3,7 @@ title: "ACE-Brain-0: Spatial Intelligence as a Shared Scaffold for Universal Emb
 authors: [Ziyang Gong, Zehang Luo, Anke Tang, Zhe Liu, Shi Fu, Zhi Hou, Ganlin Yang, Weiyun Wang, Xiaofeng Wang, Jianbo Liu, Gen Luo, Haolan Kang, Shuang Luo, Yue Zhou, Yong Luo, Li Shen, Xiaosong Jia, Yao Mu, Xue Yang, Chunxiao Liu, Junchi Yan, Hengshuang Zhao, Dacheng Tao, Xiaogang Wang]
 institutes: [ACE Robotics, Shanghai Jiao Tong University, Nanyang Technological University, CUHK, HKU, USTC, Fudan University, Xiamen University, East China Normal University, Wuhan University, Sun Yat-sen University]
 date_publish: 2026-03
+cite_key: gong2026ace
 venue: arXiv
 tags: [VLA, cross-embodiment, spatial-reasoning]
 paper: https://arxiv.org/abs/2603.03198

@@ -4,6 +4,8 @@ authors: ['Yuwen Zhai', 'Runze Li', 'Liang Wang', 'Nian Shi', 'Liwu Xu', 'Wei Zh
 year: 2026
 venue: "None"
 url: "http://arxiv.org/abs/2604.04399v1"
+cite_key: zhai2026guide
+arxiv_id: "2604.04399"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

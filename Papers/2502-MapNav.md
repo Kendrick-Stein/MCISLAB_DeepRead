@@ -3,6 +3,7 @@ title: "MapNav: A Novel Memory Representation via Annotated Semantic Maps for VL
 authors: [Lingfeng Zhang, Xiaoshuai Hao, Qinwen Xu, Qiang Zhang, Xinyao Zhang, Pengwei Wang, Jing Zhang, Zhongyuan Wang, Shanghang Zhang, Renjing Xu]
 institutes: [HKUST(GZ), BAAI, Beijing Innovation Center of Humanoid Robotics, Wuhan University, Peking University]
 date_publish: 2025-02-19
+cite_key: zhang2025mapnav
 venue: ACL 2025
 tags: [VLN, semantic-map, spatial-memory]
 paper: https://arxiv.org/abs/2502.13451

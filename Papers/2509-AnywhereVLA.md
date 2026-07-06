@@ -3,6 +3,7 @@ title: "AnywhereVLA: Language-Conditioned Exploration and Mobile Manipulation"
 authors: [Konstantin Gubernatorov, Artem Voronov, Roman Voronov, Sergei Pasynkov, Stepan Perminov, Ziang Guo, Dzmitry Tsetserukou]
 institutes: [Skoltech]
 date_publish: 2025-09-25
+cite_key: gubernatorov2025anywherevla
 venue: arXiv (submitted to ICRA 2026)
 tags: [mobile-manipulation, VLA, SLAM]
 paper: https://arxiv.org/abs/2509.21006

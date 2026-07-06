@@ -3,6 +3,7 @@ title: "ETPNav: Evolving Topological Planning for Vision-Language Navigation in 
 authors: [Dong An, Hanqing Wang, Wenguan Wang, Zun Wang, Yan Huang, Keji He, Liang Wang]
 institutes: [CASIA, BIT, Zhejiang University, ANU]
 date_publish: 2023-04-06
+cite_key: an2023etpnav
 venue: TPAMI 2024
 tags: [VLN, navigation, spatial-memory]
 paper: https://arxiv.org/abs/2304.03047

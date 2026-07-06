@@ -7,6 +7,7 @@ date_publish: "2017"
 venue: "NeurIPS"
 tags: ["hyperbolic", "embedding", "manifold", "hierarchy"]
 url: ""
+cite_key: kiela2017poincar
 code: ""
 rating: "5"
 date_added: "2026-04-28"

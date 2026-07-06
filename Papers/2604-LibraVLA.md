@@ -18,6 +18,8 @@ tags:
   - manipulation
   - diffusion-policy
 url: https://arxiv.org/abs/2604.24921
+cite_key: wei2026libra
+arxiv_id: "2604.24921"
 code: https://libra-vla.github.io/
 rating: 4
 date_added: 2026-04-29

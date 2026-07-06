@@ -6,6 +6,8 @@ date_publish: 2026-05
 venue: arXiv
 tags: [LLM]
 url: https://arxiv.org/abs/2605.20266
+cite_key: luo2026survey
+arxiv_id: "2605.20266"
 code: https://github.com/Kwwwww74/Awesome-Trustworthy-AudioLLMs
 rating: 2
 date_added: 2026-05-25

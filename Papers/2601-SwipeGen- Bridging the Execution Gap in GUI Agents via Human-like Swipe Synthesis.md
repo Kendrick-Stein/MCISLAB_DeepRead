@@ -4,6 +4,8 @@ authors: ['Xuan Wang', 'Siyuan Su', 'Quantong Fu', 'Yongxiang Hu', 'Yangfan Zhou
 year: 2026
 venue: "None"
 url: "http://arxiv.org/abs/2601.18305v1"
+cite_key: wang2026swipegen
+arxiv_id: "2601.18305"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

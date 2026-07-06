@@ -18,6 +18,8 @@ date_publish: "2025/12/02"
 venue: "arXiv"
 tags: ["VLM", "navigation", "imitation-learning"]
 url: "https://arxiv.org/abs/2512.02423"
+cite_key: yan2025gui
+arxiv_id: "2512.02423"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

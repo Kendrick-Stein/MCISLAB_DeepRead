@@ -6,6 +6,7 @@ date_publish: "2002-11-01"
 venue: "IEEE Internet Computing"
 tags: []
 url: ""
+cite_key: patrick2002building
 code: ""
 rating: "3"
 date_added: "2026-04-21"

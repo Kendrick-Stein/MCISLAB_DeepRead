@@ -21,6 +21,8 @@ date_publish: "2025/05/27"
 venue: "arXiv"
 tags: ["navigation", "imitation-learning", "RL"]
 url: "https://arxiv.org/abs/2505.21496"
+cite_key: xiao2025ui
+arxiv_id: "2505.21496"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

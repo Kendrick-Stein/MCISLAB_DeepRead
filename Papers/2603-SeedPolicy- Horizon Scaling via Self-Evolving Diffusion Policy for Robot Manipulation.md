@@ -4,6 +4,8 @@ authors: ['Youqiang Gui', 'Yuxuan Zhou', 'Shen Cheng', 'Xinyang Yuan', 'Haoqiang
 year: 2026
 venue: "None"
 url: "http://arxiv.org/abs/2603.05117v2"
+cite_key: gui2026seedpolicy
+arxiv_id: "2603.05117"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

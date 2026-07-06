@@ -6,6 +6,8 @@ date_publish: "2026-05-05"
 venue: "ICML"
 tags: ["VLM", "agentic-RL", "gui-agent"]
 url: "http://arxiv.org/abs/2605.03782v1"
+cite_key: li2026what
+arxiv_id: "2605.03782"
 code:
 rating: "3"
 date_added: "2026-05-06"

@@ -23,6 +23,8 @@ date_publish: "2025/03/18"
 venue: "arXiv"
 tags: ["imitation-learning"]
 url: "https://arxiv.org/abs/2503.14504"
+cite_key: yu2025aligning
+arxiv_id: "2503.14504"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

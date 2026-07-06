@@ -11,6 +11,8 @@ date_publish: "2025/09/22"
 venue: "arXiv"
 tags: ["imitation-learning", "RL", "scene-understanding"]
 url: "https://arxiv.org/abs/2509.17917"
+cite_key: lu2025orcust
+arxiv_id: "2509.17917"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

@@ -6,6 +6,8 @@ date_publish: "2026-05"
 venue: arXiv
 tags: [agentic-RL, VLM]
 url: https://arxiv.org/abs/2605.15529
+cite_key: li2026process
+arxiv_id: "2605.15529"
 code: 
 rating: 4
 date_added: "2026-05-25"

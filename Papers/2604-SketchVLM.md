@@ -12,6 +12,8 @@ date_publish: "2026-04-23"
 venue: "arXiv"
 tags: ["VLM", "visual-reasoning", "explainability"]
 url: "https://arxiv.org/abs/2604.22875"
+cite_key: collins2026sketchvlm
+arxiv_id: "2604.22875"
 code: "https://sketchvlm.github.io/"
 rating: "3"
 date_added: "2026-04-29"

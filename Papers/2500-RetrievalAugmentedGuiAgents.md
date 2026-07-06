@@ -13,6 +13,8 @@ date_publish: "2025/09/29"
 venue: "arXiv"
 tags: ["VLM", "imitation-learning", "web-agent"]
 url: "https://arxiv.org/abs/2509.24183"
+cite_key: xu2025retrieval
+arxiv_id: "2509.24183"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

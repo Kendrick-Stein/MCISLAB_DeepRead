@@ -11,6 +11,8 @@ date_publish: "2026/04/07"
 venue: "arXiv"
 tags: ["navigation"]
 url: "https://arxiv.org/abs/2604.06134"
+cite_key: lee2026maestro
+arxiv_id: "2604.06134"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

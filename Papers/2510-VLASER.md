@@ -3,6 +3,7 @@ title: "Vlaser: Vision-Language-Action Model with Synergistic Embodied Reasoning
 authors: [Ganlin Yang, Tianyi Zhang, Haoran Hao, Weiyun Wang, Yibin Liu, Dehui Wang, Guanzhou Chen, Zijian Cai, Junting Chen, Weijie Su, Wengang Zhou, Yu Qiao, Jifeng Dai, Jiangmiao Pang, Gen Luo, Wenhai Wang, Yao Mu, Zhi Hou]
 institutes: [Shanghai AI Laboratory, USTC, SJTU, Zhejiang University, Nanjing University, Fudan University, Tsinghua University, NUS]
 date_publish: 2025-10
+cite_key: yang2025vlaser
 venue: ICLR 2026
 tags: [VLA, embodied-reasoning, flow-matching]
 paper: https://arxiv.org/abs/2510.11027

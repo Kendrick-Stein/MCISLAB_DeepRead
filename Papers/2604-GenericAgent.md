@@ -26,6 +26,8 @@ date_publish: "2026-04-18"
 venue: "arXiv"
 tags: ["agentic-RL", "task-planning", "LLM"]
 url: "https://arxiv.org/abs/2604.17091"
+cite_key: liang2026genericagent
+arxiv_id: "2604.17091"
 code: "https://github.com/lsdefine/GenericAgent"
 rating: "4"
 date_added: "2026-06-26"

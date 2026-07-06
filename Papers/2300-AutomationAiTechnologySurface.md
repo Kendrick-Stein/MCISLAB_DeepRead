@@ -6,6 +6,8 @@ date_publish: "2023/01/24"
 venue: "arXiv"
 tags: ["navigation"]
 url: "https://arxiv.org/abs/2301.09771"
+cite_key: leung2023automation
+arxiv_id: "2301.09771"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

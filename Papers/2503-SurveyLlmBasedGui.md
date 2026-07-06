@@ -21,6 +21,7 @@ date_publish: "2025-03-27"
 venue: "ArXiv.org"
 tags: ["VLA", "navigation", "imitation-learning"]
 url: ""
+cite_key: tang2025survey
 code: ""
 rating: "3"
 date_added: "2026-04-21"

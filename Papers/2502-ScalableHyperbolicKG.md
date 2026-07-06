@@ -7,6 +7,7 @@ date_publish: "2025-02"
 venue: "arXiv"
 tags: ["hyperbolic", "knowledge-graph", "scalable", "embedding"]
 url: ""
+cite_key: authors2025scalable
 code: ""
 rating: "3"
 date_added: "2026-04-28"

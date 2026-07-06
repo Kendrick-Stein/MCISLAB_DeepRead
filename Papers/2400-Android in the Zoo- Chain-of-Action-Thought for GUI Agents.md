@@ -4,6 +4,7 @@ authors: ['Jiwen Zhang', 'Jihao Wu', 'Teng Yihua', 'Minghui Liao', 'Nuo Xu', 'Xi
 year: 2024
 venue: "None"
 url: "https://openalex.org/W4404792858"
+cite_key: zhangandroid
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

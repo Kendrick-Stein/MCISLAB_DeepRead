@@ -12,6 +12,8 @@ date_publish: "2025/10/01"
 venue: "arXiv"
 tags: ["navigation", "imitation-learning", "task-planning"]
 url: "https://arxiv.org/abs/2510.00413"
+cite_key: liu2025pal
+arxiv_id: "2510.00413"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

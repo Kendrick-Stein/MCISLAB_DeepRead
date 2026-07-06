@@ -11,6 +11,8 @@ date_publish: "2025/10/01"
 venue: "arXiv"
 tags: ["VLM", "imitation-learning", "task-planning"]
 url: "https://arxiv.org/abs/2510.00536"
+cite_key: huang2025gui
+arxiv_id: "2510.00536"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

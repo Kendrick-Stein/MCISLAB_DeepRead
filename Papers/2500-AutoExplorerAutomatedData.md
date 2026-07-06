@@ -6,6 +6,8 @@ date_publish: "2025/11/09"
 venue: "arXiv"
 tags: ["navigation", "imitation-learning", "scene-understanding"]
 url: "https://arxiv.org/abs/2511.06417"
+cite_key: guo2025auto
+arxiv_id: "2511.06417"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

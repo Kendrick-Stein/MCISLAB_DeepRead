@@ -6,6 +6,8 @@ date_publish: 2026-05-22
 venue: arXiv
 tags: [agentic-RL, task-planning, LLM]
 url: https://arxiv.org/abs/2605.23904
+cite_key: yang2026skillopt
+arxiv_id: "2605.23904"
 code:
 rating: 4
 date_added: 2026-05-25

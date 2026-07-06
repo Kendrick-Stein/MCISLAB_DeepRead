@@ -6,6 +6,8 @@ date_publish: 2026-05
 venue: arXiv
 tags: [LLM, spatial-reasoning]
 url: https://arxiv.org/abs/2605.22355
+cite_key: guo2026transitlm
+arxiv_id: "2605.22355"
 code: https://github.com/HotTricker/TransitLM
 rating: 3
 date_added: 2026-05-25

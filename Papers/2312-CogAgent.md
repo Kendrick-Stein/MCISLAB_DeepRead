@@ -3,6 +3,7 @@ title: "CogAgent: A Visual Language Model for GUI Agents"
 authors: [Wenyi Hong, Weihan Wang, Qingsong Lv, Jiazheng Xu, Wenmeng Yu, Junhui Ji, Yan Wang, Zihan Wang, Yuxuan Zhang, Juanzi Li, Bin Xu, Yuxiao Dong, Ming Ding, Jie Tang]
 institutes: [Tsinghua University, Zhipu AI]
 date_publish: 2023-12-14
+cite_key: hong2023cogagent
 venue: CVPR 2024
 tags: [gui-agent, VLM, computer-use]
 paper: https://arxiv.org/abs/2312.08914

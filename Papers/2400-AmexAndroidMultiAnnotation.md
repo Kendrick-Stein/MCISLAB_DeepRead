@@ -14,6 +14,8 @@ date_publish: "2024/07/03"
 venue: "arXiv"
 tags: ["scene-understanding", "web-agent"]
 url: "https://arxiv.org/abs/2407.17490"
+cite_key: chai2024amex
+arxiv_id: "2407.17490"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

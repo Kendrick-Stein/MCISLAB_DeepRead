@@ -10,6 +10,7 @@ date_publish: "2024-11-15"
 venue: "arXiv (Cornell University)"
 tags: ["navigation", "imitation-learning", "web-agent"]
 url: ""
+cite_key: hu2024dawn
 code: ""
 rating: "3"
 date_added: "2026-04-21"

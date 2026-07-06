@@ -3,6 +3,7 @@ title: "AgentTrek: Agent Trajectory Synthesis via Guiding Replay with Web Tutori
 authors: [Yiheng Xu, Dunjie Lu, Zhennan Shen, Junli Wang, Zekun Wang, Yuchen Mao, Caiming Xiong, Tao Yu]
 institutes: [University of Hong Kong, Salesforce Research]
 date_publish: 2024-12-12
+cite_key: xu2024agenttrek
 venue: ICLR 2025 Spotlight
 tags: [web-agent, gui-agent, VLM]
 paper: https://arxiv.org/abs/2412.09605

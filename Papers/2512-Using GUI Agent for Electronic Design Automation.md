@@ -4,6 +4,8 @@ authors: ['Chunyi Li', 'Longfei Li', 'Zicheng Zhang', 'Xiaohong Liu', 'Min Tang'
 year: 2025
 venue: "None"
 url: "http://arxiv.org/abs/2512.11611v1"
+cite_key: li2025gui
+arxiv_id: "2512.11611"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

@@ -3,6 +3,7 @@ title: "OS Agents: A Survey on MLLM-based Agents for General Computing Devices U
 authors: [Xueyu Hu, Tao Xiong, Biao Yi, Zishu Wei, Ruixuan Xiao, Yurun Chen, Jiasheng Ye, Meiling Tao, Xiangxin Zhou, Ziyu Zhao, Yuhuai Li, Shengze Xu, Shenzhi Wang, Xinchen Xu, Shuofei Qiao, Zhaokai Wang, Kun Kuang, Tieyong Zeng, Liang Wang, Jiwei Li, Yuchen Eleanor Jiang, Wangchunshu Zhou, Guoyin Wang, Keting Yin, Zhou Zhao, Hongxia Yang, Fan Wu, Shengyu Zhang, Fei Wu]
 institutes: [Zhejiang University, Fudan University, OPPO AI Center, University of Chinese Academy of Sciences, Institute of Automation CAS, The Chinese University of Hong Kong, Tsinghua University, Shanghai Jiao Tong University, 01.AI, The Hong Kong Polytechnic University]
 date_publish: 2025-08-06
+cite_key: hu2025os
 venue: ACL 2025 (Oral, 9-page version) / arXiv (full)
 tags: [computer-use, gui-agent, web-agent]
 paper: https://arxiv.org/abs/2508.04482

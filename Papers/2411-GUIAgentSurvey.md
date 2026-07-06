@@ -3,6 +3,7 @@ title: "Large Language Model-Brained GUI Agents: A Survey"
 authors: [Chaoyun Zhang, Shilin He, Jiaxu Qian, Bowen Li, Liqun Li, Si Qin, Yu Kang, Minghua Ma, Guyue Liu, Qingwei Lin, Saravan Rajmohan, Dongmei Zhang, Qi Zhang]
 institutes: [Microsoft, Shanghai AI Lab, Peking University]
 date_publish: 2025-05-02
+cite_key: zhang2025large
 venue: arXiv preprint (v8)
 tags: [gui-agent, computer-use, agentic-RL]
 paper: https://arxiv.org/abs/2411.18279

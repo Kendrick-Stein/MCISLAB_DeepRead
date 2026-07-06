@@ -6,6 +6,8 @@ date_publish: 2026-05
 venue: arXiv
 tags: [VLM, world-model]
 url: https://arxiv.org/abs/2605.12500
+cite_key: diao2026sensenova
+arxiv_id: "2605.12500"
 code: https://github.com/OpenSenseNova/SenseNova-U1
 rating: 4
 date_added: 2026-05-25

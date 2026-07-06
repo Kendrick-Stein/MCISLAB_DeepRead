@@ -3,6 +3,7 @@ title: "Vista: A Generalizable Driving World Model with High Fidelity and Versat
 authors: [Shenyuan Gao, Jiazhi Yang, Li Chen, Kashyap Chitta, Yihang Qiu, Andreas Geiger, Jun Zhang, Hongyang Li]
 institutes: [HKUST, OpenDriveLab @ Shanghai AI Lab, University of Tübingen, Tübingen AI Center, HKU]
 date_publish: 2024-05-27
+cite_key: gao2024vista
 venue: NeurIPS 2024
 tags: [world-model]
 paper: https://arxiv.org/abs/2405.17398

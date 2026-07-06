@@ -6,6 +6,8 @@ date_publish: "2025/04/29"
 venue: "arXiv"
 tags: ["VLA", "RL", "web-agent"]
 url: "https://arxiv.org/abs/2504.20464"
+cite_key: li2025survey
+arxiv_id: "2504.20464"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

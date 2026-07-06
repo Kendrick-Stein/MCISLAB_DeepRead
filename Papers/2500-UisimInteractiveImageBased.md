@@ -15,6 +15,8 @@ date_publish: "2025/09/26"
 venue: "arXiv"
 tags: ["navigation", "task-planning"]
 url: "https://arxiv.org/abs/2509.21733"
+cite_key: xiang2025uisim
+arxiv_id: "2509.21733"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

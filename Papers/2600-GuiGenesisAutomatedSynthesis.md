@@ -18,6 +18,8 @@ date_publish: "2026/02/15"
 venue: "arXiv"
 tags: ["VLM", "imitation-learning", "RL"]
 url: "https://arxiv.org/abs/2602.14093"
+cite_key: cao2026gui
+arxiv_id: "2602.14093"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

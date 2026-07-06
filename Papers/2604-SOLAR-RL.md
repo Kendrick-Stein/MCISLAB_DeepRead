@@ -18,6 +18,8 @@ date_publish: "2026-04-24"
 venue: "Findings of ACL 2026"
 tags: [RL, gui-agent, credit-assignment, long-horizon]
 url: "https://arxiv.org/abs/2604.22558"
+cite_key: wang2026solar
+arxiv_id: "2604.22558"
 code: ""
 rating: "4"
 date_added: "2026-04-28"

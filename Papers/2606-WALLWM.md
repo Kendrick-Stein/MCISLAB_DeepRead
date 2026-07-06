@@ -42,6 +42,8 @@ tags:
 - manipulation
 - embodied-reasoning
 url: https://arxiv.org/abs/2606.01955
+cite_key: li2026wall
+arxiv_id: "2606.01955"
 code: null
 rating: 4
 date_added: 2026-06-07

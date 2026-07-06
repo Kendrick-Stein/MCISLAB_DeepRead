@@ -6,6 +6,8 @@ date_publish: "2025/01/06"
 venue: "arXiv"
 tags: ["VLM", "imitation-learning", "scene-understanding"]
 url: "https://arxiv.org/abs/2501.02842"
+cite_key: ai2025foundations
+arxiv_id: "2501.02842"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

@@ -4,6 +4,8 @@ authors: ['Zheng Wu', 'Pengzhou Cheng', 'Zongru Wu', 'Lingzhong Dong', 'Zhuoshen
 year: 2025
 venue: "None"
 url: "http://arxiv.org/abs/2505.12842v4"
+cite_key: wu2025gem
+arxiv_id: "2505.12842"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

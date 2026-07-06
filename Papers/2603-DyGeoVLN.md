@@ -3,6 +3,7 @@ title: "DyGeoVLN: Infusing Dynamic Geometry Foundation Model into Vision-Languag
 authors: [Xiangchen Liu, Hanghan Zheng, Jeil Jeong, Minsung Yoon, Lin Zhao, Zhide Zhong, Haoang Li, Sung-Eui Yoon]
 institutes: [KAIST, HKUST(GZ), JD Explore Academy]
 date_publish: 2026-03-22
+cite_key: liu2026dygeovln
 venue: arXiv
 tags: [VLN, 3D-representation, spatial-reasoning]
 paper: https://arxiv.org/abs/2603.21269

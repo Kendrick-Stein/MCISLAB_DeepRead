@@ -21,6 +21,8 @@ date_publish: "2025/01/02"
 venue: "arXiv"
 tags: ["imitation-learning", "RL", "web-agent"]
 url: "https://arxiv.org/abs/2501.01149"
+cite_key: chai2025a3
+arxiv_id: "2501.01149"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

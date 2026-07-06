@@ -17,6 +17,7 @@ date_publish: "2025-06-23"
 venue: "Unknown"
 tags: ["web-agent"]
 url: ""
+cite_key: wen2025autodroid
 code: ""
 rating: "3"
 date_added: "2026-04-21"

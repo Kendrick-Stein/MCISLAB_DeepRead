@@ -18,6 +18,8 @@ date_publish: "2026/03/25"
 venue: "arXiv"
 tags: ["RL", "task-planning", "web-agent"]
 url: "https://arxiv.org/abs/2603.24533"
+cite_key: lin2026ui
+arxiv_id: "2603.24533"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

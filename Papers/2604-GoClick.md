@@ -12,6 +12,8 @@ date_publish: "2026-04-27"
 venue: "arXiv"
 tags: ["gui-agent", "VLM"]
 url: "http://arxiv.org/abs/2604.23941v1"
+cite_key: li2026goclick
+arxiv_id: "2604.23941"
 code: "https://github.com/ZJULiHongxin/GoClick"
 rating: "3"
 date_added: "2026-06-26"

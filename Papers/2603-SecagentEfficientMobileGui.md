@@ -16,6 +16,7 @@ date_publish: "2026-03-09"
 venue: "Open MIND"
 tags: ["web-agent"]
 url: ""
+cite_key: xie2026secagent
 code: ""
 rating: "3"
 date_added: "2026-04-21"

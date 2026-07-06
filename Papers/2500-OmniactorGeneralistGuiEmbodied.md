@@ -16,6 +16,8 @@ date_publish: "2025/09/02"
 venue: "arXiv"
 tags: []
 url: "https://arxiv.org/abs/2509.02322"
+cite_key: yang2025omniactor
+arxiv_id: "2509.02322"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

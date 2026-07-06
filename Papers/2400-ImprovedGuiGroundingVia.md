@@ -6,6 +6,8 @@ date_publish: "2024/11/18"
 venue: "arXiv"
 tags: ["VLM", "imitation-learning", "RL"]
 url: "https://arxiv.org/abs/2411.13591"
+cite_key: nguyen2024improved
+arxiv_id: "2411.13591"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

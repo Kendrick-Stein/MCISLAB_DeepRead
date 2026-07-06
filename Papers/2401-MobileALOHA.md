@@ -3,6 +3,7 @@ title: "Mobile ALOHA: Learning Bimanual Mobile Manipulation with Low-Cost Whole-
 authors: [Zipeng Fu, Tony Z. Zhao, Chelsea Finn]
 institutes: [Stanford University]
 date_publish: 2024-01-04
+cite_key: fu2024mobile
 venue: CoRL 2024
 tags: [mobile-manipulation, imitation-learning, manipulation]
 paper: https://arxiv.org/abs/2401.02117

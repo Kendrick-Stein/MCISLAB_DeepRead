@@ -26,6 +26,8 @@ tags:
   - manipulation
   - spatial-reasoning
 url: https://arxiv.org/abs/2606.06155
+cite_key: yu2026affordancevla
+arxiv_id: "2606.06155"
 code: https://github.com/Skywalker-yqz/AffordanceVLA
 rating: 4
 date_added: 2026-06-07

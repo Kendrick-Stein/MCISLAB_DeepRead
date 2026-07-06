@@ -12,6 +12,7 @@ date_publish: "2024-03-24"
 venue: "Proceedings of the AAAI Conference on Artificial Intelligence"
 tags: ["navigation"]
 url: ""
+cite_key: schumann2024velma
 code: ""
 rating: "3"
 date_added: "2026-04-21"

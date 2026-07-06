@@ -3,6 +3,7 @@ title: "Grounding Computer Use Agents on Human Demonstrations"
 authors: [Aarash Feizi, Shravan Nayak, Xiangru Jian, Kevin Qinghong Lin, Kaixin Li, Rabiul Awal, Xing Han Lù, Johan Obando-Ceron, Juan A. Rodriguez, Nicolas Chapados, David Vazquez, Adriana Romero-Soriano, Reihaneh Rabbany, Perouz Taslakian, Christopher Pal, Spandana Gella, Sai Rajeswar]
 institutes: [Mila, McGill, Université de Montréal, ServiceNow Research, University of Waterloo, University of Oxford, NUS, Polytechnique Montréal, ÉTS]
 date_publish: 2025-11-10
+cite_key: feizi2025grounding
 venue: arXiv 2025
 tags: [gui-agent, computer-use, agentic-RL]
 paper: https://arxiv.org/abs/2511.07332

@@ -31,6 +31,8 @@ date_publish: "2025/12/31"
 venue: "arXiv"
 tags: ["imitation-learning", "task-planning", "web-agent"]
 url: "https://arxiv.org/abs/2512.24957"
+cite_key: team2025amap
+arxiv_id: "2512.24957"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

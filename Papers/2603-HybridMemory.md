@@ -13,6 +13,8 @@ date_publish: "2026-03-25"
 venue: "arXiv"
 tags: ["world-model", "spatial-memory"]
 url: "https://arxiv.org/abs/2603.25716"
+cite_key: chen2026hybridmemory
+arxiv_id: "2603.25716"
 code: "https://github.com/H-EmbodVis/HyDRA"
 rating: "3"
 date_added: "2026-06-26"

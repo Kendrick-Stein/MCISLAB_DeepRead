@@ -22,6 +22,8 @@ date_publish: "2024-03-18"
 venue: "International Conference on Intelligent User Interfaces"
 tags: ["manipulation", "scene-understanding"]
 url: "https://doi.org/10.1145/3640543.3645172"
+cite_key: weidele2024empirical
+arxiv_id: "0543.36451"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

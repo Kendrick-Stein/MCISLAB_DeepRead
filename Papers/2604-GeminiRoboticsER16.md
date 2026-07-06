@@ -3,6 +3,7 @@ title: "Gemini Robotics ER 1.6: Enhanced Embodied Reasoning"
 authors: [Laura Graesser, Peng Xu]
 institutes: [Google DeepMind]
 date_publish: 2026-04-14
+cite_key: graesser2026gemini
 venue: Google DeepMind Blog
 tags: [embodied-reasoning, spatial-reasoning, scene-understanding]
 paper:

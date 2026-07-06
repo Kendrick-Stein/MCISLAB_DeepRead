@@ -3,6 +3,7 @@ title: "HybridVLA: Collaborative Diffusion and Autoregression in a Unified Visio
 authors: [Jiaming Liu, Hao Chen, Pengju An, Zhuoyang Liu, Renrui Zhang, Chenyang Gu, Xiaoqi Li, Ziyu Guo, Sixiang Chen, Mengzhen Liu, Chengkai Hou, Mengdi Zhao, KC Alex Zhou, Pheng-Ann Heng, Shanghang Zhang]
 institutes: [Peking University, BAAI, CUHK]
 date_publish: 2025-03-13
+cite_key: liu2025hybridvla
 venue: arXiv
 tags: [VLA, diffusion-policy, manipulation]
 paper: https://arxiv.org/abs/2503.10631

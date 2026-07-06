@@ -16,6 +16,8 @@ date_publish: "2024/06/12"
 venue: "arXiv"
 tags: ["navigation", "imitation-learning", "web-agent"]
 url: "https://arxiv.org/abs/2406.08451"
+cite_key: lu2024guiodyssey
+arxiv_id: "2406.08451"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

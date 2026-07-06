@@ -3,6 +3,7 @@ title: "Visual Embodied Brain: Let Multimodal Large Language Models See, Think, 
 authors: [Gen Luo, Ganlin Yang, Ziyang Gong, Guanzhou Chen, Haonan Duan, Erfei Cui, Ronglei Tong, Zhi Hou, Tianyi Zhang, Zhe Chen, Shenglong Ye, Lewei Lu, Jingbo Wang, Wenhai Wang, Jifeng Dai, Yu Qiao, Rongrong Ji, Xizhou Zhu]
 institutes: [Shanghai AI Laboratory, Tsinghua University, USTC, SJTU, Xiamen University, SenseTime Research, Zhejiang University, Nanjing University]
 date_publish: 2025-06
+cite_key: luo2025visual
 venue: arXiv
 tags: [VLA, spatial-reasoning, embodied-reasoning]
 paper: https://arxiv.org/abs/2506.00123

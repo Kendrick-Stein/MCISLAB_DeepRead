@@ -3,6 +3,7 @@ title: "How Good are Foundation Models in Step-by-Step Embodied Reasoning?"
 authors: [Dinura Dissanayake, Ahmed Heakl, Omkar Thawakar, Noor Ahsan, Ritesh Thawkar, Ketan More, Jean Lahoud, Rao Anwer, Hisham Cholakkal, Ivan Laptev, Fahad Khan, Salman Khan]
 institutes: [MBZUAI, Linköping University, Australian National University]
 date_publish: 2025-09-18
+cite_key: dissanayake2025how
 venue: arXiv
 tags: [embodied-reasoning, VLM, spatial-reasoning]
 paper: https://arxiv.org/abs/2509.15293

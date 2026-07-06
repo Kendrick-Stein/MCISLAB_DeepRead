@@ -6,6 +6,8 @@ date_publish: "2012/02/21"
 venue: "arXiv"
 tags: []
 url: "https://arxiv.org/abs/1202.4527"
+cite_key: isabella2012study
+arxiv_id: "1202.4527"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

@@ -16,6 +16,8 @@ date_publish: "2025/04/12"
 venue: "arXiv"
 tags: ["imitation-learning", "RL"]
 url: "https://arxiv.org/abs/2504.09138"
+cite_key: yang2025white
+arxiv_id: "2504.09138"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

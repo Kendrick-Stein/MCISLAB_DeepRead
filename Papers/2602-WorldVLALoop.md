@@ -3,6 +3,7 @@ title: "World-VLA-Loop: Closed-Loop Learning of Video World Model and VLA Policy
 authors: [Xiaokang Liu, Zechen Bai, Hai Ci, Kevin Yuchen Ma, Mike Zheng Shou]
 institutes: [Show Lab NUS]
 date_publish: 2026-02-09
+cite_key: liu2026world
 venue: arXiv
 tags: [world-model, VLA, agentic-RL]
 paper: https://arxiv.org/abs/2602.06508

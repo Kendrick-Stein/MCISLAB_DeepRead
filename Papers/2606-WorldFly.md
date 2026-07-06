@@ -6,6 +6,8 @@ date_publish: 2026-06-04
 venue: arXiv
 tags: [VLA, world-model, navigation, UAV]
 url: https://arxiv.org/abs/2606.06147
+cite_key: zheng2026worldfly
+arxiv_id: "2606.06147"
 code:
 rating: 3
 date_added: 2026-06-07

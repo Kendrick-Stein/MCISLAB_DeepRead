@@ -4,6 +4,8 @@ authors: ['Shota Takayama', 'Katsuhide Fujita']
 year: 2025
 venue: "None"
 url: "http://arxiv.org/abs/2510.13343v1"
+cite_key: takayama2025aoada
+arxiv_id: "2510.13343"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

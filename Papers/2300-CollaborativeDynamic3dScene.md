@@ -11,6 +11,8 @@ date_publish: "2023/09/12"
 venue: "arXiv"
 tags: ["scene-understanding", "3D-representation", "semantic-map"]
 url: "https://arxiv.org/abs/2309.06635"
+cite_key: greve2023collaborative
+arxiv_id: "2309.06635"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

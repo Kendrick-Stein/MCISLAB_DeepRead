@@ -34,6 +34,8 @@ date_publish: "2024-12-06"
 venue: arXiv
 tags: [web-agent, gui-agent, computer-use]
 url: "https://arxiv.org/abs/2412.05467"
+cite_key: chezelles2024browsergym
+arxiv_id: "2412.05467"
 code: "https://github.com/ServiceNow/BrowserGym"
 rating: "4"
 date_added: "2026-06-24"

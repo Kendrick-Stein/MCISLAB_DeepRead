@@ -13,6 +13,8 @@ date_publish: "2025/10/10"
 venue: "arXiv"
 tags: ["VLM", "task-planning", "web-agent"]
 url: "https://arxiv.org/abs/2510.09038"
+cite_key: wu2025auto
+arxiv_id: "2510.09038"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

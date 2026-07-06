@@ -24,6 +24,8 @@ tags:
   - LLM
   - agentic-RL
 url: https://arxiv.org/abs/2604.25917
+cite_key: yang2026recursive
+arxiv_id: "2604.25917"
 code: https://recursivemas.github.io
 rating: 4
 date_added: 2026-05-03

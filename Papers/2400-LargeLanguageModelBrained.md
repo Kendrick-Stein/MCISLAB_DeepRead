@@ -19,6 +19,8 @@ date_publish: "2024/11/27"
 venue: "arXiv"
 tags: ["VLM", "navigation", "imitation-learning"]
 url: "https://arxiv.org/abs/2411.18279"
+cite_key: zhang2024large
+arxiv_id: "2411.18279"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

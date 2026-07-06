@@ -4,6 +4,8 @@ authors: ['Wenkang Han', 'Zhixiong Zeng', 'Jing Huang', 'Shu Jiang', 'Liming Zhe
 year: 2025
 venue: "None"
 url: "http://arxiv.org/abs/2506.11127v3"
+cite_key: han2025uitron
+arxiv_id: "2506.11127"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

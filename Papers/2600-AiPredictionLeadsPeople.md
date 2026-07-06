@@ -6,6 +6,8 @@ date_publish: "2026/03/30"
 venue: "arXiv"
 tags: ["RL"]
 url: "https://arxiv.org/abs/2603.28944"
+cite_key: naito2026ai
+arxiv_id: "2603.28944"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

@@ -4,6 +4,8 @@ authors: ['Longrong Yang', 'Zhixiong Zeng', 'Yufeng Zhong', 'Jing Huang', 'Limin
 year: 2025
 venue: "None"
 url: "http://arxiv.org/abs/2509.02322v1"
+cite_key: yang2025omniactora
+arxiv_id: "2509.02322"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

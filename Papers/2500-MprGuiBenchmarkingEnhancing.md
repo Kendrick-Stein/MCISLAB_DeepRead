@@ -14,6 +14,8 @@ date_publish: "2025/11/30"
 venue: "arXiv"
 tags: ["VLM", "imitation-learning", "web-agent"]
 url: "https://arxiv.org/abs/2512.00756"
+cite_key: chen2025mpr
+arxiv_id: "2512.00756"
 code: ""
 rating: "3"
 date_added: "2026-04-15"

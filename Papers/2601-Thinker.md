@@ -3,6 +3,7 @@ title: "Thinker: A vision-language foundation model for embodied intelligence"
 authors: [Baiyu Pan, Daqin Luo, Junpeng Yang, Jiyuan Wang, Yixuan Zhang, Hailin Shi, Jichao Jiao]
 institutes: [UBTECH Robotics]
 date_publish: 2026-01-29
+cite_key: pan2026thinker
 venue: arXiv (short report)
 tags: [VLM, embodied-reasoning, task-planning]
 paper: https://arxiv.org/abs/2601.21199

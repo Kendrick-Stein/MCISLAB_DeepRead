@@ -3,6 +3,7 @@ title: "VoxPoser: Composable 3D Value Maps for Robotic Manipulation with Languag
 authors: [Wenlong Huang, Chen Wang, Ruohan Zhang, Yunzhu Li, Jiajun Wu, Li Fei-Fei]
 institutes: [Stanford University, UIUC]
 date_publish: 2023-07-12
+cite_key: huang2023voxposer
 venue: CoRL 2023
 tags: [manipulation, task-planning, scene-understanding]
 paper: https://arxiv.org/abs/2307.05973

@@ -6,6 +6,8 @@ date_publish: 2026-06-01
 venue: arXiv
 tags: [web-agent, gui-agent]
 url: https://arxiv.org/abs/2606.02404
+cite_key: lee2026browsecomp
+arxiv_id: "2606.02404"
 code: https://github.com/prometheus-eval/K-BrowseComp
 rating: 2
 date_added: 2026-06-07

@@ -3,6 +3,7 @@ title: "Embodied-R: Collaborative Framework for Activating Embodied Spatial Reas
 authors: [Baining Zhao, Ziyou Wang, Jianjie Fang, Chen Gao, Fanhang Man, Jinqiang Cui, Xin Wang, Xinlei Chen, Yong Li, Wenwu Zhu]
 institutes: [Tsinghua University]
 date_publish: 2025-04-17
+cite_key: zhao2025embodied
 venue: arXiv
 tags: [spatial-reasoning, embodied-reasoning, video-LLM, agentic-RL]
 paper: https://arxiv.org/abs/2504.12680

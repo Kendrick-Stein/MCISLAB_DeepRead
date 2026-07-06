@@ -15,6 +15,8 @@ date_publish: "2025/09/27"
 venue: "arXiv"
 tags: ["RL", "task-planning"]
 url: "https://arxiv.org/abs/2509.23263"
+cite_key: xiong2025gui
+arxiv_id: "2509.23263"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

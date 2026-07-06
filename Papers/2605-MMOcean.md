@@ -6,6 +6,8 @@ date_publish: 2026-05-21
 venue: arXiv
 tags: [VLM, video-understanding]
 url: https://arxiv.org/abs/2605.22109
+cite_key: kang2026perception
+arxiv_id: "2605.22109"
 code: 
 rating: 3
 date_added: 2026-05-25

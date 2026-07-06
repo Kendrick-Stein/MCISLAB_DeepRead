@@ -3,6 +3,7 @@ title: "SnapFlow: One-Step Action Generation for Flow-Matching VLAs via Progress
 authors: [Wuyang Luan, Junhui Li, Weiguang Zhao, Wenjian Zhang, Tieru Wu, Rui Ma]
 institutes: [Jilin University, Chongqing University, University of Liverpool, GenY]
 date_publish: 2026-04-07
+cite_key: luan2026snapflow
 venue: arXiv preprint
 tags: [VLA, flow-matching, manipulation]
 paper: https://arxiv.org/abs/2604.05656

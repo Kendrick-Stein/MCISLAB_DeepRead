@@ -13,6 +13,8 @@ date_publish: "2024/04/23"
 venue: "arXiv"
 tags: ["VLM", "imitation-learning", "task-planning"]
 url: "https://arxiv.org/abs/2404.15406"
+cite_key: caffagni2024wiki
+arxiv_id: "2404.15406"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

@@ -4,6 +4,8 @@ authors: ['Linjia Kang', 'Zhimin Wang', 'Yongkang Zhang', 'Duo Wu', 'Jinghe Wang
 year: 2026
 venue: "None"
 url: "http://arxiv.org/abs/2601.22781v1"
+cite_key: kang2026learning
+arxiv_id: "2601.22781"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

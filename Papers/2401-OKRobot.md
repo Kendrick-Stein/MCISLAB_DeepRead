@@ -3,6 +3,7 @@ title: "OK-Robot: What Really Matters in Integrating Open-Knowledge Models for R
 authors: [Peiqi Liu, Yaswanth Orru, Jay Vakil, Chris Paxton, Nur Muhammad Mahi Shafiullah, Lerrel Pinto]
 institutes: [New York University, AI at Meta]
 date_publish: 2024-01-22
+cite_key: liu2024ok
 venue: arXiv
 tags: [mobile-manipulation, scene-understanding, manipulation]
 paper: https://arxiv.org/abs/2401.12202

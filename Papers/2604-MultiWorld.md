@@ -10,6 +10,8 @@ date_publish: "2026-04-20"
 venue: "arXiv"
 tags: ["world-model", "video-understanding", "manipulation"]
 url: "https://arxiv.org/abs/2604.18564"
+cite_key: wu2026multiworld
+arxiv_id: "2604.18564"
 code: "https://multi-world.github.io/"
 rating: "4"
 date_added: "2026-06-26"

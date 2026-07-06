@@ -3,6 +3,7 @@ title: "RoboBrain: A Unified Brain Model for Robotic Manipulation from Abstract 
 authors: [Yuheng Ji, Huajie Tan, Jiayu Shi, Xiaoshuai Hao, Yuan Zhang, Hengyuan Zhang, Pengwei Wang, Mengdi Zhao, Yao Mu, Pengju An, Xinda Xue, Qinghang Su, Huaihai Lyu, Xiaolong Zheng, Jiaming Liu, Zhongyuan Wang, Shanghang Zhang]
 institutes: [Peking University, BAAI, CASIA, IIE-CAS, HKU, UCAS]
 date_publish: 2025-02-28
+cite_key: ji2025robobrain
 venue: CVPR 2025
 tags: [embodied-reasoning, manipulation, task-planning]
 paper: https://arxiv.org/abs/2502.21257

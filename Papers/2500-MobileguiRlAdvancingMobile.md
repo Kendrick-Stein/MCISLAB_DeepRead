@@ -14,6 +14,8 @@ date_publish: "2025/07/08"
 venue: "arXiv"
 tags: ["navigation", "RL", "web-agent"]
 url: "https://arxiv.org/abs/2507.05720"
+cite_key: shi2025mobilegui
+arxiv_id: "2507.05720"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

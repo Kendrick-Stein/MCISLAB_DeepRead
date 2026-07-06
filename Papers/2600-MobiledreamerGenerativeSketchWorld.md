@@ -15,6 +15,8 @@ date_publish: "2026/01/07"
 venue: "arXiv"
 tags: ["world-model", "task-planning", "web-agent"]
 url: "https://arxiv.org/abs/2601.04035"
+cite_key: cao2026mobiledreamer
+arxiv_id: "2601.04035"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

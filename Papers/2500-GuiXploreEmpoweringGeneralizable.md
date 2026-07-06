@@ -14,6 +14,8 @@ date_publish: "2025/03/22"
 venue: "arXiv"
 tags: ["navigation", "imitation-learning", "task-planning"]
 url: "https://arxiv.org/abs/2503.17709"
+cite_key: sun2025gui
+arxiv_id: "2503.17709"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

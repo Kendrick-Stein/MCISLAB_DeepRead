@@ -4,6 +4,8 @@ authors: ['Yuxi Chen', 'Haoyu Zhai', 'Chenkai Wang', 'Rui Yang', 'Lingming Zhang
 year: 2026
 venue: "None"
 url: "http://arxiv.org/abs/2603.23559v1"
+cite_key: chen2026captcha
+arxiv_id: "2603.23559"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

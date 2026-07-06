@@ -6,6 +6,8 @@ date_publish: 2026-04-27
 venue: arXiv
 tags: [gui-agent, VLM]
 url: "https://arxiv.org/abs/2604.24441"
+cite_key: autogui2026
+arxiv_id: "2604.24441"
 code: 待补充
 rating: 4
 date_added: 2026-05-04

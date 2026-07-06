@@ -6,6 +6,8 @@ date_publish: 2026-06-05
 venue: arXiv preprint
 tags: [VLA, cross-embodiment, flow-matching, manipulation]
 url: https://arxiv.org/abs/2606.07383
+cite_key: zhang2026rhinovla
+arxiv_id: "2606.07383"
 code:
 rating: 3
 date_added: 2026-06-08

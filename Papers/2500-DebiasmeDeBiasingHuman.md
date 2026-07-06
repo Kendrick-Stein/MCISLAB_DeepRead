@@ -6,6 +6,8 @@ date_publish: "2025/04/23"
 venue: "arXiv"
 tags: []
 url: "https://arxiv.org/abs/2504.16770"
+cite_key: lim2025debiasme
+arxiv_id: "2504.16770"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

@@ -4,6 +4,7 @@ authors: ['Stefán Ólafsson', 'Dhaval Parmar', 'Everlyne Kimani', 'Teresa K. O�
 year: 2021
 venue: "None"
 url: "https://openalex.org/W3163161466"
+cite_key: lafssonmore
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

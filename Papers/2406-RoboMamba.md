@@ -3,6 +3,7 @@ title: "RoboMamba: Efficient Vision-Language-Action Model for Robotic Reasoning 
 authors: [Jiaming Liu, Mengzhen Liu, Zhenyu Wang, Pengju An, Xiaoqi Li, Kaichen Zhou, Senqiao Yang, Renrui Zhang, Yandong Guo, Shanghang Zhang]
 institutes: [Peking University, AI2Robotics, BAAI]
 date_publish: 2024-06-06
+cite_key: liu2024robomamba
 venue: NeurIPS 2024
 tags: [VLA, manipulation, embodied-reasoning]
 paper: https://arxiv.org/abs/2406.04339

@@ -31,6 +31,8 @@ date_publish: "2025/06/02"
 venue: "arXiv"
 tags: ["VLM", "imitation-learning", "RL"]
 url: "https://arxiv.org/abs/2506.01391"
+cite_key: zhang2025agentcpm
+arxiv_id: "2506.01391"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

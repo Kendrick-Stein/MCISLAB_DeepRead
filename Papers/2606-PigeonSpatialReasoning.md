@@ -6,6 +6,8 @@ date_publish: 2026-06-01
 venue: ICML 2026
 tags: [spatial-reasoning, VLM, agentic-RL]
 url: https://arxiv.org/abs/2606.02459v1
+cite_key: deng2026active
+arxiv_id: "2606.02459"
 code: https://github.com/dw-dengwei/active-spatial-reasoning.git
 rating: 4
 date_added: 2026-06-07

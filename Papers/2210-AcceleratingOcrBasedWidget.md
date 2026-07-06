@@ -10,6 +10,8 @@ date_publish: "2022-10-10"
 venue: "International Conference on Automated Software Engineering"
 tags: []
 url: "https://doi.org/10.1145/3551349.3556966"
+cite_key: qian2022accelerating
+arxiv_id: "1349.35569"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

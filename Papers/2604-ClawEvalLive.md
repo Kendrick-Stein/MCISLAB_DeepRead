@@ -6,6 +6,8 @@ date_publish: 2026-04
 venue: arXiv
 tags: [computer-use, agentic-RL, LLM]
 url: "https://arxiv.org/abs/2604.28139"
+cite_key: li2026claw
+arxiv_id: "2604.28139"
 code:
 rating: 3
 date_added: 2026-05-03

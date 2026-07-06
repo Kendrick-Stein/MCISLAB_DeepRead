@@ -30,6 +30,8 @@ date_publish: "2026-05-31"
 venue: arXiv
 tags: [computer-use, gui-agent]
 url: "https://arxiv.org/abs/2606.01166"
+cite_key: feng2026braveguard
+arxiv_id: "2606.01166"
 code: "https://github.com/Yunhao-Feng/BraveGuard"
 rating: "4"
 date_added: "2026-06-26"

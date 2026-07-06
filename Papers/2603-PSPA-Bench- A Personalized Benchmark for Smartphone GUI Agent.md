@@ -4,6 +4,8 @@ authors: ['Hongyi Nie', 'Xunyuan Liu', 'Yudong Bai', 'Yaqing Wang', 'Yang Liu', 
 year: 2026
 venue: "None"
 url: "http://arxiv.org/abs/2603.29318v1"
+cite_key: nie2026pspa
+arxiv_id: "2603.29318"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

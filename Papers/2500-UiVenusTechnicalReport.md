@@ -30,6 +30,8 @@ date_publish: "2025/08/14"
 venue: "arXiv"
 tags: ["VLM", "navigation", "RL"]
 url: "https://arxiv.org/abs/2508.10833"
+cite_key: gu2025ui
+arxiv_id: "2508.10833"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

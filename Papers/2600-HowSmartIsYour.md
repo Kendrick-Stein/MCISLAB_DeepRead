@@ -6,6 +6,8 @@ date_publish: "2026/02/12"
 venue: "arXiv"
 tags: ["web-agent"]
 url: "https://arxiv.org/abs/2602.11514"
+cite_key: feng2026how
+arxiv_id: "2602.11514"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

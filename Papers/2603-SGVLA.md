@@ -3,6 +3,7 @@ title: "SG-VLA: Learning Spatially-Grounded Vision-Language-Action Models for Mo
 authors: [Ruisen Tu, Arth Shukla, Sohyun Yoo, Xuanlin Li, Junxi Li, Jianwen Xie, Hao Su, Zhuowen Tu]
 institutes: [UC San Diego, Lambda Inc.]
 date_publish: 2026-03-24
+cite_key: tu2026sg
 venue: arXiv
 tags: [VLA, mobile-manipulation, imitation-learning]
 paper: https://arxiv.org/abs/2603.22760

@@ -3,6 +3,7 @@ title: "StreamVLN: Streaming Vision-and-Language Navigation via SlowFast Context
 authors: [Meng Wei, Chenyang Wan, Xiqian Yu, Tai Wang, Yuqiang Yang, Xiaohan Mao, Chenming Zhu, Wenzhe Cai, Hanqing Wang, Yilun Chen, Xihui Liu, Jiangmiao Pang]
 institutes: [Shanghai AI Laboratory, The University of Hong Kong, Zhejiang University, Shanghai Jiao Tong University]
 date_publish: 2025-07-07
+cite_key: wei2025streamvln
 venue: ICRA 2026
 tags: [VLN, video-LLM, VLA, navigation]
 paper: https://arxiv.org/abs/2507.05240

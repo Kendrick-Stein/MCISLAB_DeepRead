@@ -6,6 +6,8 @@ date_publish: "2025/12/24"
 venue: "arXiv"
 tags: ["imitation-learning"]
 url: "https://arxiv.org/abs/2512.21309"
+cite_key: li2025plan
+arxiv_id: "2512.21309"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

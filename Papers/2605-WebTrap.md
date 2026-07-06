@@ -6,6 +6,8 @@ date_publish: 2026-05-12
 venue: arXiv
 tags: [web-agent]
 url: "http://arxiv.org/abs/2605.08310v1"
+cite_key: webtrap2026
+arxiv_id: "2605.08310"
 code:
 rating: "2"
 date_added: 2026-05-12

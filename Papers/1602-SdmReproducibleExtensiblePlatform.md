@@ -6,6 +6,7 @@ date_publish: "2016-02-03"
 venue: "Ecography"
 tags: []
 url: ""
+cite_key: naimi2016sdm
 code: ""
 rating: "3"
 date_added: "2026-04-21"

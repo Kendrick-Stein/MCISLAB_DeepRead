@@ -21,6 +21,7 @@ date_publish: "2012-07-07"
 venue: "Magnetic Resonance Imaging"
 tags: []
 url: ""
+cite_key: fedorov20123d
 code: ""
 rating: "3"
 date_added: "2026-04-21"

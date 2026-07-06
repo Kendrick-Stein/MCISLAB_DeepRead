@@ -7,6 +7,7 @@ date_publish: "2024"
 venue: "arXiv"
 tags: ["hyperbolic", "manifold", "survey", "neural-network"]
 url: ""
+cite_key: authors2024hyperbolica
 code: ""
 rating: "4"
 date_added: "2026-04-28"

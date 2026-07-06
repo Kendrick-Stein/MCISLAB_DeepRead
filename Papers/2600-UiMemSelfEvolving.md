@@ -16,6 +16,8 @@ date_publish: "2026/02/05"
 venue: "arXiv"
 tags: ["VLM", "navigation", "imitation-learning"]
 url: "https://arxiv.org/abs/2602.05832"
+cite_key: xiao2026ui
+arxiv_id: "2602.05832"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

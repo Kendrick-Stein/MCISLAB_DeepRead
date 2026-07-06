@@ -6,6 +6,7 @@ date_publish: "2026"
 venue: "Project website"
 tags: [web-agent, gui-agent, computer-use]
 url: "https://aiming-lab.github.io/webharbor.github.io/"
+cite_key: contributors2026webharbor
 code: "https://github.com/aiming-lab/WebHarbor"
 rating: "4"
 date_added: "2026-06-24"

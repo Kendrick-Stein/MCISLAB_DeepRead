@@ -16,6 +16,8 @@ date_publish: "2025/04/24"
 venue: "arXiv"
 tags: ["web-agent"]
 url: "https://arxiv.org/abs/2504.17934"
+cite_key: chen2025human
+arxiv_id: "2504.17934"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

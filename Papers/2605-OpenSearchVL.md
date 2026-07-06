@@ -16,6 +16,8 @@ date_publish: "2026-05-06"
 venue: "arXiv"
 tags: [web-agent, agentic-RL, VLM]
 url: "https://arxiv.org/abs/2605.05185v1"
+cite_key: chen2026opensearch
+arxiv_id: "2605.05185"
 code: "https://github.com/shawn0728/OpenSearch-VL"
 rating: "4"
 date_added: "2026-05-07"

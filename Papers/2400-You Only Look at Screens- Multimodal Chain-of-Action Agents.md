@@ -4,6 +4,7 @@ authors: ['Zhuosheng Zhang', 'Aston Zhang']
 year: 2024
 venue: "None"
 url: "https://openalex.org/W4402670435"
+cite_key: zhangyou
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

@@ -13,6 +13,8 @@ date_publish: "2026/02/12"
 venue: "arXiv"
 tags: ["VLA", "navigation", "imitation-learning"]
 url: "https://arxiv.org/abs/2602.12351"
+cite_key: hu2026longnav
+arxiv_id: "2602.12351"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

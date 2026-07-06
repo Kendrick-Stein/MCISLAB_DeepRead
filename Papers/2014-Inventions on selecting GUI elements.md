@@ -4,6 +4,8 @@ authors: ['Umakant Mishra']
 year: 2014
 venue: "None"
 url: "http://arxiv.org/abs/1404.6779v1"
+cite_key: mishra2014inventionsa
+arxiv_id: "1404.6779"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

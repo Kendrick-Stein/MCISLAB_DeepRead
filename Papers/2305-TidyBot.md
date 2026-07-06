@@ -3,6 +3,7 @@ title: "TidyBot: Personalized Robot Assistance with Large Language Models"
 authors: [Jimmy Wu, Rika Antonova, Adam Kan, Marion Lepert, Andy Zeng, Shuran Song, Jeannette Bohg, Szymon Rusinkiewicz, Thomas Funkhouser]
 institutes: [Princeton, Stanford, The Nueva School, Google, Columbia]
 date_publish: 2023-05-09
+cite_key: wu2023tidybot
 venue: Autonomous Robots / IROS 2023
 tags: [LLM, mobile-manipulation, scene-understanding, instruction-following]
 paper: https://arxiv.org/abs/2305.05658

@@ -15,6 +15,8 @@ date_publish: "2025/03/25"
 venue: "arXiv"
 tags: ["VLM", "scene-understanding"]
 url: "https://arxiv.org/abs/2503.19537"
+cite_key: kahlon2025agent
+arxiv_id: "2503.19537"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

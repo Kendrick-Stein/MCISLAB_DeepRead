@@ -14,6 +14,8 @@ date_publish: "2025/03/20"
 venue: "arXiv"
 tags: ["VLM", "imitation-learning", "RL"]
 url: "https://arxiv.org/abs/2503.15937"
+cite_key: dai2025advancing
+arxiv_id: "2503.15937"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

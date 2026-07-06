@@ -16,6 +16,8 @@ date_publish: "2025/07/04"
 venue: "arXiv"
 tags: ["navigation", "imitation-learning", "web-agent"]
 url: "https://arxiv.org/abs/2507.03730"
+cite_key: chen2025less
+arxiv_id: "2507.03730"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

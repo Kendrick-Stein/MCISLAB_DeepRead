@@ -4,6 +4,8 @@ authors: ['Xingyi Zhang', 'Yulei Ye', 'Kaifeng Huang', 'Wenhao Li', 'Xiangfeng W
 year: 2026
 venue: "None"
 url: "http://arxiv.org/abs/2602.10814v1"
+cite_key: zhang2026see
+arxiv_id: "2602.10814"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

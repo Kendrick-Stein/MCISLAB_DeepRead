@@ -18,6 +18,7 @@ institutes:
   - Australian National University
   - Galbot
 date_publish: 2024-02-24
+cite_key: zhang2024navid
 venue: RSS 2024
 tags: [VLN, VLM, navigation]
 paper: https://arxiv.org/abs/2402.15852

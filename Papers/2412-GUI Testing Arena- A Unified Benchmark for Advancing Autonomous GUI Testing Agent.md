@@ -4,6 +4,8 @@ authors: ['Kangjia Zhao', 'Jiahui Song', 'Leigang Sha', 'Haozhan Shen', 'Zhi Che
 year: 2024
 venue: "None"
 url: "http://arxiv.org/abs/2412.18426v1"
+cite_key: zhao2024gui
+arxiv_id: "2412.18426"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

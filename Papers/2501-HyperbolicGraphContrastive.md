@@ -7,6 +7,7 @@ date_publish: "2025-01"
 venue: "arXiv"
 tags: ["hyperbolic", "graph", "contrastive-learning", "hierarchy"]
 url: ""
+cite_key: authors2025hyperbolic
 code: ""
 rating: "3"
 date_added: "2026-04-28"

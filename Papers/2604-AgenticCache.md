@@ -9,6 +9,8 @@ date_publish: "2026-04-27"
 venue: "arXiv"
 tags: ["world-model", "planning", "embodied-AI", "cache"]
 url: "http://arxiv.org/abs/2604.24039v1"
+cite_key: kim2026agenticcache
+arxiv_id: "2604.24039"
 code: "https://github.com/hojoonleekim/MLSys26_AgenticCache"
 rating: "2"
 date_added: "2026-04-28"

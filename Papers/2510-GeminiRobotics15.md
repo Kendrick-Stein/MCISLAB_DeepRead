@@ -3,6 +3,7 @@ title: "Gemini Robotics 1.5: Pushing the Frontier of Generalist Robots with Adva
 authors: [Gemini Robotics Team]
 institutes: [Google DeepMind]
 date_publish: 2025-10
+cite_key: team2025geminia
 venue: arXiv
 tags: [VLA, cross-embodiment, embodied-reasoning]
 paper: https://arxiv.org/abs/2510.03342

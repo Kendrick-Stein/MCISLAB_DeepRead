@@ -6,6 +6,8 @@ date_publish: "2024/10/12"
 venue: "arXiv"
 tags: []
 url: "https://arxiv.org/abs/2410.09386"
+cite_key: abidi2024global
+arxiv_id: "2410.09386"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

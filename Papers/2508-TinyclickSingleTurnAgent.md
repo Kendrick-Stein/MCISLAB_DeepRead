@@ -13,6 +13,7 @@ date_publish: "2025-08-17"
 venue: "Unknown"
 tags: []
 url: ""
+cite_key: pawowski2025tinyclick
 code: ""
 rating: "3"
 date_added: "2026-04-21"

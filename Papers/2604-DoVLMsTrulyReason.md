@@ -3,6 +3,7 @@ title: "Do Vision-Language Models Truly Perform Vision Reasoning? A Rigorous Stu
 authors: [Yige Xu, Yongjie Wang, Zizhuo Wu, Kaisong Song, Jun Lin, Zhiqi Shen]
 institutes: [NTU, Alibaba-NTU ANGEL, Tongyi Lab Alibaba]
 date_publish: 2026-04
+cite_key: xu2026do
 venue: arXiv preprint
 tags: [VLM, LLM, embodied-reasoning]
 paper: https://arxiv.org/abs/2604.16256

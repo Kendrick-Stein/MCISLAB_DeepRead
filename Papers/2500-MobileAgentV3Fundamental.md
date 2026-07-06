@@ -21,6 +21,8 @@ date_publish: "2025/08/21"
 venue: "arXiv"
 tags: ["RL", "scene-understanding", "web-agent"]
 url: "https://arxiv.org/abs/2508.15144"
+cite_key: ye2025mobile
+arxiv_id: "2508.15144"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

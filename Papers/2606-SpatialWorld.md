@@ -6,6 +6,8 @@ date_publish: 2026-06-08
 venue: arXiv
 tags: [spatial-reasoning, gui-agent, VLM]
 url: https://arxiv.org/abs/2606.09669
+cite_key: gao2026spatialworld
+arxiv_id: "2606.09669"
 code:
 rating: 3
 date_added: 2026-06-10

@@ -6,6 +6,8 @@ date_publish: 2026-05-14
 venue: ICML 2026
 tags: [gui-agent, VLM, imitation-learning]
 url: https://arxiv.org/abs/2605.14747
+cite_key: xiong2026video2gui
+arxiv_id: "2605.14747"
 code: https://github.com/WeiminXiong/Video2GUI
 rating: 4
 date_added: 2026-05-22

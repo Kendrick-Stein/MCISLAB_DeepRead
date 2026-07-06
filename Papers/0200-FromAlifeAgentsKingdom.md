@@ -6,6 +6,7 @@ date_publish: "2002/05/13"
 venue: "arXiv"
 tags: []
 url: "https://arxiv.org/abs/cs/0205016"
+cite_key: han2002alife
 code: ""
 rating: "3"
 date_added: "2026-04-21"

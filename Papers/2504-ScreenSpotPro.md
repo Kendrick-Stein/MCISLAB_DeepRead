@@ -3,6 +3,7 @@ title: "ScreenSpot-Pro: GUI Grounding for Professional High-Resolution Computer 
 authors: [Kaixin Li, Ziyang Meng, Hongzhan Lin, Ziyang Luo, Yuchen Tian, Jing Ma, Zhiyong Huang, Tat-Seng Chua]
 institutes: [National University of Singapore, East China Normal University, Hong Kong Baptist University]
 date_publish: 2025-04-04
+cite_key: li2025screenspot
 venue: Workshop on Reasoning and Planning for Large Language Models (R&P-LLM @ ICLR 2025)
 tags: [gui-agent, computer-use]
 paper: https://arxiv.org/abs/2504.07981

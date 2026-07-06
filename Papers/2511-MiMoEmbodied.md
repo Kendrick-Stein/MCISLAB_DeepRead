@@ -3,6 +3,7 @@ title: "MiMo-Embodied: X-Embodied Foundation Model Technical Report"
 authors: [Xiaomi Embodied Intelligence Team]
 institutes: [Xiaomi]
 date_publish: 2025-11-20
+cite_key: team2025mimo
 venue: arXiv 2511.16518
 tags: [VLM, embodied-reasoning, spatial-reasoning]
 paper: https://arxiv.org/abs/2511.16518

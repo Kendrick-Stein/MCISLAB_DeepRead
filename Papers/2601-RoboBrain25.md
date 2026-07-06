@@ -3,6 +3,7 @@ title: "RoboBrain 2.5: Depth in Sight, Time in Mind"
 authors: [Huajie Tan, Enshen Zhou, Zhiyu Li, Yijie Xu, Yuheng Ji, Xiansheng Chen, Cheng Chi, Pengwei Wang, Huizhu Jia, Yulong Ao, Yonghua Lin, Zhongyuan Wang, Tiejun Huang, Shanghang Zhang]
 institutes: [BAAI]
 date_publish: 2026-01
+cite_key: tan2026robobrain
 venue: arXiv preprint
 tags: [spatial-reasoning, VLA, RL]
 paper: https://arxiv.org/abs/2601.14352

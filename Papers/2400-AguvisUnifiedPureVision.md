@@ -15,6 +15,8 @@ date_publish: "2024/12/05"
 venue: "arXiv"
 tags: ["scene-understanding", "web-agent"]
 url: "https://arxiv.org/abs/2412.04454"
+cite_key: xu2024aguvis
+arxiv_id: "2412.04454"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

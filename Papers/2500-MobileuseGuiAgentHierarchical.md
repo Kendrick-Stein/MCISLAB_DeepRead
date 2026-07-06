@@ -16,6 +16,8 @@ date_publish: "2025/07/21"
 venue: "arXiv"
 tags: ["navigation", "imitation-learning", "scene-understanding"]
 url: "https://arxiv.org/abs/2507.16853"
+cite_key: li2025mobileuse
+arxiv_id: "2507.16853"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

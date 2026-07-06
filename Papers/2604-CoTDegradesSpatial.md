@@ -3,6 +3,7 @@ title: "Chain-of-Thought Degrades Visual Spatial Reasoning Capabilities of Multi
 authors: [Sai Srinivas Kancheti, Aditya Sanjiv Kanade, Vineeth N. Balasubramanian, Tanuja Ganu]
 institutes: [IIT Hyderabad, Microsoft Research India]
 date_publish: 2026-04
+cite_key: kancheti2026chain
 venue: arXiv preprint
 tags: [spatial-reasoning, VLM, embodied-reasoning]
 paper: https://arxiv.org/abs/2604.16060

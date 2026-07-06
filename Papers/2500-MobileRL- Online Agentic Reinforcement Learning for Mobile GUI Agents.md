@@ -4,6 +4,7 @@ authors: ['Yifan Xu', 'Xiao Liu', 'Xinghan Liu', 'Jiaqi Fu', 'Hanchen Zhang', 'B
 year: 2025
 venue: "ArXiv.org"
 url: "https://openalex.org/W4416257382"
+cite_key: xumobilerl
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

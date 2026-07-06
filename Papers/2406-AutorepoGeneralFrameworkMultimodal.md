@@ -10,6 +10,7 @@ date_publish: "2024-06-29"
 venue: "Expert Systems with Applications"
 tags: []
 url: ""
+cite_key: pu2024autorepo
 code: ""
 rating: "3"
 date_added: "2026-04-21"

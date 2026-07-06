@@ -3,6 +3,7 @@ title: "SpatialNav: Leveraging Spatial Scene Graphs for Zero-Shot Vision-and-Lan
 authors: [Jiwen Zhang, Zejun Li, Siyuan Wang, Xiangyu Shi, Zhongyu Wei, Qi Wu]
 institutes: [Fudan University, University of Adelaide]
 date_publish: 2026-01-11
+cite_key: zhang2026spatialnav
 venue: arXiv
 tags: [VLN, spatial-memory, scene-understanding]
 paper: https://arxiv.org/abs/2601.06806

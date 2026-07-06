@@ -3,6 +3,7 @@ title: "Fast-dVLM: Efficient Block-Diffusion VLM via Direct Conversion from Auto
 authors: [Chengyue Wu, Shiyi Lan, Yonggan Fu, Sensen Gao, Jin Wang, Jincheng Yu, Jose M. Alvarez, Pavlo Molchanov, Ping Luo, Song Han, Ligeng Zhu, Enze Xie]
 institutes: [HKU, NVIDIA, MIT, MBZUAI]
 date_publish: 2026-04-08
+cite_key: wu2026fast
 venue: arXiv
 tags: [VLM, LLM]
 paper: https://arxiv.org/abs/2604.06832

@@ -16,6 +16,8 @@ tags:
   - spatial-reasoning
   - manipulation
 url: http://arxiv.org/abs/2605.05126v1
+cite_key: li2026consisvla
+arxiv_id: "2605.05126"
 code: https://github.com/iLearn-Lab/CVPR26-ConsisVLA-4D
 rating: "4"
 date_added: 2026-05-07

@@ -6,6 +6,7 @@ date_publish: "2026-02-14"
 venue: "Zenodo (CERN European Organization for Nuclear Research)"
 tags: ["web-agent"]
 url: ""
+cite_key: figurelli2026task
 code: ""
 rating: "3"
 date_added: "2026-04-21"

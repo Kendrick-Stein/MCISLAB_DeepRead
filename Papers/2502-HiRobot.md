@@ -3,6 +3,7 @@ title: "Hi Robot: Open-Ended Instruction Following with Hierarchical Vision-Lang
 authors: [Lucy Xiaoyang Shi, Brian Ichter, Michael Equi, Liyiming Ke, Karl Pertsch, Quan Vuong, James Tanner, Anna Walling, Haohuan Wang, Niccolo Fusai, Adrian Li-Bell, Danny Driess, Lachy Groom, Sergey Levine, Chelsea Finn]
 institutes: [Physical Intelligence]
 date_publish: 2025-02
+cite_key: shi2025hi
 venue: arXiv
 tags: [VLA, instruction-following, task-planning, manipulation, embodied-reasoning]
 paper: https://arxiv.org/abs/2502.19417

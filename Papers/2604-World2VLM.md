@@ -18,6 +18,8 @@ tags:
   - world-model
   - spatial-reasoning
 url: https://arxiv.org/abs/2604.26934v1
+cite_key: zhang2026world2vlm
+arxiv_id: "2604.26934"
 code: ""
 rating: "3"
 date_added: 2026-04-30

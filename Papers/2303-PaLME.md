@@ -3,6 +3,7 @@ title: "PaLM-E: An Embodied Multimodal Language Model"
 authors: [Danny Driess, Fei Xia, Mehdi S. M. Sajjadi, Corey Lynch, Aakanksha Chowdhery, Brian Ichter, Ayzaan Wahid, Jonathan Tompson, Quan Vuong, Tianhe Yu, Wenlong Huang, Yevgen Chebotar, Pierre Sermanet, Daniel Duckworth, Sergey Levine, Vincent Vanhoucke, Karol Hausman, Marc Toussaint, Klaus Greff, Andy Zeng, Igor Mordatch, Pete Florence]
 institutes: [Robotics at Google, TU Berlin, Google Research]
 date_publish: 2023-03
+cite_key: driess2023palm
 venue: ICML 2023
 tags: [VLM, embodied-reasoning, task-planning]
 paper: https://arxiv.org/abs/2303.03378

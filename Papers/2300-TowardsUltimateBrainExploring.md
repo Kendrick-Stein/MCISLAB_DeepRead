@@ -6,6 +6,8 @@ date_publish: "2023/07/08"
 venue: "arXiv"
 tags: ["imitation-learning", "auto-research"]
 url: "https://arxiv.org/abs/2308.12400"
+cite_key: adesso2023ultimate
+arxiv_id: "2308.12400"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

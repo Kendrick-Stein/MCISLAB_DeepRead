@@ -6,6 +6,8 @@ date_publish: 2026-05
 venue: arXiv
 tags: [LLM, gui-agent, computer-use, task-planning]
 url: https://arxiv.org/abs/2605.18747
+cite_key: ning2026code
+arxiv_id: "2605.18747"
 code: https://github.com/YennNing/Awesome-Code-as-Agent-Harness-Papers
 rating: 3
 date_added: "2026-05-22"

@@ -3,6 +3,7 @@ title: "RoboInter: A Holistic Intermediate Representation Suite Towards Robotic 
 authors: [Hao Li, Ziqin Wang, Zi-han Ding, Shuai Yang, Yilun Chen, Yang Tian, Xiaolin Hu, Tai Wang, Dahua Lin, Feng Zhao, Si Liu, Jiangmiao Pang]
 institutes: [University of Science and Technology of China, Shanghai Artificial Intelligence Laboratory, Beihang University, Nanyang Technological University, Zhejiang University, Tsinghua University, The Chinese University of Hong Kong]
 date_publish: 2026-02
+cite_key: li2026robointer
 venue: ICLR 2026
 tags: [VLA, manipulation, embodied-reasoning]
 paper: https://arxiv.org/abs/2602.09973

@@ -6,6 +6,8 @@ date_publish: "2022-03-25"
 venue: "2022 8th International Conference on Advanced Computing and Communication Systems (ICACCS)"
 tags: ["imitation-learning"]
 url: "https://doi.org/10.1109/icaccs54159.2022.9784972"
+cite_key: sairam2022virtual
+arxiv_id: "4159.2022"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

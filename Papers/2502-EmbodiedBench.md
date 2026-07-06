@@ -3,6 +3,7 @@ title: "EmbodiedBench: Comprehensive Benchmarking Multi-modal Large Language Mod
 authors: [Rui Yang, Hanyang Chen, Junyu Zhang, Mark Zhao, Cheng Qian, Kangrui Wang, Qineng Wang, Teja Venkat Koripella, Marziyeh Movahedi, Manling Li, Heng Ji, Huan Zhang, Tong Zhang]
 institutes: [UIUC, Northwestern, U Toronto, TTIC]
 date_publish: 2025-02-13
+cite_key: yang2025embodiedbench
 venue: ICML 2025 (Oral)
 tags: [embodied-reasoning, VLM, task-planning]
 paper: https://arxiv.org/abs/2502.09560

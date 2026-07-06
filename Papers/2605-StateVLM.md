@@ -16,6 +16,8 @@ tags:
   - scene-understanding
   - embodied-reasoning
 url: http://arxiv.org/abs/2605.03927v1
+cite_key: sun2026statevlm
+arxiv_id: "2605.03927"
 code:
 rating: "2"
 date_added: "2026-05-06"

@@ -18,6 +18,8 @@ date_publish: "2026/03/30"
 venue: "arXiv"
 tags: ["RL", "scene-understanding"]
 url: "https://arxiv.org/abs/2603.28428"
+cite_key: nie2026synergy
+arxiv_id: "2603.28428"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

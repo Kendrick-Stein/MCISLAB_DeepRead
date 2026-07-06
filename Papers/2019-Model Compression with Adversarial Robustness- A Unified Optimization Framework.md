@@ -4,6 +4,8 @@ authors: ['Shupeng Gui', 'Haotao Wang', 'Chen Yu', 'Haichuan Yang', 'Zhangyang W
 year: 2019
 venue: "None"
 url: "http://arxiv.org/abs/1902.03538v3"
+cite_key: gui2019model
+arxiv_id: "1902.03538"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

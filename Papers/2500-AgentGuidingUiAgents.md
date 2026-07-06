@@ -6,6 +6,8 @@ date_publish: "2025/10/07"
 venue: "arXiv"
 tags: ["VLM", "navigation", "imitation-learning"]
 url: "https://arxiv.org/abs/2510.06042"
+cite_key: ma2025agent
+arxiv_id: "2510.06042"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

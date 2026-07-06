@@ -11,6 +11,7 @@ date_publish: "2026-03-11"
 venue: "ArXiv.org"
 tags: ["VLM", "task-planning", "web-agent"]
 url: ""
+cite_key: zhu2026hybrid
 code: ""
 rating: "3"
 date_added: "2026-04-21"

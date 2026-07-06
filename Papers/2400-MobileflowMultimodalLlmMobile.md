@@ -13,6 +13,8 @@ date_publish: "2024/07/05"
 venue: "arXiv"
 tags: ["VLM", "VLA", "scene-understanding"]
 url: "https://arxiv.org/abs/2407.04346"
+cite_key: nong2024mobileflow
+arxiv_id: "2407.04346"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

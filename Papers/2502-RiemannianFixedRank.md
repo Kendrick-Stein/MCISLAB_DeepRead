@@ -7,6 +7,8 @@ date_publish: "2025-02"
 venue: "arXiv"
 tags: ["riemannian", "manifold", "fixed-rank", "optimization"]
 url: "https://arxiv.org/abs/2502.01856"
+cite_key: authors2025riemannian
+arxiv_id: "2502.01856"
 code: ""
 rating: "3"
 date_added: "2026-04-28"

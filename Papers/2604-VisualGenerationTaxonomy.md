@@ -44,6 +44,8 @@ tags:
   - VLM
   - agentic-RL
 url: https://arxiv.org/abs/2604.28185
+cite_key: wu2026visual
+arxiv_id: "2604.28185"
 code: https://github.com/EvolvingLMMs-Lab/Evolving-Visual-Generation
 rating: 4
 date_added: 2026-05-03

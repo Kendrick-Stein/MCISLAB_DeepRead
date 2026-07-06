@@ -6,6 +6,8 @@ date_publish: 2026-05
 venue: arXiv
 tags: []
 url: https://arxiv.org/abs/2605.19833
+cite_key: xie2026mega
+arxiv_id: "2605.19833"
 code: https://xzf-thu.github.io/Mega-ASR/
 rating: 2
 date_added: 2026-05-25

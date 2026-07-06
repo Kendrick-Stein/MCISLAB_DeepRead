@@ -15,6 +15,8 @@ date_publish: "2026-04-27"
 venue: "arXiv"
 tags: ["VLA", "world-model", "action-generation", "efficiency"]
 url: "http://arxiv.org/abs/2604.24622v1"
+cite_key: du2026cf
+arxiv_id: "2604.24622"
 code: "https://github.com/EmbodiedAI-RoboTron/CF-VLA"
 rating: "2"
 date_added: "2026-04-28"

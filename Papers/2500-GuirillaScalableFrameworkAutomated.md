@@ -10,6 +10,8 @@ date_publish: "2025/10/16"
 venue: "arXiv"
 tags: ["VLM", "navigation", "scene-understanding"]
 url: "https://arxiv.org/abs/2510.16051"
+cite_key: garkot2025guirilla
+arxiv_id: "2510.16051"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

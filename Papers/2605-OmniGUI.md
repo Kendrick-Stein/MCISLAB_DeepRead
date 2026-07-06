@@ -6,6 +6,8 @@ date_publish: 2026-04
 venue: arXiv
 tags: [gui-agent, video-LLM, VLM]
 url: https://arxiv.org/abs/2605.18758
+cite_key: henry2026omnigui
+arxiv_id: "2605.18758"
 code: 
 rating: 4
 date_added: 2026-05-22

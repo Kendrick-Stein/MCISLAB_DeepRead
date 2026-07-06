@@ -6,6 +6,8 @@ date_publish: "2026-05"
 venue: "arXiv"
 tags: [gui-agent, agentic-RL]
 url: "https://arxiv.org/abs/2605.26114"
+cite_key: wu2026mobilegym
+arxiv_id: "2605.26114"
 code: "https://github.com/Purewhiter/mobilegym"
 rating: "4"
 date_added: "2026-06-22"

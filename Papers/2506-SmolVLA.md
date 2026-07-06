@@ -3,6 +3,7 @@ title: "SmolVLA: A Vision-Language-Action Model for Affordable and Efficient Rob
 authors: [Mustafa Shukor, Dana Aubakirova, Francesco Capuano, Pepijn Kooijmans, Steven Palma, Adil Zouitine, Michel Aractingi, Caroline Pascal, Martino Russi, Andres Marafioti, Simon Alibert, Matthieu Cord, Thomas Wolf, Remi Cadene]
 institutes: [Hugging Face, Sorbonne University, valeo.ai, ENS Paris-Saclay]
 date_publish: 2025-06-02
+cite_key: shukor2025smolvla
 venue: arXiv
 tags: [VLA, flow-matching, manipulation]
 paper: https://arxiv.org/abs/2506.01844

@@ -10,6 +10,8 @@ date_publish: "2025/04/09"
 venue: "arXiv"
 tags: []
 url: "https://arxiv.org/abs/2504.08817"
+cite_key: misawa2025exploring
+arxiv_id: "2504.08817"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

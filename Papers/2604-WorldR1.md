@@ -18,6 +18,8 @@ date_publish: "2026-04-27"
 venue: "arXiv"
 tags: ["world-model", "video-generation", "RL", "3D-consistency"]
 url: "https://arxiv.org/abs/2604.24764"
+cite_key: wang2026world
+arxiv_id: "2604.24764"
 code: ""
 rating: "2"
 date_added: "2026-04-28"

@@ -20,6 +20,8 @@ date_publish: "2024/06/17"
 venue: "arXiv"
 tags: ["VLM", "navigation", "imitation-learning"]
 url: "https://arxiv.org/abs/2406.11317"
+cite_key: chen2024guicourse
+arxiv_id: "2406.11317"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

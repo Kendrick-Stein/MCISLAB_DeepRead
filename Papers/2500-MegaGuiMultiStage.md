@@ -14,6 +14,8 @@ date_publish: "2025/11/17"
 venue: "arXiv"
 tags: ["VLM", "scene-understanding"]
 url: "https://arxiv.org/abs/2511.13087"
+cite_key: kwak2025mega
+arxiv_id: "2511.13087"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

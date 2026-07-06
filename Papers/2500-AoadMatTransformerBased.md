@@ -6,6 +6,8 @@ date_publish: "2025/10/15"
 venue: "arXiv"
 tags: ["imitation-learning", "RL"]
 url: "https://arxiv.org/abs/2510.13343"
+cite_key: takayama2025aoad
+arxiv_id: "2510.13343"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

@@ -6,6 +6,8 @@ date_publish: 2026-06-03
 venue: arXiv
 tags: [VLA, spatial-reasoning, manipulation, 3D-representation]
 url: https://arxiv.org/abs/2606.04436v1
+cite_key: shi20263dthinkvla
+arxiv_id: "2606.04436"
 code: 
 rating: 4
 date_added: 2026-06-07

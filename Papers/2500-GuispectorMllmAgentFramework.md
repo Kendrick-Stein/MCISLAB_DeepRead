@@ -11,6 +11,8 @@ date_publish: "2025/10/06"
 venue: "arXiv"
 tags: ["imitation-learning"]
 url: "https://arxiv.org/abs/2510.04791"
+cite_key: kolthoff2025guispector
+arxiv_id: "2510.04791"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

@@ -6,6 +6,8 @@ date_publish: "2026-05-28"
 venue: "arXiv"
 tags: ["LLM", "gui-agent", "VLM"]
 url: "https://arxiv.org/abs/2605.30611"
+cite_key: zhao2026crafter
+arxiv_id: "2605.30611"
 code: "https://github.com/HaozheZhao/Crafter"
 rating: 3
 date_added: "2026-06-07"

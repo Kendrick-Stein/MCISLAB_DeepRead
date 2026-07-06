@@ -6,6 +6,8 @@ date_publish: 2026-05-19
 venue: arXiv
 tags: [gui-agent, computer-use]
 url: https://arxiv.org/abs/2605.19484
+cite_key: hu2026cutverse
+arxiv_id: "2605.19484"
 code: 
 rating: 4
 date_added: 2026-05-22

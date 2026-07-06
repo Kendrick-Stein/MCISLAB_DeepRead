@@ -6,6 +6,8 @@ date_publish: "2018/07/07"
 venue: "arXiv"
 tags: ["imitation-learning"]
 url: "https://arxiv.org/abs/1807.02648"
+cite_key: kiourt2018how
+arxiv_id: "1807.02648"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

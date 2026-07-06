@@ -20,6 +20,8 @@ tags:
   - agentic-RL
   - task-planning
 url: https://arxiv.org/abs/2606.01619v1
+cite_key: he2026reskill
+arxiv_id: "2606.01619"
 code:
 rating: 4
 date_added: 2026-06-07

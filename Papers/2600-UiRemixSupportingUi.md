@@ -11,6 +11,8 @@ date_publish: "2026/01/26"
 venue: "arXiv"
 tags: ["navigation"]
 url: "https://arxiv.org/abs/2601.18759"
+cite_key: wang2026ui
+arxiv_id: "2601.18759"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

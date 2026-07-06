@@ -4,6 +4,8 @@ authors: ['Yijie Lu', 'Tianjie Ju', 'Manman Zhao', 'Xinbei Ma', 'Yuan Guo', 'Zhu
 year: 2025
 venue: "None"
 url: "http://arxiv.org/abs/2505.14289v1"
+cite_key: lu2025eva
+arxiv_id: "2505.14289"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

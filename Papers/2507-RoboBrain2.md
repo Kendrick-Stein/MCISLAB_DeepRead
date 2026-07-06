@@ -3,6 +3,7 @@ title: "RoboBrain 2.0 Technical Report"
 authors: [BAAI RoboBrain Team]
 institutes: [BAAI]
 date_publish: 2025-07
+cite_key: team2025robobrain
 venue: Technical Report
 tags: [spatial-reasoning, VLM, task-planning]
 paper: https://arxiv.org/abs/2507.02029

@@ -4,6 +4,8 @@ authors: ['Mohammad Mahdi Abootorabi', 'Amirhosein Zobeiri', 'Mahdi Dehghani', '
 year: 2025
 venue: "None"
 url: "http://arxiv.org/abs/2502.08826v3"
+cite_key: abootorabi2025ask
+arxiv_id: "2502.08826"
 tags: ["Multimodal LLM"]
 status: pending
 date_added: 2026-04-15

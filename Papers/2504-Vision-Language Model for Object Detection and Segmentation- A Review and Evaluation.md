@@ -4,6 +4,8 @@ authors: ['Yongchao Feng', 'Yajie Liu', 'Shuai Yang', 'Wenrui Cai', 'Jinqing Zha
 year: 2025
 venue: "None"
 url: "http://arxiv.org/abs/2504.09480v1"
+cite_key: feng2025vision
+arxiv_id: "2504.09480"
 tags: ["Vision Language Model"]
 status: pending
 date_added: 2026-04-15

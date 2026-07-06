@@ -13,6 +13,8 @@ date_publish: "2025/11/12"
 venue: "arXiv"
 tags: ["imitation-learning", "RL", "task-planning"]
 url: "https://arxiv.org/abs/2511.09127"
+cite_key: wang2025history
+arxiv_id: "2511.09127"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

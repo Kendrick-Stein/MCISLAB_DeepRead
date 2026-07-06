@@ -6,6 +6,8 @@ date_publish: 2026-04-28
 venue: ACM MM 2026 (submitted)
 tags: [GUI-Agent, Benchmark, POMDP, Dynamic-Environment, VLM]
 url: "http://arxiv.org/abs/2604.25380v1"
+cite_key: liu2026benchmarking
+arxiv_id: "2604.25380"
 code:
 rating: "3"
 date_added: 2026-04-29

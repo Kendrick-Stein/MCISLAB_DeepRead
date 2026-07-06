@@ -3,6 +3,7 @@ title: "SpatialVLM: Endowing Vision-Language Models with Spatial Reasoning Capab
 authors: [Boyuan Chen, Zhuo Xu, Sean Kirmani, Brian Ichter, Danny Driess, Pete Florence, Dorsa Sadigh, Leonidas Guibas, Fei Xia]
 institutes: [Google DeepMind, MIT, Stanford University]
 date_publish: 2024-01-22
+cite_key: chen2024spatialvlm
 venue: CVPR 2024
 tags: [spatial-reasoning, VLM, embodied-reasoning]
 paper: https://arxiv.org/abs/2401.12168

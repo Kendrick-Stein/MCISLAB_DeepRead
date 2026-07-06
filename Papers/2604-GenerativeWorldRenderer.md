@@ -15,6 +15,8 @@ date_publish: "2026-04-04"
 venue: "arXiv"
 tags: ["world-model", "3D-representation", "dataset"]
 url: "https://arxiv.org/abs/2604.02329"
+cite_key: huang2026generativea
+arxiv_id: "2604.02329"
 code: ""
 rating: "3"
 date_added: "2026-06-26"

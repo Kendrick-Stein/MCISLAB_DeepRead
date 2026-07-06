@@ -6,6 +6,8 @@ date_publish: 2026-06-05
 venue: arXiv
 tags: [VLA, world-model, embodied-reasoning, task-planning]
 url: https://arxiv.org/abs/2606.07089v1
+cite_key: tang2026dreaming
+arxiv_id: "2606.07089"
 code: https://adawam.github.io/
 rating: 4
 date_added: "2026-06-08"

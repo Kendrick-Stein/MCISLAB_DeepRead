@@ -4,6 +4,7 @@ authors: ['Yujia Qin', 'Yining Ye', 'Jun‐Jie Fang', 'Haoming Wang', 'Shihao Li
 year: 2025
 venue: "ArXiv.org"
 url: "https://openalex.org/W4406755521"
+cite_key: qinui
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

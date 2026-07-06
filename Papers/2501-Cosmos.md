@@ -3,6 +3,7 @@ title: "Cosmos World Foundation Model Platform for Physical AI"
 authors: [NVIDIA Cosmos Team, Niket Agarwal, Yogesh Balaji, Ming-Yu Liu, et al.]
 institutes: [NVIDIA]
 date_publish: 2025-01-07
+cite_key: team2025cosmos
 venue: arXiv
 tags: [world-model, VLA, manipulation]
 paper: https://arxiv.org/abs/2501.03575

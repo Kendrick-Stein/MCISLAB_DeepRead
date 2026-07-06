@@ -12,6 +12,8 @@ date_publish: "2024/10/17"
 venue: "arXiv"
 tags: ["VLM", "scene-understanding", "3D-representation"]
 url: "https://arxiv.org/abs/2410.13860"
+cite_key: xu2024vlm
+arxiv_id: "2410.13860"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

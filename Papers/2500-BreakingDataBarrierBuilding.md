@@ -13,6 +13,8 @@ date_publish: "2025/04/14"
 venue: "arXiv"
 tags: ["VLM", "imitation-learning", "web-agent"]
 url: "https://arxiv.org/abs/2504.10127"
+cite_key: zhang2025breaking
+arxiv_id: "2504.10127"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

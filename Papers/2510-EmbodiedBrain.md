@@ -3,6 +3,7 @@ title: "EmbodiedBrain: Expanding Performance Boundaries of Task Planning for Emb
 authors: [Ding Zou, Feifan Wang, Mengyu Ge, Siyuan Fan, Zongbing Zhang, Wei Chen, Lingfeng Wang, Zhongyou Hu, Wenrui Yan, Zhengwei Gao, Hao Wang, Weizhao Jin, Yu Zhang, Hainan Zhao, Mingliang Zhang, Xianxian Xi, Yaru Zhang, Wenyuan Li, Zhengguang Gao, Yurui Zhu]
 institutes: [ZTE NebulaBrain Team]
 date_publish: 2025-10-23
+cite_key: zou2025embodiedbrain
 venue: arXiv
 tags: [embodied-reasoning, task-planning, agentic-RL]
 paper: https://arxiv.org/abs/2510.20578

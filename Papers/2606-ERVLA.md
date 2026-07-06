@@ -6,6 +6,8 @@ date_publish: 2026-06-02
 venue: arXiv
 tags: [VLA, embodied-reasoning, manipulation]
 url: https://arxiv.org/abs/2606.03784v2
+cite_key: sun2026revisiting
+arxiv_id: "2606.03784"
 website: https://taoshuaiz.github.io/ERVLA/
 rating: 4
 date_added: 2026-06-07

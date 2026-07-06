@@ -3,6 +3,7 @@ title: "Diffusion Policy: Visuomotor Policy Learning via Action Diffusion"
 authors: [Cheng Chi, Zhenjia Xu, Siyuan Feng, Eric Cousineau, Yilun Du, Benjamin Burchfiel, Russ Tedrake, Shuran Song]
 institutes: [Columbia University, Toyota Research Institute, MIT, Stanford University]
 date_publish: 2023-03-07
+cite_key: chi2023diffusion
 venue: RSS 2023 (extended IJRR version)
 tags: [diffusion-policy, imitation-learning, manipulation]
 paper: https://arxiv.org/abs/2303.04137

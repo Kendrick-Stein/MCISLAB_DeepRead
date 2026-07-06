@@ -12,6 +12,7 @@ date_publish: "2022-01-25"
 venue: "international journal of engineering trends and technology"
 tags: []
 url: "https://doi.org/10.14445/22315381/ijett-v70i1p215"
+cite_key: mustafa2022hmi
 code: ""
 rating: "3"
 date_added: "2026-04-08"

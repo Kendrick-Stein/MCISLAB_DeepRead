@@ -6,6 +6,8 @@ date_publish: 2026-05-15
 venue: arXiv
 tags: [gui-agent, agentic-RL]
 url: https://arxiv.org/abs/2605.15963
+cite_key: wei2026pager
+arxiv_id: "2605.15963"
 code: 
 rating: 4
 date_added: 2026-05-22

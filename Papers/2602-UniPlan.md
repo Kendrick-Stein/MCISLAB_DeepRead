@@ -3,6 +3,7 @@ title: "UniPlan: Vision-Language Task Planning for Mobile Manipulation with Unif
 authors: [Haoming Ye, Yunxiao Xiao, Cewu Lu, Panpan Cai]
 institutes: [Shanghai Jiao Tong University]
 date_publish: 2026-02-09
+cite_key: ye2026uniplan
 venue: arXiv
 tags: [task-planning, mobile-manipulation, embodied-reasoning]
 paper: https://arxiv.org/abs/2602.08537

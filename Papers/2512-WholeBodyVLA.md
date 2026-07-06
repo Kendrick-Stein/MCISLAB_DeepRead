@@ -3,6 +3,7 @@ title: "WholeBodyVLA: Towards Unified Latent VLA for Whole-Body Loco-Manipulatio
 authors: [Haoran Jiang, Jin Chen, Qingwen Bu, Li Chen, Modi Shi, Yanjie Zhang, Delong Li, Chuanzhe Suo, Chuang Wang, Zhihui Peng, Hongyang Li]
 institutes: [Fudan University, OpenDriveLab & MMLab @ HKU, AgiBot, SII]
 date_publish: 2025-12-11
+cite_key: jiang2025wholebodyvla
 venue: ICLR 2026
 tags: [VLA, mobile-manipulation, legged]
 paper: https://arxiv.org/abs/2512.11047

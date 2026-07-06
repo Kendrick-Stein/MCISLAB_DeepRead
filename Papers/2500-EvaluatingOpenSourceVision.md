@@ -11,6 +11,8 @@ date_publish: "2025/10/13"
 venue: "arXiv"
 tags: ["VLM"]
 url: "https://arxiv.org/abs/2510.11852"
+cite_key: basnet2025evaluating
+arxiv_id: "2510.11852"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

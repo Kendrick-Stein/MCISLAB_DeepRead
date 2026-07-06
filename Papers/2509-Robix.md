@@ -3,6 +3,7 @@ title: "Robix: A Unified Model for Robot Interaction, Reasoning and Planning"
 authors: [Huang Fang, Mengxi Zhang, Heng Dong, Wei Li, Zixuan Wang, Qifeng Zhang, Xueyun Tian, Yucheng Hu, Hang Li]
 institutes: [ByteDance Seed]
 date_publish: 2025-09
+cite_key: fang2025robix
 venue: arXiv
 tags: [embodied-reasoning, task-planning, VLM]
 paper: https://arxiv.org/abs/2509.01106

@@ -3,6 +3,7 @@ title: "HY-Embodied-0.5: Embodied Foundation Models for Real-World Agents"
 authors: [Tencent Robotics X, HY Vision Team]
 institutes: [Tencent]
 date_publish: 2026-04
+cite_key: x2026hy
 venue: arXiv
 tags: [VLM, spatial-reasoning, VLA]
 paper: https://arxiv.org/abs/2604.07430

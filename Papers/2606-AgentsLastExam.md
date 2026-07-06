@@ -6,6 +6,8 @@ date_publish: "2026-06-03"
 venue: "arXiv:2606.05405"
 tags: [computer-use, gui-agent, LLM]
 url: "https://arxiv.org/abs/2606.05405"
+cite_key: sun2026agents
+arxiv_id: "2606.05405"
 code: "https://github.com/rdi-berkeley/agents-last-exam"
 rating: "2"
 date_added: "2026-06-23"

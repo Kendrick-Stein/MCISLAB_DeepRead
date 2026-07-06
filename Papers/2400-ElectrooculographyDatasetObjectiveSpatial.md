@@ -11,6 +11,8 @@ date_publish: "2024/11/11"
 venue: "arXiv"
 tags: ["navigation"]
 url: "https://arxiv.org/abs/2411.06811"
+cite_key: zibandehpoor2024electrooculography
+arxiv_id: "2411.06811"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

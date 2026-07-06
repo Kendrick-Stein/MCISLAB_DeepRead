@@ -4,6 +4,8 @@ authors: ['Xuehui Wang', 'Zhenyu Wu', 'JingJing Xie', 'Zichen Ding', 'Bowen Yang
 year: 2025
 venue: "None"
 url: "http://arxiv.org/abs/2507.19478v1"
+cite_key: wang2025mmbench
+arxiv_id: "2507.19478"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

@@ -6,6 +6,8 @@ date_publish: 2026-05-18
 venue: arXiv
 tags: ["auto-research", "LLM"]
 url: "https://arxiv.org/abs/2605.18661"
+cite_key: kong2026ai
+arxiv_id: "2605.18661"
 code: "https://github.com/worldbench/awesome-ai-auto-research"
 rating: 4
 date_added: 2026-05-25

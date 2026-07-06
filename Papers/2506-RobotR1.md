@@ -3,6 +3,7 @@ title: "Robot-R1: Reinforcement Learning for Enhanced Embodied Reasoning in Robo
 authors: [Dongyoung Kim, Sumin Park, Huiwon Jang, Jinwoo Shin, Jaehyung Kim, Younggyo Seo]
 institutes: [KAIST, Yonsei University, UC Berkeley, RLWRLD]
 date_publish: 2025-05-29
+cite_key: kim2025robot
 venue: NeurIPS 2025
 tags: [embodied-reasoning, agentic-RL, VLM]
 paper: https://arxiv.org/abs/2506.00070

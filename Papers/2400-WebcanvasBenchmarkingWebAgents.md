@@ -17,6 +17,8 @@ date_publish: "2024/06/18"
 venue: "arXiv"
 tags: ["imitation-learning", "RL", "scene-understanding"]
 url: "https://arxiv.org/abs/2406.12373"
+cite_key: pan2024webcanvas
+arxiv_id: "2406.12373"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

@@ -3,6 +3,7 @@ title: "Pelican-VL 1.0: A Foundation Brain Model for Embodied Intelligence"
 authors: [Yi Zhang, Che Liu, Xiancong Ren, Hanchu Ni, Shuai Zhang, Zeyuan Ding, Jiayu Hu, Haozhe Shan, Zhenwei Niu, Zhaoyang Liu, Shuang Liu, Yue Zhao, Junbo Qi, Qinfan Zhang, Dengjie Li, Yidong Wang, Jiachen Luo, Zenglin Xu, Bin Shen, Qifan Wang, Yong Dai, Jian Tang, Xiaozhu Ju]
 institutes: [Beijing Innovation Center of Humanoid Robotics (X-Humanoid)]
 date_publish: 2025-11
+cite_key: zhang2025pelican
 venue: arXiv
 tags: [VLA, spatial-reasoning, agentic-RL]
 paper: https://arxiv.org/abs/2511.00108

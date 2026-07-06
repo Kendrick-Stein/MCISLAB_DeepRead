@@ -14,6 +14,8 @@ date_publish: "2025/05/22"
 venue: "arXiv"
 tags: ["navigation", "scene-understanding", "web-agent"]
 url: "https://arxiv.org/abs/2505.16827"
+cite_key: xie2025gui
+arxiv_id: "2505.16827"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

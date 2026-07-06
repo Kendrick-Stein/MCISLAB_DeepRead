@@ -6,6 +6,8 @@ date_publish: "2025/08/25"
 venue: "arXiv"
 tags: ["VLM", "navigation", "imitation-learning"]
 url: "https://arxiv.org/abs/2508.19294"
+cite_key: sapkota2025object
+arxiv_id: "2508.19294"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

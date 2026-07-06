@@ -6,6 +6,8 @@ date_publish: 2026-06-02
 venue: arXiv
 tags: [VLA, manipulation, spatial-reasoning]
 url: https://arxiv.org/abs/2606.03240v1
+cite_key: chen2026geoalign
+arxiv_id: "2606.03240"
 code:
 rating: "4"
 date_added: 2026-06-07

@@ -18,6 +18,8 @@ tags:
   - manipulation
   - diffusion-policy
 url: "http://arxiv.org/abs/2604.26848v1"
+cite_key: tian2026starry
+arxiv_id: "2604.26848"
 code:
 rating: "4"
 date_added: "2026-04-30"

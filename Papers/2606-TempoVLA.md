@@ -6,6 +6,8 @@ date_publish: 2026-06-04
 venue: arXiv
 tags: [VLA, manipulation, imitation-learning]
 url: https://arxiv.org/abs/2606.06491
+cite_key: jing2026tempovla
+arxiv_id: "2606.06491"
 code:
 rating: 4
 date_added: 2026-06-07

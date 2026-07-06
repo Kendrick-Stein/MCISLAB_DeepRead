@@ -6,6 +6,8 @@ date_publish: "2026-05-07"
 venue: arXiv
 tags: [world-model, manipulation, VLA]
 url: "https://arxiv.org/abs/2605.06481"
+cite_key: liu2026oa
+arxiv_id: "2605.06481"
 code:
 rating: 3
 date_added: "2026-05-12"

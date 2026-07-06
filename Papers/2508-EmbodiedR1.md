@@ -3,6 +3,7 @@ title: "Embodied-R1: Reinforced Embodied Reasoning for General Robotic Manipulat
 authors: [Yifu Yuan, Haiqin Cui, Yaoting Huang, Yibin Chen, Fei Ni, Zibin Dong, Pengyi Li, Yan Zheng, Hongyao Tang, Jianye Hao]
 institutes: [Tianjin University]
 date_publish: 2025-08-19
+cite_key: yuan2025embodied
 venue: ICLR 2026
 tags: [embodied-reasoning, VLA, agentic-RL, manipulation, spatial-reasoning]
 paper: https://arxiv.org/abs/2508.13998

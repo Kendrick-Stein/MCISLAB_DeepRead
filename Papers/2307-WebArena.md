@@ -3,6 +3,7 @@ title: "WebArena: A Realistic Web Environment for Building Autonomous Agents"
 authors: [Shuyan Zhou, Frank F. Xu, Hao Zhu, Xuhui Zhou, Robert Lo, Abishek Sridhar, Xianyi Cheng, Tianyue Ou, Yonatan Bisk, Daniel Fried, Uri Alon, Graham Neubig]
 institutes: [CMU, Inspired Cognition]
 date_publish: 2023-07-25
+cite_key: zhou2023webarena
 venue: ICLR 2024
 tags: [web-agent, LLM, computer-use]
 paper: https://arxiv.org/abs/2307.13854

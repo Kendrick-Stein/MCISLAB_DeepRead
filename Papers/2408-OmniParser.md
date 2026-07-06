@@ -3,6 +3,7 @@ title: "OmniParser for Pure Vision Based GUI Agent"
 authors: [Yadong Lu, Jianwei Yang, Yelong Shen, Ahmed Awadallah]
 institutes: [Microsoft Research, Microsoft Gen AI]
 date_publish: 2024-08-01
+cite_key: lu2024omniparser
 venue: arXiv
 tags: [gui-agent, computer-use, VLM]
 paper: https://arxiv.org/abs/2408.00203

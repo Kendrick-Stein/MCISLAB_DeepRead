@@ -15,6 +15,8 @@ date_publish: "2025/06/17"
 venue: "arXiv"
 tags: ["imitation-learning", "web-agent"]
 url: "https://arxiv.org/abs/2506.14477"
+cite_key: yang2025gui
+arxiv_id: "2506.14477"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

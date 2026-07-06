@@ -12,6 +12,8 @@ date_publish: "2025/03/30"
 venue: "arXiv"
 tags: ["web-agent"]
 url: "https://arxiv.org/abs/2503.23434"
+cite_key: shi2025trustworthy
+arxiv_id: "2503.23434"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

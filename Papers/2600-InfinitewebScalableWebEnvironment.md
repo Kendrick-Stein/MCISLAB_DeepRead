@@ -13,6 +13,8 @@ date_publish: "2026/01/07"
 venue: "arXiv"
 tags: ["imitation-learning", "RL", "web-agent"]
 url: "https://arxiv.org/abs/2601.04126"
+cite_key: zhang2026infiniteweb
+arxiv_id: "2601.04126"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

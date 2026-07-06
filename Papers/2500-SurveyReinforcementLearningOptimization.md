@@ -6,6 +6,8 @@ date_publish: "2025/02/13"
 venue: "arXiv"
 tags: ["RL", "cross-embodiment"]
 url: "https://arxiv.org/abs/2502.09417"
+cite_key: farooq2025survey
+arxiv_id: "2502.09417"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

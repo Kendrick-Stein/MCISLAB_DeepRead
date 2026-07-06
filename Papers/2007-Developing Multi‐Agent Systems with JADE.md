@@ -4,6 +4,7 @@ authors: ['Fabio Bellifemine', 'Giovanni Caire', 'Dominic Greenwood']
 year: 2007
 venue: "None"
 url: "https://openalex.org/W1904065432"
+cite_key: bellifeminedeveloping
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

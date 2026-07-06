@@ -11,6 +11,8 @@ date_publish: "2025/09/22"
 venue: "arXiv"
 tags: ["imitation-learning"]
 url: "https://arxiv.org/abs/2509.17337"
+cite_key: jararweh2025llavul
+arxiv_id: "2509.17337"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

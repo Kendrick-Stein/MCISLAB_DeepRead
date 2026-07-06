@@ -6,6 +6,8 @@ date_publish: 2026-05
 venue: arXiv
 tags: [computer-use, gui-agent]
 url: https://arxiv.org/abs/2605.19769
+cite_key: wei2026opencomputer
+arxiv_id: "2605.19769"
 code: 
 rating: 4
 date_added: 2026-05-22

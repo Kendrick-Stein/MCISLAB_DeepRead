@@ -24,6 +24,8 @@ date_publish: "2025/06/03"
 venue: "arXiv"
 tags: ["VLM", "navigation", "imitation-learning"]
 url: "https://arxiv.org/abs/2506.03143"
+cite_key: wu2025gui
+arxiv_id: "2506.03143"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

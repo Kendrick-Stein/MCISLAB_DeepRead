@@ -14,6 +14,8 @@ date_publish: "2025/05/01"
 venue: "arXiv"
 tags: ["imitation-learning", "scene-understanding", "web-agent"]
 url: "https://arxiv.org/abs/2505.00416"
+cite_key: huang2025scaletrack
+arxiv_id: "2505.00416"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

@@ -7,6 +7,7 @@ date_publish: "2024"
 venue: "arXiv"
 tags: ["manifold", "optimization", "riemannian", "deep-learning"]
 url: ""
+cite_key: authors2024riemannian
 code: ""
 rating: "3"
 date_added: "2026-04-28"

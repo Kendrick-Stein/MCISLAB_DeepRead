@@ -25,6 +25,8 @@ date_publish: "2026/03/31"
 venue: "arXiv"
 tags: ["navigation", "imitation-learning", "scene-understanding"]
 url: "https://arxiv.org/abs/2603.29620"
+cite_key: chen2026unify
+arxiv_id: "2603.29620"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

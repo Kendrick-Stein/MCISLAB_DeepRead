@@ -25,6 +25,8 @@ tags:
   - world-model
   - embodied-reasoning
 url: https://arxiv.org/abs/2606.04627
+cite_key: yang2026mirage
+arxiv_id: "2606.04627"
 code:
 rating: 4
 date_added: 2026-06-07

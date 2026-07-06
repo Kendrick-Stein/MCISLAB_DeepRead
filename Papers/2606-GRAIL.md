@@ -6,6 +6,8 @@ date_publish: "2026-06-03"
 venue: arXiv
 tags: [imitation-learning, manipulation, VLA, 3D-representation]
 url: https://arxiv.org/abs/2606.05160
+cite_key: xie2026grail
+arxiv_id: "2606.05160"
 code: https://research.nvidia.com/labs/dair/grail/
 rating: 4
 date_added: "2026-06-08"

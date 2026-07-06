@@ -3,6 +3,7 @@ title: "PROSPECT: Unified Streaming Vision-Language Navigation via Semantic–Sp
 authors: [Zehua Fan, Wenqi Lyu, Wenxuan Song, Linge Zhao, Yifei Yang, Xi Wang, Junjie He, Lida Huang, Haiyan Liu, Bingchuan Sun, Guangjun Bao, Xuanyao Mao, Liang Xu, Yan Wang, Feng Gao]
 institutes: [Shanghai Jiao Tong University, Tsinghua University, University of Adelaide, Wuhan University, HKUST(GZ), Beijing Jiaotong University, Lenovo]
 date_publish: 2026-03-04
+cite_key: fan2026prospect
 venue: arXiv
 tags: [VLN, VLA, world-model, spatial-reasoning]
 paper: https://arxiv.org/abs/2603.03739

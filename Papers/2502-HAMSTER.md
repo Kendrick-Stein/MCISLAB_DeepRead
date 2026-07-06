@@ -3,6 +3,7 @@ title: "HAMSTER: Hierarchical Action Models For Open-World Robot Manipulation"
 authors: [Yi Li, Yuquan Deng, Jesse Zhang, Joel Jang, Marius Memmel, Raymond Yu, Caelan Garrett, Fabio Ramos, Dieter Fox, Anqi Li, Abhishek Gupta, Ankit Goyal]
 institutes: [NVIDIA, University of Washington, University of Southern California]
 date_publish: 2025-02-08
+cite_key: li2025hamster
 venue: ICLR 2025
 tags: [VLA, manipulation, task-planning]
 paper: https://arxiv.org/abs/2502.05485

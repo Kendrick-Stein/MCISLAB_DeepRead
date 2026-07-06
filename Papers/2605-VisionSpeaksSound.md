@@ -6,6 +6,8 @@ date_publish: "2026-05"
 venue: arXiv
 tags: [VLM, video-LLM, agentic-RL]
 url: https://arxiv.org/abs/2605.16403
+cite_key: wen2026when
+arxiv_id: "2605.16403"
 code:
 rating: 4
 date_added: "2026-05-25"

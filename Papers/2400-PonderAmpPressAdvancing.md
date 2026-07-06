@@ -10,6 +10,8 @@ date_publish: "2024/12/02"
 venue: "arXiv"
 tags: ["imitation-learning", "scene-understanding", "web-agent"]
 url: "https://arxiv.org/abs/2412.01268"
+cite_key: wang2024ponder
+arxiv_id: "2412.01268"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

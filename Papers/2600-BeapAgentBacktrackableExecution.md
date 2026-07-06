@@ -12,6 +12,8 @@ date_publish: "2026/01/29"
 venue: "arXiv"
 tags: ["navigation", "task-planning", "web-agent"]
 url: "https://arxiv.org/abs/2601.21352"
+cite_key: lu2026beap
+arxiv_id: "2601.21352"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

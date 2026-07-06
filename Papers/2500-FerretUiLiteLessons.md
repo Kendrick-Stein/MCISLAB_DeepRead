@@ -22,6 +22,8 @@ date_publish: "2025/09/30"
 venue: "arXiv"
 tags: ["navigation", "RL", "scene-understanding"]
 url: "https://arxiv.org/abs/2509.26539"
+cite_key: yang2025ferret
+arxiv_id: "2509.26539"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

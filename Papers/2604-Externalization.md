@@ -27,6 +27,8 @@ date_publish: "2026-04-09"
 venue: "arXiv"
 tags: ["agentic-RL", "task-planning", "world-model"]
 url: "https://arxiv.org/abs/2604.08224"
+cite_key: zhou2026externalization
+arxiv_id: "2604.08224"
 code: ""
 rating: "3"
 date_added: "2026-06-26"

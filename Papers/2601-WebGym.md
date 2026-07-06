@@ -6,6 +6,8 @@ date_publish: 2026-01-05
 venue: arXiv
 tags: [web-agent, agentic-RL, gui-agent]
 url: https://arxiv.org/abs/2601.02439
+cite_key: bai2026webgym
+arxiv_id: "2601.02439"
 code: https://github.com/microsoft/webgym/tree/webgym
 rating: "4"
 date_added: 2026-06-23

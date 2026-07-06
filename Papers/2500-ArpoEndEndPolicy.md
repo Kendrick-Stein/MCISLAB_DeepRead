@@ -11,6 +11,8 @@ date_publish: "2025/05/22"
 venue: "arXiv"
 tags: ["VLA", "imitation-learning", "RL"]
 url: "https://arxiv.org/abs/2505.16282"
+cite_key: lu2025arpo
+arxiv_id: "2505.16282"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

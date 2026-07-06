@@ -3,6 +3,7 @@ title: "OpenCUA: Open Foundations for Computer-Use Agents"
 authors: [Xinyuan Wang, Bowen Wang, Dunjie Lu, Junlin Yang, Tianbao Xie, Junli Wang, Jiaqi Deng, Xiaole Guo, Yiheng Xu, Chen Henry Wu, Zhennan Shen, Zhuokai Li, Ryan Li, Xiaochuan Li, Junda Chen, Boyuan Zheng, Peihang Li, Fangyu Lei, Ruisheng Cao, Yeqiao Fu, Dongchan Shin, Martin Shin, Jiarui Hu, Yuyan Wang, Jixuan Chen, Yuxiao Ye, Danyang Zhang, Dikang Du, Hao Hu, Huarong Chen, Zaida Zhou, Haotian Yao, Ziwei Chen, Qizheng Gu, Yipu Wang, Heng Wang, Diyi Yang, Victor Zhong, Flood Sung, Zhilin Yang, Tao Yu]
 institutes: [XLANG Lab - The University of Hong Kong, Moonshot AI, Stanford University, University of Waterloo, Carnegie Mellon University]
 date_publish: 2025-08-12
+cite_key: wang2025opencua
 venue: "NeurIPS 2025 Spotlight"
 tags: [computer-use, gui-agent, VLM, imitation-learning]
 paper: https://arxiv.org/abs/2508.09123

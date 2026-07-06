@@ -6,6 +6,8 @@ date_publish: 2026-06-05
 venue: arXiv
 tags: [VLA, task-planning, manipulation]
 url: http://arxiv.org/abs/2606.07107v1
+cite_key: wu2026coarse
+arxiv_id: "2606.07107"
 code: 
 rating: 4
 date_added: 2026-06-08

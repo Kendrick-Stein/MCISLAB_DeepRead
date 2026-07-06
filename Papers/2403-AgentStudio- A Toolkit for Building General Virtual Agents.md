@@ -4,6 +4,8 @@ authors: ['Longtao Zheng', 'Zhiyuan Huang', 'Zhenghai Xue', 'Xinrun Wang', 'Bo A
 year: 2024
 venue: "None"
 url: "http://arxiv.org/abs/2403.17918v3"
+cite_key: zheng2024agentstudio
+arxiv_id: "2403.17918"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

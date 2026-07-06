@@ -6,6 +6,8 @@ date_publish: 2026-05-20
 venue: arXiv
 tags: [VLM, agentic-RL]
 url: https://arxiv.org/abs/2605.20682
+cite_key: tan2026indusagent
+arxiv_id: "2605.20682"
 code:
 rating: 3
 date_added: 2026-05-25

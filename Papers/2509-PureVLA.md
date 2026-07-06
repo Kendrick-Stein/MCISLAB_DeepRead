@@ -3,6 +3,7 @@ title: "Pure Vision-Language-Action (VLA) Models: A Comprehensive Survey"
 authors: [Dapeng Zhang, Jing Sun, Chenghui Hu, Xiaoyan Wu, Zhenlong Yuan, Rui Zhou, Fei Shen, Qingguo Zhou]
 institutes: [Lanzhou University, National University of Singapore, ICT CAS]
 date_publish: 2025-09-23
+cite_key: zhang2025pure
 venue: arXiv
 tags: [VLA, manipulation, embodied-reasoning]
 paper: https://arxiv.org/abs/2509.19012

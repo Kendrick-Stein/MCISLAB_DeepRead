@@ -16,6 +16,8 @@ date_publish: "2026-04-18"
 venue: "arXiv"
 tags: ["spatial-reasoning", "agentic-RL", "VLM"]
 url: "https://arxiv.org/abs/2604.14144"
+cite_key: li2026spatialevo
+arxiv_id: "2604.14144"
 code: "https://github.com/ZJU-REAL/SpatialEvo"
 rating: "4"
 date_added: "2026-06-26"

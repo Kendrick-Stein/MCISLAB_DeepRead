@@ -19,6 +19,8 @@ tags:
   - agentic-RL
   - RL
 url: "https://arxiv.org/abs/2605.05112v1"
+cite_key: zhu2026rollout
+arxiv_id: "2605.05112"
 code:
 rating: 4
 date_added: "2026-05-07"

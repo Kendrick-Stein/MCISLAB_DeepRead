@@ -21,6 +21,8 @@ date_publish: "2025/08/03"
 venue: "arXiv"
 tags: ["VLM", "imitation-learning", "scene-understanding"]
 url: "https://arxiv.org/abs/2508.01858"
+cite_key: guo2025web
+arxiv_id: "2508.01858"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

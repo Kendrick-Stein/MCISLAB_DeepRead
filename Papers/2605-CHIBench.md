@@ -6,6 +6,8 @@ date_publish: "2026-05"
 venue: arXiv
 tags: [gui-agent, agentic-RL, LLM]
 url: https://arxiv.org/abs/2605.16679
+cite_key: chen2026chi
+arxiv_id: "2605.16679"
 code: https://github.com/actava-ai/chi-bench
 rating: 4
 date_added: "2026-05-25"

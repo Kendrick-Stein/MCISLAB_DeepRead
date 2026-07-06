@@ -3,6 +3,7 @@ title: "BEHAVIOR-1K: A Human-Centered, Embodied AI Benchmark with 1,000 Everyday
 authors: [Chengshu Li, Ruohan Zhang, Josiah Wong, Cem Gokmen, Sanjana Srivastava, Roberto Martín-Martín, Chen Wang, Gabrael Levine, Wensi Ai, Li Fei-Fei]
 institutes: [Stanford University, UT Austin, UIUC, USC, Salesforce Research]
 date_publish: 2024-03
+cite_key: li2024behavior
 venue: CoRL 2022 / arXiv 2024
 tags: [mobile-manipulation, task-planning]
 paper: https://arxiv.org/abs/2403.09227

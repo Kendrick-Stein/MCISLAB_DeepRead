@@ -4,6 +4,7 @@ authors: ['Christian Derksen', 'Cherif Branki', 'Rainer Unland']
 year: 2011
 venue: "Federated Conference on Computer Science and Information Systems"
 url: "https://openalex.org/W1498303508"
+cite_key: derksenagent
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

@@ -6,6 +6,8 @@ date_publish: "2026-06-08"
 venue: "arXiv"
 tags: [agentic-RL, computer-use, gui-agent]
 url: "https://arxiv.org/abs/2605.25624"
+cite_key: wang2026cua
+arxiv_id: "2605.25624"
 code: "https://github.com/xlang-ai/CUA-Gym"
 rating: "5"
 date_added: "2026-06-24"

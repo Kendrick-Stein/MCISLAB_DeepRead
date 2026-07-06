@@ -10,6 +10,8 @@ date_publish: "2024/01/29"
 venue: "arXiv"
 tags: []
 url: "https://arxiv.org/abs/2401.16216"
+cite_key: berges2024mechanism
+arxiv_id: "2401.16216"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

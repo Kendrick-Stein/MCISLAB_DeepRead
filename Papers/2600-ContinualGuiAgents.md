@@ -13,6 +13,8 @@ date_publish: "2026/01/28"
 venue: "arXiv"
 tags: ["RL", "scene-understanding", "web-agent"]
 url: "https://arxiv.org/abs/2601.20732"
+cite_key: liu2026continual
+arxiv_id: "2601.20732"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

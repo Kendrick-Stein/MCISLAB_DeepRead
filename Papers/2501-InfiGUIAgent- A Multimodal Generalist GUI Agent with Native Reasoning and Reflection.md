@@ -4,6 +4,8 @@ authors: ['Yuhang Liu', 'Pengxiang Li', 'Zishu Wei', 'Congkai Xie', 'Xueyu Hu', 
 year: 2025
 venue: "None"
 url: "http://arxiv.org/abs/2501.04575v1"
+cite_key: liu2025infiguiagent
+arxiv_id: "2501.04575"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

@@ -3,6 +3,7 @@ title: "Dynamic Open-Vocabulary 3D Scene Graphs for Long-term Language-Guided Mo
 authors: [Zhijie Yan, Shufei Li, Zuoxu Wang, Lixiu Wu, Han Wang, Jun Zhu, Lijiang Chen, Jihong Liu]
 institutes: [Beihang University, City University of Hong Kong, Minzu University of China, Afanti Tech LLC]
 date_publish: 2024-10-16
+cite_key: yan2024dynamic
 venue: RA-L 2025
 tags: [mobile-manipulation, scene-understanding, semantic-map, task-planning]
 paper: https://arxiv.org/abs/2410.11989

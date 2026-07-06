@@ -7,6 +7,7 @@ date_publish: "2025-03"
 venue: "arXiv"
 tags: ["hyperbolic", "attention", "transformer", "long-range"]
 url: ""
+cite_key: authors2025hyperbolica
 code: ""
 rating: "3"
 date_added: "2026-04-28"

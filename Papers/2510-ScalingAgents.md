@@ -3,6 +3,7 @@ title: "The Unreasonable Effectiveness of Scaling Agents for Computer Use"
 authors: [Gonzalo Gonzalez-Pumariega, Vincent Tu, Chih-Lun Lee, Jiachen Yang, Ang Li, Xin Eric Wang]
 institutes: [Simular Research]
 date_publish: 2025-10-02
+cite_key: gonzalezpumariega2025unreasonable
 venue: arXiv preprint (ICML submission)
 tags: [computer-use, gui-agent, LLM]
 paper: https://arxiv.org/abs/2510.02250

@@ -10,6 +10,7 @@ date_publish: "2025-01-01"
 venue: "Unknown"
 tags: ["web-agent"]
 url: ""
+cite_key: wang2025inreact
 code: ""
 rating: "3"
 date_added: "2026-04-21"

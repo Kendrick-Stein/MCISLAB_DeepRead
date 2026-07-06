@@ -4,6 +4,7 @@ authors: ['Congmin Zheng', 'Xiaoyun Mo', 'Xinbei Ma', 'Qiqiang Lin', 'Yin Zhao',
 year: 2026
 venue: "arXiv (Cornell University)"
 url: "https://openalex.org/W7128864794"
+cite_key: zhengadaptive
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

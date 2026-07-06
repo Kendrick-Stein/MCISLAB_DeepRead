@@ -6,6 +6,7 @@ date_publish: "2025-03-31"
 venue: "Unknown"
 tags: []
 url: ""
+cite_key: tomic2025evaluation
 code: ""
 rating: "3"
 date_added: "2026-04-21"

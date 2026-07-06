@@ -48,6 +48,8 @@ date_publish: "2026-04-24"
 venue: "arXiv"
 tags: ["world-model", "gui-agent", "agentic-RL"]
 url: "https://arxiv.org/abs/2604.22748"
+cite_key: chu2026agentic
+arxiv_id: "2604.22748"
 code: ""
 rating: "5"
 date_added: "2026-06-26"

@@ -6,6 +6,7 @@ date_publish: "2023-11-15"
 venue: "arXiv (Cornell University)"
 tags: []
 url: ""
+cite_key: yoon2023autonomous
 code: ""
 rating: "3"
 date_added: "2026-04-21"

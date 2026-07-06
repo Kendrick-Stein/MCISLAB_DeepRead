@@ -6,6 +6,8 @@ date_publish: 2026-05-04
 venue: arXiv
 tags: ["gui-agent", "VLM", "computer-use"]
 url: "https://arxiv.org/abs/2605.02630v1"
+cite_key: yao2026autofocus
+arxiv_id: "2605.02630"
 code: "https://github.com/Mr-Bigworth/AutoFocus"
 rating: "3"
 date_added: 2026-05-05

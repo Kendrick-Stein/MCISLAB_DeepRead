@@ -10,6 +10,8 @@ date_publish: "2013/11/20"
 venue: "arXiv"
 tags: []
 url: "https://arxiv.org/abs/1311.5108"
+cite_key: soyez2013methodology
+arxiv_id: "1311.5108"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

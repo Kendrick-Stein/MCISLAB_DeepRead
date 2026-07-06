@@ -3,6 +3,7 @@ title: "EchoVLA: Synergistic Declarative Memory for VLA-Driven Mobile Manipulati
 authors: [Min Lin, Xiwen Liang, Bingqian Lin, Liu Jingzhi, Zijian Jiao, Kehan Li, Yu Sun, Weijia Liufu, Yuhan Ma, Yuecheng Liu, Shen Zhao, Yuzheng Zhuang, Xiaodan Liang]
 institutes: [Sun Yat-sen University (Shenzhen), Shanghai Jiao Tong University, Huawei Noah's Ark Lab]
 date_publish: 2025-11-22
+cite_key: lin2025echovla
 venue: arXiv preprint
 tags: [mobile-manipulation, VLA, spatial-memory]
 paper: https://arxiv.org/abs/2511.18112

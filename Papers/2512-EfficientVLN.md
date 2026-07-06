@@ -3,6 +3,7 @@ title: "Efficient-VLN: A Training-Efficient Vision-Language Navigation Model"
 authors: [Duo Zheng, Shijia Huang, Yanyang Li, Liwei Wang]
 institutes: [The Chinese University of Hong Kong]
 date_publish: 2025-12-12
+cite_key: zheng2025efficient
 venue: arXiv 2512.10310
 tags: [VLN, navigation, video-LLM]
 paper: https://arxiv.org/abs/2512.10310

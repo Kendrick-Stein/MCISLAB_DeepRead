@@ -21,6 +21,7 @@ date_publish: "2024-11-07"
 venue: "arXiv (Cornell University)"
 tags: ["web-agent"]
 url: ""
+cite_key: wang2024gui
 code: ""
 rating: "3"
 date_added: "2026-04-21"

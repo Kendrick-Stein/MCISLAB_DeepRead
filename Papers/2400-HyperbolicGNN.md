@@ -7,6 +7,7 @@ date_publish: "2024"
 venue: "arXiv/NeurIPS"
 tags: ["hyperbolic", "GNN", "manifold", "graph"]
 url: ""
+cite_key: authors2024hyperbolic
 code: ""
 rating: "3"
 date_added: "2026-04-28"

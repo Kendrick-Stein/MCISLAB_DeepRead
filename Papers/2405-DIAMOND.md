@@ -3,6 +3,7 @@ title: "Diffusion for World Modeling: Visual Details Matter in Atari"
 authors: [Eloi Alonso, Adam Jelley, Vincent Micheli, Anssi Kanervisto, Amos Storkey, Tim Pearce, François Fleuret]
 institutes: [University of Geneva, University of Edinburgh, Microsoft Research]
 date_publish: 2024-05-20
+cite_key: alonso2024diffusion
 venue: NeurIPS 2024 (Spotlight)
 tags: [world-model, RL, diffusion-policy]
 paper: https://arxiv.org/abs/2405.12399

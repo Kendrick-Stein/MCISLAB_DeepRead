@@ -3,6 +3,7 @@ title: "BUMBLE: Unifying Reasoning and Acting with Vision-Language Models for Bu
 authors: [Rutav Shah, Albert Yu, Yifeng Zhu, Yuke Zhu, Roberto Martín-Martín]
 institutes: [UT Austin]
 date_publish: 2024-10-08
+cite_key: shah2024bumble
 venue: ICRA 2025
 tags: [mobile-manipulation, embodied-reasoning, task-planning]
 paper: https://arxiv.org/abs/2410.06237

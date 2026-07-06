@@ -10,6 +10,8 @@ date_publish: "2026-06-22"
 venue: arXiv
 tags: [computer-use, gui-agent]
 url: "https://arxiv.org/abs/2606.23189"
+cite_key: goel2026capable
+arxiv_id: "2606.23189"
 code: "https://github.com/UKPLab/arxiv2026-agentcibench"
 rating: "4"
 date_added: "2026-06-25"

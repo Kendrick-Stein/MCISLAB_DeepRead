@@ -6,6 +6,8 @@ date_publish: "2014/04/27"
 venue: "arXiv"
 tags: ["navigation"]
 url: "https://arxiv.org/abs/1404.6776"
+cite_key: mishra2014inventions
+arxiv_id: "1404.6776"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

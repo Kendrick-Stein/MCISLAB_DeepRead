@@ -12,6 +12,8 @@ date_publish: "2025/11/20"
 venue: "arXiv"
 tags: ["imitation-learning", "web-agent"]
 url: "https://arxiv.org/abs/2511.16590"
+cite_key: chen2025gara
+arxiv_id: "2511.16590"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

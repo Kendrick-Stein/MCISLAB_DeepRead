@@ -6,6 +6,8 @@ date_publish: "2026-06"
 venue: "arXiv"
 tags: [computer-use, gui-agent, agentic-RL]
 url: "https://arxiv.org/abs/2606.09426"
+cite_key: li2026weavebench
+arxiv_id: "2606.09426"
 code:
 rating: "4"
 date_added: "2026-06-22"

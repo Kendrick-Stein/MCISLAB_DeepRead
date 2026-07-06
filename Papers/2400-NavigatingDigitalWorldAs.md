@@ -14,6 +14,8 @@ date_publish: "2024/10/07"
 venue: "arXiv"
 tags: ["VLM", "scene-understanding", "web-agent"]
 url: "https://arxiv.org/abs/2410.05243"
+cite_key: gou2024navigating
+arxiv_id: "2410.05243"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

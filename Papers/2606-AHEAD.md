@@ -14,6 +14,8 @@ tags:
   - world-model
   - manipulation
 url: https://arxiv.org/abs/2606.02486v1
+cite_key: syed2026intercepting
+arxiv_id: "2606.02486"
 code:
 rating: 4
 date_added: 2026-06-07

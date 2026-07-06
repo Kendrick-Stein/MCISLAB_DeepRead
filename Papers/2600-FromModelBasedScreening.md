@@ -10,6 +10,8 @@ date_publish: "2026/04/03"
 venue: "arXiv"
 tags: ["navigation"]
 url: "https://arxiv.org/abs/2604.03350"
+cite_key: saves2026model
+arxiv_id: "2604.03350"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

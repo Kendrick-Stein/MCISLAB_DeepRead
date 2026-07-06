@@ -6,6 +6,8 @@ date_publish: "2026-05-24"
 venue: "arXiv"
 tags: [computer-use, web-agent, gui-agent]
 url: "https://arxiv.org/abs/2605.15777"
+cite_key: shi2026saas
+arxiv_id: "2605.15777"
 code: "https://github.com/UniPat-AI/SaaS-Bench"
 rating: "4"
 date_added: "2026-06-24"

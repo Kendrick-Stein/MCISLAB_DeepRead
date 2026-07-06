@@ -6,6 +6,8 @@ date_publish: 2026-06-02
 venue: arXiv
 tags: ["agentic-RL", "navigation", "VLM"]
 url: https://arxiv.org/abs/2606.03963v2
+cite_key: khan2026agenticrl
+arxiv_id: "2606.03963"
 code:
 rating: 4
 date_added: 2026-06-07

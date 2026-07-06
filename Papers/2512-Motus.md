@@ -3,6 +3,7 @@ title: "Motus: A Unified Latent Action World Model"
 authors: [Hongzhe Bi, Hengkai Tan, Shenghao Xie, Zeyuan Wang, Shuhe Huang, Haitian Liu, Ruowen Zhao, Yao Feng, Chendong Xiang, Yinze Rong, Hongyan Zhao, Hanyu Liu, Zhizhong Su, Lei Ma, Hang Su, Jun Zhu]
 institutes: [Tsinghua University, Shengshu, Peking University, Horizon Robotics]
 date_publish: 2025-12-15
+cite_key: bi2025motus
 venue: arXiv preprint
 tags: [VLA, world-model, flow-matching]
 paper: https://arxiv.org/abs/2512.13030

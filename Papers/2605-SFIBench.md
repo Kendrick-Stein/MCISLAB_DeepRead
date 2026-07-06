@@ -27,6 +27,8 @@ tags:
   - VLM
   - video-understanding
 url: https://arxiv.org/abs/2605.02130v1
+cite_key: zhang2026where
+arxiv_id: "2605.02130"
 code: ""
 rating: "3"
 date_added: "2026-05-05"

@@ -4,6 +4,7 @@ authors: ['Mi Chen', 'Lynda Mokdad', 'Jalel Ben‐Othman', 'Jean-Michel Fourneau
 year: 2021
 venue: "2021 IEEE Symposium on Computers and Communications (ISCC)"
 url: "https://openalex.org/W4200046330"
+cite_key: chenmulane
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

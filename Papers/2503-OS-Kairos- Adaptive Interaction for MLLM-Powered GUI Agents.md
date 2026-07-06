@@ -4,6 +4,8 @@ authors: ['Pengzhou Cheng', 'Zheng Wu', 'Zongru Wu', 'Aston Zhang', 'Zhuosheng Z
 year: 2025
 venue: "None"
 url: "http://arxiv.org/abs/2503.16465v3"
+cite_key: cheng2025os
+arxiv_id: "2503.16465"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

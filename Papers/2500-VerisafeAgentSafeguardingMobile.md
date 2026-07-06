@@ -15,6 +15,8 @@ date_publish: "2025/03/24"
 venue: "arXiv"
 tags: ["imitation-learning", "web-agent"]
 url: "https://arxiv.org/abs/2503.18492"
+cite_key: lee2025verisafe
+arxiv_id: "2503.18492"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

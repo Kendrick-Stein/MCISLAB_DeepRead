@@ -6,6 +6,8 @@ date_publish: 2026-05
 venue: arXiv
 tags: [gui-agent, world-model, VLM]
 url: "https://arxiv.org/abs/2605.10347v1"
+cite_key: xu2026how
+arxiv_id: "2605.10347"
 code:
 rating: "2"
 date_added: 2026-05-12

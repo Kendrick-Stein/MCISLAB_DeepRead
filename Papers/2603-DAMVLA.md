@@ -3,6 +3,7 @@ title: "DAM-VLA: A Dynamic Action Model-Based Vision-Language-Action Framework f
 authors: [Xiongfeng Peng, Jiaqian Yu, Dingzhe Li, Yixiang Jin, Lu Xu, Yamin Mao, Chao Zhang, Weiming Li, Sujin Jang, Dongwook Lee, Daehyun Ji]
 institutes: [Samsung R&D Institute China-Beijing (SRCB), Samsung AI Center DS Division, Hanyang University ERICA]
 date_publish: 2026-03-01
+cite_key: peng2026dam
 venue: ICRA 2026
 tags: [VLA, manipulation, diffusion-policy]
 paper: https://arxiv.org/abs/2603.00926

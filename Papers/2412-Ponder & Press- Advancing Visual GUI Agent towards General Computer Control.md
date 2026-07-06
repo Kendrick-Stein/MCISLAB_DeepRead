@@ -4,6 +4,8 @@ authors: ['Yiqin Wang', 'Haoji Zhang', 'Jingqi Tian', 'Yansong Tang']
 year: 2024
 venue: "None"
 url: "http://arxiv.org/abs/2412.01268v1"
+cite_key: wang2024pondera
+arxiv_id: "2412.01268"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

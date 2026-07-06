@@ -3,6 +3,7 @@ title: "OS-ATLAS: A Foundation Action Model for Generalist GUI Agents"
 authors: [Zhiyong Wu, Zhenyu Wu, Fangzhi Xu, Yian Wang, Qiushi Sun, Chengyou Jia, Kanzhi Cheng, Zichen Ding, Liheng Chen, Paul Pu Liang, Yu Qiao]
 institutes: [Shanghai AI Laboratory, Shanghai Jiao Tong University, The University of Hong Kong, MIT]
 date_publish: 2024-10-30
+cite_key: wu2024os
 venue: ICLR 2025
 tags: [gui-agent, computer-use, VLM]
 paper: https://arxiv.org/abs/2410.23218

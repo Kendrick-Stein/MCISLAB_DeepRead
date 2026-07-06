@@ -13,6 +13,8 @@ date_publish: "2025/11/12"
 venue: "arXiv"
 tags: ["imitation-learning", "web-agent"]
 url: "https://arxiv.org/abs/2511.09157"
+cite_key: yang2025probench
+arxiv_id: "2511.09157"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

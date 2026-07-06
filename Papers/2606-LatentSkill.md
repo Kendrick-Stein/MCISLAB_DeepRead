@@ -6,6 +6,8 @@ date_publish: 2026-06-04
 venue: arXiv
 tags: [agentic-RL, task-planning, LLM]
 url: https://arxiv.org/abs/2606.06087
+cite_key: yu2026latentskill
+arxiv_id: "2606.06087"
 code:
 rating: 3
 date_added: 2026-06-10

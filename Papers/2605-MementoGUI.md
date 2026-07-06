@@ -6,6 +6,8 @@ date_publish: 2026-05-18
 venue: arXiv
 tags: [gui-agent, agentic-RL, VLM]
 url: https://arxiv.org/abs/2605.18652
+cite_key: zeng2026mementogui
+arxiv_id: "2605.18652"
 code:
 rating: 4
 date_added: 2026-05-22

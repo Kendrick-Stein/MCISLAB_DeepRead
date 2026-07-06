@@ -13,6 +13,8 @@ date_publish: "2025/04/18"
 venue: "arXiv"
 tags: ["imitation-learning"]
 url: "https://arxiv.org/abs/2504.13684"
+cite_key: xiangrong2025intelligent
+arxiv_id: "2504.13684"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

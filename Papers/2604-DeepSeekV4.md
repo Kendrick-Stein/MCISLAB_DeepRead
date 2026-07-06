@@ -3,6 +3,7 @@ title: "DeepSeek-V4: Towards Highly Efficient Million-Token Context Intelligence
 authors: [DeepSeek-AI]
 institutes: [DeepSeek-AI]
 date_publish: 2026-04-22
+cite_key: deepseekai2026deepseek
 venue: Technical Report (HuggingFace)
 tags: [LLM]
 paper: https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/main/DeepSeek_V4.pdf

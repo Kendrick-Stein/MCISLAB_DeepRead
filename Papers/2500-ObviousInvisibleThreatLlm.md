@@ -17,6 +17,8 @@ date_publish: "2025/04/15"
 venue: "arXiv"
 tags: ["web-agent"]
 url: "https://arxiv.org/abs/2504.11281"
+cite_key: chen2025obvious
+arxiv_id: "2504.11281"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

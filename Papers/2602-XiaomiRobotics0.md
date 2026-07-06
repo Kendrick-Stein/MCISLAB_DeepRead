@@ -3,6 +3,7 @@ title: "Xiaomi-Robotics-0: An Open-Sourced Vision-Language-Action Model with Rea
 authors: [Rui Cai, Jun Guo, Xinze He, Piaopiao Jin, Jie Li, Bingxuan Lin, Futeng Liu, Wei Liu, Fei Ma, Kun Ma, Feng Qiu, Heng Qu, Yifei Su, Qiao Sun, Dong Wang, Donghao Wang, Yunhong Wang, Rujie Wu, Diyun Xiang, Yu Yang, Hangjun Ye, Yuan Zhang, Quanyun Zhou]
 institutes: [Xiaomi]
 date_publish: 2026-02
+cite_key: cai2026xiaomi
 venue: arXiv preprint
 tags: [VLA, manipulation, flow-matching]
 paper: https://arxiv.org/abs/2602.12684

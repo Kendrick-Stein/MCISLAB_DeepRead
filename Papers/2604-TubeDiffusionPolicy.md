@@ -13,6 +13,8 @@ date_publish: "2026-04-26"
 venue: "arXiv"
 tags: ["diffusion-policy", "world-model", "manipulation", "tactile"]
 url: "http://arxiv.org/abs/2604.23609v1"
+cite_key: xue2026tube
+arxiv_id: "2604.23609"
 code: ""
 rating: "2"
 date_added: "2026-04-28"

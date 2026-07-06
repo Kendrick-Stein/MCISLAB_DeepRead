@@ -3,6 +3,7 @@ title: "NavGPT: Explicit Reasoning in Vision-and-Language Navigation with Large 
 authors: [Gengze Zhou, Yicong Hong, Qi Wu]
 institutes: [The University of Adelaide, The Australian National University]
 date_publish: 2023-05-26
+cite_key: zhou2023navgpt
 venue: AAAI 2024
 tags: [VLN, LLM, navigation]
 paper: https://arxiv.org/abs/2305.16986

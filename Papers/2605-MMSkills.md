@@ -6,6 +6,8 @@ date_publish: 2026-05-13
 venue: arXiv
 tags: [gui-agent, task-planning, VLM]
 url: https://arxiv.org/abs/2605.13527
+cite_key: zhang2026mmskills
+arxiv_id: "2605.13527"
 code: https://deepexperience.github.io/MMSkills
 rating: 4
 date_added: 2026-05-22

@@ -3,6 +3,7 @@ title: "Vision-and-Language Navigation Today and Tomorrow: A Survey in the Era o
 authors: [Yue Zhang, Ziqiao Ma, Jialu Li, Yanyuan Qiao, Zun Wang, Joyce Chai, Qi Wu, Mohit Bansal, Parisa Kordjamshidi]
 institutes: [Michigan State University, University of Michigan, UNC Chapel Hill, University of Adelaide]
 date_publish: 2024-07-09
+cite_key: zhang2024vision
 venue: TMLR 2024
 tags: [VLN, navigation, VLM]
 paper: https://arxiv.org/abs/2407.07035

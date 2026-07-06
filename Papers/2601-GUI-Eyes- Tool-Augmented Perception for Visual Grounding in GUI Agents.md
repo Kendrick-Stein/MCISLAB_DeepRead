@@ -4,6 +4,8 @@ authors: ['Chen Chen', 'Jiawei Shao', 'Dakuan Lu', 'Haoyi Hu', 'Xiangcheng Liu',
 year: 2026
 venue: "None"
 url: "http://arxiv.org/abs/2601.09770v1"
+cite_key: chen2026gui
+arxiv_id: "2601.09770"
 tags: ["GUI Agent"]
 status: pending
 date_added: 2026-04-14

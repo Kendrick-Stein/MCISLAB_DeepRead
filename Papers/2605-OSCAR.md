@@ -6,6 +6,8 @@ date_publish: 2026-05
 venue: arXiv
 tags: [LLM]
 url: https://arxiv.org/abs/2605.17757
+cite_key: zhou2026oscar
+arxiv_id: "2605.17757"
 code:
 rating: 3
 date_added: 2026-05-25

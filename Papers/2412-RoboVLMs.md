@@ -3,6 +3,7 @@ title: "What Matters in Building Vision-Language-Action Models for Generalist Ro
 authors: [Xinghang Li, Peiyan Li, Long Qian, Minghuan Liu, Dong Wang, Jirong Liu, Bingyi Kang, Xiao Ma, Xinlong Wang, Di Guo, Tao Kong, Hanbo Zhang, Huaping Liu]
 institutes: [Tsinghua University, ByteDance Research, CASIA, Shanghai Jiao Tong University, NUS, BAAI, BUPT]
 date_publish: 2024-12
+cite_key: li2024what
 venue: arXiv
 tags: [VLA, manipulation, cross-embodiment]
 paper: https://arxiv.org/abs/2412.14058

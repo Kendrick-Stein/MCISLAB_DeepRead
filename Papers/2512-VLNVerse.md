@@ -3,6 +3,7 @@ title: "VLNVerse: A Benchmark for Vision-Language Navigation with Versatile, Emb
 authors: [Sihao Lin, Zerui Li, Xunyi Zhao, Gengze Zhou, Liuyi Wang, Rong Wei, Rui Tang, Juncheng Li, Hanqing Wang, Jiangmiao Pang, Anton van den Hengel, Jiajun Liu, Qi Wu]
 institutes: [Adelaide University, AIML, Tongji University, ManyCore, Zhejiang University, Shanghai AI Lab, CSIRO Data61]
 date_publish: 2025-12-22
+cite_key: lin2025vlnverse
 venue: arXiv
 tags: [VLN, navigation, embodied-reasoning]
 paper: https://arxiv.org/abs/2512.19021

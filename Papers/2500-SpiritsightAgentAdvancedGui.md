@@ -11,6 +11,8 @@ date_publish: "2025/03/05"
 venue: "arXiv"
 tags: ["VLM", "navigation", "imitation-learning"]
 url: "https://arxiv.org/abs/2503.03196"
+cite_key: huang2025spiritsight
+arxiv_id: "2503.03196"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

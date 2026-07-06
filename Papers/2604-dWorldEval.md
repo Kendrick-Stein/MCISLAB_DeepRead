@@ -11,6 +11,8 @@ date_publish: "2026-04-24"
 venue: "arXiv"
 tags: ["world-model", "robotics", "policy-evaluation", "diffusion"]
 url: "https://arxiv.org/abs/2604.22152"
+cite_key: li2026dworldeval
+arxiv_id: "2604.22152"
 code: ""
 rating: "2"
 date_added: "2026-04-28"

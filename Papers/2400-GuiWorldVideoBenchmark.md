@@ -26,6 +26,8 @@ date_publish: "2024/06/16"
 venue: "arXiv"
 tags: ["imitation-learning", "scene-understanding", "web-agent"]
 url: "https://arxiv.org/abs/2406.10819"
+cite_key: chen2024gui
+arxiv_id: "2406.10819"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

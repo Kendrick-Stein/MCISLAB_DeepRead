@@ -3,6 +3,7 @@ title: "UI-TARS-2 Technical Report: Advancing GUI Agent with Multi-Turn Reinforc
 authors: [ByteDance Seed Team]
 institutes: [ByteDance Seed]
 date_publish: 2025-09-02
+cite_key: team2025ui
 venue: arXiv
 tags: [gui-agent, computer-use, agentic-RL]
 paper: https://arxiv.org/abs/2509.02544

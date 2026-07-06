@@ -14,6 +14,8 @@ date_publish: "2025/12/22"
 venue: "arXiv"
 tags: ["VLM", "navigation", "imitation-learning"]
 url: "https://arxiv.org/abs/2512.19396"
+cite_key: li2025echotrail
+arxiv_id: "2512.19396"
 code: ""
 rating: "3"
 date_added: "2026-04-21"

@@ -3,6 +3,7 @@ title: "Unified Embodied VLM Reasoning with Robotic Action via Autoregressive Di
 authors: [Yi Liu, Sukai Wang, Dafeng Wei, Xiaowei Cai, Linqing Zhong, Jiange Yang, Guanghui Ren, Jinyu Zhang, Maoqing Yao, Chuankang Li, Xindong He, Liliang Chen, Jianlan Luo]
 institutes: [AgiBot Research, AgiBot, Shanghai Innovation Institute]
 date_publish: 2025-12
+cite_key: liu2025unified
 venue: arXiv preprint
 tags: [VLA, embodied-reasoning, flow-matching]
 paper: https://arxiv.org/abs/2512.24125

@@ -14,6 +14,8 @@ date_publish: "2025/08/07"
 venue: "arXiv"
 tags: ["VLM", "imitation-learning", "RL"]
 url: "https://arxiv.org/abs/2508.05615"
+cite_key: du2025test
+arxiv_id: "2508.05615"
 code: ""
 rating: "3"
 date_added: "2026-04-08"

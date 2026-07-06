@@ -3,6 +3,7 @@ title: "A Survey on Vision-Language-Action Models: An Action Tokenization Perspe
 authors: [Yifan Zhong, Fengshuo Bai, Shaofei Cai, Xuchuan Huang, Zhang Chen, Xiaowei Zhang, Yuanfei Wang, Shaoyang Guo, Tianrui Guan, Ka Nam Lui, Zhiquan Qi, Yitao Liang, Yuanpei Chen, Yaodong Yang]
 institutes: [Peking University Institute for AI, PKU-PsiBot Joint Lab]
 date_publish: 2025-07-02
+cite_key: zhong2025survey
 venue: arXiv preprint
 tags: [VLA, embodied-reasoning, manipulation]
 paper: https://arxiv.org/abs/2507.01925

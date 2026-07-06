@@ -13,6 +13,8 @@ date_publish: "2026-02-22"
 venue: "arXiv"
 tags: ["agentic-RL", "gui-agent"]
 url: "https://arxiv.org/abs/2602.19225"
+cite_key: fang2026proximity
+arxiv_id: "2602.19225"
 code: "https://anonymous.4open.science/r/proxmo-B7E7/README.md"
 rating: "4"
 date_added: "2026-05-06"

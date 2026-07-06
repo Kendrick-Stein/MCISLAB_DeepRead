@@ -6,6 +6,7 @@ date_publish: "2024-08-13"
 venue: "ACM Transactions on Management Information Systems"
 tags: []
 url: ""
+cite_key: xing2024designing
 code: ""
 rating: "3"
 date_added: "2026-04-21"

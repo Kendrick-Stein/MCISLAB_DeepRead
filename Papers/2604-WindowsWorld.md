@@ -16,6 +16,8 @@ tags:
   - computer-use
   - task-planning
 url: https://arxiv.org/abs/2604.27776
+cite_key: li2026windowsworld
+arxiv_id: "2604.27776"
 code: https://github.com/HITsz-TMG/WindowsWorld
 rating: "3"
 date_added: 2026-05-06

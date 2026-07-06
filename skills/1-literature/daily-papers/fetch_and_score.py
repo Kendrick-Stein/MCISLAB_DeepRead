@@ -28,11 +28,25 @@ from urllib.request import Request, urlopen
 # ── 加载配置 ──────────────────────────────────────────────────────────────
 
 CONFIG_PATH = Path(__file__).resolve().parent / "config.json"
+TEAM_CONFIG_PATH = Path(__file__).resolve().parents[3] / "Workbench" / "config" / "team-config.json"
 DEFAULT_HISTORY_PATH = Path(__file__).resolve().parent / ".history.json"
 
 def load_config() -> dict:
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+        config = json.load(f)
+
+    if TEAM_CONFIG_PATH.exists():
+        try:
+            team = json.loads(TEAM_CONFIG_PATH.read_text())
+            extra = [kw for it in team.get("interests", []) for kw in it.get("keywords", [])]
+            seen = {k.lower() for k in config.get("keywords", [])}
+            config["keywords"] = config.get("keywords", []) + [
+                k for k in extra if k.lower() not in seen
+            ]
+        except (json.JSONDecodeError, OSError):
+            pass  # team config 损坏时降级用本地 keywords，不阻塞抓取
+
+    return config
 
 _CONFIG = load_config()
 

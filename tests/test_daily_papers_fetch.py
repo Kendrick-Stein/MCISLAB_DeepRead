@@ -234,3 +234,13 @@ def _date(y, m, d):
     import datetime
 
     return datetime.date(y, m, d)
+
+
+def test_load_config_merges_team_interests(tmp_path, monkeypatch):
+    """team-config.json 存在 interests 时，keywords = 本地 keywords ∪ interests 展开。"""
+    module = load_module()
+    team = tmp_path / "team-config.json"
+    team.write_text('{"interests": [{"name": "X", "keywords": ["quantum gui"]}]}')
+    monkeypatch.setattr(module, "TEAM_CONFIG_PATH", team)
+    cfg = module.load_config()
+    assert "quantum gui" in cfg["keywords"]

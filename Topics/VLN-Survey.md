@@ -4,6 +4,8 @@ description: 系统梳理 VLN 四条主流技术路线（graph-based、streaming
 tags: [VLN, navigation, embodied-reasoning]
 date_updated: 2026-04-23
 year_range: 2022-2026
+keywords: [vln, vision-language navigation]
+domain_map: EmbodiedAI
 ---
 
 ## Overview

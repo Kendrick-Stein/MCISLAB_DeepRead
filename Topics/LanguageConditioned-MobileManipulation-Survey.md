@@ -4,6 +4,8 @@ tags: [mobile-manipulation, VLA, instruction-following, task-planning, scene-und
 date_updated: "2026-04-02"
 year_range: 2023-2026
 papers_analyzed: 24
+keywords: [mobile manipulation, language-conditioned, instruction following]
+domain_map: EmbodiedAI
 ---
 ## Overview
 

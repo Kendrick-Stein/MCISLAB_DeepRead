@@ -4,6 +4,8 @@ tags: [survey, gui-agent, environment-engineering, testbed, simulation]
 date_updated: "2026-06-22"
 year_range: 2023-2026
 papers_analyzed: 14
+keywords: [gui environment, agent environment, web environment, sandbox, testbed]
+domain_map: GUI-Agent
 ---
 
 # GUI Environment 研究综述

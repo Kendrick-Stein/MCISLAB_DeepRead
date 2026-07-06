@@ -4,6 +4,8 @@ tags: [survey, VLA, manipulation, navigation, embodied-ai, robotics]
 date_updated: "2026-04-28"
 year_range: 2023-2026
 papers_analyzed: 45
+keywords: [embodied ai, robot learning, manipulation]
+domain_map: EmbodiedAI
 ---
 ## Overview
 

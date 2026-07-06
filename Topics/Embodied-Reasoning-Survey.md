@@ -4,6 +4,8 @@ tags: [embodied-reasoning, VLA, VLM]
 date_updated: "2026-03-30"
 year_range: 2023-2026
 papers_analyzed: 18
+keywords: [embodied reasoning, spatial reasoning]
+domain_map: EmbodiedAI
 ---
 ## Overview
 

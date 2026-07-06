@@ -4,6 +4,8 @@ tags: [survey, VLM, multimodal, vision-language-model, visual-reasoning]
 date_updated: "2026-04-28"
 year_range: 2023-2026
 papers_analyzed: 15
+keywords: [vlm, vision language model, multimodal llm, visual reasoning]
+domain_map: VLM
 ---
 
 ## Overview
@@ -220,3 +222,10 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - **未能获取**: 外部 WebSearch/WebFetch 工具受限，未能获取 arxiv 新论文
 - **核心发现**: 高分辨率视觉编码解决文本密集场景瓶颈；理解-生成统一成为趋势；效率优化可在不重新训练前提下实现显著改进
 - **status**: success
+## 🆕 Venue 回填增补（2026-06-26，CVF 近 3 年）
+
+> 补收 CVF VLM/Multimodal（29）+ Spatial/3D（22）方向论文,完整清单+综合见 [[Reports/2026-06-26-VenueBackfill]]。
+
+- **空间智能（本批最大主题）**：⭐5 [[2606-ScalingSpatialIntelligence]]（data-centric 8M scaling）、[[2606-SpatialScore]]（49 个 MLLM 评测）、[[2606-SpaceTools]]（多轮调 pointing/depth/3D 工具）、[[2606-FromIndoorTo]]（OpenBench 户外空间推理）。三条解法并行:几何 encoder 注入（[[2606-SpatialStack]]/[[2606-S2MLLM]]/[[2606-G2VLM]]/[[2606-HiSpatial]]）、data scaling、test-time 几何先验（[[2606-Abstract3DPerception]]/[[2606-GeometricallyConstrainedAg]]）。**open question：架构注入 vs data-scaling 缺同 benchmark head-to-head。**
+- **长视频理解走 agentic**：[[2606-LensWalk]]/[[2606-VideoARM]]/[[2606-SVAgent]]/[[2606-SymphonyACognitively]]/[[2606-HierarchicalLongVideo]] 普遍用 plan-observe-verify 多轮 + 检索,而非更大 video model。
+- **文档/推理 agent**：[[2606-VisualDocumentUnderstandin]]（MACT）、[[2606-CodeDance]]（code as tool）、[[2606-MonoVLM]]（coarse-to-fine GRPO 解 3D grounding reward 稀疏）。

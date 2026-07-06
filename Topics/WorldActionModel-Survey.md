@@ -9,6 +9,8 @@ tags:
 date_updated: 2026-04-01
 year_range: 2024-2026
 papers_analyzed: 8
+keywords: [world action model, action-conditioned, diffusion policy, cross-embodiment]
+domain_map: WorldModel
 ---
 
 ## Overview

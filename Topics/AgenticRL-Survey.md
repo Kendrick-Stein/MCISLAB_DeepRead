@@ -4,6 +4,8 @@ tags: [survey, RL, gui-agent, reinforcement-learning, credit-assignment, reward-
 date_updated: "2026-04-28"
 year_range: 2023-2026
 papers_analyzed: 15
+keywords: [agentic rl, agent reinforcement learning, grpo, rlvr, credit assignment, reward model]
+domain_map: AgenticRL
 ---
 ## Overview
 
@@ -218,3 +220,10 @@ Agentic RL（Agent强化学习）是指将强化学习方法应用于智能体�
 ### Survey & Overview
 - [[2500-SurveyReinforcementLearningOptimization]] - RL for Optimization in Automation
 - [[Topics/GUIAgent-Survey]] - GUI Agent 研究综述（含 RL 路线）
+## 🆕 Venue 回填增补（2026-06-26，CVF 近 3 年）
+
+> 补收 CVF Agentic/LLM-Agent 方向 27 篇，完整清单+综合见 [[Reports/2026-06-26-VenueBackfill]]。
+
+- **agentic RL + tool 调度**：[[2606-EvoGraphR1]]（multimodal GraphRAG 建成 MDP，RL 学何时检索/补充/修正）、[[2606-CodeDance]]（code 作统一 tool-use medium，RBAT reward 自适应调用）、[[2606-OctoT2I]]（self-evolving tool router）、[[2606-GTRTurbo]]（用 checkpoint merging 当 "free teacher" 解 multi-turn RL 的 thought collapse）、[[2606-ARMThinker]]（agentic reward model：带工具调用的 judge）。
+- **self-evolving / 闭环数据**：[[2606-SocraticGeo]]（Teacher-Solver-Generator 闭环造几何题）、[[2606-TrainingOneModel]]（CrossHA：同一 agent 在异构 action space 间切换，Single-Turn GRPO）。
+- **takeaway**：本批 agentic 工作的共同主题是"把外部工具/检索/纠错纳入 RL 的 action space"而非只调 prompt;与本方向 reward design 子方向（[[Papers/2606-DUDE]] asymmetric / [[Papers/2606-Skill1]] frequency credit）互补。注意 CVPR 里大量 "multi-agent" 是给传统 CV 任务换皮，需甄别是否带来 single-model 拿不到的能力。

@@ -4,6 +4,8 @@ tags: [world-model, agent, simulation, planning, MBRL]
 date_updated: "2026-04-28"
 year_range: 2024-2026
 papers_analyzed: 19
+keywords: [world model, video prediction, dynamics model, mbrl]
+domain_map: WorldModel
 ---
 ## Overview
 

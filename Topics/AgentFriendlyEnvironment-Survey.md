@@ -4,6 +4,8 @@ tags: [survey, gui-agent, environment-engineering, computer-use, web-agent, mobi
 date_updated: "2026-06-25"
 year_range: 2023-2026
 papers_analyzed: 16
+keywords: [agent-friendly, environment affordance, agent-facing, runtime, environment engineering]
+domain_map: GUI-Agent
 ---
 
 # Agent-Friendly Environment 调研与研究设想

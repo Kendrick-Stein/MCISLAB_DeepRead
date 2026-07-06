@@ -4,6 +4,8 @@ description: 从 2022 RT-1 到 2026 π0.7 / GEN-1 的 VLA 全景——按 action
 tags: [VLA, manipulation, embodied-reasoning]
 date_updated: 2026-04-23
 year_range: 2022-2026
+keywords: [vla, vision-language-action, robot policy]
+domain_map: EmbodiedAI
 ---
 
 ## Overview
@@ -307,3 +309,12 @@ MEM（video encoder + language memory 解耦，15min 任务）、EchoVLA（PHC+h
 - **新增论文数**：65 篇（全部 rating ≥ 2 均完整读过，无截断）
 - **未能获取的论文**：无；重跑相对上轮补齐了 RT-1/VoxPoser/TinyVLA/HAMSTER 的 digest，RoboMamba rating=1 按 filter 自然排除
 - **关键观察**：VLA 领域在 2025H2-2026H1 进入**多主线 convergence 期**——PI 系列（π0→π0.5→π\*0.6→π0.7）以 flow matching + hierarchical + prompt expansion 为主干拿下 commercial-grade 结果；cross-embodiment 正从 per-embodiment head 迁移到 soft prompt / latent action；Generalist AI 的 GEN-0/1 以完全 proprietary 的 wearable data engine 展示 scaling law 跨越 "commercial threshold"，与学术社区差距拉大；real-world RL（Recap / RAMP / WorldVLALoop）和 reasoning-action unification（GenieReasoner / Lumo-1 / RoboBrain 2.5）两条线同时突破。系统工程（SnapFlow / Xiaomi-Robotics-0 Λ-mask / MEM memory）成为必要配套。整体格局是"方法多样性未收敛，但工程底座、评测 crisis、data engine gap 三件事正在快速定型"。
+
+## 🆕 Venue 回填增补（2026-06-26，CVF 近 3 年）
+
+> 补收 CVF Embodied/VLA 方向 38 篇,完整清单+综合见 [[Reports/2026-06-26-VenueBackfill]]。
+
+- **affordance grounding（主线一）**：[[2606-AffordGen]]（affordance 作 demo generation 先验）、[[2510-A0AnAffordance]]（spatial affordance + low-level execution 解耦）、[[2510-CoAVLA]]（Chain-of-Affordance）、[[2506-AffordDP]]（transferable affordance 接 diffusion policy）、[[2510-RAGNet]]（reasoning-based affordance benchmark 273k）。
+- **think/reason before act（主线二）**：[[2506-CoTVLA]]（先生成 subgoal image）、[[2606-ACoTVLA]]（CoT 转到 action space）、[[2606-TRMVLA]]（keyframe-triggered reasoning + memory）、[[2606-AVAVLA]]（POMDP 历史条件策略，LIBERO 98%）、[[2606-HiFVLA]](motion vector 当低维 history)。
+- **test-time 纠错**：[[2606-AffordanceFieldInterventio]] ⭐4（用 3D affordance field 检测并 rollback VLA 的 "Memory Trap"，不改参数）。
+- **takeaway**：共同假设是端到端 VLA 缺显式中间结构（affordance / CoT / 3D geometry），加可解释中间表示提升 OOD 与 long-horizon;与 [[Topics/Embodied-Reasoning-Survey]] 的 embodied CoT 线索呼应。

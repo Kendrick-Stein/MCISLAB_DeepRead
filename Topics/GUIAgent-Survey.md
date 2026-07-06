@@ -4,6 +4,8 @@ tags: [survey, gui-agent, vlm, rl, computer-use]
 date_updated: "2026-05-04"
 year_range: 2023-2026
 papers_analyzed: 205
+keywords: [gui-agent, gui grounding, computer-use, web agent, mobile agent]
+domain_map: GUI-Agent
 ---
 
 # GUI Agent 研究综述
@@ -289,3 +291,12 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 - **调研日期**: 2026-04-21
 - **论文统计**: vault 已有 190 篇
 - **分析论文**: 30 篇核心论文
+
+## 🆕 Venue 回填增补（2026-06-26，CVF 近 3 年）
+
+> 一次性补收 CVF（CVPR/ICCV/WACV）GUI/Computer-Use 方向论文 26 篇，完整清单+综合见 [[Reports/2026-06-26-VenueBackfill]]。
+
+- **环境/评测（强化 primary 方向 Agent-Facing Environment）**：[[2606-WebGym]] ⭐5（live-site RL 环境 + rubric verifier + async rollout）、[[2606-OSOracle]] ⭐5（跨平台 step-level GUI critic）、[[2606-GUIDE]] ⭐5（从 screen recording 理解用户意图）、[[2510-UINavBench]] ⭐5（mobile UI online benchmark）、[[2606-Ego2Web]]（egocentric→web 执行 + judge）。
+- **RL 训练方法（强化 RL-based GUI Agent 方向）**：[[2606-HiconAgent]]（history-aware HCPO）、[[2606-CGL]]（continual GUI learning，GRPO+SFT 协同）、[[2606-GUISAGE]]（ground-truth hint 解 zero-advantage trap）、[[2606-TrainingHighLevel]]（staged execution-feedback RL）。
+- **Grounding robustness（与 GUI Grounding Robustness 方向直接相关）**：一批 **training-free test-time** 方案——[[2606-MVP]]（multi-view 坐标聚合）、[[2606-DRSGUI]]（search-then-predict）、[[2606-BAMI]]（coarse-to-fine focus）、[[2510-VisualTestTime]]（RegionFocus）、[[2606-ExposingAndEvaluating]]（grounding hallucination 分类）；高效小模型 grounding：[[2601-ZonUI3B]]、[[2601-AFRAgent]]、[[2606-iSHIFT]]。
+- **takeaway**：无训练的 evidence-focusing（multi-view/region-search）是 grounding robustness 除"架构级 multi-scale 训练"外的低成本竞争路线，值得与 [[Ideas/ScaleInvariant-Grounding-GUI]]、[[Ideas/EvidenceDependence-GUIGrounding]] 对照。

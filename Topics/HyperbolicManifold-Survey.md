@@ -4,6 +4,8 @@ tags: [hyperbolic, manifold, optimization, geometry, neural-network, embedding]
 date_updated: "2026-04-28"
 year_range: 2017-2026
 papers_analyzed: 10
+keywords: [hyperbolic, manifold, poincare]
+domain_map: HyperbolicManifold
 ---
 ## Overview
 

@@ -4,6 +4,8 @@ tags: [computer-use, gui-agent, VLM, RL]
 date_updated: "2026-06-25"
 year_range: 2024-2026
 papers_analyzed: 26
+keywords: [computer-use, cua, desktop agent, os agent]
+domain_map: GUI-Agent
 ---
 ## Overview
 

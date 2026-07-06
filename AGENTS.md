@@ -100,6 +100,8 @@ daily-papers / news-digest / literature-survey 的关键词打分均从该文件
 | `related-work` | 起草英文 LaTeX Related Work | Supervisor 给出 .tex 草稿 |
 | `paper-planning`/`paper-writing`/`paper-review`/`paper-rebuttal` 系列 | 论文投稿全流程（规划 → 分节写作 → 对抗式自审 → rebuttal） | Supervisor 说"准备投稿"/"写论文"/"审稿意见回来了" |
 | `academic-slides` | 学术报告 slides | Supervisor 说"准备一个 talk / 答辩 slides" |
+| `paper-figures` | 出版级 matplotlib 图表 | Supervisor 给出数据要画论文用图 |
+| `paper-graph` | 领域 lineage Mermaid 图 | Supervisor 要看某方向的"技术演进族谱" |
 
 ### Skill 协议
 

@@ -4,9 +4,10 @@
 
 ## 研究兴趣
 
-- **GUI Agent**: Computer-use Agent, GUI grounding, web/mobile agent, agent benchmark
-- **VLM / Multimodal**: Vision Language Model, Visual Reasoning, Multimodal Understanding
-- **AI Agent**: LLM Agent, Agentic RL, Tool Use
+研究兴趣的唯一权威来源是 `Workbench/config/team-config.json` 的 `interests` 字段
+（当前涵盖 GUI Agent、VLM/Multimodal、AI Agent、Embodied AI 四个方向）。
+daily-papers / news-digest / literature-survey 的关键词打分均从该文件读取；
+调整兴趣只改这一个文件。
 
 ## 研究原则
 

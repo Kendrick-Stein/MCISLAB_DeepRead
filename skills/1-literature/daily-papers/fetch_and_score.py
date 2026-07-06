@@ -13,6 +13,7 @@ Stderr: 进度日志。Stdout: JSON array。
 """
 
 import argparse
+import hashlib
 import html as html_lib
 import json
 import os
@@ -21,6 +22,7 @@ import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from pathlib import Path
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 # ── 加载配置 ──────────────────────────────────────────────────────────────
@@ -38,6 +40,16 @@ KEYWORDS = [kw.lower() for kw in _CONFIG["keywords"]]
 ARXIV_CATEGORIES = _CONFIG["arxiv_categories"]
 MIN_SCORE = _CONFIG["min_score"]
 TOP_N = _CONFIG["top_n"]
+OPENALEX_VENUES = _CONFIG.get("openalex_venues", [])
+OPENALEX_LOOKBACK_DAYS = _CONFIG.get("openalex_lookback_days", 14)
+OPENALEX_MAILTO = _CONFIG.get("openalex_mailto", "")
+CVF_PROCEEDINGS = _CONFIG.get("cvf_proceedings", [])
+FRONTMATTER_PATTERNS = [
+    re.compile(p, re.IGNORECASE) for p in _CONFIG.get("frontmatter_title_patterns", [])
+]
+MAX_PER_SOURCE = _CONFIG.get("max_per_source", {})
+RESERVE_PER_SOURCE = _CONFIG.get("reserve_per_source", {})
+CVF_BASE = "https://openaccess.thecvf.com"
 ATOM_NS = {
     "atom": "http://www.w3.org/2005/Atom",
     "arxiv": "http://arxiv.org/schemas/atom",
@@ -328,6 +340,234 @@ def fetch_arxiv_papers(start_date, end_date, days: int = 1) -> list[dict]:
     return papers
 
 
+# ── Venue 源：OpenAlex 期刊 + CVF 顶会 ────────────────────────────────────
+
+def reconstruct_abstract(inverted_index: dict | None) -> str:
+    """从 OpenAlex 的 abstract_inverted_index（word → [positions]）还原摘要文本。"""
+    if not inverted_index:
+        return ""
+    positions: list[tuple[int, str]] = []
+    for word, idxs in inverted_index.items():
+        for i in idxs:
+            positions.append((i, word))
+    positions.sort()
+    return " ".join(w for _, w in positions)
+
+
+def is_frontmatter(title: str) -> bool:
+    """期刊卷首/目录/版权页等噪声条目（OpenAlex 把它们也标成 type:article）。"""
+    t = (title or "").strip()
+    if not t:
+        return True
+    return any(pat.search(t) for pat in FRONTMATTER_PATTERNS)
+
+
+def source_family(source: str) -> str:
+    """把带后缀的 source 归一到家族：openalex:IJCV → openalex，cvf:CVPR2026 → cvf。"""
+    if source.startswith("openalex"):
+        return "openalex"
+    if source.startswith("cvf"):
+        return "cvf"
+    if source.startswith("hf"):
+        return "hf"
+    return "arxiv"
+
+
+def fetch_openalex_papers(end_date) -> list[dict]:
+    """按 config 中的 venue ISSN 抓 OpenAlex 期刊论文（自带 lookback 窗口，无需 key）。"""
+    if not OPENALEX_VENUES:
+        return []
+    lookback = max(int(OPENALEX_LOOKBACK_DAYS), 1)
+    start = end_date - timedelta(days=lookback)
+    papers: list[dict] = []
+    for venue in OPENALEX_VENUES:
+        issn = venue.get("issn", "")
+        name = venue.get("name", issn)
+        if not issn:
+            continue
+        filt = (
+            f"primary_location.source.issn:{issn},type:article,"
+            f"from_publication_date:{start.isoformat()},"
+            f"to_publication_date:{end_date.isoformat()}"
+        )
+        url = (
+            f"https://api.openalex.org/works?filter={filt}"
+            f"&sort=publication_date:desc&per-page=50"
+        )
+        if OPENALEX_MAILTO:
+            url += f"&mailto={OPENALEX_MAILTO}"
+        print(f"  Fetching OpenAlex {name} ({issn})...", file=sys.stderr)
+        raw = fetch_url(url, timeout=40)
+        if not raw:
+            continue
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+
+        kept = 0
+        for w in data.get("results", []):
+            title = (w.get("title") or "").strip()
+            if not title or is_frontmatter(title):
+                continue
+            authorships = w.get("authorships", []) or []
+            if not authorships:  # front-matter 通常无作者
+                continue
+            authors = ", ".join(
+                a.get("author", {}).get("display_name", "")
+                for a in authorships
+                if a.get("author")
+            )
+            abstract = reconstruct_abstract(w.get("abstract_inverted_index"))
+
+            arxiv_url = ""
+            for loc in w.get("locations", []) or []:
+                lp = loc.get("landing_page_url") or ""
+                if "arxiv.org/abs/" in lp:
+                    arxiv_url = lp
+                    break
+            doi = w.get("doi") or ""
+            if arxiv_url:
+                url_final = arxiv_url
+            elif doi:
+                url_final = doi  # 已是完整 https://doi.org/... 形式
+            else:
+                url_final = (w.get("primary_location") or {}).get("landing_page_url") or ""
+
+            paper = {
+                "title": title,
+                "authors": authors,
+                "abstract": abstract,
+                "url": url_final,
+                "doi": doi,
+                "date": w.get("publication_date", "") or "",
+                "score": 0,
+                "source": f"openalex:{name}",
+                "venue": name,
+            }
+            paper["score"] = score_paper(paper)
+            papers.append(paper)
+            kept += 1
+        print(f"    {name}: kept {kept}", file=sys.stderr)
+
+    print(f"  OpenAlex: {len(papers)} papers", file=sys.stderr)
+    return papers
+
+
+def search_openalex_topic(
+    query: str, year_from: int, limit: int = 25, venue_issns: list[str] | None = None
+) -> list[dict]:
+    """按主题关键词跨 venue 搜 OpenAlex（供 literature-survey 调用，补 WebSearch 漏掉的期刊论文）。
+
+    与 fetch_openalex_papers 不同：这里是关键词检索而非按 venue 列举，可选 venue_issns 限定范围。
+    """
+    filt = [f"from_publication_date:{year_from}-01-01", "type:article"]
+    if venue_issns:
+        filt.append("primary_location.source.issn:" + "|".join(venue_issns))  # | = OR
+    url = (
+        f"https://api.openalex.org/works?search={quote(query)}"
+        f"&filter={','.join(filt)}&sort=relevance_score:desc&per-page={min(limit, 50)}"
+    )
+    if OPENALEX_MAILTO:
+        url += f"&mailto={OPENALEX_MAILTO}"
+    print(f"  Searching OpenAlex: {query!r} (>= {year_from})...", file=sys.stderr)
+    raw = fetch_url(url, timeout=40)
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+
+    papers: list[dict] = []
+    for w in data.get("results", []):
+        title = (w.get("title") or "").strip()
+        if not title or is_frontmatter(title):
+            continue
+        authorships = w.get("authorships", []) or []
+        authors = ", ".join(
+            a.get("author", {}).get("display_name", "")
+            for a in authorships
+            if a.get("author")
+        )
+        abstract = reconstruct_abstract(w.get("abstract_inverted_index"))
+        arxiv_url = ""
+        for loc in w.get("locations", []) or []:
+            lp = loc.get("landing_page_url") or ""
+            if "arxiv.org/abs/" in lp:
+                arxiv_url = lp
+                break
+        doi = w.get("doi") or ""
+        venue = (w.get("primary_location") or {}).get("source") or {}
+        venue_name = venue.get("display_name", "") if isinstance(venue, dict) else ""
+        url_final = arxiv_url or doi or (w.get("primary_location") or {}).get("landing_page_url") or ""
+        papers.append(
+            {
+                "title": title,
+                "authors": authors,
+                "abstract": abstract,
+                "url": url_final,
+                "doi": doi,
+                "date": w.get("publication_date", "") or "",
+                "venue": venue_name,
+                "source": "openalex-search",
+            }
+        )
+    print(f"  OpenAlex search: {len(papers)} papers", file=sys.stderr)
+    return papers
+
+
+def fetch_cvf_papers() -> list[dict]:
+    """抓 CVF Open Access 顶会论文集（CVPR/ICCV/WACV）。listing 页无摘要 → title-only 打分。"""
+    if not CVF_PROCEEDINGS:
+        return []
+    papers: list[dict] = []
+    entry_re = re.compile(
+        r'<dt class="ptitle">\s*(?:<br\s*/?>\s*)?<a href="([^"]+\.html)">(.*?)</a>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    for proc in CVF_PROCEEDINGS:
+        print(f"  Fetching CVF {proc}...", file=sys.stderr)
+        raw = fetch_url(f"{CVF_BASE}/{proc}?day=all", timeout=90)
+        if not raw or "ptitle" not in raw:
+            raw = fetch_url(f"{CVF_BASE}/{proc}", timeout=90)
+        if not raw:
+            continue
+
+        seen_urls = set()
+        kept = 0
+        for m in entry_re.finditer(raw):
+            href = m.group(1).strip()
+            title = html_lib.unescape(re.sub(r"<[^>]+>", "", m.group(2)).strip())
+            if not title:
+                continue
+            paper_url = href if href.startswith("http") else CVF_BASE + (
+                href if href.startswith("/") else "/" + href
+            )
+            if paper_url in seen_urls:
+                continue
+            seen_urls.add(paper_url)
+            pdf_url = paper_url.replace("/html/", "/papers/").replace(".html", ".pdf")
+            paper = {
+                "title": title,
+                "authors": "",
+                "abstract": "",
+                "url": paper_url,
+                "pdf_url": pdf_url,
+                "date": "",  # listing 页无逐篇日期
+                "score": 0,
+                "source": f"cvf:{proc}",
+                "venue": proc,
+            }
+            paper["score"] = score_paper(paper)
+            papers.append(paper)
+            kept += 1
+        print(f"    {proc}: kept {kept}", file=sys.stderr)
+
+    print(f"  CVF: {len(papers)} papers", file=sys.stderr)
+    return papers
+
+
 # ── 历史去重 ──────────────────────────────────────────────────────────────
 
 def extract_arxiv_id(url: str) -> str:
@@ -335,8 +575,30 @@ def extract_arxiv_id(url: str) -> str:
     return m.group(1) if m else ""
 
 
+def paper_key(paper: dict) -> str:
+    """跨源稳定主键：arxiv id → doi → cvf 论文 id → 标题哈希。
+
+    用于合并去重与历史记录。一篇论文若同时出现在 arxiv 与某期刊（OpenAlex 返回其
+    arxiv 链接），会归到同一 arxiv id，从而跨源合并。
+    """
+    aid = extract_arxiv_id(paper.get("url", ""))
+    if aid:
+        return aid
+    doi = (paper.get("doi") or "").strip()
+    if doi:
+        return "doi:" + doi.lower().replace("https://doi.org/", "")
+    if paper.get("source", "").startswith("cvf"):
+        m = re.search(r"/html/([^/]+)\.html", paper.get("url", ""))
+        if m:
+            return "cvf:" + m.group(1)
+    norm = re.sub(r"[^a-z0-9]+", "", (paper.get("title") or "").lower())
+    if norm:
+        return "title:" + hashlib.sha1(norm.encode("utf-8")).hexdigest()[:16]
+    return ""
+
+
 def load_history(path: Path = DEFAULT_HISTORY_PATH) -> list[dict]:
-    """加载历史推荐记录。格式: [{"id": "2504.12345", "date": "2026-04-08"}, ...]"""
+    """加载历史推荐记录。新格式 {"key": ..}，兼容旧格式 {"id": "2504.12345"}。"""
     if path.exists():
         try:
             return json.loads(path.read_text(encoding="utf-8"))
@@ -345,16 +607,21 @@ def load_history(path: Path = DEFAULT_HISTORY_PATH) -> list[dict]:
     return []
 
 
+def history_key(entry: dict) -> str:
+    """历史条目主键，兼容旧 {"id": ...} 与新 {"key": ...}。"""
+    return entry.get("key") or entry.get("id") or ""
+
+
 def save_history(papers: list[dict], target_date, path: Path = DEFAULT_HISTORY_PATH) -> None:
     """追加本次推荐的论文到历史，保留最近 30 天。"""
     history = load_history(path)
-    existing_ids = {h["id"] for h in history}
+    existing_keys = {history_key(h) for h in history}
 
     for p in papers:
-        aid = extract_arxiv_id(p["url"])
-        if aid and aid not in existing_ids:
-            history.append({"id": aid, "date": str(target_date), "title": p.get("title", "")})
-            existing_ids.add(aid)
+        k = paper_key(p)
+        if k and k not in existing_keys:
+            history.append({"key": k, "date": str(target_date), "title": p.get("title", "")})
+            existing_keys.add(k)
 
     # 清理 30 天前的记录
     cutoff = str((datetime.utcnow().date() - timedelta(days=30)))
@@ -368,7 +635,54 @@ def save_history(papers: list[dict], target_date, path: Path = DEFAULT_HISTORY_P
 
 # ── 合并去重 ──────────────────────────────────────────────────────────────
 
+def cap_and_truncate(candidates: list[dict], top_n: int) -> list[dict]:
+    """按分数选 top_n，含两条规则：
+
+    - **reserve（保底名额）**：`reserve_per_source` 指定的源（如 openalex 期刊）先占住固定名额，
+      即使分数被 HF 高赞 / CVF 会议挤到 top_n 之外也保证纳入——否则期刊的 title 打分永远进不来。
+    - **cap（上限）**：`max_per_source` 限制每个 venue 源的当日条数，防止首跑灌水。
+
+    超出 cap 或 top_n 的候选不写入 history（见 main），下次运行会被重新评估，使 backlog 逐日泄洪。
+    """
+    candidates.sort(key=lambda x: x["score"], reverse=True)
+    selected: list[dict] = []
+    selected_ids: set[int] = set()
+    counts: dict[str, int] = {}
+
+    def take(p: dict) -> None:
+        selected.append(p)
+        selected_ids.add(id(p))
+        counts[source_family(p.get("source", ""))] = (
+            counts.get(source_family(p.get("source", "")), 0) + 1
+        )
+
+    # Pass 1：保底名额（按分数高低，已过 min_score 的才会进到这里）
+    for fam, quota in RESERVE_PER_SOURCE.items():
+        for p in candidates:
+            if len(selected) >= top_n or counts.get(fam, 0) >= quota:
+                break
+            if id(p) in selected_ids or source_family(p.get("source", "")) != fam:
+                continue
+            take(p)
+
+    # Pass 2：剩余名额按全局分数填充，遵守 max cap
+    for p in candidates:
+        if len(selected) >= top_n:
+            break
+        if id(p) in selected_ids:
+            continue
+        fam = source_family(p.get("source", ""))
+        cap = MAX_PER_SOURCE.get(fam)
+        if cap is not None and counts.get(fam, 0) >= cap:
+            continue
+        take(p)
+
+    selected.sort(key=lambda x: x["score"], reverse=True)
+    return selected
+
+
 def merge_and_rank(
+    venue_papers: list[dict],
     hf_papers: list[dict],
     arxiv_papers: list[dict],
     target_date,
@@ -378,14 +692,14 @@ def merge_and_rank(
 ) -> list[dict]:
     is_weekend = target_date.weekday() >= 5
 
-    # 按 arXiv ID 合并，保留高分
+    # 按稳定主键合并，保留高分（跨源去重：arxiv 与期刊预印本归并到同一 key）
     by_id: dict[str, dict] = {}
-    for p in hf_papers + arxiv_papers:
-        aid = extract_arxiv_id(p["url"])
-        if not aid:
+    for p in hf_papers + arxiv_papers + venue_papers:
+        key = paper_key(p)
+        if not key:
             continue
-        if aid not in by_id or p["score"] > by_id[aid]["score"]:
-            by_id[aid] = p
+        if key not in by_id or p["score"] > by_id[key]["score"]:
+            by_id[key] = p
 
     print(f"  Merged: {len(by_id)} unique papers", file=sys.stderr)
 
@@ -393,16 +707,15 @@ def merge_and_rank(
     if days > 1:
         print(f"  Multi-day mode (days={days}): skipping history dedup", file=sys.stderr)
         candidates = [p for p in by_id.values() if p["score"] >= MIN_SCORE]
-        candidates.sort(key=lambda x: x["score"], reverse=True)
-        top = candidates[:top_n]
+        top = cap_and_truncate(candidates, top_n)
         print(f"  Final: {len(top)} papers (top_n={top_n})", file=sys.stderr)
         return top
 
     # 单天模式：历史去重
     history = load_history(history_path)
-    history_ids: dict[str, str] = {}  # id → earliest date
+    history_ids: dict[str, str] = {}  # key → earliest date
     for h in history:
-        hid, hdate = h.get("id", ""), h.get("date", "")
+        hid, hdate = history_key(h), h.get("date", "")
         if hid and hdate:
             if hid not in history_ids or hdate < history_ids[hid]:
                 history_ids[hid] = hdate
@@ -424,10 +737,9 @@ def merge_and_rank(
 
     print(f"  After history dedup: {len(deduped)} (removed {removed})", file=sys.stderr)
 
-    # 过滤 + 排序
+    # 过滤 + 排序 + per-source cap
     candidates = [p for p in deduped.values() if p["score"] >= MIN_SCORE]
-    candidates.sort(key=lambda x: x["score"], reverse=True)
-    top = candidates[:top_n]
+    top = cap_and_truncate(candidates, top_n)
     print(f"  Final: {len(top)} papers", file=sys.stderr)
     return top
 
@@ -439,7 +751,26 @@ def main():
     parser.add_argument("--date", help="Target date YYYY-MM-DD (default: today)")
     parser.add_argument("--days", type=int, default=1, help="Number of days to fetch")
     parser.add_argument("--output", "-o", help="Output file path (default: stdout)")
+    parser.add_argument("--search", help="OpenAlex topic search (用于 literature-survey)，给定则只跑搜索")
+    parser.add_argument("--year-from", type=int, help="搜索起始年份（默认今年往前 3 年）")
+    parser.add_argument("--limit", type=int, default=25, help="搜索返回上限")
+    parser.add_argument("--venues", help="逗号分隔的 ISSN，限定搜索 venue（可选）")
     args = parser.parse_args()
+
+    # ── 主题搜索模式（literature-survey 调用）─────────────────────────────
+    if args.search:
+        year_from = args.year_from or (datetime.utcnow().year - 3)
+        venue_issns = [v.strip() for v in args.venues.split(",")] if args.venues else None
+        results = search_openalex_topic(args.search, year_from, args.limit, venue_issns)
+        out = json.dumps(results, ensure_ascii=False, indent=2) + "\n"
+        if args.output:
+            Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.output).write_text(out, encoding="utf-8")
+            print(f"  Output written to {args.output}", file=sys.stderr)
+        else:
+            sys.stdout.write(out)
+            sys.stdout.flush()
+        return
 
     # 使用 UTC 时间，避免请求超出 HF API 的服务器时间限制
     # HF Daily API 数据更新有延迟（服务器时间限制），UTC 00:00-12:00 期间当天数据可能未就绪
@@ -474,7 +805,11 @@ def main():
 
     hf_papers = fetch_hf_papers(start_date, target_date)
     arxiv_papers = fetch_arxiv_papers(start_date, target_date, days)
-    top = merge_and_rank(hf_papers, arxiv_papers, target_date, days=days, top_n=top_n, history_path=history_path)
+    venue_papers = fetch_openalex_papers(target_date) + fetch_cvf_papers()
+    top = merge_and_rank(
+        venue_papers, hf_papers, arxiv_papers, target_date,
+        days=days, top_n=top_n, history_path=history_path,
+    )
 
     # 更新历史
     save_history(top, target_date, history_path)

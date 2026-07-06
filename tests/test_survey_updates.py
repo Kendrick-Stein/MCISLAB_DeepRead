@@ -37,6 +37,14 @@ def test_match_normalizes_hyphens_vs_spaces(tmp_path):
     assert match_surveys(paper2, tmp_path) == ["GUIAgent-Survey"]
 
 
+def test_match_multiline_tags(tmp_path):
+    """多行 YAML list 形式的 tags 也要参与匹配。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2607-MultiTag.md"
+    paper.write_text("---\ntitle: MultiTag benchmark\ntags:\n  - web-agent\n  - benchmark\n---\n")
+    assert match_surveys(paper, tmp_path) == ["GUIAgent-Survey"]
+
+
 def test_record_appends_and_dedups(tmp_path):
     paper = make_vault(tmp_path)
     record(paper, tmp_path)

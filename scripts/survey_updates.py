@@ -23,14 +23,26 @@ def _frontmatter(path: Path) -> dict:
     if not m:
         return {}
     fm, out = m.group(1), {}
+    lines = fm.split("\n")
     for key in ("title", "tags", "keywords"):
-        km = re.search(rf"^{key}:\s*(.+)$", fm, re.MULTILINE)
-        if km:
-            val = km.group(1).strip()
-            if val.startswith("["):
-                out[key] = [v.strip().strip("'\"") for v in val.strip("[]").split(",") if v.strip()]
-            else:
-                out[key] = val.strip("'\"")
+        km = re.search(rf"^{key}:[ \t]*(.*)$", fm, re.MULTILINE)
+        if not km:
+            continue
+        val = km.group(1).strip()
+        if val.startswith("["):
+            out[key] = [v.strip().strip("'\"") for v in val.strip("[]").split(",") if v.strip()]
+        elif val:
+            out[key] = val.strip("'\"")
+        else:
+            # 多行 YAML list：收集紧随其后的缩进 "- item" 行，遇非缩进行停止
+            items = []
+            idx = next(i for i, ln in enumerate(lines) if re.match(rf"^{key}:[ \t]*$", ln))
+            for ln in lines[idx + 1:]:
+                im = re.match(r"^\s+-\s*(.+)$", ln)
+                if not im:
+                    break
+                items.append(im.group(1).strip().strip("'\""))
+            out[key] = items
     return out
 
 

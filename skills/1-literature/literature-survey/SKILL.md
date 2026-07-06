@@ -22,6 +22,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 | `year_range` | 近 3 年 | 时间范围 |
 | `venue_preference` | 无 | venue 偏好 |
 | `max_papers` | 20 | 最终纳入调研的论文数量上限 |
+| `scope` | `full` | `full` = 外部搜索 + vault 综合；`vault-only` = 只综合库内已读论文，产出报告到 Reports/（触发词："根据已读论文写个 XX 报告""vault 里关于 XX 的综合"） |
 
 基于 topic 生成 **3-5 条搜索策略**，覆盖以下角度：
 
@@ -44,12 +45,29 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 
 ### Step 3：外部搜索与筛选
 
-依次执行 Step 1 生成的搜索 query：
+**`scope: vault-only` 时跳过本步与 Step 4**（不做外部搜索、不新增 digest），直接以 Step 2 的库内命中论文进入 Step 5 综合分析。
+
+调研走 **两条互补检索通道**，合并候选：
+
+**通道 A — OpenAlex 主题检索（零 token，覆盖期刊/venue）**：先对核心 query 跑 OpenAlex 搜索，捞回 WebSearch（偏 arxiv）容易漏掉的期刊/顶会论文（IJCV/TNNLS/TPAMI/CVPR 等）。每个核心 query 跑一次：
+
+```bash
+python3 skills/1-literature/daily-papers/fetch_and_score.py \
+  --search "<query>" --year-from <起始年> --limit 25
+# 可选 --venues 0920-5691,0162-8828 限定 ISSN（逗号分隔）
+```
+
+输出 JSON 数组（title/authors/abstract/url/doi/venue/date）。`url` 优先 arxiv 链接、否则 doi.org，可直接喂给 Step 4 的 paper-digest（doi/CVF 走 paper-digest 对应分支）。
+
+**通道 B — WebSearch（开放网络）**：
 
 1. 对每个 query，用 **WebSearch** 搜索（建议加 `site:arxiv.org` 或 `"论文标题" arxiv`），提取搜索结果中的论文信息。
 2. 从搜索结果中收集候选论文列表，提取：title、authors、year、venue（若可判断）、url。
-3. **去重**：将每个候选论文的 title（转小写，去标点）与已知论文清单对比，跳过已在 vault 中的论文。
-4. **搜索轮数上限**：最多执行 **10 次 WebSearch**。若某些 query 返回结果质量低（无相关论文），提前停止该策略。
+
+**合并与去重**：
+
+3. **去重**：将每个候选论文的 title（转小写，去标点）与已知论文清单及两通道彼此对比，跳过重复（同一论文 arxiv 版与期刊版视为一篇）。
+4. **搜索轮数上限**：OpenAlex 最多 5 次 `--search`、WebSearch 最多 **10 次**。若某些 query 返回结果质量低（无相关论文），提前停止该策略。
 
 **搜索/抓取兜底**：若 WebSearch 或 WebFetch 在 arXiv / HuggingFace 上卡顿，先读取 `references/network-fetch-fallback.md`。对已知标题可构造 arXiv search URL 或 HuggingFace paper URL 后用：
 
@@ -91,6 +109,8 @@ python3 scripts/lexmount_fetch.py extract "<url>" --format markdown
 ### Step 6：产出
 
 #### 6a. 生成 Survey 文件
+
+**`scope: vault-only` 时**输出到 `Reports/YYYY-MM-DD-{Topic}-Report.md`（报告性质，不覆盖 Topics/ 下的正式 survey），frontmatter 增加 `scope: vault-only`；以下 survey 文件规则仅适用于 `scope: full`。
 
 Topic 名称根据主题生成（CamelCase，如 `VLA-Manipulation`、`DiffusionPolicy-Robotics`）。
 

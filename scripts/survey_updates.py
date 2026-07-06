@@ -4,13 +4,15 @@
 用法:
     python3 scripts/survey_updates.py record <paper-note.md>
     python3 scripts/survey_updates.py pending [--survey NAME]
-    python3 scripts/survey_updates.py clear --survey NAME --papers a.md,b.md
+    python3 scripts/survey_updates.py clear --survey NAME --papers a.md b.md
 """
 import argparse
 import datetime
 import json
+import os
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -59,14 +61,29 @@ def _load(root: Path) -> dict:
     p = _json_path(root)
     if p.exists():
         try:
-            return json.loads(p.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            pass  # 损坏时重建空结构（spec §9）
+            data = json.loads(p.read_text(encoding="utf-8"))
+            if not isinstance(data, dict) or not isinstance(data.get("pending"), list):
+                raise ValueError("wrong shape")
+            return data
+        except (json.JSONDecodeError, ValueError):
+            # 损坏/结构错误：备份后重建，不静默丢弃（spec §9）
+            bak = p.with_suffix(p.suffix + ".bak")
+            os.replace(p, bak)
+            print(f"[survey_updates] warning: corrupt ledger backed up to {bak}", file=sys.stderr)
     return {"version": 1, "pending": []}
 
 
 def _save(root: Path, data: dict) -> None:
-    _json_path(root).write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    p = _json_path(root)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=p.parent, prefix=p.name, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+        os.replace(tmp, p)  # 原子替换
+    except BaseException:
+        os.unlink(tmp)
+        raise
 
 
 def load_pending(root: Path = ROOT) -> list:
@@ -77,11 +94,13 @@ def match_surveys(paper: Path, root: Path = ROOT) -> list:
     fm = _frontmatter(paper)
     tags = [str(t) for t in fm.get("tags", [])]
     title = str(fm.get("title", ""))
-    haystack = _norm(" ".join(tags) + " " + title)
+    # tags 用 ", " 连接：_norm 后逗号保留，阻止多词 keyword 跨 tag 边界拼接命中
+    haystack = _norm(", ".join(tags) + ", " + title)
     matched = []
     for survey in sorted(root.glob("Topics/*-Survey.md")):
         kws = [str(k) for k in _frontmatter(survey).get("keywords", [])]
-        if any(_norm(kw) in haystack for kw in kws if kw):
+        # 词边界 + 可选复数 s（"vlm" 命中 "vlms"，但 "cua" 不命中 "evacuation"）
+        if any(re.search(rf"\b{re.escape(_norm(kw))}s?\b", haystack) for kw in kws if kw):
             matched.append(survey.stem)
     return matched
 
@@ -111,7 +130,7 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     p_rec = sub.add_parser("record"); p_rec.add_argument("paper")
     p_pen = sub.add_parser("pending"); p_pen.add_argument("--survey")
-    p_clr = sub.add_parser("clear"); p_clr.add_argument("--survey", required=True); p_clr.add_argument("--papers", required=True)
+    p_clr = sub.add_parser("clear"); p_clr.add_argument("--survey", required=True); p_clr.add_argument("--papers", required=True, nargs="+")
     args = ap.parse_args()
     if args.cmd == "record":
         matched = record(Path(args.paper))
@@ -122,7 +141,7 @@ def main() -> int:
             rows = [r for r in rows if r["survey"] == args.survey]
         print(json.dumps(rows, ensure_ascii=False, indent=2))
     else:
-        clear(args.survey, args.papers.split(","))
+        clear(args.survey, args.papers)
     return 0
 
 

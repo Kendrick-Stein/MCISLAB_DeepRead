@@ -65,3 +65,52 @@ def test_clear_removes_processed(tmp_path):
 def test_missing_json_initialized(tmp_path):
     make_vault(tmp_path)
     assert load_pending(tmp_path) == []
+
+
+def test_corrupt_json_backed_up_and_recovered(tmp_path):
+    """损坏的账本不能被静默丢弃：备份为 .bak 后重建，record 仍可用。"""
+    paper = make_vault(tmp_path)
+    ledger = tmp_path / "Workbench" / "survey-updates.json"
+    ledger.write_text("{not valid json", encoding="utf-8")
+    assert load_pending(tmp_path) == []
+    assert (tmp_path / "Workbench" / "survey-updates.json.bak").exists()
+    record(paper, tmp_path)
+    data = json.loads(ledger.read_text(encoding="utf-8"))
+    assert data["version"] == 1
+    assert len(data["pending"]) == 1
+
+
+def test_wrong_shape_json_treated_as_corrupt(tmp_path):
+    """合法 JSON 但结构错误（如 [] 或缺 pending）同样视为损坏。"""
+    make_vault(tmp_path)
+    ledger = tmp_path / "Workbench" / "survey-updates.json"
+    ledger.write_text("[]", encoding="utf-8")
+    assert load_pending(tmp_path) == []
+    assert (tmp_path / "Workbench" / "survey-updates.json.bak").exists()
+
+
+def test_no_substring_false_positive(tmp_path):
+    """词边界：keyword 'cua' 不得命中 'evacuation'。"""
+    make_vault(tmp_path)
+    (tmp_path / "Topics" / "ComputerUse-Survey.md").write_text(
+        "---\ntitle: Computer Use Survey\nkeywords: [cua]\ndomain_map: GUI-Agent\n---\n"
+    )
+    paper = tmp_path / "Papers" / "2607-Crowd.md"
+    paper.write_text("---\ntitle: Simulating crowd evacuation dynamics\ntags: [simulation]\n---\n")
+    assert match_surveys(paper, tmp_path) == []
+
+
+def test_no_cross_tag_phrase_match(tmp_path):
+    """多词 keyword 不得跨 tag 边界拼接命中：[x-gui, agent-y] 不含 'gui agent'。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2607-CrossTag.md"
+    paper.write_text("---\ntitle: Something unrelated\ntags: [x-gui, agent-y]\n---\n")
+    assert match_surveys(paper, tmp_path) == []
+
+
+def test_plural_keyword_match(tmp_path):
+    """可选复数：keyword 'vlm' 须命中标题中的 'VLMs'。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2607-VlmSurvey.md"
+    paper.write_text("---\ntitle: A survey of VLMs\ntags: [misc]\n---\n")
+    assert match_surveys(paper, tmp_path) == ["VLM-Survey"]

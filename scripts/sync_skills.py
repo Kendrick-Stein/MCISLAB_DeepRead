@@ -33,14 +33,20 @@ def check_registration(root: Path) -> tuple[list[Path], list[Path]]:
     return missing, broken
 
 
-def fix_registration(root: Path) -> None:
+def fix_registration(root: Path) -> list[Path]:
+    """为缺失的 skill 创建相对 symlink；返回跳过的非 symlink 冲突路径（留给人工处理）。"""
     reg = root / ".claude" / "skills"
     reg.mkdir(parents=True, exist_ok=True)
+    conflicts = []
     for skill in check_registration(root)[0]:
         link = reg / skill.name
+        if link.exists() and not link.is_symlink():
+            conflicts.append(link)
+            continue
         if link.is_symlink():
             link.unlink()
         link.symlink_to(Path(os.path.relpath(skill, reg)))
+    return conflicts
 
 
 def main() -> int:
@@ -48,12 +54,17 @@ def main() -> int:
     if fix:
         fix_registration(ROOT)
     missing, broken = check_registration(ROOT)
+    reg = ROOT / ".claude" / "skills"
     for s in missing:
-        print(f"MISSING: {s.relative_to(ROOT)} 未注册到 .claude/skills/")
+        link = reg / s.name
+        if link.exists() and not link.is_symlink():
+            print(f"CONFLICT: .claude/skills/{s.name} 是普通文件/目录，请人工处理")
+        else:
+            print(f"MISSING: {s.relative_to(ROOT)} 未注册到 .claude/skills/")
     for b in broken:
         print(f"BROKEN: {b} 指向不存在的目标")
     if missing or broken:
-        print("提示: 运行 python3 scripts/sync_skills.py --fix 修复缺失注册；悬空 symlink 请人工确认后删除")
+        print("提示: 运行 python3 scripts/sync_skills.py --fix 修复缺失注册；悬空 symlink / CONFLICT 请人工确认后处理")
         return 1
     print(f"OK: {len(find_vault_skills(ROOT))} 个 skill 全部已注册")
     return 0

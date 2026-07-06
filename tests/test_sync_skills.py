@@ -39,3 +39,31 @@ def test_fix_creates_relative_symlinks(tmp_path):
     assert link.resolve() == skill_dir.resolve()
     missing, broken = check_registration(tmp_path)
     assert missing == [] and broken == []
+
+
+def test_fix_skips_non_symlink_conflict(tmp_path):
+    make_skill(tmp_path, "4-writing", "auto-cite")
+    reg = tmp_path / ".claude" / "skills"
+    reg.mkdir(parents=True)
+    conflict = reg / "auto-cite"
+    conflict.mkdir()
+    (conflict / "keep.txt").write_text("do not touch")
+    conflicts = fix_registration(tmp_path)
+    assert conflicts == [conflict]
+    assert conflict.is_dir() and not conflict.is_symlink()
+    assert (conflict / "keep.txt").read_text() == "do not touch"
+
+
+def test_fix_repoints_wrong_symlink(tmp_path):
+    skill_dir = make_skill(tmp_path, "4-writing", "auto-cite")
+    other = tmp_path / "elsewhere"
+    other.mkdir()
+    reg = tmp_path / ".claude" / "skills"
+    reg.mkdir(parents=True)
+    os.symlink("../../elsewhere", reg / "auto-cite")
+    conflicts = fix_registration(tmp_path)
+    assert conflicts == []
+    link = reg / "auto-cite"
+    assert link.is_symlink()
+    assert not os.path.isabs(os.readlink(link))
+    assert link.resolve() == skill_dir.resolve()

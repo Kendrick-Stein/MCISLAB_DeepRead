@@ -21,6 +21,12 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 根据 `source` 的类型选择获取方式：
 
 - **arXiv URL**（如 `https://arxiv.org/abs/2603.08127`）：用 WebFetch 抓取该页面。若需要正文，同时抓取对应的 HTML 全文页（如 `https://arxiv.org/html/2603.08127`）。
+- **CVF Open Access URL**（如 `https://openaccess.thecvf.com/content/CVPR2026/html/..._paper.html`）：**全文** 走同名 PDF（把路径中的 `/html/` 换成 `/papers/`、`.html` 换成 `.pdf`，即 `.../content/CVPR2026/papers/..._paper.pdf`）。⚠️ **thecvf.com 对 WebFetch 的 UA 返回 403**，必须用 Bash + curl 带浏览器 UA 下载 PDF 再用 Read 读取：
+  ```bash
+  curl -s --max-time 90 -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
+    -o /tmp/cvf_paper.pdf "<pdf_url>"
+  ```
+  然后 `Read /tmp/cvf_paper.pdf`（>10 页需指定 `pages`）。abstract、作者等元数据可同样用 curl 抓 html 页解析（`id="abstract"` / `id="authors"`），或直接从 PDF 首页提取。`venue` 字段按 proceeding 填，如 `CVPR 2026`、`ICCV 2025`。CVF 论文 PDF 免费且完整，应获取全文而非停留在 abstract。若候选来自 daily-papers，其 `pdf_url` 字段已给出 PDF 直链。
 - **PDF 路径**（如 `/path/to/paper.pdf`）：用 Read 读取文件内容。
 - **论文标题或关键词**：用 WebSearch 搜索（建议加上 `site:arxiv.org` 或 `filetype:pdf`），从结果中定位最可能的论文页面，再用 WebFetch 获取内容。
 - **DOI**（如 `10.1145/...`）：用 WebFetch 抓取 `https://doi.org/<DOI>`，跟随重定向到出版商页面。
@@ -50,6 +56,8 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 | `date_publish` | 发表日期，格式 `YYYY-MM-DD`、`YYYY-MM` 或 `YYYY` |
 | `venue`        | 发表场所，如 `NeurIPS 2025`、`arXiv`；blog 填来源名如 `Google DeepMind Blog`、`Lilian Weng Blog` |
 | `url`          | 论文链接（优先用论文主页，无则用 arXiv abstract 页）     |
+| `arxiv_id`     | arXiv id，如 `2606.19409`（非 arXiv 论文留空）        |
+| `doi`          | DOI，如 `10.1109/TPAMI...`（期刊/会议有则填，否则留空）  |
 | `code`         | GitHub 代码链接（若论文中提及）                     |
 
 ### Step 2：阅读并理解
@@ -105,7 +113,16 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 
    若发现未加引号的字段，立即用 Edit 为该值加上双引号后重新检查。
 
-3. **追加日志**：用 Edit（或 Write 若文件不存在）将以下格式的 log entry 追加到 `Workbench/logs/YYYY-MM-DD.md`（日期为今天）：
+3. **固化引用身份**：用 Bash 为该论文分配稳定 cite_key 并缓存权威 BibTeX：
+
+   ```bash
+   python3 skills/4-writing/latex-citation-enhancer/assign_cite_keys.py Papers/YYMM-ShortTitle.md
+   python3 skills/4-writing/latex-citation-enhancer/fetch_bibtex.py Papers/YYMM-ShortTitle.md
+   ```
+
+   第一条从 url 抽 `arxiv_id` 并写回 `cite_key`（幂等，已有 key 不变）；第二条把 arXiv/Crossref 权威 BibTeX 存入 `references/bibtex-cache.bib`（抓不到则从 frontmatter 重建）。两条都安全可重复执行。
+
+4. **追加日志**：用 Edit（或 Write 若文件不存在）将以下格式的 log entry 追加到 `Workbench/logs/YYYY-MM-DD.md`（日期为今天）：
 
    ```markdown
    ### [HH:MM] paper-digest
@@ -117,7 +134,20 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 
    若日志文件不存在，先创建文件（包含一级标题 `# YYYY-MM-DD`），再追加 entry。
 
-4. **阅读队列**：若 source 来自阅读队列（`Workbench/queue.md` 的 Reading 部分），用 Edit 将对应条目标记为已完成（如在行首添加 `✓` 或删除该条目）。
+5. **阅读队列**：若 source 来自阅读队列（`Workbench/queue.md` 的 Reading 部分），用 Edit 将对应条目标记为已完成（如在行首添加 `✓` 或删除该条目）。
+
+### Step 6：survey 归属记账
+
+笔记保存后，运行记账脚本把它挂到相关 survey 的待更新队列：
+
+```bash
+python3 scripts/survey_updates.py record "Papers/{文件名}.md"
+```
+
+- 脚本按 `Topics/*-Survey.md` frontmatter 的 `keywords` 与本笔记 tags/标题匹配（大小写与连字符已归一化），输出匹配到的 survey 列表（JSON）。
+- 匹配为空是正常情况（论文不属于任何已有 survey 主题），静默继续。
+- 脚本报错时不阻塞 digest：在当日 log 记一条 `survey-updates 记账失败` 即可。
+- pending 的消费由 `survey-refresh` skill 负责（autoresearch 在某 survey 积压 ≥5 篇时触发）。
 
 ## Guard
 
@@ -130,6 +160,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 - [ ] `Papers/YYMM-ShortTitle.md` 已创建且正文 >200 字
 - [ ] frontmatter 的 title、authors、date_publish 字段非空
 - [ ] **YAML 前置校验通过**：所有含冒号的字段值已加双引号（title、venue 等）
+- [ ] **引用身份已固化**：frontmatter 的 `cite_key` 非空，`references/bibtex-cache.bib` 含该 key 的条目
 - [ ] Summary 节非空且不超过 3 句话
 - [ ] 日志已追加到 `Workbench/logs/YYYY-MM-DD.md`
 

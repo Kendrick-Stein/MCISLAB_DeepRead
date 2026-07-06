@@ -27,6 +27,8 @@ autoresearch 是 MindFlow 的核心研究循环，实现了 PhD 导师制中 Res
 3. `Workbench/memory/insights.md` — 近期 insight（关注 status: validated 且近 30 天内的条目）
 4. `Workbench/memory/patterns.md` — 近期 pattern
 5. 用 Glob 列出最近 3 天的 `Workbench/logs/YYYY-MM-DD.md`，用 Read 读取，了解近期执行了什么（避免重复行动）
+6. `Workbench/survey-updates.json` — 各 survey 积压的新论文（信息流闭环的消费信号）
+7. 用 Glob 列出最近的 `News/YYYY-MM-DD.md`（若目录存在），了解非论文信息源的最新动态线索
 
 若 `focus` 参数指定了某个 direction，重点关注该 direction 相关的信息。
 
@@ -39,6 +41,8 @@ autoresearch 是 MindFlow 的核心研究循环，实现了 PhD 导师制中 Res
 | queue.json 有 `status: pending` 的论文任务，或 `Workbench/daily/` 最近总结里有值得深读的论文 | 读取 `skills/1-literature/paper-digest/SKILL.md` 并执行 |
 | agenda 中某 direction 缺乏文献支撑（evidence 稀疏） | 读取 `skills/1-literature/literature-survey/SKILL.md` 并执行 |
 | vault 中有多篇相关论文但未做对比分析 | 读取 `skills/1-literature/literature-survey/SKILL.md` 并执行（其综合步骤即跨论文对比，产出 `Topics/*-Survey.md`） |
+| survey-updates.json 中某 survey pending ≥5 篇，或最老条目 added_at 距今 >7 天 | 读取 `skills/1-literature/survey-refresh/SKILL.md` 并执行 |
+| News/ 最新一期超过 config `news.days` 天数（且 Supervisor 未禁用） | 读取 `skills/1-literature/news-digest/SKILL.md` 并执行 |
 | 近期有 Topics/*-Analysis.md 标注了知识空白 | 读取 `skills/2-ideation/idea-generate/SKILL.md` 并执行 |
 | Ideas/ 中有 status: raw 的 idea 待评估 | 读取 `skills/2-ideation/idea-evaluate/SKILL.md` 并执行 |
 | Ideas/ 中有 status: developing 的 idea 缺实验方案 | 读取 `skills/3-experiment/experiment-design/SKILL.md` 并执行 |

@@ -13,8 +13,10 @@ last_updated: "2026-06-26"
 | Survey | Domain Map |
 |--------|------------|
 | [[Topics/GUIAgent-Survey]] | [[DomainMaps/GUI-Agent]] |
+| [[Topics/WebAgent-Survey]] | [[DomainMaps/GUI-Agent]] |
 | [[Topics/GUI-Environment-Survey]] | [[DomainMaps/GUI-Agent]] |
 | [[Topics/AgentFriendlyEnvironment-Survey]] | [[DomainMaps/GUI-Agent]] |
+| [[Topics/RealWorldGUIAgent-Reliability-Survey]] | [[DomainMaps/GUI-Agent]] |
 | [[Topics/ComputerUseAgents-Survey]] | [[DomainMaps/GUI-Agent]] |
 
 ### VLM / Agent / RL

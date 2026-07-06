@@ -98,6 +98,8 @@ daily-papers / news-digest / literature-survey 的关键词打分均从该文件
 | `survey-refresh` | 把新读论文增量并入 survey | survey-updates.json 积压 ≥5 篇 |
 | `news-digest` | 非论文信息源摘要 | Supervisor 说"看看AI新闻"或 News/ 超期 |
 | `related-work` | 起草英文 LaTeX Related Work | Supervisor 给出 .tex 草稿 |
+| `paper-planning`/`paper-writing`/`paper-review`/`paper-rebuttal` 系列 | 论文投稿全流程（规划 → 分节写作 → 对抗式自审 → rebuttal） | Supervisor 说"准备投稿"/"写论文"/"审稿意见回来了" |
+| `academic-slides` | 学术报告 slides | Supervisor 说"准备一个 talk / 答辩 slides" |
 
 ### Skill 协议
 

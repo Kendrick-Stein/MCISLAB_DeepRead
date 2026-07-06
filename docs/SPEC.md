@@ -112,12 +112,19 @@ ReadPaperMachine/
 | | `latex-citation-enhancer` | 固化 cite_key + 抓权威 BibTeX → 生成 references.bib |
 | | `auto-cite` | 给 LaTeX 草稿逐条判断 + 确认后插入 `\cite{}`（基于 Papers/） |
 | | `related-work` | 起草英文 LaTeX Related Work 章节 |
+| | `paper-planning` | 论文投稿前规划：story/实验/图/时间线 |
+| | `paper-writing` | 英文论文分节写作，11 步 |
+| | `paper-review` | 投稿前对抗式自审 |
+| | `paper-rebuttal` | 审稿后 rebuttal 策略与写作 |
+| | `paper-figures` | 出版级 matplotlib 图表 |
 | `5-evolution` | `memory-distill` | 从日志蒸馏记忆 |
 | | `agenda-evolve` | 演化研究议程 |
 | | `memory-retrieve` | 从记忆库检索相关经验 |
 | `6-orchestration` | `autoresearch` | 核心研究循环 |
 | | `research-team` | 多 Agent 并行协作构建知识库 |
 | `7-presentation` | `domain-presentation` | Domain Map → HTML 可视化展示 |
+| | `academic-slides` | 学术报告 slides |
+| | `paper-graph` | 领域 lineage Mermaid 图 |
 
 ## 5. Conventions
 

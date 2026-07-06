@@ -36,6 +36,15 @@ def _parse_date(s: str):
         return None
 
 
+def _atom_link(entry, ns) -> str:
+    """选 Atom entry 的正文链接：rel="alternate" 或无 rel 优先，否则退回第一个 link。"""
+    links = entry.findall("a:link", ns)
+    for el in links:
+        if el.get("rel") in (None, "alternate"):
+            return el.get("href", "")
+    return links[0].get("href", "") if links else ""
+
+
 def parse_feed(xml_text: str) -> list[dict]:
     """解析 RSS2 <item> 与 Atom <entry>，返回 {title, link, summary, published}。"""
     root = ET.fromstring(xml_text)
@@ -49,19 +58,23 @@ def parse_feed(xml_text: str) -> list[dict]:
             "published": _parse_date(_text(it.find("pubDate"))),
         })
     for it in root.findall(".//a:entry", ns):  # Atom
-        link_el = it.find("a:link", ns)
         items.append({
             "title": _text(it.find("a:title", ns)),
-            "link": link_el.get("href", "") if link_el is not None else "",
+            "link": _atom_link(it, ns),
             "summary": _text(it.find("a:summary", ns)) or _text(it.find("a:content", ns)),
             "published": _parse_date(_text(it.find("a:updated", ns)) or _text(it.find("a:published", ns))),
         })
     return items
 
 
+def _norm(s: str) -> str:
+    """匹配归一化：小写 + 连字符视为空格（与 scripts/survey_updates.py 一致）。"""
+    return s.lower().replace("-", " ")
+
+
 def score_item(item: dict, keywords: list[str]) -> int:
-    hay = (item.get("title", "") + " " + item.get("summary", "")).lower()
-    return sum(1 for kw in keywords if kw.lower() in hay)
+    hay = _norm(item.get("title", "") + " " + item.get("summary", ""))
+    return sum(1 for kw in keywords if _norm(kw) in hay)
 
 
 def main() -> int:
@@ -89,6 +102,10 @@ def main() -> int:
         except Exception as e:  # 单源失败跳过，不阻塞（spec §9）
             errors.append({"source": src["name"], "error": str(e)})
             continue
+        if not items:  # 抓到了但解析出 0 条 → 显式报告，避免静默失败
+            errors.append({"source": src["name"],
+                           "error": "0 items parsed (RSS1.0/RDF or empty feed?)"})
+            continue
         for it in items:
             pub = it.pop("published")
             if pub and pub.tzinfo is None:
@@ -101,7 +118,7 @@ def main() -> int:
                                    "published": pub.isoformat() if pub else None,
                                    "score": score})
 
-    candidates.sort(key=lambda c: c["score"], reverse=True)
+    candidates.sort(key=lambda c: (c["score"], c["published"] or ""), reverse=True)
     out = {"fetched_at": datetime.now(timezone.utc).isoformat(),
            "days": days,
            "candidates": candidates[: news_cfg.get("top_n", 20)],

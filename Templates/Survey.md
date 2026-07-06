@@ -4,6 +4,8 @@ tags: [tag1, tag2, ...]
 date_updated: "{{date}}"
 year_range: YYYY-YYYY
 papers_analyzed:
+keywords: []  # 小写短语，供 survey_updates.py 匹配论文（如 [gui-agent, web agent]）
+domain_map: null  # 对应 DomainMaps/{Name}.md，无则 null
 ---
 ## Overview
 %% 领域概览：核心问题、研究现状、整体趋势，3-5 段 %%

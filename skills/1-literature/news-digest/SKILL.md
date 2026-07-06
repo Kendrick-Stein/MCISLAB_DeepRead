@@ -68,7 +68,7 @@ sources_failed: [{失败源名}]
 ### Step 4：回链与记录
 
 1. action 中"建议 digest"的论文：追加 summarize_paper 任务到 `Workbench/queue.json`
-   （结构参照队列中现有条目）。
+   （最小结构：`{"task": {"task_id": "<8位hex>", "task_type": "summarize_paper", "title": "Summarize: <标题>", "goal": "Generate structured note for paper '<标题>'", "topic": null, "input_refs": ["<年份-标题>"], "output_path": null, "priority": 50, "status": "pending", "dependencies": [], "metadata": {"paper_url": "<arXiv url>"}}, "added_at": "<ISO 时间戳>", "source": "news-digest", "attempts": 0, "last_attempt": null}`——与 queue.json 现有条目结构一致）。
 2. 更新 `News/_index.md` 期数列表：追加一行 `- [[News/YYYY-MM-DD]] — 一句话亮点`。
 3. 与某 direction 强相关的条目：不改 `Workbench/agenda.md`（agenda 只由 agenda-evolve/
    Supervisor 改），仅在当日 log 中提示。

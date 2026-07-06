@@ -66,6 +66,7 @@ daily-papers / news-digest / literature-survey 的关键词打分均从该文件
 - `Ideas/` — 研究 idea
 - `Projects/` — 项目记录
 - `Reports/` — 生成的报告
+- `News/` — 非论文信息源摘要
 - `Meetings/` — 会议记录
 - `Workbench/` — 你的工作状态（agenda, queue, memory, logs）
 - `skills/` — 科研技能库
@@ -94,6 +95,9 @@ daily-papers / news-digest / literature-survey 的关键词打分均从该文件
 | `idea-generate` | 生成研究 idea | Topics 中标注了知识空白 |
 | `idea-evaluate` | 评估 idea 可行性 | Ideas/ 中有 status: raw 的 idea |
 | `autoresearch` | 自主研究循环 | Supervisor 说"自己干活吧" |
+| `survey-refresh` | 把新读论文增量并入 survey | survey-updates.json 积压 ≥5 篇 |
+| `news-digest` | 非论文信息源摘要 | Supervisor 说"看看AI新闻"或 News/ 超期 |
+| `related-work` | 起草英文 LaTeX Related Work | Supervisor 给出 .tex 草稿 |
 
 ### Skill 协议
 

@@ -114,7 +114,7 @@ python3 scripts/lexmount_fetch.py extract "<url>" --format markdown
 
 Topic 名称根据主题生成（CamelCase，如 `VLA-Manipulation`、`DiffusionPolicy-Robotics`）。
 
-- **新建**：若 `Topics/{Topic}-Survey.md` 不存在，用 Write 按 `Templates/Survey.md` 模板创建并填充各 section。
+- **新建**：若 `Topics/{Topic}-Survey.md` 不存在，用 Write 按 `Templates/Survey.md` 模板创建并填充各 section。新建 survey 必须填 frontmatter `keywords`（小写短语）与 `domain_map`（无对应 DomainMap 填 null），否则该 survey 无法进入 digest→survey 信息流。
 - **增量更新**：若已存在，用 Edit 在其基础上补充新论文、刷新分析，保留原有内容中仍然有效的部分。
 
 所有论文引用使用 `[[wikilink]]` 格式。

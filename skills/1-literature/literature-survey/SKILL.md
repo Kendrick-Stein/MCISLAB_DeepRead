@@ -119,6 +119,16 @@ Topic 名称根据主题生成（CamelCase，如 `VLA-Manipulation`、`Diffusion
 
 所有论文引用使用 `[[wikilink]]` 格式。
 
+**写作基线（Supervisor 2026-07-07 手改确立，最基础要求）**：
+
+1. **一句话结论就是一句话**：Overview 首句只保留单一核心论题；并列的分类/需求轴用竖排 bullet list，不塞进长句。
+2. **零对话性内容**：survey 是沉淀文档，不是对 Supervisor 的回复——不写"直觉得到验证"式框架、导览铺垫、与其他 survey 的分工说明；"建议加入 DomainMaps"等流程注记只放调研日志。
+3. **标题平实**：用"时间段/对象：内容"式描述性标题，不用叙事修辞（如"五幕""第 X 幕"）。
+4. **每行一个论点**：拆长复合句；演进链（A→B→C）竖排分行、每级加粗。
+5. **砍论据的展开，不砍论断的解释**：机制细节（文件系统原理、算法推导）留在 Paper 笔记，正文只留论断 + 关键数字 + wikilink；反之，**预测/新概念/反直觉论断必须 self-contained 展开 2-4 句**（是什么/为什么/萌芽证据）——压缩成标签再靠事后口头解释 = 写作失败。
+6. **Takeaway ≤5 条且硬**：只留可操作/可预测/指向行动的结论；类比只留一句 thesis，不留论证展开。
+7. **表格优先**：凡"维度 × 对象"的对比（能力矩阵/需求分层/用途分化）一律表格化——表格是 survey 最高价值资产。
+
 #### 6b. 追加日志
 
 用 Edit（若文件不存在则用 Write）将以下格式的 log entry 追加到 `Workbench/logs/YYYY-MM-DD.md`：
@@ -139,7 +149,7 @@ Topic 名称根据主题生成（CamelCase，如 `VLA-Manipulation`、`Diffusion
 - **paper-digest 失败不阻塞**：单篇论文 digest 失败时记录原因并继续处理下一篇，不中断整个 survey 流程。
 - **搜索上限**：最多执行 50 次 WebSearch，避免过度消耗 token 和 API 配额。
 - **不捏造论文**：所有纳入分析的论文必须来自实际搜索结果或 vault 已有笔记，不得凭记忆编造论文信息。
-- **不直接修改 DomainMaps**：综合分析中如有值得纳入 DomainMaps 的发现，在 Survey 文件的 Key Takeaways 中标注"建议加入 DomainMaps"，不得直接修改 `DomainMaps/` 下的任何文件。
+- **不直接修改 DomainMaps**：综合分析中如有值得纳入 DomainMaps 的发现，在 Survey 文件的调研日志中标注"建议加入 DomainMaps"（不放 Key Takeaways，见写作基线第 2 条），不得直接修改 `DomainMaps/` 下的任何文件。
 - **Papers/ 已有笔记只读**：不得修改 vault 中已存在的 Paper 笔记，只可读取。新论文的笔记由 paper-digest 创建。
 
 ## Verify
@@ -148,6 +158,8 @@ Topic 名称根据主题生成（CamelCase，如 `VLA-Manipulation`、`Diffusion
 - [ ] 技术路线分类 ≥2 条
 - [ ] Datasets & Benchmarks 表非空
 - [ ] Open Problems 节非空
+- [ ] **写作基线**：Overview 首句为单一论题句；全篇无对话性内容与流程注记（后者只在调研日志）
+- [ ] **展开度**：Takeaway 中每条预测/新概念/反直觉论断都有 2-4 句 self-contained 解释，可脱离对话独立读懂
 
 ## Examples
 

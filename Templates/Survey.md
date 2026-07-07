@@ -8,7 +8,7 @@ keywords: []  # 小写短语，供 survey_updates.py 匹配论文（如 [gui-age
 domain_map: null  # 对应 DomainMaps/{Name}.md，无则 null
 ---
 ## Overview
-%% 领域概览：核心问题、研究现状、整体趋势，3-5 段 %%
+%% 领域概览：核心问题、研究现状、整体趋势，3-5 段。首句=单一核心论题（真正的一句话）；并列分类用竖排 bullet；禁对话性内容与流程注记（写作基线见 literature-survey SKILL Step 6a） %%
 
 ## 技术路线
 %% 按方法论聚类（2-4 个路线），每个路线含代表论文、核心思路、优劣势 %%
@@ -22,7 +22,7 @@ domain_map: null  # 对应 DomainMaps/{Name}.md，无则 null
 %% 该领域主要数据集和评测基准，SOTA 列填当前最优结果及方法（如 "98.7% (Xiaomi-Robotics-0)"），可根据具体情况调整Table格式 %%
 
 ## Key Takeaways
-%% 3-5 条核心结论 %%
+%% ≤5 条核心结论，只留可操作/可预测/指向行动的；预测/新概念/反直觉论断必须自带 2-4 句 self-contained 解释（砍论据的展开，不砍论断的解释） %%
 
 ## Open Problems
 %% 该领域尚未解决的问题和研究机会 %%

@@ -1,6 +1,6 @@
 ---
 title: Topics
-last_updated: "2026-06-26"
+last_updated: "2026-07-07"
 ---
 
 ## 研究主题
@@ -14,6 +14,7 @@ last_updated: "2026-06-26"
 |--------|------------|
 | [[Topics/GUIAgent-Survey]] | [[DomainMaps/GUI-Agent]] |
 | [[Topics/WebAgent-Survey]] | [[DomainMaps/GUI-Agent]] |
+| [[Topics/WebEnvironment-Engine-Survey]] | [[DomainMaps/GUI-Agent]] |
 | [[Topics/GUI-Environment-Survey]] | [[DomainMaps/GUI-Agent]] |
 | [[Topics/AgentFriendlyEnvironment-Survey]] | [[DomainMaps/GUI-Agent]] |
 | [[Topics/RealWorldGUIAgent-Reliability-Survey]] | [[DomainMaps/GUI-Agent]] |

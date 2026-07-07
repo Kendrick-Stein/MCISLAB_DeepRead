@@ -3,7 +3,7 @@ title: "Web 环境引擎需求演进综述——从 WebBench/WebEnv 十年演进
 tags: [web-agent, survey, environment-engineering, agentic-RL, benchmark]
 date_updated: "2026-07-07"
 year_range: 2017-2026
-papers_analyzed: 30
+papers_analyzed: 31
 keywords: [web environment, environment engine, browser environment, snapshot, reset, parallel rollout, backtracking, state fork, verifier, reward, task generation, rl infrastructure, webarena, deterministic replay]
 domain_map: GUI-Agent
 ---
@@ -18,7 +18,7 @@ domain_map: GUI-Agent
 
 **为什么环境端成了瓶颈**：agent 侧的每一次范式升级，都会向环境端提出一批新需求，且环境需求**滞后于训练范式约一年才被显影**。prompting 时代（2023）只需要观察和终态打分；inference-time search 时代（2024）需要回溯；RL 时代（2024–2025）需要廉价 reset、大规模并行、可靠 reward；self-improving/大规模训练时代（2025–2026）需要任务自动生成和失败轨迹合成。每一代 benchmark 的"设计缺陷"，其实是上一代需求清单的化石。
 
-**一个不可能三角贯穿始终**：realism（真实性）、controllability（可控性：reset/fork/verify）、scalability（并行成本）三者不可兼得。live web 有完美 realism 但 controllability≈0（[[Papers/2504-OnlineMind2Web]] 靠它揭穿"进步幻觉"，但 [[Papers/2502-InSTA]] 在它上面只敢做 read-only 任务）；Docker 自托管有完美 controllability 但 realism 有限且 scalability 差（WebArena 每容器 6.78GB / 启动近 1 分钟，DreamGym 实测只能开 4 个并行 session）；合成环境 scalability 无限但 realism 存疑。2025–2026 的所有环境工作都在这个三角内找新的帕累托点：确定性副本（[[Papers/2504-REAL]]）、Docker mirror（[[Papers/2600-WebHarbor]]）、块级快照容器（[[Papers/2510-WebServ]]）、规范驱动合成（[[Papers/2600-InfinitewebScalableWebEnvironment]]）。
+**一个不可能三角贯穿始终**：realism（真实性）、controllability（可控性：reset/fork/verify）、scalability（并行成本）三者不可兼得。live web 有完美 realism 但 controllability≈0（[[Papers/2504-OnlineMind2Web]] 靠它揭穿"进步幻觉"，但 [[Papers/2502-InSTA]] 在它上面只敢做 read-only 任务）；Docker 自托管有完美 controllability 但 realism 有限且 scalability 差（WebArena 每容器 6.78GB / 启动近 1 分钟，[[Papers/2511-DreamGym]] 实测只能开 4 个并行 session 且需手动 sweep-reset）；合成环境 scalability 无限但 realism 存疑。2025–2026 的所有环境工作都在这个三角内找新的帕累托点：确定性副本（[[Papers/2504-REAL]]）、Docker mirror（[[Papers/2600-WebHarbor]]）、块级快照容器（[[Papers/2510-WebServ]]）、规范驱动合成（[[Papers/2600-InfinitewebScalableWebEnvironment]]）。
 
 本综述与既有笔记的分工：[[Topics/WebAgent-Survey]] 讲 agent 方法侧演进，[[Topics/GUI-Environment-Survey]] 讲跨平台（mobile/desktop/web）环境基建，[[Topics/AgentFriendlyEnvironment-Survey]] 提出 AFE Protocol 的供给侧设想；**本篇专注 web 模态，做需求侧推导**——从 benchmark/训练环境的演进史反推环境引擎的需求规格，为 primary direction（Agent-Facing Environment Runtime）补齐 demand-side 证据链。
 
@@ -44,7 +44,7 @@ judge 的可靠性随即成为独立研究对象。[[Papers/2504-AgentRewardBenc
 
 [[Papers/2411-WebRL]] 证明 online RL 能让 8B 开源模型反超 GPT-4-Turbo 后，训练侧对环境的需求全面爆发，且每一项都有量化证据：
 
-- **廉价 reset**：AgentGym-RL (2509.08755) 不得不给 WebArena 加装 full-reset 接口和多 Chromium 子进程架构；DreamGym (2511.03773) 抱怨"不存在可靠的 WebArena 开源 RL 基建，倾尽工程也只能开 4 个并行 session"——干脆放弃真实环境转向合成经验。
+- **廉价 reset**：AgentGym-RL (2509.08755) 不得不给 WebArena 加装 full-reset 接口和多 Chromium 子进程架构；[[Papers/2511-DreamGym]] 的第一手证词（Appendix A.3，已核实原文）："不存在可靠的 WebArena 开源 RL 基建，倾尽工程也只能开 4 个 AWS server / 4 个并行 session"，还要手动 sweep-reset 防跨任务污染、且官方评测函数存在已知误判——干脆放弃真实环境转向合成经验。
 - **大规模并行**：[[Papers/2508-ComputerRL]] 用 Docker+gRPC 撑起千级 VM；[[Papers/2606-AsyncWebRL]] 全异步 rollout；[[Papers/2509-DARTGUI]] 解耦异步架构把环境利用率从 12.2% 提到 67.7%（5.5×）——**引擎工程效率的收益常常大于算法创新**。
 - **可验证 reward**：[[Papers/2606-WebGym]]（~292k 任务 + rubric binary reward）与 [[Papers/2606-CUAGym]]（环境构建时同步生成 task/state/reward.py，产出 32K+ verified RLVR tuples）代表两条路线：前者用 judge 换覆盖面，后者把 reward 做进环境本体。
 - **任务供给**：[[Papers/2502-InSTA]] 把任务生成推到 150k 个 live 站点（LLM proposer 89% 可验证 / safety filter 97% / judge 82.6%），$521 收集 2.2M 轨迹，1.7B 模型训到 56.9% 超过 235× 大的收集 policy。**共识：OOD 泛化来自任务分布 scaling，而非新算法**（WebGym/AsyncWebRL/InSTA 三方一致）。
@@ -58,7 +58,7 @@ judge 的可靠性随即成为独立研究对象。[[Papers/2504-AgentRewardBenc
 1. [[Papers/2407-TreeSearchLMAgents]] 证明 inference-time tree search 收益巨大（VWA +39.7% 相对，弱模型 +119.7%，且随预算单调 scaling），但环境无快照，回溯只能"reset 环境 + 重放动作序列"——O(depth) 的昂贵模拟，还依赖确定性假设，只在沙盒可行。
 2. [[Papers/2411-WebDreamer]] 明确指出 live 站点上 "resetting the environment or undoing action sequences is not feasible"，动作不可逆 + 搜索放大副作用 → 干脆把探索搬进 LLM 的参数化世界知识里做"想象模拟"。代价可量化：VWA 23.6% vs 真实搜索 26.4%（想象探索拿到真实探索 ~70% 的收益），且模拟深度 H>1 即退化。
 3. WebOperator (2512.12692，摘要级) 进一步指出 Tree Search/LATS/WebPilot 全都隐含假设动作可逆，提出 action-aware 安全回溯——需求细化为"**环境应显式标注动作可逆性**"。
-4. DreamGym (2511.03773，摘要级) 则是训练侧的同构故事：真实环境并行开不起 → 合成经验替代真实 rollout。
+4. [[Papers/2511-DreamGym]] 则是训练侧的同构故事：真实环境并行开不起 → 推理式经验模型合成转移+reward 替代真实 rollout，WebArena 上零真实交互 GRPO 7.3→13.3；其 Theorem 1 还给出了替代路线的理论边界——合成训练的真实环境收益只取决于 **ε_R（reward 保真）+ ε_P（转移域一致）**，与 raw-state 复刻无关。但纯合成在 RL-ready 环境仍略低于真实 RL（S2R 混合才反超），说明合成是 warm-start 而非终局替代。
 
 这条平行线的含义：**world model / 经验合成路线与环境引擎路线在竞争同一个需求**——要么环境提供廉价的真实状态分支，要么模型自己想象。二者的相对成本决定路线选择（详见 Takeaway 3）。
 
@@ -88,7 +88,7 @@ L3 是质变：只有可编程注入才支撑 (a) 边角场景评测（缺货、
 
 ### 轴 3：并行（parallel）——瓶颈在 per-instance 成本与异步解耦，不在机器数
 
-数字线索：4 个 session（DreamGym 在 WebArena 上的极限）→ 256 并行/单机（MobileGym，~400MB/实例）→ 200+/单机（WebServ，28MiB/实例）→ 千级 VM（ComputerRL，靠钱堆）。两个杠杆：
+数字线索：4 个 session（[[Papers/2511-DreamGym]] 在 WebArena 上的极限）→ 256 并行/单机（MobileGym，~400MB/实例）→ 200+/单机（WebServ，28MiB/实例）→ 千级 VM（ComputerRL，靠钱堆）。两个杠杆：
 
 - **per-instance 成本**：6.78GB→28MiB 的 240× 差距来自存储架构（分层文件系统整文件复制 vs block-level CoW），不是调参能解决的——**引擎选型即命运**。
 - **异步解耦**：GPU（训练）与 CPU/浏览器（rollout）速度失配，同步架构让环境利用率只有 12.2%（[[Papers/2509-DARTGUI]]）；解耦后 67.7%。[[Papers/2606-AsyncWebRL]] 还发现同步假设泄漏进算法（GRPO 的 1/|τ| 归一化在异步长轨迹下鼓励失败）——**引擎架构与算法设计耦合，不是纯工程问题**。
@@ -146,7 +146,7 @@ L3 是质变：只有可编程注入才支撑 (a) 边角场景评测（缺货、
 
 2. **环境引擎在重新发明 OS/数据库的核心抽象**。六轴需求逐条对应成熟系统概念：可编程 init = seed/fixture、状态隔离 = transaction isolation、快照/分支 = copy-on-write fork、确定性重试 = record-replay debugging、state-diff verify = assertion、任务注入 = test harness。WebServ 用 ZFS CoW、REAL 用 localStorage 单存储、MobileGym 用 JSON state——都是把 web 栈搬回"状态是一等对象"的系统设计。**这个类比有预测力**：OS/DB 领域已解决而 web env 还没搬过来的能力（如 MVCC 式多 agent 并发隔离、WAL 式状态审计日志）就是下一波工作。（建议加入 DomainMaps。）
 
-3. **环境能力与模型能力可以互相替代，竞争同一预算**。环境不支持回溯 → WebDreamer 用 LLM 想象模拟（拿到真实搜索 ~70% 收益）；环境并行开不起 → DreamGym 合成经验。反向推论：引擎每把一项能力做便宜一个数量级（如快照 240×），对应的 world-model 绕行路线就失去必要性。评估任何 world-model-for-web 工作时，都应问"如果环境原生支持这个操作，该方法还剩什么价值"。
+3. **环境能力与模型能力可以互相替代，竞争同一预算**。环境不支持回溯 → WebDreamer 用 LLM 想象模拟（拿到真实搜索 ~70% 收益）；环境并行开不起 → [[Papers/2511-DreamGym]] 合成经验。替代的理论边界由 DreamGym Theorem 1 给出：合成路线的收益上限受 ε_R（reward 保真）+ ε_P（转移域一致）约束——**当真实引擎的并行/reset 成本降到合成推理成本以下，或任务要求的转移保真超出 LLM 先验，天平倒向引擎**。反向推论：引擎每把一项能力做便宜一个数量级（如快照 240×），对应的 world-model 绕行路线就失去必要性。评估任何 world-model-for-web 工作时，都应问"如果环境原生支持这个操作，该方法还剩什么价值"。
 
 4. **评测环境与训练环境的需求已分化，同一环境难以同时最优**。评测要 determinism、防泄漏、严 verifier、固定任务集；训练要吞吐、dense/partial reward、任务多样性、允许 progress probe。REAL（binary reward，自认不适合 RL）与 WebGym（rubric judge 换覆盖面）各自只占一端。环境设计应显式区分 eval mode / train mode（与 [[Topics/AgentFriendlyEnvironment-Survey]] Open Problem 5 呼应，现在有了实证支撑）。
 
@@ -165,8 +165,9 @@ L3 是质变：只有可编程注入才支撑 (a) 边角场景评测（缺货、
 
 ## 调研日志
 
-- **调研日期**: 2026-07-07（初版，autoresearch focus 指定：Web 环境引擎需求演进）
-- **论文统计**: vault 已有 ~24 篇直接相关 + 新 digest 6 篇（[[Papers/2407-TreeSearchLMAgents]]、[[Papers/2411-WebDreamer]]、[[Papers/2504-REAL]]、[[Papers/2502-InSTA]]、[[Papers/2504-AgentRewardBench]]、[[Papers/2510-WebServ]]）= 30 篇深度分析；另有 5 篇摘要级引用（WebOperator 2512.12692、DreamGym 2511.03773、AgentGym-RL 2509.08755、OpenWebRL 2606.02031、WAC 2602.15384），均来自 WebSearch 结果，未捏造。
+- **调研日期**: 2026-07-07（初版，autoresearch focus 指定：Web 环境引擎需求演进）；2026-07-07 增量（补 digest DreamGym）
+- **论文统计**: vault 已有 ~24 篇直接相关 + 新 digest 7 篇（[[Papers/2407-TreeSearchLMAgents]]、[[Papers/2411-WebDreamer]]、[[Papers/2504-REAL]]、[[Papers/2502-InSTA]]、[[Papers/2504-AgentRewardBench]]、[[Papers/2510-WebServ]]、[[Papers/2511-DreamGym]]）= 31 篇深度分析；另有 4 篇摘要级引用（WebOperator 2512.12692、AgentGym-RL 2509.08755、OpenWebRL 2606.02031、WAC 2602.15384），均来自 WebSearch 结果，未捏造。
 - **外部检索**: WebSearch 6 次（tree search 回溯 / world model 绕行 / 确定性副本 / internet-scale 任务生成 / judge 可靠性 / RL 基建 snapshot-reset-parallel）。
-- **仍未 digest（供后续）**: WebOperator (2512.12692，action-aware 安全回溯)、DreamGym (2511.03773，合成经验)、AgentGym-RL (2509.08755)、OpenWebRL (2606.02031，live RL 容错基建)、NNetNav/Explorer/Go-Browse（探索式任务合成家族）、PAE (2412.13194)。
+- **2026-07-07 增量**: [[Papers/2511-DreamGym]] 全文（PDF 27 页）消化——Appendix A.3 "4 并发 / 手动 sweep-reset / 官方评测误判"三条证词核实原文无误；新增 Theorem 1（ε_R+ε_P 边界）注入 Takeaway 3，"合成 vs 引擎"的替代关系从经验观察升级为有理论刻画的权衡。
+- **仍未 digest（供后续）**: WebOperator (2512.12692，action-aware 安全回溯)、AgentGym-RL (2509.08755)、OpenWebRL (2606.02031，live RL 容错基建)、NNetNav/Explorer/Go-Browse（探索式任务合成家族）、PAE (2412.13194)。
 - **建议加入 DomainMaps**: (a) GUI-Agent domain 的 Environment/Harness 分支下新增"环境引擎六轴需求"框架；(b) "环境引擎 = web 的 OS/DB 化"类比（Takeaway 2）作为 cross-domain pattern 候选。

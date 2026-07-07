@@ -20,14 +20,14 @@ date_updated: "2026-06-25"
 - [[Papers/2606-MyPCBench]] - personal context benchmark，暴露 logged-in-like assistant 场景。
 - [[Papers/2606-BraveGuard]] - trajectory-level guard training，强调 execution trace safety。
 - [[Papers/2606-AgentCIBench]] - contextual integrity benchmark，证明 normal-use CUA 会发生 context-inappropriate disclosure，平均 leakage 67.9%。
-- [[Papers/2500-PermissionManifestsWebAgents]] - permission manifest 思路，可作为 task scope 表达基础。
+- [[Papers/2512-PermissionManifestsWebAgents]] - permission manifest 思路，可作为 task scope 表达基础。
 - [[Ideas/HybridVerifier-GUIRuntime]] - agent-facing verifier，用于减少 reward hacking；本 idea 更关注 privacy/safety。
 
 **Novelty**: 3/5。AgentCIBench 已直接覆盖 personal CUA 的 contextual disclosure evaluation，因此“发现这个风险 / 定义 leakage benchmark”不再新；仍有差异化的是 task-scoped permission manifest + trajectory privacy guard 作为 runtime intervention，而不是离线评测。
 
 ## Evaluation — 2026-06-25
 
-**Novelty**: 3/5 — closest works: [[Papers/2606-AgentCIBench]], [[Papers/2606-MyPCBench]], [[Papers/2606-BraveGuard]], [[Papers/2500-PermissionManifestsWebAgents]]
+**Novelty**: 3/5 — closest works: [[Papers/2606-AgentCIBench]], [[Papers/2606-MyPCBench]], [[Papers/2606-BraveGuard]], [[Papers/2512-PermissionManifestsWebAgents]]
 
 AgentCIBench 明确提出 CUA contextual integrity / inappropriate disclosure benchmark，直接压低 novelty。剩余创新空间在于把 AgentCIBench 的 disclosure taxonomy 变成 agent-facing permission / guard protocol，并测 runtime intervention 对 leakage 和 task utility 的因果作用。
 
@@ -37,7 +37,7 @@ AgentCIBench 明确提出 CUA contextual integrity / inappropriate disclosure be
 
 **Risk**: 3/5 — 主要风险是与 AgentCIBench mitigation 过近、manifest 变成人工规则工程、guard 过保守导致 utility drop。可通过强 baseline（AgentCIBench mitigations / prompt-only / output-only guard）和 process-level trajectory metric 区分。
 
-**Evidence**: 5/5 — [[Papers/2606-MyPCBench]] 证明 personal context 是 CUA 能力轴，[[Papers/2606-AgentCIBench]] 直接证明 contextual disclosure 高发，[[Papers/2606-BraveGuard]] 支持 trajectory-level guard 比 prompt-level guard 更合适，[[Papers/2500-PermissionManifestsWebAgents]] 提供 permission manifest 设计先例。
+**Evidence**: 5/5 — [[Papers/2606-MyPCBench]] 证明 personal context 是 CUA 能力轴，[[Papers/2606-AgentCIBench]] 直接证明 contextual disclosure 高发，[[Papers/2606-BraveGuard]] 支持 trajectory-level guard 比 prompt-level guard 更合适，[[Papers/2512-PermissionManifestsWebAgents]] 提供 permission manifest 设计先例。
 
 **Total**: 20/25。
 

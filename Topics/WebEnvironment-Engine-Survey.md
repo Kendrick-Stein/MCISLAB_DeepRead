@@ -118,7 +118,7 @@ L3 是质变：只有可编程注入才支撑 (a) 边角场景评测（缺货、
 
 - **确定性执行**：flaky 不只来自内容漂移，更来自**动作-观察竞态**——SPA 异步加载下"等固定时长"拿到 partially-observed 状态（[[Papers/2510-WebServ]] 的网络感知 idle 同步是目前最干净的解法）。数据层确定性则靠静态化（REAL 三件套：数据固定 + 时间锁定 + localStorage 状态）。live 环境无法确定性化时的次优解是**容错层**：[[Papers/2606-OpenWebRL]] 用 K8s 沙盒隔离 + 分级超时重试 + 七类结构化失败归因 + 站点黑名单撑起 80–100 并发的 live online RL（4B 平均 68.4% 追平 Gemini CUA），但其失败分析显示 **51% 的失败仍在环境接入层**（bot 检测/封锁/网络）——容错层是给不可控环境补的"伪引擎"，天花板明确。
 - **安全隔离**：三重动机——(a) 真实副作用（live 下不敢做 transactional 任务，InSTA 因此把任务分布系统性偏向 read-only，**这是 live 训练路线的结构性天花板**）；(b) 受控注入评测（[[Papers/2504-WASP]]/[[Papers/2409-EIA]] 的 prompt injection 攻击评测只能在沙盒里做）；(c) 对外部世界的责任（InSTA 的每站 1 任务/30 动作限速协议）。
-- **治理接口萌芽**：InSTA 的 agents.txt（站长声明速率限制、可访问范围、**自建 playground 副本**）与 [[Papers/2500-PermissionManifestsWebAgents]] 的 agent-permissions.json 是同一趋势——**环境对 agent 的声明式接口标准**，可视为"环境引擎需求"的站长侧镜像。
+- **治理接口萌芽**：InSTA 的 agents.txt（站长声明速率限制、可访问范围、**自建 playground 副本**）与 [[Papers/2512-PermissionManifestsWebAgents]] 的 agent-permissions.json 是同一趋势——**环境对 agent 的声明式接口标准**，可视为"环境引擎需求"的站长侧镜像。
 
 ## Datasets & Benchmarks：环境引擎能力矩阵
 

@@ -69,5 +69,5 @@ mindmap
 ## Notes
 
 - **对 AFE 的证据价值**：InSTA 是"live web 作为训练环境"的能力上界与代价清单——覆盖面无限但 **init/reset/verify/transactional 全部缺失**，只能用 read-only 任务 + 噪声 judge。它自己在 Appendix D 提出的 playground（站点自建仿真副本）恰恰承认了这个缺口：**规模要从 live 拿，可控性要从副本拿**。这与 [[Papers/2504-REAL]]（副本）、[[Papers/2600-WebHarbor]]（mirror）形成需求-供给呼应。
-- agents.txt 与 [[Papers/2500-PermissionManifestsWebAgents]] 的 agent-permissions.json 是治理层的两个平行提案，可在 survey 里合并为"环境对 agent 的声明式接口"。
+- agents.txt 与 [[Papers/2512-PermissionManifestsWebAgents]] 的 agent-permissions.json 是治理层的两个平行提案，可在 survey 里合并为"环境对 agent 的声明式接口"。
 - 数据混合泛化 +156% 支持 [[Topics/WebAgent-Survey]] 的"OOD 泛化来自任务分布 scaling"结论。

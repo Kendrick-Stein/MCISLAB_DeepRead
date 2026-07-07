@@ -86,7 +86,7 @@ web agent 必然消费**不可信的第三方网页内容**，因此面临 GUI/d
 
 - **攻击**：[[Papers/2605-WebTrap]]（parasitic goal fusion 中途劫持，真实站点 100% ASR）、[[Papers/2504-WASP]]（84 任务，realistic 威胁模型，86% 部分成功但完整攻击难——"security by incompetence"）、[[Papers/2409-EIA]]（环境注入窃隐私，Mind2Web PII 70%，ICLR 2025）、InjecAgent、SafeArena、VPI-Bench（视觉注入）。
 - **防御/检测**：WebAgentGuard、WebSentinel、WAInjectBench（基于 WASP/EIA 场景的检测线）。
-- **治理**：[[Papers/2500-PermissionManifestsWebAgents]] 提 `agent-permissions.json`（类 robots.txt 的机器可解析权限声明：resource/action 分层 + API-first）——在"全封禁"与"全放任"间建中间层。
+- **治理**：[[Papers/2512-PermissionManifestsWebAgents]] 提 `agent-permissions.json`（类 robots.txt 的机器可解析权限声明：resource/action 分层 + API-first）——在"全封禁"与"全放任"间建中间层。
 - 关键结论：当前安全主要是"security by incompetence"（靠 agent 无能而非鲁棒防御），一旦能力提升，注入风险会随之放大。
 
 ## Datasets & Benchmarks

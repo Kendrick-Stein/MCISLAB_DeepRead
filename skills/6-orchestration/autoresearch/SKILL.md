@@ -42,7 +42,7 @@ autoresearch 是 MindFlow 的核心研究循环，实现了 PhD 导师制中 Res
 | agenda 中某 direction 缺乏文献支撑（evidence 稀疏） | 读取 `skills/1-literature/literature-survey/SKILL.md` 并执行 |
 | vault 中有多篇相关论文但未做对比分析 | 读取 `skills/1-literature/literature-survey/SKILL.md` 并执行（其综合步骤即跨论文对比，产出 `Topics/*-Survey.md`） |
 | survey-updates.json 中某 survey pending ≥5 篇，或最老条目 added_at 距今 >7 天 | 读取 `skills/1-literature/survey-refresh/SKILL.md` 并执行 |
-| News/ 最新一期超过 config `news.days` 天数（且 Supervisor 未禁用） | 读取 `skills/1-literature/news-digest/SKILL.md` 并执行 |
+| News/ 最新一期超过 config `news.days` 天数（且 Supervisor 未禁用） | 读取 `skills/1-literature/news-digest/SKILL.md` 并执行（该 skill 已含博客/媒体/**公众号**三类源，公众号走搜狗微信搜索，见 `scripts/wechat_search/`） |
 | 近期有 Topics/*-Analysis.md 标注了知识空白 | 读取 `skills/2-ideation/idea-generate/SKILL.md` 并执行 |
 | Ideas/ 中有 status: raw 的 idea 待评估 | 读取 `skills/2-ideation/idea-evaluate/SKILL.md` 并执行 |
 | Ideas/ 中有 status: developing 的 idea 缺实验方案 | 读取 `skills/3-experiment/experiment-design/SKILL.md` 并执行 |

@@ -32,6 +32,19 @@ Read 输出 JSON：`candidates`（RSS 已打分排序）、`web_sources`（需 a
 `errors`（失败源）。对每个 web_source 用 WebFetch（或 `scripts/lexmount_fetch.py` fallback，
 见 references/network-fetch-fallback.md）抓首页，人工筛出时间范围内的条目并入候选。
 
+**公众号源（若 config `news.wechat.enabled`）**：再跑一次微信搜索（爬搜狗，零 token）：
+
+```bash
+python3 scripts/wechat_search/fetch_wechat.py --days {DAYS} \
+  --output Workbench/daily/.wechat-candidates.json
+```
+
+Read 输出 JSON：`candidates` 已按 `watched`（是否来自关注账号）+ 打分排序，字段与上面的
+news candidates 对齐（title/link/summary/source/published/score），可直接并入候选池。
+`errors` 记录被搜狗限流/失败的关键词。**首次运行**若报 `node_modules 缺失`，先
+`cd scripts/wechat_search && npm install`（依赖 Node 18+ 与 cheerio）。搜狗返回的是中间链，
+精读时若打不开可提示用户在浏览器打开或据标题+摘要判断。
+
 ### Step 2：分流
 
 扫 title + summary，把候选分为：**精读**（与 interests 强相关、含新方法/新产品/新数据点，
@@ -77,7 +90,9 @@ sources_failed: [{失败源名}]
 ## Guard
 
 - News 条目是线索与观点来源，**不得作为 agenda evidence 的唯一支撑**（非 peer-reviewed）。
-- 抓取失败的源跳过并记入 frontmatter `sources_failed` 与当日 log，不阻塞。
+  公众号文章尤其如此——它多为二手解读，真正的证据是它指向的原始论文（应 digest 原文）。
+- 抓取失败的源跳过并记入 frontmatter `sources_failed` 与当日 log，不阻塞。微信源被搜狗限流
+  （`.wechat-candidates.json` 的 `errors` 非空或候选为 0）视同单源失败，跳过不阻塞。
 - 不直接修改 agenda.md / Topics/（只回链与提示，改动走各自 owner skill）。
 - so-what 必须诚实：没有含义就写"与当前方向无直接关联"，不硬编。
 

@@ -52,6 +52,26 @@ python3 skills/1-literature/daily-papers/fetch_and_score.py \
 
 **历史去重**：脚本在 output 同目录维护 `.history.json`，单天模式自动过滤已总结过的论文（30 天窗口），多天模式跳过去重。每次运行后自动更新历史。
 
+### Step 1.5：公众号 AI 动态（可选，若 config `news.wechat.enabled`）
+
+抓关注公众号（机器之心/量子位/新智元/PaperWeekly 等，配置见 `team-config.json` `news.wechat`）
+在时间窗内的相关文章，作为**论文线索的补充信道**——很多号就是在第一时间解读新论文。
+
+```bash
+python3 scripts/wechat_search/fetch_wechat.py --days {DAYS} \
+  --output Workbench/daily/.wechat-candidates.json
+```
+
+Read `candidates`（已按关注账号 + 关键词打分排序）。对每条：
+
+- **是在解读某篇具体论文**（标题/摘要出现明确论文名、"XX 团队提出"、arXiv/会议名等）→
+  用 WebSearch 反查该论文的 arXiv id，若查到且 vault 无笔记，按 Step 2c 的方式
+  `queue_ops.py enqueue` 入队（`source` 记为 `wechat`），让 paper-digest 后续消化**原文**。
+- **是行业动态/观点**（发布、融资、综述、访谈）→ 不入论文队列，留到 Step 4 的「公众号动态」小节一句话带过。
+
+**Guard**：公众号是**二手线索**，只用来发现论文和感知风向；真正入库的证据永远是它指向的原始
+论文。搜狗限流导致候选为空或 `errors` 非空时，跳过本步不阻塞。**不要**把公众号解读当论文点评写。
+
 ### Step 2：快速分流
 
 读取 `Workbench/daily/.candidates.json`，做**轻量级分类**，不写详细点评。
@@ -153,6 +173,14 @@ tags: [daily-papers, tag1, tag2, ...]
 | 论文 | 跳过原因 |
 |------|----------|
 | ... | ... |
+
+## 公众号动态
+
+<仅在 Step 1.5 有相关候选时保留本节；无则整节省略>
+
+| 公众号 | 标题 | 一句话 / 已入队论文 |
+|--------|------|--------------------|
+| {source} | [{标题}]({link}) | {动态摘要，或"→ 已入队 arXiv:xxxx 待 digest"} |
 ```
 
 **Tag 选择**：阅读 vault 目录下的 `{vault_root}/references/tags.md`，按照规范选择 tag。

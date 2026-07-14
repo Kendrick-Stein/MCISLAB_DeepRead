@@ -1,6 +1,6 @@
 ---
 title: Topics
-last_updated: "2026-07-08"
+last_updated: "2026-07-09"
 ---
 
 ## 研究主题
@@ -27,6 +27,7 @@ last_updated: "2026-07-08"
 |--------|------------|
 | [[Topics/VLM-Survey]] | [[DomainMaps/VLM]] |
 | [[Topics/AgenticRL-Survey]] | [[DomainMaps/AgenticRL]] |
+| [[Topics/SelfEvolvingAgents-Survey]] | [[DomainMaps/AgenticRL]] |
 
 ### Embodied / VLA / VLN
 

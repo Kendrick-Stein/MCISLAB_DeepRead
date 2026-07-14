@@ -28,7 +28,8 @@ python3 skills/1-literature/news-digest/fetch_news.py --days {DAYS} \
   --output Workbench/daily/.news-candidates.json
 ```
 
-Read 输出 JSON：`candidates`（RSS 已打分排序）、`web_sources`（需 agent 抓取的网页源）、
+Read 输出 JSON：`candidates`（RSS 已打分排序；`title_only: true` 的条目来自无摘要 feed，
+脚本无从预筛而全量保留，分流时需自行判断相关性）、`web_sources`（需 agent 抓取的网页源）、
 `errors`（失败源）。对每个 web_source 用 WebFetch（或 `scripts/lexmount_fetch.py` fallback，
 见 references/network-fetch-fallback.md）抓首页，人工筛出时间范围内的条目并入候选。
 

@@ -215,6 +215,13 @@ async function httpGet(url, cookieStr = '') {
     retries: 1,
   });
 
+  // 搜狗 antispider 限流：302 跳转到 /antispider/。必须显式报错，
+  // 否则拦截页会被解析成"0 条结果"静默吞掉（fetch_wechat 记不到 errors）。
+  const loc = resp.headers && resp.headers.location;
+  if (resp.statusCode >= 300 && resp.statusCode < 400 && loc && loc.includes('antispider')) {
+    throw new Error('sogou antispider 限流（IP 被暂时封禁），稍后重试');
+  }
+
   return resp.text;
 }
 
@@ -649,6 +656,9 @@ async function searchWechatArticles(query, maxResults = 10, resolveRealUrl = fal
         await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
       }
     } catch (error) {
+      if (error.message.includes('antispider')) {
+        throw error; // 限流要让上层（fetch_wechat errors）看见，不能当"无结果"
+      }
       console.error(`请求第${page}页失败:`, error.message);
       break;
     }

@@ -10,7 +10,7 @@ const config: QuartzConfig = {
     analytics: null,
     locale: "en-US",
     baseUrl: "kendrick-stein.github.io/MCISLAB_DeepRead",
-    ignorePatterns: ["Templates/**", ".obsidian/**", "docs/**", "website/**", "Private/**", "private", "*.canvas", "CLAUDE.md", "AGENTS.md", "README.md", "skills/**", "references/**", "Workbench/**", "Meetings/**"],
+    ignorePatterns: ["Templates/**", ".obsidian/**", "docs/**", "website/**", "Private/**", "private", "*.canvas", "CLAUDE.md", "AGENTS.md", "README.md", "skills/**", "scripts/**", "references/**", "Workbench/**", "Meetings/**"],
     defaultDateType: "published",
     theme: {
       fontOrigin: "googleFonts",

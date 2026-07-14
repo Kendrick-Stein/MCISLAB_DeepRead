@@ -13,3 +13,5 @@ tags: [index, news]
 ## 期数
 
 （由 news-digest 追加，格式：`- [[News/YYYY-MM-DD]] — 一句话亮点`）
+
+- [[News/2026-07-14]] — 首期：NVIDIA 开源 Nemotron agent 训练数据栈（10T+ token，强调失败覆盖）；"physical AI" 营销语义辨析；搜狗公众号源限流

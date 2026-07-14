@@ -113,10 +113,13 @@ def main() -> int:
             if pub and pub < cutoff:
                 continue
             score = score_item(it, keywords)
-            if score >= news_cfg.get("min_score", 1):
+            # 摘要为空的 feed（如 HF Blog）只剩标题可打分，短标题几乎必然 0 分；
+            # 此时无从预筛，窗口内条目直接保留（title_only 标记），交由 agent 分流。
+            title_only = not it.get("summary")
+            if score >= news_cfg.get("min_score", 1) or (title_only and pub):
                 candidates.append({**it, "source": src["name"],
                                    "published": pub.isoformat() if pub else None,
-                                   "score": score})
+                                   "score": score, "title_only": title_only})
 
     candidates.sort(key=lambda c: (c["score"], c["published"] or ""), reverse=True)
     out = {"fetched_at": datetime.now(timezone.utc).isoformat(),

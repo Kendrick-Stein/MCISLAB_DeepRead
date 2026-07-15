@@ -129,3 +129,9 @@ mindmap
 | Grounding | Prototype GoClick+FPN, test on ScreenSpot multi-res | High |
 | RL Training | Read SOLAR-RL/ProxMO, assess ForkPoint feasibility | Medium |
 | Self-Improving | Read SGV, monitor progress | Low |
+
+## 近期格局变化
+
+- **[2026-07-15] 评测"进步幻觉"获第二独立数据点**：[[2504-OnlineMind2Web]] 证明 WebVoyager ~90% 分数在 live 站点崩塌（多数 agent 退回 SeeAct 水平，仅 Operator ~61%），并诊断成因为 shortcut 可解任务 + 不可靠 judge；与 Odysseys 44.5% 互证，judge 方法学成为分数可比性的一等变量。见 [[Topics/GUIAgent-Survey]] Takeaway 7。
+- **[2026-07-15] 非参数自我改进路线成型，失败轨迹升为一等资源**：[[2409-AgentWorkflowMemory]]（NL workflow）→ [[2504-SkillWeaver]]（可执行 skill，强→弱迁移 +54.3%）→ [[2606-LearningFromFailure]]（失败轨迹 → runtime code patch，OSWorld +6.6 零训练）演进链清晰；参数化侧 [[2411-WebRL]] 同样把失败当 curriculum。改进产物的可执行性与失败经验的复用形态是新的方法区分轴。见 [[Topics/GUIAgent-Survey]] Takeaway 14。
+- **[2026-07-15] web 安全面确立"security by incompetence"论断**：[[2504-WASP]]（NeurIPS 2025 D&B）现实威胁模型下部分劫持成功率 86% 但完整攻击少有达成——当前表观安全是 agent 无能的副产物，能力提升将直接放大注入风险；[[2409-EIA]]（ICLR 2025）把隐私泄露确立为独立攻击面（环境注入偷 PII 70%，精细注入绕过人工检查）。防御研究必须先于能力到位。见 [[Topics/GUIAgent-Survey]] Takeaway 6。

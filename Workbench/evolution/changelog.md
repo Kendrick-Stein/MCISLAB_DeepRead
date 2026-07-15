@@ -143,3 +143,23 @@
 - **directions_paused**: 0
 - **directions_abandoned**: 0
 - **reasoning**: primary 方向的核心假设由三部分组成（observe/verify affordance + 因果收益），本轮 "Verifier 角色迁移" 升 validated 确立了 verify 组件的跨域可行性（SWE + dialogue 两个新域），"runtime state 一等对象化"（5 篇论文收敛）确立了 observe 组件的接口工程形态——两者都不能替代自有实验对因果收益的验证，故 confidence 仅小幅上调。GUI Grounding 的 evidence-dependence 诊断角度获得独立方法论支撑（DecodableNotGrounded 的 arbiter 协议可直接迁移），使无训练备选路径的可行性显著上升。未新增方向：validated/developing ideas 均已被现有 direction 覆盖。
+
+### [2026-07-15] memory-distill
+
+- **period**: 2026-07-04 ~ 2026-07-15
+- **logs_processed**: 7（2026-07-06, 07-07, 07-08, 07-09, 07-13, 07-14, 07-15）
+- **new_patterns**: 7（失败轨迹一等资源化；judge/reward model 可靠性系统性不足；工业技术报告 claim-evidence 错位；agent-facing 原语暴露窗口收窄；GRPO 增益条件化；on-policy distillation 迁移 RL 增量；自演化的演化步验证空白）
+- **promoted_to_insight**: 3（L1 → L2：失败轨迹资源化 6 论文跨 2 日期；judge 可靠性 4 独立日期；工业报告错位 4 独立日期——均同批达阈值即晋升）
+- **validated_insights**: 1（L2 → L3："多模态表观能力需 counterfactual/intervention 诊断" 获 Video-Oasis[视频 benchmark 捷径审计] + VisualAccessBoundary[CoT 视觉访问因果掩蔽] 两个新独立日期，累计 5 日期跨模态一致，provisional → validated，confidence low → medium）
+- **queued_for_review**: 0（validated 条目 confidence 均为 medium，未达 L3 → L4 门槛）
+- **evidence_appended**: 3（"真实长程未饱和" +AndroidDaily/LHTB/MAG；"Verifier 角色迁移" +DreamGym/InSTA/训练信号生产系统/自演化可验证性分界；"read-only evidence sub-agent" +Vera 部分支持，维持 provisional）
+
+### [2026-07-15] agenda-evolve
+
+- **trigger**: memory-distill 产出 1 条新 validated insight（counterfactual/intervention 诊断）+ 3 条新 provisional insight，且 agenda 自 7/3 起未吸收期间 4 篇新 survey 与竞争情报
+- **insights_reviewed**: 3（"多模态表观能力需 counterfactual/intervention 诊断" 今日升 validated；"真实长程未饱和"、"Verifier 角色迁移" validated 获新证据）
+- **directions_added**: 0
+- **directions_updated**: 3（AFE: +4 篇 survey 证据 + 窗口收窄竞争情报 + judge 精度约束，next_action 聚焦三条剩余空白，confidence 0.45→0.5；GUI Grounding: counterfactual 诊断 insight 升 validated 使无训练诊断路径方法论确立，confidence 0.5→0.55；RL Training: GRPO 条件化 + 失败复用形态两个可操作切入点，confidence 0.35→0.4）
+- **directions_paused**: 0
+- **directions_abandoned**: 0
+- **reasoning**: 三个 active direction 的证据都在累积但均未有自有实验验证，故 confidence 均小幅上调而 status 保持 exploring。AFE 的关键变化是竞争情报——Crab/AgenticExplorationSystems 入场使时间窗口收窄，差异化落点从"全面 affordance 套件"修正为三条剩余空白；judge 可靠性 insight（precision 70–85%）转化为 verify affordance 的显式设计约束。另：Self-Improving Agent Reliability 的 resume_condition 已被 Misevolution 等论文触发，新增 Discussion Topic 请 Supervisor 在 resume / 并入 AFE / 先评 idea 三选项间决策（Researcher 倾向先 idea-evaluate 再并入 AFE）。

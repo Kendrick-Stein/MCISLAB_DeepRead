@@ -1,9 +1,9 @@
 ---
 title: GUI Agent Survey
 tags: [survey, gui-agent, vlm, rl, computer-use]
-date_updated: "2026-05-04"
+date_updated: "2026-07-15"
 year_range: 2023-2026
-papers_analyzed: 205
+papers_analyzed: 216
 keywords: [gui-agent, gui grounding, computer-use, web agent, mobile agent]
 domain_map: GUI-Agent
 ---
@@ -53,6 +53,7 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 - **UI-Genie**：提出统一 Reward Model（UI-Genie-RM）作为 verifier，再通过 agent/RM 联合迭代自增强。关键创新是先解决"可验证性"问题，再扩张数据。
 - **UI-Voyager**：两阶段框架——Rejection Fine-Tuning (RFT) 筛选高质量轨迹，Group Relative Self-Distillation (GRSD) 从成组 rollout 中定位 fork points，用成功轨迹为失败轨迹构造稠密步级监督。
 - **UI-Mem**：Hierarchical Experience Memory，将 workflow、subtask skill、failure pattern 抽象为参数化模板，支持跨任务迁移与 memory-guided exploration。
+- **Learning from Failure**：[[2606-LearningFromFailure]] 把 self-improvement 的对象从模型权重扩展到 runtime harness——失败轨迹经 LLM 诊断转成 inference-time code patches（Visual Search 坐标放大验证 / Terminal Execution / Knowledge Support / Repetition Warnings），OpenCUA-72B OSWorld 42.3%→48.9% 零训练，patch 可跨 benchmark 迁移（AndroidControl 28.4→36.2）。
 
 **优势**：减少对人工标注的依赖；失败经验利用显著提升数据效率；适应动态变化的界面环境。  
 **局限**：高度依赖 reward model/verifier 的正确性；自增强过程中可能放大系统性偏差；工程复杂度高。
@@ -66,6 +67,8 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 - **MobileRL**：提出 Difficulty-Adaptive GRPO (ADAGRPO)，通过 difficulty-adaptive positive replay 和 failure curriculum filtering 适应任务难度分布，并在 AndroidWorld 达到 80.2% 成功率。
 - **UI-R1**：基于 rule-based action reward（action type + coordinate + format），仅用 136 条高质量任务进行 GRPO 式强化微调，在 ScreenSpot 上取得 22.1% 提升。强调 efficient reasoning而非冗长 CoT。
 - **Continual GUI Agents**：提出 GUI-AiF 框架，通过 Anchoring Point Reward (APR-iF) 与 Anchoring Region Reward (ARR-iF) 在分布漂移中保持稳定 grounding。
+- **WebRL**：[[2411-WebRL]] web 模态 online RL 的奠基工作（ICLR 2025）——self-evolving curriculum（失败轨迹自动生成新任务）+ outcome-supervised reward model + KL 约束/置信度过滤回放三件套，Llama-3.1-8B 在 WebArena-Lite 从 4.8% 提到 42.4%，反超 GPT-4-Turbo (17.6%)，证明开源 web agent 的瓶颈在训练范式而非 backbone。
+- **TGPO**：[[2509-TGPO]] 针对 web 轨迹 credit assignment 的离线偏好优化——把多条轨迹中语义相同的 state 合并成树以消除偏好标签冲突，配 process reward（subgoal 进度 + 冗余检测 + 动作验证）与关键分叉步动态加权，在 Online-Mind2Web / C-WebShop 上成功率更高且冗余步更少；"语义同状态合并"是 web 版 state-similarity credit（与 ProxMO PSA 对照）。
 
 **优势**：数据效率高；直接优化执行成功而非模仿文本形式；适合可程序验证的 GUI 动作空间。  
 **局限**：RL 训练稳定性依赖采样策略；适用范围偏向结构化、单步可验证的动作类型；对长程多步任务需要额外 reward shaping。
@@ -93,6 +96,8 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 - **Web-CogReasoner**：Knowledge-driven reasoning，结合认知框架与 chain-of-thought 提升任务泛化。
 - **Retrieval-Augmented GUI Agents**：从外部数据库检索相关轨迹或示例，指导当前任务的执行决策。
 - **Memory-Augmented Agents**：Graph-structured 或 self-evolving memory，管理长期工作流与动态环境。
+- **Agent Workflow Memory**：[[2409-AgentWorkflowMemory]]（ICML 2025）从成功轨迹归纳自然语言 workflow 并选择性注入 prompt，Mind2Web 相对 +24.6% / WebArena 相对 +51.1%；train-test 分布差距越大领先越大（+8.9~14.0 绝对点），证明 workflow 抽象提升泛化而非记题。
+- **SkillWeaver**：[[2504-SkillWeaver]] 把复用交互模式经 propose→practice→distill 蒸馏成**可执行 API skill**，WebArena 相对 +31.8%、真实网站 +39.8%，强 agent 造的 skill 库可迁移给弱 agent（最高 +54.3%）——与 AWM 构成 "NL workflow（what to do）vs executable skill（how to execute）" 的经典对照。
 
 **优势**：增强泛化到未见任务的能力；显式知识结构可解释性强。  
 **局限**：依赖高质量知识框架与检索库；可扩展性受知识覆盖度限制。
@@ -111,9 +116,12 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 | **GUIOdyssey** | Android Mobile | 8,334 episodes, 212 apps, 1,357 app组合 | Success Rate | OdysseyAgent + History Resampler | Cross-app navigation，语义推理标注 |
 | **MMBench-GUI** | Windows/macOS/Linux/iOS/Android/Web | 四层级评测 | EQA (Efficiency-Quality Area) | 多模型评测 | 层级化多平台评估框架 |
 | **Mind2Web** | Web | 2,000+ 任务 | Success Rate | SeeClick 提升 | 真实网页导航任务 |
+| **VisualWebArena** | Web (self-hosted 3 站点) | 910 个视觉必要任务 | Functional Correctness | GPT-4V 与人类有显著 visual grounding gap | 首个大规模多模态 web benchmark（ACL 2024），视觉是任务设计原则 |
+| **WebVoyager** | Web (Live, 15 真实网站) | 643 任务 | GPT-4V-as-Judge (85.3% 人工一致) | 首报 59.1%，后期 agent 报 ~90% 被证虚高 | 开创 live + 截图 + SoM 端到端范式；后被 Online-Mind2Web 证明 ~51% 任务 shortcut 可解 |
 | **MiniWob** | Web | 小型网页交互 | Success Rate | SeeClick 提升 | 经典 web agent benchmark |
 | **AITW** | Android | 多任务 | Action Accuracy | SeeClick 提升 | 移动端操作 benchmark |
 | **Odysseys** | Web (Live Internet) | 200 个真实长时域任务 | Success Rate / Efficiency | Claude-Opus: 44.5%, Efficiency: 1.15% | 首个 live Internet + long-horizon + rubric-based 评测 |
+| **Online-Mind2Web** | Web (Live, 136 真实网站) | 300 任务，按步数分三档难度 | Success Rate (WebJudge ~85% 人工一致) | OpenAI Operator ~61%，多数 agent 退回 SeeAct 水平 | 揭穿旧 benchmark "进步幻觉"：反 shortcut 任务筛选 + 可靠 LLM judge |
 | **ProBench** | Mobile | 200+ 挑战性任务 | 过程级评估 | 需验证 | 引入过程信息提供者，精确过程评估 |
 | **A3 (Android Arena)** | Android | 真实应用任务 | Success Rate | UI-Genie SOTA | 真实 app 交互评测 |
 | **GUI-Testing Arena** | Multi-platform | 自动化测试任务 | Test Coverage | 需验证 | GUI 自动化测试专用 benchmark |
@@ -124,7 +132,7 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 - 从单平台到跨平台统一评测（MMBench-GUI）
 - 从终点评估到过程级评估（ProBench）
 - 从离线测试到在线交互（AndroidLab）
-- 从静态 snapshot 到 live Internet 真实环境（Odysseys 44.5% 成功率暴露 frontier models 在真实场景的惨淡表现）
+- 从静态 snapshot 到 live Internet 真实环境（Odysseys 44.5% 成功率暴露 frontier models 在真实场景的惨淡表现；[[2504-OnlineMind2Web]] 进一步证明 WebVoyager ~90% 的分数在真实动态站点上崩塌，且 judge 方法学本身是分数可比性的关键变量）
 - 效率首次成为 first-class concern（Odysseys Trajectory Efficiency 指标）
 
 ---
@@ -141,9 +149,9 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 
 5. **评测从终点评估走向过程级评估**：ProBench、MMBench-GUI 的 EQA 指标表明，仅看终点状态不足以准确评估 agent 能力。过程信息、效率指标、层级化诊断成为新的评测方向。
 
-6. **信任与安全开始被系统性关注**：Towards Trustworthy GUI Agents 提出感知-推理-交互三层信任框架，指出 Execution Gap 是核心挑战。不可逆操作、多步计划一致性、对抗性攻击防护成为新的研究方向。SnapGuard 针对 screenshot-based web agent 提出 lightweight prompt injection 检测（F1=0.75），但精度仍不足以支撑"安全"claim。
+6. **信任与安全开始被系统性关注**：Towards Trustworthy GUI Agents 提出感知-推理-交互三层信任框架，指出 Execution Gap 是核心挑战。不可逆操作、多步计划一致性、对抗性攻击防护成为新的研究方向。SnapGuard 针对 screenshot-based web agent 提出 lightweight prompt injection 检测（F1=0.75），但精度仍不足以支撑"安全"claim。web 模态的攻击面已有两个系统性锚点：[[2504-WASP]]（NeurIPS 2025 D&B）用现实威胁模型（敌意用户仅能在允许区域注入）测得部分攻击成功率高达 86% 但完整攻击目标少有达成——当前是 **"security by incompetence"**（表观安全是 agent 无能的副产物，会随能力提升而消失）；[[2409-EIA]]（ICLR 2025）把隐私泄露确立为独立攻击面：环境注入伪装 HTML form 诱导 agent 交出 PII 成功率 70%，且精细注入可绕过人工检查（security-autonomy 根本张力）。评测方法学要点：须区分"部分带偏"与"完整达成攻击目标"。
 
-7. **Live Internet 评测揭示真实能力缺口**：Odysseys 在真实开放互联网上评测 200 个长时域任务，最强 frontier model 仅达 44.5% 成功率、1.15% 效率——彻底戳穿 WebArena/WebVoyager 在 static snapshot 上"饱和"的假象。Long-horizon + live environment 是 distinct capability frontier。
+7. **Live Internet 评测揭示真实能力缺口**：Odysseys 在真实开放互联网上评测 200 个长时域任务，最强 frontier model 仅达 44.5% 成功率、1.15% 效率——彻底戳穿 WebArena/WebVoyager 在 static snapshot 上"饱和"的假象。Long-horizon + live environment 是 distinct capability frontier。[[2504-OnlineMind2Web]] 提供第二个独立数据点并诊断了幻觉成因：shortcut 可解任务（WebVoyager 大量任务仅用 Google Search 即可解 ~51%）+ 不可靠 judge + 缓存页面禁止真实探索；其 WebJudge（~85% 人工一致）与难度分层协议成为 live 评测的事实参考，只有 OpenAI Operator 达 ~61%。
 
 8. **VLM Grounding 可视化验证有启发**：SketchVLM 的 coordinate prompting + SVG overlay 设计可迁移到 GUI grounding 验证——"show me where you would click"的可视化 debug 为 grounding 错误诊断提供新思路。>94% annotation-text faithfulness 证明视觉输出和文本输出一致性。
 
@@ -156,6 +164,8 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 12. **数据合成成本急剧下降**：从 CogAgent 时代的人工标注，到 AgentTrek（$0.55/trajectory）、OS-Genesis（逆向任务合成）、TongUI（143K trajectories from tutorials），数据获取成本下降 20×。OpenCUA 的 reflective CoT augmentation 证明 CoT 质量比 trajectory 数量更重要（+32%）。
 
 13. **感知 pipeline 质量是被低估因素**：WindowsAgentArena 发现 SoM annotation 质量造成 15-57% 性能波动，OmniParser 证明 local semantics 提升 23.3%。比起 reasoning 能力，感知质量对最终性能的影响可能更大。
+
+14. **非参数自我改进正在成为与权重更新并行的路线，失败轨迹是一等资源**：[[2409-AgentWorkflowMemory]]（NL workflow 注入 prompt）→ [[2504-SkillWeaver]]（可执行 API skill，强→弱迁移 +54.3%）→ [[2606-LearningFromFailure]]（失败轨迹 → LLM 诊断 → inference-time code patch，OSWorld +6.6 零训练）呈现清晰的演进链：改进产物从自然语言建议到可执行、可迁移、可验证的资产，改进证据从成功轨迹扩展到失败轨迹。与参数化路线共享同一洞察——[[2411-WebRL]] 把失败轨迹当 curriculum、UI-Voyager GRSD 用失败轨迹构造步级监督。失败经验的复用形态（课程 / 步级监督 / runtime patch）正在成为区分方法的关键轴。
 
 ---
 
@@ -183,7 +193,7 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 
 8. **不可逆操作的风险控制**：删除数据、支付转账、发送消息等不可逆操作一旦出错后果严重。如何设计确认机制、撤销能力、风险检测与阻断机制，是可信 GUI Agent 的关键要求。
 
-9. **隐私与安全攻击防护**：Fine-print injection、indirect prompt injection、恶意界面元素等攻击手段已被识别（EVA、Obvious Invisible Threat），但系统性防御方案尚未成熟。SnapGuard 提出轻量级检测（VSI + APD），但 F1=0.75 漏检率对安全场景 unacceptable——lightweight 但不够 accurate。
+9. **隐私与安全攻击防护**：Fine-print injection、indirect prompt injection、恶意界面元素等攻击手段已被识别（EVA、Obvious Invisible Threat、[[2504-WASP]] 现实威胁模型下部分劫持 86%、[[2409-EIA]] 环境注入偷 PII 70%），但系统性防御方案尚未成熟。SnapGuard 提出轻量级检测（VSI + APD），但 F1=0.75 漏检率对安全场景 unacceptable——lightweight 但不够 accurate。WASP 的警示更根本：当前的"安全"来自 agent 能力不足（security by incompetence），能力提升会直接放大注入风险，防御必须先行。
 
 10. **Live Internet 评测的可复现性困境**：Odysseys 在真实开放互联网上评测，真实性最高但不可复现——网站更新、内容变化，每次评测结果可能不同。如何在 realism 与 reproducibility 之间取得平衡，是 benchmark design 的 fundamental trade-off。
 
@@ -208,11 +218,15 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 - [[2500-UiGenieSelfImproving]] - UI-Genie: Reward model + self-improvement
 - [[2600-UiVoyagerSelfEvolving]] - UI-Voyager: RFT + GRSD
 - [[2600-UiMemSelfEvolving]] - UI-Mem: Hierarchical experience memory
+- [[2606-LearningFromFailure]] - Learning from Failure: 失败轨迹 → inference-time code patches
+- [[2409-AgentWorkflowMemory]] - AWM: NL workflow 记忆（ICML 2025）
+- [[2504-SkillWeaver]] - SkillWeaver: 可执行 API skill 自我改进
 
 **Reinforcement Learning**：
 - [[2500-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]] - MobileRL: ADAGRPO
 - [[2500-UiR1EnhancingEfficient]] - UI-R1: Rule-based RL
 - [[2600-ContinualGuiAgents]] - Continual GUI Agents: Anchoring reward
+- [[2411-WebRL]] - WebRL: Self-evolving online curriculum RL（ICLR 2025）
 
 **多模态与层次规划**：
 - [[2509-OmniActor- A Generalist GUI and Embodied Agent for 2D&3D Worlds]] - OmniActor: GUI + Embodied unified
@@ -224,16 +238,22 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 
 - GUI Agents Survey - GUI Agents: A Survey (ACL Findings 2025)
 - [[2500-TowardsTrustworthyGuiAgents]] - Towards Trustworthy GUI Agents
+- [[2503-WebAgentsSurvey]] - 首篇 WebAgent 专门综述（KDD 2025）：architectures / training / trustworthiness 三分法
 
 ### 6.3 Benchmark 论文
 
 - [[2507-MMBench-GUI- Hierarchical Multi-Platform Evaluation Framework for GUI Agents]] - MMBench-GUI
 - [[2500-ProbenchBenchmarkingGuiAgents]] - ProBench: Process-level evaluation
 - [[2604-Odysseys]] - Odysseys: Live Internet long-horizon benchmark（Rating 3 🔥）
+- [[2504-OnlineMind2Web]] - Online-Mind2Web + WebJudge: 揭穿 web agent "进步幻觉"（COLM 2025，Rating 5）
+- [[2401-VisualWebArena]] - VisualWebArena: 首个大规模多模态 web benchmark（ACL 2024）
+- [[2401-WebVoyager]] - WebVoyager: live + 截图 + SoM 端到端范式开创者，后成"进步幻觉"主要对象（ACL 2024）
 
 ### 6.4 安全与防护
 
 - [[2604-SnapGuard]] - SnapGuard: Lightweight prompt injection detection for screenshot-based web agents
+- [[2504-WASP]] - WASP: 现实威胁模型下的 prompt injection benchmark，"security by incompetence"（NeurIPS 2025 D&B）
+- [[2409-EIA]] - EIA: 环境注入偷 PII 70%，隐私泄露独立攻击面（ICLR 2025）
 
 ### 6.5 Grounding 可视化验证
 
@@ -262,6 +282,24 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 ---
 
 ## 调研日志
+
+### 2026-07-15 survey-refresh（积压消化第 2 批）
+- **并入论文**: 5 篇（[[2504-WASP]]、[[2409-EIA]]、[[2509-TGPO]]、[[2401-VisualWebArena]]、[[2401-WebVoyager]]）
+- **跳过**: 3 篇（[[2509-WebSailorV2]]、[[2505-WebDancer]]、[[2508-WebWatcher]]）——Tongyi deep-research 家族不操作 GUI，归属 WebAgent-Survey
+- **核心变化**:
+  - Takeaway 6 / Open Problem 9 升级：web 安全面获两个顶会锚点——WASP "security by incompetence"（表观安全是能力副产物，防御必须先行）+ EIA 隐私泄露独立攻击面（PII 70%）
+  - Benchmark 表补入 VisualWebArena（多模态奠基）与 WebVoyager（live 范式开创者 + 进步幻觉反面教材）
+  - RL 路线补入 TGPO（树合并消除偏好标签冲突的 web 版 state-similarity credit）
+- **status**: success
+
+### 2026-07-15 survey-refresh（积压消化第 1 批）
+- **并入论文**: 6 篇（[[2606-LearningFromFailure]]、[[2411-WebRL]]、[[2504-OnlineMind2Web]]、[[2503-WebAgentsSurvey]]、[[2409-AgentWorkflowMemory]]、[[2504-SkillWeaver]]）
+- **跳过**: 2 篇（[[2507-WebSailor]]、[[2506-DeepResearchAgents]]）——deep-research/information-seeking 支线不操作 GUI，归属 WebAgent-Survey
+- **核心变化**:
+  - 新增 Key Takeaway 14：非参数自我改进（NL workflow → executable skill → runtime patch）成为与权重更新并行的路线，失败轨迹是一等资源
+  - Takeaway 7 升级：Online-Mind2Web 为"live 评测揭示真实能力缺口"提供第二独立数据点并诊断幻觉成因（shortcut 任务 + 不可靠 judge）
+  - Benchmark 表新增 Online-Mind2Web；RL 路线补入 web 模态奠基工作 WebRL
+- **status**: success
 
 ### 2026-04-28 更新
 - **调研日期**: 2026-04-28

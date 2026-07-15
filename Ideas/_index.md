@@ -30,3 +30,5 @@ title: Ideas
 | [[Ideas/HybridVerifier-GUIRuntime]] | raw | GUI Environment / WeaveBench | Agent-facing cross-channel verifier to reduce reward hacking |
 | [[Ideas/EvidenceDependence-GUIGrounding]] | raw | VisualFLIP / GUI grounding | Action Collapse Rate for counterfactual GUI evidence dependence |
 | [[Ideas/PersonalizedSafety-CUA]] | raw | MyPCBench / BraveGuard | Task-scoped permission + trajectory privacy guard for personal CUA |
+| [[Ideas/CounterfactualProbe-EvolutionGate]] | raw | SelfEvolvingAgents-Survey / ABot-AgentOS | Counterfactual invariance probe 作演化步准入判据，外推 gating frontier |
+| [[Ideas/RetrievalMediated-MemoryMisevolution]] | raw | Misevolution / Memoir | Memory reward hacking 由检索正反馈介导，改检索不洗内容即可防御 |

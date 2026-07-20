@@ -3,7 +3,7 @@ title: "Recovery-Selection Gap：GUI Agent 的固定恢复策略留下多少可�
 tags: [gui-agent, computer-use, research-idea]
 status: raw
 linked_project:
-date_updated: "2026-07-16"
+date_updated: "2026-07-20"
 ---
 ## Hypothesis
 
@@ -74,3 +74,13 @@ GUI agent 检测到"执行结果与预期不符"（mismatch）后，现有方法
 **Reasoning**：第三版把 claim 收缩为一个可测量的量（gap），完备性辩护义务消失，kill/go 在实验第 3 步即分晓。相比前版，唯一的让步是不再承诺机制解释——聚类是描述性的；若 gap 显著且聚类结构清晰，机制研究是自然的后续论文而非本篇负担。
 
 **History**：v1（2026-07-16 上午）三分类先验 + 归因混淆率；v2（同日下午）五分类 + 完备性三重验收；v3（本版）应 Supervisor 要求去除分类学依赖，改为分叉测量 gap。教训：claim 不应建立在需要无限辩护的分类学之上。
+
+## Upgrade — 2026-07-20（AgentRuntimePrimitives 调研后的算法强化）
+
+本周三原语调研（[[Topics/AgentRuntimePrimitives-Survey]] 37 篇 + idea 淘汰赛检索）为本 idea 补三块，novelty 复查后仍干净：
+
+**1. 训练信号的免疫性论证（新亮点）**：[[Papers/2607-EvoCUA15]] 实证 PRM 在稀疏 reward 下被 hack（Fig 7：PRM 分升、真实成功率停滞），并指名 counterfactual local replay 为替代方向但未实现。本 idea 的分叉标签正是该方向在恢复子问题上的实现——selector 的监督是**反事实环境结局**（同一 mismatch 点分叉出的各恢复动作的真实成败），不是 judge 打分，结构上免疫 EvoCUA-1.5 记录的 reward hacking 失效模式。这把 selector 从"工程组件"提升为"grounded counterfactual supervision 的首个 GUI 实例"。
+
+**2. Train-with-fork, deploy-fork-free（部署故事）**：分叉只发生在可快照的 emulator（测量/训练期），部署时 selector 是纯 policy 前向、零分叉——绕开 live 环境不可分叉的硬约束（survey 核心张力）。先例定位：[[Papers/2410-ExACT]] 把搜索树蒸馏进 policy（恢复 87% 搜索性能），本 idea 蒸馏的是恢复选择且标签更强（环境结局 vs 树遍历）。
+
+**3. Novelty 复查（2026-07-20 检索）**：邻域新增三篇均不覆盖——ALAS (2505.12501)：workflow 调度域的 retry/rollback/delay 成本启发式选择（非学习、非 GUI）；MTTR-A (2511.20663)：多 agent 恢复反射（rollback/replan/retry）的度量学（测延迟不选动作）；Scheduler-theoretic (2604.11378)：主张恢复应为有界协议而非 ad-hoc LLM 决策（规则路线，恰构成对立面——learned selector 是 ad-hoc 与固定协议之间的第三条路，可作为 positioning 引用）。Learning to Explore (2605.08978) 学的是"何时探索"非"选哪种恢复"；EvoCUA-1.5 的 Reflection & Recovery 偏好对是二元（反思恢复 vs 盲走），非多候选选择。"分叉测量 gap + mismatch-conditioned 恢复选择"仍无先例。

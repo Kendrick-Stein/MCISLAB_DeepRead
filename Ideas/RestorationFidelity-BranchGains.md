@@ -1,9 +1,10 @@
 ---
 title: "Restoration Fidelity：回溯没恢复的那部分状态，及其对分支收益与训练数据的污染"
 tags: [gui-agent, web-agent, computer-use]
-status: raw
+status: veto
 linked_project:
 date_updated: "2026-07-20"
+veto_reason: "Supervisor 2026-07-20：这是 infra/测量问题而非算法问题，无亮点；不如 MismatchTriage（错误累积恢复选择）"
 ---
 ## Hypothesis
 

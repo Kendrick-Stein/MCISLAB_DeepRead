@@ -1,9 +1,10 @@
 ---
 title: "Self-Initiated Fork：让 GUI agent 学会何时分支"
 tags: [gui-agent, computer-use, agentic-RL]
-status: developing
+status: veto
 linked_project: "[[Projects/SelfInitiatedFork]]"
 date_updated: "2026-07-20"
+veto_reason: "Supervisor 2026-07-20：新颖性不达标——Learning to Explore (2605.08978) 已做 GUI rollback 调用学习、PGTS (2502.06813) 已做 invocation policy RL，本 idea 是二者的延伸组合而非无人研究的空白"
 ---
 ## Hypothesis
 

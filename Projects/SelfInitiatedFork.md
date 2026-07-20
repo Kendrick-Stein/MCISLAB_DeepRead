@@ -1,8 +1,9 @@
 ---
 title: "Self-Initiated Fork：分支决策作为 GUI agent 的可学习动作"
 tags: [gui-agent, computer-use, agentic-RL]
-status: planning
+status: archived
 date_started: "2026-07-20"
+archived_reason: "Supervisor 2026-07-20 否决底层 idea（新颖性不达标：Learning to Explore 已做 rollback 调用学习、PGTS 已做 invocation policy，本方向属延伸组合）；替代方向见 [[Ideas/RestorationFidelity-BranchGains]]"
 ---
 ## Goal
 

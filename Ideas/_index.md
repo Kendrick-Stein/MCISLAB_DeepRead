@@ -34,4 +34,5 @@ title: Ideas
 | [[Ideas/RetrievalMediated-MemoryMisevolution]] | raw | Misevolution / Memoir | Memory reward hacking 由检索正反馈介导，改检索不洗内容即可防御 |
 | [[Ideas/MismatchTriage-LongHorizonRecovery-GUI]] | raw | Reliability-Survey / TRIAGE | 最优恢复动作随 mismatch 点而变，固定策略留下可测量的 recovery-selection gap |
 | [[Ideas/StateSufficiency-AmnesiaProbe-GUI]] | raw | EvoCUA / context management | 用遗忘探针测 GUI 任务的历史信息充分性边界 |
-| [[Ideas/SelfInitiatedFork-GUI]] | developing | AgentRuntimePrimitives-Survey | fork 作为可学习的 agent 动作：selective fork 以 1/3 预算保留全程搜索 70% 增益（→ [[Projects/SelfInitiatedFork]]） |
+| [[Ideas/SelfInitiatedFork-GUI]] | veto | AgentRuntimePrimitives-Survey | ~~fork 作为可学习的 agent 动作~~（Supervisor 否决：LtE/PGTS 已覆盖调用学习，属延伸非空白） |
+| [[Ideas/RestorationFidelity-BranchGains]] | raw | AgentRuntimePrimitives-Survey OP4 | 恢复保真度从未被测量：三档恢复的保真度-收益因果曲线 + divergence-aware search + 训练数据 replay 噪声（经 5 轮外部检索验证无先例） |

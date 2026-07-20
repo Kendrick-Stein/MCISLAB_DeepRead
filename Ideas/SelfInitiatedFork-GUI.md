@@ -1,8 +1,8 @@
 ---
 title: "Self-Initiated Fork：让 GUI agent 学会何时分支"
 tags: [gui-agent, computer-use, agentic-RL]
-status: raw
-linked_project:
+status: developing
+linked_project: "[[Projects/SelfInitiatedFork]]"
 date_updated: "2026-07-20"
 ---
 ## Hypothesis

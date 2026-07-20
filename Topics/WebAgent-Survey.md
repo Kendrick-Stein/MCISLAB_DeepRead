@@ -1,9 +1,9 @@
 ---
 title: "Web Agent 研究综述"
 tags: [web-agent, survey, gui-agent, deep-research, browser-agent]
-date_updated: "2026-07-06"
+date_updated: "2026-07-19"
 year_range: 2022-2026
-papers_analyzed: 39
+papers_analyzed: 47
 keywords: [web agent, web navigation, browser agent, webarena, mind2web, deep research, information seeking, web environment, browsecomp, visual web agent]
 domain_map: GUI-Agent
 ---
@@ -39,7 +39,8 @@ Web agent 的第一个设计轴是**"给模型看什么"**：
 
 - **ReAct 闭环**：thought→action→observation 迭代，是 web agent 事实标准骨架（Operator/CUA、WebVoyager、WebDancer 均用）。
 - **Planning / 分层**：把长程任务分解为子目标，缓解多步一致性问题；"Why Do LLM Web Agents Fail? A Hierarchical Planning Perspective"（2603.14248）指出失败常源于规划层而非执行层。
-- **World-model augmented**：用世界模型预测动作效果做 action correction（"World-Model-Augmented Web Agents", 2602.15384），与 [[Papers/2604-VeriGUI]] 的 action-effect 自验证同源。
+- **Inference-time search / 回溯**：[[Papers/2407-TreeSearchLMAgents]] 首证 best-first search + GPT-4o value function 在真实 web benchmark 有效（VWA 18.9%→26.4%，弱模型相对收益 +119.7%，随搜索预算单调 scaling），但回溯只能靠"reset 环境 + 重放动作序列"在沙盒模拟；[[Papers/2512-WebOperator]] 把隐含的"动作可逆"假设显式化——动作四分类（safe/destructive/terminating/invalid）+ checkpoint URL 跳转 + speculative backtracking（并行 tab 对照 snapshot 校验重放），WebArena 54.6% 且首次让 tree search 可用于 live 站点；其消融显示 **naive 回溯反而有害**（51.6% < 53.6%），回溯价值有"可行性校验"前置条件。
+- **World-model augmented**：[[Papers/2411-WebDreamer]]（TMLR 2025）因"live 站点上 reset/undo 不可行"把探索搬进 LLM 想象——NL state-delta 模拟 + MPC 单步 lookahead，达到 tree search 收益的 ~70%（VWA 23.6% vs 26.4%）且 wall-clock 快 4.4×，但模拟深度 H=1 封顶（LLM 模拟误差随步数复合）；派生 WAC（2602.15384）等做 action correction，与 [[Papers/2604-VeriGUI]] 的 action-effect 自验证同源。
 - **Multi-agent / delegation**：[[Papers/2606-SearchSwarm]] 把 deep research 拆成 delegation 智能，多 agent 分工检索——长程信息任务的组织范式。
 
 ### 3. 训练范式（SFT / RL / verifier）
@@ -49,7 +50,8 @@ Web agent 的第一个设计轴是**"给模型看什么"**：
 - **轨迹合成 + SFT**：[[Papers/2412-AgentTrek]] 用 web tutorials 引导 replay 合成 agent 轨迹，解决 demonstration 稀缺。
 - **Online curriculum RL**：[[Papers/2411-WebRL]]——self-evolving curriculum（失败即课程）+ ORM + KL 约束 + 置信度过滤回放，把 Llama-3.1-8B 在 WebArena-Lite 从 4.8%→42.4%，超 GPT-4-Turbo 17.6%。奠基工作。
 - **大规模 visual web RL**：[[Papers/2606-WebGym]]（~292k realistic tasks + rubric binary reward + async rollout，OOD 26.2%→42.9%）、[[Papers/2606-AsyncWebRL]]（fully-async + 诊断 GRPO 的 `1/|τ|` step normalizer 会鼓励长失败轨迹，换成常数 `1/k` 后 42.9%→45.4%）、[[Papers/2508-ComputerRL]]（API-GUI 混合动作 + 千级并行 VM + Entropulse）。**共识：OOD 泛化来自任务分布 scaling + 可靠 verifier，而非新算法**。
-- **Reward / verification**：从 [[Papers/2307-WebArena]] 的 functional correctness（程序化 state locator）→ [[Papers/2400-WebcanvasBenchmarkingWebAgents]] 的 keynode 中间态 → [[Papers/2606-WebGym]] 的 rubric-based LLM judge → WebRL 的 ORM。verifier 形态随可观测性退化，可靠性本身是研究对象。
+- **合成经验替代真实 rollout**：[[Papers/2511-DreamGym]]（Meta）用 CoT 经验模型在抽象文本状态空间合成转移 + reward + reward-entropy 课程，零真实交互在 WebArena 超过真实环境 GRPO（7.3→13.3）、在 WebShop 追平 80K 真实交互，S2R 混合仅用 5K 真实数据反超；Theorem 1 说明合成环境只需 reward 保真 + 转移域一致，无需 raw-state 复刻。其 Appendix A.3 证词（WebArena 仅 4 并发 + 手动 reset + 官方评测误判）是"真实环境非 RL-ready"的第一手证据。
+- **Reward / verification**：从 [[Papers/2307-WebArena]] 的 functional correctness（程序化 state locator）→ [[Papers/2400-WebcanvasBenchmarkingWebAgents]] 的 keynode 中间态 → [[Papers/2606-WebGym]] 的 rubric-based LLM judge → WebRL 的 ORM。verifier 形态随可观测性退化，可靠性本身是研究对象。[[Papers/2504-AgentRewardBench]] 首次系统测量（1302 条专家标注轨迹）：12 个 LLM judge precision 无一超 70%，rule-based 评测 recall 仅 55.9%（官方分数系统性低估真实能力）——双向失败，评估器可靠性是 benchmark 打分与 RL reward 的公共上游瓶颈。
 - **Credit assignment / 偏好优化**：[[Papers/2509-TGPO]] 用树结构合并语义同状态消除偏好标签冲突 + process reward（子目标进度/冗余检测/动作验证），在 Online-Mind2Web 上更少冗余步——web 版细粒度信用分配。
 
 ### 4. Memory 与自我改进（非参数路线）
@@ -67,7 +69,10 @@ Web agent 的第一个设计轴是**"给模型看什么"**：
 
 - **Self-hosted 真实站点**：[[Papers/2307-WebArena]]（GitLab/Magento/Reddit/CMS Docker 化）——高真实、可复现，但站点数少。
 - **Docker mirror 真实站点**：[[Papers/2600-WebHarbor]] 用 coding agent 把真实网站"dock"成本地 mirror（WebVoyager 15 站），保留视觉/账号/checkout 深功能 + 可 reset + human review 保真——真实与可控的折中。
+- **确定性副本**：[[Papers/2504-REAL]] 用 React/Next.js 重建 11 个高频真实站点（Amazon/Gmail/Airbnb 等）的确定性副本——数据静态化 + 时间锁定 + 状态全存 localStorage，`/clear` 一键重置、`/config` 可编程初始化、`/finish` state-diff 断言；最强模型仅 41.07%（OpenAI CUA 7.14%）。代价是无真实后端，确定性用"砍掉动态性"换取。
 - **合成环境**：[[Papers/2600-InfinitewebScalableWebEnvironment]] 用统一 spec + task-driven 后端 + 设计图引导前端，自动生成功能性网页 + 自动评估器，无限扩展（缓解 synthetic artifact 靠 review）。
+- **Live 互联网做训练场**：[[Papers/2502-InSTA]] 用 LLM 三角色（task proposer 89% 可验证 / safety filter 97% / judge 82.6%）把任务供给从 ~200 站推到 150k 站点，$521 收集 2.2M 轨迹，Qwen3-1.7B 训后 56.9% 反超 235B 数据收集 policy；但 live 的天然代价是无 reset / 无重放 / 禁状态修改（任务系统性偏只读），judge 17% 错误率直接进入训练信号——其自提的 agents.txt / playground（站点自建仿真副本）提案正承认了这一缺口。
+- **RL-ready 引擎原语**：[[Papers/2510-WebServ]] 用 Incus block-level copy-on-write 替换 Docker（启动 5×、存储 240×、单机 200+ 并发），实现**运行中容器的快照/克隆/分支**；其 Section 5.2 是目前最完整的环境引擎需求规格书（checkpoint / deterministic retry / sub-rollout sampling / counterfactual trial / cheap reset），但停留在基建验证——无端到端 RL 实验。
 - **大规模任务环境**：[[Papers/2606-WebGym]] 聚合 10 个 source（InSTA/PAE-WebVoyager/BrowseComp/Mind2Web-Live/GAIA-Web...）到 ~292k tasks / 127k 网站，OOD split。
 - **统一 gym 生态**：[[Papers/2412-BrowserGymAgentLab]] 把 MiniWoB/WebArena/VisualWebArena/WorkArena/WebLINX/AssistantBench 统一成 gym API + AgentLab 实验框架——研究基础设施而非新 agent。
 
@@ -86,7 +91,7 @@ web agent 必然消费**不可信的第三方网页内容**，因此面临 GUI/d
 
 - **攻击**：[[Papers/2605-WebTrap]]（parasitic goal fusion 中途劫持，真实站点 100% ASR）、[[Papers/2504-WASP]]（84 任务，realistic 威胁模型，86% 部分成功但完整攻击难——"security by incompetence"）、[[Papers/2409-EIA]]（环境注入窃隐私，Mind2Web PII 70%，ICLR 2025）、InjecAgent、SafeArena、VPI-Bench（视觉注入）。
 - **防御/检测**：WebAgentGuard、WebSentinel、WAInjectBench（基于 WASP/EIA 场景的检测线）。
-- **治理**：[[Papers/2512-PermissionManifestsWebAgents]] 提 `agent-permissions.json`（类 robots.txt 的机器可解析权限声明：resource/action 分层 + API-first）——在"全封禁"与"全放任"间建中间层。
+- **治理**：[[Papers/2512-PermissionManifestsWebAgents]] 提 `agent-permissions.json`（类 robots.txt 的机器可解析权限声明：resource/action 分层 + API-first）——在"全封禁"与"全放任"间建中间层；[[Papers/2502-InSTA]] Appendix D 的 agents.txt（速率限制 / 可访问页面 / 站点自建 playground 副本）是平行提案，两者可合并视为"环境对 agent 的声明式接口"。
 - 关键结论：当前安全主要是"security by incompetence"（靠 agent 无能而非鲁棒防御），一旦能力提升，注入风险会随之放大。
 
 ## Datasets & Benchmarks
@@ -108,6 +113,8 @@ web agent 必然消费**不可信的第三方网页内容**，因此面临 GUI/d
 | [[Papers/2606-KBrowseComp]] | 400 韩语 | live | accuracy | GPT-5.5 45.67% | 非英语鸿沟 |
 | [[Papers/2606-WebGym]] | ~292k train / 1167 OOD | 真实站点(rubric) | rubric binary SR | 26.2%→42.9%（Qwen3-VL-8B RL） | 训练环境 scaling |
 | [[Papers/2606-Ego2Web]] | egocentric video grounded | — | — | — | 用第一视角视频锚定任务 |
+| [[Papers/2504-REAL]] | 112 任务/11 站 | 确定性 React 副本 | localStorage state-diff 断言 + rubric judge | Claude 3.7 Thinking 41.07% / CUA 7.14% | 确定性重放 + /config 可编程初始化 + impossible tasks |
+| [[Papers/2504-AgentRewardBench]] | 1302 轨迹/351 任务 | 5 benchmark 轨迹集 | 专家标注测 judge P/R | LLM judge P ≤70% / rule-based R 55.9% | "评估器的评估"，双向失败测量 |
 | [[Papers/2504-WASP]] | 84 任务 | WebArena+注入 | attack success rate | 86% 部分 / 完整攻击低 | 现实威胁模型，动作劫持 |
 | [[Papers/2409-EIA]] | Mind2Web+注入 | live 框架 | privacy leak ASR | PII 70% / 完整请求 16% | 环境注入窃隐私 (ICLR'25) |
 | [[Papers/2412-BrowserGymAgentLab]] | 统一 6+ benchmark | gym 生态 | 各 benchmark | — | 研究基础设施 |
@@ -122,9 +129,11 @@ web agent 必然消费**不可信的第三方网页内容**，因此面临 GUI/d
 
 4. **Deep research 已从 GUI-operation 分化为独立范式**：紧凑 action space + 长推理，用高不确定性合成任务 + agentic RL 训练（[[Papers/2507-WebSailor]]）；但 BrowseComp 绝对分仍低（72B 仅 12% en），且与"操作真实网页 GUI"能力不互通——这是两种 web agent。
 
-5. **可靠性瓶颈在 verify/recover 而非 grounding**：与 [[Topics/RealWorldGUIAgent-Reliability-Survey]] 的 web 侧证据一致——长程失败多来自"不知道自己错了"的空转，而非点不准。verifier 形态随可观测性退化（程序化→keynode→rubric LLM judge），judge 可靠性本身是开放问题。
+5. **可靠性瓶颈在 verify/recover 而非 grounding**：与 [[Topics/RealWorldGUIAgent-Reliability-Survey]] 的 web 侧证据一致——长程失败多来自"不知道自己错了"的空转，而非点不准。verifier 形态随可观测性退化（程序化→keynode→rubric LLM judge），judge 可靠性本身是开放问题——[[Papers/2504-AgentRewardBench]] 给出定量下界：LLM judge precision ≤70%（说成功的 ~30% 其实失败）、rule-based recall 55.9%（系统性漏判成功），且副作用检测近乎不可用（precision 7–14%）。
 
-6. **web agent 有 GUI/desktop 没有的安全面**：必然消费不可信第三方内容 → indirect/environmental prompt injection（WebTrap/WASP/EIA）。当前是"security by incompetence"，能力上升会放大风险；治理层（PermissionManifests）刚起步。
+6. **web agent 有 GUI/desktop 没有的安全面**：必然消费不可信第三方内容 → indirect/environmental prompt injection（WebTrap/WASP/EIA）。当前是"security by incompetence"，能力上升会放大风险；治理层（PermissionManifests/agents.txt）刚起步。
+
+7. **回溯/搜索的价值已被证实，其天花板由环境状态原语决定**：证据链——真实探索有大收益但依赖 reset+replay 模拟回溯（[[Papers/2407-TreeSearchLMAgents]] +39.7%）；live 站点不支持回溯，只能退化为想象模拟（[[Papers/2411-WebDreamer]]，收益 ~70% 且深度 H=1 封顶）或 agent 侧投机回溯（[[Papers/2512-WebOperator]]，destructive 动作启发式确认率仅 37%）；而动作可逆性、状态序列化恰是环境端零成本掌握的信息。引擎侧回应已出现（[[Papers/2510-WebServ]] O(1) 快照/分支），极端解是整个放弃真实环境（[[Papers/2511-DreamGym]] 合成经验）。"环境原生 fork/rollback + 可逆性元数据"是这条证据链指向的共同缺口。
 
 ## Open Problems
 
@@ -138,7 +147,7 @@ web agent 必然消费**不可信的第三方网页内容**，因此面临 GUI/d
 8. **非英语/多文化鸿沟**：[[Papers/2606-KBrowseComp]] 揭示 frontier 模型在韩语场景骤降、本土模型近乎失效——多语种 web agent 严重缺口。
 
 ## 调研日志
-- **调研日期**: 2026-07-06（初版）；2026-07-06 增量（补 digest 15 篇遗留论文）
+- **调研日期**: 2026-07-06（初版）；2026-07-06 增量（补 digest 15 篇遗留论文）；2026-07-19 survey-refresh（并入 8 篇 07-07 记账批次：搜索/回溯 [[Papers/2407-TreeSearchLMAgents]]/[[Papers/2411-WebDreamer]]/[[Papers/2512-WebOperator]]，环境/引擎 [[Papers/2504-REAL]]/[[Papers/2502-InSTA]]/[[Papers/2510-WebServ]]，训练/评测 [[Papers/2511-DreamGym]]/[[Papers/2504-AgentRewardBench]]；新增 Key Takeaway 7"回溯价值与环境状态原语缺口"；另清账 15 篇 07-06 重复记账条目——初版构建当日已并入正文）
 - **论文统计**: vault 已有相关 ~21 篇 + 首轮新 digest 3 篇（[[Papers/2411-WebRL]]、[[Papers/2504-OnlineMind2Web]]、[[Papers/2507-WebSailor]]）+ 增量 digest 15 篇 = 共 ~39 篇。
 - **增量 digest 15 篇**: 综述——[[Papers/2503-WebAgentsSurvey]]、[[Papers/2506-DeepResearchAgents]]；记忆/技能——[[Papers/2409-AgentWorkflowMemory]]、[[Papers/2504-SkillWeaver]]；deep-research 家族——[[Papers/2505-WebDancer]]、[[Papers/2508-WebWatcher]]、[[Papers/2509-WebSailorV2]]；训练——[[Papers/2509-TGPO]]；安全——[[Papers/2504-WASP]]、[[Papers/2409-EIA]]；基础 benchmark——[[Papers/2401-VisualWebArena]]、[[Papers/2401-WebVoyager]]、[[Papers/2311-GAIA]]、[[Papers/2504-BrowseComp]]、[[Papers/2403-WorkArena]]。
 - **外部检索**: WebSearch 6 次 + WebFetch 15 篇 arXiv abstract/HTML。

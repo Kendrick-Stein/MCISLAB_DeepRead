@@ -1,9 +1,9 @@
 ---
 title: GUI Agent Survey
 tags: [survey, gui-agent, vlm, rl, computer-use]
-date_updated: "2026-07-15"
+date_updated: "2026-07-19"
 year_range: 2023-2026
-papers_analyzed: 216
+papers_analyzed: 222
 keywords: [gui-agent, gui grounding, computer-use, web agent, mobile agent]
 domain_map: GUI-Agent
 ---
@@ -83,6 +83,8 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 - **MEGA-GUI**：Multi-stage modular framework，bidirectional ROI zoom + grounding agent，在 ScreenSpot-Pro 达到 73.18% accuracy。
 - **GUIOdyssey**：Cross-app 数据集（8,334 episodes，212 apps），引入 History Resampler 压缩长序列视觉历史，提升跨应用任务性能。
 - **InfiGUIAgent**：Two-stage SFT pipeline，Stage 1 强化 grounding，Stage 2 引入 hierarchical reasoning 与 expectation-reflection reasoning。
+- **Inference-time tree search**：[[2407-TreeSearchLMAgents]] 首证 best-first search + value function 在真实 web 环境有效（VisualWebArena 18.9%→26.4%，随搜索预算单调 scaling），但回溯只能靠"reset+重放动作序列"在沙盒模拟——环境缺原生 checkpoint/restore 的最直接证据。
+- **World-model planning**：[[2411-WebDreamer]]（TMLR 2025）因 live 站点 reset/undo 不可行，把探索搬进 LLM 想象（NL state-delta 模拟 + MPC），达 tree search 收益 ~70% 且快 4.4×，但模拟深度 H=1 封顶——想象是回溯的替代品而非等价物。
 
 **优势**：适合复杂长程任务；层次结构可解释性强；支持多应用、多平台迁移。  
 **局限**：模块间协调可能引入 cascading errors；历史建模增加推理开销；训练数据需覆盖跨应用流程。
@@ -126,6 +128,9 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 | **A3 (Android Arena)** | Android | 真实应用任务 | Success Rate | UI-Genie SOTA | 真实 app 交互评测 |
 | **GUI-Testing Arena** | Multi-platform | 自动化测试任务 | Test Coverage | 需验证 | GUI 自动化测试专用 benchmark |
 | **AutoGUI-v2** | Multi-platform (6 OS) | 2,753 tasks | Region/Element-level Accuracy, Interaction Outcome Prediction | Qwen3-VL (grounding), Gemini-2.5-Pro (captioning) | Deep functionality understanding + state prediction，发现 VLM dichotomy |
+| **[[2403-WorkArena]] / ++** | Web (ServiceNow 企业沙盒) | 33 / 682 组合任务 | 程序化 Success Rate | 开源<<闭源，长程组合更低 | 首个企业知识工作 benchmark，随附 BrowserGym（ACL 2024） |
+| **[[2504-REAL]]** | Web (11 站确定性 React 副本) | 112 任务 | localStorage state-diff 断言 + rubric judge | Claude 3.7 Thinking 41.07% / OpenAI CUA 7.14% | 数据静态化+时间锁定，/clear 重置、/config 可编程初始化、impossible tasks 抗 overclaim |
+| **[[2504-AgentRewardBench]]** | 5 benchmark 轨迹集 | 1302 轨迹/351 任务 | 专家标注测 judge P/R | LLM judge P ≤70% / rule-based R 55.9% | "评估器的评估"：judge 与 rule-based 双向失败的首次系统测量 |
 
 **Benchmark 演进趋势**：
 - 从静态 grounding（ScreenSpot）到动态交互（AndroidWorld、OSWorld）
@@ -151,7 +156,7 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 
 6. **信任与安全开始被系统性关注**：Towards Trustworthy GUI Agents 提出感知-推理-交互三层信任框架，指出 Execution Gap 是核心挑战。不可逆操作、多步计划一致性、对抗性攻击防护成为新的研究方向。SnapGuard 针对 screenshot-based web agent 提出 lightweight prompt injection 检测（F1=0.75），但精度仍不足以支撑"安全"claim。web 模态的攻击面已有两个系统性锚点：[[2504-WASP]]（NeurIPS 2025 D&B）用现实威胁模型（敌意用户仅能在允许区域注入）测得部分攻击成功率高达 86% 但完整攻击目标少有达成——当前是 **"security by incompetence"**（表观安全是 agent 无能的副产物，会随能力提升而消失）；[[2409-EIA]]（ICLR 2025）把隐私泄露确立为独立攻击面：环境注入伪装 HTML form 诱导 agent 交出 PII 成功率 70%，且精细注入可绕过人工检查（security-autonomy 根本张力）。评测方法学要点：须区分"部分带偏"与"完整达成攻击目标"。
 
-7. **Live Internet 评测揭示真实能力缺口**：Odysseys 在真实开放互联网上评测 200 个长时域任务，最强 frontier model 仅达 44.5% 成功率、1.15% 效率——彻底戳穿 WebArena/WebVoyager 在 static snapshot 上"饱和"的假象。Long-horizon + live environment 是 distinct capability frontier。[[2504-OnlineMind2Web]] 提供第二个独立数据点并诊断了幻觉成因：shortcut 可解任务（WebVoyager 大量任务仅用 Google Search 即可解 ~51%）+ 不可靠 judge + 缓存页面禁止真实探索；其 WebJudge（~85% 人工一致）与难度分层协议成为 live 评测的事实参考，只有 OpenAI Operator 达 ~61%。
+7. **Live Internet 评测揭示真实能力缺口**：Odysseys 在真实开放互联网上评测 200 个长时域任务，最强 frontier model 仅达 44.5% 成功率、1.15% 效率——彻底戳穿 WebArena/WebVoyager 在 static snapshot 上"饱和"的假象。Long-horizon + live environment 是 distinct capability frontier。[[2504-OnlineMind2Web]] 提供第二个独立数据点并诊断了幻觉成因：shortcut 可解任务（WebVoyager 大量任务仅用 Google Search 即可解 ~51%）+ 不可靠 judge + 缓存页面禁止真实探索；其 WebJudge（~85% 人工一致）与难度分层协议成为 live 评测的事实参考，只有 OpenAI Operator 达 ~61%。[[2504-AgentRewardBench]] 进一步给评估器可靠性定量下界：1302 条专家标注轨迹上 12 个 LLM judge precision 无一超 70%、rule-based 评测 recall 仅 55.9%（官方分数系统性低估）、副作用检测 precision 仅 7–14%——judge 与规则两条路线双向失败，"评测结论的可信度"本身需要随分数一起报告。
 
 8. **VLM Grounding 可视化验证有启发**：SketchVLM 的 coordinate prompting + SVG overlay 设计可迁移到 GUI grounding 验证——"show me where you would click"的可视化 debug 为 grounding 错误诊断提供新思路。>94% annotation-text faithfulness 证明视觉输出和文本输出一致性。
 
@@ -159,9 +164,9 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 
 10. **API-GUI 统一是效率突破口**：ComputerRL 的 API-GUI 范式和 UI-TARS-2 的 GUI-SDK 扩展表明，单纯模拟人类 GUI 操作效率低下，让 agent 同时掌握程序化 API 调用可减少 3× 步数。9B 模型在 OSWorld 达 48.9% 超越 o3。
 
-11. **Training-time 与 Test-time scaling 正交互补**：UI-TARS-2/ComputerRL 代表训练时 RL scaling，Agent S3/BJudge 代表推理时 compute scaling（OSWorld 72.6% 超人类）。两者可组合——用 RL 训练的强模型作为 base，再用 test-time scaling 提升可靠性。
+11. **Training-time 与 Test-time scaling 正交互补**：UI-TARS-2/ComputerRL 代表训练时 RL scaling，Agent S3/BJudge 代表推理时 compute scaling（OSWorld 72.6% 超人类）。两者可组合——用 RL 训练的强模型作为 base，再用 test-time scaling 提升可靠性。test-time search 的源头是 [[2407-TreeSearchLMAgents]]（VWA +39.7%，弱模型收益最大 +119.7%），但其回溯依赖沙盒 reset+replay；live 环境下 [[2411-WebDreamer]] 只能用 LLM 想象模拟替代——test-time scaling 的上限受环境状态原语（checkpoint/fork）制约。
 
-12. **数据合成成本急剧下降**：从 CogAgent 时代的人工标注，到 AgentTrek（$0.55/trajectory）、OS-Genesis（逆向任务合成）、TongUI（143K trajectories from tutorials），数据获取成本下降 20×。OpenCUA 的 reflective CoT augmentation 证明 CoT 质量比 trajectory 数量更重要（+32%）。
+12. **数据合成成本急剧下降**：从 CogAgent 时代的人工标注，到 AgentTrek（$0.55/trajectory）、OS-Genesis（逆向任务合成）、TongUI（143K trajectories from tutorials），数据获取成本下降 20×。OpenCUA 的 reflective CoT augmentation 证明 CoT 质量比 trajectory 数量更重要（+32%）。[[2502-InSTA]] 把规模推到极限：LLM 三角色（proposer 89% 可验证 / safety filter 97% / judge 82.6%）覆盖 150k 站点，$521 收集 2.2M 轨迹，1.7B student 反超 235B 数据收集 policy；代价是 live 无 reset/禁状态修改导致任务分布系统性偏只读，judge 17% 错误率直接进入训练信号。
 
 13. **感知 pipeline 质量是被低估因素**：WindowsAgentArena 发现 SoM annotation 质量造成 15-57% 性能波动，OmniParser 证明 local semantics 提升 23.3%。比起 reasoning 能力，感知质量对最终性能的影响可能更大。
 
@@ -270,6 +275,7 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 - [[2412-AgentTrek]] - AgentTrek: Tutorial→trajectory，$0.55/trajectory
 - [[2412-OSGenesis]] - OS-Genesis: 逆向任务合成
 - [[2500-TonguiInternetScaleTrajectories|TongUI]] - TongUI: 多模态教程→143K trajectories
+- [[2502-InSTA]] - InSTA: 150k 站点 / $521 / 2.2M 轨迹，LLM 全程当 curator
 
 ### 6.8 Foundation Models
 
@@ -282,6 +288,16 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 ---
 
 ## 调研日志
+
+### 2026-07-19 survey-refresh（积压消化第 3 批）
+- **并入论文**: 6 篇（[[2403-WorkArena]]、[[2504-REAL]]、[[2504-AgentRewardBench]]、[[2407-TreeSearchLMAgents]]、[[2411-WebDreamer]]、[[2502-InSTA]]）
+- **跳过**: 2 篇（[[2311-GAIA]]、[[2504-BrowseComp]]）——deep-research/information-seeking 标尺不含 GUI 操作，归属 WebAgent-Survey（已并入该 survey benchmark 表）
+- **核心变化**:
+  - 2.4 路线新增 inference-time tree search / world-model planning 两条目；Takeaway 11 升级（test-time scaling 上限受环境状态原语制约）
+  - Takeaway 7 补 AgentRewardBench 定量下界（judge P≤70% / rule R 55.9% / 副作用检测 7-14%）
+  - Takeaway 12 补 InSTA 极限数据点（150k 站点 / $521 / 2.2M 轨迹及其只读偏置代价）
+  - Benchmark 表 +WorkArena/REAL/AgentRewardBench
+- **status**: success
 
 ### 2026-07-15 survey-refresh（积压消化第 2 批）
 - **并入论文**: 5 篇（[[2504-WASP]]、[[2409-EIA]]、[[2509-TGPO]]、[[2401-VisualWebArena]]、[[2401-WebVoyager]]）

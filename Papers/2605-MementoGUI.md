@@ -57,6 +57,16 @@ MementoCore 使用以下方式训练：
 人工验证 200 个采样轨迹，197 个完全正确（98.5% 准确率）。
 
 ## Key Results
+### 评测协议与指标定义
+**在线评测（GUI-Odyssey，Table 1）**：AMS = Action Matching Score（步级动作匹配，GUI-Odyssey 标准指标），Traj SR = Trajectory Success Rate。Working Memory 条件下 backbone 每步输入为 u_t = (x_t, V_mem_t, c_t)——当前截图 + 记忆选出的 ROI 图 + 文本上下文（goal + WM 摘要 + 检索到的 episodic 文本），**从不回看原始历史截图**。
+
+**MementoGUI-Bench（离线，Section 4.4）**：源自 PSAI computer-use 视频，200 条轨迹 / 6,953 步（平均 34.8 步/轨迹），80 条测试、120 条用于构建 episodic memory bank。聚焦"下一动作依赖累积任务状态、延迟约束、已完成子目标或先前经验"的 memory-dependent 决策点。三个 memory-aware 指标（均由 Gemini-3.1-Pro 作 VLM judge 打分）：
+- **VAM**（VLM-based Action Match）：预测动作与参考动作在当前截图上是否语义等价
+- **TPS**（Task Progress Score）：预测序列是否推进任务（无 loop、regression、stalling）
+- **MCS**（Memory Consistency Score）：memory 状态是否随任务进展一致演化（含先前选择、已完成子目标、用户约束、检索到的 episodic 经验）
+
+注意：benchmark **不含**任何 context-reset / 中途恢复 / resumability / "只靠 memory 继续任务" 的干预式测量；MCS 是对 memory 内容一致性的判分，属于观察式质量评估，未做 memory 充分性（sufficiency）或压缩信息损失的因果测试。
+
 ### 主要结果（Table 1）
 MementoGUI 一致性地改进所有冻结骨干。在 GUI-Odyssey 上使用 UI-Venus-1.5-8B：
 - 无历史 → 工作记忆：AMS 54.58→67.69，Traj SR 1.29→2.69

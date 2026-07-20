@@ -104,6 +104,18 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 **优势**：增强泛化到未见任务的能力；显式知识结构可解释性强。  
 **局限**：依赖高质量知识框架与检索库；可扩展性受知识覆盖度限制。
 
+### 2.6 架构谱系：Native End-to-End vs Compositional Framework
+
+**代表论文**：[[2312-CogAgent]]、[[2501-UITARS]]、[[2508-OpenCUA]]、[[2504-AgentS2]]、[[2510-ScalingAgents]]、[[2408-OmniParser]]
+
+跨越 2.1–2.5 各路线之上，存在一条正交的架构轴：把 agent 做成单一端到端模型，还是可组合的模块化框架。
+
+- **Native 谱系**：[[2312-CogAgent]]（CVPR 2024 Highlight，dual-resolution cross-attention 首次让纯视觉在 Mind2Web 超越 HTML-based LLM）→ [[2501-UITARS]]（感知增强 + 统一 action space + System-2 reasoning）→ [[2509-UITARS2]]（data flywheel + multi-turn RL）→ [[2508-OpenCUA]]（完整开源 pipeline，OSWorld-Verified 45.0% 开源 SOTA）。优势：知识跨平台迁移、无需手工 prompt、可持续自我改进；代价：训练资源巨大（数千 VM）、推理延迟高。
+- **Compositional 谱系**：[[2504-AgentS2]]（Manager-Worker 层级 + Mixture of Grounding 三专家，OSWorld 34.5%，但 Workflow 类任务仅 18.21%）→ [[2510-ScalingAgents]]（Agent S3：Behavior Judge + multi-rollout wide scaling，OSWorld 72.6% 超人类）。优势：模块可插拔、test-time scaling 潜力大；代价：依赖强商用模型，多 rollout 假设独立初始状态。
+- **可插拔感知层**：[[2408-OmniParser]]（YOLOv8 检测 + icon 描述 + OCR + Set-of-Marks，ScreenSpot 73.0%）作为任意 VLM 的 plug-in——模块化感知 vs 端到端训练（SeeClick 路线）的取舍仍是 open question。
+
+两谱系互补而非互斥：grounding 专用模型可作为 compositional agent 的专家模块（Agent S2 用 UI-TARS 做 visual grounding expert）；native 谱系的 training-time RL scaling 与 compositional 谱系的 test-time scaling 正交可组合（见 Takeaway 11）。
+
 ---
 
 ## 3. Datasets & Benchmarks
@@ -131,6 +143,10 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 | **[[2403-WorkArena]] / ++** | Web (ServiceNow 企业沙盒) | 33 / 682 组合任务 | 程序化 Success Rate | 开源<<闭源，长程组合更低 | 首个企业知识工作 benchmark，随附 BrowserGym（ACL 2024） |
 | **[[2504-REAL]]** | Web (11 站确定性 React 副本) | 112 任务 | localStorage state-diff 断言 + rubric judge | Claude 3.7 Thinking 41.07% / OpenAI CUA 7.14% | 数据静态化+时间锁定，/clear 重置、/config 可编程初始化、impossible tasks 抗 overclaim |
 | **[[2504-AgentRewardBench]]** | 5 benchmark 轨迹集 | 1302 轨迹/351 任务 | 专家标注测 judge P/R | LLM judge P ≤70% / rule-based R 55.9% | "评估器的评估"：judge 与 rule-based 双向失败的首次系统测量 |
+| **[[2409-WindowsAgentArena]]** | Windows | 154 任务 | Task completion | 56.6% (Agent S3) / Human 74.5% | 云端并行评测；SoM annotation 质量造成 15-57% 性能波动 |
+| **OfficeWorld** | Desktop | 120 任务 | Execution-based | 43.3% (ComputerRL) | Office 软件操作 |
+| **[[2606-MyPCBench]]** | Desktop (personal) | Linux + 17 simulated web apps | Fully-solved rate | Claude Opus 4.6: 55.4% | Personal assistant setting：logged-in 账号 + 历史数据 + 跨应用个人上下文 |
+| **[[2606-AgentCIBench]]** | Multi (privacy) | contextual integrity 任务集 | V_share / V_leak | 平均 leakage 67.9% | 无 adversary 的正常使用中测 inappropriate disclosure |
 
 **Benchmark 演进趋势**：
 - 从静态 grounding（ScreenSpot）到动态交互（AndroidWorld、OSWorld）
@@ -154,7 +170,7 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 
 5. **评测从终点评估走向过程级评估**：ProBench、MMBench-GUI 的 EQA 指标表明，仅看终点状态不足以准确评估 agent 能力。过程信息、效率指标、层级化诊断成为新的评测方向。
 
-6. **信任与安全开始被系统性关注**：Towards Trustworthy GUI Agents 提出感知-推理-交互三层信任框架，指出 Execution Gap 是核心挑战。不可逆操作、多步计划一致性、对抗性攻击防护成为新的研究方向。SnapGuard 针对 screenshot-based web agent 提出 lightweight prompt injection 检测（F1=0.75），但精度仍不足以支撑"安全"claim。web 模态的攻击面已有两个系统性锚点：[[2504-WASP]]（NeurIPS 2025 D&B）用现实威胁模型（敌意用户仅能在允许区域注入）测得部分攻击成功率高达 86% 但完整攻击目标少有达成——当前是 **"security by incompetence"**（表观安全是 agent 无能的副产物，会随能力提升而消失）；[[2409-EIA]]（ICLR 2025）把隐私泄露确立为独立攻击面：环境注入伪装 HTML form 诱导 agent 交出 PII 成功率 70%，且精细注入可绕过人工检查（security-autonomy 根本张力）。评测方法学要点：须区分"部分带偏"与"完整达成攻击目标"。
+6. **信任与安全开始被系统性关注**：Towards Trustworthy GUI Agents 提出感知-推理-交互三层信任框架，指出 Execution Gap 是核心挑战。不可逆操作、多步计划一致性、对抗性攻击防护成为新的研究方向。SnapGuard 针对 screenshot-based web agent 提出 lightweight prompt injection 检测（F1=0.75），但精度仍不足以支撑"安全"claim。web 模态的攻击面已有两个系统性锚点：[[2504-WASP]]（NeurIPS 2025 D&B）用现实威胁模型（敌意用户仅能在允许区域注入）测得部分攻击成功率高达 86% 但完整攻击目标少有达成——当前是 **"security by incompetence"**（表观安全是 agent 无能的副产物，会随能力提升而消失）；[[2409-EIA]]（ICLR 2025）把隐私泄露确立为独立攻击面：环境注入伪装 HTML form 诱导 agent 交出 PII 成功率 70%，且精细注入可绕过人工检查（security-autonomy 根本张力）。评测方法学要点：须区分"部分带偏"与"完整达成攻击目标"。**2026-06 起安全面进一步从 adversarial 扩展到正常使用中的授权内越界**：[[2606-MyPCBench]]（personal context 是真实 CUA 能力轴）、[[2606-BraveGuard]]（风险出现在 multi-step trajectory 组合中，prompt-level guard 看不到）、[[2606-AgentCIBench]]（无 adversary 时 contextual disclosure leakage 平均 67.9%）构成三角证据——不可逆动作之外还有不可逆披露，personal CUA 的评估须把 task success、contextual disclosure leakage、out-of-scope access 分开报告，只看 pass rate 会高估可部署性。
 
 7. **Live Internet 评测揭示真实能力缺口**：Odysseys 在真实开放互联网上评测 200 个长时域任务，最强 frontier model 仅达 44.5% 成功率、1.15% 效率——彻底戳穿 WebArena/WebVoyager 在 static snapshot 上"饱和"的假象。Long-horizon + live environment 是 distinct capability frontier。[[2504-OnlineMind2Web]] 提供第二个独立数据点并诊断了幻觉成因：shortcut 可解任务（WebVoyager 大量任务仅用 Google Search 即可解 ~51%）+ 不可靠 judge + 缓存页面禁止真实探索；其 WebJudge（~85% 人工一致）与难度分层协议成为 live 评测的事实参考，只有 OpenAI Operator 达 ~61%。[[2504-AgentRewardBench]] 进一步给评估器可靠性定量下界：1302 条专家标注轨迹上 12 个 LLM judge precision 无一超 70%、rule-based 评测 recall 仅 55.9%（官方分数系统性低估）、副作用检测 precision 仅 7–14%——judge 与规则两条路线双向失败，"评测结论的可信度"本身需要随分数一起报告。
 
@@ -180,7 +196,7 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 
 1. **长程任务的 Credit Assignment**：多步任务中，稀疏反馈导致中间正确操作无法被强化。UI-Voyager 的 GRSD 提出了 fork point 定位思路，但如何在高噪声、多分支、状态不完全可观测的真实界面中稳定实现，仍是开放问题。
 
-2. **跨域/跨分辨率的稳定 Grounding**：Continual GUI Agents 提出了 APR-iF/ARR-iF，但真实场景中界面变化更复杂（动画、个性化布局、主题切换）。如何设计更鲁棒的 scale-invariant、layout-invariant grounding 机制需要进一步研究。
+2. **跨域/跨分辨率的稳定 Grounding**：Continual GUI Agents 提出了 APR-iF/ARR-iF，但真实场景中界面变化更复杂（动画、个性化布局、主题切换）。如何设计更鲁棒的 scale-invariant、layout-invariant grounding 机制需要进一步研究。两个被系统性忽视的子问题：专业软件的 icon/非文字元素 grounding（[[2504-ScreenSpotPro]] 揭示 icon 识别仅 4% 准确率）与多语言 GUI 理解（ScreenSpot-Pro-CN 中文指令下性能显著下降）。
 
 3. **Self-improving 的系统性偏差风险**：UI-Genie 的 RM、UI-Mem 的 experience template 若存在错误抽象，自增强过程可能放大偏差而非纠错。如何构建"可纠错"而非"可增强"的自进化系统是关键问题。
 
@@ -201,6 +217,8 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 9. **隐私与安全攻击防护**：Fine-print injection、indirect prompt injection、恶意界面元素等攻击手段已被识别（EVA、Obvious Invisible Threat、[[2504-WASP]] 现实威胁模型下部分劫持 86%、[[2409-EIA]] 环境注入偷 PII 70%），但系统性防御方案尚未成熟。SnapGuard 提出轻量级检测（VSI + APD），但 F1=0.75 漏检率对安全场景 unacceptable——lightweight 但不够 accurate。WASP 的警示更根本：当前的"安全"来自 agent 能力不足（security by incompetence），能力提升会直接放大注入风险，防御必须先行。
 
 10. **Live Internet 评测的可复现性困境**：Odysseys 在真实开放互联网上评测，真实性最高但不可复现——网站更新、内容变化，每次评测结果可能不同。如何在 realism 与 reproducibility 之间取得平衡，是 benchmark design 的 fundamental trade-off。
+
+11. **跨应用 Workflow 与长程状态追踪**：Agent S2 在 Workflow 类任务上仅 18.21%、[[2604-WindowsWorld]] 显示跨应用任务 14% vs 单应用 46%，说明跨应用状态追踪与长程 context 维护是独立于单应用能力的根本性瓶颈，可能需要 explicit memory / world model 支持。同时它也是 privacy boundary 难题：跨 app state 越丰富，agent 越容易因 visual co-location 或 recipient misalignment 而 over-disclose（[[2606-AgentCIBench]]）。
 
 ### 5.4 研究方向建议
 
@@ -244,6 +262,9 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 - GUI Agents Survey - GUI Agents: A Survey (ACL Findings 2025)
 - [[2500-TowardsTrustworthyGuiAgents]] - Towards Trustworthy GUI Agents
 - [[2503-WebAgentsSurvey]] - 首篇 WebAgent 专门综述（KDD 2025）：architectures / training / trustworthiness 三分法
+- [[2501-ACUSurvey]] - ACU Survey: 3 维 taxonomy / 87 agents / 6 大研究缺口
+- [[2411-GUIAgentSurvey]] - GUI Agent Survey: 8 RQ / 500+ papers 全景地图
+- [[2508-OSAgentsSurvey]] - OS Agents Survey（ACL 2025 Oral）: 3 层框架 / 33 benchmarks
 
 ### 6.3 Benchmark 论文
 
@@ -259,6 +280,9 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 - [[2604-SnapGuard]] - SnapGuard: Lightweight prompt injection detection for screenshot-based web agents
 - [[2504-WASP]] - WASP: 现实威胁模型下的 prompt injection benchmark，"security by incompetence"（NeurIPS 2025 D&B）
 - [[2409-EIA]] - EIA: 环境注入偷 PII 70%，隐私泄露独立攻击面（ICLR 2025）
+- [[2606-MyPCBench]] - MyPCBench: personal assistant setting benchmark
+- [[2606-BraveGuard]] - BraveGuard: threat mining + trajectory-level supervision（AgentHazard 38.79%→82.38%）
+- [[2606-AgentCIBench]] - AgentCIBench: contextual integrity 视角的 disclosure 评测
 
 ### 6.5 Grounding 可视化验证
 

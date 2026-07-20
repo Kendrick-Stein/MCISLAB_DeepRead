@@ -8,7 +8,7 @@ tags: [gui-agent, agentic-RL]
 url: https://arxiv.org/abs/2602.22190
 arxiv_id: "2602.22190"
 doi:
-cite_key:
+cite_key: yang2026gui
 code: https://gui-libra.github.io
 rating: 4
 date_added: 2026-07-20

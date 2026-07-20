@@ -8,7 +8,7 @@ tags: [gui-agent, instruction-following]
 url: https://arxiv.org/abs/2602.11750
 arxiv_id: "2602.11750"
 doi:
-cite_key:
+cite_key: sun2026ambibench
 code: https://anonymous.4open.science/r/MUSE-2973
 rating: 4
 date_added: 2026-07-20

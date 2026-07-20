@@ -8,7 +8,7 @@ tags: [gui-agent, computer-use]
 url: https://arxiv.org/abs/2604.15093
 arxiv_id: "2604.15093"
 doi:
-cite_key:
+cite_key: cheng2026openmobile
 code: https://njucckevin.github.io/openmobile/
 rating: 4
 date_added: 2026-07-20

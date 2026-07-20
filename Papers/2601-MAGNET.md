@@ -8,7 +8,7 @@ tags: [gui-agent, task-planning]
 url: https://arxiv.org/abs/2601.19199
 arxiv_id: "2601.19199"
 doi:
-cite_key:
+cite_key: sun2026magnet
 code:
 rating: 3
 date_added: 2026-07-20

@@ -8,7 +8,7 @@ tags: [gui-agent, computer-use]
 url: https://arxiv.org/abs/2605.12501
 arxiv_id: "2605.12501"
 doi:
-cite_key:
+cite_key: zhang2026covering
 code: https://github.com/microsoft/Phi-Ground
 rating: 4
 date_added: 2026-07-20

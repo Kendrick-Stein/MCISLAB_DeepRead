@@ -25,7 +25,7 @@ tags:
 url: "https://arxiv.org/abs/2602.06075"
 arxiv_id: "2602.06075"
 doi: ""
-cite_key: ""
+cite_key: liu2026memguia
 code: "https://lgy0404.github.io/MemGUI-Bench/"
 rating: 4
 date_added: "2026-07-20"

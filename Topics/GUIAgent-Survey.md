@@ -1,10 +1,10 @@
 ---
 title: GUI Agent Survey
 tags: [survey, gui-agent, vlm, rl, computer-use]
-date_updated: "2026-07-19"
+date_updated: "2026-07-20"
 year_range: 2023-2026
-papers_analyzed: 222
-keywords: [gui-agent, gui grounding, computer-use, web agent, mobile agent]
+papers_analyzed: 233
+keywords: [gui-agent, gui grounding, computer-use, web agent, mobile agent, cua, desktop agent, os agent]
 domain_map: GUI-Agent
 ---
 
@@ -301,17 +301,33 @@ GUI Agent 是指能够理解图形用户界面（GUI）、执行人类指令、�
 - [[2500-TonguiInternetScaleTrajectories|TongUI]] - TongUI: 多模态教程→143K trajectories
 - [[2502-InSTA]] - InSTA: 150k 站点 / $521 / 2.2M 轨迹，LLM 全程当 curator
 
-### 6.8 Foundation Models
+### 6.8 Foundation Models & 架构谱系
 
 - [[2410-OSAtlas]] - OS-Atlas: 13.58M grounding corpus，7B 超 GPT-4o
 - [[2506-ShowuiOneVisionLanguage|ShowUI]] - ShowUI: UI-guided token selection，2B 接近 7B
 - [[2511-GroundCUA]] - GroundCUA: Dense annotation，3B 超 72B agentic
 - [[2508-OpenCUA]] - OpenCUA: 开源 pipeline + Reflective CoT
 - [[2510-ScalingAgents]] - Agent S3: BJudge + wide scaling，OSWorld 72.6% 超人类
+- [[2312-CogAgent]] - CogAgent: dual-resolution cross-attention，native 谱系先驱（CVPR 2024 Highlight）
+- [[2504-AgentS2]] - Agent S2: Manager-Worker + Mixture of Grounding
+- [[2408-OmniParser]] - OmniParser: 模块化屏幕解析 plug-in
+- [[2504-ScreenSpotPro]] - ScreenSpot-Pro: 专业高分辨率 grounding benchmark（icon 仅 4%）
+- [[2409-WindowsAgentArena]] - WindowsAgentArena: Windows 云端并行评测
 
 ---
 
 ## 调研日志
+
+### 2026-07-20 合并 ComputerUseAgents-Survey（survey 整合）
+- **动因**: Supervisor 指示同方向 survey 合并整合。ComputerUseAgents-Survey（26 篇，2026-06-25 止更）与本 survey 范围重合（computer-use = GUI agent 的 desktop 子集），且其 5 条核心 takeaway 已于 2026-04-30 MindFlow 合并时并入。
+- **本次并入的独有内容**:
+  - 新增 2.6 架构谱系（Native End-to-End vs Compositional Framework，CogAgent→UI-TARS→OpenCUA / Agent S2→S3 / OmniParser plug-in）
+  - Takeaway 6 + Open Problem 11 并入 Personal CUA Safety 三角证据（MyPCBench / BraveGuard / AgentCIBench，contextual disclosure）
+  - Benchmark 表 +WindowsAgentArena / OfficeWorld / MyPCBench / AgentCIBench
+  - Open Problem 2 补 icon grounding（ScreenSpot-Pro 4%）与多语言；新增 Open Problem 11（跨应用 workflow）
+  - 参考文献 +11（三篇领域综述、安全三件套、架构谱系五篇）
+- **未保留**: 原 Paper Comparison 逐篇表（细节在各 Papers/ 笔记中，survey 不重复维护）
+- **status**: success
 
 ### 2026-07-19 survey-refresh（积压消化第 3 批）
 - **并入论文**: 6 篇（[[2403-WorkArena]]、[[2504-REAL]]、[[2504-AgentRewardBench]]、[[2407-TreeSearchLMAgents]]、[[2411-WebDreamer]]、[[2502-InSTA]]）

@@ -31,6 +31,25 @@ domain_map: GUI-Agent
 
 **核心张力**：不可逆性既是技术问题也是安全问题。live web 上动作不可逆 → 分支探索被限制在沙盒/副本（realism 受损）或退化为想象模拟（[[Papers/2411-WebDreamer]] 拿到真实搜索 ~70% 收益）；引擎快照解决技术不可逆，但外部副作用（邮件、支付、第三方 API）的不可逆没有任何快照能恢复（[[Papers/2510-AgenticExplorationSystems]] Challenge 2、[[Papers/2512-WebOperator]] 可逆性四分类、[[Topics/WebEnvironment-Engine-Survey]] Open Problem 2 三方汇合）。
 
+## 三原语的能力语义：agent 以前缺什么、现在如何获得
+
+旧范式下 agent 的执行模型是"单条不可逆轨迹"：每个动作是一次不可撤销的贪心承诺，经验只能串行积累。三原语各自拆掉一条约束，对应三种过去结构性缺失的能力：
+
+| 原语 | 拆掉的约束 | 测试侧场景 → 能力 | 训练侧场景 → 能力 |
+|:--|:--|:--|:--|
+| **Recovery** | 错误 = 不可逆终态（只能硬走或整任务重启） | wrong-turn 撤回与卡死逃逸（[[Papers/2504-WebRollback]] 卡死率 19%→7%）；**试错胆量**——可撤销使 agent 敢执行不确定动作（[[Papers/2604-Crab]] proactive rollback -29% 步数） | 失败轨迹 → 纠正数据（[[Papers/2606-SRC]] +9.7~12.9pp）；恢复行为成为可教技能（[[Papers/2605-GUIRobustEval]] 80 万恢复样本）；从错误中间态重启采样（[[Papers/2506-GoBrowse]]） |
+| **Branching** | 决策 = 单次贪心承诺（多假设只能在参数空间里想象比较） | **deliberation**——在真实环境中并行验证多个假设再选择（tree search 家族；[[Papers/2602-AgentAlpha]] 救回 bBoN 失败任务 33.9%）；部分成功前缀复用；跨分支教训共享 | **免费 counterfactual**——同状态多后续的回报差是天然 step 级信号，直接命中稀疏 reward 的 credit assignment（[[Papers/2509-TreeGRPO]]、[[Papers/2408-AgentQ]]）；branch point 数据工厂（[[Papers/2602-ANCHOR]]） |
+| **Parallelism** | 经验 = 串行获取（单次机会，探索速率被墙钟锁死） | **方差消除**——不同 rollout 成功集互补 + 选优（[[Papers/2510-ScalingAgents]] disjoint task success）；宽任务分工的 context 隔离（[[Papers/2602-WideSeekR1]]）；延迟隐藏（speculative 家族） | rollout 吞吐 = 训练速率的物理上限（[[Papers/2601-EvoCUA]] 10 万并发、[[Papers/2509-DARTGUI]] 5.5× 利用率）；经验覆盖多样性 |
+
+**Action 化谱系**——原语从"外部算法的控制流"下放为"agent 可调用动作"的进度（2026-07 快照）：
+
+- **Recovery 最成熟**：prompted 调用（[[Papers/2504-WebRollback]] critique 模块、[[Papers/2604-Crab]] `sbx.rollback()`）已推进到 **learned 调用**——Learning to Explore (2605.08978) 先用 SFT 教会 rollback 动作、再用 variational 探索奖励训练"何时探索"，覆盖 text + GUI benchmark。
+- **Parallelism 居中**：spawn 已 action 化且被训练，但仅在无状态检索域（[[Papers/2602-WideSeekR1]] 的 `call_subagent` 是 MARL 训练出的动作）；GUI 域只有 prompted 框架分工（Mobile-Agent 系），有状态场景的 spawn 调用无训练先例。
+- **Branching 最落后**：环境交互域中 agent 自主发起 fork（"这步不确定，分两条试"）无任何先例——分支至今全部由外部搜索算法或训练框架控制。reasoning token 空间有可迁移先例：PGTS (2502.06813) 用 RL 训练在 expand/branch/backtrack/terminate 四个元动作间选择的策略；backtrack token (2504.07052)、ASTRO (2507.00417) 把回溯内化为语言行为——但 token 空间的分支零成本、可完美恢复，GUI 的分支有真实状态重建成本与不可逆约束，迁移非平凡。
+- 硬边界参照：Guided Search in Non-Serializable Environments (2505.13652) 形式化了不可序列化环境（无 rollback、无状态复制、无分支）下的搜索约束——live web / 生产 SWE 属于此类。
+
+**规律**：action 化进度与调用后果的状态重建成本成反比——rollback 只需恢复一条已知状态（成本最低，最先完成），spawn 需要隔离新实例（居中），fork 需要复制运行中状态（最高，至今无 agent-facing 先例）。这与 Takeaway 3"树方法落地顺序 = 状态重建成本排序"是同一规律的两个投影。
+
 ## 技术路线
 
 ### 路线 1：agent 侧模拟——用浏览器技巧近似 recovery/branching
@@ -147,7 +166,7 @@ domain_map: GUI-Agent
 
 1. **Web 全栈 fork 语义**：browser session（DOM、cookie、页内状态）+ 后端（DB、server session）+ 外部副作用三层状态的一致快照无人实现；WebServ 覆盖容器栈但无浏览器语义层，Crab 覆盖 FS/process 但无 web。外部副作用层被三方独立判定为不可快照（AgenticExplorationSystems / WebOperator / 引擎综述），fork-aware API（副作用版本化）是唯一被提出的系统性方向。
 2. **agent-facing 暴露的因果收益**：fork/rollback 给 agent 自主调用 vs 留给外部算法，对 success/recovery/false-completion 的差异无任何对照实验；Crab 的效率数字不回答此问题。同时缺 prompt-only 强对照排除"收益来自信息展示"。
-3. **分支决策信号的系统比较**：何时/何处分支——随机（Tree-GRPO）、熵（ARPO 家族）、critique（WebRollback）、value（MCTS 系）四类信号无同环境对比；agent 自主分支 vs 算法控制分支的边界未画出。
+3. **分支决策信号的系统比较**：何时/何处分支——随机（Tree-GRPO）、熵（ARPO 家族）、critique（WebRollback）、value（MCTS 系）四类信号无同环境对比；agent 自主分支 vs 算法控制分支的边界未画出。2026-05 后该空白部分收窄：invocation policy 的可学习性在 reasoning 域（PGTS）与 rollback 动作（Learning to Explore, 2605.08978）上分别被证实，但**环境交互域的 fork 调用学习**（真实状态成本 + 不可逆约束下）仍无先例。
 4. **恢复保真度谱系的量化**：URL / replay / 快照三档恢复的保真度-成本-收益曲线没有 benchmark；SRC 的 resettable 假设、WebRollback 的 URL 天花板都指向同一缺失度量。
 5. **并行分支的评估瓶颈**：N 条中段分支的比较比 N 条完整轨迹更难（局部进展无 outcome 可查）；verifier/progress probe 与 fork 的联合设计无人研究。
 6. **live 环境的分支安全边界**：Agent Q 式 live 树搜索的副作用风险无缓解方案；可逆性标注（WebOperator 方向）+ 站长声明接口（agents.txt / [[Papers/2512-PermissionManifestsWebAgents]]）+ 沙盒 fork 的组合是候选路径。
@@ -162,3 +181,4 @@ domain_map: GUI-Agent
 - **建议加入 DomainMaps**: (a) GUI-Agent domain 增加"运行时原语三路线"（agent 侧模拟 / 模型内化 / 引擎原语）竞争框架；(b) "树方法落地顺序 = 状态重建成本排序"作为 cross-domain pattern 候选
 - **仍未 digest（供后续）**: Intelligent Go-Explore（archive/restore 血统的正式笔记）、ARPO 2507.19849（熵分支的代表作）、WebPilot（MCTS 家族补全）、UI-Simulator (2510.14969)、AgentSynth (2506.14205)、WAC (2602.15384)
 - **增量更新 2026-07-20**（Supervisor 重提：并行/分支/回溯，训练/测试两角度 + multi-agent + 浏览器分支）：新 digest 4 篇——[[Papers/2602-AgentAlpha]]（路线 1，step 级 MCTS 刷新 OSWorld）、[[Papers/2602-ANCHOR]]（路线 4 新增用途 4：branch point 数据工厂）、[[Papers/2512-ScalingAgentSystems]]、[[Papers/2602-WideSeekR1]]（路线 5 新增组织式并行形态）；[[Papers/2505-BacktrackAgent]] 由摘要级升级为正式笔记引用。摘要级新增：GUI Exploration Lab (2512.02423, NeurIPS'25，多轮 RL 中回溯行为自发涌现)、ParallelMuse (2510.24698)、Share-More-Search-Less (2605.27030)、Agent-as-Tool/ParaManager (2604.17009)、LAMaS (2601.10560)。外部检索：WebSearch 3 次。矩阵 +3 行，Takeaway 5 补 2026-07 证据。
+- **增量更新 2026-07-20 (2)**（Supervisor 追问：三原语各对应什么能力、有何可开展方向）：新增"能力语义"一节（约束-能力表 + action 化谱系 + 状态重建成本规律）；Open Problem 3 按新证据收窄。摘要级新增：PGTS (2502.06813，reasoning 域 invocation policy RL)、Learning to Explore (2605.08978，SFT rollback + exploration-aware RL，recovery 调用学习首例)、ASTRO (2507.00417)、backtrack token (2504.07052)、Guided Search in Non-Serializable Environments (2505.13652，不可分支环境的形式化)、MobileGym（JSON state fork 基建，已在路线 3）。产出新 idea：[[Ideas/SelfInitiatedFork-GUI]]（branch 调用学习——action 化谱系唯一空白）。外部检索：WebSearch 2 次 + WebFetch 1 次。

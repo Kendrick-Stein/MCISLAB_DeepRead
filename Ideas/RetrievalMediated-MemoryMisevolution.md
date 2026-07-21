@@ -1,9 +1,9 @@
 ---
 title: "Retrieval-Mediated Defense for Memory Misevolution"
 tags: [agentic-RL, LLM, research-idea]
-status: raw
+status: validated
 linked_project:
-date_updated: "2026-07-14"
+date_updated: "2026-07-21"
 ---
 ## Hypothesis
 
@@ -74,3 +74,29 @@ date_updated: "2026-07-14"
 | **Total** | **18/25** | |
 
 **Reasoning**：假设尖锐（检索介导 vs 内容介导是二choice 机制问题）、实验便宜（无训练）、两种结局都可发表。与 CounterfactualProbe-EvolutionGate 构成互补组合：一个管演化产物的准入，一个管已入库经验的使用——共同覆盖 memory 演化安全的写入/读取两端。短板是赛道拥挤带来的 framing 压力——A-MemGuard 对照实验应最先做。
+
+## External novelty re-check — 2026-07-21 (idea-evaluate, Self-Improving resume 后复评)
+
+WebSearch（关键词：memory retrieval ranking intervention reward hacking self-evolving），检索记录：
+
+| 新发现 | 内容 | 对本 idea 的影响 |
+|:--|:--|:--|
+| [Safety in Self-Evolving LLM Agent Systems (2606.23075)](https://arxiv.org/pdf/2606.23075) | survey 形式化七种放大效应，其中 **Selective Amplification / echo-trap exploitation** 正是本 idea 的检索正反馈机制 | 机制被独立命名（概念首发权收窄），但 survey 只分类不做因果干预——**"固定内容仅动检索"的因果实验仍无人做**；Evidence 显著加强 |
+| [MemRL (2601.03192)](https://arxiv.org/html/2601.03192v2) | 检索打分 = 从环境 reward 学 Q 值（value-based retrieval） | 检索 scoring 杠杆已主流化；且 MemRL 本身是"按历史 return 排序"正反馈机制的实例——应新增实验条件 **R6：value-based 检索是否加剧 hacking**（比 R0 更尖锐的正例对照） |
+| [MemoryGraft (2512.16962)](https://arxiv.org/html/2512.16962v1) | 投毒攻击 + Cryptographic Provenance Attestation 防御 | 对抗威胁模型的 provenance 防御第二例（与 A-MemGuard 并列），强化"两类威胁模型需区分"的 framing |
+| [Towards Healthy Evolution (2606.06114)](https://arxiv.org/pdf/2606.06114) | memory-induced deployment-time reward hacking 有专节，mitigation 走 human-in-loop | 确认机制干预缺位；human-in-loop 是第三条对照路线可引 |
+
+**结论**：机制假设获得独立命名与两条 survey 级确认，核心差异（良性 misevolution 的检索侧因果干预 + 机制归因）未被占据；MemRL 的主流化使问题从学术好奇升级为实际部署风险。
+
+## Evaluation — 2026-07-21 (idea-evaluate 复评)
+
+| Dimension | Score | Notes |
+|:----------|:-----:|:------|
+| Novelty | 3/5 | 检索侧因果干预 + 机制归因仍无先例；机制概念已被 2606.23075 命名，首发权收窄到"因果实验证明"。closest works: [[Papers/2509-Misevolution]], [[Papers/2603-Memoir]], A-MemGuard, MemRL（新）, 2606.23075（新） |
+| Feasibility | 4/5 | 不变；零训练、协议现成 |
+| Impact | 4/5 | 两个 survey 确认 mitigation 缺位；MemRL 主流化使"value 检索会否放大 hacking"成为部署级问题 |
+| Risk | 3/5 | 机制假设可能错但双向可报告；防御 trick 赛道拥挤但机制归因定位稳 |
+| Evidence | 5/5 | Misevolution 崩塌 signature + Memoir 检索主导价值 + 2606.23075 独立命名同一机制 + MemRL 证明杠杆可行，四路收敛 |
+| **Total** | **19/25**（原 18/25） | |
+
+**Verdict**：**validated，Self-Improving（literature-only）方向的 lead idea**。按 Supervisor 2026-07-21 scope 约束：实验设计冻结（Approach sketch 保留为未来 AFE verify affordance 侧或解禁后的执行蓝本，R6 条件已补入）；近期动作 = digest 4 篇新发现论文并入 [[Topics/SelfEvolvingAgents-Survey]]。

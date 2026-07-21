@@ -1,9 +1,10 @@
 ---
 title: "Counterfactual Probe Gating for Self-Evolution Steps"
 tags: [agentic-RL, LLM, research-idea]
-status: raw
+status: archived
 linked_project:
-date_updated: "2026-07-14"
+date_updated: "2026-07-21"
+archived_reason: "2026-07-21 idea-evaluate 复评：probe-based admission gate 已被 GRASP (2605.29668) 直接占据，赛道 3 个月内 ≥6 并发工作，novelty 4→2；文献侧价值转为 SelfEvolvingAgents-Survey 的 gate 家族整理"
 ---
 ## Hypothesis
 
@@ -73,3 +74,31 @@ date_updated: "2026-07-14"
 | **Total** | **18/25** | |
 
 **Reasoning**：占据一个刚被理论工作（PACE/信息论极限）圈出但无人给出机制性解法的空白；证据链来自本 vault 两条 validated/provisional insight 的交汇，差异化清晰。短板是 probe 合成质量的不确定性——建议先做 20 个产物的 pilot 验证 probe 可靠性再扩大。
+
+## External novelty re-check — 2026-07-21 (idea-evaluate, Self-Improving resume 后复评)
+
+WebSearch 两轮（关键词：evolution step verification gate / regression testing invariance agent self-improvement），检索记录：
+
+| 新发现 | 内容 | 对本 idea 的影响 |
+|:--|:--|:--|
+| [GRASP (2605.29668)](https://arxiv.org/abs/2605.29668) | bounded skill library 准入 gate = balanced **held-out probe** 净提升 ∧ hard regression budget；MedAgentBench 40.6→88.8，超 5 个 self-improvement baseline 21pp | **直接占据 probe-based admission gate**——本 idea 的核心机制形态已被实现（差异仅剩 probe 的构造方式） |
+| [SKILL.nb (2606.08049)](https://arxiv.org/abs/2606.08049) | validation-gated promotion，recovery/regression 72.9%/4.2% vs AWM-online 58/17；去 gate 消融证明 regression 上升 | gate 有效性已被实证，"gate 是否该存在"不再是开放问题 |
+| [ASG-SI (2512.23760)](https://arxiv.org/abs/2512.23760) | skill 带 pre/postcondition contract，verifier–auditor 用 held-out + contract check + **controlled perturbations** + 周期 replay | 结构性 invariance 检查已有工程实现（schema 级，非行为级） |
+| [Anytime-Valid Certificates (2607.00871)](https://arxiv.org/abs/2607.00871) | downstream-utility gate：macro 仅在其 context 上 newer-vs-older lift 为正才准入 | trigger-context 条件化准入已出现 |
+| [Next-Gen Agentic RL Systems (2607.01120)](https://arxiv.org/pdf/2607.01120v2) | position paper：明文提出 evolution-step **counterfactual replay** 测试协议（past failures + known successes） | 概念空间已被公开圈定 |
+| [SEVerA (2603.25111)](https://arxiv.org/html/2603.25111) | formal AST-based gate 防演化 cheating | gate 家族又一成员 |
+
+**结论**：survey Open Problem 2（"演化步验证机制无系统工作"）已过时——gate 家族在 2605–2607 三个月内成型（≥6 并发工作）。本 idea 剩余差异（trigger-boundary 反事实不变性 probe 的具体形式 + misevolution 安全率 ground truth 的 frontier 横评）按"延伸组合不算空白"与"测量型无亮点"两条品味规则均不足以支撑独立论文。
+
+## Evaluation — 2026-07-21 (idea-evaluate 复评)
+
+| Dimension | Score | Notes |
+|:----------|:-----:|:------|
+| Novelty | 2/5 | probe-based gate 被 GRASP 占据、controlled perturbation 被 ASG-SI 占据、counterfactual replay 协议被 2607.01120 圈定；closest works: GRASP, ASG-SI, [[Papers/2605-SkillOpt]], PACE, [[Papers/2607-ABotAgentOS]] |
+| Feasibility | 3/5 | 不变 |
+| Impact | 2/5 | OP2 空白正被快速填充，再出 gate 变体受众有限；安全-frontier 横评是测量型贡献（品味规则降级） |
+| Risk | 2/5 | 赛道 3 个月 ≥6 工作，竞争窗口成为主要风险（= 淘汰信号） |
+| Evidence | 4/5 | gate 有效性反而更强（GRASP/SKILL.nb 实证），但这利好的是已入场者 |
+| **Total** | **13/25**（原 18/25） | |
+
+**Verdict**：**archived**。文献侧遗产两项：(1) 6 篇 gate 家族论文入 digest 清单，作为 [[Topics/SelfEvolvingAgents-Survey]] 新增"evolution-step gating 家族"小节的素材（literature-only scope 内的正当产出）；(2) "现有 gate 全部只测 capability regression、无一连接 misevolution 安全协议"仍是真观察，记入 survey Open Problem 更新而非独立 idea。

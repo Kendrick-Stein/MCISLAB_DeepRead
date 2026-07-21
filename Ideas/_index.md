@@ -30,8 +30,8 @@ title: Ideas
 | [[Ideas/HybridVerifier-GUIRuntime]] | raw | GUI Environment / WeaveBench | Agent-facing cross-channel verifier to reduce reward hacking |
 | [[Ideas/EvidenceDependence-GUIGrounding]] | raw | VisualFLIP / GUI grounding | Action Collapse Rate for counterfactual GUI evidence dependence |
 | [[Ideas/PersonalizedSafety-CUA]] | raw | MyPCBench / BraveGuard | Task-scoped permission + trajectory privacy guard for personal CUA |
-| [[Ideas/CounterfactualProbe-EvolutionGate]] | raw | SelfEvolvingAgents-Survey / ABot-AgentOS | Counterfactual invariance probe 作演化步准入判据，外推 gating frontier |
-| [[Ideas/RetrievalMediated-MemoryMisevolution]] | raw | Misevolution / Memoir | Memory reward hacking 由检索正反馈介导，改检索不洗内容即可防御 |
+| [[Ideas/CounterfactualProbe-EvolutionGate]] | archived (13/25) | SelfEvolvingAgents-Survey / ABot-AgentOS | ~~Counterfactual invariance probe 作演化步准入判据~~（2026-07-21 复评淘汰：GRASP 已占据 probe-based gate，赛道 3 个月 ≥6 并发；遗产转 survey gate 家族小节） |
+| [[Ideas/RetrievalMediated-MemoryMisevolution]] | validated (19/25) | Misevolution / Memoir | Memory reward hacking 由检索正反馈介导，改检索不洗内容即可防御（Self-Improving literature-only 方向 lead idea；机制获 2606.23075 独立命名佐证） |
 | [[Ideas/MismatchTriage-LongHorizonRecovery-GUI]] | developing → [[Projects/MismatchTriage]] | Reliability-Survey / TRIAGE | 最优恢复动作随 mismatch 点而变，固定策略留下可测量的 recovery-selection gap（2026-07-20 算法强化：分叉标签 = 免疫 PRM-hacking 的 counterfactual 监督；train-with-fork deploy-fork-free） |
 | [[Ideas/StateSufficiency-AmnesiaProbe-GUI]] | raw | EvoCUA / context management | 用遗忘探针测 GUI 任务的历史信息充分性边界 |
 | [[Ideas/SelfInitiatedFork-GUI]] | veto | AgentRuntimePrimitives-Survey | ~~fork 作为可学习的 agent 动作~~（Supervisor 否决：LtE/PGTS 已覆盖调用学习，属延伸非空白） |

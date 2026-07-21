@@ -165,3 +165,8 @@ dWorldEval 将任务完成状态编码进 world model
 | Environment | 监控 Agent-World 的 MCP-Mark 进展 |
 | UI World Model | 研究 MobileDreamer + grounding 结合 |
 | Policy Eval | 研究 dWorldEval progress token 与 L3 Evolver 关联 |
+## 近期格局变化
+
+- **2026-07-21｜Digital domain WM 收敛于文本语义状态空间**：[[Papers/2607-SeerGuard]]（8B 语义预测超 235B 基座）、[[Papers/2511-DreamGym]]（Theorem 1：ε_R+ε_P 与像素重建无关）、[[Papers/2510-UISimulator]]（合成经验 4× OS-Genesis）从安全/理论/训练三角度独立收敛——与 robotics 的 pixel/latent 路线形成清晰分野（[[Topics/WorldModel-Survey]]）
+- **2026-07-21｜WAM"可检查想象"安全假设被实证击穿**：[[Papers/2607-BadWAM]] 用 black-box 视觉扰动使 action 与 imagined future 解耦（LIBERO 96.5%→43.1%）；WAM 范式需要 action–imagination 同步性验证器这一新组件（[[Topics/WorldModel-Survey]]）
+- **2026-07-21｜"降级使用"成为 WM 落地的跨领域 pattern**：预测精度不足时选容错性高的用途——[[Papers/2603-Memoir]] imagination 作 retrieval query、[[Papers/2411-WebDreamer]] 仅 H=1 lookahead、[[Papers/2607-SeerGuard]] 仅二分类风险判定；WM 精度要求越低的用途落地越早（[[Topics/WorldModel-Survey]]）

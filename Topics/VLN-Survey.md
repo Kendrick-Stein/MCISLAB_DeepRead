@@ -2,7 +2,7 @@
 title: Vision-Language Navigation Survey
 description: 系统梳理 VLN 四条主流技术路线（graph-based、streaming VLA、zero-shot MLLM with EWR、GRPO-based RFT）及其性能对比、benchmark 格局与 open problems；作为 VLN DomainMap 的 delta 报告，重点覆盖 2025–2026 的新进展
 tags: [VLN, navigation, embodied-reasoning]
-date_updated: 2026-04-23
+date_updated: "2026-07-21"
 year_range: 2022-2026
 keywords: [vln, vision-language navigation]
 domain_map: EmbodiedAI
@@ -12,7 +12,7 @@ domain_map: EmbodiedAI
 
 **一句话定位**：VLN（Vision-and-Language Navigation）要求 agent 按自然语言指令在未见环境中导航到目标，是 embodied AI 中语言 grounding 与空间推理最成熟的落点之一。
 
-**领域活跃度**：过去 3 年 VLN 从"discrete nav-graph + task-specific encoder-decoder"稳态跃迁到"continuous environment + streaming VLM"的新范式，R2R-CE val-unseen SR 从 2022 年 ~50%（DUET, HAMT）提升到 2026 年 64%+（Efficient-VLN, ETP-R1），同时 zero-shot MLLM 路线从 <10%（NavGPT 早期尝试）追到 48.8%（GTA）。四大活跃方向并行推进：**graph-based supervised** ([[Papers/2202-DUET|DUET]] → [[Papers/2304-ETPNav|ETPNav]] → [[Papers/2512-EfficientVLN|Efficient-VLN]] / [[Papers/2512-ETPR1|ETP-R1]])、**streaming VLA** ([[Papers/2402-NaVid|NaVid]] → [[Papers/2412-NaVILA|NaVILA]] → [[Papers/2507-StreamVLN|StreamVLN]] → [[Papers/2603-PROSPECT|PROSPECT]] → [[Papers/2603-DyGeoVLN|DyGeoVLN]])、**zero-shot MLLM with EWR** ([[Papers/2305-NavGPT|NavGPT]] → [[Papers/2602-GTA|GTA]] / [[Papers/2601-SpatialNav|SpatialNav]])、**GRPO-based RFT** ([[Papers/2506-VLNR1|VLN-R1]] → [[Papers/2512-ETPR1|ETP-R1]])。
+**领域活跃度**：过去 3 年 VLN 从"discrete nav-graph + task-specific encoder-decoder"稳态跃迁到"continuous environment + streaming VLM"的新范式，R2R-CE val-unseen SR 从 2022 年 ~50%（DUET, HAMT）提升到 2026-04 的 64%+（Efficient-VLN, ETP-R1），2026-07 被 [[Papers/2607-ABotN1|ABot-N1]] 推到 70.9%；同时 zero-shot MLLM 路线从 <10%（NavGPT 早期尝试）追到 48.8%（GTA）。四大活跃方向并行推进：**graph-based supervised** ([[Papers/2202-DUET|DUET]] → [[Papers/2304-ETPNav|ETPNav]] → [[Papers/2512-EfficientVLN|Efficient-VLN]] / [[Papers/2512-ETPR1|ETP-R1]])、**streaming VLA** ([[Papers/2402-NaVid|NaVid]] → [[Papers/2412-NaVILA|NaVILA]] → [[Papers/2507-StreamVLN|StreamVLN]] → [[Papers/2603-PROSPECT|PROSPECT]] → [[Papers/2603-DyGeoVLN|DyGeoVLN]] → [[Papers/2607-ABotN1|ABot-N1]])、**zero-shot MLLM with EWR** ([[Papers/2305-NavGPT|NavGPT]] → [[Papers/2602-GTA|GTA]] / [[Papers/2601-SpatialNav|SpatialNav]])、**GRPO-based RFT** ([[Papers/2506-VLNR1|VLN-R1]] → [[Papers/2512-ETPR1|ETP-R1]])。
 
 **整体趋势**：
 1. **Continuous > discrete**：R2R-CE / RxR-CE 已成 de facto benchmark，discrete nav-graph 上的 SOTA 主要是历史参考；R2R-CE 是 VLN 在 2025–2026 的核心战场。
@@ -51,7 +51,9 @@ VLN 当前四条主流路线在 R2R-CE val-unseen 上的代表性数字见下表
 - Waypoint 级 high-level action space 等价于 RL 的 token，天然支持 closed-loop multi-turn GRPO（ETP-R1）；
 - GASA（Graph-Aware Self-Attention）把 all-pair shortest distance 作为 attention bias，是轻量有效的结构先验。
 
-**实际效果与瓶颈**：R2R-CE SR 64% 是 2026-04 supervised SOTA 上限，但依赖 pretrained waypoint predictor（CWP）+ ground-truth pose + 预定义 navigable 节点，sim-to-real 部署仍需工程化。方法层面已比较成熟，但**被 LLM-based agent 路线部分替代**的风险真实存在——ETP-R1 用 GRPO 续命是目前的补救策略。
+**实际效果与瓶颈**：R2R-CE SR 64% 是 2026-04 supervised SOTA 上限，但依赖 pretrained waypoint predictor（CWP）+ ground-truth pose + 预定义 navigable 节点，sim-to-real 部署仍需工程化。方法层面已比较成熟，但**被 LLM-based agent 路线部分替代**的风险真实存在——ETP-R1 用 GRPO 续命是目前的补救策略；2026-07 该上限已被 [[Papers/2607-ABotN1|ABot-N1]]（70.9%，tri-view RGB、无 waypoint predictor/GT pose）越过，替代风险从预期变为现实。
+
+**记忆维度的扩展**：[[Papers/2603-Memoir|Memoir]]（TPAMI 2026）把 graph-based 底座（DUET/GR-DUET）扩展到 memory-persistent 设定（IR2R：同一环境连续 episode 的 tour 内累积经验），用 language-conditioned world model 想象未来导航状态作检索 query，从跨 episode 混合记忆库（观测 + 行为轨迹双库）选择性取用——IR2R +5.4 SPL / 8.3× 训练加速 / -74% 推理显存 over GR-DUET。消融显示收益主体是"选择性检索 + 行为记忆"框架本身（全量记忆注入 69.98 SPL 甚至低于随机检索 70.34），imagination query 相对朴素 state-based query 仅 +0.61 SPL；oracle 检索 93.4 SPL 揭示记忆访问机制仍有 20 点 headroom。
 
 ### 2) Streaming VLA（Video-LLM as end-to-end navigator）
 
@@ -65,6 +67,7 @@ VLN 当前四条主流路线在 R2R-CE val-unseen 上的代表性数字见下表
 - [[Papers/2603-PROSPECT|PROSPECT]]（2026-03）：SigLIP + CUT3R 3D fusion + JEPA-style latent prediction 分支（训练时附加，推理时砍掉，零 latency 代价），R2R-CE SR 58.9 / SPL 54.0；CUT3R 因 absolute scale 优于 VGGT 系在长 episode 上。
 - [[Papers/2603-DyGeoVLN|DyGeoVLN]]（2026-03）：自研 dynamic geometry FM（π³/VGGT + Depth Anything residual + DyHM3D 数据）+ pose-free occupancy voxel pruning，单目 RGB R2R-CE SR 60.8——反超 panoramic RGB-D + waypoint predictor。
 - [[Papers/2509-NavFoM|NavFoM]]（2025-09）：generalist navigation VLM，TVI tokens（view angle + time step indicator）+ BATS（budget-aware token sampling），统一 VLN / OVON / tracking / autonomous driving 四类任务，RxR-CE SR 64.4。
+- [[Papers/2607-ABotN1|ABot-N1]]（2026-07，高德 AMAP）：slow-fast 双系统——4B reasoner 低频输出 CoT + pixel goal（affordance/target 双像素），2B action expert 高频输出连续 SE(2) waypoints；以 pixel goal 为统一接口整合 point-goal / instruction-following / object-goal / POI-goal / person-following 五任务，30M 样本预训练 + GRPO post-training，R2R-CE SR 70.9 / SPL 67.5 刷新 supervised SOTA（仅前左右 tri-view RGB，无 depth/odometry），multi-task ≥ specialist；但全文无组件 ablation，pixel-goal 的贡献归因是叙事而非实验，自建 PointBench/POIBench 未声明训练/评测场景隔离。
 
 **核心优势**：
 - Single-view RGB 即可竞争 panoramic RGB-D + waypoint（NaVILA、StreamVLN 早已证明，DyGeoVLN 进一步反超），部署门槛低；
@@ -72,7 +75,7 @@ VLN 当前四条主流路线在 R2R-CE val-unseen 上的代表性数字见下表
 - KV cache 复用把 per-step prefill 成本从 O(T²) 降到 O(T)（StreamVLN Figure 5）。
 
 **实际效果与瓶颈**：
-- R2R-CE val-unseen SR 目前在 54–60% 区间，与 graph-based 的 64% 仍有 4–10 pt gap；
+- R2R-CE val-unseen SR 2026-04 时在 54–60% 区间、落后 graph-based 的 64%；2026-07 [[Papers/2607-ABotN1|ABot-N1]] 以 70.9% 完成反超（代价是 30M 样本的工业级数据工程）；
 - 训练成本高（StreamVLN 1500 A100·h / NavFoM 4032 H100·h），Efficient-VLN 证明通过 recency-aware memory 可压到 282 H800·h；
 - Long-horizon 一致性、动态障碍下的 reactive 避障、VLM 低频推理下的闭环控制仍是限制。
 
@@ -112,7 +115,7 @@ VLN 当前四条主流路线在 R2R-CE val-unseen 上的代表性数字见下表
 
 | 路线 | 代表方法 | R2R-CE SR | Obs | 训练成本 | Sim-to-real | 核心权衡 |
 |---|---|---|---|---|---|---|
-| Graph-based | [[Papers/2512-EfficientVLN\|Efficient-VLN]] | **64.2%** | Pano+Depth | 282 H800·h | 需 waypoint predictor + GT pose | SOTA 上限高但依赖预训练组件 |
+| Graph-based | [[Papers/2512-EfficientVLN\|Efficient-VLN]] | 64.2% | Pano+Depth | 282 H800·h | 需 waypoint predictor + GT pose | SOTA 上限高但依赖预训练组件 |
 | Graph + GRPO | [[Papers/2512-ETPR1\|ETP-R1]] | 64.0% (test) | Pano+Depth | 较高 | 同上 | closed-loop RFT，需要三阶段训练 |
 | Streaming VLA | [[Papers/2603-PROSPECT\|PROSPECT]] | 58.9% | Mono RGB | ~2500 A800·h | 单 RGB 部署友好 | RxR 长指令增益大；code 未开源 |
 | Streaming VLA | [[Papers/2603-DyGeoVLN\|DyGeoVLN]] | 60.8% | Mono RGB | 未披露 | 单目 + 自推 pose | 动态几何 FM 是主要变量 |
@@ -122,14 +125,15 @@ VLN 当前四条主流路线在 R2R-CE val-unseen 上的代表性数字见下表
 | Zero-shot EWR | [[Papers/2602-GTA\|GTA]] | 48.8% | Mono RGB-D | 零训 (推理) | **wheeled 40% / drone 42% real** | sim-to-real gap 最小 |
 | RFT (LVLM) | [[Papers/2506-VLNR1\|VLN-R1]] | 30.2% | Mono RGB | SFT + GRPO | 未量化 | sample-efficient cross-domain |
 | Generalist | [[Papers/2509-NavFoM\|NavFoM]] | 61.7% | Multi-view | 4032 H100·h | 5 类 embodiment | VLN + OVON + tracking + driving 统一 |
+| Generalist | [[Papers/2607-ABotN1\|ABot-N1]] | **70.9%** | Tri-view RGB | 30M 样本 + GRPO | 四足真机 10Hz（仅定性） | pixel-goal 统一五任务；无组件 ablation |
 
 > \* SpatialNav 使用了 pre-exploration，严格来说不是纯 online zero-shot。
 
 **关键观察**：
-1. **Pano+Depth vs Mono RGB 的 gap 正在消失**：graph-based（Pano+Depth）64%、streaming VLA（Mono RGB）60%，差距 ~4 pt 且随 3D foundation model 进步快速缩小（DyGeoVLN 已反超）。
+1. **Pano+Depth vs Mono RGB 的 gap 已完成反转**（2026-07 更新，来源 [[Papers/2607-ABotN1|ABot-N1]]）：2026-04 时 graph-based（Pano+Depth）64% 领先 streaming VLA（Mono RGB）60% 约 4 pt；ABot-N1 以 tri-view RGB（无 depth/odometry）70.9% 全面反超 Pano+Depth 系。
 2. **Closed-loop > open-loop RFT**：VLN-R1（open-loop SFT+GRPO）30.2 vs ETP-R1（closed-loop GRPO）64——RFT 要起效必须有合适的 action abstraction。
 3. **Zero-shot 的真正卖点是 sim-to-real**：sim 上 zero-shot 仍比 supervised 差 4–15 pt，但 real-world 上 domain-invariant representation 让它反超（GTA real 40%+ vs supervised 16–20%）。
-4. **数据多样性比模型大小更关键**：Efficient-VLN（0.45B 级方案）以 282 H800·h 打过 NavFoM（7B，4032 H100·h），训练策略（recency-aware memory + dynamic DAgger β）的杠杆远大于 scaling。
+4. **数据多样性比模型大小更关键**：Efficient-VLN（0.45B 级方案）以 282 H800·h 打过 NavFoM（7B，4032 H100·h），训练策略（recency-aware memory + dynamic DAgger β）的杠杆远大于 scaling；但 [[Papers/2607-ABotN1|ABot-N1]] 以 30M 样本的数据工程重夺 SOTA——在更高数据 regime 下"训练策略 vs 数据规模"的杠杆之争重新打开（因其无 ablation，pixel-goal 接口与数据规模的贡献无法拆分）。
 
 ## Datasets & Benchmarks
 
@@ -168,8 +172,9 @@ VLN 主流训练资源（按规模）：
 | NavFoM ([[Papers/2509-NavFoM\|2025]]) | CE | Multi-view | 61.7 | 55.3 |
 | PROSPECT ([[Papers/2603-PROSPECT\|2026]]) | CE | Mono RGB | 58.9 | 54.0 |
 | DyGeoVLN ([[Papers/2603-DyGeoVLN\|2026]]) | CE | Mono RGB | **60.8** | **55.8** |
-| Efficient-VLN ([[Papers/2512-EfficientVLN\|2025]]) | CE | Pano+Depth | **64.2** | 55.9 |
+| Efficient-VLN ([[Papers/2512-EfficientVLN\|2025]]) | CE | Pano+Depth | 64.2 | 55.9 |
 | ETP-R1 ([[Papers/2512-ETPR1\|2025]]) | CE | Pano+Depth (test) | 64.0 | 54.0 |
+| ABot-N1 ([[Papers/2607-ABotN1\|2026]]) | CE | Tri-view RGB | **70.9** | **67.5** |
 | GTA zero-shot ([[Papers/2602-GTA\|2026]]) | CE | Mono RGB-D | 48.8 | 41.8 |
 | SpatialNav zero-shot ([[Papers/2601-SpatialNav\|2026]]) | CE | Pano+SSG | 64.0\* | — |
 
@@ -182,8 +187,13 @@ VLN 主流训练资源（按规模）：
 | ETPNav | 54.8 | 44.9 | 61.9 |
 | StreamVLN | 52.9 | 46.0 | 61.9 |
 | PROSPECT | 54.6 | 46.2 | 62.1 |
-| NavFoM (multi-view) | **64.4** | 56.2 | — |
-| Efficient-VLN | **67.0** | 54.3 | — |
+| NavFoM (multi-view) | 64.4 | 56.2 | — |
+| Efficient-VLN | 67.0 | 54.3 | — |
+| ABot-N1 ([[Papers/2607-ABotN1\|2026]]) | **73.9** | **63.9** | — |
+
+> ABot-N1 的 RxR-CE SR 仍次于未入表的 Qwen-RobotNav-4B（75.2/65.0，后者用了更大的 in-domain RxR 数据）。
+
+**Memory-persistent benchmarks**（跨 episode 记忆设定）：IR2R（unseen tour 平均 71.2 个 episode）与 GSA-R2R（150 个 HM3D 场景 × 600 路径）要求 agent 在同一环境的连续 episode 中累积经验、越走越熟。[[Papers/2603-Memoir|Memoir]] IR2R 77.6 SR / 73.3 SPL vs GR-DUET 72.7 / 67.9，tour 级 t-nDTW +12.1；GSA-R2R 上仅 +2.5 SPL——方法收益对 tour 长度/episode 重叠度敏感。
 
 **Physical & embodied benchmarks**（关注 embodied gap）：
 
@@ -268,3 +278,7 @@ VLN 主流训练资源（按规模）：
 - "Zero-shot" 的定义在 [[Papers/2601-SpatialNav|SpatialNav]] 把 pre-exploration 纳入后有争议，本 Survey 保留其原标记但加 `*` 提示。
 
 **未能获取**: none
+
+**增量更新 2026-07-21**（survey-refresh，+2 篇）：
+- [[Papers/2607-ABotN1]]：R2R-CE SR 70.9 / SPL 67.5 刷新 supervised SOTA，tri-view RGB 反超 Pano+Depth——Overview、路线 1/2 瓶颈、综合对比表、两个 leaderboard、关键观察 1/4 相应更新（"64% 上限"与"gap 正在消失"两个结论被推翻）；因其无组件 ablation 且自建 benchmark 未声明场景隔离，归因性 claim 均按叙事归因处理、不采信为实验结论。
+- [[Papers/2603-Memoir]]：新增 memory-persistent VLN 覆盖（IR2R/GSA-R2R 设定 + imagination-as-query 检索式记忆访问），并入路线 1"记忆维度的扩展"与 benchmark 节；其消融（imagination 相对 state-based query 仅 +0.61 SPL）提示该方向的收益主体是选择性检索框架而非 world model 本身。

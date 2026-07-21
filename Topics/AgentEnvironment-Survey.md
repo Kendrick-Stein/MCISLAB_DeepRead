@@ -1,9 +1,9 @@
 ---
 title: "Agent Environment 综述——需求六轴、跨平台引擎与 agent-friendly 接口"
 tags: [survey, gui-agent, environment-engineering, web-agent, computer-use, mobile-agent, agentic-RL, benchmark]
-date_updated: "2026-07-20"
+date_updated: "2026-07-21"
 year_range: 2017-2026
-papers_analyzed: 55
+papers_analyzed: 63
 keywords: [agent environment, environment engine, web environment, gui environment, sandbox, testbed, snapshot, reset, parallel rollout, state fork, verifier, reward, task generation, rl infrastructure, agent-friendly, environment affordance, harness, deterministic replay]
 domain_map: GUI-Agent
 ---
@@ -44,7 +44,7 @@ MiniWoB++（World of Bits 血统）和 WebShop 把网页做成合成小环境：
 
 [[Papers/2401-WebVoyager]]（live 站点 + GPT-4V judge）、[[Papers/2400-WebcanvasBenchmarkingWebAgents]]（live + keynode 中间态）、[[Papers/2504-OnlineMind2Web]]（live + WebJudge，揭示"进步幻觉"：旧 benchmark 虚高，多数 agent 真实水平退回 SeeAct）把评测搬到真实互联网。收获是 realism 与"进步幻觉"的曝光；代价是**环境引擎能力归零**：不可 reset、不可复现（内容漂移、CAPTCHA、geo-block）、不可并行（速率限制）、评测只能依赖 LLM judge。
 
-judge 的可靠性随即成为独立研究对象。[[Papers/2504-AgentRewardBench]] 给出系统测量：**12 个 LLM judge 无一 precision 超过 70%**（judge 判成功的轨迹 ~30% 实为失败），而 rule-based 评测 recall 仅 55.9%（WebArena 官方分比专家判定低 16.7pp）——**评测器在两个方向上同时不可靠**。verifier 可靠性与状态可观测性的正相关在 vault 证据链上完整成谱：程序化 verifier 94.1% 人类对齐（[[Papers/2605-OpenComputer]]）> 视觉证据 judge 87.4%（[[Papers/2605-AndroidDaily]]）> WebJudge ~85% > 通用 judge ≤70%。
+judge 的可靠性随即成为独立研究对象。[[Papers/2504-AgentRewardBench]] 给出系统测量：**12 个 LLM judge 无一 precision 超过 70%**（judge 判成功的轨迹 ~30% 实为失败），而 rule-based 评测 recall 仅 55.9%（WebArena 官方分比专家判定低 16.7pp）——**评测器在两个方向上同时不可靠**。verifier 可靠性与状态可观测性的正相关在 vault 证据链上完整成谱：程序化 verifier 94.1% 人类对齐（[[Papers/2605-OpenComputer]]）> 交互式 verifier agent 92.9%（[[Papers/2602-VAGEN]]，主动探测终态环境取证）> 视觉证据 judge 87.4%（[[Papers/2605-AndroidDaily]]）> WebJudge ~85% > 通用 judge ≤70%。[[Papers/2510-CUARewardBench]] 把 judge 审计扩展到 desktop（OSWorld 轨迹 + 专家标注）：最佳单模型 ORM precision 82.9%、PRM 仅 69.5%，且 CUA 专用训练反而损害 reward 判断能力——judge 不可靠在 web/desktop 双域成立。
 
 ### 第四幕（2024–2026）：RL 训练需求爆发——引擎从"能跑"到"吞吐优先"
 
@@ -92,6 +92,17 @@ L3 是质变：只有可编程注入才支撑 (a) 边角场景评测（缺货、
 2. **评测与 RL reward 是同一个基础设施**（RLVR 视角）。AgentRewardBench 的 ~30% judge 假阳性会直接变成训练标签噪声（InSTA judge 82.6% 意味着 17% 噪声进入 SFT）；[[Papers/2606-ENVS]] 反过来用环境原生 oracle 过滤分支搜索轨迹当 SFT 监督——**环境 verifier 的每一点可靠性提升同时惠及评测与训练**。
 3. **双向失败要求混合设计**：rule-based 低 recall（写死断言拒绝合法替代解）+ LLM judge 低 precision（看不见 hidden state）→ 程序化断言管 state-changing、rubric judge 管 information-seeking 的混合模式正在成型（REAL 已是这个结构；[[Ideas/HybridVerifier-GUIRuntime]] 的空间被证据确认）。另有反直觉发现：给 judge 的观察 screenshot-only 优于 screenshot+AXTree——**verifier 的观察也要做信息设计**。judge 本身还可特化小型化：[[Papers/2606-OpenWebRL]] 蒸馏的 8B judge（89.8% acc）超过 GPT-4o judge（85.6%）且评判成本近零——verifier 不必绑定 frontier 模型。
 
+4. **2026 上半年的四条新路线按状态锚定深度排成谱系，锚定越浅 hacking 面越大**。[[Papers/2602-VAGEN]] 给出这条路线分化的第一性依据——验证不对称性：同一 Claude-Sonnet-4.5 在 OSWorld 上求解 55.9%（28.5 步）、验证 83.1%（17.4 步），验证比求解便宜得多，verifier 也应 agent 化。
+
+| 路线 | 状态锚定 | 可靠性 | 代价 |
+|:--|:--|:--|:--|
+| 交互式 verifier agent（[[Papers/2602-VAGEN]]） | 最深：shell/python/computer-use 主动探测轨迹终态环境 | 92.9% acc（人评 GT）；弱 actor 下 precision 88.5%（passive judge 崩至 ~75%）；免手写脚本 | 须与轨迹终态环境在线耦合（离线轨迹不可用），17.4 步/条；read-only 仅 prompt 级软约束 |
+| 加权 subtask 分解 + hidden verifier（[[Papers/2607-LongHorizonTerminalBench]]） | 深：hidden stress cases 程序化判分，gold solution 须拿满 1.0（相当于验证 grader 本身） | dense reward 把 62.8% 落在 partial 区间的 run 从零分中区分出来 | subtask 分解与权重人工设计，规模化到数百题存疑 |
+| 一致性 ensemble + 弃权（[[Papers/2510-CUARewardBench]] UPE） | 浅：被动看截图序列 | ORM precision 89.8% / NPV 93.3% | recall 56.8%——用覆盖率换可靠性；未经 RL 闭环验证 |
+| milestone dense reward（[[Papers/2602-ADMIRE]]） | 最浅：agent 自述 action description 与 milestone 文本 SBERT 匹配 | AndroidWorld 7B 44.0%（milestone 内容锚定环境 validator 判定成功的轨迹） | per-step 判定是 self-reported 文本，hacking 面从 judge 侧移到 policy 输出侧 |
+
+谱系印证要点 1：交互式验证是目前唯一同时保住 precision 与 recall 的路线（UPE 弃权伤 recall，ADMIRE 判定不锚定状态），且它把"状态可观测性"从**环境预先暴露**改为 **verifier 按需获取**——与 AFE `verify()` affordance 是同一问题的两侧。
+
 ### 轴 3：并行（parallel）——瓶颈在 per-instance 成本与异步解耦，不在机器数
 
 数字线索：4 个 session（[[Papers/2511-DreamGym]] 在 WebArena 上的极限）→ 256 并行/单机（MobileGym，~400MB/实例）→ 200+/单机（WebServ，28MiB/实例）→ 千级 VM（ComputerRL，靠钱堆）。两个杠杆：
@@ -101,7 +112,7 @@ L3 是质变：只有可编程注入才支撑 (a) 边角场景评测（缺货、
 
 ### 轴 4：回溯与分支（fork/rollback）——最被低估的一轴，用途已分化为四类
 
-关键澄清：**回溯不是浏览器 go_back**（丢失 scroll offset、表单输入等页内状态，[[Papers/2407-TreeSearchLMAgents]] 明确弃用），而是**完整环境状态（前端 + 后端 + session）的快照与恢复**。实现谱系：reset+replay 模拟（Tree Search，O(depth) 且要求确定性）→ JSON state forking（[[Papers/2605-MobileGym]]，functional 仿真才可行）→ **运行中容器块级快照/克隆/分支**（[[Papers/2510-WebServ]]，O(1) 原生操作）→ 想象模拟替代（[[Papers/2411-WebDreamer]]，live 下唯一选择）。agent 侧模拟的最新集大成是 [[Papers/2512-WebOperator]]（checkpoint 跳转 + speculative 回溯 + 可逆性分类，全靠浏览器技巧），其 37% destructive 确认率与"动态站点上可能退化为顺序搜索"的自认，正是 agent 侧模拟的天花板刻度。
+关键澄清：**回溯不是浏览器 go_back**（丢失 scroll offset、表单输入等页内状态，[[Papers/2407-TreeSearchLMAgents]] 明确弃用），而是**完整环境状态（前端 + 后端 + session）的快照与恢复**。实现谱系：reset+replay 模拟（Tree Search，O(depth) 且要求确定性）→ JSON state forking（[[Papers/2605-MobileGym]]，functional 仿真才可行）→ **运行中容器块级快照/克隆/分支**（[[Papers/2510-WebServ]]，O(1) 原生操作）→ 想象模拟替代（[[Papers/2411-WebDreamer]]，live 下唯一选择）。agent 侧模拟的最新集大成是 [[Papers/2512-WebOperator]]（checkpoint 跳转 + speculative 回溯 + 可逆性分类，全靠浏览器技巧），其 37% destructive 确认率与"动态站点上可能退化为顺序搜索"的自认，正是 agent 侧模拟的天花板刻度。训练侧同款绕行见 [[Papers/2505-BacktrackAgent]]：检测到错误固定回退一步、同页重写动作，仅因 Mobile3M 是预遍历页面图（回退免费、不可逆问题被环境设定绕开）才可行；其 actual vs simulated outcome page 消融（task success +5.65 vs +0.70）把"回溯收益以状态转移真实性为前提"落到数字上。
 
 用途已分化为四类，对应不同的调用方：
 
@@ -112,11 +123,11 @@ L3 是质变：只有可编程注入才支撑 (a) 边角场景评测（缺货、
 | counterfactual 评测（同状态反复 what-if、确定性重试、公平对比 policy） | 评测框架 | WebServ deterministic retries；[[Papers/2606-ENVS]] 分支搜索+oracle 过滤 |
 | 失败恢复数据合成（从错误状态分支造恢复轨迹） | 数据管线 | [[Papers/2605-GUIRobustEval]] RoTS fragility-driven 分支合成 80 万样本 |
 
-**第五种用途的空白**——把 fork/rollback 作为 affordance 暴露给 agent 本身在任务执行中调用——经 [[Topics/AgentRuntimePrimitives-Survey]] 2026-07 盘点已部分收窄（sandbox 域 Crab 先例），但 web 全栈状态 + 因果验证仍无人做（见 Takeaway 6）。
+**第五种用途的空白**——把 fork/rollback 作为 affordance 暴露给 agent 本身在任务执行中调用——已在 sandbox 域被 [[Papers/2604-Crab]] 打穿：eBPF 追踪 turn 级"净变化"跳过 75–87% 不必要检查点、把 C/R 重叠进 LLM 推理等待窗口（p50 0.1s），`sbx.rollback(ckpt)` 作为 agent 可调用工具实证四场景收益（proactive recovery 步数 -29% / speculative execution / spot 迁移 / RL 树分支 token -40~64%）。但 Crab 的域是 shell/FS+process（不含浏览器 session 与后端 DB），且只测效率未测 success 因果——web 全栈状态 + 因果验证仍无人做（见 Takeaway 6）。
 
 ### 轴 5：任务供给（task supply）——直觉之外，环境价值 = 可验证任务数 × 多样性
 
-多篇工作把瓶颈明确归到任务而非环境本体：WebRL 用 self-evolving curriculum 造任务；[[Papers/2606-WebGym]] 聚合 10 个来源到 292k 任务并证明 OOD 泛化随任务分布 scaling；[[Papers/2502-InSTA]] 把供给推到 150k 站点、并证明 LLM 当 task proposer/safety filter/judge 都够用；**探索式合成家族**给出四种设计——[[Papers/2410-NNetNav]]（interaction-first + hindsight relabeling，对环境要求最低：无需 reset/verifier，靠"每 4 步语言可命名性剪枝"控成本）、[[Papers/2502-Explorer]]（四阶段流水线 94K 轨迹 / $0.28 每条）、[[Papers/2506-GoBrowse]]（网站=图的结构化探索 + prefixed sampling 让弱模型从中间态起步贡献数据——**reset 频率直接决定 URL 覆盖 183→260**，reset 成本第一次被量化为数据质量约束）、[[Papers/2412-PAE]]（proposer-agent-evaluator 闭环 RL，"提案/评判 ≪ 执行"的 VLM 能力不对称使弱模型可给强 agent 供任务与 reward）；共同软肋是 judge 噪声（8.6%–19%）与沙盒-live 迁移崩塌（Go-Browse 21.7%→OOD 5.33%，NNetNav WebArena 训→live 仅 9.5%）；[[Papers/2600-InfinitewebScalableWebEnvironment]] 干脆连网站带任务带评估器一起合成；[[Papers/2606-CUAGym]] 的范式最彻底——**task/state/reward 三件套与环境同步生成**，任务天生可验证。
+多篇工作把瓶颈明确归到任务而非环境本体：WebRL 用 self-evolving curriculum 造任务；[[Papers/2606-WebGym]] 聚合 10 个来源到 292k 任务并证明 OOD 泛化随任务分布 scaling；[[Papers/2502-InSTA]] 把供给推到 150k 站点、并证明 LLM 当 task proposer/safety filter/judge 都够用；**探索式合成家族**给出四种设计——[[Papers/2410-NNetNav]]（interaction-first + hindsight relabeling，对环境要求最低：无需 reset/verifier，靠"每 4 步语言可命名性剪枝"控成本）、[[Papers/2502-Explorer]]（四阶段流水线 94K 轨迹 / $0.28 每条）、[[Papers/2506-GoBrowse]]（网站=图的结构化探索 + prefixed sampling 让弱模型从中间态起步贡献数据——**reset 频率直接决定 URL 覆盖 183→260**，reset 成本第一次被量化为数据质量约束）、[[Papers/2412-PAE]]（proposer-agent-evaluator 闭环 RL，"提案/评判 ≪ 执行"的 VLM 能力不对称使弱模型可给强 agent 供任务与 reward）；共同软肋是 judge 噪声（8.6%–19%）与沙盒-live 迁移崩塌（Go-Browse 21.7%→OOD 5.33%，NNetNav WebArena 训→live 仅 9.5%）；[[Papers/2603-AgentSynth]] 补上长程难度可控一环：先顺序生成并执行逐步可验证的简单子任务，再把子任务链总结成 agent 不可见的高层任务（information asymmetry）——难度 = 子任务数（SOTA agent 从 Level 1 的 18% 掉到 Level 6 的 4%），组合式 hard-task 生成成功率 52% vs 直接生成 11%，~$0.60/轨迹，且 task factory 与 environment runtime 天然分层（前者供给目标分布，后者供给状态/fork/verify）；[[Papers/2600-InfinitewebScalableWebEnvironment]] 干脆连网站带任务带评估器一起合成；[[Papers/2606-CUAGym]] 的范式最彻底——**task/state/reward 三件套与环境同步生成**，任务天生可验证。
 
 推论：环境引擎的接口设计必须把"任务"当一等公民（task = 初态注入 + 终态断言 + 难度元数据），而不是环境之外的 prompt 列表。任务供给与轴 1（init 注入初态）和轴 2（reward 断言）在接口上是同一件事的三面。
 
@@ -157,6 +168,7 @@ web 之外，mobile/desktop 环境基建沿同样的需求轴演进，并贡献�
 
 - **[[2606-RHO]]（self-supervised harness optimization）**：DPP 选 difficulty-diversity coreset + self-validation/self-consistency + pairwise self-preference，**无需外部标注**优化 harness（tools/prompts/skills）配置，SWE-Bench Pro 59%→78%；ablation 显示 self-consistency（cross-trajectory 矛盾检测，−0.22）比 self-validation（−0.08）更关键。
 - **Harness-1（stateful retrieval harness）**：harness 维护可恢复搜索状态（候选文档、证据链接、验证记录），policy 只做高层决策——状态外部化思路可类比迁移到 GUI 操作环境。
+- **[[Papers/2607-HarnessHandbook]]（harness 可维护性）**：harness 是随 model/API/环境持续演化的代码资产，修改请求用行为描述而 repo 按文件组织——L1–L3 behavior→implementation 映射 + Behavior-Guided Progressive Disclosure 让 coding agent 修改 harness 时 localization F1 +5.0–18.8pp、planner token -8.6~12.7%；与 RHO 互补（RHO 优化 harness 配置，Handbook 让 harness 代码本身可导航可编辑）。
 - **[[Papers/2508-ComputerRL]]（API-GUI 统一）**：agent 同时掌握程序化 API 调用减少 3× 步数，9B OSWorld 48.9% 超 o3——harness 层的动作通道扩展是关键杠杆。
 
 Harness 优化说明：**agent-friendly 不等于只改观察空间，也要改动作空间和 harness state**——很多失败并非模型不知道目标，而是被迫用错误粒度的动作通道完成任务。
@@ -207,6 +219,7 @@ trace()    -> trajectory log / state delta / action provenance / replay artifact
 | Realistic 可执行环境 | OSWorld、AndroidWorld、[[Papers/2409-WindowsAgentArena]]、WebArena 系 | 真实软件状态 + execution-based 评测 | human-facing env repurposed for agents，未为 agent 重新设计 runtime |
 | Verifier-first / State-grounded | [[Papers/2605-MobileGym]]、[[Papers/2605-OpenComputer]]、MobileWorld | 状态可见、可比、可 fork、结果可验证——AFE 核心骨架 | 能力留在 evaluator/trainer 手里，未暴露给 agent |
 | Harness / Hybrid interface | [[Papers/2508-ComputerRL]]、[[2606-WeaveBench]]、Harness-1、[[2606-RHO]] | 动作空间与 harness state 的外部化 | harness 配置优化 ≠ 环境状态 affordance |
+| Agent-facing recovery runtime | [[Papers/2604-Crab]] | rollback 作为 agent 可自调工具（`sbx.rollback`），四场景端到端效率收益 | 域限 shell/FS+process（无浏览器/后端 DB）；只测效率，无 success 因果与 prompt-only 对照 |
 | Safety / Sandbox | ToolEmu、AgentDojo、OS-Harm | permission、side-effect control、untrusted data 隔离 | 安全组件未与其余 affordance 集成 |
 | Multi-actor / Shared world | τ²-Bench、MobileWorld | user simulator、dual-control、Dec-POMDP 建模 | 单 agent 独占假设之外的状态隔离/归因未解决 |
 
@@ -253,6 +266,7 @@ trace()    -> trajectory log / state delta / action provenance / replay artifact
 | **[[Papers/2605-OpenComputer]]** | Desktop (verifiable) | 1,000 任务 / 33 应用 | verifier-human 对齐 94.1% | multi-channel 程序化 verifier |
 | **[[2606-WeaveBench]]** | Desktop (hybrid) | 114 任务 / 8 领域 | 41.2% (Claude Opus 4.7 + Claude Code) | GUI+CLI+Code 协同，trajectory-aware judge |
 | **[[2605-WorkspaceBench]]** | Desktop (文件生态) | 388 任务 / 20,476 文件 | 68.7% vs 人类 80.7% | 异构文件依赖 + lineage tracing |
+| **[[Papers/2607-LongHorizonTerminalBench]]** | Terminal (Docker) | 46 任务 | Grok 4.5 最佳 28.3% @R≥0.95；9.8M tokens / 239 episodes / 88.9min per run | 加权 subtask dense reward + hidden stress verifier；gold solution 须拿满 1.0 |
 | **[[2604-AgentWorld]]** | Multi-tool (合成) | 1,978 环境 / 19,822 工具 | 23 个 benchmark 提升 | MCP + research agent 环境合成 |
 | **[[2605-EnvFactory]]** | Tool-use (合成) | 85 环境 / 2,575 轨迹 | BFCLv3 +15% | 三 agent 协作 + 验证前置 |
 | **ClawEval** | Multi-benchmark | 6 benchmarks / 11+ models | 95.8% vs official | 标准化评测复现性 |
@@ -267,15 +281,15 @@ trace()    -> trajectory log / state delta / action provenance / replay artifact
 
 3. **环境能力与模型能力可以互相替代，竞争同一预算**。环境不支持回溯 → WebDreamer 用 LLM 想象模拟（拿到真实搜索 ~70% 收益）；环境并行开不起 → [[Papers/2511-DreamGym]] 合成经验。替代的理论边界由 DreamGym Theorem 1 给出：合成路线的收益上限受 ε_R（reward 保真）+ ε_P（转移域一致）约束——**当真实引擎的并行/reset 成本降到合成推理成本以下，或任务要求的转移保真超出 LLM 先验，天平倒向引擎**。反向推论：引擎每把一项能力做便宜一个数量级（如快照 240×），对应的 world-model 绕行路线就失去必要性。评估任何 world-model-for-web 工作时，都应问"如果环境原生支持这个操作，该方法还剩什么价值"。
 
-4. **评测环境与训练环境的需求已分化，同一环境难以同时最优**。评测要 determinism、防泄漏、严 verifier、固定任务集；训练要吞吐、dense/partial reward、任务多样性、允许 progress probe。REAL（binary reward，自认不适合 RL）与 WebGym（rubric judge 换覆盖面）各自只占一端。环境设计应显式区分 eval mode / train mode / debug mode（affordance 暴露程度逐级放宽）。
+4. **评测环境与训练环境的需求已分化，同一环境难以同时最优**。评测要 determinism、防泄漏、严 verifier、固定任务集；训练要吞吐、dense/partial reward、任务多样性、允许 progress probe。REAL（binary reward，自认不适合 RL）与 WebGym（rubric judge 换覆盖面）各自只占一端。一个修正：dense/partial reward 不再是训练侧专属——[[Papers/2607-LongHorizonTerminalBench]] 显示难度触顶时评测同样需要 partial credit（782 个 run 仅 6.4% 通过、62.8% 落在 partial 区间、near-miss 多于通过，二值判分使多数模型并列零分而失去区分度）。环境设计应显式区分 eval mode / train mode / debug mode（affordance 暴露程度逐级放宽）。
 
 5. **需求滞后镜像可用于预测**：环境需求跟着 agent 训练范式走、滞后约一年。按此推，2026–2027 的下一波需求：(a) 多 agent 并发同环境的隔离与归因；(b) 跨 session 持久状态（agent 记忆与环境状态的一致性）；(c) 环境侧 counterfactual 监督规模化（ENVS/CUAGym/GUI-RobustEval 已萌芽——环境引擎从"评测器"变成"数据工厂"）；(d) agent-native 声明式接口标准化（agents.txt / permission manifests 收敛）。
 
-6. **对 primary direction 最重要的空隙**：六轴能力目前几乎全部服务于 trainer/evaluator/数据管线，**web 域没有任何环境把 snapshot/fork/verify 作为原生 affordance 暴露给 agent 在任务执行中自主调用**（WebServ 的快照是训练框架 API；[[Papers/2512-WebOperator]] 的 agent 侧模拟 37% 启发式噪声恰恰量化了缺环境支持的代价）。REAL 的失败模式分析显示 agent 缺的正是状态验证与回溯。demand-side 证据链已齐（Tree Search +39.7% / REAL 失败分析），supply-side 已便宜（WebServ O(1) 快照），中间的 agent-facing 接口层就是 [[Ideas/AgentFacing-WebRuntime]] 的位置——sandbox 域先例（Crab）与系统社区入场（AgenticExplorationSystems）使时间窗口收窄，详见 [[Topics/AgentRuntimePrimitives-Survey]] Takeaway 4。
+6. **对 primary direction 最重要的空隙**：六轴能力目前几乎全部服务于 trainer/evaluator/数据管线，**web 域没有任何环境把 snapshot/fork/verify 作为原生 affordance 暴露给 agent 在任务执行中自主调用**（WebServ 的快照是训练框架 API；[[Papers/2512-WebOperator]] 的 agent 侧模拟 37% 启发式噪声恰恰量化了缺环境支持的代价）。REAL 的失败模式分析显示 agent 缺的正是状态验证与回溯。demand-side 证据链已齐（Tree Search +39.7% / REAL 失败分析），supply-side 已便宜（WebServ O(1) 快照），中间的 agent-facing 接口层就是 [[Ideas/AgentFacing-WebRuntime]] 的位置——sandbox 域先例（[[Papers/2604-Crab]]：agent 自调 rollback 已实现且有端到端效率收益）与系统社区入场（AgenticExplorationSystems）使时间窗口收窄，详见 [[Topics/AgentRuntimePrimitives-Survey]] Takeaway 4。
 
 7. **Functional modeling 足够好，跨平台共同抽象是 state transition**：MobileGym 证明"交互保真度"而非"像素级渲染"是 GUI 仿真的关键指标（95.1% sim-to-real retention，成本比 emulator 低一个数量级）。Web 的 route/DOM/backend state、Mobile 的 app/OS runtime state、Desktop 的 file/process/app state 本质都是状态转移系统——跨平台 environment protocol 比三个互不相干的 simulator 更是正确目标。
 
-8. **Verification 是环境构建的组织原则，verifier 是环境的一部分**：OpenComputer 94.1% vs LLM judge 79.2% 的差距说明"谁来判断成功"比"环境多逼真"更根本；AFE 最小闭环 `state → affordance → action → transition → verifier → feedback`。混合设计（程序化断言管 state-changing、rubric judge 管 information-seeking）正在成型。
+8. **Verification 是环境构建的组织原则，verifier 是环境的一部分**：OpenComputer 94.1% vs LLM judge 79.2% 的差距说明"谁来判断成功"比"环境多逼真"更根本；AFE 最小闭环 `state → affordance → action → transition → verifier → feedback`。混合设计（程序化断言管 state-changing、rubric judge 管 information-seeking）正在成型。第三条路线已出现：[[Papers/2602-VAGEN]] 的交互式 verifier agent（92.9% acc，免手写脚本）证明状态可观测性也可由 verifier 主动获取而非环境预先暴露——代价是与环境实例在线耦合。
 
 9. **Hybrid interface 与 harness 是被低估的杠杆**：WeaveBench interface ablation +31.6pp、35.2% 失败是 reward hacking 而非能力不足；RHO 无标注 harness 优化 +19pp；ComputerRL API-GUI 减 3× 步数。agent-friendly 不只改观察空间，动作空间与 harness state 同样关键。
 
@@ -285,15 +299,21 @@ trace()    -> trajectory log / state delta / action provenance / replay artifact
 
 1. **不可能三角的量化**：realism–controllability–scalability 的取舍全靠定性论证，缺一个 fidelity metric 量化"副本/mirror/合成环境相对 live 的行为一致性"（MobileGym 95.1% retention 是 mobile 端孤例；web 端 REAL/WebHarbor 都没给这个数字；哪些交互必须 pixel-level、哪些 functional model 即可，无系统分析）。
 2. **fork 语义的边界**：块级快照能恢复容器栈，但恢复不了外部世界（发出的邮件、第三方 API 调用、支付）——动作可逆性需要显式建模（WebOperator 方向）；快照粒度（浏览器 tab / session / 全栈）与成本的权衡未系统研究。
-3. **verifier 与环境合成的可扩展性死结**：程序化 verifier 可靠（94.1%）但每任务手写不 scale；LLM judge scale 但 precision ≤70%。CUAGym 的"环境生成时共生成 verifier"是最有希望的解，但只在 mock apps 验证过；同构问题在环境合成侧：EnvFactory 的前置验证在千级环境规模下不可扩展，合成环境与真实环境的行为一致性缺自动验证手段。
+3. **verifier 与环境合成的可扩展性死结**：程序化 verifier 可靠（94.1%）但每任务手写不 scale；LLM judge scale 但 precision ≤70%。[[Papers/2602-VAGEN]] 的交互式验证提供第三解（免脚本 92.9%），死结松动但未解开——每条 17.4 步的验证成本在 RL rollout 规模下未验证，且 verifier 须与轨迹终态环境在线耦合、离线轨迹不可用。CUAGym 的"环境生成时共生成 verifier"是最有希望的解，但只在 mock apps 验证过；同构问题在环境合成侧：EnvFactory 的前置验证在千级环境规模下不可扩展，合成环境与真实环境的行为一致性缺自动验证手段。
 4. **live 环境的 transactional 缺口**：InSTA 式 live 训练永远做不了状态修改任务，副本/mirror 又覆盖不了长尾站点。agents.txt 的 playground 提案（站长自建副本）是唯一指向系统性解法的方向，但没有任何激励机制研究。
 5. **多 agent 并发环境**：所有现有引擎假设单 agent 独占实例；多 agent 共享世界（协作/竞争/人机共控 τ²-Bench 式）的状态隔离、冲突检测、贡献归因在 web 端完全空白——并行基建已成熟使此问题更迫切。
-6. **agent-facing 暴露的因果验证**：fork/verify 作为 agent 可调用 affordance 的因果收益无对照实验（Crab 只测效率不测 success）——AFE-MiniSuite C0–C7 对照（见 [[Reports/2026-06-23-AgentFriendlyEnvironment-Proposal]]）要补的正是这一点。
+6. **agent-facing 暴露的因果验证**：fork/verify 作为 agent 可调用 affordance 的因果收益无对照实验（[[Papers/2604-Crab]] 只测效率不测 success）——AFE-MiniSuite C0–C7 对照（见 [[Reports/2026-06-23-AgentFriendlyEnvironment-Proposal]]）要补的正是这一点。
 7. **Allowed affordance boundary 的形式化**：哪些 affordance 允许（当前状态/合法动作列表/结构图/state diff/undo/task-agnostic progress probe）、哪些算 oracle（gold next action/gold trajectory/task-specific macro/complete flag）需要写成协议和测试，而非口头解释——这是 AFE 方向不滑向 trivial 的关键。
 8. **真实环境漂移**：live web/real app 的广告、A/B test、登录、schema migration 使 AFE adapter 面临持续维护成本；合理路径是先在 self-hosted but realistic 环境证明因果，再逐步接入真实环境。
-9. **长程任务的 reward hacking 检测**：WeaveBench 35.2% 失败是 reward hacking，trajectory-aware judge 有额外 compute cost；lightweight 检测机制（如 cross-channel state consistency check）与 "alignment for GUI agents" 方法论未建立。
+9. **长程任务的 reward hacking 检测**：WeaveBench 35.2% 失败是 reward hacking，trajectory-aware judge 有额外 compute cost；lightweight 检测机制（如 cross-channel state consistency check）与 "alignment for GUI agents" 方法论未建立。新增三个未测的 hacking 面：[[Papers/2602-ADMIRE]] 的 milestone 命中判定取自 policy 自述文本（policy 可学会"把描述写得像 milestone"）；[[Papers/2602-VAGEN]] 的 verifier 与 actor 共享动作空间（actor 理论上可伪造 verifier 会检查的表面证据）；[[Papers/2607-LongHorizonTerminalBench]] 实测 14 个 run 在 R≥0.75 即自判完成退出（false finish——agent 系统性高估完成度、吝于做最终验证）。
 
 ## 调研日志
+
+### 2026-07-21 增量并入 8 篇（survey-refresh）
+- **队列 10 篇，跳过 2 篇**：WebOperator（已于 2026-07-07 增量并入，笔记无未覆盖内容）；SpectraReward（T2I 图像生成 reward，与 agent 环境无关，keyword 误报）。
+- **并入**：[[Papers/2602-VAGEN]] / [[Papers/2510-CUARewardBench]] / [[Papers/2602-ADMIRE]] / [[Papers/2607-LongHorizonTerminalBench]]（轴 2 新增要点 4"状态锚定谱系"表 + 第三幕谱系插入 92.9% 档 + Takeaway 4/8 + OP 3/9）；[[Papers/2604-Crab]]（轴 4 第五用途改写 + §4.3 新增 Agent-facing recovery runtime 行 + Takeaway 6 / OP6 wikilink 化）；[[Papers/2505-BacktrackAgent]]（轴 4 实现谱系，simulated outcome page 消融）；[[Papers/2603-AgentSynth]]（轴 5，information asymmetry 任务工厂）；[[Papers/2607-HarnessHandbook]]（§3.4，harness 代码可维护性）。
+- **结论修订**：OP3 verifier 可扩展性由"死结"改为"松动但未解开"（VAGEN 第三解）；Takeaway 4 修正"dense reward 是训练侧专属"（LHTB 证明评测侧同样需要 partial credit）。
+- **status**: success
 
 ### 2026-07-20 三 survey 合并（本篇成立）
 - **动因**: Supervisor 指示同方向 survey 合并。GUI-Environment-Survey（14 篇）、AgentFriendlyEnvironment-Survey（16 篇）、WebEnvironment-Engine-Survey（38 篇）同属环境工程方向，论文重叠 ~13 篇（MobileGym/OpenComputer/DART-GUI/ComputerRL/WeaveBench/BrowserGym/WebGym/AsyncWebRL/OSWorld/WebArena/WindowsAgentArena/InfiniteWeb/AgentStudio）。

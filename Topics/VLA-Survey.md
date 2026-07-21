@@ -2,7 +2,7 @@
 title: Vision-Language-Action Models
 description: 从 2022 RT-1 到 2026 π0.7 / GEN-1 的 VLA 全景——按 action 表示与 data recipe 双轴组织，覆盖 AR token / 连续 flow matching / hierarchical / latent / reasoning-augmented / hybrid / world-model-conditioned / RL-post-trained 八类技术路线，重点分析 scaling law、cross-embodiment 统一、real-world RL、reasoning-action 融合、data engine 工学术分化等前沿议题
 tags: [VLA, manipulation, embodied-reasoning]
-date_updated: 2026-04-23
+date_updated: "2026-07-21"
 year_range: 2022-2026
 keywords: [vla, vision-language-action, robot policy]
 domain_map: EmbodiedAI
@@ -16,13 +16,13 @@ VLA 把预训练 VLM 扩展为端到端机器人策略，将 internet-scale 的�
 
 - **时间线**：[[2212-RT1|RT-1]] (2022) 奠定 AR 范式 → [[2307-RT2|RT-2]] (2023) 注入 web VLM → [[2410-Pi0|π0]] (2024) flow matching 跨 50 Hz → [[2504-Pi05|π0.5]] (2025) 家庭长程 → [[2511-PiStar06|π*0.6]] (2025-11) real-world RL → [[2604-Pi07|π0.7]] / [[2604-GEN1|GEN-1]] (2026Q1-Q2) 宣称跨越商业阈值，仅三年从概念验证走到 deployment 讨论。
 - **参与格局**：工业方向 Physical Intelligence（π 系列）/ Generalist AI（GEN 系列）/ Google DeepMind（Gemini Robotics）/ NVIDIA（GR00T / DreamZero）/ Figure AI（Helix）/ AgiBot（[[2512-GenieReasoner|GenieReasoner]]）/ Xiaomi（[[2602-XiaomiRobotics0|Xiaomi-Robotics-0]]）/ Dexmal·StepFun（[[2602-DM0|DM0]]）；开源方向 [[2406-OpenVLA|OpenVLA]] / [[2506-SmolVLA|SmolVLA]] / [[2510-XVLA|X-VLA]] / LeRobot 生态持续跟进。
-- **学术产出**：2025H2-2026H1 主要会议（NeurIPS / ICLR / ICRA 2026）VLA 论文密度激增，arXiv VLA survey 8+ 篇；本笔记覆盖 65 篇核心 + 3 篇 survey（[[2507-VLATokenizationSurvey]]、[[2509-PureVLA]]、[[2510-EfficientVLASurvey]]）。
+- **学术产出**：2025H2-2026H1 主要会议（NeurIPS / ICLR / ICRA 2026）VLA 论文密度激增，arXiv VLA survey 8+ 篇；本笔记覆盖 79 篇核心 + 4 篇 survey（[[2507-VLATokenizationSurvey]]、[[2509-PureVLA]]、[[2510-EfficientVLASurvey]]、[[2405-VLASurvey]]——广义三层 taxonomy（components / control policy / task planner）的 TNNLS 正式版，适合作领域入口，但模块划分轴与 action interface 离散/连续、data regime、control frequency 等真正决定能力的轴脱节）。
 
 **整体趋势**：
 
 1. **Action representation 从 discrete 到 continuous**：RT-2 token（3 Hz）→ Octo diffusion → π0 flow matching（50 Hz chunk-level），continuous path 已是默认；离散路线退守到"辅助监督"角色（[[2504-Pi05]] FAST + flow 双头、[[2512-GenieReasoner]] FACT = VQ + flow decoder）。
 2. **Dual-system 成 industry default**：System 2 VLM 1-10 Hz + System 1 action 20-200 Hz 的分层解耦被 π0.5 / GR00T N1 / Gemini Robotics / Helix / NaVILA 同时采纳；hierarchical with language intermediate 的历史包袱（语义表达力不足）由 latent action / reasoning trace / 2D trajectory 等替代中间表征消化。
-3. **Data recipe > model size**：[[2506-SmolVLA|SmolVLA]] 0.45B、[[2510-XVLA|X-VLA]] 0.9B、[[2602-DM0|DM0]] 2B 反复在主流 benchmark 击败 3-7B baseline；[[2511-GEN0|GEN-0]] 虽然在 7B 观察到"intelligence threshold"相变，但跨越阈值后 data scaling 的 ROI 远大于继续扩参。
+3. **Data recipe > model size**：[[2506-SmolVLA|SmolVLA]] 0.45B、[[2510-XVLA|X-VLA]] 0.9B、[[2602-DM0|DM0]] 2B 反复在主流 benchmark 击败 3-7B baseline；[[2511-GEN0|GEN-0]] 虽然在 7B 观察到"intelligence threshold"相变，但跨越阈值后 data scaling 的 ROI 远大于继续扩参；[[2607-XiaomiRobotics1|Xiaomi-Robotics-1]] 固定 20K hr 数据时 2.6B/5.1B/10.5B 仅 61/75/79%，而 data scaling 把 unseen-env 成功率从 26% 拉到 75%——data 是当前更强 bottleneck 的第二条独立证据。
 4. **Real-world RL 和 data engine 改写 ceiling**：[[2511-PiStar06|π*0.6]] 的 advantage conditioning + HIL rollout 首次让 4B 级 flow matching VLA 真实自改进；[[2602-GigaBrain05M|GigaBrain-0.5M*]] 的 RAMP 把它推广到"latent-conditioned"；[[2511-GEN0|GEN-0]] / [[2604-GEN1|GEN-1]] 的 500K 小时 wearable 数据路线让"数据天花板"从学术共识变成工业实验室专属筹码。
 5. **评测从 lab saturation 转向 real-robot mastery**：LIBERO（98.7）/ CALVIN ABCD→D（4.80）接近饱和；战场迁移到 RoboChallenge Table30、[[2511-PiStar06|π*0.6]] 商业部署、AC-One long-horizon、[[2604-GEN1|GEN-1]] 6-task mastery suite 等 real-robot 评测——但这些评测各自为政，尚无统一 leaderboard。
 
@@ -66,7 +66,7 @@ VLA 试图解决的核心问题可以用 [[2509-PureVLA]] 的一句 framing 概�
 - **优势**：天然建模 multi-modal 连续分布；flow matching 1-4 步采样（比 DDPM 10+ 步快）；chunk-level 生成 + Real-Time Chunking（RTC）/async inference 解决 AR 延迟。
 - **痛点**：
   - **Likelihood 不可解析**：PPO / trust region 不兼容；π\*0.6 的 "advantage conditioning"（二值 advantage 作 text prefix + CFG 推理）是目前最成熟的 RL 绕行方案。
-  - **梯度污染 VLM**：Continuous flow matching loss 会侵蚀 VLM 语义（[[2504-Pi05]] Knowledge Insulation 用 stop-gradient + FAST 离散辅助监督解决；[[2512-GenieReasoner]] FACT 用离散 VQ token 学 + flow decoder 重构）。
+  - **梯度污染 VLM**：Continuous flow matching loss 会侵蚀 VLM 语义（[[2504-Pi05]] Knowledge Insulation 用 stop-gradient + FAST 离散辅助监督解决；[[2512-GenieReasoner]] FACT 用离散 VQ token 学 + flow decoder 重构）。2026-07 新证据把侵蚀量化并挑战 KI 的充分性：[[2606-Act2Answer|Act2Answer]] 用"动作作答"协议测出 VLA 相比源 VLM 在语义类知识上掉 20-40 分，且知识在中层仍可线性解码、到动作通路衰减至近随机——问题是"读出通路"而非"数据遗忘"；[[2607-AnchorAlignVLA|Anchor-Align]] 证明 co-training+KI 路线存在 language-action 脱钩（LIBERO-PRO position-swap 0%），在同一 observation 上做 frozen VLM 逐层蒸馏 + 动作转方向词对齐更优（61.0→71.9，shuffle 标签控制实验排除正则化解释）。两篇一致指向：防遗忘应默认配 anchoring / VQA co-training，仅梯度隔离不够。
   - **延迟一致性**：Action chunk 边界不连续；π0.7 训练时注入 0-12 step inference delay 模拟 RTC；[[2604-SnapFlow]] 用 corrected consistency self-distillation 把 10 步 denoising 压到 1 步（π0.5 LIBERO 97.75%→98.75%，端到端 274ms→83ms 3.3×）。
 
 ### 3. Hierarchical with Language Intermediates
@@ -92,6 +92,7 @@ VLA 试图解决的核心问题可以用 [[2509-PureVLA]] 的一句 framing 概�
   - **不可解释**：latent 无法像 language motion 那样被人当场纠正。
   - **Latent 混杂**：LAPA 承认 latent 把 camera motion / scene change / agent action 混在一起，对 fine-grained grasping 有害。
   - **Granularity / comprehensiveness / alignment 三道坎**：[[2507-VLATokenizationSurvey]] 明确**不推荐**把 latent 纳入未来 hierarchical 架构。
+- **不走 latent 的两条平行路（2026-07 对照）**：human/play 数据不必经由 latent action 才能利用。[[2607-EgoSteer|EgoSteer]] 用 EgoSmith 管线把 in-the-wild egocentric 视频显式重建为统一 R^48 相机系 state-action（9.6K hr / 2.09M episodes，预训练呈 log-linear scaling，40 真机任务 75%），以表示一致性绕开 latent 的不可解释与混杂问题；[[2607-TAP|TAP]] 用 Inverse Dynamics 从 task-agnostic play / off-task 轨迹先学 "how to move" 再以少量 expert 对齐 "what to do"（SIMPLER 相对同架构 BC +10.2pp），代价是仍需 action label 但免语言/任务标注。
 
 ### 5. Reasoning-Augmented Action
 
@@ -127,6 +128,7 @@ VLA 试图解决的核心问题可以用 [[2509-PureVLA]] 的一句 framing 概�
 
 - **核心思路**：把 world model 从"生成训练数据"（DreamGen 路线）转向"推理时 condition"——VLA policy 接收 world model 预测的未来 state 和 value，作为 planning 信号。或者用 world model 内跑 RL，闭环 refine policy。代表：[[2511-PiStar06|π*0.6]]（Recap = value function + advantage conditioning + HIL rollout）→ [[2602-GigaBrain05M]]（RAMP: RECAP 形式化为"对 z 边缘化的特例"，加 future visual latent 做条件）→ [[2602-WorldVLALoop]]（Closed-loop co-evolving world model + VLA via SANS dataset）。[[2511-GEN0]] / [[2604-GEN1]] 代表**数据-first** 路线。
 - **实际效果**：π\*0.6 连续 13 小时咖啡馆做 espresso / 2 小时家庭折 laundry / 59 个巧克力包装盒工厂部署；GigaBrain-0 在 RoboChallenge 51.67%（超 π0.5 42.67%），RAMP 在 Box Packing / Espresso 长程任务上比 RECAP +30%；WorldVLALoop 在 real-world 从 SFT 13.3% → RL 第一轮 36.7% → 第二轮 50%；GEN-0 首次在 robotics 观察到 ossification 相变（≥7B "intelligence threshold"）+ power-law scaling $L(D)=(D_c/D)^{\alpha_D}$；GEN-1 把数据扩到 500K 小时 wearable、1h robot fine-tune 达 99% SR × 3× speed（blog only）；DreamZero 把 Wan2.1 14B 作为 WAM backbone，unseen env+object 62.2%，38× 推理加速后 7 Hz 部署。
+- **2026-07 增量（WAM 分支细化 + 拿下 sim SOTA）**：[[2607-FlowWAM|FlowWAM]] 用 HSV 编码 optical flow 作为 video-native 统一动作表示，同一双流 DiT（Wan2.2-TI2V-5B）兼任 policy 与 world model（RoboTwin 2.0 92.94%、WorldArena TrajAcc 64.26 最佳），ablation 定位关键在"把 flow 映射进预训练视频先验的 RGB 空间"（raw flow 72.3 → HSV 89.8）而非 flow 本身；[[2607-ABotM05|ABot-M0.5]] 把 video → frame-level latent action → executable action 组织为三级生成链，Dual-level MoT 解耦 mobility/manipulation 分支、Dream Forcing 缓解 self-dreamed rollout 的 exposure bias（RoboTwin 2.0 94.1、LIBERO 99.4、RoboCasa365 40.4/46.6），首个统一移动与操作的 WAM，但 Composite-Unseen 仅 7.9%；[[2606-RehearseVLA|RehearseVLA]] 用 action-conditioned video WM 替代仿真器做 RL post-training（LIBERO 5-demo 79.6 vs SFT 74.85，与仿真器 RL 的 RIPT-VLA 持平），与 [[2602-WorldVLALoop]] 互证"失败/次优探索数据是 WM-as-simulator 的关键 ingredient"，但 WM 冻结、未设防 reward hacking；[[2606-Orca|Orca]] 把 modeling target 上移到 Next-State-Prediction 统一 world latent，冻结 backbone 后 language/image/action 三路 readout 随预训练数据 scaling 同步提升（双臂 OOD action readout 32.4 vs V-JEPA 2.1 的 17.0，但 binary success 仅 6%）——world latent 作为 VLA 上游表示的可反驳性检验。
 - **优势**：
   - 突破 BC 天花板（π\*0.6 throughput 2× 不靠增量 demo）。
   - World model latent 提供 dense supervision，缓解 sparse reward。
@@ -153,12 +155,14 @@ VLA 试图解决的核心问题可以用 [[2509-PureVLA]] 的一句 framing 概�
 
 1. **Flow matching + hierarchical + prompt expansion = 当前主流主干**（PI 系列 π0 → π0.5 → π\*0.6 → π0.7 + 追随者 GR00T N1 / X-VLA / SmolVLA / Motus）。
 2. **离散 + 连续双监督成为标配**：π0.5 的 FAST discrete + flow continuous 双头、GenieReasoner 的 FACT、π0.7 的 Knowledge Insulation 都属于同一范式。
-3. **Scaling law 正在浮现**：GEN-0 的 7B ossification / $L(D)=(D_c/D)^{\alpha_D}$；GEN-1 继续外推（64% → 99%）；DreamZero 5B→14B 在 VLA 上 +29pp（vs 同规模纯 VLA 仍 0%）。但学术社区数据规模与工业差距正在拉大。
+3. **Scaling law 正在浮现**：GEN-0 的 7B ossification / $L(D)=(D_c/D)^{\alpha_D}$；GEN-1 继续外推（64% → 99%）；DreamZero 5B→14B 在 VLA 上 +29pp（vs 同规模纯 VLA 仍 0%）；[[2607-XiaomiRobotics1|Xiaomi-Robotics-1]] 提供 GEN 系之外第二条独立 data-scaling 曲线（unseen-env 26%→75%）且实测 data > model size。但学术社区数据规模与工业差距正在拉大。
 4. **Cross-embodiment 从 "per-embodiment head" 迁移到 "input-side soft prompt / latent action"**（X-VLA / LAPA / DreamZero / π0.7 UR5e 迁移 / 2602-DM0 的 Embodied-Native）。
 5. **Real-world RL 范式转变**：π\*0.6 的 advantage conditioning 是"绕开 flow matching PPO 难题"的工程胜利，被 RAMP / WorldVLALoop 沿用；RL 的瓶颈正从"算法"移到"世界模型保真度 + reward 引擎"。
 6. **Reasoning-action 从 shallow CoT 走向 unified discrete framework**（GenieReasoner FACT / Lumo-1 spatial action tokenizer / RoboBrain 2.5 3D+temporal）；"在 action space 做 reasoning" 的激进方向仍无实证。
-7. **Memory 成为 long-horizon 明确子问题**：[[2603-MEM|MEM]]（video encoder + language memory，15min 任务）、[[2511-EchoVLA]]（dual PHC+hippocampus memory）、[[2507-StreamVLN]]（streaming KV-cache + voxel pruning）都在 2025-2026 集中出现。
+7. **Memory 成为 long-horizon 明确子问题**：[[2603-MEM|MEM]]（video encoder + language memory，15min 任务）、[[2511-EchoVLA]]（dual PHC+hippocampus memory）、[[2507-StreamVLN]]（streaming KV-cache + voxel pruning）都在 2025-2026 集中出现；[[2607-LaMemVLA|LaMem-VLA]] 进一步把记忆从 policy-side 外挂挪进模型 native embedding 空间（短期视觉/长期动作双 vault，latent-native 相对 policy-side 条件化 +2pp）。
 8. **Deployment 工程栈成熟**：async inference（SmolVLA）、RTC（π0.7）、1-step flow matching（SnapFlow 274→83ms）、int4 量化（OpenVLA）、Λ-mask 防 shortcut（Xiaomi-Robotics-0）、paged attention（GEN-1）——"VLA 推理延迟是核心瓶颈"的共识正在推动专用优化技术涌现。
+9. **执行期监控与恢复独立成层（2026-07 新 pattern）**：失败常源于"执行中途坏掉且回不来"而非"不会做"，恢复机制可与策略学习解耦。[[2606-RehearseVLA|RehearseVLA]] 的 instant reflector 暴露 VLA 评测对 oracle 终止信号的隐性依赖（禁用后 OpenVLA-OFT 掉 11.8pp）；[[2607-RobustExecAgenticRL]] 在冻结 VLA 上用 PPO 训 {Execute/Retry/Repair/Reset} 调度层、以回滚历史 nominal state 恢复执行（扰动设定 LIBERO-Long 平均 +39.2pp，但缺规则阈值 baseline、扰动类型为方法量身定做）；与 venue 回填的 [[2606-AffordanceFieldInterventio]] test-time rollback 同线。
+10. **下游适配配方成为受控研究对象**：[[2607-LoRAVLA]] 给出 π0 工业微调的实证 recipe——LoRA r=32 + SigLIP 全量微调持平 FFT（VRAM 36.2→10.8 GiB），embodiment adaptation 的瓶颈在视觉 domain shift 而非动作层；[[2607-DART]] 把适配数据的价值从"重学任务"改写为"测量 domain direction"——source/target one-shot update vector 相减 + SVD subspace 过滤，一条 target demo 把 domain shift 迁移到全部任务（LIBERO viewpoint shift 79.1% vs one-shot FT 31.5%，真机 UR10e 81.7%）。
 
 ## Datasets & Benchmarks
 
@@ -176,12 +180,14 @@ VLA 试图解决的核心问题可以用 [[2509-PureVLA]] 的一句 framing 概�
 | Physical Intelligence 自采 | 2024-2026 | ~10K hr teleop (aggregate) | 多 robot | [[2410-Pi0\|π0]] / [[2504-Pi05\|π0.5]] / [[2511-PiStar06\|π*0.6]] / [[2604-Pi07\|π0.7]] | 私有；π0.5 训练中 97.6% 来自非目标平台 |
 | Generalist AI wearable | 2025-2026 | 270K hr → 500K hr；10K hr/week | 零 robot data | [[2511-GEN0\|GEN-0]] / [[2604-GEN1\|GEN-1]] | 完全 proprietary，wearable 采集范式 |
 | GigaWorld 合成视频 | 2025-2026 | ~6.65K hr 合成 | 多 embodiment | [[2602-GigaBrain05M\|GigaBrain-0.5]] pretrain（61% 合成 + 39% 真机） | synthetic data 首次在 VLA pretrain 占多数 |
+| Xiaomi UMI 自采 | 2026 | 100K+ hr UMI + ~10K hr robot post-train | UMI handheld → 多 robot | [[2607-XiaomiRobotics1\|Xiaomi-Robotics-1]] | state-transition 自动标注（Qwen3.5-27B）；方法论公开、数据承诺后续发布；scaling curve 实测于 20K hr subset |
+| EgoSmith（EgoSteer） | 2026 | 9.6K hr / 2.09M episodes（12 个公开 egocentric 数据集清洗） | Human egocentric → 双臂灵巧手 | [[2607-EgoSteer\|EgoSteer]] | 4D 手部轨迹重建为统一 R^48 state-action，预训练/后训练表示一致 |
 
 ### Manipulation sim benchmarks
 
-| Benchmark                    | 规模 / 定位                 | Metric             | SOTA (2026-04)                                                                                                                                        |
+| Benchmark                    | 规模 / 定位                 | Metric             | SOTA (2026-07)                                                                                                                                        |
 | ---------------------------- | ----------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| LIBERO                       | 4 suite × 10 task 短程    | 4-suite avg SR     | **98.7%** ([[2602-XiaomiRobotics0\|Xiaomi-Robotics-0]] 4.7B) <br>98.2% (EO-1) <br>98.1% ([[2510-XVLA\|X-VLA]] 0.9B)                                   |
+| LIBERO                       | 4 suite × 10 task 短程    | 4-suite avg SR     | **99.4%** ([[2607-ABotM05\|ABot-M0.5]], WAM) <br>98.7% ([[2602-XiaomiRobotics0\|Xiaomi-Robotics-0]] 4.7B) <br>98.2% (EO-1) <br>98.1% ([[2510-XVLA\|X-VLA]] 0.9B)                                   |
 | LIBERO-Long                  | 长程子集                    | SR                 | 97.6% ([[2512-Motus\|Motus]] / [[2510-XVLA\|X-VLA]] 并列) <br>97.2% ([[2602-XiaomiRobotics0\|Xiaomi-Robotics-0]])                                       |
 | CALVIN ABCD→D                | In-dist 长程              | Avg task length /5 | **4.80** ([[2602-XiaomiRobotics0\|Xiaomi-Robotics-0]])                                                                                                |
 | CALVIN ABC→D                 | OOD 长程                  | Avg task length /5 | **4.75** ([[2602-XiaomiRobotics0\|Xiaomi-Robotics-0]], vs 次优 FLOWER 4.53)                                                                             |
@@ -189,8 +195,9 @@ VLA 试图解决的核心问题可以用 [[2509-PureVLA]] 的一句 framing 概�
 | SimplerEnv Google Robot VA   | Real-to-sim             | avg SR             | 75.7% ([[2510-XVLA\|X-VLA]]) <br>74.7% ([[2602-XiaomiRobotics0\|Xiaomi-Robotics-0]])                                                                  |
 | SimplerEnv WidowX            | Real-to-sim             | avg SR             | **95.8%** ([[2510-XVLA\|X-VLA]], vs 前 SOTA MemoryVLA 71.9) <br>79.2% ([[2602-XiaomiRobotics0\|Xiaomi-Robotics-0]])                                    |
 | RoboCasa Kitchen Easy / Hard | 100 photorealistic 厨房任务 | SR                 | 70.0 / 39.0 ([[2510-XVLA\|X-VLA]])                                                                                                                    |
+| RoboCasa365                  | 365-task 移动操作 pretraining 设置 | avg SR      | **57.4%** ([[2607-XiaomiRobotics1\|Xiaomi-Robotics-1]], Composite-Unseen 32.1%) <br>46.6% ([[2607-ABotM05\|ABot-M0.5]] +Condensed Memory, Composite-Unseen 7.9%)                                |
 | VLABench                     | VLA-centric 综合          | Avg.PS             | 51.1 ([[2510-XVLA\|X-VLA]])                                                                                                                           |
-| RoboTwin 2.0 Randomized      | 50-task bimanual Aloha  | avg SR             | **87.02%** ([[2512-Motus\|Motus]]) <br>72.84% ([[2510-XVLA\|X-VLA]]) <br>43.84% ([[2504-Pi05\|π0.5]])                                                 |
+| RoboTwin 2.0 Randomized      | 50-task bimanual Aloha  | avg SR             | **94.2%** ([[2607-ABotM05\|ABot-M0.5]]) <br>92.14% ([[2607-FlowWAM\|FlowWAM]]) <br>87.02% ([[2512-Motus\|Motus]]) <br>72.84% ([[2510-XVLA\|X-VLA]]) <br>43.84% ([[2504-Pi05\|π0.5]])                                                 |
 | BiCoord                      | 18 bimanual 长程紧耦合       | single-task avg SR | 46.4% ([[2410-Pi0\|π0]], 次 [[2502-OpenVLA-OFT\|OpenVLA-OFT]] 40.5 / RDT 39.5 / DP 33.1) <br>27.2% ([[2410-Pi0\|π0]] multi-task, 相比 single-task −19pp) |
 
 ### Real-robot benchmarks
@@ -243,6 +250,8 @@ VLA 试图解决的核心问题可以用 [[2509-PureVLA]] 的一句 framing 概�
 - **自建 benchmark bias**：[[2601-RoboBrain25\|RoboBrain 2.5]] / [[2602-RynnBrain\|RynnBrain]] / [[2510-VLASER|Vlaser]] / [[2603-ACEBrain0\|ACE-Brain-0]] / [[2511-PelicanVL\|Pelican-VL]] 各自在自家 benchmark 领先——横向对比困难；[[2512-GenieReasoner\|GenieReasoner]] ERIQ 试图用 "action-decoupled reasoning benchmark" 标准化但尚未被社区采纳。
 - **Metric 口径不齐**：[[2410-Pi0\|π0]] 50 Hz 是 chunk-level、[[2406-OpenVLA\|OpenVLA]] 6 Hz 是 token-level；TL（trajectory length）只算成功 episode → selection bias（[[2604-BiCoord]]）；partial SR / subgoal-weighted score 不同工作定义不同。
 - **OOD 定义模糊**：[[2604-Pi07]] 自承"训练集太大无法严格定义 unseen"，compositional generalization claim 难证伪。
+- **Oracle 终止信号的隐性依赖**：[[2606-RehearseVLA|RehearseVLA]] 禁用 ground-truth 终止信号（所有方法跑满 horizon）后 OpenVLA-OFT 从 74.85 掉到 63.05——post-success 冗余动作破坏已完成状态，现行 benchmark 数字系统性高估部署性能，无 oracle 评测协议值得推广。
+- **World model 成为 policy evaluator**：[[2607-GigaWorld1|GigaWorld-1]] 用 WMBench 的 2,989 条 paired real/WM rollouts 把 surrogate 评测的成功标准从视频观感改为 real-world outcome agreement，综合 evaluator score 超最强 Wan baseline 14.9%；结论是 evaluator 质量取决于 long-horizon action fidelity、可迁移 physical prior 与空间对齐 action control，但 video WM 对 contact-sensitive failure 有 optimistic bias——policy evaluator 最危险的误差类型。
 
 ## Open Problems
 
@@ -253,6 +262,7 @@ VLA 试图解决的核心问题可以用 [[2509-PureVLA]] 的一句 framing 概�
 - **Ossification 的 weight-level 机制**？当前只是行为层面观察，没有 effective rank / gradient norm 诊断。
 - **Commercial threshold 的泛化性**："mastery 三元组（reliability+speed+improvisation）" 中 improvisation 完全定性，GEN-1 没给 quantitative breakdown。
 - **Scaling 在学术数据上是否成立**？[[2412-RoboVLMs]] 等小规模实验反而发现 "in-domain > cross-embodiment"，与 GEN-0 大规模结论冲突——可能是 capacity 临界点问题，小模型 + 少数据下跨 embodiment 是 noise，大模型 + 长训练后变 signal。
+- **第二条独立 data-scaling 曲线（2026-07）**：[[2607-XiaomiRobotics1]] 在 20K-hr UMI subset 上 unseen-env 成功率 26%→75%（12.5% 数据已达 53%），固定数据时 2.6B/5.1B/10.5B 为 61/75/79%——与 GEN-0 的 "data > size" 独立互证；但完整 100K-hr 曲线未报告、自动 caption 噪声不可外部审计。
 
 ### 2. Real-world RL for large VLAs
 
@@ -280,10 +290,13 @@ VLA 试图解决的核心问题可以用 [[2509-PureVLA]] 的一句 framing 概�
 - **Metric 口径不齐**：π0 的 50 Hz 是 chunk-level，OpenVLA 的 6 Hz 是 token-level；TL（trajectory length）只算成功 episode 引入 selection bias（[[2604-BiCoord]]）。
 - **OOD 定义模糊**：[[2604-Pi07]] 自己承认"训练集太大无法严格定义 unseen"，compositional generalization claim 难证伪。
 - **ERIQ / BiCoord / RoboChallenge** 是 2025-2026 的新尝试（reasoning/coordination/real-robot），尚未社区采纳。
+- **评测成本的两条候选出路（2026-07）**：world-model-as-evaluator（[[2607-GigaWorld1]]，paired rollout 的 outcome agreement 作为 benchmark 单位）与无 oracle 终止协议（[[2606-RehearseVLA]]）；前者的 contact-sensitive optimistic bias、后者未报告的误终止率是各自短板。[[2606-Act2Answer]] 补充第三类协议——把 VLM 知识 benchmark 改造成"用动作作答"的行为级评测，解耦知识缺失与控制失败。
 
 ### 6. Data engine 的工程 vs 学术 gap
 
 [[2511-GEN0]] 270K hr + [[2604-GEN1]] 500K hr wearable + 10K hr/week，全 proprietary + Early Access Partner only；开源社区最大到 OXE / DROID / AgiBot World 百 K episodes 量级。若 scaling law 成立，学术社区将**系统性落后工业实验室**——类似 LLM 2023 后的 Anthropic/OpenAI/DeepMind 局面。更棘手的是 GEN 系列数据采集形态（wearable 传感器组合、action 空间对齐）完全不公开，**复现门槛不是"钱"而是"方法论本身不公开"**。
+
+2026-07 更新：**"方法论黑箱"判断被部分削弱**——[[2607-XiaomiRobotics1]] 公开 UMI handheld gripper + state-transition 自动标注（Qwen3.5-27B captioning）的完整方法论（100K+ hr，数据/checkpoint 承诺后续发布）；[[2607-EgoSteer]] 的 EgoSmith 管线从公开 egocentric 数据集清洗出 9.6K hr 且工程细节可复用；[[2607-TAP]] 证明 30 hr autonomous play 可替代部分 expert 数据预算。非遥操作数据引擎的方法论正在公开化，gap 收敛为"数据本体与算力"而非"方法论本身"。
 
 ### 7. Memory 与 long-horizon
 
@@ -291,6 +304,7 @@ MEM（video encoder + language memory 解耦，15min 任务）、EchoVLA（PHC+h
 - Memory 的**压缩粒度**（token / frame / 语义摘要）跨任务最优策略？
 - Explicit voxel 3D memory 在动态遮挡下失灵（EchoVLA OR 任务输给 baseline），explicit vs implicit memory trade-off 未系统化。
 - 长于 1 小时的 memory 几乎无工作；GEN-1 "连续 200+ 次无干预"demo 未开放评测协议。
+- Latent-native vs policy-side：[[2607-LaMemVLA]] 显示记忆织入 native embedding 空间优于外部条件化（+2pp），但纯仿真、top-K 检索不可微——真机稳健性与可微检索是下一步。
 
 ### 8. Safety / alignment for embodied intelligence
 
@@ -318,3 +332,14 @@ MEM（video encoder + language memory 解耦，15min 任务）、EchoVLA（PHC+h
 - **think/reason before act（主线二）**：[[2506-CoTVLA]]（先生成 subgoal image）、[[2606-ACoTVLA]]（CoT 转到 action space）、[[2606-TRMVLA]]（keyframe-triggered reasoning + memory）、[[2606-AVAVLA]]（POMDP 历史条件策略，LIBERO 98%）、[[2606-HiFVLA]](motion vector 当低维 history)。
 - **test-time 纠错**：[[2606-AffordanceFieldInterventio]] ⭐4（用 3D affordance field 检测并 rollback VLA 的 "Memory Trap"，不改参数）。
 - **takeaway**：共同假设是端到端 VLA 缺显式中间结构（affordance / CoT / 3D geometry），加可解释中间表示提升 OOD 与 long-horizon;与 [[Topics/EmbodiedAI-Survey]] 专题一的 embodied CoT 线索呼应。
+
+## 🆕 增量并入（2026-07-21，15 篇）
+
+本批全部整合进上文各节：[[2607-XiaomiRobotics1]]、[[2607-GigaWorld1]]、[[2607-ABotM05]]、[[2607-FlowWAM]]、[[2606-RehearseVLA]]、[[2606-Orca]]、[[2607-EgoSteer]]、[[2607-TAP]]、[[2607-LaMemVLA]]、[[2607-AnchorAlignVLA]]、[[2606-Act2Answer]]、[[2607-RobustExecAgenticRL]]、[[2607-LoRAVLA]]、[[2607-DART]]、[[2405-VLASurvey]]。
+
+结构性变化：
+
+1. **WAM 系拿下 sim SOTA**：RoboTwin 2.0（[[2607-ABotM05]] 94.2 / [[2607-FlowWAM]] 92.14 超 Motus 87.02）、LIBERO（ABot-M0.5 99.4）、RoboCasa365（[[2607-XiaomiRobotics1]] 57.4）——video-generation-based policy 从"昂贵替代"变为 benchmark 领跑者，但 Composite-Unseen（7.9-32.1%）暴露组合泛化仍未解。
+2. **表征遗忘从轶事变为可测量问题**：[[2606-Act2Answer]]（测量：语义类知识掉 20-40 分、中层可解码但动作通路读不出）+ [[2607-AnchorAlignVLA]]（干预：在线锚定优于 co-training+KI）构成同一现象的测量-干预对；Route 2 "梯度污染" 痛点的既有结论（KI 足够）被削弱。
+3. **数据引擎方法论公开化**：Xiaomi UMI 100K hr / EgoSmith 9.6K hr / TAP autonomous play 削弱 Open Problem 6 的"方法论黑箱"判断。
+4. **新增 convergence 观察 9（执行期监控与恢复独立成层）、10（下游适配配方受控研究）**；评测 crisis 新增 oracle 终止依赖与 world-model-as-evaluator（[[2607-GigaWorld1]]）两条。

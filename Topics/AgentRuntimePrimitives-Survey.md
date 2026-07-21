@@ -1,9 +1,9 @@
 ---
 title: "Recovery / Branching / Parallelism 作为 Agent 运行时原语综述——web agent 从单条不可逆轨迹到可分支执行"
 tags: [web-agent, survey, environment-engineering, agentic-RL, computer-use]
-date_updated: "2026-07-20"
+date_updated: "2026-07-21"
 year_range: 2024-2026
-papers_analyzed: 37
+papers_analyzed: 39
 keywords: [rollback, backtracking, branching, fork, snapshot, checkpoint, tree search, mcts, parallel rollout, test-time scaling, speculative execution, recovery, agent runtime, trajectory generation]
 domain_map: GUI-Agent
 ---
@@ -61,7 +61,7 @@ domain_map: GUI-Agent
 - **nearest-URL 混合重放**：[[Papers/2510-BranchAndBrowse]] 取最近 URL 检查点 + 局部重放，配 background reasoning（只敢预扩展有显式 URL 的确定性 click）与 page action memory，WebArena 35.8% 且时间 -40.4%。
 - **可逆性感知回溯**：[[Papers/2512-WebOperator]] 动作可逆性四分类 + checkpoint URL 跳转 + 并行 tab speculative 校验，WebArena 54.6%；其消融显示 naive tree search 反而掉分（51.61% < 无搜索 53.55%），且 agent 侧启发式判断 destructive 动作确认率仅 ~37%。
 - **step 级 MCTS 集大成**：[[Papers/2602-AgentAlpha]] alpha-UCT + max 回传 + 兄弟节点对比式评估 + 语义去重扩展，OSWorld ~77% 超 Agent S3 bBoN 4.71pp、同基座对照 +10pp（64.27% vs 54.29%），bBoN 失败任务救回 33.9%；恢复仍是前缀重放（O(depth)，3.6× 墙钟）——2026 年 SOTA 树搜索的状态恢复机制与 2024 年无异。
-- 同谱系：[[Papers/2505-BacktrackAgent]]（EMNLP 2025，GUI 错误检测+回退）、Plan-MCTS (2602.14083，plan 层搜索)。
+- 同谱系：[[Papers/2505-BacktrackAgent]]（EMNLP 2025，可训练 judger 看 outcome page 判错即单步回退重写、检测信号兼作训练 reward，Mobile3M task SR +7.59pp；但检测 precision 75%/recall 44%、恢复 accuracy <40%，且"回到前页"依赖预遍历页面图环境——真实 GUI 不可逆性被数据集设定绕开）、Plan-MCTS (2602.14083，plan 层搜索)。
 
 **天花板已清晰**：恢复保真度受限（URL ≠ 全栈状态）、串行执行（Branch-and-Browse 自认单浏览器 session、并行是 future work）、可逆性靠猜（37% 确认率）。这三条正是环境侧零成本掌握、agent 侧永远拿不到的信息与能力。
 
@@ -69,7 +69,7 @@ domain_map: GUI-Agent
 
 环境不支持分支时的第二条绕行路：让模型自己"想象"或"学会"分支。
 
-- **想象模拟**：[[Papers/2411-WebDreamer]] 用 LLM 世界知识模拟动作后果替代真实探索（live 下唯一选择），拿到真实搜索 ~70% 收益，模拟深度 H>1 即退化；WebSynthesis (2507) 把 world-model MCTS 用于训练轨迹合成；[[Papers/2511-DreamGym]] 是训练侧同构（合成经验替代真实 rollout，Theorem 1 给出 ε_R+ε_P 替代边界）。
+- **想象模拟**：[[Papers/2411-WebDreamer]] 用 LLM 世界知识模拟动作后果替代真实探索（live 下唯一选择），拿到真实搜索 ~70% 收益，模拟深度 H>1 即退化；[[Papers/2507-WebSynthesis]] 把 world-model MCTS 从 inference 搬到离线轨迹合成——虚拟 WebUI 中搜索并保留 valuable + rollback 轨迹做 behavior cloning，WebArena-Lite Pass@1 14.93% 超 OS-Genesis（7.4k 真实轨迹），其消融（rollback-only 1.49% / valuable-only 5.97% / 组合 9.70%）表明 rollback 轨迹须与成功轨迹组合才有纠错价值；[[Papers/2511-DreamGym]] 是训练侧同构（合成经验替代真实 rollout，Theorem 1 给出 ε_R+ε_P 替代边界）。
 - **搜索行为蒸馏**：[[Papers/2410-ExACT]] Exploratory Learning 把 R-MCTS 搜索树摊平成单轨迹微调，教模型自主 explore/evaluate/backtrack——1/4 token 恢复 ~87% 搜索性能，且 test-time scaling 曲线优于 imitation learning。
 - **内化的极限**：ExACT 恢复 87% 而非超越；[[Papers/2408-AgentQ]] 训练后模型 81.7% vs +search 95.4%——**训练不消除搜索的独立价值**，两代工作一致。
 
@@ -117,7 +117,9 @@ domain_map: GUI-Agent
 | [[Papers/2504-WebRollback]] | recover | URL 重定向 | **agent 自身** | inference | live web | 零样本 +3~6pp，卡死 19%→7% |
 | [[Papers/2510-BranchAndBrowse]] | branch+recover | nearest-URL 重放 | 搜索算法 | inference | web 沙盒 | WebArena 35.8%，时间 -40.4% |
 | [[Papers/2512-WebOperator]] | branch+recover | 可逆性分类+checkpoint URL | 搜索算法 | inference | web 沙盒 | WebArena 54.6%；naive search 有害 |
+| [[Papers/2505-BacktrackAgent]] | recover | 单步回退+动作重写（页面图查询） | 框架（learned judger 触发） | inference+training | GUI 数据集图 | Mobile3M +7.59pp；检测 precision 75%/recall 44% |
 | [[Papers/2411-WebDreamer]] | branch（想象） | LLM 世界模型 | 模型 | inference | live web | 真实搜索 ~70% 收益 |
+| [[Papers/2507-WebSynthesis]] | branch+recover（想象） | LLM world model + MCTS | 数据管线 | training | 虚拟 WebUI | Pass@1 14.93%；rollback-only 仅 1.49% |
 | [[Papers/2410-ExACT]] | branch→内化 | R-MCTS→EL 蒸馏 | 模型 | inference+training | web 沙盒 | 1/4 token 恢复 87% |
 | [[Papers/2408-AgentQ]] | branch | MCTS（前向，无恢复） | 搜索算法 | training | live web | OpenTable 18.6→95.4% |
 | [[Papers/2509-TreeGRPO]] | branch | 上下文续写（无状态环境） | 训练框架 | training | 检索/搜索 QA | 1/4 预算超 chain |
@@ -152,7 +154,7 @@ domain_map: GUI-Agent
 
 ## Key Takeaways
 
-1. **三原语的价值已分别证实，但收益上限由状态恢复保真度决定**。分支收益随保真度递增的证据线：URL 恢复（WebRollback +3~6pp）< 混合重放（Branch-and-Browse +16.6pp）< 可逆性感知（WebOperator 刷新 tree search SOTA）；而 naive 分支在不校验重放可行性时为负收益（WebOperator 消融）。推论：engine-level 全栈快照是这条收益曲线的未测上界——这正是 research statement 的可证伪空间。
+1. **三原语的价值已分别证实，但收益上限由状态恢复保真度决定**。分支收益随保真度递增的证据线：URL 恢复（WebRollback +3~6pp）< 混合重放（Branch-and-Browse +16.6pp）< 可逆性感知（WebOperator 刷新 tree search SOTA）；而 naive 分支在不校验重放可行性时为负收益（WebOperator 消融）。观测侧同构证据：[[Papers/2505-BacktrackAgent]] 的 backtrack 收益在 actual execution 下 +5.65pp、simulated execution 下骤降至 +0.70pp——outcome 状态不真实时错误检测随之失灵。推论：engine-level 全栈快照是这条收益曲线的未测上界——这正是 research statement 的可证伪空间。
 
 2. **同一分支基建同时服务 inference 与 training，但没有任何工作统一验证两侧**。现状是分域分证：inference 侧（Tree Search/ExACT/WebRollback）与 training 侧（Tree-GRPO/SRC/Agent Q）各自成立；Crab 四场景最接近统一但只测效率不测 success。"一套 fork 原语、两侧收益"的端到端验证（同一环境同一原语，前测 task solving、后测 trajectory generation 质量）仍无人做——这是 research statement 作为一篇论文的完整性所在。
 
@@ -182,3 +184,4 @@ domain_map: GUI-Agent
 - **仍未 digest（供后续）**: Intelligent Go-Explore（archive/restore 血统的正式笔记）、ARPO 2507.19849（熵分支的代表作）、WebPilot（MCTS 家族补全）、UI-Simulator (2510.14969)、AgentSynth (2506.14205)、WAC (2602.15384)
 - **增量更新 2026-07-20**（Supervisor 重提：并行/分支/回溯，训练/测试两角度 + multi-agent + 浏览器分支）：新 digest 4 篇——[[Papers/2602-AgentAlpha]]（路线 1，step 级 MCTS 刷新 OSWorld）、[[Papers/2602-ANCHOR]]（路线 4 新增用途 4：branch point 数据工厂）、[[Papers/2512-ScalingAgentSystems]]、[[Papers/2602-WideSeekR1]]（路线 5 新增组织式并行形态）；[[Papers/2505-BacktrackAgent]] 由摘要级升级为正式笔记引用。摘要级新增：GUI Exploration Lab (2512.02423, NeurIPS'25，多轮 RL 中回溯行为自发涌现)、ParallelMuse (2510.24698)、Share-More-Search-Less (2605.27030)、Agent-as-Tool/ParaManager (2604.17009)、LAMaS (2601.10560)。外部检索：WebSearch 3 次。矩阵 +3 行，Takeaway 5 补 2026-07 证据。
 - **增量更新 2026-07-20 (2)**（Supervisor 追问：三原语各对应什么能力、有何可开展方向）：新增"能力语义"一节（约束-能力表 + action 化谱系 + 状态重建成本规律）；Open Problem 3 按新证据收窄。摘要级新增：PGTS (2502.06813，reasoning 域 invocation policy RL)、Learning to Explore (2605.08978，SFT rollback + exploration-aware RL，recovery 调用学习首例)、ASTRO (2507.00417)、backtrack token (2504.07052)、Guided Search in Non-Serializable Environments (2505.13652，不可分支环境的形式化)、MobileGym（JSON state fork 基建，已在路线 3）。产出新 idea：[[Ideas/SelfInitiatedFork-GUI]]（branch 调用学习——action 化谱系唯一空白）。外部检索：WebSearch 2 次 + WebFetch 1 次。
+- **增量更新 2026-07-21**（survey-refresh）：[[Papers/2507-WebSynthesis]] 由摘要级升级为正式笔记引用（路线 2 + 矩阵：rollback 轨迹须与 valuable 轨迹组合的消融）；[[Papers/2505-BacktrackAgent]] 覆盖加深（路线 1 定位扩充 + 矩阵新行 + Takeaway 1 补 simulated execution 收益骤降的观测侧保真度证据）；[[Papers/2602-AgentAlpha]] 经核对已于 07-20 完整并入，本轮无变更。

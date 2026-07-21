@@ -2,7 +2,8 @@
 title: "AFE-MiniSuite: Causal Ablation of Agent-Facing Web Runtime Affordances"
 idea: "[[Ideas/AgentFacing-WebRuntime]]"
 tags: [gui-agent, web-agent, computer-use, environment, agent-facing-runtime]
-status: planned
+status: in-progress
+project: "[[Projects/AFE-MiniSuite]]"
 date_created: "2026-06-25"
 date_completed:
 ---

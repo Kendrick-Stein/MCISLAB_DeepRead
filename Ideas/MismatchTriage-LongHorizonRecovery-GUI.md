@@ -1,9 +1,9 @@
 ---
 title: "Recovery-Selection Gap：GUI Agent 的固定恢复策略留下多少可收回的成功率"
 tags: [gui-agent, computer-use, research-idea]
-status: raw
-linked_project:
-date_updated: "2026-07-20"
+status: developing
+linked_project: "[[Projects/MismatchTriage]]"
+date_updated: "2026-07-21"
 ---
 
 ## Hypothesis

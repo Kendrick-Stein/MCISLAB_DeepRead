@@ -1,6 +1,6 @@
 ---
-last_updated: "2026-07-15"
-updated_by: agenda-evolve
+last_updated: "2026-07-21"
+updated_by: supervisor-decision (Self-Improving resume, literature-only)
 active_topic: GUI Agent
 ---
 
@@ -42,21 +42,19 @@ active_topic: GUI Agent
 - **next_action**: 在 WebHarbor mirror 或 CUA-Gym-Hub mock apps 上原型化 AFE-MiniSuite（observe/map/rollback/verify affordance + C0–C7 因果对照），先验证 Web-only causal mechanism；prompt-only baseline 必须把 affordance 文本原样塞进 prompt 作为强对照，以排除"收益仅来自信息展示"。竞争窗口在收窄（Crab / AgenticExplorationSystems 已入场），差异化聚焦三条剩余空白：web 全栈状态 fork、success/recovery 因果增益（含 prompt-only 对照）、affordance 组合消融；verify affordance 设计须显式处理 judge 精度边界（70–85% 区间，蒸馏特化 judge 与投票+弃权聚合是现有两条改进路径）
 - **confidence**: 0.5 (↑ from 0.45，demand-side 证据链补齐：AgentEnvironment-Survey 六轴推导 + Reliability-Survey 把瓶颈定位到 verify/recover + Crab 在 sandbox 域的 agent-facing rollback 构成部分直接证据；agent-facing 暴露的 success 因果收益仍无自有实验验证)
 
+### Self-Improving Agent Reliability
+
+- **priority**: medium（**literature-only** — Supervisor 2026-07-21 决定 resume，scope 限定为 paper 收集 → digest → survey → idea 孵化，**不做实验**；实验侧衔接由 AFE 的 verify affordance（[[Ideas/HybridVerifier-GUIRuntime]]）承接）
+- **status**: exploring
+- **origin**: researcher-discovered
+- **hypothesis**: 自增强循环存在系统性验证偏差——该假设已被外部完整实证（[[Papers/2509-Misevolution]] 四路径实测：memory reward hacking >60%、workflow ASR 54→83）；当前开放问题收窄为外部纠错机制的具体形态——**evolution-step verifier gating**（四条演化路线中仅 tool/skill 内建验证关口，见 [[Topics/SelfEvolvingAgents-Survey]]）
+- **evidence**: [[Topics/SelfEvolvingAgents-Survey]], [[Papers/2509-Misevolution]], [[Papers/2607-ABotAgentOS]]（工业侧 8 存 1 印证）, [[Topics/GUIAgent-Survey]], [[2500-UiGenieSelfImproving]], [[Ideas/AdversarialVerification-SelfImproving-GUI]], [[Ideas/CounterfactualProbe-EvolutionGate]] (18/25), [[Ideas/RetrievalMediated-MemoryMisevolution]] (18/25), 2026-07-21 survey-refresh 新证据链：「监督资产是 policy 相对的」跨域收敛（[[Papers/2607-SEED]] 静态 skill 库 −7.4 / [[Papers/2607-KnowActGUIClaw]] 跨 backbone +3.1 但跨演化阶段过期 / [[Papers/2607-EvoCUA15]] RL 数据子集 policy 相对）+ skill 路线内化 vs 外挂分岔（[[Topics/AgenticRL-Survey]] / [[Topics/SelfEvolvingAgents-Survey]]）
+- **next_action**: 对 [[Ideas/CounterfactualProbe-EvolutionGate]] 与 [[Ideas/RetrievalMediated-MemoryMisevolution]] 跑 idea-evaluate（novelty-first）；daily-papers 关键词已扩充（self-evolving / misevolution / skill library 等），持续收集 evolution-step verifier gating 相关论文入 [[Topics/SelfEvolvingAgents-Survey]]
+- **confidence**: 0.45（假设已被外部实证、证据链完整；作为文献跟踪 + idea 孵化线产出确定性高，研究贡献路径依赖 idea 存活性与 AFE 侧衔接）
+
 ---
 
 ## Paused Directions
-
-### Self-Improving Agent Reliability
-
-- **priority**: low
-- **status**: paused
-- **origin**: researcher-discovered
-- **hypothesis**: Self-improving GUI Agent 的自增强循环中存在系统性验证偏差，需要外部纠错机制（adversarial verifier 或 self-grounded verification）防止偏差放大
-- **evidence**: [[Topics/GUIAgent-Survey]], [[2500-UiGenieSelfImproving]], [[Ideas/AdversarialVerification-SelfImproving-GUI]]
-- **pause_reason**: next_action（阅读 SGV / Self-Grounded Verification 论文）自 2026-05-07 起连续无法推进——vault 与 web search 均未找到该论文来源（见 Discussion Topics "SGV 论文来源 — 2026-05-07"）；其 verification debiasing 主题已被新方向 Agent-Facing Environment Runtime 的 [[Ideas/HybridVerifier-GUIRuntime]]（agent-facing cross-channel verifier 降低 reward hacking）更具体地承接
-- **resume_condition**: Supervisor 提供 SGV 论文 URL/标题，或出现新的 self-improving verification 论文，或 Agent-Facing Environment Runtime 实验显示需要独立的 self-improving 偏差研究
-- **confidence**: 0.15
-- **supervisor_note**: 2026-06-26 Supervisor 确认继续暂停
 
 ### Personal CUA Safety & Contextual Integrity
 
@@ -121,3 +119,4 @@ active_topic: GUI Agent
 - **context**: 该方向 6/26 确认暂停，resume_condition 之一为"出现新的 self-improving verification 论文"。7/9 [[Topics/SelfEvolvingAgents-Survey]] 确认该条件已满足：[[Papers/2509-Misevolution]]（ICLR 2026，rating 5）四路径 misevolution 实证 + Safety Risks in Experience-Driven Self-Evolving Agents (2604.16968) 正是等待中的实证论文，且完整验证了原 hypothesis（自增强循环存在系统性验证偏差、需外部纠错机制）。survey 同时定位方法空白 "evolution-step verifier gating"（四条演化路线中仅 tool/skill 内建验证关口）；7/14 已生成 2 个针对该空白的 raw idea（[[Ideas/CounterfactualProbe-EvolutionGate]]、[[Ideas/RetrievalMediated-MemoryMisevolution]]，均 18/25）；工业侧 [[Papers/2607-ABotAgentOS]] self-evolution 资产 8 存 1 亦印证
 - **question**: 是否 resume 该方向？三个选项：(a) resume 为独立 active direction（假设已被外部验证，证据链完整）；(b) 不独立 resume，将 evolution-step verifier gating 并入 AFE 的 verify affordance（由 [[Ideas/HybridVerifier-GUIRuntime]] 承接为第二应用场景）；(c) 维持 paused，先对 2 个 raw idea 做 idea-evaluate 再决策。Researcher 倾向 (c)→(b)：先评估 idea 存活性，存活则作为 AFE verify affordance 的应用场景推进，避免新开独立方向分散 primary 精力
 - **related_direction**: Self-Improving Agent Reliability, Agent-Facing Environment Runtime
+- **resolved**: 2026-07-21 Supervisor 决定 — **resume 为 active direction（medium），但 scope 限定文献侧**：只收集 paper → digest → survey → idea，不做实验；实验侧仍由 AFE verify affordance 承接。已执行：agenda 移入 Active、team-config 关键词扩充、2 个 raw idea 进入 idea-evaluate

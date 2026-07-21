@@ -67,6 +67,6 @@ mindmap
 
 ## Notes
 
-- **对 AFE 的证据价值（回溯轴闭环）**：WebOperator 是"环境不给、agent 自己造"的最新最强版本——checkpoint/snapshot/可逆性标注全部在 agent 侧用浏览器技巧模拟。三条推论：(1) 回溯需求真实且值钱（+8.39pp）；(2) agent 侧模拟的天花板 = 启发式噪声（37% destructive 确认率）+ 动态站点失效；(3) 这些恰是环境端零成本掌握的信息（写操作、状态序列化）——**动作可逆性元数据 + 原生 checkpoint 应是环境 affordance**，与 [[Papers/2510-WebServ]] 引擎侧快照互补，与 [[Topics/WebEnvironment-Engine-Survey]] Open Problem 2（fork 语义边界/动作可逆性显式建模）直接对应。
+- **对 AFE 的证据价值（回溯轴闭环）**：WebOperator 是"环境不给、agent 自己造"的最新最强版本——checkpoint/snapshot/可逆性标注全部在 agent 侧用浏览器技巧模拟。三条推论：(1) 回溯需求真实且值钱（+8.39pp）；(2) agent 侧模拟的天花板 = 启发式噪声（37% destructive 确认率）+ 动态站点失效；(3) 这些恰是环境端零成本掌握的信息（写操作、状态序列化）——**动作可逆性元数据 + 原生 checkpoint 应是环境 affordance**，与 [[Papers/2510-WebServ]] 引擎侧快照互补，与 [[Topics/AgentEnvironment-Survey]] Open Problem 2（fork 语义边界/动作可逆性显式建模）直接对应。
 - "naive tree search 反而掉分"修正了 [[Papers/2407-TreeSearchLMAgents]] 的叙事：回溯的价值有前置条件（可行性校验），环境提供可靠 fork 时这个前置条件自动满足。
 - destructive 后"树根重置"策略可对照 [[Papers/2605-GUIRobustEval]] 的 error-depth 恢复：前者绕开不可逆，后者训练面对它。

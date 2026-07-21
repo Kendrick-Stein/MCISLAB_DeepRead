@@ -101,4 +101,4 @@ mindmap
 
 - 对 [[Ideas/PersonalizedSafety-CUA]] 的直接影响：novelty 需要下调，因为 contextual disclosure benchmark 已经出现；但 evidence 和 impact 大幅上调，因为问题已被系统验证。
 - 和 [[Papers/2606-BraveGuard]] 的互补：BraveGuard 是 trajectory-level safety detection framework，AgentCIBench 是 personal disclosure evaluation harness。一个更完整的 research direction 是把 AgentCIBench 的 CI labels 做成 runtime guard / permission intervention，而不是只做离线评测。
-- 对 [[Topics/AgentFriendlyEnvironment-Survey]] 的补充：agent-facing state API 必须 privacy-aware。暴露更多 state 可能提升 task success，也可能放大 contextual disclosure risk。
+- 对 [[Topics/AgentEnvironment-Survey]] 的补充：agent-facing state API 必须 privacy-aware。暴露更多 state 可能提升 task success，也可能放大 contextual disclosure risk。

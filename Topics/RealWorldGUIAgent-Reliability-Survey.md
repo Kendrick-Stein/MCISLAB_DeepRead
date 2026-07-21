@@ -12,7 +12,7 @@ domain_map: GUI-Agent
 
 ## Overview
 
-GUI Agent 从 grounding/benchmark 竞赛走向真实部署时，暴露出一个被静态评测系统性掩盖的问题：**在真实、长程、动态的界面环境中，agent 无法稳定完成任务**。这不是"再高几个点 accuracy"的问题，而是可靠性（reliability）问题——同一个在 curated benchmark 上得高分的模型，遇到网络延迟、渲染延迟、权限弹窗、账号风控、支付验证、动态内容时会**未检测地失败、反复空转、错误累积直至崩溃**。本综述聚焦 **agent-侧的真实执行可靠性**（execution stability + abnormal-state handling + error recovery），与已有的 [[Topics/GUI-Environment-Survey]]（环境/testbed 侧）和 [[Topics/GUIAgent-Survey]]（宽领域）互补。
+GUI Agent 从 grounding/benchmark 竞赛走向真实部署时，暴露出一个被静态评测系统性掩盖的问题：**在真实、长程、动态的界面环境中，agent 无法稳定完成任务**。这不是"再高几个点 accuracy"的问题，而是可靠性（reliability）问题——同一个在 curated benchmark 上得高分的模型，遇到网络延迟、渲染延迟、权限弹窗、账号风控、支付验证、动态内容时会**未检测地失败、反复空转、错误累积直至崩溃**。本综述聚焦 **agent-侧的真实执行可靠性**（execution stability + abnormal-state handling + error recovery），与已有的 [[Topics/AgentEnvironment-Survey]]（环境/testbed 侧）和 [[Topics/GUIAgent-Survey]]（宽领域）互补。
 
 本领域最强的共识信号是 **"真实长程/组合工作流远未饱和"**（vault validated insight）：跨多个真实 benchmark、跨任务类型、跨平台，frontier model 的端到端成功率一致偏低——[[Papers/2605-SaaSBench]] resolved 3.8%、[[Papers/2606-OSWorld2]] 20.6% binary completion、[[Papers/2604-WindowsWorld]] ~20%、[[Papers/2604-ClawEvalLive]] 66.7%（无一超 70%）、[[Papers/2605-AndroidDaily]]（闭源真实 App）62.0%。这条低水位证据链说明：真实场景难度被静态 benchmark 系统性低估，且天花板反映的是 capability gap 而非评测噪声。
 

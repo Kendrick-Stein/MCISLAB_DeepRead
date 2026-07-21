@@ -317,4 +317,4 @@ MEM（video encoder + language memory 解耦，15min 任务）、EchoVLA（PHC+h
 - **affordance grounding（主线一）**：[[2606-AffordGen]]（affordance 作 demo generation 先验）、[[2510-A0AnAffordance]]（spatial affordance + low-level execution 解耦）、[[2510-CoAVLA]]（Chain-of-Affordance）、[[2506-AffordDP]]（transferable affordance 接 diffusion policy）、[[2510-RAGNet]]（reasoning-based affordance benchmark 273k）。
 - **think/reason before act（主线二）**：[[2506-CoTVLA]]（先生成 subgoal image）、[[2606-ACoTVLA]]（CoT 转到 action space）、[[2606-TRMVLA]]（keyframe-triggered reasoning + memory）、[[2606-AVAVLA]]（POMDP 历史条件策略，LIBERO 98%）、[[2606-HiFVLA]](motion vector 当低维 history)。
 - **test-time 纠错**：[[2606-AffordanceFieldInterventio]] ⭐4（用 3D affordance field 检测并 rollback VLA 的 "Memory Trap"，不改参数）。
-- **takeaway**：共同假设是端到端 VLA 缺显式中间结构（affordance / CoT / 3D geometry），加可解释中间表示提升 OOD 与 long-horizon;与 [[Topics/Embodied-Reasoning-Survey]] 的 embodied CoT 线索呼应。
+- **takeaway**：共同假设是端到端 VLA 缺显式中间结构（affordance / CoT / 3D geometry），加可解释中间表示提升 OOD 与 long-horizon;与 [[Topics/EmbodiedAI-Survey]] 专题一的 embodied CoT 线索呼应。

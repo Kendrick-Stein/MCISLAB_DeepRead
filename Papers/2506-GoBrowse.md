@@ -65,6 +65,6 @@ mindmap
 
 ## Notes
 
-- **对 AFE 的证据价值（map + init affordance 的数据侧实证）**：Go-Browse 的图发现 = 在数据采集时手工构建了 [[Topics/AgentFriendlyEnvironment-Survey]] AFE Protocol 的 `map()`（route graph）；prefixed sampling = 轴 1 L3"可编程注入中间态"的价值证明（深节点成功率、弱模型 bootstrap）。**这两个 affordance 目前只在训练管线里用，没暴露给推理时的 agent**——与 WebOperator 的 checkpoint 同属"engine 能力被 trainer 独占"的证据。
+- **对 AFE 的证据价值（map + init affordance 的数据侧实证）**：Go-Browse 的图发现 = 在数据采集时手工构建了 [[Topics/AgentEnvironment-Survey]] AFE Protocol 的 `map()`（route graph）；prefixed sampling = 轴 1 L3"可编程注入中间态"的价值证明（深节点成功率、弱模型 bootstrap）。**这两个 affordance 目前只在训练管线里用，没暴露给推理时的 agent**——与 WebOperator 的 checkpoint 同属"engine 能力被 trainer 独占"的证据。
 - "reset 频率 ↔ URL 覆盖"的权衡是 reset 成本进入数据质量的直接量化——WebServ 式 O(1) 快照可以让这个权衡消失（每任务独立 fork）。
 - OOD 崩塌（21.7%→5.33%）与 [[Papers/2410-NNetNav]] 的 WebArena→live 9.5% 一致：**沙盒合成数据的站点绑定问题是任务供给家族的共同软肋**，支持 survey 轴 5 "任务多样性>单站深度"的推断。

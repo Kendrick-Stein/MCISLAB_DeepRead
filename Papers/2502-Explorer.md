@@ -67,4 +67,4 @@ mindmap
 ## Notes
 
 - 任务供给轴的"规模极点"：与 [[Papers/2410-NNetNav]]（hindsight，1 万条）比，Explorer 用半结构化流水线换了一个数量级的规模（9.4 万条）；与 [[Papers/2502-InSTA]]（15 万站但任务更浅）比，Explorer 轨迹更长（7.7 步）更多模态。三者共享同一个天花板：**live 环境无 verifier → LLM judge 噪声（~19%）+ 无状态修改任务**。
-- $0.28/条的单位成本 + "数据 scaling 单调涨"给 [[Topics/WebEnvironment-Engine-Survey]] 轴 5 提供了供给侧经济学数据点：任务供给的成本瓶颈已经不在采集而在**可验证性**。
+- $0.28/条的单位成本 + "数据 scaling 单调涨"给 [[Topics/AgentEnvironment-Survey]] 轴 5 提供了供给侧经济学数据点：任务供给的成本瓶颈已经不在采集而在**可验证性**。

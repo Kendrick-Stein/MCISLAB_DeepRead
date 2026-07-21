@@ -83,7 +83,7 @@ mindmap
 
 ## Notes
 
-- **对 AFE / 环境引擎方向的定位**：DreamGym 是 [[Topics/WebEnvironment-Engine-Survey]] "环境能力与模型能力互相替代"（Takeaway 3）的训练侧极点——环境引擎六轴全部缺失时（WebArena：4 并发 + 手动 reset + 评测误判），最优解干脆是**放弃真实环境**。它与 [[Papers/2510-WebServ]] 构成同一需求的两个对偶解：WebServ 把引擎做便宜（240× 存储、O(1) 快照），DreamGym 把引擎做没（合成经验）。两者的竞争边界正是 Theorem 1 的 ε_R/ε_P：**当真实引擎的并行/reset 成本降到合成推理成本以下、或任务要求的转移保真超出 LLM 先验时，天平倒向引擎**。
+- **对 AFE / 环境引擎方向的定位**：DreamGym 是 [[Topics/AgentEnvironment-Survey]] "环境能力与模型能力互相替代"（Takeaway 3）的训练侧极点——环境引擎六轴全部缺失时（WebArena：4 并发 + 手动 reset + 评测误判），最优解干脆是**放弃真实环境**。它与 [[Papers/2510-WebServ]] 构成同一需求的两个对偶解：WebServ 把引擎做便宜（240× 存储、O(1) 快照），DreamGym 把引擎做没（合成经验）。两者的竞争边界正是 Theorem 1 的 ε_R/ε_P：**当真实引擎的并行/reset 成本降到合成推理成本以下、或任务要求的转移保真超出 LLM 先验时，天平倒向引擎**。
 - Theorem 1 与 [[Papers/2605-MobileGym]] 的 95.1% sim-to-real retention 互为理论-实证：环境价值在"学习相关信号"（reward 正确 + 转移域一致）而非像素/DOM 复刻——这直接支持 AFE 的立场：affordance 暴露的是 state-transition 语义层。
 - Appendix A.3 三条证词（4 并发上限 / 手动 sweep-reset / 官方评测函数误判）是 survey 第五幕和并行轴的第一手引用源，已核实原文。
 - 但注意其反面：DreamGym 的"经验模型当 reward"与 [[Ideas/HybridVerifier-GUIRuntime]] 的方向相反（后者主张 verifier 靠环境状态可观测性）；若在支持 fork/verify 的引擎（WebServ/WebHarbor）上做 S2R，ε_R 可以用程序化 verifier 压到接近 0——**"合成转移 + 真实 verifier"的混合可能优于两个纯路线**，这是一个可写进 AFE 讨论的具体 idea 种子。

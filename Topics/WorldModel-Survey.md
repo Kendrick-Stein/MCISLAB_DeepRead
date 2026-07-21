@@ -1,10 +1,10 @@
 ---
 title: World Model Survey
-tags: [world-model, agent, simulation, planning, MBRL]
-date_updated: "2026-04-28"
+tags: [world-model, agent, simulation, planning, MBRL, VLA, diffusion-policy, cross-embodiment]
+date_updated: "2026-07-20"
 year_range: 2024-2026
 papers_analyzed: 19
-keywords: [world model, video prediction, dynamics model, mbrl]
+keywords: [world model, video prediction, dynamics model, mbrl, world action model, action-conditioned, diffusion policy, cross-embodiment]
 domain_map: WorldModel
 ---
 ## Overview
@@ -75,9 +75,9 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 
 **缺点**：Temporal dynamics / action 缺失（本质是 scene generator 而非 world model）；数据稀缺；精度-压缩权衡。
 
-### 4. Unified Video-Action / VLA+WM Joint Models
+### 4. Unified Video-Action / VLA+WM Joint Models（即 World Action Model, WAM）
 
-**核心思路**：把 VLA（policy）、forward dynamics（WM）、inverse dynamics、video generation 统一进一个模型，通过 timestep / mask 切换。
+**核心思路**：把 VLA（policy）、forward dynamics（WM）、inverse dynamics、video generation 统一进一个模型，通过 timestep / mask 切换。这条路线在 2026 被正式命名为 **World Action Model（WAM）**（DreamZero 定义），核心 claim 是 "world models are implicit policies"——video generation 天然具备的时空动态理解可直接转化为 motor control；WAM 不是 VLA 的替代而是演进，差异化优势在于能自然利用海量 action-free video 数据（UWM cotraining / DreamGen neural trajectories / Motus optical-flow latent action 各自验证了这一点），DreamZero unseen tasks 上比最优 VLA 高 2 倍以上的泛化正来自 world modeling。
 
 **代表工作**：
 - [[2504-UWM|UWM]]（RSS 2025, UW & TRI）：**"diffusion timestep ≡ soft mask"**——给 action 和 future obs 独立采样 timestep，推理时切换 policy / forward dynamics / inverse dynamics / video prediction 四个条件分布。DROID 2K 预训练 + 5 个 Franka 任务全面超 DP/PAD/GR1
@@ -156,8 +156,11 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 | ItTakesTwo | 多人游戏 | FVD, PSNR | MultiWorld | Multi-agent gaming |
 | RoboFactory | 多机械臂 | Action Accuracy | Concat-View 92.0 | Robot manipulation |
 | LIBERO | - | Success Rate | dWorldEval, CF-VLA 83.0% | Robotic policy evaluation |
-| RoboTwin | - | Success Rate | dWorldEval | Robotic manipulation |
+| RoboTwin | - | Success Rate | 87.02% (Motus，超 π0.5 45%) | Robotic manipulation |
 | CALVIN | - | Success Rate | CF-VLA | Long-horizon manipulation |
+| Push-T | 推块任务 | IoU | 0.961 (IRASim model-based planning) | Planar manipulation，policy evaluation 与 GT simulator 相关度 0.99 |
+| DreamGen Bench | 22 novel behaviors | Success Rate | DreamGen | World model 泛化评测（新动词/新环境解锁） |
+| TokenBench | Video tokenizer | PSNR / FVD | PSNR 35.85 (Cosmos) | Video tokenizer 质量评测 |
 
 ## Key Takeaways
 
@@ -194,9 +197,11 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 13. **World Model for GUI Agent 的 grounding 问题**：如何与 grounding robustness 结合？
 14. **Progress token 作为 L3 Evolver 信号**：能否用于自主修正触发？
 15. **Plan locality 的适用边界**：是否适用于所有 embodied tasks？
+16. **WAM 的 scaling laws 未知**：DreamGen 展示 log-linear scaling 趋势，但 Motus/DreamZero 的 scaling behavior 未被系统研究；video vs action 之间的 optimal compute allocation 无结论——这决定 WAM 范式是否值得学术实验室以外的算力投入（参见 Open Problem 8 可复现性断层）。
 
 ## 调研日志
 
+- **2026-07-20 合并 WorldActionModel-Survey**（Supervisor 指示同方向 survey 整合）：该 survey 的 8 篇论文（DreamZero/UWM/Motus/DreamGen/World-VLA-Loop/IRASim/Cosmos/RWM）本已全部覆盖于路线 1/2/4/5，属完全子集。本次仅并入其独有内容：路线 4 标题补 WAM 命名与 "world models are implicit policies" 范式定义、action-free video data 优势论证；Benchmark 表 +Push-T/DreamGen Bench/TokenBench；Open Problem +16（WAM scaling laws）。原文见 git history。
 - **调研日期**: 2026-04-28
 - **论文统计**: vault 已有 4 篇（Archive）+ 2 篇（Papers）+ 新创建 6 篇 + 补充 4 篇（World-R1, dWorldEval, EmotionPose, AgenticCache）+ VLA 相关 3 篇（M²-VLA, Tube Diffusion Policy, CF-VLA）= 19 篇
 - **未能获取**: 无（基于已有月度总结和 candidates.json 创建笔记）

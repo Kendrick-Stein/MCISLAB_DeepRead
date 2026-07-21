@@ -29,7 +29,7 @@ domain_map: GUI-Agent
 - **2025 下半年**：三线并发——agent 侧树搜索卷向效率与安全（[[Papers/2510-BranchAndBrowse]]、[[Papers/2512-WebOperator]]）；training-time 树 rollout 在无状态工具环境落地（[[Papers/2509-TreeGRPO]]、ARPO 家族）；**系统社区正式认领问题**（[[Papers/2510-AgenticExplorationSystems]]：六种 snapshot 机制全部太慢，提出 fork 语义/外部副作用/原生 fork 三大挑战）；引擎侧 O(1) 容器分支就绪（[[Papers/2510-WebServ]]）。
 - **2026**：sandbox 域出现完整 runtime（[[Papers/2604-Crab]]：agent-facing rollback API + speculative execution + RL 分支四场景统一）；rollback 进入训练数据管线（[[Papers/2606-SRC]]）；step 级 MCTS 在 OSWorld 超越任务级 BoN 与人类（[[Papers/2602-AgentAlpha]]）；branch point 进入 SFT 数据合成（[[Papers/2602-ANCHOR]]）；multi-agent 并行获得首个受控定量研究（[[Papers/2512-ScalingAgentSystems]]）与 MARL 训练先例（[[Papers/2602-WideSeekR1]]）。
 
-**核心张力**：不可逆性既是技术问题也是安全问题。live web 上动作不可逆 → 分支探索被限制在沙盒/副本（realism 受损）或退化为想象模拟（[[Papers/2411-WebDreamer]] 拿到真实搜索 ~70% 收益）；引擎快照解决技术不可逆，但外部副作用（邮件、支付、第三方 API）的不可逆没有任何快照能恢复（[[Papers/2510-AgenticExplorationSystems]] Challenge 2、[[Papers/2512-WebOperator]] 可逆性四分类、[[Topics/WebEnvironment-Engine-Survey]] Open Problem 2 三方汇合）。
+**核心张力**：不可逆性既是技术问题也是安全问题。live web 上动作不可逆 → 分支探索被限制在沙盒/副本（realism 受损）或退化为想象模拟（[[Papers/2411-WebDreamer]] 拿到真实搜索 ~70% 收益）；引擎快照解决技术不可逆，但外部副作用（邮件、支付、第三方 API）的不可逆没有任何快照能恢复（[[Papers/2510-AgenticExplorationSystems]] Challenge 2、[[Papers/2512-WebOperator]] 可逆性四分类、[[Topics/AgentEnvironment-Survey]] Open Problem 2 三方汇合）。
 
 ## 三原语的能力语义：agent 以前缺什么、现在如何获得
 
@@ -73,7 +73,7 @@ domain_map: GUI-Agent
 - **搜索行为蒸馏**：[[Papers/2410-ExACT]] Exploratory Learning 把 R-MCTS 搜索树摊平成单轨迹微调，教模型自主 explore/evaluate/backtrack——1/4 token 恢复 ~87% 搜索性能，且 test-time scaling 曲线优于 imitation learning。
 - **内化的极限**：ExACT 恢复 87% 而非超越；[[Papers/2408-AgentQ]] 训练后模型 81.7% vs +search 95.4%——**训练不消除搜索的独立价值**，两代工作一致。
 
-该路线与引擎路线竞争同一预算（[[Topics/WebEnvironment-Engine-Survey]] Takeaway 3）：引擎每把分支成本降一个数量级，想象/内化路线的必要性就削弱一分；反之内化后的 backtrack 动作在部署时仍需环境支持——两条路线长期互补而非互斥。
+该路线与引擎路线竞争同一预算（[[Topics/AgentEnvironment-Survey]] Takeaway 3）：引擎每把分支成本降一个数量级，想象/内化路线的必要性就削弱一分；反之内化后的 backtrack 动作在部署时仍需环境支持——两条路线长期互补而非互斥。
 
 ### 路线 3：引擎级原语——系统侧供给 snapshot/fork/checkpoint
 
@@ -96,7 +96,7 @@ domain_map: GUI-Agent
 3. **rollback 造纠正/恢复数据**：[[Papers/2606-SRC]] K 步试探分支 + teacher 定位回退 + QD archive，WebArena-Infinity +9.7pp / OSWorld +12.9pp（恢复实现 = reset+replay，作者自列 resettable 假设为局限）；[[Papers/2605-GUIRobustEval]] 从环境侧注入 error-depth 初态合成 80 万恢复样本；[[Papers/2506-GoBrowse]] prefixed sampling 让弱模型从中间态起步贡献数据（reset 频率直接决定 URL 覆盖 183→260）。
 4. **branch point 造多样性数据**：[[Papers/2602-ANCHOR]] 在种子轨迹的 UI 状态变化节点分叉新任务变体（复用已验证前缀直达深层状态），1,777 条轨迹（$0.47/条）使 Qwen3-VL-8B OSWorld +3.7pp / WAA +7.7pp、超人工数据——branch 的训练侧用途从恢复行为扩展到任务多样性；分支结构本可提供的 step 级对比信号未被利用。
 
-基建侧的并行需求同源：[[Papers/2509-AgentGymRL]] 给 WebArena 补 full-reset、[[Papers/2606-AsyncWebRL]] 全异步 rollout、[[Papers/2509-DARTGUI]] 解耦架构 5.5× 环境利用率、[[Papers/2511-DreamGym]] "WebArena 只能开 4 并发"的第一手证词——trainer 侧对 parallel/reset 的需求已充分显影（详见 [[Topics/WebEnvironment-Engine-Survey]] 轴 3/4）。
+基建侧的并行需求同源：[[Papers/2509-AgentGymRL]] 给 WebArena 补 full-reset、[[Papers/2606-AsyncWebRL]] 全异步 rollout、[[Papers/2509-DARTGUI]] 解耦架构 5.5× 环境利用率、[[Papers/2511-DreamGym]] "WebArena 只能开 4 并发"的第一手证词——trainer 侧对 parallel/reset 的需求已充分显影（详见 [[Topics/AgentEnvironment-Survey]] 轴 3/4）。
 
 ### 路线 5：并行原语——wide scaling 与 speculative execution
 
@@ -177,7 +177,7 @@ domain_map: GUI-Agent
 - **论文统计**: vault 已有 25 篇直接相关 + 新 digest 8 篇（[[Papers/2504-WebRollback]]、[[Papers/2510-BranchAndBrowse]]、[[Papers/2410-ExACT]]、[[Papers/2408-AgentQ]]、[[Papers/2509-TreeGRPO]]、[[Papers/2510-AgenticExplorationSystems]]、[[Papers/2604-Crab]]、[[Papers/2606-SRC]]）= 33 篇深度分析
 - **摘要级引用（未建 Papers/ 笔记）**: LATS (2310.04406)、WebPilot (2408.15978, AAAI'25)、Plan-MCTS (2602.14083)、BacktrackAgent (EMNLP'25)、Intelligent Go-Explore (2405.15143, ICLR'25，archive+restore 血统)、ARPO (2507.19849, ICLR'26)、AEPO (2510.14545)、AT2PO (2601.04767)、GiGPO (2505.10978)、TreeRL (2506.11902)、WebSynthesis (2507)、Speculative Actions (2510.04371)、PASTE (2603.18897)、B-PASTE (2604.16469)、Sherlock (2511.00330)、TraceGraph (2605.31308)、Agent libOS (2606.03895)、Scaling Test-time Compute for LLM Agents (2506.12928)、WebUncertainty (ACL'26 findings)
 - **外部检索**: WebSearch 9 次 + OpenAlex 1 次（WebRollback/Branch-and-Browse 定位、ExACT/AgentQ/WebPilot ID 确认、Tree-GRPO/ARPO 家族、并行 scaling、speculative execution、agent-facing fork gap 核查——最后一项发现 Crab 与 AgenticExplorationSystems，推翻"完全空白"的先验）
-- **与 [[Topics/WebEnvironment-Engine-Survey]] 的关系**: 该综述做需求侧推导（引擎该长什么样），本综述做 related work 正面盘点（原语已被谁以何种形式实现/使用）；轴 4"第五用途空白"的表述经本轮修正为 Takeaway 4 的三条剩余空白
+- **与 [[Topics/AgentEnvironment-Survey]] 的关系**: 该综述做需求侧推导（引擎该长什么样），本综述做 related work 正面盘点（原语已被谁以何种形式实现/使用）；轴 4"第五用途空白"的表述经本轮修正为 Takeaway 4 的三条剩余空白
 - **建议加入 DomainMaps**: (a) GUI-Agent domain 增加"运行时原语三路线"（agent 侧模拟 / 模型内化 / 引擎原语）竞争框架；(b) "树方法落地顺序 = 状态重建成本排序"作为 cross-domain pattern 候选
 - **仍未 digest（供后续）**: Intelligent Go-Explore（archive/restore 血统的正式笔记）、ARPO 2507.19849（熵分支的代表作）、WebPilot（MCTS 家族补全）、UI-Simulator (2510.14969)、AgentSynth (2506.14205)、WAC (2602.15384)
 - **增量更新 2026-07-20**（Supervisor 重提：并行/分支/回溯，训练/测试两角度 + multi-agent + 浏览器分支）：新 digest 4 篇——[[Papers/2602-AgentAlpha]]（路线 1，step 级 MCTS 刷新 OSWorld）、[[Papers/2602-ANCHOR]]（路线 4 新增用途 4：branch point 数据工厂）、[[Papers/2512-ScalingAgentSystems]]、[[Papers/2602-WideSeekR1]]（路线 5 新增组织式并行形态）；[[Papers/2505-BacktrackAgent]] 由摘要级升级为正式笔记引用。摘要级新增：GUI Exploration Lab (2512.02423, NeurIPS'25，多轮 RL 中回溯行为自发涌现)、ParallelMuse (2510.24698)、Share-More-Search-Less (2605.27030)、Agent-as-Tool/ParaManager (2604.17009)、LAMaS (2601.10560)。外部检索：WebSearch 3 次。矩阵 +3 行，Takeaway 5 补 2026-07 证据。

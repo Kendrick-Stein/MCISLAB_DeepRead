@@ -1,12 +1,14 @@
 ---
 title: 面向云手机复杂任务的高效可靠 GUI VLA 模型技术报告
-tags: [survey, gui-agent, VLA, cloud-phone, reliability, efficient-inference]
+tags: [report, gui-agent, VLA, cloud-phone, reliability, efficient-inference]
 date_updated: "2026-07-01"
 scope: "任务书技术诉求对齐版"
 evidence: "本地 notebook 论文笔记 + 远程论文/代码检索"
 keywords: [cloud phone, android agent, gui vla]
 domain_map: GUI-Agent
 ---
+
+> 2026-07-20 自 Topics/ 移入 Reports/：本文是面向特定任务书的某一时点技术报告（SPEC §5.3），非持续更新的 survey。
 
 # 面向云手机复杂任务的高效可靠 GUI VLA 模型技术报告
 

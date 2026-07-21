@@ -26,7 +26,7 @@ title: Ideas
 | [[Ideas/ForkPoint-CreditAssignment-GUI]] | raw | GUIAgent-Survey | Fork-point detection for long-horizon credit assignment |
 | [[Ideas/ScaleInvariant-Grounding-GUI]] | raw | GUIAgent-Survey | FPN-like scale handling for GUI grounding |
 | [[Ideas/AdversarialVerification-SelfImproving-GUI]] | raw | GUIAgent-Survey | Adversarial verifier for self-improving bias correction |
-| [[Ideas/AgentFacing-WebRuntime]] | validated | AgentFriendlyEnvironment-Survey | Non-oracle runtime affordances for zero-training web agents |
+| [[Ideas/AgentFacing-WebRuntime]] | validated | AgentEnvironment-Survey | Non-oracle runtime affordances for zero-training web agents |
 | [[Ideas/HybridVerifier-GUIRuntime]] | raw | GUI Environment / WeaveBench | Agent-facing cross-channel verifier to reduce reward hacking |
 | [[Ideas/EvidenceDependence-GUIGrounding]] | raw | VisualFLIP / GUI grounding | Action Collapse Rate for counterfactual GUI evidence dependence |
 | [[Ideas/PersonalizedSafety-CUA]] | raw | MyPCBench / BraveGuard | Task-scoped permission + trajectory privacy guard for personal CUA |

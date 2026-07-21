@@ -10,7 +10,7 @@ domain_map: GUI-Agent
 
 ## Overview
 
-Web Agent 是一类以 LLM/VLM 为大脑、在**浏览器/网页环境**中根据自然语言指令自主完成任务的 agent。它是 GUI/Computer-Use Agent 家族里**最早成形、也最先规模化**的分支：网页是标准化（HTML/DOM/AXTree）、可无限获取、且承载了电商、办公、政务、检索等绝大多数真实数字工作流，因此 web 天然成为 agent 落地的第一战场。本综述聚焦 **web 模态特有** 的问题，与已有的 [[Topics/ComputerUseAgents-Survey]]（desktop/OS 侧）、[[Topics/GUIAgent-Survey]]（宽领域）、[[Topics/GUI-Environment-Survey]]（环境基建）、[[Topics/RealWorldGUIAgent-Reliability-Survey]]（可靠性）互补——后四者不覆盖 web agent 独有的 **deep-research 信息检索支线** 与 **indirect/environmental prompt injection** 安全面。
+Web Agent 是一类以 LLM/VLM 为大脑、在**浏览器/网页环境**中根据自然语言指令自主完成任务的 agent。它是 GUI/Computer-Use Agent 家族里**最早成形、也最先规模化**的分支：网页是标准化（HTML/DOM/AXTree）、可无限获取、且承载了电商、办公、政务、检索等绝大多数真实数字工作流，因此 web 天然成为 agent 落地的第一战场。本综述聚焦 **web 模态特有** 的问题，与已有的 [[Topics/GUIAgent-Survey]]（方法总览，含 desktop/computer-use 架构谱系）、[[Topics/AgentEnvironment-Survey]]（环境基建）、[[Topics/RealWorldGUIAgent-Reliability-Survey]]（可靠性）互补——后三者不覆盖 web agent 独有的 **deep-research 信息检索支线** 与 **indirect/environmental prompt injection** 安全面。
 
 **核心问题分三层**：(1) **感知**——如何观察网页（DOM 文本 / 截图像素 / Set-of-Marks 混合），如何把语言指令 ground 到可操作元素；(2) **决策**——如何在长程、多标签页、状态可变的网页上规划并执行动作序列，并在出错时觉察与恢复；(3) **学习与评测**——用什么环境/数据训练，用什么 benchmark 可信地衡量真实能力。
 
@@ -65,7 +65,7 @@ Web agent 的第一个设计轴是**"给模型看什么"**：
 
 ### 5. 环境与数据基础设施
 
-"在什么上面训练/评测"是 web agent 的根本瓶颈（详见 [[Topics/GUI-Environment-Survey]]）：
+"在什么上面训练/评测"是 web agent 的根本瓶颈（详见 [[Topics/AgentEnvironment-Survey]]）：
 
 - **Self-hosted 真实站点**：[[Papers/2307-WebArena]]（GitLab/Magento/Reddit/CMS Docker 化）——高真实、可复现，但站点数少。
 - **Docker mirror 真实站点**：[[Papers/2600-WebHarbor]] 用 coding agent 把真实网站"dock"成本地 mirror（WebVoyager 15 站），保留视觉/账号/checkout 深功能 + 可 reset + human review 保真——真实与可控的折中。

@@ -68,4 +68,4 @@ mindmap
 
 - **对 AFE 的证据价值**：这是"回溯 affordance 需求"的原点论文——agent 侧已证明搜索/回溯有大收益（+39.7%），但只能用 reset+replay 在沙盒里模拟，说明环境端缺一个原生 `checkpoint()/restore()`。[[Papers/2510-WebServ]] 的 block-level snapshot 正是对这个缺口的工程回应；[[Papers/2411-WebDreamer]] 则是绕开缺口的 world-model 路线。
 - 后续 WebOperator (2512.12692) 指出本文及 LATS/WebPilot 等都**隐含假设所有动作可逆**，提出 action-aware 安全回溯——需求进一步细化为"环境应显式标注动作可逆性"。
-- 与 [[Topics/AgentFriendlyEnvironment-Survey]] 的 AFE Protocol `recover()` 接口直接对应。
+- 与 [[Topics/AgentEnvironment-Survey]] 的 AFE Protocol `recover()` 接口直接对应。

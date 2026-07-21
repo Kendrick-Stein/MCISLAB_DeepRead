@@ -83,6 +83,6 @@ Read 其分类框架与 Key Takeaways。Related Work 的段落划分优先沿用
 ## Examples
 
 `/related-work ~/papers/afe/main.tex "agent-facing environment" 4` →
-借 Topics/AgentFriendlyEnvironment-Survey 的分类起草 4 段（GUI agents、agent 环境与
+借 Topics/AgentEnvironment-Survey 的分类起草 4 段（GUI agents、agent 环境与
 benchmark、verifier/reward、runtime affordance），28 个 cite 全部来自 references.bib，
 missing 清单 2 篇。

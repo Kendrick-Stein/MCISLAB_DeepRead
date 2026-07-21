@@ -20,7 +20,9 @@ GUI Agent 的研究前沿，已经从“识别屏幕并生成动作”推进到�
 
 研究对象覆盖 Web、Mobile、Desktop 与 GUI+API/CLI 混合操作；能力层级从 element grounding、single-step action 延伸到 app workflow、cross-app long-horizon task、主动澄清与受约束的 proactive assistance。只有直接研究 UI observation、GUI action、computer-use environment、GUI verifier 或部署期 safety/HCI 的工作进入本综述。纯 Deep Research、通用 Agentic RL、通用 VLM/World Model 与 Embodied Agent 仅作为邻接证据，不因使用相似模型或术语而并入。
 
-这一问题经历了五次可辨认的抽象升级：
+这一问题经历了五次可辨认的抽象升级，每次跃迁都由上一阶段的结构性瓶颈驱动。结构化接口路线用 DOM/AXTree 与 element action 把自然语言目标转成可执行 navigation，但对网页结构的依赖阻断了向 canvas、mobile 与 desktop 的迁移，screenshot-native 遂以高分辨率视觉与 coordinate grounding 换取跨平台观察；跨平台之后，局部 grounding 与长程成功的脱节转而成为主要矛盾，agent-system 化把 grounding、planning、memory 与 tool use 分给专用模块，却引入模块误差级联与状态所有权不清。
+
+静态分工无法自我修正，闭环学习于是以 task/state/verifier 共生成与 online RL 让真实交互产生可学习 reward，而 task validity、rollout 吞吐与 verifier 偏差随即构成新上限——其共同根源是“成功”本身不可检查。刚进入萌芽期的可问责系统因此把 belief provenance、explicit task state、semantic action 与 oversight 提为一等对象，将端到端成功拆成可检查的状态转移，但跨层因果证据、安全边界与人类注意力尚未闭合。各阶段的抽象、动因与代表证据见下表：
 
 | 阶段 | 主导抽象 | 解决的旧问题 | 新暴露的瓶颈 | 代表证据 |
 |:--|:--|:--|:--|:--|
@@ -78,17 +80,17 @@ flowchart LR
 
 ### 2.1 Observation 与 Grounding
 
-GUI observation 有三种基本形态：
+GUI observation 的三种基本形态对应一条清晰的发展线。最早的 web agent 依赖结构化输入——DOM / AXTree / element ID token-efficient 且便于精确操作，先解决了把自然语言目标转成可执行 navigation 的问题；但这一表示对 canvas、远程桌面和跨平台迁移脆弱，随着研究对象从 self-hosted web 扩展到 mobile 与 desktop，screenshot-only 取而代之成为通用路线：它与人类可见状态一致，跨平台性最强，代价是小目标、密集布局和动态页面使 grounding 成为显式瓶颈。
 
-- **结构化输入**：DOM / AXTree / element ID token-efficient 且便于精确操作，但对 canvas、远程桌面和跨平台迁移脆弱。
-- **Screenshot-only**：与人类可见状态一致，跨平台性最强，但小目标、密集布局和动态页面使 grounding 成为显式瓶颈。
-- **Hybrid observation**：screenshot + DOM/AXTree + bbox/SoM 兼顾语义和视觉，是工程上的主流折中；若没有 provenance、freshness 与一致性检查，更多通道也会把 stale structure 变成更强的错误证据。
+工程实践因此收敛到 hybrid observation：screenshot + DOM/AXTree + bbox/SoM 兼顾语义和视觉，是工程上的主流折中。但通道叠加暴露了新问题——若没有 provenance、freshness 与一致性检查，更多通道也会把 stale structure 变成更强的错误证据：当结构通道滞后于界面真实状态时，“信息更多”反而为模型跟随过期证据提供了更强的理由。
 
 [[Papers/2312-CogAgent]] 用 dual-resolution 视觉架构证明高分辨率 screenshot-only 输入可以超过 HTML-based 大模型；[[Papers/2408-OmniParser]] 代表把 detector、OCR 与 icon caption 组合成可插拔 perception layer 的路线。[[Papers/2602-ToolTok]] 进一步把绝对坐标改成离散 tool token 与 coarse-to-fine pathfinding，4B 模型用约 5K synthetic + 2K real samples 达到 ScreenSpot-Pro 61.1%，但尚未证明这种局部 grounding 优势能稳定传递到 long-horizon execution。
 
 [[Papers/2607-GUIStateBelief]] 改变了“hybrid observation 信息更多、因而更可靠”的默认判断。735 个跨 Web、Mobile、Desktop 的 paired probes 显示，模型在 image-only 读取接近饱和时，仍会在冲突下跟随 stale structure；真实网页中的结构跟随率最高达 0.88。在最多六步、首步冲突已导致 structure-following error、且 aligned twin 至少需要两步的 MiniWoB++ click-style episodes 中，self-recovery 不超过 0.03。prompt 级 pixel-priority cue 到 action 层失效，而 training-free consistency gate 才同时降低 hijack 与 task error，说明 fusion failure 不能只靠扩大视觉模型解决。
 
 ### 2.2 Action Representation
+
+动作表示的发展线是从裸坐标走向携带更多语义与验证信息的动作对象：coordinate action 以平台无关、与 screenshot 对齐为起点，element-ID 与 structured GUI action 换取精确与易验证，semantic action object 进一步把 target、affordance、provenance 与 verification cue 一体化，GUI + API/CLI 混合则允许绕开重复低效的界面操作。贯穿这条线的核心分歧是平台无关性与可验证性的取舍——越依赖像素越可跨平台，越依赖结构越可核验、也越受 DOM/AXTree 可用性约束。
 
 | 表示 | 优点 | 主要失败模式 | 代表工作 |
 |:--|:--|:--|:--|
@@ -103,6 +105,8 @@ GUI observation 有三种基本形态：
 统一 Agent 不等于统一动作 token。跨平台模型必须保留 platform convention 或显式路由，否则 mixed-SFT 会让 desktop/mobile 的交互规则相互污染；[[Papers/2607-UIMOPD]] 的 platform-conditioned distillation 就是在解决这一冲突。[[Papers/2607-Tactile]] 则把问题从“预测哪个动作 token”推进为“runtime 能否暴露可执行且可核验的动作对象”：Codex Success@100 从 41.1% 提到 50.0%，但 Limited-AX 场景只提升 5.55 个百分点，说明 semantic action 的上限仍受环境结构质量约束。
 
 ### 2.3 Model-level 与 Agent-system-level 架构
+
+Native end-to-end 与 compositional 之争的现状不是一方取代另一方，而是失败可诊断性与数据闭环之间的取舍：前者数据闭环简单、跨平台迁移自然，但错误难隔离；后者组件可替换、失败可诊断，代价是 latency 与 cascading error。
 
 | 架构 | 机制 | 强项 | 边界 |
 |:--|:--|:--|:--|
@@ -138,6 +142,8 @@ SFT 负责注入动作语法、界面知识与基本轨迹模式；RL 只有在 
 
 ### 3.2 RL 决策条件
 
+下表是前置诊断清单而非算法对比：它回答 RL 是否值得做、失败时先修什么，而不是选哪种 policy-gradient 变体。任何一项前置变量不满足时，正确的响应通常是先补数据、修 verifier 或改环境，而不是继续调整算法。
+
 | 前置变量 | 诊断 | 失败时优先选择 | 证据 |
 |:--|:--|:--|:--|
 | Sampling headroom | base policy 的 pass@k 是否明显高于 pass@1 | 无 headroom 时补 SFT / mid-training / expert data | [[Papers/2607-GRPONullWebAgent]] |
@@ -156,16 +162,13 @@ SFT 负责注入动作语法、界面知识与基本轨迹模式；RL 只有在 
 
 ### 3.3 Credit Assignment 与 Reward Design
 
-长程 GUI task 的核心矛盾是：outcome reward 可信但稀疏，process reward 密集但容易被 judge 偏差与 reward hacking 污染。现有解法可归为四类：
-
-1. first-failure / fork-point 定位，把成功与失败轨迹的最早分叉作为监督；
-2. milestone / progress reward，把成功轨迹中的可验证状态转成中间信用；
-3. tree rollout，用兄弟子树回报差免费得到 step-level signal；
-4. interactive verifier，让评估器主动取证而不是仅看文本或最后截图。
+长程 GUI task 的核心矛盾是：outcome reward 可信但稀疏，process reward 密集但容易被 judge 偏差与 reward hacking 污染。现有解法可以按对 outcome-only reward 的改造深度排成四条路线。改动最小的是 first-failure / fork-point 定位：不引入新的 reward 形式，只把成功与失败轨迹的最早分叉作为监督，代价是依赖可对比的成对轨迹。milestone / progress reward 更进一步，把成功轨迹中的可验证状态转成中间信用，信号密度提高的代价是中间信用可能与真实 outcome 脱钩。tree rollout 转而利用轨迹的树结构，用兄弟子树回报差免费得到 step-level signal，把成本从 reward 设计转移到环境的 fork 与 reset 能力上。最后一条路线改造评估器本身：interactive verifier 让评估器主动取证而不是仅看文本或最后截图，以更高的评估成本换取对 hidden evidence 的访问。四条路线的共同规律是：信用越密集，对轨迹结构、环境能力与评估预算的额外要求就越高。
 
 [[Papers/2601-EvoCUA]] 与 [[Papers/2607-EvoCUA15]] 把任务、初始状态和 executable validator 共生成，并给出两个重要负结果：训练数据价值是 policy-relative；PRM 分数可以上升而真实 outcome 停滞。[[Papers/2602-VAGEN]] 代表主动取证路线，但其验证成本与 actor–verifier 共享动作空间下的新 reward-hacking 面仍未在大规模 RL 闭环中验证。
 
 ### 3.4 Self-improvement：参数化与非参数化
+
+Self-improvement 不是单一技术，而是按改进对象分化的四条路线：更新 model weights、积累 retrieved experience、沉淀可执行的 tool/skill asset、调整 workflow/harness 的 control flow。四条路线共享同一约束——verifier 独立性：无论演化发生在哪一层，验证信号都不能来自被改进的对象自身。
 
 | 路线 | 改进对象 | 代表机制 | 主要风险 |
 |:--|:--|:--|:--|
@@ -215,15 +218,11 @@ Trainer-facing 的并行、reset 和 deterministic judge 已相对成熟，Mobil
 
 ### 5.1 环境设计的三角约束
 
-GUI 环境同时追求 realism、controllability 与 scalability，但三者存在结构性冲突：
-
-- **Live / real-device** 最真实，却难以 reset、并行、复现和安全探索。
-- **Self-hosted real software** 可控且有真实功能，但站点/应用覆盖有限、维护成本高。
-- **Functional simulator / synthetic environment** 易 scale、易 fork，却可能丢失真实后端、异常态和视觉分布。
-
-因此环境工作应按能力规格比较，而不是只按“真实/合成”二分。
+GUI 环境同时追求 realism、controllability 与 scalability，但三者存在结构性冲突，现有三类供给形态实际上是同一三角约束下的三种取舍。Live / real-device 把 realism 推到最高，代价是难以 reset、并行、复现和安全探索，等于让渡了 controllability 与 scalability 的大部分；self-hosted real software 居中，可控且有真实功能，但站点/应用覆盖有限、维护成本高，scalability 成为它让渡的轴；functional simulator / synthetic environment 走向另一端，易 scale、易 fork，却可能丢失真实后端、异常态和视觉分布，把损失集中在 realism 一侧。三者没有绝对优劣，只是把冲突转移到不同的轴上；因此环境工作应按能力规格比较，而不是只按“真实/合成”二分。
 
 ### 5.2 六轴规格
+
+六轴构成环境的能力规格语言：任何环境都应沿这六条轴声明自己提供什么、缺什么，而不是笼统自称“真实”或“可控”。训练与评测对每轴的需求并不相同——训练侧优先 rollout throughput 与稳定 reward 信号，评测侧优先可复现与防污染——同一环境因此可能胜任训练供给而不胜任评测，反之亦然。
 
 | 轴 | 最低能力 | 训练价值 | 评测价值 | 典型失败 |
 |:--|:--|:--|:--|:--|
@@ -248,6 +247,8 @@ GUI 环境同时追求 realism、controllability 与 scalability，但三者存�
 | [[Papers/2607-SCALECUA]] | desktop RL/task factory | 100+ task workers、600 并发 VM、capability-frontier rollout | 50-turn cap、Ubuntu-only；抽样 task validity 仍需人工 audit |
 | [[Papers/2607-HyMobileAgent]] | mock + sandbox + real-device mixture | 2,000+ 实例；PhoneWorld 34 apps / 34,242 tasks | AndroidWorld 82.6% 到私有真机 42.0%；高风险状态被过滤 |
 | [[Papers/2604-Crab]] | sandbox runtime | agent-facing rollback；步数 −29%，branch token −40–64% | 仅 shell/FS/process，不是 GUI 全栈先例 |
+
+环境供给谱系呈现出清晰的成熟度梯度。Trainer-facing 能力已相对成熟：[[Papers/2510-WebServ]] 把 fork 成本压到 1.78s clone、28 MiB/instance 并支撑 200+ 并发，[[Papers/2607-SCALECUA]] 已能调度 600 并发 VM，[[Papers/2605-MobileGym]] 与 [[Papers/2605-OpenComputer]] 的 deterministic judge / programmatic verifier 分别做到 95.1% sim-to-real gain retention 与 94.1% 人类对齐——reset、并行与可判定 reward 已不再是主要瓶颈。相比之下 agent-facing runtime 刚起步：[[Papers/2604-Crab]] 的 agent-facing rollback 仅覆盖 shell/FS/process，[[Papers/2605-MobileGym]] 面向 agent 的接口仍以 screenshot + primitive action 为主，环境内部的 state 与 snapshot 尚未变成 agent 可利用的执行接口。Live 供给的主要损耗则依旧发生在环境本体之外：[[Papers/2606-OpenWebRL]] 的 51% 失败仍来自 bot detection/封锁/网络，[[Papers/2607-HyMobileAgent]] 从 AndroidWorld 82.6% 跌到私有真机 42.0%，说明 realism 一侧的缺口主要是漂移与对抗，而非接口设计。
 
 ### 5.4 Trainer-facing 与 Agent-facing
 
@@ -285,6 +286,8 @@ GUI 评测最初依赖 agent 自报、最后截图或 element match；self-hoste
 [[Papers/2607-EvoGUI]] 代表 diagnostic evaluation 的最新推进：它从 normalized Mind2Web/WebLINX trajectories 构造 3,000 个 diagnostic VQA instances，任务包括 temporal ordering、inverse action/value prediction 与 one-step successor discrimination，覆盖 120 domains 和 28 个 model configurations；最强模型 EvoGain 仅 60.4，model scale 与 GUI specialization 都不能稳定预测 transition understanding。它揭示了 end-to-end 分数隐藏的 state-dynamics 缺口，但仍是 browser-centered offline probe，logged successor 与 sampled distractor 也不能替代 executable counterfactual。
 
 ### 6.2 Verifier 谱系
+
+四类 verifier 的分界不在判定算法而在证据访问能力——能读内部状态、能主动取证，还是只能依赖外部观察；证据访问越受限，判定越依赖 judge 自身的偏差与幻觉，而访问越深则以成本、实例耦合或覆盖为代价。
 
 | Verifier | 证据访问 | 优点 | 上限/风险 | 代表证据 |
 |:--|:--|:--|:--|:--|
@@ -326,12 +329,7 @@ GUI 评测最初依赖 agent 自报、最后截图或 element match；self-hoste
 
 ### 7.2 Safety 与 Privacy
 
-安全不能只看 user prompt。风险来自第三方内容、跨应用上下文、动作后果和 self-improvement 资产：
-
-- **Environmental injection**：[[Papers/2504-WASP]] 在现实威胁模型下的部分攻击成功率可达 86%；[[Papers/2409-EIA]] 的环境注入窃取特定 PII 成功率为 70%。
-- **Contextual disclosure**：[[Papers/2606-AgentCIBench]] 在无 adversary 的正常使用中测得平均 contextual leakage 67.9%，说明 task success 不能代理 privacy safety。
-- **Least disclosure**：[[Papers/2601-GUIGuardBench]] 的 binary privacy detection 尚可，但 strict full match 在 Android/PC 只有 8.8%/0.6%。
-- **Action-level guard**：[[Papers/2607-SeerGuard]] 指出 91% high-risk case 来自“良性指令 + 上下文危险动作”，所以 guard 必须在执行前预测后果，而不是只筛 instruction。
+安全不能只看 user prompt；对威胁面的认识沿一条不断扩展的路径推进，风险被先后定位到第三方内容、跨应用上下文、动作后果和 self-improvement 资产。最早确立的威胁是 environmental injection：[[Papers/2504-WASP]] 在现实威胁模型下的部分攻击成功率可达 86%，[[Papers/2409-EIA]] 的环境注入窃取特定 PII 成功率为 70%，第三方内容由此被证明是与 user prompt 同级的攻击入口。下一步认识是风险并不依赖 adversary：[[Papers/2606-AgentCIBench]] 在无 adversary 的正常使用中测得平均 contextual leakage 67.9%，说明 task success 不能代理 privacy safety，日常跨应用上下文本身就是泄露源。而即使把披露控制作为显式目标，细粒度的 least disclosure 仍然失败：[[Papers/2601-GUIGuardBench]] 的 binary privacy detection 尚可，但 strict full match 在 Android/PC 只有 8.8%/0.6%——模型能判断存在隐私风险，却无法精确指出哪些信息不该披露。这条认识路径的当前落点是把判定单位从 instruction 移到动作后果：[[Papers/2607-SeerGuard]] 指出 91% high-risk case 来自“良性指令 + 上下文危险动作”，所以 guard 必须在执行前预测后果，而不是只筛 instruction。
 
 最新分界是从“检测恶意内容”转向“恢复 trust boundary”。[[Papers/2607-UCM]] 在 privileged planner 看到页面前遮蔽 untrusted DOM region，只允许 quarantined model 通过 typed query 返回数据；强化版 WASP 上 ASR 为 0%，benign utility 保持不变，成本增加 1.05–1.84 倍。其保证只覆盖 control-flow injection：trust label 错误、typed value corruption、selection hijacking 与必须读取 free-form untrusted text 的任务仍在边界外。
 
@@ -430,6 +428,12 @@ GUI benchmark 的发展与能力抽象同步：static grounding 先隔离“看�
 - **结构**：按模型与 Agent 架构、训练与适应、数据、环境与 runtime、评测/verifier、可靠性/safety/HCI 组织；主文显式引用的 71 篇代表论文各设一个 primary home，其他位置只 cross-link。
 - **边界**：Deep Research、通用 Agentic RL、通用 Self-Evolving Agent、通用 VLM/World Model 保留为邻接方向，不因共享 backbone 或算法而计入 GUI core。
 - **检索**：本轮为 vault-first consolidation，没有外部搜索或新增 paper digest；证据来自现有 Papers 笔记及已完成的 survey 调研。
+
+### 2026-07-21 叙事化改写
+
+- **触发**：Supervisor 要求各章以完整段落叙述发展进程/研究现状/待解决问题，不做方法罗列。
+- **修改**：共 12 处。§1 五阶段引导句扩为因果链叙事段；§2.1 observation 三形态、§3.3 credit assignment 四类、§5.1 环境三角约束、§7.2 威胁面四类由 bullet/编号列表改写为发展叙事段；§2.2、§2.3、§3.2、§3.4、§5.2、§6.2 表格前补框架段；§5.3 谱系表后补成熟度综合段。
+- **不变**：全部表格、84 篇去重 wikilink 与所有数字未改动；§5.4 接口定义与 §6.1 capability ladder 因属枚举性内容保留列表形态。
 
 ### 2026-07-21 最新论文分章节扩展
 

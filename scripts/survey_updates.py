@@ -19,14 +19,18 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def _frontmatter(path: Path) -> dict:
-    """轻量 frontmatter 解析：只取 title/tags/keywords（避免 yaml 依赖差异）。"""
+    """轻量 frontmatter 解析：只取路由字段（避免 yaml 依赖差异）。"""
     text = path.read_text(encoding="utf-8")
     m = re.match(r"^---\n(.*?)\n---\n", text, re.DOTALL)
     if not m:
         return {}
     fm, out = m.group(1), {}
     lines = fm.split("\n")
-    for key in ("title", "tags", "keywords"):
+    for key in (
+        "title", "tags", "keywords", "exclude_tags", "exclude_keywords",
+        "hard_exclude_keywords", "exclude_override_tags",
+        "exclude_override_keywords", "status",
+    ):
         km = re.search(rf"^{key}:[ \t]*(.*)$", fm, re.MULTILINE)
         if not km:
             continue
@@ -93,12 +97,46 @@ def load_pending(root: Path = ROOT) -> list:
 def match_surveys(paper: Path, root: Path = ROOT) -> list:
     fm = _frontmatter(paper)
     tags = [str(t) for t in fm.get("tags", [])]
+    normalized_tags = {_norm(tag) for tag in tags}
     title = str(fm.get("title", ""))
     # tags 用 ", " 连接：_norm 后逗号保留，阻止多词 keyword 跨 tag 边界拼接命中
     haystack = _norm(", ".join(tags) + ", " + title)
     matched = []
     for survey in sorted(root.glob("Topics/*-Survey.md")):
-        kws = [str(k) for k in _frontmatter(survey).get("keywords", [])]
+        survey_fm = _frontmatter(survey)
+        if _norm(str(survey_fm.get("status", ""))) == "merged":
+            continue
+        override_tags = {
+            _norm(str(tag)) for tag in survey_fm.get("exclude_override_tags", [])
+        }
+        override_keywords = [
+            str(keyword) for keyword in survey_fm.get("exclude_override_keywords", [])
+        ]
+        exclusion_overridden = bool(normalized_tags & override_tags) or any(
+            re.search(rf"\b{re.escape(_norm(keyword))}s?\b", haystack)
+            for keyword in override_keywords if keyword
+        )
+        hard_excluded_keywords = [
+            str(keyword) for keyword in survey_fm.get("hard_exclude_keywords", [])
+        ]
+        if any(
+            re.search(rf"\b{re.escape(_norm(keyword))}s?\b", haystack)
+            for keyword in hard_excluded_keywords if keyword
+        ):
+            continue
+        excluded = {_norm(str(tag)) for tag in survey_fm.get("exclude_tags", [])}
+        excluded_keywords = [
+            str(keyword) for keyword in survey_fm.get("exclude_keywords", [])
+        ]
+        if not exclusion_overridden:
+            if normalized_tags & excluded:
+                continue
+            if any(
+                re.search(rf"\b{re.escape(_norm(keyword))}s?\b", haystack)
+                for keyword in excluded_keywords if keyword
+            ):
+                continue
+        kws = [str(k) for k in survey_fm.get("keywords", [])]
         # 词边界 + 可选复数 s（"vlm" 命中 "vlms"，但 "cua" 不命中 "evacuation"）
         if any(re.search(rf"\b{re.escape(_norm(kw))}s?\b", haystack) for kw in kws if kw):
             matched.append(survey.stem)

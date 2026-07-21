@@ -147,7 +147,12 @@ python3 scripts/survey_updates.py record "Papers/{文件名}.md"
 - 脚本按 `Topics/*-Survey.md` frontmatter 的 `keywords` 与本笔记 tags/标题匹配（大小写与连字符已归一化），输出匹配到的 survey 列表（JSON）。
 - 匹配为空是正常情况（论文不属于任何已有 survey 主题），静默继续。
 - 脚本报错时不阻塞 digest：在当日 log 记一条 `survey-updates 记账失败` 即可。
-- pending 的消费由 `survey-refresh` skill 负责（autoresearch 在某 survey 积压 ≥5 篇时触发）。
+- pending 的消费由 `survey-refresh` skill 负责（GUI canonical 在 ≥1 篇时触发；其他 survey 在 ≥5 篇或最老条目超 7 天时触发）。
+- 若输出列表含 `GUIAgent-Survey`，该 pending 是下一 skill round 的强制优先项：在执行任何其他研究任务、或宣告一个包含 digest+整合的多步请求完成前，必须先运行 `survey-refresh`。独立的单篇 digest 可以在本轮结束，但必须明确报告“GUI survey integration pending”；这保留“一轮一个 skill”的原子性，同时保证下一轮立即整合。
+- **GUI canonical 特例**：若输出包含 `GUIAgent-Survey`，不等待 5 篇 / 7 天阈值；保持本轮
+  paper-digest 原子性，并由下一轮优先执行 `survey-refresh GUIAgent-Survey`。GUI 论文的 tag
+  必须遵守 `references/tags.md` 的 umbrella 规则，避免只标 `agentic-RL` 或宽泛 `environment`
+  而漏记账。
 
 ## Guard
 

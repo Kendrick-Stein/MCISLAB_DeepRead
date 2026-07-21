@@ -41,7 +41,8 @@ autoresearch 是 MindFlow 的核心研究循环，实现了 PhD 导师制中 Res
 | queue.json 有 `status: pending` 的论文任务，或 `Workbench/daily/` 最近总结里有值得深读的论文 | 读取 `skills/1-literature/paper-digest/SKILL.md` 并执行 |
 | agenda 中某 direction 缺乏文献支撑（evidence 稀疏） | 读取 `skills/1-literature/literature-survey/SKILL.md` 并执行 |
 | vault 中有多篇相关论文但未做对比分析 | 读取 `skills/1-literature/literature-survey/SKILL.md` 并执行（其综合步骤即跨论文对比，产出 `Topics/*-Survey.md`） |
-| survey-updates.json 中某 survey pending ≥5 篇，或最老条目 added_at 距今 >7 天 | 读取 `skills/1-literature/survey-refresh/SKILL.md` 并执行 |
+| survey-updates.json 中 `GUIAgent-Survey` 有任意 pending（≥1 篇） | 下一轮优先读取 `skills/1-literature/survey-refresh/SKILL.md` 并执行；GUI canonical survey 不等待批量阈值 |
+| survey-updates.json 中其他 survey pending ≥5 篇，或最老条目 added_at 距今 >7 天 | 读取 `skills/1-literature/survey-refresh/SKILL.md` 并执行 |
 | News/ 最新一期超过 config `news.days` 天数（且 Supervisor 未禁用） | 读取 `skills/1-literature/news-digest/SKILL.md` 并执行（该 skill 已含博客/媒体/**公众号**三类源，公众号走搜狗微信搜索，见 `scripts/wechat_search/`） |
 | 近期有 Topics/*-Analysis.md 标注了知识空白 | 读取 `skills/2-ideation/idea-generate/SKILL.md` 并执行 |
 | Ideas/ 中有 status: raw 的 idea 待评估 | 读取 `skills/2-ideation/idea-evaluate/SKILL.md` 并执行 |
@@ -56,6 +57,11 @@ autoresearch 是 MindFlow 的核心研究循环，实现了 PhD 导师制中 Res
 - agenda 中 priority: high 的 direction 的 next_action
 - queue 中积压的待处理项
 - 最近未被处理的完成态工作（如 completed experiment 未分析）
+
+**GUI 即时刷新规则**：`paper-digest` 新增一篇 GUI / Computer-Use 论文并记账到
+`GUIAgent-Survey` 后，本轮保持 paper-digest 原子性；下一轮必须先执行
+`survey-refresh GUIAgent-Survey`，再继续 digest 其他论文。这样每篇 GUI 论文都会进入 canonical
+survey，同时不在同一轮串联两个 skill。
 
 ### Step 3：ACT
 

@@ -36,6 +36,21 @@ Key Takeaways / Open Questions。
 对 pending 中每篇，用 Read 读取 `Papers/` 笔记全文，提取：核心贡献、关键数据、
 与 survey 现有分类的关系（落入哪个既有小节？是否挑战某个既有结论？是否开辟新分类？）。
 
+处理 `GUIAgent-Survey` 时，额外建立一行分类记录再决定落点：
+
+| 字段 | 允许值 / 判断 |
+|:--|:--|
+| `platform` | web / mobile / desktop / cross-platform / hybrid GUI+API/CLI |
+| `task_level` | grounding / step / app workflow / cross-app long-horizon / interactive-proactive |
+| `primary_section` | model-architecture / training-RL / data-task / environment-runtime / evaluation-verifier / reliability-safety-HCI |
+| `environment_setting` | offline / self-hosted / live / real-device |
+| `verifier_type` | programmatic / interactive agent / visual-rubric judge / human / none |
+| `evidence_strength` | direct end-to-end / component-only / adjacent transferable evidence |
+
+每篇论文只能有一个 `primary_section`；最多在 1-2 个其他章节 cross-link。纯 Deep Research、
+通用 Agentic RL、通用 VLM/World Model 或 terminal/tool sandbox 若没有直接 GUI 交互证据，
+不得因共享模型、算法或 environment 术语硬并入 GUI core。
+
 **相关性检查**：keyword 匹配存在误报。若某篇论文与本 survey 主题明显无关
 （读笔记后判断），跳过它：不并入 survey，但在 Step 6 一并 clear（附一句跳过理由记入日志），
 避免它永远滞留 pending。
@@ -49,6 +64,13 @@ Key Takeaways / Open Questions。
    未被挑战的原有内容一律保留。
 3. 若多篇新论文形成新 pattern，可新增小节；更新 Key Takeaways / Open Questions。
 4. 更新 frontmatter：`date_updated` 设为今天，`papers_analyzed` 增加新并入篇数。
+
+`GUIAgent-Survey` 的额外更新规则：
+
+- 按 canonical 六层结构落位，不新建按单篇论文或临时热词命名的平行 taxonomy。
+- Benchmark 数字必须同时写清 environment setting、verifier、step budget（笔记有记录时）与是否同 backbone 对照。
+- 只有新论文改变已有判断时才修改 Key Takeaways / Open Problems；普通增量只更新 primary subsection 或矩阵。
+- `papers_analyzed` 按唯一 `Papers/` wikilink 口径机械复核，不把 redirect survey 的旧统计相加。
 
 ### Step 5：刷新 DomainMap（若有）
 
@@ -83,6 +105,7 @@ python3 scripts/survey_updates.py clear --survey {survey-name} --papers "Papers/
 - 不删除 survey 中未被新证据推翻的原有结论；修改结论必须标注推翻它的论文 wikilink。
 - 单轮最多并入 8 篇；不一次清空大积压。
 - 与 survey 主题明显无关的 pending 论文：跳过不并入，但必须 clear 并记录理由——不得硬并入，也不得留在 pending。
+- `status: merged` 或 `keywords: []` 的 redirect survey 不得恢复为独立更新目标；其内容统一写入 `merged_into` 指向的 canonical survey。
 - 本 skill 是 DomainMaps 的唯一自动写入方；只写 `## 近期格局变化` 小节，
   不改 DomainMap 其他部分（Established Knowledge 等仍由 Human 经 queue Review 晋升）。
 - 只 clear 本轮实际处理（并入或跳过）的条目；未处理的留在 pending。

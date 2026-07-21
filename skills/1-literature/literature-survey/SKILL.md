@@ -41,7 +41,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 1. 用 Grep 在 `Papers/` 的 frontmatter 和正文中搜索 topic 相关关键词（2-3 个核心关键词）。
 2. 用 Grep 在 `Topics/` 中搜索是否已有相关调研或分析。
 3. 收集所有匹配的 Paper 笔记，建立"**已知论文清单**"（title 列表），后续用于去重。
-4. 若发现已有 Survey（如 `Topics/{Topic}-Survey.md` 已存在），读取其内容作为基线，后续步骤在此基础上增量更新（补充新论文、更新分析），而非从零重建。
+4. 若发现已有 Survey（如 `Topics/{Topic}-Survey.md` 已存在），先检查 frontmatter。若 `status: merged`，沿 `merged_into` 读取 canonical survey 并把后续检索、综合与写入目标全部改为 canonical；redirect 只读且不得复活。否则读取原文件作为基线，后续步骤在此基础上增量更新（补充新论文、更新分析），而非从零重建。
 
 ### Step 3：外部搜索与筛选
 
@@ -115,7 +115,7 @@ python3 scripts/lexmount_fetch.py extract "<url>" --format markdown
 Topic 名称根据主题生成（CamelCase，如 `VLA-Manipulation`、`DiffusionPolicy-Robotics`）。
 
 - **新建**：若 `Topics/{Topic}-Survey.md` 不存在，用 Write 按 `Templates/Survey.md` 模板创建并填充各 section。新建 survey 必须填 frontmatter `keywords`（小写短语）与 `domain_map`（无对应 DomainMap 填 null），否则该 survey 无法进入 digest→survey 信息流。
-- **增量更新**：若已存在，用 Edit 在其基础上补充新论文、刷新分析，保留原有内容中仍然有效的部分。
+- **增量更新**：若已存在且不是 `status: merged`，用 Edit 在其基础上补充新论文、刷新分析，保留原有内容中仍然有效的部分。若命中 merged redirect，只更新其 `merged_into` 指向的 canonical survey。
 
 所有论文引用使用 `[[wikilink]]` 格式。
 
@@ -147,6 +147,7 @@ Topic 名称根据主题生成（CamelCase，如 `VLA-Manipulation`、`Diffusion
 ## Guard
 
 - **paper-digest 失败不阻塞**：单篇论文 digest 失败时记录原因并继续处理下一篇，不中断整个 survey 流程。
+- **merged survey 只读**：frontmatter 含 `status: merged` 的文件只承担旧链接跳转，不得恢复 keywords、追加正文或重新参与增量更新；必须沿 `merged_into` 写入 canonical survey。
 - **搜索上限**：最多执行 50 次 WebSearch，避免过度消耗 token 和 API 配额。
 - **不捏造论文**：所有纳入分析的论文必须来自实际搜索结果或 vault 已有笔记，不得凭记忆编造论文信息。
 - **不直接修改 DomainMaps**：综合分析中如有值得纳入 DomainMaps 的发现，在 Survey 文件的调研日志中标注"建议加入 DomainMaps"（不放 Key Takeaways，见写作基线第 2 条），不得直接修改 `DomainMaps/` 下的任何文件。

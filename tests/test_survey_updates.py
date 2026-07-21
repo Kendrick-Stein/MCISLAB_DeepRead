@@ -11,7 +11,19 @@ def make_vault(tmp_path):
     (tmp_path / "Papers").mkdir()
     (tmp_path / "Workbench").mkdir()
     (tmp_path / "Topics" / "GUIAgent-Survey.md").write_text(
-        "---\ntitle: GUI Agent Survey\nkeywords: [gui-agent, web agent]\ndomain_map: GUI-Agent\n---\n"
+        "---\ntitle: GUI Agent Survey\nkeywords: [gui-agent, web agent]\n"
+        "exclude_tags: [deep-research]\n"
+        "exclude_keywords: [deep research, information seeking, search agent]\n"
+        "hard_exclude_keywords: [browsecomp]\n"
+        "exclude_override_tags: [gui-agent, computer-use]\n"
+        "domain_map: GUI-Agent\n---\n"
+    )
+    (tmp_path / "Topics" / "WebAgent-Survey.md").write_text(
+        "---\ntitle: Deep Research Survey\n"
+        "keywords: [deep research, information seeking, browsecomp, search agent]\n"
+        "exclude_tags: [gui-agent, computer-use]\n"
+        "exclude_override_keywords: [browsecomp]\n"
+        "domain_map: AgenticRL\n---\n"
     )
     (tmp_path / "Topics" / "VLM-Survey.md").write_text(
         "---\ntitle: VLM Survey\nkeywords: [vlm]\ndomain_map: VLM\n---\n"
@@ -35,6 +47,60 @@ def test_match_normalizes_hyphens_vs_spaces(tmp_path):
     paper2 = tmp_path / "Papers" / "2607-BazAgent.md"
     paper2.write_text("---\ntitle: A GUI agent for spreadsheets\ntags: [misc]\n---\n")
     assert match_surveys(paper2, tmp_path) == ["GUIAgent-Survey"]
+
+
+def test_excluded_tag_overrides_title_keyword(tmp_path):
+    """纯 Deep Research 即使标题含 web/browser agent，也不得误入 GUI survey。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2607-ResearchAgent.md"
+    paper.write_text(
+        "---\ntitle: Web Agents for Persistent Deep Research\n"
+        "tags: [web-agent, deep-research]\n---\n"
+    )
+    assert match_surveys(paper, tmp_path) == ["WebAgent-Survey"]
+
+
+def test_legacy_deep_research_title_routes_without_new_tag(tmp_path):
+    """旧笔记尚无 deep-research tag 时，Deep Research 标题仍应排除 GUI。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2607-LegacySearch.md"
+    paper.write_text(
+        "---\ntitle: Scaling Search Agents on the Open Web\n"
+        "tags: [web-agent, agentic-RL]\n---\n"
+    )
+    assert match_surveys(paper, tmp_path) == ["WebAgent-Survey"]
+
+
+def test_gui_umbrella_tag_wins_for_true_hybrid(tmp_path):
+    """真正操作 GUI 的 hybrid 论文以 GUI canonical 为 primary home。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2607-Hybrid.md"
+    paper.write_text(
+        "---\ntitle: Deep Research through Interactive GUI Workflows\n"
+        "tags: [gui-agent, deep-research]\n---\n"
+    )
+    assert match_surveys(paper, tmp_path) == ["GUIAgent-Survey"]
+
+
+def test_browsecomp_semantics_override_stale_gui_tag(tmp_path):
+    """BrowseComp 家族是 information seeking；旧 gui-agent 标签不得污染路由。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2607-KBrowseComp.md"
+    paper.write_text(
+        "---\ntitle: K-BrowseComp: A Web Browsing Agent Benchmark\n"
+        "tags: [web-agent, gui-agent]\n---\n"
+    )
+    assert match_surveys(paper, tmp_path) == ["WebAgent-Survey"]
+
+
+def test_merged_survey_never_routes_even_with_keywords(tmp_path):
+    """redirect 即使误留 keywords，也不得重新进入增量路由。"""
+    paper = make_vault(tmp_path)
+    (tmp_path / "Topics" / "Legacy-Survey.md").write_text(
+        "---\ntitle: Legacy Survey\nkeywords: [gui-agent]\n"
+        "status: merged\nmerged_into: Topics/GUIAgent-Survey\n---\n"
+    )
+    assert match_surveys(paper, tmp_path) == ["GUIAgent-Survey"]
 
 
 def test_match_multiline_tags(tmp_path):

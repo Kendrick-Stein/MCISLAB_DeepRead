@@ -1,9 +1,9 @@
 ---
 title: "GUI / Computer-Use Agent 统一研究综述"
 tags: [survey, gui-agent, computer-use, web-agent, mobile-agent, agentic-RL]
-date_updated: "2026-07-21"
+date_updated: "2026-07-22"
 year_range: 2017-2026
-papers_analyzed: 84
+papers_analyzed: 90
 keywords: [gui-agent, gui grounding, computer-use, web agent, browser agent, mobile agent, cua, desktop agent, os agent]
 exclude_tags: [deep-research]
 exclude_keywords: [deep research, information seeking, browsecomp, research agent, search agent]
@@ -16,9 +16,13 @@ domain_map: GUI-Agent
 
 ## 1. Overview
 
-GUI Agent 的研究前沿，已经从“识别屏幕并生成动作”推进到“维护来源可信的任务状态，并通过 environment、runtime、verifier 与人类监督实现可验证、可恢复、受约束的长程执行”。
+GUI / Computer-Use Agent 的通行组织坐标是**平台（Web / Mobile / Desktop / 跨平台）× agent 组件（observation、grounding、planning、memory、action、verifier）**——已发表 survey（Microsoft LLM-Brained、[[Papers/2508-OSAgentsSurvey|OS Agents]]、Nguyen ACL Findings 等）多沿这两轴编目。
+
+本综述在这套坐标之上叠一个**作者综合论断**（非领域既成共识）：优化单元正从“识别屏幕并生成动作”的模型输出，收束为可追溯来源、可核验、可恢复的**状态转移**，并通过 environment、runtime、verifier 与人类监督实现受约束的长程执行。该论断的证据到 2026 年中仍以新近、未经独立复现的 preprint 为主，应与已确立阶段区别对待；下文五阶段的第五阶段即属此类前瞻押注，读者宜先在上述通行坐标里站稳，再接受本文的重排。
 
 研究对象覆盖 Web、Mobile、Desktop 与 GUI+API/CLI 混合操作；能力层级从 element grounding、single-step action 延伸到 app workflow、cross-app long-horizon task、主动澄清与受约束的 proactive assistance。只有直接研究 UI observation、GUI action、computer-use environment、GUI verifier 或部署期 safety/HCI 的工作进入本综述。纯 Deep Research、通用 Agentic RL、通用 VLM/World Model 与 Embodied Agent 仅作为邻接证据，不因使用相似模型或术语而并入。
+
+前沿的绝对水位可用桌面主基准 OSWorld(-Verified) 标定：最强系统从 2024-04 的 12.24% 抬到 Claude Sonnet 4.5 的 61.4%（2025-09）、Sonnet 4.6 的 72.5%（2026-02），后者首次触及 human baseline 72.36%；2026 年中 tracker 头部已报 80–85%，但均为 self-reported 且对 harness、step budget、judge 高度敏感，不可横向裸比。开源可复现前沿由 [[Papers/2509-UITARS2|UI-TARS-2]]（OSWorld 47.5 / AndroidWorld 73.3 / Online-Mind2Web 88.2）与 [[Papers/2602-Mobile-Agent-v3.5- Multi-platform Fundamental GUI Agents|GUI-Owl-1.5 / Mobile-Agent-v3.5]]（ScreenSpot-Pro 80.3）两条线撑起。这条曲线本身即说明局部能力已非主要瓶颈：AndroidWorld 与 ScreenSpot-V2 均已饱和（顶级系统 >90%），战场分别移向 MobileWorld（best framework 51.7）与 ScreenSpot-Pro（当前 SOTA 80.3），而长程可靠、真实分布与可核验成功成为新上限。
 
 这一问题经历了五次可辨认的抽象升级，每次跃迁都由上一阶段的结构性瓶颈驱动。结构化接口路线用 DOM/AXTree 与 element action 把自然语言目标转成可执行 navigation，但对网页结构的依赖阻断了向 canvas、mobile 与 desktop 的迁移，screenshot-native 遂以高分辨率视觉与 coordinate grounding 换取跨平台观察；跨平台之后，局部 grounding 与长程成功的脱节转而成为主要矛盾，agent-system 化把 grounding、planning、memory 与 tool use 分给专用模块，却引入模块误差级联与状态所有权不清。
 
@@ -31,6 +35,8 @@ GUI Agent 的研究前沿，已经从“识别屏幕并生成动作”推进到�
 | 2024–2025：Agent-system 化 | grounder、planner、memory、critic、tool router | 将 perception、planning 与 execution 分工 | 模块误差级联，状态所有权不清 | [[Papers/2504-AgentS2]] |
 | 2025–2026 上半年：闭环学习 | task/state/verifier 共生成 + online RL + environment factory | 让真实交互产生可学习 reward | task validity、rollout 吞吐与 verifier 偏差成为上限 | [[Papers/2601-EvoCUA]]、[[Papers/2511-DreamGym]] |
 | 2026 年 7 月：可问责系统（萌芽） | belief provenance + explicit task state + semantic action + oversight | 把成功拆成可检查的状态转移 | 跨层因果证据、安全边界与人类注意力尚未闭合 | [[Papers/2607-GUIStateBelief]]、[[Papers/2607-Tactile]] |
+
+其中第五阶段是本文的**前瞻押注而非已完成的转折**：它由 2026 年 7 月（距本文 0–3 周）的 preprint 支撑、尚无独立复现，读者应把它当作"值得下注的方向"而非"已确立的终点"；前四阶段则有多组工作与时间沉淀支撑。
 
 五阶段时间轴解释研究抽象如何变化；下面的闭环则解释当前系统由哪些相互制约的层组成。第 2–7 章沿着模型/状态、学习、数据、环境/runtime、评测/verifier 与可靠部署六层，分别追踪它们在五阶段中的演进，而不是按论文热词分组。
 
@@ -74,7 +80,7 @@ flowchart LR
 
 ### 本章发展进程与研究现状
 
-模型侧最初把 GUI 理解为“从指令到坐标”的视觉定位问题，随后通过高分辨率输入、专用 grounding head 与 active zoom 改善小目标定位。Agent-system 路线再把 grounding、planning、memory 与 tool use 分给不同组件，但长程失败表明，仅有更强的局部模块仍不足以维持正确状态。
+模型侧最初把 GUI 理解为“从指令到坐标”的视觉定位问题，随后通过高分辨率输入、专用 grounding head 与 active zoom 改善小目标定位。需要说明的是，grounding 泛化本身仍是社区公认的第一瓶颈——ScreenSpot-Pro 头部虽已到 80.3，但专业软件、密集小图标与动态布局（spreadsheet、移动端一屏 200+ 元素）仍是最难 case；本章把重心移向 state belief，并不主张 grounding 已解决，而是主张即便局部定位可靠也不自动传递到长程正确——这两点须同时成立。Agent-system 路线再把 grounding、planning、memory 与 tool use 分给不同组件，但长程失败表明，仅有更强的局部模块仍不足以维持正确状态。
 
 当前转折是把 **state belief** 提升为一等对象：不仅要知道模型读到了什么，还要记录证据来自 pixels、DOM/AXTree、memory 还是 prior，以及这些证据是否新鲜、冲突或已被动作改变。架构的比较单位也从“单模型或多模块”变成“谁拥有状态、谁能修改状态、谁负责验证状态”。
 
@@ -302,6 +308,10 @@ GUI 评测最初依赖 agent 自报、最后截图或 element match；self-hoste
 
 [[Papers/2504-OnlineMind2Web]] 证明 shortcut task、缓存页面与不可靠 judge 可以让旧 benchmark 系统性高估能力；迁到 live 站点后多数 agent 退回早期水位。[[Papers/2604-Odysseys]] 的 200 个 live long-horizon 任务中，Opus 4.6 的 perfect success 最高（44.5%），GPT-5.4 的 Trajectory Efficiency 最高（1.15%）；两个最优值来自不同模型，且都说明真实交互的主要缺口不是单步 grounding，而是持续状态跟踪、恢复与成本控制。
 
+评测不可信有比“缓存页面”更硬的证据。审计显示 WebArena、OSWorld 等多个 benchmark 可被刷到近满分而不真正解题：两者都允许 agent 可控字符串触发 `eval()` 式代码执行，并把 gold reference 泄漏进 task config / metadata；WebArena 的 strict string-match + naive LLM-judge 造成约 1.6–5.2% 绝对误估，OSWorld 因过时网站被指约 28% 低估。判据与 scaffold 本身即可制造约 50 个点的落差（Online-Mind2Web 上受控 scaffold 约 40% vs tracker 报到 97%），static 到 live 更可掉多达 59%。这直接催生了 verified 重发（OSWorld-Verified；WebArena Verified 审计全部 812 任务、把 substring 换成 type/normalization-aware 比较并验证后端状态，false-negative 降 11.3pp）——引用旧 benchmark 分数时须注明是原版还是 verified 口径。
+
+另一条被 reviewer 反复 push、却在多数 GUI survey 缺席的维度是**成本**。[[Papers/2407-AgentsThatMatter|AI Agents That Matter]]（TMLR 2025）与 [[Papers/2510-HAL|Holistic Agent Leaderboard]]指出 accuracy 可被"多试几次"这类无科学意义手段刷高，要求把 agent 画在 cost–accuracy Pareto frontier 上；HAL 一次 21,730 rollout 的复现里，9 个 benchmark 只有 1 个（CORE-Bench Hard）的最贵模型落在美元 Pareto 前沿，提高 reasoning effort 在 36 个 model×agent×benchmark 组合里 21 个只得到持平或更低 accuracy，同一 benchmark 换 scaffold 可差 9 倍成本。任何报 SOTA 的章节都应同时给 cost 与 Pareto 位置，而非裸报最高分。
+
 评测不诚实还来自训练复现。[[Papers/2607-TeachStop]] 的 variance decomposition 显示 evaluation noise 近零、training-seed effect 不超过 10%，但 data draw 与 run-to-run nondeterminism 主导结果，最难 cell 甚至呈 bimodal distribution。GUI/CUA 论文因此应报告 verifier precision/recall/coverage/cost，也应报告 data-draw × seed、paired task statistics 与 environment failure；单次 run 的 headline gain 已不足以支持方法结论。
 
 本章最关键的决定性实验，是固定 trajectory、evidence budget 与 actor，直接比较 programmatic、visual/rubric 与 interactive verifier 的 precision、recall、coverage、cost、abstention 和抗操纵能力。只有这种等证据对照，才能判断主动取证是否真的突破 verifier trade-off，而不只是花更多调用预算。
@@ -353,9 +363,11 @@ GUI benchmark 的发展与能力抽象同步：static grounding 先隔离“看�
 
 跨 benchmark 数字尤其不能横向裸比。模型版本、step budget、environment snapshot、是否 real device、verifier evidence access 与 live failure policy 都会改变分数；下一步需要 versioned setting card、paired rerun、verifier audit 和 environment-failure breakdown，使进步能被归因到模型、runtime 或环境，而不是隐含的评测条件。
 
+**Baseline 与训练数据的标准配置**也应显式声明，否则读者无法判断一篇新工作是否比对了正确对象。Grounding baseline 已换代三层：SeeClick、CogAgent 是历史锚点（ScreenSpot-Pro 仅个位数），UGround、Aguvis、OS-Atlas 是中坚，UI-TARS、GTA1、GUI-Owl 是当前头部；端到端 agent 侧的常见对照是 UI-TARS 系列、Agent-S（S2/S3）、OpenAI Operator/CUA、Claude computer use，web 记忆线仍以 AWM 为标准对照。训练侧的事实标配是 **AGUVIS collection**（聚合 MM-Mind2Web、GUIAct、MiniWoB++、AndroidControl、GUI-Odyssey、AMEX、AITW 等）加 OS-Atlas（13M elements）/ UGround（10M elements）两套 grounding 预训练数据；离线 step-wise 评测三件套是 AITW、AndroidControl、GUI-Odyssey。survey 章节若不锚定这套 canon，"比过 SOTA"就无法被校验。
+
 | Benchmark | 能力/平台 | 规模 | 指标与关键数字 | Verifier / Setting |
 |:--|:--|:--|:--|:--|
-| ScreenSpot-Pro ([[Papers/2504-ScreenSpotPro]]) | high-resolution grounding / multi | 专业 GUI | 专业 icon 识别仍是极弱项 | offline annotation |
+| ScreenSpot-Pro ([[Papers/2504-ScreenSpotPro]]) | high-resolution grounding / multi（当前 grounding 主战场） | 1,581 tasks / 23 apps | SOTA GUI-Owl-1.5-32B 80.3；老 baseline 惨（SeeClick 1.1 / OS-Atlas-7B 18.9 / UGround-7B 16.5 / UI-TARS-72B 38.1） | offline annotation |
 | CUActSpot ([[Papers/2605-CUActSpot]]) | long-tail action grounding / multi | 206 eval + 50M synthetic | Phi-Ground-Any-4B 44.4% | offline action match |
 | MMBench-GUI ([[Papers/2507-MMBench-GUI- Hierarchical Multi-Platform Evaluation Framework for GUI Agents]]) | content / grounding / automation / collaboration | Windows、macOS、Linux、iOS、Android、Web 四层级 | EQA 同时衡量执行质量与效率 | hierarchical offline + online evaluation |
 | AutoGUI-v2 ([[Papers/2604-AutoGUIv2]]) | functional GUI understanding / 6 OS | 2,753 tasks | region function grounding/caption + state prediction | offline functional evaluation |
@@ -367,7 +379,8 @@ GUI benchmark 的发展与能力抽象同步：static grounding 先隔离“看�
 | REAL ([[Papers/2504-REAL]]) | deterministic web replica | 112 tasks / 11 sites | Claude 3.7 Thinking 41.07% | localStorage state diff + rubric |
 | Online-Mind2Web ([[Papers/2504-OnlineMind2Web]]) | live web | real sites | Operator 约 61%；多数旧 agent 崩塌 | WebJudge，约 85% human agreement |
 | Odysseys ([[Papers/2604-Odysseys]]) | live long-horizon web | 200 tasks | Opus 4.6 perfect 44.5%；GPT-5.4 TE 1.15% | rubric + live execution audit |
-| AndroidWorld | mobile long-horizon | 116 tasks / 20 apps | [[Papers/2500-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents|MobileRL-9B]] 80.2% | emulator state evaluator |
+| AndroidWorld | mobile long-horizon（已饱和） | 116 tasks / 20 apps | 顶级 framework >90%；UI-TARS-2 73.3、GUI-Owl-1.5 71.6、[[Papers/2500-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents|MobileRL-9B]] 80.2 | emulator state evaluator |
+| MobileWorld ([[Papers/2512-MobileWorld]]) | mobile long-horizon（AndroidWorld 后继） | 201 tasks / 20 apps / 27.8 步 | best framework 51.7；端到端模型 20.9 | agent-user interaction + MCP-augmented |
 | AmbiBench ([[Papers/2602-AmbiBench]]) | ambiguous instruction / mobile | 240 tasks × 4 clarity levels | non-interactive TSR 0%；IGR 12% | real-device dialogue evaluation |
 | AndroidDaily ([[Papers/2605-AndroidDaily]]) | closed-source commercial mobile apps | 350 tasks / 94 apps | Gemini 3 Flash 62.0%；GRADE–human agreement 87.37% | visual trajectory evidence + guideline judge |
 | MemGUIBench ([[Papers/2602-MemGUIBench]]) | memory-intensive mobile | 128 tasks / 26 apps | strongest 32.8% | pass@1 |
@@ -442,3 +455,12 @@ GUI benchmark 的发展与能力抽象同步：static grounding 先隔离“看�
 - **结构更新**：以“结构化接口 → screenshot-native → agent-system → 闭环学习 → 可问责系统”五阶段重写总脉络；各章统一补入发展进程、当前分化、反证/边界与待解决的因果问题，避免按论文逐条罗列。
 - **边界**：排除同批结果中的 UAV、机器人/VLA 与只借用 GUI 场景但不研究 computer-use loop 的论文；其证据留在 Embodied AI / VLA 方向，不并入 GUI core。
 - **计数**：统一主文当前可解析且去重的 `Papers/` wikilink 为 84 篇；新增论文均进入对应章节与 benchmark/结论交叉引用。
+
+### 2026-07-22 taste 校准（对照已发表 survey）
+
+- **触发**：Supervisor 指出 survey 内容丰富但 taste（覆盖面 / 场域形状 / 重要性判断）偏弱，要求检索已发表 GUI survey 做校准；确认幅度为"校准式改写"（保留五阶段/可问责状态脊柱，不重构）。
+- **外部检索**（三路后台调研，2026-07-22）：①11 篇发表 survey 清单 + 4 篇深读的 taxonomy/canonical/open-problem——Microsoft LLM-Brained（2411.18279）、OS Agents ACL Oral（2508.04482）、Nguyen ACL Findings（2412.13501）、RL survey（2604.27955）；②SOTA 与 baseline canon（OSWorld/AndroidWorld/ScreenSpot-Pro/Online-Mind2Web leaderboard、frontier 系统、数据集 canon）；③社区 debate 与 reviewer 关注点（OpenReview 被 challenge 墙挡，reviewer 关注点以已发表方法学批评论文为间接证据）。
+- **校准 diff 与改动**：①§1 补 frontier SOTA 水位曲线（OSWorld 12.24→61.4→72.5 越线）与基准换代（AndroidWorld/ScreenSpot-V2 饱和 → MobileWorld/ScreenSpot-Pro）；开篇先给社区平台×组件坐标系，"可问责状态转移"明标为作者综合押注、第五阶段标为未复现前瞻。②§2 章首承认 grounding 泛化仍是社区第一瓶颈，化解与 thesis 的张力。③§6.3 补更硬的评测不可信证据（可刷分 / gold 泄漏 / 50 点 scaffold 摆动 / 59% live gap / verified 重发）与 cost-Pareto 维度。④§8 benchmark 表更新 ScreenSpot-Pro SOTA 80.3、AndroidWorld 标饱和、新增 MobileWorld 行；补 baseline/数据 canon 段（三代 grounding baseline + AGUVIS collection + OS-Atlas/UGround 数据）。
+- **未改**：五阶段叙事脊柱、既有 84 篇 wikilink、各章原有数字。校准以增补 + 重新框定为主，不删既有内容。
+- **建议加入 DomainMaps**：GUI-Agent DomainMap 可增记"评测可信度危机（可刷分/gold 泄漏/cost-Pareto 缺席）"与"grounding 泛化仍是 #1 bottleneck 与 accountable-state thesis 的张力"两条。
+- **引用 grounding（同日补做）**：先前作为裸名字引用的工作已接成 wikilink——UI-TARS-2（[[Papers/2509-UITARS2]]）、GUI-Owl-1.5/Mobile-Agent-v3.5（[[Papers/2602-Mobile-Agent-v3.5- Multi-platform Fundamental GUI Agents]]）、OS Agents survey（[[Papers/2508-OSAgentsSurvey]]）三篇 vault 已有笔记；新 digest 三篇并接入正文：[[Papers/2512-MobileWorld]]（§8 benchmark 表）、[[Papers/2407-AgentsThatMatter]] 与 [[Papers/2510-HAL]]（§6.3 cost-Pareto）。仍未 digest：WebArena Verified、AGUVIS collection（作为 canon 名词引用，暂未建笔记）。

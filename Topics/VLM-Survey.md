@@ -1,9 +1,9 @@
 ---
 title: VLM Survey
 tags: [survey, VLM, multimodal, vision-language-model, visual-reasoning]
-date_updated: "2026-07-21"
+date_updated: "2026-07-22"
 year_range: 2023-2026
-papers_analyzed: 28
+papers_analyzed: 30
 keywords: [vlm, vision language model, multimodal llm, visual reasoning]
 domain_map: VLM
 ---
@@ -135,13 +135,15 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 ### 2.8 机制分析：视觉信息"在"但"读不出"
 
-**代表论文**：[[2607-VisualAccessBoundary]]、[[2606-Act2Answer]]
+**代表论文**：[[2607-VisualAccessBoundary]]、[[2606-Act2Answer]]、[[2607-GUIStateBelief]]、[[2607-EvoGUI]]
 
-**核心结论**：两篇在不同域用因果干预/行为级协议独立发现同一 pattern——信息在 hidden states 里（线性 probe 可恢复）但模型行为上读不出，VLM 的瓶颈从"表征缺失"转向"读出通路"。
+**核心结论**：多篇在不同域用因果干预/行为级协议独立发现同一 pattern——信息在 hidden states 里（线性 probe 可恢复）但模型行为上读不出，VLM 的瓶颈从"表征缺失"转向"读出通路"。GUI 域进一步给出跨模态与时序两个变体：结构文本与像素冲突时模型偏信过期结构（[[2607-GUIStateBelief]]），以及状态转移/时序理解不随模型规模或 GUI 专门化提升（[[2607-EvoGUI]]）。
 
 **关键发现**：
 - **Visual Access Boundary**：硬屏蔽 generated token→image token attention 的 2D 扫描（layer × time）显示，CoT 生成长度拉长约 50 倍但所需视觉访问边界与 Direct answering 相差 ≤2 层——CoT 增益来自对已写入 hidden states 的视觉信息做更长语言计算，而非持续"回看"图像；CoT 增益上限受 perceptual readout 制约，难属性存在 probe-vs-decode gap（probe 高精度、decode 显著更差）（[[2607-VisualAccessBoundary]]）
 - **Act2Answer**：把知识题改造成"用动作作答"的 VLA 评测协议以剥离低层控制混淆；robotics 微调让语义类知识相比源 VLM 掉 20-40 分，layerwise probing 显示知识在中层仍可解码、到 action head 附近衰减至近随机；VQA co-training 有显著保护作用（Magma retention 86.7% vs π₀ 36.2%）（[[2606-Act2Answer]]）
+- **GUIStateBelief（跨模态变体）**：735 组 Web/Mobile/Desktop paired probe——image-only 读取接近饱和时，模型在 pixel↔structure 冲突下仍跟随 stale structure（真实网页结构跟随率最高 0.88），首步注错的 MiniWoB++ episode 自恢复 ≤0.03，training-free consistency gate 才同时降 hijack 与 task error；证据"在"（像素可读）却不被采信，是 readout gap 的 modality-trust 版本（[[2607-GUIStateBelief]]）
+- **EvoGUI（时序变体）**：3,000 个 state-transition diagnostic VQA（temporal ordering / inverse action / one-step successor，120 domains），最强模型仅 60.4，且 model scale 与 GUI specialization 均非稳定预测因子——VLM 的状态动态理解是端到端分数掩盖的独立缺口（[[2607-EvoGUI]]）
 
 **含义**：对"拉长推理链提升 multimodal reasoning"和"扩数据防遗忘"两类流行方案都是警示——前者不扩张视觉访问、后者丢的不是知识而是读出。**适用边界**：VAS 的任务限于"一眼看完再算"型，visual search / 多步 grounding 上结论可能翻转；Act2Answer 的二选一格式分辨率有限。
 
@@ -170,6 +172,8 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 | **SearchGen-Bench** | Knowledge-intensive T2I | 751 test / 12 失败类 | 9 分量 judge 评分 | GPT-Image-2 71.2 | 知识密集生成；附冻结 search corpus 可离线复现 |
 | **GUIGuard-Bench** | GUI Privacy | 241 轨迹 / 4,080 截图 | detection + plan fidelity | strict full match ≤8.8% | trajectory-conditioned 隐私评测 |
 | **CMGUI-Bench** | 中文 Mobile GUI Navigation | 390 episodes / 2,574 steps | Step/Task Acc | SecAgent-3B 96.4/80.0 | 多合法 action 标注，减 false negative |
+| **State-Belief Probes** | 跨模态证据冲突诊断 / GUI | 735 paired probes | stale-structure follow rate | 结构跟随率最高 0.88 | pixel/structure 单变量干预 + live episode |
+| **EvoGUI** | GUI 状态转移诊断 VQA | 3,000 / 120 domains | ACC | best 60.4 | trajectory-derived offline probe |
 
 **Benchmark 演进趋势**：
 - 从自然图像问答（VQAv2）到文本密集场景（TextVQA、DocVQA）
@@ -320,4 +324,11 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - 并入 13 篇：[[2607-BRAID]]、[[2607-Gemma4]]、[[2509-ScaleCUA]]、[[2607-VisualAccessBoundary]]、[[2607-SpectraReward]]、[[2607-SynthDocBench]]、[[2607-SearchGenBoundary]]、[[2606-Act2Answer]]、[[2606-HiViG]]、[[2602-ToolTok]]、[[2601-GUIGuardBench]]、[[2603-SecAgent]]、[[2606-Orca]]
 - 跳过 1 篇：[[2607-GRPONullWebAgent]]（纯 RL 训练方法学的受控阴性结果，无 VLM 架构/多模态能力层贡献，归 AgenticRL/WebAgent survey）
 - 结构变化：新增 2.6（统一模型 RL 后训练）、2.7（VLM as CUA 基座）、2.8（机制分析：decodable ≠ used）三个小节；Key Takeaways +3（7-9）；Open Problems 新增 knowledge boundary、MLLM-as-reward 可信度、知识侵蚀三项；benchmark 表 +5 行；修订 Takeaway 3（BAGEL 系 hybrid AR-diffusion 挑战 discrete diffusion + MoE 的"主流"论断）
+- **status**: success
+
+### 2026-07-22 增量更新（survey-refresh）
+- 并入 2 篇（均 GUI 域跨域 VLM 能力证据，primary home 为 GUIAgent-Survey）：[[2607-GUIStateBelief]]（§2.8，跨模态证据冲突=readout gap 的 modality-trust 变体）、[[2607-EvoGUI]]（§2.8 + benchmark 表，VLM 状态转移/时序理解缺口）
+- 跳过：无
+- 结构变化：仅增量并入——§2.8 代表论文 +2、关键发现 +2 bullet；benchmark 表 +2 行；未改 Key Takeaways / Open Problems（两篇强化既有 readout 主题，未推翻结论）
+- domain_map: skipped（无格局级变化，仅强化 §2.8 "decodable ≠ used" 主题）
 - **status**: success

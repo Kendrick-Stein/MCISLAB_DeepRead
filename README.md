@@ -48,7 +48,8 @@ ReadPaperMachine/
 │
 ├── Workbench/           # Researcher 工作状态
 │   ├── agenda.md        # 研究议程
-│   ├── queue.md         # 待办队列
+│   ├── queue.json       # 持久任务队列
+│   ├── runs/            # research run manifest / checkpoint
 │   ├── memory/          # 蒸馏记忆
 │   ├── logs/            # 每日操作日志
 │   └── evolution/       # 演化记录

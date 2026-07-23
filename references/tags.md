@@ -100,9 +100,11 @@
 | `RL` | 通用强化学习方法与理论（不特指 agent 或 embodied 场景；Agentic RL 请用 `agentic-RL`） | Agent / Embodied |
 | `task-planning` | 任务规划与分解（含 hierarchical planning、long-horizon、skill library） | Agent / Embodied |
 | `instruction-following` | 自然语言指令跟随、人机交互 | Agent / Embodied |
+| `hci` | Human-Computer Interaction 基础问题（mixed-initiative、human-in-the-loop、agent oversight、interruptibility、direct manipulation 与 automation 的耦合原则）；GUI 论文用时须与 `gui-agent`/`computer-use` umbrella 复合 | Agent / GUI / Embodied |
 
 ## 更新记录
 
+- **2026-07-22** — 新增跨领域 tag `hci`：覆盖 mixed-initiative / human-in-the-loop / agent oversight / interruptibility 等 HCI 基础问题（引入于消化 Horvitz 1999 "Principles of Mixed-Initiative User Interfaces"，该文是 GUI agent oversight 根祖）。GUI 相关论文使用时须与 `gui-agent`/`computer-use` umbrella 复合，不得单独替代 umbrella。
 - **2026-07-21** — GUI survey 统一后增加复合归属规则：GUI RL/environment/reliability 必须保留 `gui-agent` 或 `computer-use` umbrella tag；将 `web-agent` 收窄为网页状态交互，新增 `deep-research` 区分纯信息检索。该规则保证 paper-digest 后只把 GUI 论文路由到 canonical `GUIAgent-Survey`。
 - **2026-04-13 (audit)** — 全 vault tag 审计：新增 `spatial-reasoning`（Embodied/感知）、`embodied-reasoning`（跨领域）、`LLM`（跨领域，重新引入：2026-03-26 曾因过宽删除，本次按 use-with-discipline 原则重新加入，仅在笔记真正聚焦语言模型基座/推理/post-training 时使用，避免给所有 LLM-based 论文都打）；明确 `daily-papers`/`weekly` 为 meta tag 例外。修正 13 个文件的非规范 tag（含 `agentic-rl` 大小写、`spatial-representation`/`spatial-intelligence` 等 alias、`Atari`/`game-engine` 等过细 tag、`survey`/`skill-design` 等 meta tag）。
 - **2026-04-13** — 按三大研究方向（Multimodal Understanding / AI Agent / Embodied AI）重组 taxonomy，跨领域 tag（`world-model`、`RL`、`task-planning`、`instruction-following`）单列；组内 tag 按对研究兴趣（VLA / Spatial Intelligence / World Model / Agentic RL）的相关性从高到低排序。Multimodal Understanding 新增 `video-LLM`、`video-understanding`；AI Agent 新增 `agentic-RL`、`computer-use`、`gui-agent`，原 `RL` tag 窄化为通用 RL。

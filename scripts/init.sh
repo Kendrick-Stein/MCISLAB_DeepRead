@@ -27,8 +27,9 @@ if [ "$FRESH" = 1 ]; then
     mkdir -p "$d"
     [ -f "$d/_index.md" ] || printf -- '---\ntitle: %s Index\ntags: [index]\n---\n\n# %s\n' "$d" "$d" > "$d/_index.md"
   done
-  rm -rf Workbench/logs Workbench/daily Workbench/evolution Workbench/backfill
-  mkdir -p Workbench/logs Workbench/daily Workbench/memory Workbench/config
+  rm -rf Workbench/logs Workbench/daily Workbench/evolution Workbench/backfill Workbench/runs
+  mkdir -p Workbench/logs Workbench/daily Workbench/memory Workbench/config Workbench/runs
+  : > Workbench/runs/.gitkeep
   printf '{\n  "queue": [],\n  "version": 2,\n  "updated_at": "%s",\n  "settings": {}\n}\n' "$(date +%F)" > Workbench/queue.json
   rm -f Workbench/survey-updates.json Workbench/survey-updates.json.bak Workbench/redigest-manifest.md
   : > Workbench/memory/insights.md; : > Workbench/memory/patterns.md
@@ -51,6 +52,38 @@ fresh = sys.argv[3] == "1"
 cfg_path = Path("Workbench/config/team-config.json")
 cfg = json.loads(cfg_path.read_text()) if cfg_path.exists() else {}
 cfg["interests"] = [{"name": d, "keywords": keywords} for d in directions] or cfg.get("interests", [])
+digest_defaults = {
+    "parallel_limit": 4,
+    "prepare_parallel_limit": 2,
+    "review_parallel_limit": 2,
+    "timeout_minutes": 12,
+    "retry_limit": 2,
+}
+digest = cfg.setdefault("digest", {})
+for key, value in digest_defaults.items():
+    digest.setdefault(key, value)
+orchestration_defaults = {
+    "checkpoint_every": 3,
+    "max_papers_per_run": 20,
+    "max_search_queries": 10,
+    "post_verification_queries": 3,
+    "post_verification_loops": 1,
+    "synthesis_min_committed": 3,
+    "max_wall_minutes": 90,
+}
+orchestration = cfg.setdefault("orchestration", {})
+for key, value in orchestration_defaults.items():
+    orchestration.setdefault(key, value)
+role_defaults = {
+    "finder": {"tier": "cheap-fast"},
+    "digest": {"tier": "balanced"},
+    "verifier": {"tier": "strong", "require_different_agent": True, "hide_finder_reasoning": True},
+    "judge": {"tier": "strongest-available", "trigger": "disputed-high-impact-only"},
+    "synthesis": {"tier": "strong"},
+}
+model_policy = cfg.setdefault("model_policy", {})
+for role, policy in role_defaults.items():
+    model_policy.setdefault(role, policy)
 cfg.setdefault("news", {"sources": [], "days": 3, "min_score": 1, "top_n": 20})
 cfg_path.parent.mkdir(parents=True, exist_ok=True)
 cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n")

@@ -2,8 +2,8 @@
 name: paper-digest
 description: >
   当 Supervisor 给出论文或 blog 的 URL/标题/PDF/DOI，或阅读队列中有待处理条目时，消化内容并生成结构化笔记到 Papers/
-argument-hint: "[arXiv URL / blog URL / PDF path / title / DOI]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
+argument-hint: "[arXiv URL / blog URL / PDF path / title / DOI] [--prepare-only]"
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch, Agent
 ---
 
 ## Purpose
@@ -13,6 +13,11 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 支持两种内容类型：
 - **论文**：arXiv、PDF、DOI 等学术论文
 - **Blog**：技术博客文章（如 Google Research Blog、Lilian Weng、公司技术博客等）
+
+支持两种提交模式：
+
+- **direct（默认）**：单篇任务直接完成 source check、落库、引用身份、日志与 survey 记账。
+- **`--prepare-only`**：供 `daily-papers` / `research-team` 并行使用；只返回完整 draft + verification report，禁止写 `Papers/`、queue、日志、BibTeX cache 或 `survey-updates.json`。由 coordinator 串行执行 Step 5-6 commit contract。
 
 ## Steps
 
@@ -73,6 +78,20 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 
 如果只能获取 abstract 而非全文，在所有内容区块开头加注：`> [未获取全文，仅基于 abstract]`
 
+### Step 2.5：建立高风险 Claim Package
+
+在起草笔记前，把会进入 Summary / Key Results / Strengths & Weaknesses 的高风险信息提取为紧凑 claim package：
+
+| 字段 | 要求 |
+|:--|:--|
+| `claim_id` | `C1`、`C2`…，在本笔记内稳定 |
+| `claim` | 可独立判断真假的一句话，不把多个断言揉在一起 |
+| `type` | number / comparison / sota-novelty / benchmark-setting / license-code / causal-mechanism |
+| `expected_locator` | page / section / table / figure；暂时找不到填 `unknown` |
+| `source` | primary source URL 或本地 PDF 路径 |
+
+普通背景、作者明确标注的 speculation、以及个人评价不必逐句建 claim。高风险数字不得只从搜索摘要、二手报道或既有 Paper note 复制。
+
 ### Step 3：确定文件名和 tags
 
 **文件名格式**：`YYMM-ShortTitle.md`
@@ -92,9 +111,50 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 补充规则（模板未涵盖的）：
 - **rating**：必填，按模板中的 1-5 分制评分，基于内容质量和与当前研究方向的相关性综合判断
 - **未获取全文**：在受影响的章节开头加注 `> [未获取全文，仅基于 abstract]`，不得推测正文内容
+- **content_scope**：全文已读填 `full-text`；否则填 `abstract-only`
+- **verification_status**：由 Step 4.5 的结果填写；不得把 source check 写成“独立复现”或“结论已被验证”
+- **Evidence Ledger**：每个高风险 claim 一行；原文短摘录最多 25 words，并保留 page/section/table/figure locator
 - **date_added**：填写今天日期，格式 `YYYY-MM-DD`
 
-### Step 5：保存并记录
+### Step 4.5：独立 Source Verification
+
+Finder / digest 作者不得自行给自己的 claim 判 `source-verified`。派发一个**独立 verifier agent**，只给它：primary source、Step 2.5 claim package、允许的状态定义；不要给 Finder 的推理过程、rating 或 Strengths & Weaknesses。
+
+Verifier 对每个 claim 独立定位原文，返回：
+
+```text
+claim_id | status | source_locator | evidence_excerpt | correction
+```
+
+状态只能是：
+
+- `source-verified`：primary source 明确支持；仅表示 source consistency，不表示独立复现。
+- `unsupported`：没有找到足够支持，或证据比 claim 弱。
+- `contradicted`：primary source 与 claim 冲突。
+- `not-checkable`：付费墙、缺页、图表无法读取等导致无法核查。
+- `abstract-only`：只能在 abstract 层确认，不能支撑机制、失败条件或强比较。
+
+根据 verifier 结果修订 draft：
+
+1. `unsupported` / `contradicted` claim 不得继续以事实口吻留在 Summary / Key Results；删除、纠正或明确降级。
+2. `not-checkable` / `abstract-only` 必须就地标明 evidence boundary。
+3. `verification_status`：全部高风险 claim 为 `source-verified` → `source-checked`；部分不可核查但已降级 → `partial`；没有完成独立 source check → `unverified`。
+4. verifier 与 Finder 有分歧时，由主 agent 只基于 source locator 裁决；高影响分歧无法解决则保留 `not-checkable`，不得多数投票硬判真。
+
+### Step 5：保存与引用身份
+
+**`--prepare-only` 分支**：到此不落库，返回以下 artifact envelope 后停止：
+
+```text
+proposed_path: Papers/YYMM-ShortTitle.md
+source_identity: arxiv_id / DOI / canonical URL
+note_markdown: <完整笔记>
+verification: source-checked / partial / unverified
+claim_counts: total / source-verified / downgraded / disputed
+commit_preconditions: duplicate check passed / failed
+```
+
+禁止在 prepare-only 模式执行下面的共享写入。Coordinator 必须按 artifact envelope 顺序**串行**执行 direct commit contract：落笔记 → YAML/contract 校验 → cite key/BibTeX → queue 完成 → survey 记账 → 日志。单篇 direct 模式同样执行此 contract。
 
 1. **写入文件**：用 Write 将笔记保存到 `Papers/YYMM-ShortTitle.md`。
 
@@ -122,21 +182,16 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 
    第一条从 url 抽 `arxiv_id` 并写回 `cite_key`（幂等，已有 key 不变）；第二条把 arXiv/Crossref 权威 BibTeX 存入 `references/bibtex-cache.bib`（抓不到则从 frontmatter 重建）。两条都安全可重复执行。
 
-4. **追加日志**：用 Edit（或 Write 若文件不存在）将以下格式的 log entry 追加到 `Workbench/logs/YYYY-MM-DD.md`（日期为今天）：
+4. **阅读队列**：若 source 来自 `Workbench/queue.json` 的 `summarize_paper` 任务，在笔记、YAML 与引用身份均成功后运行：
 
-   ```markdown
-   ### [HH:MM] paper-digest
-   - **input**: <source 的原始内容>
-   - **output**: [[Papers/YYMM-ShortTitle]]
-   - **observation**: <一句话描述论文核心贡献>
-   - **status**: success
+   ```bash
+   python3 skills/1-literature/daily-papers/queue_ops.py complete \
+     --task-id <task_id> --output-path Papers/YYMM-ShortTitle.md
    ```
 
-   若日志文件不存在，先创建文件（包含一级标题 `# YYYY-MM-DD`），再追加 entry。
+   不直接手改 queue JSON；未完成落库前不得提前把任务标为 done。
 
-5. **阅读队列**：若 source 来自阅读队列（`Workbench/queue.md` 的 Reading 部分），用 Edit 将对应条目标记为已完成（如在行首添加 `✓` 或删除该条目）。
-
-### Step 6：survey 归属记账
+### Step 6：survey 归属记账与日志
 
 笔记保存后，运行记账脚本把它挂到相关 survey 的待更新队列：
 
@@ -154,20 +209,41 @@ python3 scripts/survey_updates.py record "Papers/{文件名}.md"
   必须遵守 `references/tags.md` 的 umbrella 规则，避免只标 `agentic-RL` 或宽泛 `environment`
   而漏记账。
 
+记账结束后，用 Edit（或 Write 若文件不存在）把以下 entry 追加到 `Workbench/logs/YYYY-MM-DD.md`：
+
+```markdown
+### [HH:MM] paper-digest
+- **input**: <source 的原始内容>
+- **output**: [[Papers/YYMM-ShortTitle]]
+- **observation**: <一句话描述论文核心贡献>
+- **verification**: <source-checked / partial / unverified；verified/total claim 数>
+- **survey_updates**: <匹配列表 / none / failed>
+- **run_id**: <由上层 orchestrator 传入；独立调用填 standalone-YYYYMMDD-HHMM>
+- **status**: success / partial
+```
+
+若日志文件不存在，先创建文件（包含一级标题 `# YYYY-MM-DD`）。survey 记账失败不撤销已落库笔记，但必须在 `survey_updates` 和 status 中明确记录 partial。
+
 ## Guard
 
 - **不覆盖已有笔记**：若 `Papers/YYMM-ShortTitle.md` 已存在，停止执行并告知 Human，不得覆盖或修改已有文件。
 - **不捏造信息**：所有字段必须来自论文原文。无法获取全文时，在受影响的章节开头标注 `> [未获取全文，仅基于 abstract]`，不得推测正文内容填充 Method / Key Results 等节。
+- **Finder ≠ Verifier**：生成 claim 的 agent 不得给同一 claim 判 `source-verified`。若无法派发独立 verifier，笔记只能标 `verification_status: unverified`，强 claim 必须降级。
+- **验证不等于复现**：`source-verified` 只说明 primary source 确实包含该 claim；不得写成结果已被独立复现或领域已形成共识。
+- **prepare-only 零共享写入**：prepare-only agent 禁止改 Papers、queue、日志、BibTeX cache 与 survey-updates；共享写入只由 coordinator 串行 commit。
 - **语言规范**：正文用中文撰写，英文技术术语（模型名、方法名、benchmark 名）保持英文，不做翻译。
 
 ## Verify
 
-- [ ] `Papers/YYMM-ShortTitle.md` 已创建且正文 >200 字
+- [ ] **direct 模式**：`Papers/YYMM-ShortTitle.md` 已创建且正文 >200 字；**prepare-only**：artifact envelope 含完整 `note_markdown` 且未发生共享写入
 - [ ] frontmatter 的 title、authors、date_publish 字段非空
+- [ ] frontmatter 的 `content_scope` 与 `verification_status` 合法
 - [ ] **YAML 前置校验通过**：所有含冒号的字段值已加双引号（title、venue 等）
-- [ ] **引用身份已固化**：frontmatter 的 `cite_key` 非空，`references/bibtex-cache.bib` 含该 key 的条目
+- [ ] **direct 模式引用身份已固化**：frontmatter 的 `cite_key` 非空，`references/bibtex-cache.bib` 含该 key；prepare-only 保留空 cite_key 供 coordinator commit
+- [ ] **Evidence Ledger 完整**：Summary / Key Results 中的高风险数字与比较均有 claim row、locator 和状态
+- [ ] **独立性**：source-verified claim 由不同于 Finder 的 verifier 检查；否则状态为 unverified
 - [ ] Summary 节非空且不超过 3 句话
-- [ ] 日志已追加到 `Workbench/logs/YYYY-MM-DD.md`
+- [ ] **direct 模式**日志与 survey 记账已完成；**prepare-only** 未修改日志、queue、BibTeX 或 survey-updates
 
 ## Examples
 

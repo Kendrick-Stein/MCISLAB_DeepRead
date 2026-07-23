@@ -54,10 +54,10 @@ agenda-evolve 是 MindFlow 研究议程的演化引擎。它定期审视 `Workbe
 
 ### Step 4：读取 Queue 中的 Questions 和 Review 条目
 
-用 Read 读取 `Workbench/queue.md`，提取两类条目：
+用 Read 读取 `Workbench/queue.json`，只看 `.queue[].task.status == "pending"`，提取两类任务：
 
-1. **Questions 部分**：Researcher 自问的悬而未决的研究问题。若某个问题已经积累了足够多的答案线索（在 insights 或论文中出现相关回答），该 question 可能触发一个新方向的诞生。
-2. **Review 部分**：已完成某类积累、等待 Researcher 决策的条目。特别关注"建议晋升至 DomainMaps"类条目，这类条目说明某个 validated insight 已足够成熟，可能值得围绕其开辟或强化一个研究方向。
+1. **`task_type: research_question`**：Researcher 自问的悬而未决问题。若已经积累足够回答线索，该 question 可能触发新方向。
+2. **`task_type: review_insight`**：等待 Human 审核的 DomainMap 晋升候选。它可以作为 agenda 判断输入，但 agenda-evolve 不得把 pending review 当成已批准，也不得自动修改对应 DomainMap。
 
 对每条相关条目，记录其内容摘要，供后续判断变更时参考。
 
@@ -269,7 +269,7 @@ priority 依据：高度相关 Mission 且有强证据支持 → high；与 Miss
 
 3. Read `Workbench/memory/failed-directions.md`，发现历史上"End-to-End Waypoint Regression"曾被废弃（原因：训练不稳定，与 Insight A 无直接冲突）。
 
-4. Read `Workbench/queue.md` Review 部分，发现一条"建议晋升至 DomainMaps"的条目，指向 Insight A，suggested_map 为 `DomainMaps/VLN.md`。
+4. Read `Workbench/queue.json`，发现一条 pending `review_insight` 任务，指向 Insight A，`metadata.suggested_map` 为 `DomainMaps/VLN.md`；保留 Human gate，不把它视为已批准。
 
 5. Glob + Read `Ideas/`，发现一个 `status: developing` 的 Idea "DiffusionPolicyTuning"，hypothesis 为"调整 action chunk size 可在操控任务上提升 10% 性能"，与 Insight B 高度吻合。
 

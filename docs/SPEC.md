@@ -2,7 +2,7 @@
 
 > 本文件是 ReadPaperMachine 的 single source of truth。
 
-**Last updated**: 2026-07-06（skill 通过 repo 内 `.claude/skills/` 符号链接自动注册，见 §1 Setup）
+**Last updated**: 2026-07-23（claim-level provenance、独立 source verification、run checkpoint 与单写者 commit）
 
 ---
 
@@ -78,13 +78,15 @@ ReadPaperMachine/
 ├── references/          # 协议文档
 │   ├── skill-protocol.md
 │   ├── memory-protocol.md
+│   ├── research-run-protocol.md
 │   ├── agenda-protocol.md
 │   └── tags.md
 │
 ├── Workbench/           # Researcher 工作状态
 │   ├── agenda.md        #   研究议程
 │   ├── memory/          #   蒸馏后的记忆
-│   ├── queue.md         #   待办队列
+│   ├── queue.json       #   持久任务队列（summarize_paper / review_insight 等）
+│   ├── runs/            #   多阶段 research run manifest 与 checkpoint
 │   ├── logs/            #   每日操作日志
 │   ├── survey-updates.json  # digest→survey 记账（paper-digest 写，survey-refresh 消费）
 │   └── evolution/       #   演化记录
@@ -161,3 +163,11 @@ ReadPaperMachine/
   - `cite_key`：LaTeX 引用 key，格式 `{lastname}{year}{firstTitleWord}`（如 `wen2026openrath`）。
 - **不变量**：`cite_key` 一旦写入**永久冻结**——保证已发草稿里的 `\cite{}` 永不失效。改 key 须手动编辑该字段；工具（`assign_cite_keys.py`）只为缺失的论文分配、绝不覆盖。
 - 权威 BibTeX 缓存在 `references/bibtex-cache.bib`（按 cite_key 索引，`source=arxiv|crossref|reconstructed`），由 `fetch_bibtex.py` 维护，勿手改。`references.bib` 由 `generate_bibtex.py` 从缓存 + frontmatter 组装。
+
+### 5.6 Evidence 与 Research Run 不变量
+
+- 新 Paper note 必须声明 `content_scope` 与 `verification_status`，并为数字、SOTA/novelty、benchmark 比较、license/code、因果/机制等高风险 claim 维护 `## Evidence Ledger`。
+- `source-verified` 只表示 primary source 确实包含该信息，不表示结果已独立复现。Finder/Digest 不得验证自己的 claim。
+- 多 Agent 工作流只并行读取、提取和 reviewer 工作；Papers、queue、日志、BibTeX、survey-updates、Survey/DomainMap 由 coordinator 串行 commit。
+- 多阶段工作在 `Workbench/runs/{run_id}.json` checkpoint；达到预算或部分失败时保留 partial artifact 与 unresolved gaps，不从头重跑，也不允许整轮无产物。
+- Memory 的独立证据按 canonical source identity 计数，不按日期、agent 或 run 计数；DomainMap 晋升必须经过 queue.json 的 `review_insight` Human gate。

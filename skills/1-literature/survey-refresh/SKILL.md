@@ -36,6 +36,13 @@ Key Takeaways / Open Questions。
 对 pending 中每篇，用 Read 读取 `Papers/` 笔记全文，提取：核心贡献、关键数据、
 与 survey 现有分类的关系（落入哪个既有小节？是否挑战某个既有结论？是否开辟新分类？）。
 
+同时读取 `content_scope`、`verification_status` 与 `## Evidence Ledger`：
+
+- `source-checked`：可使用 ledger 中 `source-verified` 的 claim，但仍只能表述为“原文一致性已核查”，不能写成独立复现。
+- `partial`：只使用 source-verified 行；其他 claim 必须降级或省略。
+- `unverified` / 缺少字段的 legacy note：可作为论文存在性与主题归类证据，但不得凭它新增关键数字、共识、Key Takeaway 或 Validated Gap。
+- `abstract-only`：不得支撑机制、失败条件、benchmark 横向比较或强 novelty claim。
+
 处理 `GUIAgent-Survey` 时，额外建立一行分类记录再决定落点：
 
 | 字段 | 允许值 / 判断 |
@@ -60,15 +67,15 @@ Key Takeaways / Open Questions。
 用 Edit 修改 `Topics/{survey-name}.md`（遵循 literature-survey 的增量更新规则）：
 
 1. 把每篇新论文以 `[[wikilink]]` 并入对应小节，附一句话定位（贡献 + 与既有工作的关系）。
-2. 若新证据**推翻或削弱**某既有结论，修改该结论并标注新证据来源；
-   未被挑战的原有内容一律保留。
+2. 若新证据**推翻或削弱**某既有结论，修改该结论并标注新证据来源；未被挑战的原有内容一律保留。若新论文是既有"共识"的独立反例，把该结论从共识**降级为争议**并记录冲突双方，而非只追加一句。
 3. 若多篇新论文形成新 pattern，可新增小节；更新 Key Takeaways / Open Questions。
 4. 更新 frontmatter：`date_updated` 设为今天，`papers_analyzed` 增加新并入篇数。
+5. 若本轮改变 Overview、benchmark 横向判断、Key Takeaways 或 Open Problems，同步更新 `## Key Evidence Matrix` 的 state、claim IDs/locators 与 contradiction boundary；普通增量无需新增矩阵行。
 
 `GUIAgent-Survey` 的额外更新规则：
 
 - 按 canonical 六层结构落位，不新建按单篇论文或临时热词命名的平行 taxonomy。
-- Benchmark 数字必须同时写清 environment setting、verifier、step budget（笔记有记录时）与是否同 backbone 对照。
+- Benchmark 数字必须对应 Evidence Ledger 中 `source-verified` 的 claim row，并同时写清 environment setting、verifier、step budget（笔记有记录时）与是否同 backbone 对照。
 - 只有新论文改变已有判断时才修改 Key Takeaways / Open Problems；普通增量只更新 primary subsection 或矩阵。
 - `papers_analyzed` 按唯一 `Papers/` wikilink 口径机械复核，不把 redirect survey 的旧统计相加。
 
@@ -109,6 +116,9 @@ python3 scripts/survey_updates.py clear --survey {survey-name} --papers "Papers/
 - 本 skill 是 DomainMaps 的唯一自动写入方；只写 `## 近期格局变化` 小节，
   不改 DomainMap 其他部分（Established Knowledge 等仍由 Human 经 queue Review 晋升）。
 - 只 clear 本轮实际处理（并入或跳过）的条目；未处理的留在 pending。
+- **引用 ≠ 继承/支持**：并入新论文时，其与既有工作的关系以内容判断（introduces/extends/contradicts/fails-to-reproduce…），不因它引用了某篇就自动记为支持或继承。
+- **不升格未验证结论**：本 skill 不做外部检索；库内无独立验证的结论标"库内暂无独立验证"，不得表述为共识或写"首次/无人研究"。
+- **Legacy note 限权**：缺 Evidence Ledger 的旧笔记可以保持既有引用，但本轮不得仅据它升级共识、关键数字或 Validated Gap；需要升级时交由下一次 full literature-survey 的 verification gate。
 
 ## Verify
 
@@ -116,6 +126,9 @@ python3 scripts/survey_updates.py clear --survey {survey-name} --papers "Papers/
 - [ ] 本轮每篇并入论文在 survey 正文中有 `[[wikilink]]`
 - [ ] survey-updates.json 中本轮条目（含跳过的）已清除
 - [ ] 日志已追加（merged/skipped/changes/domain_map 四项齐全）
+- [ ] 并入的关键结论可溯到全文笔记；未把仅 abstract 或单篇支持的结论表述为共识
+- [ ] 新增关键数字均对应 source-verified claim row；partial/unverified/legacy note 未被用于升级强结论
+- [ ] 若高层判断发生变化，Key Evidence Matrix 已同步；普通增量未制造冗余 claim rows
 
 ## Examples
 

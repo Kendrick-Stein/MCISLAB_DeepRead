@@ -1,9 +1,9 @@
 ---
 title: "GUI / Computer-Use Agent 统一研究综述"
 tags: [survey, gui-agent, computer-use, web-agent, mobile-agent, agentic-RL]
-date_updated: "2026-07-22"
-year_range: 2017-2026
-papers_analyzed: 90
+date_updated: "2026-07-23"
+year_range: 1997-2026
+papers_analyzed: 94
 keywords: [gui-agent, gui grounding, computer-use, web agent, browser agent, mobile agent, cua, desktop agent, os agent]
 exclude_tags: [deep-research]
 exclude_keywords: [deep research, information seeking, browsecomp, research agent, search agent]
@@ -86,6 +86,8 @@ flowchart LR
 
 ### 2.1 Observation 与 Grounding
 
+screenshot-native grounding 常被视为 LLM 时代的产物，其范式实则更早：[[Papers/0910-Sikuli]]（UIST 2009）已用 GUI 元素截图同时做检索与鼠标键盘定位，确立"看像素、按图操作、不依赖 API/坐标"路线。但它是纯外观模板匹配（MSER+SIFT）、无语义泛化——只能匹配确切截图、无法解析"点击提交按钮"，本质是 visual macro 而非 agent；RPA 与 programming-by-demonstration 则是 LLM agent 在产业界取代的对象（规则脚本、脆弱、无泛化）。LLM/VLM 补上的正是语义与 planning，而 pixels-in / keyboard-mouse-out 的范式自 Sikuli 未变。补进这条 pre-LLM 谱系可校正"视觉操作 UI 是 LLM 发明"的时序错觉。
+
 GUI observation 的三种基本形态对应一条清晰的发展线。最早的 web agent 依赖结构化输入——DOM / AXTree / element ID token-efficient 且便于精确操作，先解决了把自然语言目标转成可执行 navigation 的问题；但这一表示对 canvas、远程桌面和跨平台迁移脆弱，随着研究对象从 self-hosted web 扩展到 mobile 与 desktop，screenshot-only 取而代之成为通用路线：它与人类可见状态一致，跨平台性最强，代价是小目标、密集布局和动态页面使 grounding 成为显式瓶颈。
 
 工程实践因此收敛到 hybrid observation：screenshot + DOM/AXTree + bbox/SoM 兼顾语义和视觉，是工程上的主流折中。但通道叠加暴露了新问题——若没有 provenance、freshness 与一致性检查，更多通道也会把 stale structure 变成更强的错误证据：当结构通道滞后于界面真实状态时，“信息更多”反而为模型跟随过期证据提供了更强的理由。
@@ -124,7 +126,7 @@ Native end-to-end 与 compositional 之争的现状不是一方取代另一方�
 
 ### 2.4 Planning、Memory 与 Search
 
-Planning 的第一阶段是扩大 history 或引入 planner；第二阶段把成功轨迹压缩成 workflow/skill，[[Papers/2409-AgentWorkflowMemory]] 与 [[Papers/2504-SkillWeaver]] 分别代表自然语言和可执行资产；第三阶段则把 task progress、belief 与 recovery condition 显式化。[[Papers/2607-TSR]] 的 explicit task state 在 MobileWorld 最多提升 12 个百分点，却让 Qwen 在 AndroidWorld 下降 3.45 个百分点，说明状态维护只有在 horizon 与状态密度足以抵消额外 context 时才有净收益。
+Planning 的第一阶段是扩大 history 或引入 planner；第二阶段把成功轨迹压缩成 workflow/skill，[[Papers/2409-AgentWorkflowMemory]] 与 [[Papers/2504-SkillWeaver]] 分别代表自然语言和可执行资产，而 [[Papers/2606-SkillNb]] 用 selective formalization 把这条 NL–可执行光谱变成逐步可调的量：按执行证据决定每个步骤固化成代码还是保留为 NL，运行时 gate 校验不过就地回退（代码→NL→裸意图），并让 workflow 在 provisional/released/retired 间流转。它把评价单位从"单轮成功"移到"复用与漂移下的可靠性"——WebArena-Verified 单轮仅 53.7%（+3.9pp），但三次重跑保住 91.7% 初始成功任务（比次优高 15.5 分）、有限修复后回收 72.9% 失败且把修复后回归压到 4.2%（持续型 baseline 15–17%），且消融显示这条可靠性收益几乎全来自 gate（去 gate 回归从 3.3% 爆到 18.6%），而非把 skill 写成代码本身。第三阶段则把 task progress、belief 与 recovery condition 显式化。[[Papers/2607-TSR]] 的 explicit task state 在 MobileWorld 最多提升 12 个百分点，却让 Qwen 在 AndroidWorld 下降 3.45 个百分点，说明状态维护只有在 horizon 与状态密度足以抵消额外 context 时才有净收益。
 
 Memory 也不是越多越好。[[Papers/2605-MementoGUI]] 的多模态 memory controller 提高 GUI-Odyssey 成功率，但绝对 trajectory success 仍只有 3.57%，随机 episodic memory 还会拉低表现；问题已从“能否存历史”转成“哪些证据值得保留、何时可跨任务迁移”。Test-time search 同样依赖环境：[[Papers/2407-TreeSearchLMAgents]] 的回溯需要 reset+replay，[[Papers/2512-WebOperator]] 则证明不感知可逆性的 naive search 可能负收益。
 
@@ -183,7 +185,7 @@ Self-improvement 不是单一技术，而是按改进对象分化的四条路线
 | Tool / skill | executable asset | API skill、runtime patch | 权限扩大、跨版本失效 |
 | Workflow / harness | control flow | planner、retry、visual search、terminal assist | benchmark overfitting 与安全偏航 |
 
-Self-improvement 的共同前提不是“能生成更多经验”，而是每次演化都有独立、可追溯、不能被当前 policy 轻易操纵的验证。GUI 领域的 verifier-first 原则同时适用于权重、memory、skill 与 harness；否则系统会把偏差当成成功模式复用。
+Self-improvement 的共同前提不是“能生成更多经验”，而是每次演化都有独立、可追溯、不能被当前 policy 轻易操纵的验证。GUI 领域的 verifier-first 原则同时适用于权重、memory、skill 与 harness；否则系统会把偏差当成成功模式复用。[[Papers/2606-SkillNb]] 是这条原则在 skill/workflow 路线的具体 GUI 实例：workflow 每步的形式化与仓库更新只有在 environment-observable gate（不接触 hidden evaluator 标签）通过时才被接受，并按 repair 负担自动 demote/retire，直接缓解上表 tool/skill 路线的“跨版本失效”风险——GitLab 15.7→18.9 真实 DOM 漂移下 frozen-vs-fresh 差距仅 −1.7/+0.6pp；其消融证明可靠性收益几乎全来自 gate 而非“会写 skill”。
 
 本章仍缺少统一的 failure triage：同一个 0 reward 可能来自 policy support 缺失、credit assignment、validator 漏判、环境故障或 context staleness。下一步应先诊断失败来源，再决定使用 SFT、distillation、RL、runtime patch 还是环境改造，并把 multi-seed、multi-data-draw 与 held-out trajectory 设为最低报告标准。
 
@@ -322,6 +324,8 @@ GUI 评测最初依赖 agent 自报、最后截图或 element match；self-hoste
 
 可靠性研究已从“动作是否正确”推进到“agent 是否知道动作没生效、能否及时停止、恢复或求助”。Safety 也从 instruction-level maliciousness detection，推进到 action-consequence prediction，再到 architecture-level trust isolation；HCI 则开始把笼统的 human-in-the-loop 拆成 monitoring、intervention timing、context resumption 与 attention management。
 
+这些拆分大多是对 HCI 既有框架的**再发现**而非新问题——这是本 survey 之前缺失的邻域根基。[[Papers/9905-MixedInitiative]]（Horvitz, CHI 1999）早已把 agent 的 act / ask / wait 归为不确定性下的期望效用决策（置信度与 context 相关阈值 p* 的比较），[[Papers/9706-AutomationMisuse]]（Parasuraman & Riley, 1997，数千引用）则用 use / misuse / disuse / abuse 命名了 over-reliance、告警弃用与设计者过度自动化。当前 GUI oversight 工作把 SVM 换成 LLM 置信度、把邮件日程换成 GUI 操作，核心问题（何时自动、何时求助、如何校准信任）与根基一致；真正的新增量在长程、多 agent 与视觉界面上，而非重新命名这些现象。
+
 这三条路线共享一个条件：风险不能只在最终输出上判断。系统必须在执行前预测后果、执行后核验状态，在证据不足时 abstain 或请求人类介入，并把介入所需的信息控制在可理解的认知预算内。
 
 ### 7.1 Verify / Recover 是独立能力
@@ -355,7 +359,7 @@ GUI 评测最初依赖 agent 自报、最后截图或 element match；self-hoste
 
 后台运行的 CUA 带来一种不同于单步 confirmation 的监督问题：用户不能持续盯着 trajectory，却需要知道 agent 是否前进、何时出错，以及返回工作时发生了什么。[[Papers/2607-Sidekick]] 将交互拆成 background ambient cue、resume-time multimodal summary 与 foreground reasoning visualization；30 人实验中 spreadsheet errors 从 chat/peripheral text 的 2.51/2.32 降到 1.31，并提高总体任务表现。
 
-这一结果并不意味着“展示更多信息”总是更好。Sidekick 没有显著降低 task switch 或 monitoring time，也没有显著改变 trust/confidence；相对普通 chat 的总分优势仅边缘显著，实验还局限于单 CUA 与受控 spreadsheet workflow。开放问题由此变成：何时打断、展示哪些 execution evidence、如何在多 agent/多 workspace 中支持快速 context resumption，同时避免 alarm fatigue 与 automation bias。
+这一结果并不意味着“展示更多信息”总是更好。Sidekick 没有显著降低 task switch 或 monitoring time，也没有显著改变 trust/confidence；相对普通 chat 的总分优势仅边缘显著，实验还局限于单 CUA 与受控 spreadsheet workflow。开放问题由此变成：何时打断、展示哪些 execution evidence、如何在多 agent/多 workspace 中支持快速 context resumption，同时避免 alarm fatigue 与 automation bias。这里的 automation bias 与 alarm fatigue 并非新现象：[[Papers/9706-AutomationMisuse]] 早已区分 misuse 的 omission（agent 漏、人没接住）与 commission（人执行 agent 的不当建议）两类监控失败，并用告警的 base-rate 问题（cry wolf）解释用户为何关掉 guardrail——提示 GUI agent 的告警应走 likelihood 分级而非二元弹窗，且两类错误须分开度量。
 
 ## 8. Datasets & Benchmarks
 
@@ -464,3 +468,14 @@ GUI benchmark 的发展与能力抽象同步：static grounding 先隔离“看�
 - **未改**：五阶段叙事脊柱、既有 84 篇 wikilink、各章原有数字。校准以增补 + 重新框定为主，不删既有内容。
 - **建议加入 DomainMaps**：GUI-Agent DomainMap 可增记"评测可信度危机（可刷分/gold 泄漏/cost-Pareto 缺席）"与"grounding 泛化仍是 #1 bottleneck 与 accountable-state thesis 的张力"两条。
 - **引用 grounding（同日补做）**：先前作为裸名字引用的工作已接成 wikilink——UI-TARS-2（[[Papers/2509-UITARS2]]）、GUI-Owl-1.5/Mobile-Agent-v3.5（[[Papers/2602-Mobile-Agent-v3.5- Multi-platform Fundamental GUI Agents]]）、OS Agents survey（[[Papers/2508-OSAgentsSurvey]]）三篇 vault 已有笔记；新 digest 三篇并接入正文：[[Papers/2512-MobileWorld]]（§8 benchmark 表）、[[Papers/2407-AgentsThatMatter]] 与 [[Papers/2510-HAL]]（§6.3 cost-Pareto）。仍未 digest：WebArena Verified、AGUVIS collection（作为 canon 名词引用，暂未建笔记）。
+
+### 2026-07-22 literature-survey（覆盖度审计驱动，补 pre-LLM + HCI 根基）
+
+- **触发**：dogfood 新优化的 literature-survey skill（覆盖度审计 + 矛盾/负结果/邻域/术语漂移检索）。
+- **覆盖度审计**：确认 survey 盲点不在 frontier（已饱和）而在结构性根基——(1) pre-LLM 自动化谱系（RPA/PbD/Sikuli）零覆盖；(2) HCI oversight 只由 GUI 论文自身支撑、未接 human-factors 根基；(3) accountable-state thesis 主要靠 16 篇 2607 preprint 单来源。
+- **gap-driven 检索（4 类）**：术语漂移→Sikuli/RPA/PbD 谱系；邻域→Horvitz mixed-initiative、Parasuraman automation bias；矛盾/负结果→2604.17849(reliability)、2604.17817(screentext)、2605.05716/2604.27891(通用 agent scaffold 干扰)。
+- **triage（verify-before-new）**：子代理找的 frontier 反证中 2607.04334=[[Papers/2607-GUIStateBelief]]、OSWorld 2.0=[[Papers/2606-OSWorld2]]、LearningFromFailure（2606.31270，vault 已有）均已在库，跳过不重复 digest。
+- **新 digest 并入 3 篇 foundational（全文）**：[[Papers/0910-Sikuli]]（§2.1 pre-LLM pixel-grounding 谱系）、[[Papers/9905-MixedInitiative]]（§7 章首 oversight 根基）、[[Papers/9706-AutomationMisuse]]（§7 章首 + §7.4 automation bias 根基）。papers_analyzed 90→93，year_range 起点 2017→1997。
+- **consensus 纪律**：三篇为独立、数千引用的 HCI/自动化 canon，作 established 根基呈现，框定当前 GUI oversight 多为再发现（新增量在长程/多 agent/视觉界面）。
+- **未 digest 的 coverage 候选**（留待后续）：2604.17849 CUA reliability variance、2604.17817 smartphone screentext failures（GUI-specific frontier 负结果）；2605.05716/2604.27891（通用 agent scaffold 干扰，非 GUI core，可留 AgenticRL 方向）。
+- **建议加入 DomainMaps**：GUI-Agent DomainMap 可记"pre-LLM 谱系（Sikuli/RPA/PbD）"与"oversight 的 HCI 根基（Horvitz/Parasuraman）"两条历史锚点。

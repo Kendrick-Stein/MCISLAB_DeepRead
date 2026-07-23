@@ -52,6 +52,10 @@ allowed-tools: Read, Write, Edit, Glob, Grep
 3. **影响力估算**：审稿人会在意这个结果吗？
    - "So what?" 测试：若实验成功，是否改变人们对该问题的认知？
    - 结论是 actionable 的，还是仅仅 interesting？
+4. **Gap 质量检查**（淘汰伪 idea）：
+   - 不是单纯"A+B 组合"——必须有机制假设说明为什么该组合会 work，以及为什么以前没人做（困难/无价值/资源不足/被忽略，四选一并说明）
+   - 不是把某论文的 Limitations / Future Work 原样当 idea——作者列的 future work 是宣传性清单，不等于高价值 gap
+   - 对应的是 survey Open Problems 中的 **Validated Gap**（经 prior-art 检索），而非未验证的 Observed Tension
 
 淘汰未通过任一检查的 idea，通常剩余 4-6 个。
 
@@ -91,6 +95,8 @@ allowed-tools: Read, Write, Edit, Glob, Grep
 - **不捏造文献支持**：`## Hypothesis` 中 `closest works` 引用必须指向 vault 中 `Papers/` 目录下已存在的笔记（`[[Papers/YYMM-ShortTitle]]`）；若尚无相关 Paper 笔记，写"暂无相关笔记，建议先 paper-digest X"，不得引用不存在的链接。
 - **不直接修改 agenda.md**：idea-generate 的产出只写入 `Ideas/`；是否将某个 idea 纳入 agenda 的 direction，由 agenda-evolve skill 或 Supervisor 决策，idea-generate 不擅自修改 `Workbench/agenda.md`。
 - **hypothesis 必须可证伪**：若某个候选 idea 的假设无法在合理实验条件下被证伪（如过于宽泛的"改进 VLA 的泛化能力"），不得写入文件；须拒绝该候选，并在输出中说明原因，改换更具体的方向。
+- **不把 Limitations/Future Work 当 idea**：论文作者的 future work 与 limitation 是宣传性/免责性清单，不得原样转成研究 idea；idea 必须建立在结构化证据（矛盾/机制缺口/未验证假设/测量缺口）之上。
+- **A+B 组合须带机制假设**：仅"把方法 A 用到领域 B"或"A 和 B 结合"而无机制假设与必要性论证的，不得写入文件。
 - **语言规范**：正文用中文撰写，英文技术术语（模型名、方法名、benchmark 名、任务名）保持英文，不做翻译。
 
 ## Examples

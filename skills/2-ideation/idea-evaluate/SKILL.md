@@ -43,12 +43,16 @@ idea-evaluate 支持两种输入：
 - **Key Results**：主要实验结果（判断 idea 的 Novelty 和 Evidence）
 - **Strengths & Weaknesses**：先前工作的局限（判断 idea 的 Feasibility 和 Impact）
 
-### Step 2：WebSearch 补充外部证据
+### Step 2：Prior-art challenge（WebSearch 反向验证）
 
-用 WebSearch 搜索与 idea 核心假设相关的最新工作（vault 外的论文、博客、技术报告）：
-- 搜索关键词从 hypothesis 和 approach sketch 中提取
-- 重点关注：是否已有非常相似的工作（影响 Novelty）、是否有新的实验证据支持或反驳假设（影响 Evidence 和 Risk）
-- 将发现整合到后续评分中，若发现高度相似的已有工作需在 Novelty 说明中注明
+目标不是证明 idea 新颖，而是**尽最大努力推翻它的新颖性**。用 WebSearch 至少覆盖：idea 原始表述、核心机制的术语、应用场景变体、相邻学科的别名，以及 limitation / failed / replication 类反向词。
+
+- 关键词从 hypothesis 与 approach sketch 提取；**机制层术语优先于方法名**（避免只搜当前流行词而漏掉旧名称/邻域工作）。
+- 找到最接近的已有工作（closest prior art），据此给出 prior-art 状态标签：
+  - **CONFIRMED_UNDEREXPLORED**：检索到少量相关工作，但核心问题仍缺系统研究或关键证据
+  - **PARTIALLY_ADDRESSED**：已有工作覆盖部分，须缩小 / 重新定义 idea
+  - **INVALIDATED**：已有直接工作解决或系统研究了该问题 → Novelty 记 1-2，建议淘汰或 pivot
+- 检索为空只能记"当前检索范围内未发现"，不得作为"新颖"的充分证据（未检索到 ≠ 无人研究）。将发现整合进后续评分。
 
 ### Step 3：读取 DomainMaps 上下文
 
@@ -65,10 +69,12 @@ idea-evaluate 支持两种输入：
 综合前三步收集的信息，对以下五个维度分别给出 **1-5 分**和简要说明（1-3 句话）：
 
 #### Novelty（1-5）
-评估 idea 与已有工作的差异化程度：
-- **5**：核心方法/框架在 vault 中无先例，与相关论文有明确区分
-- **3**：有新角度，但与已有工作重叠较多，需要进一步差异化
-- **1**：与已有论文高度重复，几乎无新贡献
+评估 idea 与已有工作的差异化程度（须与 Step 2 的 prior-art 状态一致）：
+- **5**：核心方法/框架无先例，与最接近工作有明确**机制**区分（CONFIRMED_UNDEREXPLORED）
+- **3**：有新角度但与已有工作重叠较多，需进一步差异化（PARTIALLY_ADDRESSED）
+- **1**：与已有工作高度重复，或只是"A+B 组合"而无新机制假设（INVALIDATED）
+
+延伸/组合本身不算 novelty；"竞争窗口"若出现在 Risk 节即为淘汰信号。
 
 #### Feasibility（1-5）
 评估当前资源条件（算力、数据、工程能力）下能否在合理时间内完成：
@@ -98,6 +104,7 @@ idea-evaluate 支持两种输入：
 
 - [ ] 5 个维度均有评分（1-5）和简要说明
 - [ ] Novelty line 已按格式输出（`**Novelty**: X/5 — closest works: ...`），closest works 引用指向 vault 中已有的 Paper 笔记
+- [ ] Novelty line 含 prior-art 状态标签（CONFIRMED_UNDEREXPLORED / PARTIALLY_ADDRESSED / INVALIDATED），且无未验证的"首次/无人研究"表述
 - [ ] 总分已计算
 - [ ] Reasoning 已给出（2-4 句话）
 

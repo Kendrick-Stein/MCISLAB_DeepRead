@@ -1,8 +1,8 @@
 ---
 name: daily-papers
 description: 每日论文总结。抓取 HuggingFace Daily/Trending + arXiv + venue 源（OpenAlex 期刊 IJCV/TNNLS/TPAMI、CVF 顶会 CVPR/ICCV/WACV）最新论文，按研究方向打分筛选， 生成论文笔记后基于深度阅读写出有态度的总结锐评。 触发词："今日论文总结""过去3天论文总结""过去一周论文总结""看看最近有什么论文"
-argument-hint: "[今日 / 过去N天 / 过去一周]"
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep
+argument-hint: "[今日 / 过去N天 / 过去一周] [--collect-only --run-id <parent>]"
+allowed-tools: Bash, Read, Write, Edit, Glob, Grep, WebSearch, WebFetch, Agent
 ---
 
 ## Purpose
@@ -11,9 +11,9 @@ allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 
 1. **Python 脚本**抓取 + 打分（零 token）
 2. **快速分流** → 确定必读论文
-3. **每篇必读论文**：独立 subagent 生成笔记 + 基于笔记写单篇点评 → 主 agent 汇总锐评和分流表，保存文件
+3. **每篇必读论文**：Digest preparer 生成已 source-check 的 draft → coordinator 串行 commit → 独立 reviewer 基于笔记写点评 → 主 agent 汇总
 
-> **关键设计**：单篇点评由生成笔记的 subagent 在同一会话内完成——它此时刚读完论文、有完整上下文；让主 agent 读回笔记重写点评是对 context 的浪费，且摘要驱动的重写容易丢失笔记里的 ablation / caveat 细节。
+> **关键设计**：Finder / Digest / Reviewer 分离。Reviewer 只接收已落库笔记及其 Evidence Ledger，不接收 digest agent 的推理过程；context 节省通过 `paper-digest --prepare-only` 的紧凑 artifact envelope 和 bounded batch 实现，不以作者自审替代独立判断。
 
 ## Steps
 
@@ -27,6 +27,10 @@ allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 - 无特殊指定 → 默认当天
 
 将解析出的天数存为 `DAYS` 变量。
+
+`--collect-only` 供 `research-team` Collector 使用：接收 parent `run_id`，执行抓取、去重、分流后返回候选与“要精读”IDs；不更新 queue、不创建嵌套 manifest、不派发 digest/reviewer、不写 daily summary/log。Parent coordinator 负责 checkpoint 与后续串行 enqueue。
+
+普通模式生成本次 `run_id`（如 `daily-20260723-0930`），按 `references/research-run-protocol.md` 创建或更新 `Workbench/runs/{run_id}.json`。每完成一个 stage 或一批 commit 就原子更新；即使后续失败，也必须保留可读的 partial state。
 
 ### Step 1：抓取 + 打分（Python 脚本，零 token）
 
@@ -92,6 +96,8 @@ Read `candidates`（已按关注账号 + 关键词打分排序）。对每条：
 
 把"要精读"论文写入 `Workbench/queue.json`，作为持久 backlog——这样即使本次 inline digest 未全部完成（论文太多 / 网络中断），剩余论文仍会留存，由 autoresearch 的 `paper-digest` 继续消费。
 
+若为 `--collect-only`，此处只返回分流结果与稳定 `paper_key` / arXiv IDs，然后停止；禁止执行 enqueue 与后续 Step 3-5。
+
 收集"要精读"论文的 arXiv id（从 `.candidates.json` 的 url 中提取，如 `2605.21573`），运行：
 
 ```bash
@@ -100,17 +106,44 @@ python3 skills/1-literature/daily-papers/queue_ops.py enqueue \
   --ids <id1> <id2> ...
 ```
 
-脚本自动去重（已有笔记或已在队列的跳过）、自清理（已有笔记的 pending 任务剪除）、并按 `max_queue_size` 裁剪。Step 3 的 inline digest 落地笔记后，下次 enqueue 会自动剪除这些任务，无需手动标记完成。
+脚本自动去重（已有笔记或已在队列的跳过）、自清理历史遗留的“已有笔记但仍 pending”任务，并按 `max_queue_size` 裁剪。正常路径由 Step 3 coordinator 在 artifact 安全 commit 后调用 `queue_ops.py complete` 标记 done。
 
-### Step 3：每篇要精读论文 → 笔记 + 单篇点评
+### Step 3：每篇要精读论文 → Prepare、串行 Commit、独立点评
 
-**每篇要精读论文派发一个 subagent**，指示它：
-1. 调用 `paper-digest` skill 生成笔记；若笔记已存在，则直接读取已有笔记（`paper-digest` 会自动固化 `cite_key` + 缓存权威 BibTeX，无需额外操作）
-2. 基于笔记正文（而非摘要），依照点评原则生成点评，并按点评模版返回点评
+从 `Workbench/config/team-config.json` 读取 `digest.parallel_limit`、`prepare_parallel_limit`、`review_parallel_limit`、`orchestration.checkpoint_every` 与 role policy。默认 global=4 / prepare=2 / reviewer=2 / checkpoint=3。Global limit 包含 nested verifier；必须给 verifier 和 coordinator 留槽位，不得把所有候选无界并发派发。
+
+#### Phase A：并行 Prepare（无共享写入）
+
+**每篇要精读论文派发一个 digest preparer**，指示它：
+
+1. 调用 `paper-digest <source> --prepare-only`。
+2. 按 paper-digest 内部协议由独立 verifier 检查高风险 claim。
+3. 返回 artifact envelope：proposed path、完整 note、verification、claim counts、duplicate precondition。
+4. 禁止写 Papers、queue、日志、BibTeX cache、survey-updates 与 daily 文件。
+
+每批最多 `prepare_parallel_limit` 个 preparer，且所有 preparer + nested verifier 不得突破 global `parallel_limit`。每批结束更新 run manifest；单篇失败记录原因并继续，不丢失已完成 artifact。
+
+#### Phase B：Coordinator 串行 Commit
+
+主 agent 按候选优先级逐个处理 artifact envelope：
+
+1. commit 前重新做 title / arXiv / DOI 去重；重复则不写并记录。
+2. 严格执行 `paper-digest` Step 5-6 direct commit contract：写笔记 → YAML/contract 校验 → cite key/BibTeX → queue complete → survey 记账 → 日志。
+3. 每 commit `checkpoint_every` 篇更新 manifest；共享状态一次只允许一个 writer。
+4. 某篇 commit 失败时不得回滚已成功论文；manifest 标 `partial` 并继续安全项。
+
+#### Phase C：独立 Reviewer
+
+对每篇已 commit 或已存在的必读论文，派发**不同于 digest preparer 的 reviewer agent**：
+
+1. 只提供 Paper note、Evidence Ledger、研究兴趣；不提供 Finder/Digest 的 reasoning、rating 或原点评。
+2. 基于全文笔记而非候选摘要，按点评原则生成点评。
+3. Evidence Ledger 中 `unsupported` / `contradicted` / `not-checkable` 的 claim 不得包装成肯定结论；必要时在锐评中明确指出 evidence boundary。
+4. Reviewer 不修改 Paper note 或共享状态，只返回点评块。
 
 **范围控制**：仅对"要精读" 论文执行，"可跳过"不派发 subagent。
 
-**并行执行**：要精读论文全部并行派发（background agents）。等待所有返回后再进入下一步。
+Reviewer 最多 `review_parallel_limit` 个并行；不要等待所有论文成功后才首次产出。只要有已 commit 论文就能形成 partial summary，最终再合并剩余结果。
 
 #### 点评模板
 
@@ -141,7 +174,7 @@ python3 skills/1-literature/daily-papers/queue_ops.py enqueue \
 
 ### Step 4：汇总点评 + 生成总结文件
 
-汇总论文点评，生成总结文件，保存到 `Workbench/daily/YYYY-MM-DD.md`（日期为目标日期）。若文件已存在，覆盖写入。
+汇总独立 reviewer 的点评，生成总结文件，保存到 `Workbench/daily/YYYY-MM-DD.md`（日期为目标日期）。若部分论文失败，仍输出可用总结，并在开头标 `run_status: partial` 与失败清单；不得因最后一个 agent 超时而让整轮无产物。若文件已存在，覆盖写入。
 
 写入后执行 YAML 前置校验：检查 frontmatter 中含冒号的字段值是否已加双引号，若未加则立即用 Edit 修复。
 
@@ -194,6 +227,8 @@ tags: [daily-papers, tag1, tag2, ...]
 - **input**: {DAYS} 天
 - **output**: [[Workbench/daily/YYYY-MM-DD]]
 - **observation**: 抓取 K 篇，精读 N 篇（rating 3: X / 2: Y / 1: Z），跳过 M 篇
+- **verification**: source-checked / partial / unverified 各 N 篇；高风险 claims verified/total
+- **run_id**: <run_id>（manifest: Workbench/runs/<run_id>.json）
 ```
 
 若日志文件不存在，先创建文件（包含一级标题 `# YYYY-MM-DD`），再追加 entry。
@@ -206,4 +241,7 @@ tags: [daily-papers, tag1, tag2, ...]
 - [ ] `Workbench/daily/YYYY-MM-DD.md` 已创建
 - [ ] 评分表中的 `[[#{短标题}]]` 链接与论文点评的 `### {短标题}` 完全匹配
 - [ ] 要精读论文笔记已生成，论文点评基于笔记内容
+- [ ] Digest preparer 使用 `--prepare-only`，共享状态由 coordinator 串行 commit
+- [ ] 每篇点评由不同于 Digest/Finder 的 reviewer 生成，且只依赖笔记 + Evidence Ledger
+- [ ] run manifest 包含 stage/checkpoint/失败清单；partial run 仍有可读总结
 - [ ] 日志已追加到 `Workbench/logs/YYYY-MM-DD.md`

@@ -29,6 +29,8 @@ autoresearch 是 MindFlow 的核心研究循环，实现了 PhD 导师制中 Res
 5. 用 Glob 列出最近 3 天的 `Workbench/logs/YYYY-MM-DD.md`，用 Read 读取，了解近期执行了什么（避免重复行动）
 6. `Workbench/survey-updates.json` — 各 survey 积压的新论文（信息流闭环的消费信号）
 7. 用 Glob 列出最近的 `News/YYYY-MM-DD.md`（若目录存在），了解非论文信息源的最新动态线索
+8. `Workbench/runs/` 中最近的 `partial` / `in_progress` manifest（格式见 `references/research-run-protocol.md`）——优先恢复同一目标的安全 checkpoint，避免重复搜索和 digest
+9. `Workbench/config/team-config.json` 的 orchestration/model policy——读取本轮 paper/search/time budget、checkpoint 与 fallback
 
 若 `focus` 参数指定了某个 direction，重点关注该 direction 相关的信息。
 
@@ -39,6 +41,8 @@ autoresearch 是 MindFlow 的核心研究循环，实现了 PhD 导师制中 Res
 | 状态信号 | 可能的行动 |
 |:--------|:----------|
 | queue.json 有 `status: pending` 的论文任务，或 `Workbench/daily/` 最近总结里有值得深读的论文 | 读取 `skills/1-literature/paper-digest/SKILL.md` 并执行 |
+| queue.json 有 `task_type: review_insight` 且 `status: pending` | 把 claim、evidence refs、suggested_map 加入给 Supervisor 的 review 摘要；不得由 autoresearch 代替 Human 批准 |
+| Workbench/runs 有同目标 partial run 且 checkpoint 可恢复 | 优先继续该 run 的下一个未完成 stage，不重新执行 discovery |
 | agenda 中某 direction 缺乏文献支撑（evidence 稀疏） | 读取 `skills/1-literature/literature-survey/SKILL.md` 并执行 |
 | vault 中有多篇相关论文但未做对比分析 | 读取 `skills/1-literature/literature-survey/SKILL.md` 并执行（其综合步骤即跨论文对比，产出 `Topics/*-Survey.md`） |
 | survey-updates.json 中 `GUIAgent-Survey` 有任意 pending（≥1 篇） | 下一轮优先读取 `skills/1-literature/survey-refresh/SKILL.md` 并执行；GUI canonical survey 不等待批量阈值 |
@@ -54,6 +58,7 @@ autoresearch 是 MindFlow 的核心研究循环，实现了 PhD 导师制中 Res
 
 判断时优先考虑：
 
+- 可安全恢复的 partial run（先完成已有承诺，再开新 run）
 - agenda 中 priority: high 的 direction 的 next_action
 - queue 中积压的待处理项
 - 最近未被处理的完成态工作（如 completed experiment 未分析）
@@ -79,6 +84,9 @@ survey，同时不在同一轮串联两个 skill。
 - **judgment**: <为什么选这个行动（一句话推理）>
 - **action**: <调了哪个 skill，传了什么参数>
 - **outcome**: <产出了什么文件/更新>
+- **run_id**: <关联 manifest；无则 standalone-YYYYMMDD-HHMM>
+- **verification**: <source-checked/partial/unverified 与 disputed claim 摘要；不适用填 n/a>
+- **budget**: <paper/search/time budget 使用情况；不可得填 n/a>
 ```
 
 然后回到 Step 1 开始下一轮。
@@ -89,6 +97,8 @@ survey，同时不在同一轮串联两个 skill。
 
 - [ ] 本轮有明确的 skill 调用（不允许"思考了一圈但什么都没做"）
 - [ ] 日志已追加本轮记录（包含 state_summary / judgment / action / outcome 四个字段）
+- [ ] 有 run 的行动已更新 manifest；partial 状态可从 checkpoint 恢复
+- [ ] paper/survey 行动报告了 verification boundary，未把 source check 写成独立复现
 
 ## Guard
 
@@ -99,6 +109,9 @@ survey，同时不在同一轮串联两个 skill。
 - **不对外发布**：不投稿论文、不发送外部通讯——PhD 导师制的唯一硬约束
 - **Skill 执行规范**：调用卫星 skill 时，必须先 Read 对应的 SKILL.md 文件，严格按其 Steps 和 Guard 执行。不要凭记忆执行——每次都重新读取 SKILL.md
 - **日志完整**：每轮的 LOG 步骤不可跳过，即使 skill 执行失败也要记录失败原因
+- **预算停止**：达到本轮 budget 后不再派发新工作；完成当前安全 commit，写 partial manifest 与 unresolved gaps 后停止。
+- **Human gate**：`review_insight`、高影响 disputed claim 与 DomainMap 晋升不得由 autoresearch 自动批准。
+- **恢复优先**：同目标存在可恢复 partial run 时，不得新开重复 discovery run。
 
 ## Examples
 

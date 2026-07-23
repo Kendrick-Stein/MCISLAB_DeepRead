@@ -87,7 +87,7 @@ A bulleted list of rules the skill must never violate. These act as hard constra
 
 - Never overwrite an existing paper note without explicit user confirmation.
 - Never modify `agenda.md` Mission section.
-- Do not mark an insight as `validated` without ≥2 independent evidence sources.
+- Do not mark an insight as `validated` without ≥3 unique canonical source_ids, verified support, and a contradiction check. Logs/runs are audit pointers, not independent evidence.
 - Copilot mode: produce a draft only — output to conversation for Supervisor review before writing files.
 ```
 

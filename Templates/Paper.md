@@ -11,6 +11,8 @@ doi: "%% DOI，如 10.1109/TPAMI...；期刊/会议有则填，否则留空 %%"
 cite_key: "%% 引用 key（如 wen2026openrath），留空由 assign_cite_keys.py 分配。一旦写入永久冻结 %%"
 code:
 rating: "%% 1=不相关, 2=了解即可, 3=有参考价值, 4=重要, 5=必读 %%"
+content_scope: "%% full-text / abstract-only %%"
+verification_status: "%% source-checked / partial / unverified；仅表示原文一致性核查，不表示独立复现 %%"
 date_added: "{{date}}"
 ---
 ## Summary
@@ -24,6 +26,13 @@ date_added: "{{date}}"
 
 ## Key Results
 %% 主要实验结果，包含具体数字和 benchmark 名称。 %%
+
+## Evidence Ledger
+%% 只列高风险 claim：数字、SOTA/novelty、benchmark 可比性、license/code、因果或机制断言。Source locator 用 page/section/table/figure；Evidence excerpt 为原文短摘录（≤25 words）。Status 允许 source-verified / unsupported / contradicted / not-checkable / abstract-only。source-verified 仅表示 primary source 确实包含该信息，不表示结果已被独立复现。 %%
+
+| Claim ID | Claim | Type | Source locator | Evidence excerpt | Status |
+|:--|:--|:--|:--|:--|:--|
+| C1 |  |  |  |  |  |
 
 ## Strengths & Weaknesses
 %% 方法亮点与局限的个人评价，以及对领域的潜在影响。 %%

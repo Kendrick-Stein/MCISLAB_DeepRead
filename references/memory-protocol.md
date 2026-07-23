@@ -22,8 +22,8 @@ Workbench/
 
 | File | Purpose | Key Fields |
 |---|---|---|
-| `patterns.md` | Early-stage observations that recur across sources; feeds the promotion pipeline | observation, occurrences, confidence (low/medium), needs_verification |
-| `insights.md` | Curated claims with evidence and confidence tracking; provisional -> validated | claim, evidence, confidence, source, impact, status |
+| `patterns.md` | Early-stage observations that recur across sources; feeds the promotion pipeline | observation, occurrences, evidence, source_ids, confidence, needs_verification |
+| `insights.md` | Curated claims with canonical evidence identity and confidence tracking | claim, evidence, source_ids, audit_logs, confidence, source, impact, status, status_history |
 | `effective-methods.md` | Strategies that worked, with context and caveats | context, method, evidence, pitfalls |
 | `failed-directions.md` | What was tried and why it was abandoned; prevents re-exploring dead ends | original_hypothesis, evidence_against, lesson, related_directions |
 
@@ -43,6 +43,7 @@ All memory files use the same heading-and-bullet structure. Entries are **append
 
 Each file's specific fields are listed in the table above. Common rules:
 - Use Obsidian `[[wikilinks]]` for all evidence references.
+- Store canonical `source_ids` beside wikilinks. Logs are audit pointers, not independent evidence.
 - Claims and hypotheses must be falsifiable and specific.
 - `confidence` in `patterns.md` is capped at `medium` — validated patterns belong in `insights.md`.
 
@@ -55,11 +56,11 @@ Knowledge is promoted upward through five levels as evidence accumulates.
 ```
 Level 4  Domain Map           DomainMaps/{Name}.md
          Stable, integrated knowledge
-              |  Researcher promotes when evidence sufficient
+              |  Human approves pending review_insight task
 Level 3  Validated Insight    insights.md, status: validated
-              |  >=2 independent sources confirm
+              |  >=3 canonical sources + quality/contradiction gate
 Level 2  Provisional Insight  insights.md, status: provisional
-              |  Pattern observed >=3 times independently
+              |  >=2 canonical sources support
 Level 1  Pattern              patterns.md
               |  memory-distill extracts from logs
 Level 0  Raw Log              Workbench/logs/
@@ -70,9 +71,11 @@ Level 0  Raw Log              Workbench/logs/
 | Transition | Trigger | Who |
 |---|---|---|
 | L0 -> L1 | `memory-distill` processes session logs and extracts recurring observations | Researcher (via skill) |
-| L1 -> L2 | Pattern appears in >=3 independent sources | Researcher (via skill) |
-| L2 -> L3 | Provisional insight supported by >=2 independent evidence sources | Researcher (via skill) |
-| L3 -> L4 | Researcher judges evidence sufficient for Domain Map integration. No numeric threshold — Researcher uses judgment. Logged to `evolution/changelog.md` | Researcher |
+| L1 -> L2 | Pattern has >=2 unique canonical source_ids | Researcher (via skill) |
+| L2 -> L3 | >=3 source_ids, source/experiment verification passes, and no unresolved contradiction | Researcher (via skill) |
+| L3 -> L4 | `review_insight` is approved; no numeric threshold replaces Human judgment | Human |
+
+**Independent-source rule**: identity is based on the underlying paper/experiment/dataset/code artifact, not date, agent, run, URL variant, or venue version. The same paper summarized on three dates remains one source. `source-verified` means the primary source contains the claim; it is not an independent replication.
 
 ---
 

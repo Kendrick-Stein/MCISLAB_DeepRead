@@ -66,17 +66,18 @@ mkdir -p website/content/static/presentations/{DomainName}/images
 ### Step 6 · 在 queue Review 提建议
 
 不直接修改 Domain Map 文件（DomainMaps 的直接编辑仅由 survey-refresh 的 `## 近期格局变化`
-小节或 Human 完成）。用 Edit 将以下条目追加到 `Workbench/queue.md` 的 Review 部分，
-建议 Human 手动补充导航链接：
+小节或 Human 完成）。通过 queue helper 把建议写入 `Workbench/queue.json` 的 Human review：
 
-```markdown
-### [YYYY-MM-DD] 建议在 DomainMaps/{DomainName}.md 添加可视化演示链接
-- **suggested_map**: DomainMaps/{DomainName}.md
-- **suggested_content**:
-  ## 可视化演示
-
-  [🌐 在线浏览 HTML 演示](/static/presentations/{DomainName}/index.html) — 杂志风格翻页展示
+```bash
+python3 skills/1-literature/daily-papers/queue_ops.py enqueue-review \
+  --insight-ref "website/content/static/presentations/{DomainName}/index.html" \
+  --title "Add DomainMap presentation link: {DomainName}" \
+  --claim "建议在 DomainMaps/{DomainName}.md 增加已生成 HTML 演示的导航链接" \
+  --suggested-map "DomainMaps/{DomainName}.md" \
+  --source "domain-presentation"
 ```
+
+Human 批准后再补入：`[🌐 在线浏览 HTML 演示](/static/presentations/{DomainName}/index.html)`。
 
 ## 输出位置
 

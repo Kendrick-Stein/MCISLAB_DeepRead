@@ -32,9 +32,9 @@ Web agent 训练 infra 的焦点已经从“再设计一个 agent policy”转�
 
 ## 新读锚点
 
-**[[Papers/2603-AgentSynth]]** 是任务供给侧的核心论文。它用简单子任务链和 final summarization 制造 information asymmetry，把可验证子任务组合成长程 computer-use task；6,000+ tasks、hard-task generation 52% vs direct 11%、约 $0.60/trajectory。它解决的是“哪里来足够多的可验证任务”，不是 rollout throughput。
+**[[Papers/2603-AgentSynth]]** 是任务供给侧的核心论文。它用简单子任务链和 final summarization 制造 information asymmetry，把可验证子任务组合成长程 computer-use task；6,000+ tasks、hard-task generation 52% vs direct 11%、约 \$0.60/trajectory。它解决的是“哪里来足够多的可验证任务”，不是 rollout throughput。
 
-**[[Papers/2510-UISimulator]]** 是 simulator 侧的核心论文。它用结构化 UI state + LLM/rule transition 合成 WebArena / AndroidWorld 训练经验，web trajectory 成本约 $0.02-$0.05；关键 ablation 显示 step-wise task control 和 multi-step simulation 都不可少。它说明 cheap synthetic experience 有价值，但也暴露 fidelity / hallucinated transition 风险。
+**[[Papers/2510-UISimulator]]** 是 simulator 侧的核心论文。它用结构化 UI state + LLM/rule transition 合成 WebArena / AndroidWorld 训练经验，web trajectory 成本约 \$0.02-\$0.05；关键 ablation 显示 step-wise task control 和 multi-step simulation 都不可少。它说明 cheap synthetic experience 有价值，但也暴露 fidelity / hallucinated transition 风险。
 
 **[[Papers/2507-WebSynthesis]]** 把 world-model MCTS 用于 offline WebUI trajectory synthesis。WebArena-Lite Pass@3 20.15%，小规模合成数据接近或超过更大 real/tutorial trajectory 数据；valuable + rollback trajectories 明显优于 rollback-only。它把 rollback 从 runtime recovery 变成训练数据形态。
 

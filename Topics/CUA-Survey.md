@@ -343,7 +343,7 @@ GUI 环境同时追求 realism、controllability 与 scalability，但三者存�
 | [[Papers/2510-WebServ]] | snapshot engine | 1.78s clone、28 MiB/instance、200+ 并发、运行中 fork | 尚无端到端 GUI RL 因果实验 |
 | [[Papers/2509-AgentGymRL]] | multi-environment RL stack | full reset、并行 Chromium、horizon curriculum | 环境改造成本转移到框架维护 |
 | [[Papers/2606-OpenWebRL]] | live RL stack | K8s isolation、retry、failure taxonomy、80–100 并发 | 51% 失败仍来自 bot detection/封锁/网络 |
-| [[Papers/2502-InSTA]] | live task proposal | 150K sites、2.2M trajectories、$521；judge 82.6% | 任务偏只读，init/reset/事务性缺失 |
+| [[Papers/2502-InSTA]] | live task proposal | 150K sites、2.2M trajectories、\$521；judge 82.6% | 任务偏只读，init/reset/事务性缺失 |
 | [[Papers/2506-GoBrowse]] | structured exploration | 界面建图，reset 频率调节覆盖（1 reset/30 任务→183 URL vs 15 reset/2 任务→260 URL） | reset 依赖共享沙盒，两个 affordance 目前只在训练管线里用 |
 | [[Papers/2600-WebHarbor]] | self-hosted mirror | coding agent 生成 15 个 WebVoyager 网站的 Docker 镜像，sub-second reset，模型排序与 3 个 live-web benchmark 一致 | task-driven scoping 只覆盖任务所需功能，非完整站点；验证仍偏初步 |
 | [[Papers/2504-REAL]] | deterministic web replica | 112 tasks / 11 sites，localStorage state diff + rubric | 副本覆盖有限，非动态站点 |
@@ -497,7 +497,7 @@ AndroidControl 的原始工作 [[Papers/2406-DataScaleUIControl]] 系统研究�
 | Tutorial replay | 从教程或演示重放得到轨迹 | [[Papers/2412-AgentTrek]]、[[Papers/2500-TonguiInternetScaleTrajectories]] | 成本低，受教程覆盖和 replay 成功率限制 |
 | Interaction-first exploration | 先探索，再 hindsight 标注任务 | [[Papers/2410-NNetNav]] | 消除不可行任务；沙盒到 live 仅 9.5% |
 | Reverse task synthesis | 先乱点收集 `<s_pre, a, s_post>` transition，再反推 low/high-level 指令 | [[Papers/2412-OSGenesis]] | AndroidWorld 上 Qwen2-VL-7B 从 task-driven 9.82% 升到 17.41%，WebArena overall 从 7.05% 升到 10.79%，与 human 数据 SR retention >80%；但 exploration、reverse synthesis、执行、reward modeling 四环节均依赖 GPT-4o，开源 VLM 尚接不上这条 pipeline |
-| Live task proposal | proposer–agent–judge 在真实网站采集 | [[Papers/2502-InSTA]] | 150K sites、2.2M trajectories、$521；judge 82.6%，任务偏只读 |
+| Live task proposal | proposer–agent–judge 在真实网站采集 | [[Papers/2502-InSTA]] | 150K sites、2.2M trajectories、\$521；judge 82.6%，任务偏只读 |
 | Structured exploration | 网站/界面建图，从中间态采样 | [[Papers/2506-GoBrowse]] | reset 频率直接影响 coverage，环境能力进入数据质量 |
 | Accessibility-driven crawling | 用 a11y 接口系统探索桌面应用，组织成层次化状态图（MacApp Tree） | [[Papers/2500-GuirillaScalableFrameworkAutomated]] | 量化了平台代表性缺口：macOS 界面在既有 grounding 语料 OS-Atlas 中仅占 0.06% 样本，在自动采集 desktop UI 整体中约占 2.45%；自身采集规模（应用数/状态数/转移数）未披露 |
 | Stochastic exploration + intent-aware reasoning | 随机探索模拟试错，再任务导向补全并回顾性标注 | [[Papers/2500-GuiRewalkMassiveData]] | 作者声称提升交互流覆盖率与用户意图真实性，但论文未给出可核实的规模数字 |
@@ -1249,7 +1249,7 @@ Computer-use 能力已从研究原型收敛为几家前沿实验室以 **API/工
 | Amazon | Nova Act（`nova-act` SDK / AWS 服务） | Python SDK + AWS 托管服务，基于 Playwright 驱动浏览器 | 浏览器 UI workflow，支持 MCP / Strands 等框架 | research preview 2025-03 → GA（AWS 服务）2025-12-02（GitHub/官方） |
 | Microsoft | Copilot Studio "computer-using agents" | 企业 agent 构建平台（非自研 CU 基座，复用 OpenAI CUA + Claude Sonnet 4.5） | 浏览器 + Windows 桌面应用（desktop 为 preview） | GA 2026-05-13，覆盖全部商用 Power Platform 地域（官方 Tech Community） |
 
-**OpenAI.** OpenAI 的 Computer-Using Agent（CUA）最初随 Operator 于 2025-01 亮相，官方 CUA 页自述在 OSWorld 达 38.1%、WebArena 58.1%、WebVoyager 87%（厂商自述，as of 2026-07，来源 openai.com/index/computer-using-agent）。开发者侧现有两条路径：早期的 `computer-use-preview` 模型，以及新版 computer use tool——后者官方文档将 CU 训练并入 `gpt-5.4` 及后续模型，通过 Responses API 内置 loop 或自建 harness（Playwright/Selenium/VNC）调用（官方文档，as of 2026-07）。计价方面仅检索到第三方聚合站将 `computer-use-preview` 列为 input $3 / output $12 每百万 token（未经官方页确认，as of 2026-07，来源 economize.cloud），官方价目需人工复核。
+**OpenAI.** OpenAI 的 Computer-Using Agent（CUA）最初随 Operator 于 2025-01 亮相，官方 CUA 页自述在 OSWorld 达 38.1%、WebArena 58.1%、WebVoyager 87%（厂商自述，as of 2026-07，来源 openai.com/index/computer-using-agent）。开发者侧现有两条路径：早期的 `computer-use-preview` 模型，以及新版 computer use tool——后者官方文档将 CU 训练并入 `gpt-5.4` 及后续模型，通过 Responses API 内置 loop 或自建 harness（Playwright/Selenium/VNC）调用（官方文档，as of 2026-07）。计价方面仅检索到第三方聚合站将 `computer-use-preview` 列为 input \$3 / output \$12 每百万 token（未经官方页确认，as of 2026-07，来源 economize.cloud），官方价目需人工复核。
 
 **Anthropic.** Claude 的 computer use tool 自 2024-10（Claude 3.5 Sonnet）起以 beta 形态提供，是最早对外开放的 CU 开发者接口之一。官方文档（as of 2026-07）显示当前经 `computer-use-2025-11-24` beta header 支持 Claude Sonnet 5、Opus 4.8/4.7/4.6/4.5、Sonnet 4.6，经 `computer-use-2025-01-24` 支持 Sonnet 4.5、Haiku 4.5 等；工具提供截图、鼠标、键盘与桌面自动化，可与 bash、text-editor 工具组合成完整自动化链，并同时上架 AWS Bedrock 与 Google Vertex。相较 OpenAI，Anthropic 的差异化在于把同一套能力延伸到"在你自己机器上工作"的产品形态（Claude Code / 桌面产品，见 §9.2）。
 
@@ -1271,17 +1271,17 @@ Computer-use 能力已从研究原型收敛为几家前沿实验室以 **API/工
 | Project Mariner | Google | 独立 agentic 浏览器扩展（Gemini 2.0/2.5） | Chrome 扩展 | 2024-12-11 prototype → **2026-05-04 discontinued**（Wikipedia/Digital Trends） |
 | Comet | Perplexity | agentic 浏览器（Comet Assistant 侧栏） | macOS/Windows/Android/iOS | 2025-07 Max 独占 → **2025-10 全球免费**；Android 2025-11、iOS 2026-03 |
 
-**OpenAI 产品线的三次折叠。** Operator 于 2025-01-23 作为 research preview 面向美国 ChatGPT Pro（$200/月）推出，2025-07 被 **ChatGPT Agent** 取代并于 2025-08-31 关停——CU 能力自此以 ChatGPT 内 "agent mode" 形态提供给 Plus/Pro/Team 等付费层（官方，运行在带浏览器/终端的虚拟机中，执行高风险动作前请求确认）。2025-10-21 OpenAI 又推出 agentic 浏览器 **ChatGPT Atlas**（macOS，agent mode 面向 Plus/Pro/Business 预览）；但不到一年，2026-07-09 OpenAI 宣布把 Atlas 的 agentic browsing 能力并回 ChatGPT 桌面端与一个 Chrome 扩展，**Atlas 于 2026-08-09 停止运行**，同时推出基于 GPT-5.6、跑数小时长任务产出成品文档的 **ChatGPT Work**（TechCrunch / The Register，as of 2026-07；这些为 2026-07 时点信息，建议投稿前复核）。这条时间线本身即是 §9.2 开头"品牌收敛"论断的最强证据。
+**OpenAI 产品线的三次折叠。** Operator 于 2025-01-23 作为 research preview 面向美国 ChatGPT Pro（\$200/月）推出，2025-07 被 **ChatGPT Agent** 取代并于 2025-08-31 关停——CU 能力自此以 ChatGPT 内 "agent mode" 形态提供给 Plus/Pro/Team 等付费层（官方，运行在带浏览器/终端的虚拟机中，执行高风险动作前请求确认）。2025-10-21 OpenAI 又推出 agentic 浏览器 **ChatGPT Atlas**（macOS，agent mode 面向 Plus/Pro/Business 预览）；但不到一年，2026-07-09 OpenAI 宣布把 Atlas 的 agentic browsing 能力并回 ChatGPT 桌面端与一个 Chrome 扩展，**Atlas 于 2026-08-09 停止运行**，同时推出基于 GPT-5.6、跑数小时长任务产出成品文档的 **ChatGPT Work**（TechCrunch / The Register，as of 2026-07；这些为 2026-07 时点信息，建议投稿前复核）。这条时间线本身即是 §9.2 开头"品牌收敛"论断的最强证据。
 
 **Anthropic：从扩展到"在你机器上工作"。** **Claude for Chrome** 于 2025-08-26 以 research preview 形态放给 1000 名 Max 用户（其余排 waitlist），Anthropic 公开的红队数据显示无防护时浏览器攻击成功率 23.6%、加固后降至 11.2%、部分浏览器专属攻击从 35.7% 降至 0%（厂商自述），并配套高风险站点拦截、逐站授权、管理员 allow/blocklist 等机制。该扩展于 2025-12 从 Max 独占扩展到全部付费计划（Pro/Max/Team/Enterprise，as of 2026-07）。与浏览器沙箱路线并行，Anthropic 还把 CU 延伸到用户本机（Claude Code / 桌面产品由产品侧管理会话与授权升级），形成"沙箱 API vs 本机产品"两套执行契约。
 
 **Google：Mariner 退场、能力并入 Gemini app。** **Project Mariner** 2024-12-11 作为研究原型发布，2025-05 面向美国 Google AI Ultra 订阅者开放，是最早的消费级 agentic 浏览器之一；但作为独立产品于 **2026-05-04 停运**（Wikipedia / Digital Trends），官方称其技术"航行到了其他 Google 产品"——web 自动化任务（收邮件、订位、多步流程）现由 Gemini app 内的 **Gemini Agent** 承接，底层 CU 能力则进入 Gemini API / Vertex AI（见 §9.1）。这与 OpenAI 关停 Operator/Atlas 是同一模式。
 
-**Perplexity Comet：反向扩张的异类。** 与前三家"收敛进主产品"相反，Perplexity 的 agentic 浏览器 **Comet** 走了独立扩张路线：2025-07 以 Max（$200/月）独占上线，waitlist 达数百万，2025-10 起**全球免费**并陆续补齐 Windows/macOS/Android（2025-11-20）/iOS（2026-03-18）四端（CNBC / Wikipedia，as of 2026-07）。核心是每个新标签页侧栏常驻的 Comet Assistant（可跨 tab 导航、汇总、执行用户发起的任务）；免费层提供实时问答与页面摘要，付费层（Max）解锁更强模型与可后台异步跑多步任务的 Background Assistant / Email Assistant。需注意 Comet 截至 2026-07 尚未公开完整独立安全审计（媒体观点）。
+**Perplexity Comet：反向扩张的异类。** 与前三家"收敛进主产品"相反，Perplexity 的 agentic 浏览器 **Comet** 走了独立扩张路线：2025-07 以 Max（\$200/月）独占上线，waitlist 达数百万，2025-10 起**全球免费**并陆续补齐 Windows/macOS/Android（2025-11-20）/iOS（2026-03-18）四端（CNBC / Wikipedia，as of 2026-07）。核心是每个新标签页侧栏常驻的 Comet Assistant（可跨 tab 导航、汇总、执行用户发起的任务）；免费层提供实时问答与页面摘要，付费层（Max）解锁更强模型与可后台异步跑多步任务的 Background Assistant / Email Assistant。需注意 Comet 截至 2026-07 尚未公开完整独立安全审计（媒体观点）。
 
 ### 9.3 Enterprise Automation and RPA
 
-传统 RPA 厂商在 2024–2025 集体从"确定性脚本自动化"转向"agentic automation"：把 LLM/CUA 作为**推理层**接入，让 RPA bot 退居为受治理的**确定性执行层**，并新增编排控制平面协调 agent、bot 与人。这一路线的共识是——**RPA 提供可审计、可回滚、合规的动作执行，LLM agent 负责意图理解与非确定性决策**；同时 vision-based computer use 正逐步替代脆弱的 selector-based 脚本。四家主流厂商（UiPath、Automation Anywhere、Microsoft、SS&C Blue Prism）均被列为 2025 Gartner RPA Magic Quadrant Leader（报告于 2025-06-23 发布，评估 13 家厂商，2024 年市场规模 $3.8B、同比 +18%）（as of 2026-07，来源：UiPath/Automation Anywhere newsroom、Gartner MQ 2025）。
+传统 RPA 厂商在 2024–2025 集体从"确定性脚本自动化"转向"agentic automation"：把 LLM/CUA 作为**推理层**接入，让 RPA bot 退居为受治理的**确定性执行层**，并新增编排控制平面协调 agent、bot 与人。这一路线的共识是——**RPA 提供可审计、可回滚、合规的动作执行，LLM agent 负责意图理解与非确定性决策**；同时 vision-based computer use 正逐步替代脆弱的 selector-based 脚本。四家主流厂商（UiPath、Automation Anywhere、Microsoft、SS&C Blue Prism）均被列为 2025 Gartner RPA Magic Quadrant Leader（报告于 2025-06-23 发布，评估 13 家厂商，2024 年市场规模 \$3.8B、同比 +18%）（as of 2026-07，来源：UiPath/Automation Anywhere newsroom、Gartner MQ 2025）。
 
 | 厂商 | 传统 RPA 资产 | Agentic / CUA 能力 | 编排控制平面 | 模型策略 |
 |:--|:--|:--|:--|:--|
@@ -1353,11 +1353,11 @@ Computer-use 能力已从研究原型收敛为几家前沿实验室以 **API/工
 | **金融后台 / 会计** | **Pilot**（"AI Accountant"）、**Coasty**、Akira AI、Vic.ai、Docyt | computer-use agent 直接操作会计/ERP UI 做发票录入、对账、PO 匹配 | 新兴：多为 vendor 早期方案，重人工复核 |
 | **医疗行政** | prior-authorization agents：Latent Health、Tandem、Innovaccer **Flow**、Cohere Health | 从 EHR 抽数、填 payer 表单/提交；voice agent 导航 payer IVR 电话系统 | 新兴：受监管，AI 不得单独作医疗必要性拒付 |
 
-**编码 agent——最成熟的专业垂直。** Cognition Devin 是自主 SWE 代表：在 Dev Box（Linux shell + 编辑器 + 浏览器 + agent）内规划/写/测/调/部署代码，数据可全程留在客户 VPC；Devin 2.0（2025-04）把入门价从 $500/月降到 $20/月，并称 per-ACU 完成的初级任务量较 1.x 提升 83%（厂商自述）。企业侧的标志性验证是 Goldman Sachs 于 2025-07 试点，与 12,000 名工程师组成"hybrid workforce"、宣称 ~20% 效率提升（Goldman/Cognition 自述，未独立验证，且需数周知识库配置与专人管理）；Cognition 2025-07 收购 AI-native IDE Windsurf，估值从 2025-03 的 $4B 升至约 $10.2B，并于 2026-05 前后洽谈以 $25B pre-money 融资（as of 2026-07，来源：Contrary Research、SiliconANGLE）。平台侧，GitHub Copilot coding agent 于 2025-09 GA（接 issue → 自主开 draft PR，需人工 review 才触发 CI/CD），并通过 Agent HQ 把 Anthropic Claude、OpenAI Codex 作为可选 agent 纳入同一平台（2026-02 起对 Business/Pro 开放）；OpenAI 称 Codex 周活超 500 万（来源：分析媒体，非官方一手，待核）。架构层面的一个 grounding：逆向 Claude Code 源码显示仅约 1.6% 是 AI 决策逻辑、其余 98.4% 是确定性基础设施（权限门控、上下文管理、恢复机制），印证"生产级 agent 竞争壁垒已从模型转向 harness"（见 [[Papers/2604-ClaudeCode]]）。
+**编码 agent——最成熟的专业垂直。** Cognition Devin 是自主 SWE 代表：在 Dev Box（Linux shell + 编辑器 + 浏览器 + agent）内规划/写/测/调/部署代码，数据可全程留在客户 VPC；Devin 2.0（2025-04）把入门价从 \$500/月降到 \$20/月，并称 per-ACU 完成的初级任务量较 1.x 提升 83%（厂商自述）。企业侧的标志性验证是 Goldman Sachs 于 2025-07 试点，与 12,000 名工程师组成"hybrid workforce"、宣称 ~20% 效率提升（Goldman/Cognition 自述，未独立验证，且需数周知识库配置与专人管理）；Cognition 2025-07 收购 AI-native IDE Windsurf，估值从 2025-03 的 \$4B 升至约 \$10.2B，并于 2026-05 前后洽谈以 \$25B pre-money 融资（as of 2026-07，来源：Contrary Research、SiliconANGLE）。平台侧，GitHub Copilot coding agent 于 2025-09 GA（接 issue → 自主开 draft PR，需人工 review 才触发 CI/CD），并通过 Agent HQ 把 Anthropic Claude、OpenAI Codex 作为可选 agent 纳入同一平台（2026-02 起对 Business/Pro 开放）；OpenAI 称 Codex 周活超 500 万（来源：分析媒体，非官方一手，待核）。架构层面的一个 grounding：逆向 Claude Code 源码显示仅约 1.6% 是 AI 决策逻辑、其余 98.4% 是确定性基础设施（权限门控、上下文管理、恢复机制），印证"生产级 agent 竞争壁垒已从模型转向 harness"（见 [[Papers/2604-ClaudeCode]]）。
 
-**客服 agent——营收与规模化最快。** Sierra（Bret Taylor 与 Clay Bavor 联创）以 Agent OS + 语音 agent 驱动增长，2025-11 越过 $100M ARR、进入第三年时 ARR >$150M、服务超 40% 的 Fortune 50；融资从 2024 年 $4.5B 估值一路到 2025-09 的 $10B（$350M 轮）与 2026-05 的 $15.8B（$950M E 轮）（as of 2026-07，来源：Sacra、CMSWire、Axios）。Decagon 用第三方（OpenAI/Anthropic/Cohere）+ 自研微调模型做文本与语音客服，2025-06 完成 $131M C 轮、估值 $1.5B，客户含 Hertz、Duolingo、Chime（Chime 报告联络中心成本降 60%，客户自述）。Salesforce Agentforce 360 于 2025-10-13 GA，基于超 12,000 次 Agentforce 实施；客户 Reddit 报告 46% 案件 deflection、解决时间降 84%（厂商/客户自述）。值得注意的反直觉信号：Salesforce Agentic Enterprise Index 显示 2025 上半年 agent 主导对话量增 22×，但**升级到人工的比例从 Q1 的 22% 升到 Q2 的 32%**——规模化伴随更多而非更少的 human handoff。三家共性是 outcome-based 定价（按 conversation/resolution 计费），把商业模式与 agent 实际成效绑定。
+**客服 agent——营收与规模化最快。** Sierra（Bret Taylor 与 Clay Bavor 联创）以 Agent OS + 语音 agent 驱动增长，2025-11 越过 \$100M ARR、进入第三年时 ARR >\$150M、服务超 40% 的 Fortune 50；融资从 2024 年 \$4.5B 估值一路到 2025-09 的 \$10B（\$350M 轮）与 2026-05 的 \$15.8B（\$950M E 轮）（as of 2026-07，来源：Sacra、CMSWire、Axios）。Decagon 用第三方（OpenAI/Anthropic/Cohere）+ 自研微调模型做文本与语音客服，2025-06 完成 \$131M C 轮、估值 \$1.5B，客户含 Hertz、Duolingo、Chime（Chime 报告联络中心成本降 60%，客户自述）。Salesforce Agentforce 360 于 2025-10-13 GA，基于超 12,000 次 Agentforce 实施；客户 Reddit 报告 46% 案件 deflection、解决时间降 84%（厂商/客户自述）。值得注意的反直觉信号：Salesforce Agentic Enterprise Index 显示 2025 上半年 agent 主导对话量增 22×，但**升级到人工的比例从 Q1 的 22% 升到 Q2 的 32%**——规模化伴随更多而非更少的 human handoff。三家共性是 outcome-based 定价（按 conversation/resolution 计费），把商业模式与 agent 实际成效绑定。
 
-**QA/测试、金融、医疗——差异化的成熟度。** 测试领域，Tricentis 把 Agentic Test Automation 嵌入 Tosca（自然语言自动生成用例），其 Vision AI 以像素级图像识别操作 SAP GUI、Citrix 虚拟桌面与遗留企业应用——这是传统 Web 自动化框架够不到的场景（Tricentis 获 2025 Gartner AI-Augmented Software Testing MQ Leader，来源：Tricentis blog / 分析媒体）。金融后台与会计出现明确的 computer-use 叙事：agent 像人一样"看屏幕、动鼠标键盘"直接操作会计软件做发票录入/PO 匹配/对账，规避 API 集成与 selector 脚本脆弱性（Pilot 于 2026-02 宣称推出首个 SMB"全自主 AI Accountant"；Coasty 提供操作真实桌面/浏览器的 computer-use agent）——但此处证据多来自 vendor blog，成本/效率数字（如手工发票 $18–$40/张、Gartner 预测 2027 年底 40%+ agentic 项目被取消）应视为方向性而非独立核实。医疗行政以 prior authorization 为主战场（Menlo Ventures 估该类工具支出从 2024 的 $10M 十倍增至 2025 的 $100M）：agent 从 EHR 抽取临床文档、填 payer 表单并提交，voice agent 自主导航 payer IVR 电话；但监管是硬约束——Texas（2025）、Arizona、Maryland 立法禁止仅凭自动化系统作出医疗必要性拒付，CMS-0057-F 自 2026-01-01 起生效，使该垂直**结构性地保留 human-in-the-loop**（来源：Innovaccer、Forbes Councils、Healthcare Huddle）。
+**QA/测试、金融、医疗——差异化的成熟度。** 测试领域，Tricentis 把 Agentic Test Automation 嵌入 Tosca（自然语言自动生成用例），其 Vision AI 以像素级图像识别操作 SAP GUI、Citrix 虚拟桌面与遗留企业应用——这是传统 Web 自动化框架够不到的场景（Tricentis 获 2025 Gartner AI-Augmented Software Testing MQ Leader，来源：Tricentis blog / 分析媒体）。金融后台与会计出现明确的 computer-use 叙事：agent 像人一样"看屏幕、动鼠标键盘"直接操作会计软件做发票录入/PO 匹配/对账，规避 API 集成与 selector 脚本脆弱性（Pilot 于 2026-02 宣称推出首个 SMB"全自主 AI Accountant"；Coasty 提供操作真实桌面/浏览器的 computer-use agent）——但此处证据多来自 vendor blog，成本/效率数字（如手工发票 \$18–\$40/张、Gartner 预测 2027 年底 40%+ agentic 项目被取消）应视为方向性而非独立核实。医疗行政以 prior authorization 为主战场（Menlo Ventures 估该类工具支出从 2024 的 \$10M 十倍增至 2025 的 \$100M）：agent 从 EHR 抽取临床文档、填 payer 表单并提交，voice agent 自主导航 payer IVR 电话；但监管是硬约束——Texas（2025）、Arizona、Maryland 立法禁止仅凭自动化系统作出医疗必要性拒付，CMS-0057-F 自 2026-01-01 起生效，使该垂直**结构性地保留 human-in-the-loop**（来源：Innovaccer、Forbes Councils、Healthcare Huddle）。
 
 **横向判断。** 垂直 agent 的落地深度与两个变量强相关：(1) 任务是否有可验证的成功信号（编码有测试/CI、客服有 resolution，故最快成熟）；(2) 领域是否受合规约束（医疗、金融判断型任务被立法钉在 human oversight）。这解释了为何 2026-07 时点上编码与客服已产生规模化营收与受监管企业部署，而金融后台与医疗仍停留在点解决方案 + 重人工复核阶段。
 
@@ -1369,10 +1369,10 @@ Computer-Use Agent 的能力上限由模型决定，但**可用性上限由运�
 
 | 服务 | 形态 / 开源 | 关键能力 | 时点信息（as of 2026-07） |
 |:--|:--|:--|:--|
-| **Browserbase** | 闭源托管；开源 SDK **Stagehand**（Playwright+AI）| 云端 Chrome 会话、stealth/反指纹、residential proxy、自动 CAPTCHA、认证态、live view+录制回放、MCP server | 2024 年由 Paul Klein IV 创立；2025-06 完成 $40M B 轮（约 $300M 估值，Notable Capital 领投，CRV/Kleiner Perkins 跟投），累计约 $68M；厂商自述 2025 年处理 50M+ 会话、1,000+ 客户 |
+| **Browserbase** | 闭源托管；开源 SDK **Stagehand**（Playwright+AI）| 云端 Chrome 会话、stealth/反指纹、residential proxy、自动 CAPTCHA、认证态、live view+录制回放、MCP server | 2024 年由 Paul Klein IV 创立；2025-06 完成 \$40M B 轮（约 \$300M 估值，Notable Capital 领投，CRV/Kleiner Perkins 跟投），累计约 \$68M；厂商自述 2025 年处理 50M+ 会话、1,000+ 客户 |
 | **Steel** | **开源**浏览器 API（`steel-dev/steel-browser`）+ 托管云 | RESTful 会话管理、Stealth Browser、专用 IP、auth-walled 站点访问、CAPTCHA、Session Viewer；Rust/Go/原生 SDK；单会话最长 24h | 定位"开源、透明的浏览器层"；厂商自述同区域会话冷启 <1s（其自published benchmark 对自身有利，需谨慎） |
 | **Hyperbrowser** | 闭源托管 | stealth-first、云原生、高并发容器化浏览器，面向 agentic 用例打包 | 主打"路线图明确 agentic"的差异化定位 |
-| **Anchor Browser** | 闭源托管 | 云端浏览器自动化、stealth、proxy fingerprinting、session management、CAPTCHA | 厂商自述 WebVoyager 89% 任务完成率；免费档 $10/月额度 + 100 浏览器小时 |
+| **Anchor Browser** | 闭源托管 | 云端浏览器自动化、stealth、proxy fingerprinting、session management、CAPTCHA | 厂商自述 WebVoyager 89% 任务完成率；免费档 \$10/月额度 + 100 浏览器小时 |
 | **Cloudflare Browser Run**（原 Browser Rendering）| 闭源，随 Cloudflare 平台 | 全球网络上的 headless Chrome、Live View、**Human in the Loop**、CDP 访问、session recording、WebMCP | 2026-04-15 更名/重构；2026-05 迁移至 Cloudflare Containers，并发 30→120、响应快 50%；属其"六层 agent 基建栈"的 browsing 层 |
 | **Kernel** | 托管浏览器基建 | 面向 agent 的远程浏览器 | 独立公司，公开细节有限（见 uncovered）|
 
@@ -1380,9 +1380,9 @@ Computer-Use Agent 的能力上限由模型决定，但**可用性上限由运�
 
 | 服务 | 隔离模型 | 形态 | 时点信息（as of 2026-07） |
 |:--|:--|:--|:--|
-| **E2B** | **Firecracker microVM**（内核级隔离）| 开源（主仓 Apache-2.0）云沙箱；含 **E2B Desktop**（带 GUI 桌面环境，供 computer use）| 沙箱创建 <200ms；支持 Python/JS/TS/R/Java/Bash；BYOC（AWS/GCP）；2025-07 完成 $21M A 轮（Insight Partners 领投），累计约 $32.5M；厂商自述 88% Fortune 100 注册、2025-03 达 15M 沙箱/月（较 2024-03 增 375×）|
+| **E2B** | **Firecracker microVM**（内核级隔离）| 开源（主仓 Apache-2.0）云沙箱；含 **E2B Desktop**（带 GUI 桌面环境，供 computer use）| 沙箱创建 <200ms；支持 Python/JS/TS/R/Java/Bash；BYOC（AWS/GCP）；2025-07 完成 \$21M A 轮（Insight Partners 领投），累计约 \$32.5M；厂商自述 88% Fortune 100 注册、2025-03 达 15M 沙箱/月（较 2024-03 增 375×）|
 | **Modal** | **gVisor** 容器隔离，deny-by-default 入站 | Python 原生 serverless 云，支持 A100/H100 GPU | 厂商自述支持 100,000+ 并发沙箱 |
-| **Daytona** | 默认 **Docker 容器**，可选 Kata/Sysbox 加固 | 沙箱生命周期自动化（auto-stop/archive/delete）、warm-start | 2025-02 从 dev-environment 转型为 agent 代码运行时；2026-02 完成 $24M A 轮；**2026-06 生产代码闭源**（开源仓归档）|
+| **Daytona** | 默认 **Docker 容器**，可选 Kata/Sysbox 加固 | 沙箱生命周期自动化（auto-stop/archive/delete）、warm-start | 2025-02 从 dev-environment 转型为 agent 代码运行时；2026-02 完成 \$24M A 轮；**2026-06 生产代码闭源**（开源仓归档）|
 | **Fly Machines** | microVM | 低层原始 primitive，供自建 | 供团队自搭沙箱 |
 | **Vercel Sandbox** | Firecracker | 面向 agent 的托管代码执行 | 见 uncovered（细节未充分核实）|
 | **Scrapybara** | 完整 VM / 桌面 | **Ubuntu / Windows / Mac** + 纯 browser 三档实例；Act SDK；ComputerTool/BashTool | YC F24；厂商自述 <1s 启动、可扩至数百实例；对接 OpenAI CUA API；按用量计费（Windows/Mac 为 early-access/企业档）|

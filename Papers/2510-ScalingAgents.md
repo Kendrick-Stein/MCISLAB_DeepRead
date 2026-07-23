@@ -248,7 +248,7 @@ Judge Subset = 159 个"至少一对一错"的可改进任务。其中 35 个 BJu
 ### Weaknesses
 
 1. **本质是 ensemble + selector，不是新算法**：贡献是工程化的 representation + ranking 设计。可推广性强，但不是新 insight 范式——Best-of-N 的思路在 LLM reasoning 已用了两年。
-2. **Cost 高且对闭源模型依赖**：72.6% 配置需要 GPT-5 + Opus 4.5 各 5 rollouts + GPT-5 做 judge——单任务保守估计 $4-5 美元、20+ 分钟，远超实用部署阈值。
+2. **Cost 高且对闭源模型依赖**：72.6% 配置需要 GPT-5 + Opus 4.5 各 5 rollouts + GPT-5 做 judge——单任务保守估计 \$4-5 美元、20+ 分钟，远超实用部署阈值。
 3. **Judge 没有 abstain**：当所有 N 个 rollout 都失败时，BJudge 仍会硬选一个——这在生产环境可能是"自信地交付错误结果"。
 4. **Independence 假设强**：要求 N 个 rollout 独立从同一 initial state 出发。在用户真实桌面（非 VM snapshot）上不成立——shared online state（邮箱、cart）会引入 cross-run interference，作者自己也承认这是 deployment 障碍。
 5. **没和 RL-based selector 对比**：BJudge 全是 prompted VLM judge，未对比 trained reward model / preference model。后者在 LLM reasoning 领域已被证明更稳定，CUA 上是否同样如此是开放问题。

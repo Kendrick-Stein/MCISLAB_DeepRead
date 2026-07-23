@@ -136,7 +136,7 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 | Planning / lookahead | [[2411-WebDreamer]]（TMLR 2025）、[[2600-MobiledreamerGenerativeSketchWorld]] | live 网站动作不可逆 → 用 LLM 想象替代真实 tree search：VWA 23.6%（reactive 17.7% / tree search 26.4%），拿到 tree search 收益的 ~70% 且 4.4× 快；**H=1 最优、H=3 全面退化——LLM 模拟误差随步数复合** |
 | Pre-execution guard | [[2607-SeerGuard]]、[[2602-WAC]] | SeerGuard 重标注发现 **91% high-risk 任务是"良性指令 + 危险执行"**→ 安全评估必须下沉到 action 级；8B SFT 语义 next-state 预测超 235B 基座（Next-State-QA 0.762 vs 0.651）。WAC 通用任务纠错仅 +1.8pp / +1.3pp——guard 用途中安全判定比任务纠错收益大 |
 | RL simulator | [[2511-DreamGym]]（Meta） | LLM 经验模型（CoT 推理生成转移 + reward）+ reward-entropy 课程：WebArena GRPO 7.3→13.3 零真实交互，S2R 用 <10% 真实数据反超 from-scratch；第一手证词——WebArena 真实 RL 只能 4 并发 + 手动 reset |
-| Trajectory synthesis | [[2510-UISimulator]]、[[2507-WebSynthesis]] | UI-Simulator：同等真实测试环境暴露下合成经验达 OS-Genesis 的 4×（WebArena），$0.02–0.05/轨迹；WebSynthesis：WM-guided MCTS 合成轨迹，**rollback-only 训练无效（1.49%）——rollback 信号必须与成功轨迹配合** |
+| Trajectory synthesis | [[2510-UISimulator]]、[[2507-WebSynthesis]] | UI-Simulator：同等真实测试环境暴露下合成经验达 OS-Genesis 的 4×（WebArena），\$0.02–0.05/轨迹；WebSynthesis：WM-guided MCTS 合成轨迹，**rollback-only 训练无效（1.49%）——rollback 信号必须与成功轨迹配合** |
 | Image-based simulation | [[2500-UisimInteractiveImageBased]] | 两阶段 UI simulator（layout prediction → layout-to-image），layout-first 符合 UI 结构化本质 |
 
 **与 robotics WM 的分野**：digital WM 的瓶颈不在算力而在**转移幻觉与 reward 无外部审计**——DreamGym 的经验模型既当转移函数又当 reward 函数、无独立 verifier；UI-Simulator 的 LLM transition 有状态幻觉。robotics 侧的 action-following 问题在这里表现为"对不存在的页面状态过度自信"。
@@ -164,7 +164,7 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 | Unified VLA+WM | UWM / Motus / DreamZero / FlowWAM / ABot-M0.5 | VLA policy backbone | 百 ms 级（工程后） | 算力门槛 / unify 必要性 / action–imagination 同步性 |
 | WM-as-RL-simulator | World-VLA-Loop / GigaBrain-0.5M / RehearseVLA | VLA RL post-train | 30 h / 任务级 | Action-following / 样本量 |
 | WM-as-evaluator | GigaWorld-1 / dWorldEval | Policy checkpoint 筛选 | 视频生成级 | contact-sensitive failure 的 optimistic bias |
-| Digital text-space WM | DreamGym / UI-Simulator / WebDreamer / SeerGuard | Planning / RL sim / 轨迹合成 / safety guard | LLM 推理级（$0.02–1/轨迹） | 转移幻觉 / reward 无外部审计 |
+| Digital text-space WM | DreamGym / UI-Simulator / WebDreamer / SeerGuard | Planning / RL sim / 轨迹合成 / safety guard | LLM 推理级（\$0.02–1/轨迹） | 转移幻觉 / reward 无外部审计 |
 
 ## Datasets & Benchmarks
 

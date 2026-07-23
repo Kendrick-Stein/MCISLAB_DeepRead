@@ -41,10 +41,10 @@ date_added: 2026-07-14
 ## Key Results
 
 - **规模压力**：平均每 run 9.8M tokens、239 episodes、88.9 分钟（90 分钟预算），比 Terminal-Bench 2（20–30 分钟/20–30 episodes）高一个量级。
-- **主结果（v2）**：Grok 4.5 最强——28.3%（13/46）@R≥0.95、19.6% @R≥1.0，mean reward 0.51，约 $11/任务；GPT-5.6-sol 和 GPT-5.5 各 15.2%（7/46），约 $21/任务；MiniMax M3 / Kimi K2.7 Code / DeepSeek V4 Pro 各 6.5%（3/46）；全体均值 6.4% @0.95、3.2% @1.0。阈值收紧到 1.0 时大多数模型 pass rate 归零。
+- **主结果（v2）**：Grok 4.5 最强——28.3%（13/46）@R≥0.95、19.6% @R≥1.0，mean reward 0.51，约 \$11/任务；GPT-5.6-sol 和 GPT-5.5 各 15.2%（7/46），约 \$21/任务；MiniMax M3 / Kimi K2.7 Code / DeepSeek V4 Pro 各 6.5%（3/46）；全体均值 6.4% @0.95、3.2% @1.0。阈值收紧到 1.0 时大多数模型 pass rate 归零。
 - **dense reward 的必要性**：17×46=782 个 run 中仅 50 个（6.4%）通过 R≥0.95，241 个（30.8%）几乎无进展（R<0.05），中间 491 个（62.8%）有 partial reward 但二值判分下全算失败；[0.85,0.95) 区间就有 68 个 run，比通过数还多。pass rate 与 mean reward 只有中等相关（Spearman ρ=0.74），会给出不同的模型排名。
 - **失败模式**：79% 的 unresolved run（518/660）是 90 分钟预算耗尽时 agent 仍在工作，但这些 timeout run 的 mean reward 仅 0.10–0.35（离完成很远）；19% 是 early exit。124 个自主提前退出的 run 中有 14 个"false finish"（R≥0.75 就自判完成退出，实际没过 hidden verifier）——agent 系统性高估完成度、吝于做最终验证。
-- **成本**：$3.6–$26/任务；GPT-5.4 最贵（约 $26）但 pass rate 远低于 Grok 4.5，说明单纯堆推理开销买不到 long-horizon 能力。
+- **成本**：\$3.6–\$26/任务；GPT-5.4 最贵（约 \$26）但 pass rate 远低于 Grok 4.5，说明单纯堆推理开销买不到 long-horizon 能力。
 
 ## Strengths & Weaknesses
 

@@ -16,7 +16,7 @@ date_added: 2026-05-25
 首个覆盖完整学术研究生命周期的 AI 辅助研究 survey，将研究流程拆解为 4 个阶段 8 个 stage（从 idea generation 到 dissemination），系统梳理每个 stage 的方法、benchmark 和能力边界。核心发现：AI 在结构化任务上表现优异，但在开放式创新、科学判断和验证上严重滞后——生成速度远超验证能力，human-governed collaboration 是当前最可靠的部署范式。
 
 ## Problem & Motivation
-AI 系统已能以 ~$15 成本生成研究论文（FARS 系统 100 篇论文平均 2.3 小时一篇），但这种生产力暴露了完整性危机："即使是 frontier LLMs 仍会捏造结果、遗漏隐藏错误、无法可靠判断 novelty"。现有工作聚焦单点任务（如 literature review、code generation），缺乏对完整研究生命周期的统一分析。本文填补这一空白，提供 taxonomy、benchmark suite、tool inventory 和 practitioner playbook。
+AI 系统已能以 ~\$15 成本生成研究论文（FARS 系统 100 篇论文平均 2.3 小时一篇），但这种生产力暴露了完整性危机："即使是 frontier LLMs 仍会捏造结果、遗漏隐藏错误、无法可靠判断 novelty"。现有工作聚焦单点任务（如 literature review、code generation），缺乏对完整研究生命周期的统一分析。本文填补这一空白，提供 taxonomy、benchmark suite、tool inventory 和 practitioner playbook。
 
 ## Method
 ### 四阶段八 Stage 框架
@@ -102,7 +102,7 @@ AI 系统已能以 ~$15 成本生成研究论文（FARS 系统 100 篇论文平�
 mindmap
   root((AIAutoResearch))
     Problem
-      $15 生成论文但 integrity 危机
+      \$15 生成论文但 integrity 危机
       生成快于验证
       缺乏全生命周期分析
     Method

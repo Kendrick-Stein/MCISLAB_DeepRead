@@ -71,7 +71,7 @@ coding agent 在真实 repo 任务中不只是“会不会写 patch”，还要�
 
 - GPT-5.4 + FC-4B-RL 在 SWE-bench Multilingual 从 457k 降到 338k（-26.0%），SWE-bench Pro 从 818k 降到 701k（-14.3%），SWE-QA 从 418k 降到 210k（-49.8%）。
 - same-model exploration 在 GPT-5.4 SWE-QA 上 token 从 418k 降到 166k（-60.3%），但成本上不如小模型 explorer 有吸引力。
-- 成本 audit：GPT-5.4 SWE-bench Multilingual 中，4B-RL explorer 总计 22.58M tokens，按 $0.20 / 1M tokens 估算仅 $4.52；主模型成本从 $282.47 降到 $208.92，即使算上 explorer 仍省 $69.03。
+- 成本 audit：GPT-5.4 SWE-bench Multilingual 中，4B-RL explorer 总计 22.58M tokens，按 \$0.20 / 1M tokens 估算仅 \$4.52；主模型成本从 \$282.47 降到 \$208.92，即使算上 explorer 仍省 \$69.03。
 
 **Standalone localization**：
 

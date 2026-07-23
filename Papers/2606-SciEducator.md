@@ -35,7 +35,7 @@ Educating 阶段在理解出 scientific phenomenon 和 underlying principle 后�
 - **PDSA ablation / education**：max rounds 从 1 到 3 再到 5 时，Education Subset 上 win rate 持续上升；1 round 为 **2.50 / 0 / 2.50 / 15.00**，3 rounds 为 **7.50 / 7.50 / 32.50 / 35.00**，5 rounds 为 **90.00 / 92.50 / 65.00 / 50.00**，对应 Relevance / IQ / Attractiveness / EV。
 - **Evaluator Agent ablation**：完整 EA 归一化 Time/Token 为 **1.00 / 1.00**，Average Rounds **3.79**，Acc **64.00**；去掉 empirical prior \(E\) 后为 **1.20 / 1.18 / 4.09 / 57.50**，去掉 IDF 后为 **1.08 / 1.06 / 3.99 / 59.90**，去掉 \(A_{percep}\) 后为 **1.14 / 1.13 / 4.17 / 54.50**。这支持 Evaluator 的三类信息都在 accuracy 与资源消耗上有贡献。
 - **Study Stage ablation**：完整 SciEducator 在 Physics/Chemistry/Daily Life 为 **81.88/65.31、73.97/64.86、64.58/62.24**；去掉 \(K_{new}\) 和 failure analysis \(F\) 降到 **59.69/45.94、53.04/45.27、35.94/32.55**；只去掉 \(K_{new}\) 为 **65.94/50.94、61.82/54.05、38.28/34.64**；只去掉 \(F\) 为 **71.56/55.63、66.55/57.09、48.95/45.83**。
-- **Cost**：补充材料报告 understanding 阶段 max PDSA rounds = 1 / 3 / 5 时，平均每题耗时约 **105s / 158s / 206s**，money cost 为 **$0.0542 / $0.0783 / $0.1051**。
+- **Cost**：补充材料报告 understanding 阶段 max PDSA rounds = 1 / 3 / 5 时，平均每题耗时约 **105s / 158s / 206s**，money cost 为 **\$0.0542 / \$0.0783 / \$0.1051**。
 
 ## Strengths & Weaknesses
 **已知 / Strengths**
@@ -49,7 +49,7 @@ Educating 阶段在理解出 scientific phenomenon 和 underlying principle 后�
 - Understanding 评测输入只保留 visual content，去掉 subtitles 和 audio narrations；这能控制泄漏，但也意味着结果不覆盖需要 speech/audio grounding 的 scientific videos。
 - Education quantitative comparison 只比较 shared textual modality，但 SciEducator 的输出本身包含 images/audio/hyperlinks/layout；这让文本 win rate 能说明 instructional text 更好，却不能完全量化多模态 booklet 的端到端学习效果。
 - SciVBench 规模是 500 QA pairs、211 videos，教育子集是 40 videos；作为新 benchmark 有价值，但仍不足以证明其覆盖所有科学视频长尾现象。
-- 成本不可忽略：max PDSA rounds = 5 时平均每题约 206s 和 $0.1051，这对大规模在线服务或低延迟交互是实际约束。
+- 成本不可忽略：max PDSA rounds = 5 时平均每题约 206s 和 \$0.1051，这对大规模在线服务或低延迟交互是实际约束。
 
 **推测 / Open Questions**
 - 这个 PDSA loop 对 GUI-agent / embodied-agent 的潜在迁移点在于：当 observation 不足、工具失败或 retrieval 太泛时，agent 应该显式记录 failure reason、获取新证据并重写 plan；但本文只在 scientific videos 上验证，不能直接推出 GUI 或 robotics 场景有效。

@@ -15,7 +15,7 @@ date_added: 2026-07-07
 ---
 ## Summary
 
-InSTA 把**整个 live 互联网当训练环境**：LLM 三阶段流水线（150k 站点任务标注 → Playwright agent rollout → LLM judge 过滤），全程无人工标注，$521 收集 2.2M 截图/动作轨迹，训出的 Qwen3-1.7B 达 56.9% 成功率、超过 235× 大的数据收集 policy。核心论断：human data 是低效资源，LLM 是够用的 task proposer（89% 可验证）/ safety filter（97%）/ judge（82.6%，高置信子集 93.1%）。
+InSTA 把**整个 live 互联网当训练环境**：LLM 三阶段流水线（150k 站点任务标注 → Playwright agent rollout → LLM judge 过滤），全程无人工标注，\$521 收集 2.2M 截图/动作轨迹，训出的 Qwen3-1.7B 达 56.9% 成功率、超过 235× 大的数据收集 policy。核心论断：human data 是低效资源，LLM 是够用的 task proposer（89% 可验证）/ safety filter（97%）/ judge（82.6%，高置信子集 93.1%）。
 
 ## Problem & Motivation
 
@@ -26,7 +26,7 @@ Web agent 训练数据依赖 ~200 个热门网站的人工标注 demonstration�
 三阶段，LLM 全程当 curator：
 
 1. **任务生成**：Common Crawl top-1M 站点（PageRank 排序）→ safety filter 筛到 150k 安全站点（过滤成人内容、需登录站点、API/CDN 端点）；task proposer 两阶段——先从 URL 生成简单探索任务，agent 执行后基于轨迹反馈提出**更难且 grounded** 的任务。
-2. **Rollout**：Playwright API 动作空间（JSON function call），HTML DOM → 紧凑 Markdown 观察；150k 任务产出 2.2M 截图 + 2.2M 推理轨迹，1200 V100 GPU 时 / **$521.55**。
+2. **Rollout**：Playwright API 动作空间（JSON function call），HTML DOM → 紧凑 Markdown 观察；150k 任务产出 2.2M 截图 + 2.2M 推理轨迹，1200 V100 GPU 时 / **\$521.55**。
 3. **Judge 过滤**：LLM 输出 0–1 连续分 + 推理轨迹 + 置信度 conf=2·|r−0.5|；取 judge=1 的轨迹做 SFT。
 
 **负责任爬取协议**：每站仅 1 任务、≤30 动作、~90s 交互；禁止状态修改（不购买/评论/注册）；scrubadub 去 PII。**Appendix D 提出 "agents.txt" 标准**：站长可声明 agent 速率限制、可访问页面、对 agent 隐藏的元素，以及 **"playgrounds"——站点自建的仿真副本**供 agent 训练，把 agent 流量导离生产页面。
@@ -40,7 +40,7 @@ Web agent 训练数据依赖 ~200 个热门网站的人工标注 demonstration�
 
 ## Strengths & Weaknesses
 
-**Strengths**：第一次把任务供给规模推到 150k 站点（此前 ~200）；证明"LLM as curator"三个角色的可靠性都够用且可量化；$521 的成本数字有说服力；agents.txt/playground 提案是环境治理层的早期设计。
+**Strengths**：第一次把任务供给规模推到 150k 站点（此前 ~200）；证明"LLM as curator"三个角色的可靠性都够用且可量化；\$521 的成本数字有说服力；agents.txt/playground 提案是环境治理层的早期设计。
 
 **Weaknesses / 边界**：
 - **live 环境的天然代价**：无 reset、无重放（网站天天变，静态参考答案立即失效）→ 只能依赖 LLM judge 当 reward，而 judge 82.6% 的错误率会直接进入训练信号（17% 标签噪声）。
@@ -58,7 +58,7 @@ mindmap
       互联网3亿站点
     Method
       150k 站任务生成
-      Playwright rollout $521
+      Playwright rollout \$521
       LLM judge 82.6% 过滤
     Results
       1.7B 达 56.9% 超 235B

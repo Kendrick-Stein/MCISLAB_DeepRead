@@ -50,7 +50,7 @@ computer-use agent 的评测长期只看 OSWorld 等 benchmark 上的 success ra
 ## Strengths & Weaknesses
 **Strengths.** 问题 formulation 好——把 latency/步数效率从「顺带一提」提升为一等评测维度，切中 CUA 生产落地的真实痛点；延迟归因（大模型 planning/reflection 调用 + prompt 随 history 膨胀导致后段变慢）是可操作的 first-principles insight，直接指向减少 reflection 调用、压缩 history、grouped-action 等优化方向；WES 用「人类最优轨迹步数比」做归一化，比裸测秒数更抗硬件/API 波动，可跨 agent 比较。人工标注 369 条参考轨迹本身是可复用的公共资产。
 
-**Weaknesses.** WES 以「步数比」为核心，但步数并不等于 wall-clock latency（一步 grouped-action 可能内含多次昂贵模型调用），效率≠步数效率，二者在含义上有张力；single/grouped 两套轨迹说明「一步」的定义本身有主观性，人类最优轨迹也可能非唯一最优，引入标注者偏差；延迟归因仅在约 39 任务子集、少数 agent（Agent S2 / GTA1）上做，结论外推到全部 16 agent 需谨慎；WES 未计入 token 成本/美元成本，与真正的 cost-accuracy（$/task）仍隔一层。对综述价值：作为 §8.10 的锚点，它提供了「效率是首要障碍」这一论断的最直接证据，可与 per-task $ 成本类工作（如 WebVoyager 上的延迟/成本 profiling、MobiBench 的 cost-latency 分析）互补。
+**Weaknesses.** WES 以「步数比」为核心，但步数并不等于 wall-clock latency（一步 grouped-action 可能内含多次昂贵模型调用），效率≠步数效率，二者在含义上有张力；single/grouped 两套轨迹说明「一步」的定义本身有主观性，人类最优轨迹也可能非唯一最优，引入标注者偏差；延迟归因仅在约 39 任务子集、少数 agent（Agent S2 / GTA1）上做，结论外推到全部 16 agent 需谨慎；WES 未计入 token 成本/美元成本，与真正的 cost-accuracy（\$/task）仍隔一层。对综述价值：作为 §8.10 的锚点，它提供了「效率是首要障碍」这一论断的最直接证据，可与 per-task \$ 成本类工作（如 WebVoyager 上的延迟/成本 profiling、MobiBench 的 cost-latency 分析）互补。
 
 ## Mind Map
 ```mermaid

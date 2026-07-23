@@ -138,15 +138,15 @@ OSWorld 1.0 多用 binary pass/fail；OSWorld 2.0 用 task-specific checkpoints 
 
 | Model / setting | Binary (%) | Partial (%) | Cost/task | Tool calls/task | Out tok/task | Steps/task |
 |---|---:|---:|---:|---:|---:|---:|
-| Claude Opus 4.8, batched | 20.6 | 54.8 | ~$72.4 | 481.8 | 224K | 103 |
-| Claude Opus 4.7, batched | 18.2 | 48.91 | ~$33.6 | 597.1 | 150K | 160.7 |
-| GPT-5.5, batched | 13.0 | 49.5 | ~$25.5 | 149.8 | 37.1K | 95.2 |
-| Claude Opus 4.8, single | 18.5 | 49.3 | ~$76.1 | 190.5 | 259.5K | 190.5 |
-| Claude Opus 4.7, single | 13.9 | 49.1 | ~$35.8 | 318.4 | 150.5K | 318.4 |
-| Claude Sonnet 4.6, single | 8.3 | 41.5 | ~$22.3 | 253.3 | 185.9K | 253.3 |
-| MiniMax M3, single | 4.6 | 22.3 | ~$2.4 | 326.7 | 70.8K | 326.7 |
-| Kimi 2.6, single | 4.6 | 22.1 | ~$6.6 | 179.3 | 63.0K | 179.3 |
-| Qwen 3.7-Plus, single | 2.8 | 21.5 | ~$3.8 | 173.5 | 28.9K | 173.5 |
+| Claude Opus 4.8, batched | 20.6 | 54.8 | ~\$72.4 | 481.8 | 224K | 103 |
+| Claude Opus 4.7, batched | 18.2 | 48.91 | ~\$33.6 | 597.1 | 150K | 160.7 |
+| GPT-5.5, batched | 13.0 | 49.5 | ~\$25.5 | 149.8 | 37.1K | 95.2 |
+| Claude Opus 4.8, single | 18.5 | 49.3 | ~\$76.1 | 190.5 | 259.5K | 190.5 |
+| Claude Opus 4.7, single | 13.9 | 49.1 | ~\$35.8 | 318.4 | 150.5K | 318.4 |
+| Claude Sonnet 4.6, single | 8.3 | 41.5 | ~\$22.3 | 253.3 | 185.9K | 253.3 |
+| MiniMax M3, single | 4.6 | 22.3 | ~\$2.4 | 326.7 | 70.8K | 326.7 |
+| Kimi 2.6, single | 4.6 | 22.1 | ~\$6.6 | 179.3 | 63.0K | 179.3 |
+| Qwen 3.7-Plus, single | 2.8 | 21.5 | ~\$3.8 | 173.5 | 28.9K | 173.5 |
 
 关键观察：
 

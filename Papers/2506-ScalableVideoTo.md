@@ -52,7 +52,7 @@ action annotation 使用 GPT-4o 和 narration，分三步逐步收紧定位：�
 - MONDAY 含 20K videos / 313K annotated frames，Table 1 中规模超过 Video2Action 的 6K videos / 30K frames，并且是 iOS + Android cross-platform。
 - 数据集平台分布约 iOS 49.50% / Android 50.50%；action distribution 中 touch 79.83%、scroll 8.53%、hardware interactions 6.73%、typing 2.68%、long press 1.11%、multi touch 0.80%、zoom 0.32%。
 - 附录报告 20,337 videos 覆盖 2,479 unique apps，OS-native / third-party apps 比例为 37.6% / 62.4%。
-- 生成成本为 $0.34 per video，而 expert manual annotation 在 100-video test set 上估计为 $5.76 per video。
+- 生成成本为 \$0.34 per video，而 expert manual annotation 在 100-video test set 上估计为 \$5.76 per video。
 
 **Dataset collection method evaluation**
 

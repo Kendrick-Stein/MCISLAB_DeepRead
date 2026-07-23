@@ -15,7 +15,7 @@ date_added: 2026-07-07
 ---
 ## Summary
 
-Explorer 用四阶段多 agent 流水线（Task Proposer 从首页出抽象任务 → Task Refiner 边探索边细化 → Task Summarizer 事后总结 → Task Verifier LLM 判成败）在 live web 上合成了当时最大的多模态轨迹数据集：**94,949 条成功轨迹 / 49,494 个 URL / 72 万截图 / 3330 万网页元素，$0.28/条**（约为 AgentTrek 的一半成本）。Explorer-7B 在 Multimodal-Mind2Web 上 53.2% step SR，MiniWob++ 零样本 53.26% 超 GPT-4。
+Explorer 用四阶段多 agent 流水线（Task Proposer 从首页出抽象任务 → Task Refiner 边探索边细化 → Task Summarizer 事后总结 → Task Verifier LLM 判成败）在 live web 上合成了当时最大的多模态轨迹数据集：**94,949 条成功轨迹 / 49,494 个 URL / 72 万截图 / 3330 万网页元素，\$0.28/条**（约为 AgentTrek 的一半成本）。Explorer-7B 在 Multimodal-Mind2Web 上 53.2% step SR，MiniWob++ 零样本 53.26% 超 GPT-4。
 
 ## Problem & Motivation
 
@@ -38,7 +38,7 @@ Explorer 用四阶段多 agent 流水线（Task Proposer 从首页出抽象任�
 
 ## Strengths & Weaknesses
 
-**Strengths**：把探索式合成推到 49K 站点规模并给出干净的成本数字（$0.28 vs AgentTrek $0.55——任务供给的单位经济学）；refiner 的"任务随探索细化"设计避免了纯 instruction-first 的不可行问题。
+**Strengths**：把探索式合成推到 49K 站点规模并给出干净的成本数字（\$0.28 vs AgentTrek \$0.55——任务供给的单位经济学）；refiner 的"任务随探索细化"设计避免了纯 instruction-first 的不可行问题。
 
 **Weaknesses / 边界**：
 - verifier 与人 81% 一致 → **19% 标签噪声直接进训练集**（与 [[Papers/2502-InSTA]] judge 82.6% 同款问题）。
@@ -59,7 +59,7 @@ mindmap
       49K站 60并行 50小时
       CAPTCHA登录支付即停
     Results
-      94K轨迹 $0.28/条
+      94K轨迹 \$0.28/条
       MM-M2W 53.2 step SR
       MiniWob零样本超GPT-4
 ```
@@ -67,4 +67,4 @@ mindmap
 ## Notes
 
 - 任务供给轴的"规模极点"：与 [[Papers/2410-NNetNav]]（hindsight，1 万条）比，Explorer 用半结构化流水线换了一个数量级的规模（9.4 万条）；与 [[Papers/2502-InSTA]]（15 万站但任务更浅）比，Explorer 轨迹更长（7.7 步）更多模态。三者共享同一个天花板：**live 环境无 verifier → LLM judge 噪声（~19%）+ 无状态修改任务**。
-- $0.28/条的单位成本 + "数据 scaling 单调涨"给 [[Topics/AgentEnvironment-Survey]] 轴 5 提供了供给侧经济学数据点：任务供给的成本瓶颈已经不在采集而在**可验证性**。
+- \$0.28/条的单位成本 + "数据 scaling 单调涨"给 [[Topics/AgentEnvironment-Survey]] 轴 5 提供了供给侧经济学数据点：任务供给的成本瓶颈已经不在采集而在**可验证性**。

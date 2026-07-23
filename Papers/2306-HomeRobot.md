@@ -88,7 +88,7 @@ OVMM 同时具备 (a) 200 场景规模、(b) 7892 物体实例、(c) 连续动�
 
 ### 真机平台
 
-**Hello Robot Stretch + DexWrist**：$25K 价位、6-DoF 操作、人体尺寸、低风险。Sec H.1 解释选 Stretch 是因为已在 40+ 实验室部署，跨实验室复现有基础。
+**Hello Robot Stretch + DexWrist**：\$25K 价位、6-DoF 操作、人体尺寸、低风险。Sec H.1 解释选 Stretch 是因为已在 40+ 实验室部署，跨实验室复现有基础。
 
 **Figure 4. HomeRobot 软件栈架构——Stretch 跑底层控制 + SLAM，工作站 GPU 跑感知 + 规划，路由器连接。**
 ![](https://arxiv.org/html/2306.11565v2/x3.png)

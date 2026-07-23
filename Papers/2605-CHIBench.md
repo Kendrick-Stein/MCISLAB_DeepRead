@@ -72,7 +72,7 @@ date_added: "2026-05-25"
 **无 agent 在 pass^3 上超过 20%**，显示严重的 run-to-run 不一致性。例如 Opus 4.6 从 28.0%（pass@1）降至 18.7%（pass^3）。
 
 ### 成本与效率
-每次试验平均步数从约 15（DeepAgents 配置）到约 142（Gemini CLI + Gemini 3 Flash）。每次试验成本从 $0.16（Claude Code + Haiku 4.5）到 $11.48（OpenClaw + Opus 4.7）。
+每次试验平均步数从约 15（DeepAgents 配置）到约 142（Gemini CLI + Gemini 3 Flash）。每次试验成本从 \$0.16（Claude Code + Haiku 4.5）到 \$11.48（OpenClaw + Opus 4.7）。
 
 ROI 分析识别 OAI Agents + GLM-5.1 为"Sweet Spot"象限，Claude Code + Opus 4.6 位于"Premium"。
 

@@ -31,7 +31,7 @@ OpenWebRL 证明**直接在 live 网站上做 online multi-turn RL 可行**并�
 ## Key Results
 
 - **OpenWebRL-4B 平均 68.4%**（WebVoyager 74.1 / OM2W 67.0 / DeepShop 64.0）：base 39.3 → SFT 52.0（+12.7）→ RL **68.4**（+16.4）；超 MolmoWeb-8B（51.9，用 278K 轨迹 SFT）、FARA-7B（44.6），追平 Gemini CUA（69.3）、超 OpenAI CUA（51.3）。
-- **蒸馏 judge**：OpenWebRL-Judge-8B acc 89.8 / P 89.5 / R 94.8，超 GPT-4o（85.6/83.6/93.4）；训练期评判成本 $545.50 → 近零。
+- **蒸馏 judge**：OpenWebRL-Judge-8B acc 89.8 / P 89.5 / R 94.8，超 GPT-4o（85.6/83.6/93.4）；训练期评判成本 \$545.50 → 近零。
 - 消融：去历史推理文本掉 −14.6/−23.7/−8.6（最大项）；去环境反馈 −5~−8；rollout 课程优于任一固定长度；PPO epochs=2 最优（3 过优化）。
 - **失败归因：51% 来自访问与环境问题**（bot 检测/封锁/网络），27% 来自推理约束跟踪——live RL 的上限一半卡在环境接入层。
 

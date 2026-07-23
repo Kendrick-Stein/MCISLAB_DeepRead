@@ -18,7 +18,7 @@ date_added: 2026-05-03
 
 ## Problem & Motivation
 
-**为什么重要**：Computer-use agent 的核心痛点不是成功率，而是推理成本和延迟。现有系统每一步都调用大模型，单任务成本可超过 $1，耗时 tens of minutes。这种 uniform compute allocation 对 production deployment 是致命障碍。
+**为什么重要**：Computer-use agent 的核心痛点不是成功率，而是推理成本和延迟。现有系统每一步都调用大模型，单任务成本可超过 \$1，耗时 tens of minutes。这种 uniform compute allocation 对 production deployment 是致命障碍。
 
 **现有方法局限**：
 1. Query-level cascade 不适用：GUI 任务是 evolving interaction，不是 single query
@@ -92,7 +92,7 @@ date_added: 2026-05-03
 mindmap
   root((StepLevelOptimization))
     Problem
-      Inference cost >$1 per task
+      Inference cost >\$1 per task
       Latency tens of minutes
       Uniform compute allocation inefficient
     Method

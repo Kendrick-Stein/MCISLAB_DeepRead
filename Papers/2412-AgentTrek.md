@@ -18,14 +18,14 @@ date_added: 2026-04-20
 > [!summary] AgentTrek: Agent Trajectory Synthesis via Guiding Replay with Web Tutorials
 > - **核心**: 用互联网上的 GUI 教程做 "guided replay"，让 VLM agent 在真实浏览器里按教程一步步操作，自动合成 web agent 的 multi-step trajectory 训练数据
 > - **方法**: 三阶段 pipeline——(1) FastText 分类器从 RedPajama 过滤教程；(2) GPT-4o 在 BrowserGym 中按教程引导执行，记录 screenshot/AXTree/DOM/action；(3) GPT-4o VLM evaluator 过滤无效轨迹。最终 Qwen2-VL/Qwen2.5 SFT
-> - **结果**: 10,398 条 trajectory（127 网站，平均 12.1 步，每条 $0.55），Qwen2-VL-7B+AgentTrek 在 ScreenSpot Web 67.4 (vs 30.7 baseline)，Mind2Web 全面超过 GPT-4 baseline
+> - **结果**: 10,398 条 trajectory（127 网站，平均 12.1 步，每条 \$0.55），Qwen2-VL-7B+AgentTrek 在 ScreenSpot Web 67.4 (vs 30.7 baseline)，Mind2Web 全面超过 GPT-4 baseline
 > - **Sources**: [paper](https://arxiv.org/abs/2412.09605) | [website](https://agenttrek.github.io/) | [github](https://github.com/xlang-ai/AgentTrek)
 > - **Rating**: 1 - Archived（+230% replay ablation 有清晰因果证据、ICLR 2025 Spotlight，但发表 16 个月后 cc=69 / gh 54⭐ stale、未被 OS-Atlas / UI-TARS 等 GUI agent 主线采纳，作为 tutorial-as-plan 的单点参考）
 
 **Key Takeaways:**
 1. **Tutorial-as-supervision**: 把网上现成的"how-to"教程当成弱监督的轨迹脚手架——human 已经免费写好了 step-by-step 计划，剩下的只是让 agent 在真实环境里 grounding 执行，避开了纯 LLM self-instruct 在长 horizon 上的脆弱
 2. **Guided replay vs unguided rollout**: 同样 400 个任务，带教程的 effective trajectory 比例 52% vs 无教程 15.78%（+230%）。说明在当前 VLM 能力下，high-level goal 还远不够，detailed step 是数据合成成功率的瓶颈
-3. **VLM evaluator 可用且成本低**: GPT-4o 作 trajectory-level judge，acc 84%，成本仅占总 pipeline 的 1.4%（$3.10/1k vs replay $215/1k），是 cost-effective 的 quality filter
+3. **VLM evaluator 可用且成本低**: GPT-4o 作 trajectory-level judge，acc 84%，成本仅占总 pipeline 的 1.4%（\$3.10/1k vs replay \$215/1k），是 cost-effective 的 quality filter
 4. **Pure-vision + pyautogui** unified action space，避开 HTML 跨站点格式不一致问题，token cost 从 4k/step → 1.2k/step (Qwen2-VL 720p)
 
 **Teaser. AgentTrek 三阶段 pipeline overview**
@@ -48,7 +48,7 @@ date_added: 2026-04-20
 1. **Prefilter (rule-based)**: 关键词匹配（`click`, `type`, `macOS`, `Windows`）+ 长度 + URL format。在 180 正 / 105 负 ground truth 上 recall 92.69%。20.8B → 68.8M
 2. **LLM Labeler (GPT-4o-mini)**: 在 ground truth validation set 上 F1 ≈ 90%，作者声称在 lengthy text 中识别教程内容反而比 human 更准。用来给 FastText 打标
 3. **FastText Classifier**: ~90k LLM+human 标签的样本训练，二分类。结果 18.8M tutorial-like 文本
-4. **Tag & Paraphrase (GPT-4o-mini)**: 标准化模板——Platform / Target / Task Description / Prerequisites / Step-by-step Instructions / Expected Outcome。$0.89/1k 条
+4. **Tag & Paraphrase (GPT-4o-mini)**: 标准化模板——Platform / Target / Task Description / Prerequisites / Step-by-step Instructions / Expected Outcome。\$0.89/1k 条
 
 **Table 2. 三层 filter 性能对比**
 
@@ -89,7 +89,7 @@ date_added: 2026-04-20
 | Eval   | 3.10        | gpt-4o      |
 | Total  | 219.35      | –           |
 
-考虑 44.4% replay 成功率 → 每条 effective trajectory $0.551。
+考虑 44.4% replay 成功率 → 每条 effective trajectory \$0.551。
 
 ### Stage 3：训练 Pure-Vision Web Agent
 
@@ -200,7 +200,7 @@ Insight: 当前 VLM 在 long-horizon 任务上的瓶颈不是 grounding，而是
 
 1. **问题定位清晰且重要**：GUI agent 的 trajectory data scarcity 是真实瓶颈，而 web tutorial 这一 supervision 来源被低估了——把 "how-to 文章" 这类**人类已经付出 cognitive effort 写好的过程性知识**直接利用，相比 self-instruct 的 LLM 凭空想象，是更可靠的 plan source
 2. **三层级联 filter 设计务实**：rule → LLM (GPT-4o-mini) → FastText 的瀑布，把 expensive model 用在数据少处、cheap model 用在 data scale 处。Cost engineering 做得到位
-3. **Cost number 公开且 itemized**（Table 4），方便后续工作复用预算估计；$0.55/trajectory 对比 human annotation 数十美元有数量级优势
+3. **Cost number 公开且 itemized**（Table 4），方便后续工作复用预算估计；\$0.55/trajectory 对比 human annotation 数十美元有数量级优势
 4. **+230% replay success rate 是有说服力的 ablation**——证明了 tutorial 不是装饰而是核心，pipeline 的因果链清晰
 5. **AT + M2W 互补结果好**：训练数据非冗余，说明 AgentTrek 拓展了 Mind2Web 未覆盖的区域
 
@@ -227,7 +227,7 @@ Insight: 当前 VLM 在 long-horizon 任务上的瓶颈不是 grounding，而是
 - ✅ **VLM agent + tutorial guidance 显著提高 trajectory 合成成功率**：400-task ablation, 52% vs 15.78%, gap 大且方向稳健
 - ✅ **AgentTrek + Mind2Web 联合训练在 Mind2Web 三 split 全部 SOTA**：Table 7 数字明确
 - ✅ **ScreenSpot Web grounding 显著提升**：30.7 → 67.4 同样 backbone (Qwen2-VL-7B)
-- ⚠️ **"$0.551/trajectory" cost claim**：基于 44.4% replay success rate 折算，但 evaluator 84% acc 意味着实际 effective trajectory 还要再打折；真实 quality-adjusted cost 偏高
+- ⚠️ **"\$0.551/trajectory" cost claim**：基于 44.4% replay success rate 折算，但 evaluator 84% acc 意味着实际 effective trajectory 还要再打折；真实 quality-adjusted cost 偏高
 - ⚠️ **"surpasses teacher GPT-4" claim (intro)**：在某些 benchmark 上 7B 学生超过 GPT-4o，但 GPT-4o 没在同 prompt format / action space 下评估过——比较不严格
 - ⚠️ **VLM evaluator 84% acc**：自己生成自己评估的 confounding 没排除；human-validated set 的代表性未说明
 - ⚠️ **"覆盖 12 categories / 127 websites" diversity claim**：缺分布数据，可能长尾严重

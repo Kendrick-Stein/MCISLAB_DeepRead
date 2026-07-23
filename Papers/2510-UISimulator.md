@@ -35,7 +35,7 @@ UI-Simulator 的问题设定是：能否把 LLM 世界知识转成可扩展、�
 - **Equal test-env exposure.** 在相同真实测试环境暴露下，OS-Genesis 只有 1.48 WebArena / 5.2 AndroidWorld，而 UI-Simulator-R 约为其 WebArena 4x、AndroidWorld 2.5x。
 - **Real-env synthesis ablation.** 直接在真实测试环境中合成经验反而较差：UI-Simulator-F/R 的 "Synthesize in Real Env" 约 4.31 WebArena，AndroidWorld 约 4.7/9.1。
 - **Control ablations.** 去掉 step-wise task control 后降到 1.72 WebArena / 5.2 AndroidWorld；去掉 multi-step simulation 后降到 4.06 WebArena / 9.1 AndroidWorld。
-- **Cost.** 论文报告 web trajectory 成本约 $0.02（retrieval-free）和 $0.05（retrieval-augmented）；Android 约为其两倍。
+- **Cost.** 论文报告 web trajectory 成本约 \$0.02（retrieval-free）和 \$0.05（retrieval-augmented）；Android 约为其两倍。
 
 ## Strengths & Weaknesses
 **已知的强点。** 这篇把 synthetic UI simulator 的训练价值讲得很清楚：模拟器不需要完全真实，但必须能提供目标相关、可控、多步的 state transition。它也展示了一个反直觉点：直接在真实环境合成经验不一定优于模拟器，因为真实环境采样不可控、难以覆盖失败分布。

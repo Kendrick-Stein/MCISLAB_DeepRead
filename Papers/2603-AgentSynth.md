@@ -33,7 +33,7 @@ AgentSynth 的核心假设是：简单子任务更容易生成和验证，复杂
 - **Difficulty gradient.** SOTA agents 从 Level 1 的 18% success drop 到 Level 6 的 4% success，说明合成任务难度能拉开模型差异。
 - **Generation quality.** 对 100 个 sampled tasks 的人工评估中，各项质量指标均超过 85%。Verifier stress test 中，near-miss trajectory 只有 12% 被误接受，而 paraphrase-equivalent trajectory 有 96% 被接受。
 - **Hard-task generation.** 直接生成 hard tasks 的成功率约 11%，AgentSynth 组合式生成 hard tasks 成功率约 52%。
-- **Cost.** 论文报告五个 follow-up subtasks 的完整 trajectory 约 $0.60；六个 task levels 平均约 $0.10/task。
+- **Cost.** 论文报告五个 follow-up subtasks 的完整 trajectory 约 \$0.60；六个 task levels 平均约 \$0.10/task。
 - **Web appendix.** 在 InSTA Docker web environment 上，AgentSynth 可迁移生成 web tasks；论文报告 summarized InSTA tasks 比原始任务更难，GPT-4o success 降到 6.45%。
 
 ## Strengths & Weaknesses

@@ -19,7 +19,7 @@ GTR-Turbo 解决 multi-turn VLM agent RL 中 sparse reward 和 long-horizon cred
 ## Problem & Motivation
 多轮 VLM agent 训练的问题不是简单“给最终成功奖励再 PPO”即可解决：在 Points24、ALFWorld 这类环境中，reward 稀疏、trajectory 长、action space 大，vanilla RL 容易让 reasoning output 变得重复、模板化和不一致，即论文称为 thought collapse / entropy collapse 的现象。
 
-GTR 通过外部 VLM corrector 给 step-level thought guidance，能缓解这个问题，但代价很重。论文报告在 Points24 上用 GPT-4o corrector 训练 LLaVA-v1.6-mistral-7B 15,000 steps 需要 86h、33.5M tokens、约 $146.56；换成 Qwen2.5-VL-72B 虽然 token cost 降到约 $18.59，但训练时间变成 110h、corrector performance 只有 6.5%；Qwen2.5-VL-7B corrector 则无法提供有效 thought guidance。
+GTR 通过外部 VLM corrector 给 step-level thought guidance，能缓解这个问题，但代价很重。论文报告在 Points24 上用 GPT-4o corrector 训练 LLaVA-v1.6-mistral-7B 15,000 steps 需要 86h、33.5M tokens、约 \$146.56；换成 Qwen2.5-VL-72B 虽然 token cost 降到约 \$18.59，但训练时间变成 110h、corrector performance 只有 6.5%；Qwen2.5-VL-7B corrector 则无法提供有效 thought guidance。
 
 因此作者要回答的问题是：能否在不依赖 GPT/Gemini 这类 privileged external teacher、不增加人工标注和额外 teacher training 的情况下，仍然获得 process guidance，让 VLM agent 在复杂 visual interactive environments 中稳定自我改进。
 
@@ -36,9 +36,9 @@ GTR 通过外部 VLM corrector 给 step-level thought guidance，能缓解这个
 **训练与任务。** 主实验用 Qwen2.5-VL-7B，先做一轮 SFT 初始化，再做 RL；Points24 训练 30,000 steps，ALFWorld 训练 20,000 steps，均比前作训练预算更长。Points24 要从图片中识别扑克牌并构造等于 24 的公式；ALFWorld 在论文设置中移除了文本场景描述，只保留 RGB image observation 和 action history，因此更强调视觉识别、long-horizon planning 和 commonsense reasoning。
 
 ## Key Results
-**Points24.** GTR-Turbo (KL) 在最终评估中达到 **53.5% success rate / 2.39 episode return**，高于 GTR 的 **44.5% / 0.53**、GTR-Turbo (SFT) 的 **48.0% / 1.32**、Qwen2.5-VL-7B-sft 的 **22.0% / -3.2**、GPT-4o + Tool 的 **13.5% / -3.59** 和 RL4VLM 的 **3.5% / -13.3**。按 Table 4 的训练开销，Points24 上 GTR 为 **41% SR / 191h / $307.78 / 70.35M tokens**，GTR-Turbo (KL) 为 **54% SR / 89h / $114.81**，训练时间约为 GTR 的 46.6%，额外成本约为 GTR 的 37.3%。
+**Points24.** GTR-Turbo (KL) 在最终评估中达到 **53.5% success rate / 2.39 episode return**，高于 GTR 的 **44.5% / 0.53**、GTR-Turbo (SFT) 的 **48.0% / 1.32**、Qwen2.5-VL-7B-sft 的 **22.0% / -3.2**、GPT-4o + Tool 的 **13.5% / -3.59** 和 RL4VLM 的 **3.5% / -13.3**。按 Table 4 的训练开销，Points24 上 GTR 为 **41% SR / 191h / \$307.78 / 70.35M tokens**，GTR-Turbo (KL) 为 **54% SR / 89h / \$114.81**，训练时间约为 GTR 的 46.6%，额外成本约为 GTR 的 37.3%。
 
-**ALFWorld.** 在视觉 ALFWorld 上，GTR-Turbo (KL) 达到 **0.15 average success rate**，接近 GTR 的 **0.16**，高于 RL4VLM 和 Qwen2.5-VL-7B-sft 的 **0.08**，但低于 GPT-4o 的 **0.42** 和 Qwen2.5-VL-72B 的 **0.32**。按 Table 4，ALFWorld 上 GTR 为 **16% SR / 164h / $145.76 / 30.94M tokens**，GTR-Turbo (KL) 为 **15% SR / 78h / $100.62**，说明它主要赢在本地、自举和效率，而不是超过强外部模型本身。
+**ALFWorld.** 在视觉 ALFWorld 上，GTR-Turbo (KL) 达到 **0.15 average success rate**，接近 GTR 的 **0.16**，高于 RL4VLM 和 Qwen2.5-VL-7B-sft 的 **0.08**，但低于 GPT-4o 的 **0.42** 和 Qwen2.5-VL-72B 的 **0.32**。按 Table 4，ALFWorld 上 GTR 为 **16% SR / 164h / \$145.76 / 30.94M tokens**，GTR-Turbo (KL) 为 **15% SR / 78h / \$100.62**，说明它主要赢在本地、自举和效率，而不是超过强外部模型本身。
 
 **Android-in-the-Wild.** Appendix C.2 在 AitW 上用 Qwen3-VL-8B-Instruct 测试，GTR-Turbo 达到 **80.2% success rate / 3.93 reasoning score**，高于 PPO 的 **75.0% / 3.26** 和 DigiRL 的 **71.9% success rate**。这说明方法不只限于 Points24 / ALFWorld，也能迁移到 GUI benchmark，但该实验是 appendix 规模，且论文说未做 heavy hyperparameter tuning 和 reward shaping。
 

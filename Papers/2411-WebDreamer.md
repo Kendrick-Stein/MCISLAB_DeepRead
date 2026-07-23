@@ -32,7 +32,7 @@ Tree search（[[Papers/2407-TreeSearchLMAgents]]）已证明规划有大收益�
 - **VWA (910 任务)**：reactive 17.7% / tree search 26.4% / **WebDreamer 23.6%**（+33.3% 相对 reactive，达到 tree search 收益的 ~70%）。medium 难度上 24.1% 反超 tree search 的 22.2%。
 - **Mind2Web-live (104 任务, 69 个真实网站)**：reactive 22.1%→**25.0%**（tree search 无法运行）。
 - **效率**：wall-clock（VWA Shopping）reactive 87.7s / tree search 785.7s / WebDreamer 179.4s——**~4.4× 快于 tree search**；动作步数 4.1–5.2 vs tree search 9.9–13.6（真实执行的动作更少 = 副作用更少）。
-- 成本：~$1/任务（GPT-4o API）。
+- 成本：~\$1/任务（GPT-4o API）。
 
 ## Strengths & Weaknesses
 

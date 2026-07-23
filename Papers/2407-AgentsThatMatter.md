@@ -54,12 +54,12 @@ Agent 研究的评测实践存在系统性问题，导致 leaderboard 上的 SOT
 
 | 方法 | Accuracy | Cost |
 |:--|:--|:--|
-| Warming (GPT-4) | 93.2% | $2.45 |
-| LDB (GPT-4 + GPT-3.5) | 91.0% | $2.19 |
-| **GPT-4 zero-shot** | **89.6%** | **$1.93** |
-| LATS (GPT-4) | 88.0% | **$134.50** |
-| Reflexion (GPT-4) | 87.8% | $3.90 |
-| GPT-3.5 zero-shot | 73.9% | $0.05 |
+| Warming (GPT-4) | 93.2% | \$2.45 |
+| LDB (GPT-4 + GPT-3.5) | 91.0% | \$2.19 |
+| **GPT-4 zero-shot** | **89.6%** | **\$1.93** |
+| LATS (GPT-4) | 88.0% | **\$134.50** |
+| Reflexion (GPT-4) | 87.8% | \$3.90 |
+| GPT-3.5 zero-shot | 73.9% | \$0.05 |
 
 关键结论 "there is no significant accuracy difference between our warming strategy and the best-performing agent architecture"，而 LATS 成本比简单策略高 50 多倍。作者强调这类论文"haven't adequately tested simple baselines"——一个正确跑出来的 GPT-4 zero-shot（89.6%）已经追平/接近所有复杂 agent。
 

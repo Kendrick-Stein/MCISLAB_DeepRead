@@ -15,7 +15,7 @@ date_added: 2026-07-20
 ---
 ## Summary
 
-ANCHOR 把"分支"用于训练数据合成：在少量种子轨迹上由 GPT-5.1 识别 branch point（UI 发生实质状态变化的节点），从该状态出发提出新任务变体、由执行 agent（Claude Sonnet 4.5）展开新轨迹、验证器过滤，配合前缀过滤与 branch 后去噪两级 step 级清洗——1,777 条轨迹（$0.47/条）使 Qwen3-VL-8B 在 OSWorld 16.82→20.56、WindowsAgentArena 23.07→30.76。
+ANCHOR 把"分支"用于训练数据合成：在少量种子轨迹上由 GPT-5.1 识别 branch point（UI 发生实质状态变化的节点），从该状态出发提出新任务变体、由执行 agent（Claude Sonnet 4.5）展开新轨迹、验证器过滤，配合前缀过滤与 branch 后去噪两级 step 级清洗——1,777 条轨迹（\$0.47/条）使 Qwen3-VL-8B 在 OSWorld 16.82→20.56、WindowsAgentArena 23.07→30.76。
 
 ## Problem & Motivation
 
@@ -27,7 +27,7 @@ ANCHOR 把"分支"用于训练数据合成：在少量种子轨迹上由 GPT-5.1
 - **任务变体提议**：给 LLM 轨迹前缀 + 当前 GUI 状态，合成 state-grounded 的新任务描述；执行中若 agent 行为漂移或环境变化，迭代修正指令。
 - **轨迹展开与验证**：Claude Sonnet 4.5 从 branch 状态执行新任务；task summarizer 产生高层描述；Qwen3-VL-32B 验证器做 state-aware 完成检查，失败轨迹丢弃（人工审计 87% 一致率，95% CI 79.0-92.2%）。
 - **两级 step 过滤**：(1) 前缀过滤——对跨后代共享的前缀生成多个候选 action-reasoning 对，只保留与观测状态转移视觉一致的步骤；(2) branch 后去噪——intention-consistency 检查动作与视觉变化匹配性，剔除噪声步但保留其后的有效步（保留"犯错后纠正"的恢复监督）。
-- 产出：1,777 条成功轨迹（Ubuntu 1,174 / Windows 603），平均 17.24 步，$0.47/条。
+- 产出：1,777 条成功轨迹（Ubuntu 1,174 / Windows 603），平均 17.24 步，\$0.47/条。
 
 ## Key Results
 
@@ -38,7 +38,7 @@ ANCHOR 把"分支"用于训练数据合成：在少量种子轨迹上由 GPT-5.1
 ## Strengths & Weaknesses
 
 **Strengths**
-- Branch-point 展开在数据合成谱系中占据一个干净的生态位：介于"从零合成"（多样但浅）与"人工演示"（深但贵）之间，复用已验证前缀直达深层 UI 状态，$0.47/条的成本数字有说服力。
+- Branch-point 展开在数据合成谱系中占据一个干净的生态位：介于"从零合成"（多样但浅）与"人工演示"（深但贵）之间，复用已验证前缀直达深层 UI 状态，\$0.47/条的成本数字有说服力。
 - 超过人工数据（7.94 vs 4.67）是合成数据罕见的强 claim——解释是覆盖了人工演示不会经过的状态多样性。
 - 去噪时保留"错误后的纠正段"，无意中成为恢复行为的监督来源。
 

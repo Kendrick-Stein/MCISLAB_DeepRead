@@ -32,7 +32,7 @@ MolmoAct2 是一个面向真实世界部署的全开源 VLA 系统，通过五�
 
 | 数据集 | 规模 | 亮点 |
 |:------|:-----|:-----|
-| **BimanualYAM** | 720h, 34.5K demos, 28+ tasks | 最大开源双臂数据集，成本 <$6K |
+| **BimanualYAM** | 720h, 34.5K demos, 28+ tasks | 最大开源双臂数据集，成本 <\$6K |
 | **SO-100/101** | 从 1,222 个公开 LeRobot 数据集中筛选 | 38K episodes, 19.8M frames，四阶段质量过滤 |
 | **DROID** | 74,604 episodes, 17.7M frames | 扩展语言标注（95% episodes 3 条指令），idle-frame 过滤 |
 
@@ -123,5 +123,5 @@ mindmap
 - Molmo2-ER 的 embodied reasoning 数据 recipe（6 大支柱、两阶段 specialize-then-rehearse）对 VLM 具身化训练有较强参考价值，值得单独深入
 - OpenFAST 作为开源 action tokenizer 可能成为社区标准组件
 - 自适应深度推理（MolmoThink）的思路可以推广到其他需要 dense prediction 的 VLA 场景
-- BimanualYAM 数据集的低成本采集协议（<$6K, 720h）对社区贡献大
+- BimanualYAM 数据集的低成本采集协议（<\$6K, 720h）对社区贡献大
 - 整体是一个 engineering 贡献为主的工作，architecture novelty 有限（flow-matching + KV conditioning 已有先例），但系统整合和开源程度值得肯定

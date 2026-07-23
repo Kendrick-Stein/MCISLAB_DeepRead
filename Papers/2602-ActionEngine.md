@@ -51,7 +51,7 @@ WebArena Reddit（Postmill）子集 106 个任务，ActionEngine（Claude 4.5 So
 |:--|:--|:--|:--|
 | Success Rate | 66% | **95%** | +29pp |
 | 平均延迟 | 237s | **118s** | 2.0x |
-| 平均成本/任务 | $0.71 | **$0.06** | 11.8x |
+| 平均成本/任务 | \$0.71 | **\$0.06** | 11.8x |
 | 平均 LLM 调用 | 10.2 | **1.8** | 5.7x |
 
 - **Multi-step reasoning**（统计某作者 downvotes>upvotes 的评论数）：AgentOccam 17.8 次调用、60% 成功；ActionEngine 1 次调用、100% 成功（65s vs 343s）。
@@ -65,7 +65,7 @@ WebArena Reddit（Postmill）子集 106 个任务，ActionEngine（Claude 4.5 So
 - 把 "amortized offline indexing + one-shot programmatic planning" 这条 code-as-policy 路线落到 GUI agent 上，问题切分干净：应用结构理解（可摊销、可复用）与任务执行（确定性）解耦。
 - SMG 的 static/dynamic atom 区分 + 类型化集合是控制状态爆炸的关键设计；affordance-based operation 定义保证了跨任务复用性。
 - Fallback 不只是兜底，还回写 memory，形成 self-healing 循环。
-- 成本/延迟数字对 agent 产品化有直接意义：95% @ $0.06 是质变而非增量。
+- 成本/延迟数字对 agent 产品化有直接意义：95% @ \$0.06 是质变而非增量。
 
 **局限（作者承认 + 隐含假设）**：
 

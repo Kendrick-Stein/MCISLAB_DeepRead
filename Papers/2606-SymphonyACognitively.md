@@ -50,7 +50,7 @@ Planning Agent 是 central coordinator，负责全局 task planning、agent sche
 - **Sampling ablation**：在 LVBench EU subset 上，`FPS=0.5, clip interval=60s` 为 **68.6% / 69.4s**；提高到 `FPS=1, 60s` 为 **70.9% / 74.8s**，缩短到 `0.5, 30s` 为 **70.3% / 79.0s**；降低到 `0.25, 60s` 掉到 **62.1%**，拉长到 `0.5, 120s` 掉到 **64.7%**。
 - **Voting upper bound**：三路独立 Symphony majority voting 得到 Symphony-Vote，在 LVBench / LongVideoBench / VideoMME / MLVU 上为 **73.7 / 80.5 / 82.1 / 83.6**，比标准 Symphony 的 **71.8 / 77.1 / 78.1 / 81.0** 高约 2-4 个点；它在 MLVU 上仍低于 LvAgent 的 **83.9**。
 - **Foundation model control**：Appendix Table 8 在 LVBench 上重测不同 base models，Ours + Seed 1.6VL / Qwen2.5VL-72B / Qwen2.5VL-7B / GPT-4o 分别为 **71.8 / 68.2 / 65.1 / 67.1**，均高于同表 VideoTree、VideoAgent、VideoRAG、VDR 对应设置。
-- **Cost**：Appendix C 报告在 LVBench 上 DeepSeek R1 平均每个 query 消耗 **0.22M tokens**、约 **$0.124**，比 DVD 使用 OpenAI o3 的 **$0.213** 低 **41.8%**；该数字只按论文描述覆盖其主要 LLM API 成本。
+- **Cost**：Appendix C 报告在 LVBench 上 DeepSeek R1 平均每个 query 消耗 **0.22M tokens**、约 **\$0.124**，比 DVD 使用 OpenAI o3 的 **\$0.213** 低 **41.8%**；该数字只按论文描述覆盖其主要 LLM API 成本。
 
 ## Strengths & Weaknesses
 **已知**

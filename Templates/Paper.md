@@ -8,7 +8,7 @@ tags: []
 url:
 arxiv_id: "%% arXiv id，如 2606.19409；非 arXiv 留空。由 assign_cite_keys.py 自动从 url 抽取 %%"
 doi: "%% DOI，如 10.1109/TPAMI...；期刊/会议有则填，否则留空 %%"
-cite_key: "%% 引用 key（如 wen2026openrath），留空由 assign_cite_keys.py 分配。一旦写入永久冻结 %%"
+cite_key: # 留空、勿加引号（写成 "" 会让 assign_cite_keys.py 静默跳过）；由脚本分配，一旦写入永久冻结
 code:
 rating: "%% 1=不相关, 2=了解即可, 3=有参考价值, 4=重要, 5=必读 %%"
 content_scope: "%% full-text / abstract-only %%"

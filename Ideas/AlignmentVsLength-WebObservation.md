@@ -1,5 +1,5 @@
 ---
-title: "Alignment-vs-Length：web agent 观察优化的杠杆是"对齐"还是"变短"？"
+title: 'Alignment-vs-Length：web agent 观察优化的杠杆是"对齐"还是"变短"？'
 tags: [gui-agent, web-agent, research-idea]
 status: raw
 linked_project:

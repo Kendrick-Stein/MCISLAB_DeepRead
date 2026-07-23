@@ -7,12 +7,12 @@ papers_analyzed: 0
 keywords: []
 domain_map: GUI-Agent
 status: merged
-merged_into: "[[Topics/GUIAgent-Survey]]"
+merged_into: "[[Topics/CUA-Survey]]"
 ---
 
 # Real-World GUI Agent Reliability Survey（已并入 GUI 主报告）
 
-真实执行分布、action-effect verification、error awareness、recovery、abstention 与异常态评测已成为 GUI Agent 的独立能力层，并于 2026-07-21 完整并入 [[Topics/GUIAgent-Survey]]。
+真实执行分布、action-effect verification、error awareness、recovery、abstention 与异常态评测已成为 GUI Agent 的独立能力层，并于 2026-07-21 完整并入 [[Topics/CUA-Survey]]。
 
 ## 迁移映射
 

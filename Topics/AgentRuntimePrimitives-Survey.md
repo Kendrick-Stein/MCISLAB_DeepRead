@@ -7,12 +7,12 @@ papers_analyzed: 0
 keywords: []
 domain_map: GUI-Agent
 status: merged
-merged_into: "[[Topics/GUIAgent-Survey]]"
+merged_into: "[[Topics/CUA-Survey]]"
 ---
 
 # Agent Runtime Primitives Survey（已并入 GUI 主报告）
 
-Recovery、branching、parallelism、checkpoint、rollback 与 replay 不再作为独立 GUI survey 维护。它们分别是 Agent 架构、训练 rollout 与 environment runtime 的原语，已按控制方重新归入 [[Topics/GUIAgent-Survey]]。
+Recovery、branching、parallelism、checkpoint、rollback 与 replay 不再作为独立 GUI survey 维护。它们分别是 Agent 架构、训练 rollout 与 environment runtime 的原语，已按控制方重新归入 [[Topics/CUA-Survey]]。
 
 ## 迁移映射
 

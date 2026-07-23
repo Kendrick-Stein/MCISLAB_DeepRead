@@ -1,18 +1,23 @@
 ---
-title: "GUI / Computer-Use Agent 统一研究综述"
+title: "GUI / Computer-Use Agent 统一研究综述（已升级并入 CUA-Survey）"
 tags: [survey, gui-agent, computer-use, web-agent, mobile-agent, agentic-RL]
 date_updated: "2026-07-23"
 year_range: 1997-2026
-papers_analyzed: 106
-keywords: [gui-agent, gui grounding, computer-use, web agent, browser agent, mobile agent, cua, desktop agent, os agent]
+papers_analyzed: 111
+keywords: []
 exclude_tags: [deep-research]
 exclude_keywords: [deep research, information seeking, browsecomp, research agent, search agent]
 hard_exclude_keywords: [browsecomp]
 exclude_override_tags: [gui-agent, computer-use]
 domain_map: GUI-Agent
+status: merged
+merged_into: "[[Topics/CUA-Survey]]"
 ---
 
 # GUI / Computer-Use Agent 统一研究综述
+
+> [!info] 已升级为 [[Topics/CUA-Survey]]（2026-07-23）
+> 本综述已按 12 节完整 Computer-Use Agents 目录重排并补全，canonical 版本为 [[Topics/CUA-Survey]]。以下为并入前的内容，仅作历史留存，不再单独更新（digest→survey 流水线已改指向 CUA-Survey）。
 
 ## 1. Overview
 
@@ -97,6 +102,8 @@ GUI observation 的三种基本形态对应一条清晰的发展线。最早的 
 [[Papers/2607-GUIStateBelief]] 改变了“hybrid observation 信息更多、因而更可靠”的默认判断。735 个跨 Web、Mobile、Desktop 的 paired probes 显示，模型在 image-only 读取接近饱和时，仍会在冲突下跟随 stale structure；真实网页中的结构跟随率最高达 0.88。在最多六步、首步冲突已导致 structure-following error、且 aligned twin 至少需要两步的 MiniWoB++ click-style episodes 中，self-recovery 不超过 0.03。prompt 级 pixel-priority cue 到 action 层失效，而 training-free consistency gate 才同时降低 hijack 与 task error，说明 fusion failure 不能只靠扩大视觉模型解决。
 
 局部 grounding 之外还有一条正交的 context 工程线——**推理期效率**：当 observation 与历史轨迹撑大 context 时如何在不掉精度下压缩存储。[[Papers/2606-StarKV]] 针对 GUI VLM 的 KV cache，用 spatial mutual-information prior + cross-frame temporal-stability discount + entropy sharpening 替代通用方法的单一 saliency 加固定 top-B，在 40% 预算下与 full cache 持平（ScreenSpot-Pro 49.94 vs 49.75）、20% 预算峰值显存降约 38.5%；[[Papers/2601-CompressToFocus]] 则把压缩折进多轮 RL——跨 rollout 聚合 click 坐标定 ROI、裁历史截图并丢弃非坐标动作的截图，把 1AO→3AO 的 token 增幅从 semi-online RL 的 41% 压到约 4%，GUI-Odyssey 长程 SR +21.4pp。[[Papers/2603-STLiteKV]] 的更硬贡献其实是诊断而非方法：GUI 注意力在**所有层**都均匀高稀疏，导致 PyramidKV/VL-Cache 的分层预算先验错配、在低预算下崩溃（ScreenSpot-Pro @1% 预算 VL-Cache 1.1 / PyramidKV 4.8 vs ST-Lite 7.3），改用均匀预算 + 零超参空间显著性后 2.45× 解码加速、@20% 预算甚至微超 full cache——但其 intro 的“平均 7.3% 提升”经独立核查实为单个最大 cell、真实均值约 2.2–2.4%（该 note 标 partial）。这条线与 accountable-state thesis 正交：它按 attention/redundancy 启发式决定留哪些 token，而非按 belief source 或 freshness 决定；隐患也在此——裁剩的 ROI crop 或高 saliency token 不保证仍反映当前 UI state，压缩本身可能把 stale evidence 留在 context 内。
+
+与视觉/结构侧的表示重构平行，web agent 有一条更早成型、如今已进入自我质疑期的 **observation reduction** 线——针对 raw DOM/HTML 常达 10k–100k token 的问题，喂给 agent 的不是原始 DOM 而是其优化版。四条路线已固化：程序化剪枝（[[Papers/2511-Prune4Web]]，LLM 只产出 keyword_weights 参数填入固定打分模板、并非真生成 Python，候选削减 25–50×、low-level grounding 46.8→88.28）、LLM 选行检索（[[Papers/2510-FocusAgent]]，轻量 retriever 按 goal 从 AxTree 选相关行、削减 >50%）、规则式结构重构（前述 [[Papers/2605-A11yCompressor]]），以及与"缩短"正交的表示对齐（[[Papers/2410-AgentOccam]]）。这条线最有价值的产出不是又一个压缩器，而是三个跨论文的校正性发现。其一，**优化 ≠ 省 token**：AgentOccam 把页面重构成 Markdown/降噪表示、WebArena 做到 43.1% 超一众带 search/多角色的复杂系统，但其每步观察 token 反而从 vanilla 的 2210 升到 2930——杠杆是"对齐 LLM 预训练分布 + 降噪"而非缩短长度，做压缩类工作时"对齐"与"缩短"必须分开评估。其二，**压缩并非普遍有益、且高度依赖底座**：[[Papers/2604-ReadMoreThinkMore]] 在 WorkArena L1 上系统对比 a11y 与完整 HTML，强模型（gpt-5.1、claude-sonnet-4-6）用完整 HTML 反而 +14.6~17.5pp、弱开源模型用 HTML 大幅退化（gpt-oss-20b −18.8pp），最优表示取决于 model capability × thinking budget（o3-mini −7.6pp 的反例说明决定因素是能力而非闭源）——这把"reduction 总是好"从默认假设降级为有边界条件的判断。其三，**收益随模型变强而蒸发**：Prune4Web 对 GPT-4o 零提升（42.1→42.1，增益集中在小模型）、FocusAgent 在 WebArena 反低于全观察（32.3 vs 36.5），三篇独立指向"DOM 优化正从能力问题退化为成本/延迟/安全问题"。这条线与本章的 belief-source 讨论互补：reduction 决定喂哪些证据，而 [[Papers/2607-GUIStateBelief]] 说明喂进来的证据一旦 stale/冲突就会主导错误——两者共同表明观察工程的正确单位不是"更短"，而是"为哪个模型、哪个下游目标、在什么 freshness 下最优"。该子领域已成熟到自建廉价评测代理（见 §6.3 [[Papers/2605-MFSCoverage]]），也从侧面印证方法层面接近饱和。
 
 ### 2.2 Action Representation
 
@@ -316,6 +323,8 @@ GUI 评测最初依赖 agent 自报、最后截图或 element match；self-hoste
 
 另一条被 reviewer 反复 push、却在多数 GUI survey 缺席的维度是**成本**。[[Papers/2407-AgentsThatMatter|AI Agents That Matter]]（TMLR 2025）与 [[Papers/2510-HAL|Holistic Agent Leaderboard]]指出 accuracy 可被"多试几次"这类无科学意义手段刷高，要求把 agent 画在 cost–accuracy Pareto frontier 上；HAL 一次 21,730 rollout 的复现里，9 个 benchmark 只有 1 个（CORE-Bench Hard）的最贵模型落在美元 Pareto 前沿，提高 reasoning effort 在 36 个 model×agent×benchmark 组合里 21 个只得到持平或更低 accuracy，同一 benchmark 换 scaffold 可差 9 倍成本。任何报 SOTA 的章节都应同时给 cost 与 Pareto 位置，而非裸报最高分。
 
+评测成本高到会阻塞子领域进展本身，也催生了针对性的廉价代理。[[Papers/2605-MFSCoverage]] 针对 observation-reduction 方法族，用 Minimal Failure Set（删掉哪些元素会导致任务失败的最小集合）的 coverage 作端到端 success rate 的 proxy——由于覆盖判定无需 web access 与 policy 推理、可完全并行，把 WorkArena L1（33 任务横评 11 方法 × 32 配置本需 232 小时）的累计评测提速 >100×，且 coverage 与真实 SR 强相关（回归掉 reduction ratio 后仍强）。它是"评测太贵反噬进展"的一个具体解法，也顺带给出压缩方法的成本–覆盖地图（extractive 压缩要么算力昂贵、要么依赖 domain-specific 优化）；但代价是 MFS 假设"失败=缺关键元素"、对 reasoning/planning 类失败无解释力，样本偏小（59/42 实例）且每换一个 benchmark 需重建 MFS，coverage 因此只能补充而非替代端到端。
+
 评测不诚实还来自训练复现。[[Papers/2607-TeachStop]] 的 variance decomposition 显示 evaluation noise 近零、training-seed effect 不超过 10%，但 data draw 与 run-to-run nondeterminism 主导结果，最难 cell 甚至呈 bimodal distribution。GUI/CUA 论文因此应报告 verifier precision/recall/coverage/cost，也应报告 data-draw × seed、paired task statistics 与 environment failure；单次 run 的 headline gain 已不足以支持方法结论。
 
 本章最关键的决定性实验，是固定 trajectory、evidence budget 与 actor，直接比较 programmatic、visual/rubric 与 interactive verifier 的 precision、recall、coverage、cost、abstention 和抗操纵能力。只有这种等证据对照，才能判断主动取证是否真的突破 verifier trade-off，而不只是花更多调用预算。
@@ -346,6 +355,8 @@ GUI 评测最初依赖 agent 自报、最后截图或 element match；self-hoste
 ### 7.2 Safety 与 Privacy
 
 安全不能只看 user prompt；对威胁面的认识沿一条不断扩展的路径推进，风险被先后定位到第三方内容、跨应用上下文、动作后果和 self-improvement 资产。最早确立的威胁是 environmental injection：[[Papers/2504-WASP]] 在现实威胁模型下的部分攻击成功率可达 86%，[[Papers/2409-EIA]] 的环境注入窃取特定 PII 成功率为 70%，第三方内容由此被证明是与 user prompt 同级的攻击入口。下一步认识是风险并不依赖 adversary：[[Papers/2606-AgentCIBench]] 在无 adversary 的正常使用中测得平均 contextual leakage 67.9%，说明 task success 不能代理 privacy safety，日常跨应用上下文本身就是泄露源。而即使把披露控制作为显式目标，细粒度的 least disclosure 仍然失败：[[Papers/2601-GUIGuardBench]] 的 binary privacy detection 尚可，但 strict full match 在 Android/PC 只有 8.8%/0.6%——模型能判断存在隐私风险，却无法精确指出哪些信息不该披露。这条认识路径的当前落点是把判定单位从 instruction 移到动作后果：[[Papers/2607-SeerGuard]] 指出 91% high-risk case 来自“良性指令 + 上下文危险动作”，所以 guard 必须在执行前预测后果，而不是只筛 instruction。
+
+在 detection 与下述 architectural isolation 之间还有一条更廉价的观察侧防线：[[Papers/2510-FocusAgent]] 的选行 reduction 因为只保留与 task goal 相关的 AxTree 行，天然把与任务无关的注入内容（banner/popup）过滤掉，一句 defense prompt 就把 WebArena-Reddit 的注入 ASR 从 32.4%/90.4% 压到约 1% 且不损 benign utility——这印证了"观察压缩与 injection 防御同源"。但它成立的前提正是"注入与 goal 无关"，一旦攻击伪装成 task-relevant（goal-aligned injection）即可绕过选行过滤，这也正是下面 typed quarantine 要正面处理的边界。
 
 最新分界是从“检测恶意内容”转向“恢复 trust boundary”。[[Papers/2607-UCM]] 在 privileged planner 看到页面前遮蔽 untrusted DOM region，只允许 quarantined model 通过 typed query 返回数据；强化版 WASP 上 ASR 为 0%，benign utility 保持不变，成本增加 1.05–1.84 倍。其保证只覆盖 control-flow injection：trust label 错误、typed value corruption、selection hijacking 与必须读取 free-form untrusted text 的任务仍在边界外。
 
@@ -481,3 +492,11 @@ GUI benchmark 的发展与能力抽象同步：static grounding 先隔离“看�
 - **consensus 纪律**：三篇为独立、数千引用的 HCI/自动化 canon，作 established 根基呈现，框定当前 GUI oversight 多为再发现（新增量在长程/多 agent/视觉界面）。
 - **未 digest 的 coverage 候选**（留待后续）：2604.17849 CUA reliability variance、2604.17817 smartphone screentext failures（GUI-specific frontier 负结果）；2605.05716/2604.27891（通用 agent scaffold 干扰，非 GUI core，可留 AgenticRL 方向）。
 - **建议加入 DomainMaps**：GUI-Agent DomainMap 可记"pre-LLM 谱系（Sikuli/RPA/PbD）"与"oversight 的 HCI 根基（Horvitz/Parasuraman）"两条历史锚点。
+
+### 2026-07-23 survey-refresh（web observation reduction 专题增量）
+
+- **触发**：Supervisor 检索"浏览器 context 优化——不给 raw DOM 而给优化版"→ 本轮 digest 5 篇锚点后 survey-refresh 并入（pending 5 篇全部处理）。
+- **并入 5 篇**：[[Papers/2410-AgentOccam]]、[[Papers/2511-Prune4Web]]、[[Papers/2510-FocusAgent]]（primary → §2.1 Observation，新增"web observation reduction"叙事段）；[[Papers/2604-ReadMoreThinkMore]]（§2.1，作 reduction 有边界条件的反主流证据）；[[Papers/2605-MFSCoverage]]（primary → §6.3 评测成本，作廉价评测代理）。cross-link：FocusAgent 的 DefenseFocusAgent 接入 §7.2（观察压缩=injection 防御的廉价端，接 UCM typed quarantine 的边界）。
+- **结构性变化**：§2.1 此前只有 A11yCompressor（desktop 结构压缩）与 KV-cache 效率线，缺 web DOM reduction 主线；本轮补上并把该子领域"方法饱和、转入自我质疑"框定清楚。三条跨论文校正性发现（优化≠省 token / 压缩非普遍有益且依赖底座 / 收益随模型变强蒸发）为新增 pattern。未改 Key Takeaways / Open Problems（属 §2.1 subsection 级 enrichment，非顶层判断反转）。
+- **papers_analyzed**：106 → 111（5 篇新唯一 wikilink，A11yCompressor 已在库不重复计）。
+- **domain_map**：GUI-Agent 追加 1 条近期格局变化（web observation reduction 子领域进入祛魅期）。

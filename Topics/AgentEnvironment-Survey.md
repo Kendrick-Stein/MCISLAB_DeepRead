@@ -7,12 +7,12 @@ papers_analyzed: 0
 keywords: []
 domain_map: GUI-Agent
 status: merged
-merged_into: "[[Topics/GUIAgent-Survey]]"
+merged_into: "[[Topics/CUA-Survey]]"
 ---
 
 # Agent Environment Survey（已并入 GUI 主报告）
 
-本文件原有六轴环境规格、跨平台引擎、agent-friendly interface 与能力矩阵已于 2026-07-21 并入 [[Topics/GUIAgent-Survey]]。
+本文件原有六轴环境规格、跨平台引擎、agent-friendly interface 与能力矩阵已于 2026-07-21 并入 [[Topics/CUA-Survey]]。
 
 ## 迁移映射
 

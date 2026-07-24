@@ -84,4 +84,4 @@ mindmap
 - **GRADE = "视觉证据 + guideline judge" 的可验证性范式**，是 [[Papers/2605-OpenComputer]] 程序化 verifier 在闭源不可见状态下的退化替代——两者构成 verifier 谱系两端：可见状态用程序化（94.1%），不可见状态用视觉证据 LLM judge（87.4%）。这与 vault 的 "Verifier 角色迁移" validated insight 直接相关：verifier 形态随可观测性退化而变。
 - **约束数（constraint count）作为难度维度**比 step 数更贴近真实——64.6% 任务 3+ 约束，且 3+ 约束成功率掉 11pp。可作为真实任务难度刻画的标准维度之一。
 - 62.0% 天花板加入 vault 真实可靠性低水位证据链：[[Papers/2605-SaaSBench]] 3.8% resolved、[[Papers/2606-OSWorld2]] 20.6%、[[Papers/2604-WindowsWorld]] ~20%、[[Papers/2604-ClawEvalLive]] 66.7%、AndroidDaily 62.0%——不同任务/平台一致指向"真实长程未饱和"。
-- 关联：[[Topics/GUIAgent-Survey]]、[[Papers/2606-XiaomiGUI0]]、[[Papers/2500-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]]。
+- 关联：[[Topics/CUA-Survey]]、[[Papers/2606-XiaomiGUI0]]、[[Papers/2500-MobileRL- Online Agentic Reinforcement Learning for Mobile GUI Agents]]。

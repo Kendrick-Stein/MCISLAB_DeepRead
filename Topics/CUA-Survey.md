@@ -10,11 +10,11 @@ exclude_keywords: [deep research, information seeking, browsecomp, research agen
 hard_exclude_keywords: [browsecomp]
 exclude_override_tags: [gui-agent, computer-use]
 domain_map: GUI-Agent
-supersedes: "[[Topics/GUIAgent-Survey]]"
+supersedes: "GUIAgent-Survey（已并入本文，原文件 2026-07-24 删除）"
 ---
 
-> [!note] 2026-07-23 建成
-> 本文是在 [[Topics/GUIAgent-Survey]] 基础上按 12 节完整 CUA survey 目录重排 + 补全的产物。构建完成并通过 verification gate 后，GUIAgent-Survey 将转为 `status: merged` redirect 指向本文。构建期间原 GUIAgent-Survey 保持只读不动。每节标题下的 bullet 为目标子节大纲（待起草内容替换）。
+> [!note] 版本说明（2026-07-23）
+> 本文在 GUIAgent-Survey 的基础上按 12 节完整 CUA survey 目录重排并补全；原 GUIAgent-Survey 的全部内容已并入本文。
 
 # Computer-Use Agents: A Unified Survey
 
@@ -27,7 +27,7 @@ Computer-Use Agents（CUA）将自然语言目标转化为对现有数字界面�
 
 现有综述共享两组主要组织轴：平台轴覆盖 Web、Mobile、Desktop 与跨平台系统，组件轴覆盖 observation、grounding、planning、memory、action、execution feedback 与 verifier。Microsoft 的综述以平台 × pipeline 的 cookbook 组织领域，OS Agents 进一步区分环境、观察空间、动作空间以及 understanding、planning、grounding 能力，technology-agnostic 的 ACU survey 则补入 domain、interaction 与 learning 视角 [[Papers/2411-GUIAgentSurvey]] [[Papers/2508-OSAgentsSurvey]] [[Papers/2501-ACUSurvey]]。本综述沿用这一公共坐标，研究范围包括 GUI-only 与 GUI+API/CLI hybrid agent，但排除不直接研究 UI observation、GUI action、computer-use environment、GUI verifier 或部署期监督的通用 Agent、VLM 与 World Model 工作。
 
-本综述在公共坐标之上提出一个作者综合论断：CUA 的优化单元正在从屏幕识别与动作生成，扩展为来源可追溯、结果可核验、失败可恢复的状态转移；environment、runtime、verifier 与 human oversight 因而成为与模型同等重要的系统层。该论断不是已知领域共识，其主要直接证据来自 2026 年的新近工作，尚缺跨系统因果验证与独立复现。
+在这一公共坐标之上，本文进一步论证：CUA 的优化单元正在从屏幕识别与动作生成，扩展为来源可追溯、结果可核验、失败可恢复的状态转移；environment、runtime、verifier 与 human oversight 因而成为与模型同等重要的系统层。支撑证据集中于 2026 年的新近工作（§1.3 第五阶段与 §11.1），尚缺跨系统因果验证与独立复现。
 
 ### 1.2 Research Significance
 
@@ -40,7 +40,7 @@ CUA 的研究意义不由单一 benchmark 分数决定，而来自通用数字�
 | 系统基础设施 | environment、reset、parallel rollout、runtime 与 verifier 决定训练和评测上限 | 状态污染、不可复现、验证器偏差与高 rollout 成本 |
 | 人机协作 | agent 会接触账号、文件、通信和不可逆操作 | privacy、prompt injection、权限边界、澄清与人工接管 |
 
-OSWorld 同时展示了能力水位的快速上升与横向比较的脆弱性。下表只列当前 vault 中能够定位到原文表格或 claim verification 的锚点；它们不是同一受控实验，不能被解释为单一模型能力的纯时间曲线。
+OSWorld 同时展示了success rate 的快速上升与横向比较的脆弱性。下表只列能够在原始论文中定位到具体表格或原文 claim 的锚点；它们不是同一受控实验，不能被解释为单一模型能力的纯时间曲线。
 
 | 时间 | 系统与 OSWorld 设置 | Success Rate | 证据边界 |
 |:--|:--|--:|:--|
@@ -48,7 +48,7 @@ OSWorld 同时展示了能力水位的快速上升与横向比较的脆弱性。
 | 2025-08 | OpenCUA-72B，OSWorld-Verified，100 steps | 45.0% | 三次运行并由 OSWorld 团队独立评测；属于当时开源系统锚点 [[Papers/2508-OpenCUA]] |
 | 2025-10 | BJudge，100 steps | 72.6% | GPT-5 与 Opus 4.5 各生成 5 条 rollout，再由 GPT-5 选优；相对 72.36% human baseline 的 0.24 点差约等于一个任务，不能据此宣称稳定超越人类 [[Papers/2510-ScalingAgents]] |
 
-高分辨率专业软件又暴露出另一种边界：在普通 grounding benchmark 上的能力不能直接迁移到密集工具栏、小图标和多窗口界面，ScreenSpot-Pro 因此把评测从通用页面推进到专业桌面场景 [[Papers/2504-ScreenSpotPro]]。这些结果共同说明，benchmark 水位上升并未消除 setting、cost、verifier 与长程可靠性的差异；可发表的 CUA 综述必须同时报告能力与证据条件。
+高分辨率专业软件又暴露出另一种边界：在普通 grounding benchmark 上的能力不能直接迁移到密集工具栏、小图标和多窗口界面，ScreenSpot-Pro 因此把评测从通用页面推进到专业桌面场景 [[Papers/2504-ScreenSpotPro]]。这些结果共同说明，benchmark 分数上升并未消除 setting、cost、verifier 与长程可靠性的差异；对 CUA 能力的任何横向比较都必须同时报告分数与其证据条件。
 
 ### 1.3 Development of Computer-Use Agents
 
@@ -66,7 +66,7 @@ CUA 的发展不是模型名称的顺序更替，而是连续五次系统抽象�
 
 ### 1.4 Limitations of Existing Surveys
 
-现有 survey 已建立平台、组件、能力和学习范式的基础 taxonomy，但其截稿时间与组织方式不足以覆盖 2025–2026 年 environment、Agentic RL、verifier、runtime 和可靠部署的快速发展。以下差异不是对既有工作的质量排序，而是说明本综述需要补齐的分析层。
+现有 survey 已建立平台、组件、能力和学习范式的基础 taxonomy，但其截稿时间与组织方式不足以覆盖 2025–2026 年 environment、Agentic RL、verifier、runtime 和可靠部署的快速发展。各 survey 的覆盖范围、可复用价值与局限对照如下。
 
 | Survey | 主要覆盖 | 可复用价值 | 对完整 CUA 综述的局限 |
 |:--|:--|:--|:--|
@@ -76,11 +76,11 @@ CUA 的发展不是模型名称的顺序更替，而是连续五次系统抽象�
 
 三类 survey 的共同缺口是：taxonomy 强于机制归因，静态模型与 framework 强于 environment/runtime，任务成功率汇总强于 verifier 可信度，成功案例强于 failure、recovery、abstention 与 human oversight。完整 CUA 综述因而需要把模型、学习、数据、环境、评测和部署放入同一状态转移闭环，并在每项横向比较中显式报告 harness、step budget、backbone、verifier、cost 与数据分布。
 
-此外，[[Papers/2604-RLGUIAgentsSurvey]] 从 RL 视角给出 Offline / Online / Hybrid 三分类学与 reward engineering 三层架构，可作 §7 的外部 taxonomy 参照系；但它自述为 RL×GUI agent 领域首篇综述，与更早的 arXiv:2504.20464 冲突，且本轮为单 agent digest、库内暂无独立验证。
+此外，[[Papers/2604-RLGUIAgentsSurvey]] 从 RL 视角给出 Offline / Online / Hybrid 三分类学与 reward engineering 三层架构，可作 §7 的外部 taxonomy 参照系；但它自述为 RL×GUI agent 领域首篇综述，与更早的 arXiv:2504.20464 冲突，且本文尚未对其内容做独立核验。
 
 ### 1.5 Research Questions
 
-后续十二节由十二个研究问题组织。问题从定义与感知逐步推进到学习基础设施、可靠部署和开放研究议程，避免按平台或模型名称重复罗列工作。
+后续十二节由十二个研究问题组织。问题从定义与感知逐步推进到学习基础设施、可靠部署和开放研究议程。
 
 | RQ | 对应后续主题 | 核心问题 |
 |:--|:--|:--|
@@ -109,7 +109,7 @@ CUA 的发展不是模型名称的顺序更替，而是连续五次系统抽象�
 
 - **贯通模型与基础设施。** 在同一闭环中分析 observation、action、architecture、learning、data、environment、runtime、evaluation、recovery、safety 与 HCI，突出跨层依赖而非孤立模块增益。
 
-- **提出可证伪的 accountable-state thesis。** 将 provenance、explicit task state、semantic action、verification、recovery 与 oversight 视为长程可靠性的候选共同接口，同时明确该观点属于作者综合假设，仍需独立复现和因果实验。
+- **提出可证伪的 accountable-state thesis。** 将 provenance、explicit task state、semantic action、verification、recovery 与 oversight 视为长程可靠性的候选共同接口，并将其作为有待检验的前瞻性假设；其有效性仍需独立复现和因果实验。
 
 - **形成十二问题研究议程。** 后续章节以十二个 RQ 覆盖从基础定义到真实部署的完整链路，并将缺乏来源、设置不可比和证据冲突保留为显式 gaps，而非转写为确定结论。
 
@@ -149,7 +149,7 @@ Tool-use agent（泛指任意 function-calling/API 调用的 LLM agent）、CLI/
 | GUI + API/CLI hybrid | 以 GUI 为默认通道，按需路由到 API/CLI | 属于 CUA 内部的一种 action space 设计，非独立范畴 | [[Papers/2508-ComputerRL]]、[[Papers/2606-WeaveBench]] |
 | RPA / programming-by-demonstration | 录制的固定 GUI 操作序列，规则重放 | CUA 的历史前身与产业界替代对象，非语义泛化系统 | [[Papers/0910-Sikuli]] |
 
-GUI 与 CLI 并非互斥而是可比较、可路由的两条通道，二者的取舍在同一系统内已有直接实验证据：[[Papers/2508-ComputerRL]] 在 GPT-4o 上做框架消融，纯 GUI 通道 OSWorld 11.2% 提升到 GUI+API 混合通道 26.2%（+134%，Office 域从 6.2%→27.9%），说明相当一部分 desktop 任务的上限来自可用的 API 注入而非算法本身；[[Papers/2605-OpenComputer]] 则在同一 14 应用、343 个 CLI 兼容任务上直接对比两条纯通道——GUI agent 通过率更高（75.2% vs. CLI 67.2%），但 CLI agent 显著更快（141s vs. GUI 的 288–622s），因为绕开了 screenshot-action 循环。这组对照支撑一个具体判断：**GUI 与 CLI 不是竞争关系而是互补的动作通道**，谁更优取决于任务是否需要视觉反馈校验——这正是 [[Papers/2607-Tactile]] 等 semantic action runtime 试图显式建模的路由问题（见 §2 已迁移内容 / 主报告 §2.2）。
+GUI 与 CLI 并非互斥而是可比较、可路由的两条通道，二者的取舍在同一系统内已有直接实验证据：[[Papers/2508-ComputerRL]] 在 GPT-4o 上做框架消融，纯 GUI 通道 OSWorld 11.2% 提升到 GUI+API 混合通道 26.2%（+134%，Office 域从 6.2%→27.9%），说明相当一部分 desktop 任务的上限来自可用的 API 注入而非算法本身；[[Papers/2605-OpenComputer]] 则在同一 14 应用、343 个 CLI 兼容任务上直接对比两条纯通道——GUI agent 通过率更高（75.2% vs. CLI 67.2%），但 CLI agent 显著更快（141s vs. GUI 的 288–622s），因为绕开了 screenshot-action 循环。这组对照支撑一个具体判断：**GUI 与 CLI 不是竞争关系而是互补的动作通道**，谁更优取决于任务是否需要视觉反馈校验——这正是 [[Papers/2607-Tactile]] 等 semantic action runtime 试图显式建模的路由问题（见 §4.8）。
 
 CLI/coding agent 领域也存在与 CUA 不直接重叠、只作邻接证据的部分：[[Papers/2605-EnvTrustBench]] 把"agent 把观察到的一条 claim 当成证据却不核对当前环境真实状态"的失败模式（evidence-grounding defect）形式化，在 6 个 LLM backbone × 5 个 coding/CLI scaffold 共 14 个 stack、3,850 次受控 run 上测得 83.3% 的聚合 Environmental Misgrounding Rate；但该工作明确将 scope 限定为通用软件/CLI agent（阅读文件、查 API、跑脚本），**非 GUI-specific**，因此本综述只将其作为"belief provenance 缺失是通用 agent 问题而非 GUI 独有"的邻接证据，不纳入核心对象。
 
@@ -170,11 +170,11 @@ CLI/coding agent 领域也存在与 CUA 不直接重叠、只作邻接证据的�
 
 ### 2.5 Literature Search and Selection
 
-检索遵循 vault-first 原则：先审计已有论文清单与既有 survey 覆盖度、定位结构性缺口，再针对缺口做定向外部检索，而非对相似主题重复召回。检索沿两条互补通道执行——OpenAlex 主题检索（覆盖期刊/顶会，零 token 成本）与 WebSearch（覆盖 arXiv 新预印本），并按九类 query 角度分工：核心主题、主流技术路线、既有 survey、benchmark/数据集、应用场景五类"覆盖角度"，加上矛盾检索、负结果检索、邻域检索、术语漂移检索四类"证据完整性角度"；后者即使返回"未发现反例"也要记录，因为"缺矛盾"本身是覆盖信号。
+检索遵循先审计后补缺的原则：先审计已有论文清单与既有 survey 覆盖度、定位结构性缺口，再针对缺口做定向外部检索，而非对相似主题重复召回。检索沿两条互补通道执行——OpenAlex 主题检索（覆盖期刊/顶会）与通用 web 搜索（覆盖 arXiv 新预印本），并按九类 query 角度分工：核心主题、主流技术路线、既有 survey、benchmark/数据集、应用场景五类"覆盖角度"，加上矛盾检索、负结果检索、邻域检索、术语漂移检索四类"证据完整性角度"；后者即使返回"未发现反例"也要记录，因为"缺矛盾"本身是覆盖信号。
 
-本综述的前身 [[Topics/GUIAgent-Survey]] 经过多轮检索迭代：2026-07-21 一轮围绕模型/状态、RL、数据、环境/runtime、评测、Safety/HCI 六个主题执行 4 组 arXiv API、5 组 OpenAlex 与 4 组 WebSearch 查询，纳入 10 篇新论文；2026-07-22 一轮针对性检索 11 篇已发表 GUI/CUA survey 做 taste 校准，同时核对 SOTA/baseline canon 与社区 reviewer 关注点；随后的覆盖度审计确认盲点不在 frontier（已饱和）而在结构性根基——pre-LLM 自动化谱系（RPA/PbD/Sikuli）零覆盖、HCI oversight 仅由 GUI 论文自身支撑、accountable-state 论断主要靠单一时间窗口的 preprint 支撑——据此触发术语漂移（Sikuli/RPA/PbD）、邻域（Horvitz mixed-initiative、Parasuraman automation bias）、矛盾/负结果三类 gap-driven 检索并补入相应论文。截至本文构建时，可解析且去重的 `Papers/` wikilink 为 111 篇，覆盖年份范围 1997–2026（起点由 pre-LLM 谱系论文决定）。
+本综述的前身 GUIAgent-Survey 经过多轮检索迭代：2026-07-21 一轮围绕模型/状态、RL、数据、环境/runtime、评测、Safety/HCI 六个主题执行 4 组 arXiv API、5 组 OpenAlex 与 4 组 web 搜索查询，纳入 10 篇新论文；2026-07-22 一轮针对性检索 11 篇已发表 GUI/CUA survey，校准本综述的组织结构与选材标准，同时核对 SOTA/baseline canon 与社区 reviewer 关注点；随后的覆盖度审计确认盲点不在 frontier（已饱和）而在结构性根基——pre-LLM 自动化谱系（RPA/PbD/Sikuli）零覆盖、HCI oversight 仅由 GUI 论文自身支撑、accountable-state 论断主要靠单一时间窗口的 preprint 支撑——据此触发术语漂移（Sikuli/RPA/PbD）、邻域（Horvitz mixed-initiative、Parasuraman automation bias）、矛盾/负结果三类 gap-driven 检索并补入相应论文。截至定稿，纳入并去重后的引用文献共 111 篇，覆盖年份范围 1997–2026（起点由 pre-LLM 谱系论文决定）。
 
-所有候选论文经 paper-digest 生成 Evidence Ledger 后进入 verification gate：会进入 Overview、benchmark 横向比较、Key Takeaways 或 Open Problems 的高影响 claim，由不同于抽取者的独立 verifier 核对，统一标注为 `source-verified / unsupported / contradicted / not-checkable / abstract-only` 五态之一，只有 `source-verified` 的 claim 可无保留进入关键结论；跨论文横向比较还需核对 environment、verifier、step budget、backbone 与数据集 split 是否可比，不可比时禁止写成横向胜负。
+所有候选论文经逐条证据抽取生成 Evidence Ledger 后进入 verification gate：会进入 Overview、benchmark 横向比较、Key Takeaways 或 Open Problems 的高影响 claim，由不同于抽取者的独立 verifier 核对，统一标注为 `source-verified / unsupported / contradicted / not-checkable / abstract-only` 五态之一，只有 `source-verified` 的 claim 可无保留进入关键结论；跨论文横向比较还需核对 environment、verifier、step budget、backbone 与数据集 split 是否可比，不可比时禁止写成横向胜负。
 
 ### 2.6 Paper Coding Scheme
 
@@ -183,15 +183,15 @@ CLI/coding agent 领域也存在与 CUA 不直接重叠、只作邻接证据的�
 | 字段 | 允许取值 | 用途 |
 |:--|:--|:--|
 | `platform` | web / mobile / desktop / cross-platform / hybrid GUI+API/CLI | 对应 §2.2 的平台坐标 |
-| `task_level` | grounding / step / app workflow / cross-app long-horizon / interactive-proactive | 能力层级（见主报告能力阶梯） |
+| `task_level` | grounding / step / app workflow / cross-app long-horizon / interactive-proactive | 能力层级（见 §3.3 能力阶梯） |
 | `primary_section` | model-architecture / training-RL / data-task / environment-runtime / evaluation-verifier / reliability-safety-HCI | 论文的唯一主归属章节 |
 | `environment_setting` | offline / self-hosted / live / real-device | 决定其 claim 的可迁移性边界 |
 | `verifier_type` | programmatic / interactive agent / visual-rubric judge / human / none | 决定其成功率数字的可信度基线 |
 | `evidence_strength` | direct end-to-end / component-only / adjacent transferable evidence | 决定它能否支撑核心结论还是仅作旁证 |
 
-每篇论文只允许一个 `primary_section`，最多再向 1–2 个其他章节 cross-link，避免同一证据在多处被重复计为独立支持；与本综述主题明显无关的候选论文（keyword 打分误报）直接跳过，不勉强归入任何字段。证据质量字段则复用 paper-digest 的既有产出：`rating`（1–5，按内容质量与相关性打分）与 Evidence Ledger 的 `verification_status`（`source-checked` / `partial` / `unverified` / `abstract-only`）；后者决定该笔记的数字能否被写入 survey 正文——`abstract-only` 或缺 Evidence Ledger 的 legacy 笔记只能作为论文存在性与主题归类证据，不得凭它新增关键数字、共识判断或 Key Takeaway。
+每篇论文只允许一个 `primary_section`，最多再向 1–2 个其他章节 cross-link，避免同一证据在多处被重复计为独立支持；与本综述主题明显无关的候选论文（keyword 打分误报）直接跳过，不勉强归入任何字段。证据质量字段有两个：一是内容质量与相关性评分（1–5），二是 Evidence Ledger 的逐条核验状态（`source-checked` / `partial` / `unverified` / `abstract-only`）；后者决定该论文报告的数字能否被写入 survey 正文——核验状态为 `abstract-only` 或未建立 Evidence Ledger 的文献，只能作为论文存在性与主题归类证据，不得凭其新增关键数字、共识判断或 Key Takeaway。
 
-`primary_section` 当前取值沿用 [[Topics/GUIAgent-Survey]] 的六层结构（该结构是本综述 §4–§9 的直接前身）；本次重排为 12 节结构后，需要把六层字段值 remap 到新的章节编号，remap 规则尚未形式化，见 gaps。
+`primary_section` 当前取值沿用前身 GUIAgent-Survey 的六层结构（该结构是本综述 §4–§9 的直接前身）；重排为 12 节结构后，六层取值到新章节编号的映射尚未形式化，是本编码方案的一处已知局限。
 
 
 ## 3. Problem Formulation and Unified Taxonomy
@@ -200,7 +200,7 @@ CLI/coding agent 领域也存在与 CUA 不直接重叠、只作邻接证据的�
 
 Computer-use agent 的执行过程可以形式化为一个部分可观察序贯决策问题（POMDP）：agent 不能直接读取数字系统的真实状态，只能反复观察、决策、执行并核验，直到任务终止或被判定失败。这不是本文独创的记号——[[Papers/2501-ACUSurvey]]（JAIR 2026，87 篇 ACU agent 的系统综述）与 [[Papers/2412-BrowserGymAgentLab]]（ServiceNow/Mila 的 web agent 研究基础设施）分别从"文献综述"和"系统实现"两条独立路径显式采用了 POMDP 形式化，可视为领域内事实上的通用记号。
 
-标准 POMDP 六元组 $(S, A, O, T, \Omega, R)$ 在 computer-use 场景中的实例化如下：隐藏状态 $s_t \in S$ 是数字环境的真实状态（数据库记录、后端 session、文件系统、通知队列、权限设置），大多不会完整渲染到屏幕上；观测 $o_t$ 是 screenshot、DOM/AXTree、accessibility tree 或 network trace 的组合（[[Papers/2412-BrowserGymAgentLab]] 的 observation space 即包含 task goal、tab 状态、raw screenshot、DOM/AXTree object、唯一 element id、bbox/可见度信息与上一步 action 的 error feedback）；动作 $a_t$ 是 click/tap/type/scroll 等 GUI 动作与 shell/API 调用的组合；指令 $i$ 在整个 episode 内固定，是策略的外生条件变量而非标准元组的一部分——[[Papers/2501-ACUSurvey]] 把这一点显式写成 $a_t \sim \pi(\cdot \mid o_t, i)$；环境转移 $T$ 由浏览器引擎、模拟器或真机执行，往往不可逆；reward/verifier 只在终止步或间歇性地被观察到，构成稀疏反馈。[[Papers/2501-ACUSurvey]] 进一步指出该 taxonomy 刻意做成 technology-agnostic，使 RL-era 的 specialized agent 与当前 foundation-agent-era 的 prompt-based agent 能被放进同一坐标系比较，这也是本节沿用该形式化而非另起炉灶的原因。
+标准 POMDP 六元组 $(S, A, O, T, \Omega, R)$ 在 computer-use 场景中的实例化如下：隐藏状态 $s_t \in S$ 是数字环境的真实状态（数据库记录、后端 session、文件系统、通知队列、权限设置），大多不会完整渲染到屏幕上；观测 $o_t$ 是 screenshot、DOM/AXTree、accessibility tree 或 network trace 的组合（[[Papers/2412-BrowserGymAgentLab]] 的 observation space 即包含 task goal、tab 状态、raw screenshot、DOM/AXTree object、唯一 element id、bbox/可见度信息与上一步 action 的 error feedback）；动作 $a_t$ 是 click/tap/type/scroll 等 GUI 动作与 shell/API 调用的组合；指令 $i$ 在整个 episode 内固定，是策略的外生条件变量而非标准元组的一部分——[[Papers/2501-ACUSurvey]] 把这一点显式写成 $a_t \sim \pi(\cdot \mid o_t, i)$；环境转移 $T$ 由浏览器引擎、模拟器或真机执行，往往不可逆；reward/verifier 只在终止步或间歇性地被观察到，构成稀疏反馈。[[Papers/2501-ACUSurvey]] 进一步指出该 taxonomy 刻意做成 technology-agnostic，使 RL-era 的 specialized agent 与当前 foundation-agent-era 的 prompt-based agent 能被放进同一坐标系比较，这也是本节沿用该形式化而非另行提出新记号的原因。
 
 这一形式化直接预测了两个后续章节反复出现的结构性难题，而不依赖任何具体架构：其一，部分可观察意味着 belief 维护本身是一个非平凡且易错的子问题——多数实现把 belief 简化为对原始 history $h_t$ 的隐式拼接（screenshot + 文本 token 直接塞进 context），而非显式维护、可核验的状态对象；其二，稀疏且延迟的终止奖励使跨长程步骤的 credit assignment 天然困难，这正是第 7 章反复讨论的训练稳定性瓶颈的形式化根源。[[Papers/2501-ACUSurvey]] 报告的 offline/online 评测差距（同一 agent 在 Mind2Web 上 offline success 12% vs online success 36%）是第一个难题的一个侧面：静态轨迹匹配无法捕捉 belief 与真实环境状态的分歧，只有让 policy 真正与环境交互才能暴露差距。
 
@@ -250,7 +250,7 @@ flowchart LR
 
 这一阶梯并非人为堆叠：每一级都在解决前一级留下的问题，也都暴露出新的失效模式。第 1、2 级大致对应 [[Papers/2501-ACUSurvey]] 独立提出的评测层级划分（step-level 的 step success rate / action F1 / element accuracy，task-level 的 task success rate / progress / avg reward），两者从不同角度收敛到同一个"先看单步、再看整体"的结构，可以视为跨来源的交叉验证。第 3 级向第 4 级的跃迁揭示了一个此前被 end-to-end 分数掩盖的缺口：[[Papers/2607-EvoGUI]] 从 Mind2Web/WebLINX 轨迹构造 3,000 个 diagnostic VQA instance，专测 temporal ordering、inverse action/value prediction 与 successor discrimination，最强模型 EvoGain 也仅 60.4，且 model scale 与 GUI specialization 均不能稳定预测这种 state-dynamics 理解能力——这是单篇诊断研究的发现，说明"任务能做到"与"状态转移能被正确建模"是两件事，任务级高分不能反推 agent 真的理解了长程动态。第 5 级同样有具体证据支持其独立性：现有工作报告 error awareness 与 depth-5 recovery 之间存在明显落差（见后续架构章 verification/recovery 小节），"发现错了"本身并不等于"能改回来"。第 6 级的证据来自两组独立研究：[[Papers/2602-AmbiBench]] 显示非交互 mobile agent 在指令降为 Ambiguous 级时 task success rate 直接归零（AutoGLM 从 Detailed 65.2% 降到 Ambiguous 0%），[[Papers/2606-AgenticAbstention]] 在 WebShop、terminal 与 QA 三类 setting 上测 13 个 agent 系统，发现最强 baseline 的 timely abstention recall 也只有 26.7%，且同一 base model 换 scaffold（Codex CLI 约 0.38 vs Terminus 2 约 0.18）abstention 能力差异巨大——两者共同说明"知道何时不做"是一项独立于任务执行能力、且当前普遍薄弱的能力，而非执行能力足够强后的自然副产品。第 7 级（隐私、安全、副作用）在现有证据中呈现出与第 6 级相近但不完全重合的失效模式（判断风险 vs 精确定位敏感信息 vs 预测动作后果），具体证据与机制留待架构与部署相关章节展开。
 
-评测报告能力层级时必须同时绑定 evidence setting：environment version、step budget、verifier 类型、是否 live/real-device、是否同 backbone 对照。否则 leaderboard 差异可能来自环境、预算或 judge 本身，而非方法真实差距——[[Papers/2501-ACUSurvey]] 的 online/offline 差距（36% vs 12%，见 3.1）就是同一能力层级（task outcome）因 evidence setting 不同而产生数倍级差异的直接例证。这条纪律贯穿第 6、8、10 章对具体能力层级的深入讨论。
+评测报告能力层级时必须同时绑定 evidence setting：environment version、step budget、verifier 类型、是否 live/real-device、是否同 backbone 对照。否则 leaderboard 差异可能来自环境、预算或 judge 本身，而非方法真实差距——[[Papers/2501-ACUSurvey]] 的 online/offline 差距（36% vs 12%，见 3.1）就是同一能力层级（task outcome）因 evidence setting 不同而产生数倍级差异的直接例证。这一要求贯穿第 6、8、10 章对具体能力层级的深入讨论。
 
 ### 3.4 Environment, Interface, Architecture, Learning, and Evaluation Axes
 
@@ -276,7 +276,7 @@ flowchart LR
 | Desktop | screenshot / OS API / files / shell / app state | 跨应用、长程专业 workflow、隐私与不可逆操作 | OSWorld、WindowsWorld、SaaSBench |
 | Hybrid | GUI + API / CLI / SDK | 工具路由、语义对齐、权限边界 | [[Papers/2508-ComputerRL]]、[[Papers/2606-WeaveBench]] |
 
-第 9 章（产业与部署）与第 10 章（开放问题）不构成第七、八条独立技术轴，而是把上述六轴的结论分别投射到真实产品化约束（成本、延迟、凭证与权限管理）与尚未解决的研究问题上，避免与本节 taxonomy 重复建轴。
+第 9 章（产业与部署）与第 10 章（开放问题）不构成第七、八条独立技术轴，而是把上述六轴的结论分别投射到真实产品化约束（成本、延迟、凭证与权限管理）与尚未解决的研究问题上。
 
 
 ## 4. Tasks, Environments, and Interaction Interfaces
@@ -297,7 +297,7 @@ flowchart LR
 | 6. Clarification、abstention 与 proactive restraint | 指令不完整时主动澄清或拒绝 |
 | 7. Privacy、safety 与 side effect | 后果预测与不可逆操作规避 |
 
-这一梯度在 §6.1 被用作评测报告必须绑定的强制维度；这里仅作为任务复杂度的组织坐标，不重复其评测方法论讨论。
+这一梯度在 §6.1 被用作评测报告必须绑定的强制维度；这里仅作为任务复杂度的组织坐标。
 
 平台是第二条轴，决定了同一算法证据强度的来源与边界：
 
@@ -386,9 +386,9 @@ Desktop 供给最先在大规模 VM 并行与可验证状态上成熟，随后�
 
 hybrid observation 并非没有代价：多通道叠加暴露了新问题——若没有 provenance、freshness 与一致性检查，更多通道会把 stale structure 变成更强的错误证据。[[Papers/2607-GUIStateBelief]] 用 735 个跨 Web、Mobile、Desktop 的 paired probes 证明这一点：模型在 image-only 读取接近饱和时，仍会在冲突下跟随 stale structure，真实网页中的结构跟随率最高达 0.88；在最多六步的 MiniWoB++ click-style episodes 中，首步冲突导致 structure-following error 后，self-recovery 不超过 0.03。这一发现改变了"通道更多、因而更可靠"的默认判断——环境暴露多少种 observation 通道，不等于模型能安全地整合它们。
 
-与视觉/结构侧的表示重构平行，web agent 有一条独立成型的 **observation reduction** 线，针对 raw DOM/HTML 常达 10k–100k token 的问题优化喂给 agent 的观察。四条路线已固化：程序化剪枝（[[Papers/2511-Prune4Web]]，候选削减 25–50×，low-level grounding 46.8→88.28）、LLM 选行检索（[[Papers/2510-FocusAgent]]，削减 >50%）、规则式结构重构（[[Papers/2605-A11yCompressor]]，OSWorld input token 压到约 22% 的同时 success +5.1pp）、与"缩短"正交的表示对齐（[[Papers/2410-AgentOccam]]）。这条线最有价值的产出是三个跨论文的校正性发现：其一，**优化 ≠ 省 token**——AgentOccam 每步观察 token 反而从 vanilla 的 2210 升到 2930，杠杆是"对齐 LLM 预训练分布 + 降噪"而非缩短长度；其二，**压缩并非普遍有益、且高度依赖底座**——[[Papers/2604-ReadMoreThinkMore]] 显示强模型（gpt-5.1、claude-sonnet-4-6）用完整 HTML 反而 +14.6~17.5pp、弱开源模型用 HTML 大幅退化（gpt-oss-20b −18.8pp）；其三，**收益随模型变强而蒸发**——Prune4Web 对 GPT-4o 零提升、FocusAgent 在 WebArena 反低于全观察（32.3 vs 36.5）。该子领域已成熟到自建廉价评测代理（[[Papers/2605-MFSCoverage]]），侧面印证方法层面接近饱和。
+与视觉/结构侧的表示重构平行，web agent 有一条独立成型的 **observation reduction** 线，针对 raw DOM/HTML 常达 10k–100k token 的问题优化喂给 agent 的观察。四条路线已固化：程序化剪枝（[[Papers/2511-Prune4Web]]，候选削减 25–50×，low-level grounding 46.8→88.28）、LLM 选行检索（[[Papers/2510-FocusAgent]]，削减 >50%）、规则式结构重构（[[Papers/2605-A11yCompressor]]，OSWorld input token 压到约 22% 的同时 success +5.1pp）、与"缩短"正交的表示对齐（[[Papers/2410-AgentOccam]]）。这条线最有价值的产出是三个跨论文的校正性发现：其一，**优化 ≠ 省 token**——AgentOccam 每步观察 token 反而从 vanilla 的 2210 升到 2930，真正起作用的机制是"对齐 LLM 预训练分布 + 降噪"而非缩短长度；其二，**压缩并非普遍有益、且高度依赖底座**——[[Papers/2604-ReadMoreThinkMore]] 显示强模型（gpt-5.1、claude-sonnet-4-6）用完整 HTML 反而 +14.6~17.5pp、弱开源模型用 HTML 大幅退化（gpt-oss-20b −18.8pp）；其三，**收益随模型变强而蒸发**——Prune4Web 对 GPT-4o 零提升、FocusAgent 在 WebArena 反低于全观察（32.3 vs 36.5）。该子领域已成熟到自建廉价评测代理（[[Papers/2605-MFSCoverage]]），侧面印证方法层面接近饱和。
 
-局部 grounding 与结构压缩之外，还有一条正交的推理期效率线——当 observation 与历史轨迹撑大 context 时如何在不掉精度下压缩存储。[[Papers/2606-StarKV]] 用 spatial mutual-information prior 替代通用 KV cache 压缩的单一 saliency 先验，在 40% 预算下与 full cache 持平；[[Papers/2601-CompressToFocus]] 把压缩折进多轮 RL，GUI-Odyssey 长程 SR +21.4pp；[[Papers/2603-STLiteKV]] 的更硬贡献是诊断——GUI 注意力在所有层都均匀高稀疏，导致分层预算先验（PyramidKV/VL-Cache）在低预算下崩溃。这条线与前述 belief-source 讨论正交：它按 attention/redundancy 启发式决定留哪些 token，而非按证据来源或新鲜度决定，裁剩的 token 不保证仍反映当前 UI state。
+局部 grounding 与结构压缩之外，还有一条正交的推理期效率线——当 observation 与历史轨迹撑大 context 时如何在不掉精度下压缩存储。[[Papers/2606-StarKV]] 用 spatial mutual-information prior 替代通用 KV cache 压缩的单一 saliency 先验，在 40% 预算下与 full cache 持平；[[Papers/2601-CompressToFocus]] 把压缩折进多轮 RL，GUI-Odyssey 长程 SR +21.4pp；[[Papers/2603-STLiteKV]] 更具实质性的贡献是诊断——GUI 注意力在所有层都均匀高稀疏，导致分层预算先验（PyramidKV/VL-Cache）在低预算下崩溃。这条线与前述 belief-source 讨论正交：它按 attention/redundancy 启发式决定留哪些 token，而非按证据来源或新鲜度决定，裁剩的 token 不保证仍反映当前 UI state。
 
 ### 4.6 GUI Action Spaces
 
@@ -410,15 +410,15 @@ hybrid observation 并非没有代价：多通道叠加暴露了新问题——�
 GUI 之外，computer-use agent 可用的动作通道还包括应用内建/自动构建的 API、CLI/Code 脚本以及通过 Model Context Protocol（MCP）调用的外部工具。这些通道的共同动机是绕开重复低效的界面操作，代价是工具选择、权限与副作用管理更复杂。
 
 | 通道 | 暴露的能力 | 优点 | 已知边界 | 代表工作 |
-|:--|:--|:--|:--|
+|:--|:--|:--|:--|:--|
 | API（应用内建/自动构建） | 直接调用应用功能，跳过 UI 渲染 | 一步替代多步点击，减少 grounding 错误累积 | 需工程化构建 workflow API，覆盖仅限已建功能 | [[Papers/2508-ComputerRL]] |
 | CLI / Code | 脚本化操作文件系统、配置、后台进程 | 精确、可复现、天然可验证 | 无法触达纯视觉/渲染层交互；依赖沙盒权限 | [[Papers/2606-WeaveBench]] |
 | MCP（外部工具协议） | 标准化调用第三方服务/数据源 | 复用既有工具生态，无需重建 API | 返回内容体量大，易撑爆 context window | [[Papers/2512-MobileWorld]] |
 | GUI（兜底通道） | 处理必须可视化交互的前端操作 | 通用、无需应用专属集成 | 慢、脆弱、误差随步数累积 | 见 §4.6 |
 
-[[Papers/2508-ComputerRL]] 把 API 通道系统化为工程流程：为应用自动构建 workflow API（103 个 API，覆盖 Code/Chrome/LibreOffice 三件套/VLC 共 6 类应用），在 system prompt 里同时暴露 API 函数和 10 个 GUI 原语，让 agent 自行选择；GPT-4o 上的框架消融显示纯 GUI 11.2% 到 API+GUI 26.2%（+134%），Office 域从 6.2% 升到 27.9%，说明相当一部分收益来自工程化的 API 注入而非策略本身。[[Papers/2606-WeaveBench]] 则从 benchmark 侧证实了单一通道的系统性不足：114 个覆盖 8 个真实工作领域的长 horizon 任务上，GUI-only 与 CLI-only 两种单通道设置全面崩溃（GUI-only ≤1.8%，CLI-only ≤3.5%），同一 interface ablation 下 Hybrid 升到 35.1%（Claude Opus 4.7，Δ+31.6）；全局最高 41.2% PassRate 来自另一 runtime 组合（Claude Code），与前两者非同一实验轴。最佳 rollout 中位数 76 次工具调用、16 次 GUI↔CLI 通道切换；trajectory-aware judge 相比 outcome-only grading 系统性拉低 10–20 个百分点，失败分析显示 35.2% 的失败源于 reward hacking 而非能力不足。MCP 作为最新一类通道，vault 内证据仍然稀薄：[[Papers/2512-MobileWorld]] 首创的 MCP-Augmented 任务类别（40/201，19.9%）显示混合工具调用与 GUI 操作是真实 mobile 使用中被现有 benchmark 忽略的能力维度，最优框架在该类别达 51.6% SR，但最主要的失败模式是 context overflow——MCP 工具返回内容过大，直接撑爆 agent 的 context window。生产级参考架构上，[[Papers/2604-ClaudeCode]] 对 Claude Code 源码的逆向分析显示，其扩展机制按上下文代价分四层递增：Hooks（零成本）→ Skills（极低成本）→ Plugins（中等成本）→ MCP Servers（高成本，8+ 传输协议的远程工具墙），这一层级结构本身即说明 MCP 在生产系统中被当作最昂贵、需要最谨慎路由的扩展手段，而非默认通道。
+[[Papers/2508-ComputerRL]] 把 API 通道系统化为工程流程：为应用自动构建 workflow API（103 个 API，覆盖 Code/Chrome/LibreOffice 三件套/VLC 共 6 类应用），在 system prompt 里同时暴露 API 函数和 10 个 GUI 原语，让 agent 自行选择；GPT-4o 上的框架消融显示纯 GUI 11.2% 到 API+GUI 26.2%（+134%），Office 域从 6.2% 升到 27.9%，说明相当一部分收益来自工程化的 API 注入而非策略本身。[[Papers/2606-WeaveBench]] 则从 benchmark 侧证实了单一通道的系统性不足：114 个覆盖 8 个真实工作领域的长 horizon 任务上，GUI-only 与 CLI-only 两种单通道设置全面崩溃（GUI-only ≤1.8%，CLI-only ≤3.5%），同一 interface ablation 下 Hybrid 升到 35.1%（Claude Opus 4.7，Δ+31.6）；全局最高 41.2% PassRate 来自另一 runtime 组合（Claude Code），与前两者非同一实验轴。最佳 rollout 中位数 76 次工具调用、16 次 GUI↔CLI 通道切换；trajectory-aware judge 相比 outcome-only grading 系统性拉低 10–20 个百分点，失败分析显示 35.2% 的失败源于 reward hacking 而非能力不足。MCP 作为最新一类通道，本综述覆盖的文献中证据仍然稀薄：[[Papers/2512-MobileWorld]] 首创的 MCP-Augmented 任务类别（40/201，19.9%）显示混合工具调用与 GUI 操作是真实 mobile 使用中被现有 benchmark 忽略的能力维度，最优框架在该类别达 51.6% SR，但最主要的失败模式是 context overflow——MCP 工具返回内容过大，直接撑爆 agent 的 context window。生产级参考架构上，[[Papers/2604-ClaudeCode]] 对 Claude Code 源码的逆向分析显示，其扩展机制按上下文代价分四层递增：Hooks（零成本）→ Skills（极低成本）→ Plugins（中等成本）→ MCP Servers（高成本，8+ 传输协议的远程工具墙），这一层级结构本身即说明 MCP 在生产系统中被当作最昂贵、需要最谨慎路由的扩展手段，而非默认通道。
 
-针对此前 vault 稀薄的 MCP 证据，近期已出现专门评测：[[Papers/2510-OSWorldMCP]] 在 computer-use agent 内基准化 MCP tool invocation，[[Papers/2506-MCPWorld]] 提供统一 API/GUI/Hybrid 测试床——两者把 MCP 从被忽略的旁路通道推进为可独立度量的接口维度（均为本轮 gap-fill 补录，库内暂无独立验证）。
+针对上述 MCP 证据稀薄的缺口，近期已出现专门评测：[[Papers/2510-OSWorldMCP]] 在 computer-use agent 内基准化 MCP tool invocation，[[Papers/2506-MCPWorld]] 提供统一 API/GUI/Hybrid 测试床——两者把 MCP 从被忽略的旁路通道推进为可独立度量的接口维度（均为新近收录的工作，其结果尚未经独立验证）。
 
 ### 4.8 Hybrid Action Routing
 
@@ -438,7 +438,7 @@ GUI 之外，computer-use agent 可用的动作通道还包括应用内建/自�
 
 **任务分类缺乏共享 schema。** §4.1 的能力层级、平台、结构形状三条轴目前分散在不同 benchmark 的自定义标签里（informational/transactional、single/cross-app、GUI-only/Agent-User-Interaction/MCP 等），没有一张能同时标注这三条轴、供跨 benchmark 对照任务难度的报告卡。缺少这张卡，"benchmark A 比 benchmark B 更难"这类判断就无法被系统核验。
 
-**MCP 作为 GUI/computer-use 专属动作通道的研究仍然稀薄。** vault 内除 [[Papers/2512-MobileWorld]] 的 context-overflow 观察与 [[Papers/2604-ClaudeCode]] 的生产级 harness 案例外，没有针对 GUI agent 场景下 MCP tool-selection policy、权限边界或 MCP-specific reward hacking 的受控研究；MobileWorld 的 MCP 子类样本仅 40 个任务，统计噪声较大。
+**MCP 作为 GUI/computer-use 专属动作通道的研究仍然稀薄。** 本综述覆盖的文献中，除 [[Papers/2512-MobileWorld]] 的 context-overflow 观察与 [[Papers/2604-ClaudeCode]] 的生产级 harness 案例外，没有针对 GUI agent 场景下 MCP tool-selection policy、权限边界或 MCP-specific reward hacking 的受控研究；MobileWorld 的 MCP 子类样本仅 40 个任务，统计噪声较大。
 
 **三种路由范式尚无同环境对照。** [[Papers/2508-ComputerRL]]（RL 联合 policy）、[[Papers/2508-CoAct1]]（LLM 编排）与 [[Papers/2604-ClawGUI]]（规则式 fallback）来自三个不同 backbone、三个不同 benchmark，无法判断固定 backbone 与环境下哪种路由范式更优、或路由本身贡献了多少收益（相对于单纯拥有更多通道）。
 
@@ -453,26 +453,26 @@ GUI understanding data 是监督颗粒度最粗的一层：它不直接监督坐
 
 | 数据集/模块 | 规模 | 覆盖内容 | 证据与边界 |
 |:--|:--|:--|:--|
-| GUICourse（GUIEnv/GUIAct/GUIChat）[[Papers/2400-GuicourseFromGeneralVision]] | 规模未在现有摘录中给出可核实数字 | 三段式课程：OCR+定位（GUIEnv）、导航指令（GUIAct）、多轮对话（GUIChat），面向把通用 VLM 升级为 GUI agent | 具体准确率数字疑似模板化生成，不采信；仅课程结构（OCR/定位→导航→对话）可信 |
+| GUICourse（GUIEnv/GUIAct/GUIChat）[[Papers/2400-GuicourseFromGeneralVision]] | 规模数字未能核实 | 三段式课程：OCR+定位（GUIEnv）、导航指令（GUIAct）、多轮对话（GUIChat），面向把通用 VLM 升级为 GUI agent | 具体准确率数字未经核实，不采信；仅课程结构（OCR/定位→导航→对话）可信 |
 | ScaleCUA-Understanding [[Papers/2509-ScaleCUA]] | 471K | 元素级外观/OCR/布局/意图标注 + 截图级 Interface Captioning + Screen Transition Captioning，跨 6 平台 | 32B 模型 MMBench-GUI L1-Hard 达 94.4，超过 GPT-4o（53.5）；但同一模型端到端 OSWorld 仅 17.7%——understanding SOTA 不等于 acting 能力 |
-| GUI-World [[Papers/2400-GuiWorldVideoBenchmark]] | 精确视频/片段数未在摘录中给出 | 面向动态 GUI 视频理解：时序操作、跨窗口切换、弹窗，并基于此微调出 GUI-Vid | 作者报告 image-LLM 与 video-LLM 在动态 GUI 场景普遍表现弱，GUI-Vid 微调后有提升但仍与可靠 GUI agent 有明显差距——这是论文自己承认的负结果，而非 cherry-pick |
+| GUI-World [[Papers/2400-GuiWorldVideoBenchmark]] | 精确视频/片段数未能核实 | 面向动态 GUI 视频理解：时序操作、跨窗口切换、弹窗，并基于此微调出 GUI-Vid | 作者报告 image-LLM 与 video-LLM 在动态 GUI 场景普遍表现弱，GUI-Vid 微调后有提升但仍与可靠 GUI agent 有明显差距——这是论文自己承认的负结果，而非 cherry-pick |
 
 ScaleCUA 把三层监督（understanding/grounding/trajectory）放进同一个数据管线对比，其"understanding 分数高但 OSWorld 低"的结果本身就是一个方法论信号：静态截图理解和多步动作执行是两种不同难度的能力，不能用同一份 understanding 数据的 scale 去外推 agent 的实际可靠性。GUI-World 进一步指出理解层还有一个尚未被规模化的维度——时间/视频维度，当前数据供给几乎全部停留在单帧截图，跨帧状态跟踪缺乏对应体量的监督。
 
 ### 5.2 GUI Grounding Data
 
-Grounding data 把"看懂"收窄为"指哪打哪"：给定 instruction 和 screenshot，输出目标元素坐标。这条数据线最早被规模化，也最先形成"数据量→性能"的清晰曲线；但近期证据表明规模不是唯一杠杆——标注密度与采集来源（自动化 pipeline vs 人工标注）同样决定上限。
+Grounding data 把"看懂"收窄为"精确定位"：给定 instruction 和 screenshot，输出目标元素坐标。这条数据线最早被规模化，也最先形成"数据量→性能"的清晰曲线；但近期证据表明规模不是唯一杠杆——标注密度与采集来源（自动化 pipeline vs 人工标注）同样决定上限。
 
 | 数据集 | 规模 | 采集方式 | 证据与边界 |
 |:--|:--|:--|:--|
 | OS-Atlas [[Papers/2410-OSAtlas]] | 13M elements / 2.3M screenshots，跨 Win/macOS/Linux/Android/Web | Web 用 FineWeb URL 整页截图切片；desktop/mobile 用 AndroidEnv/OSWorld + A11y tree（pyatspi/pywinauto/ApplicationServices）DFS/random walk 自动遍历 | ScreenSpot 7B 平均 82.47（standard）/85.14（GPT-4o planner），显著超 SeeClick/UGround-7B；但纯 web 预训练难以 transfer 到 desktop grounding，desktop 数据有独立价值 |
 | GroundCUA [[Papers/2511-GroundCUA]] | 87 apps、56K screenshots、3.56M elements，人工标注 | 真人录制 desktop 任务 → 提取 keyframe → 标注每个可见元素 bbox+文本标签+类别（50% 元素）→ MLLM 合成 Direct/Functional/Spatial 三类指令 | GroundNext-7B 在 5 个 grounding benchmark 平均 70.5（vs JEDI-7B 56.1）；700K 高质量样本击败 9M+ 自动化样本，是"数据质量>规模"针对 scale-only 路线的直接反例 |
 | ScaleCUA-Grounding [[Papers/2509-ScaleCUA]] | 17.1M（point/bbox/action 三种监督格式，LLM 增广） | agent-environment 自动探索 + agent-human 混合双环 pipeline，跨 6 平台 | ScreenSpot-Pro 59.2、OSWorld-G 60.6 开源 SOTA；但同一模型端到端 OSWorld 仅 17.7% |
-| AGUVIS grounding+planning 语料 [[Papers/2400-AguvisUnifiedPureVision]] | 规模数字未在现有摘录中验证 | 纯视觉多模态 grounding+推理标注，两阶段课程（先 grounding 再 planning/reasoning） | 具体准确率数字疑似模板化生成，不采信；仅两阶段课程设计（grounding 先于 reasoning）可信 |
+| AGUVIS grounding+planning 语料 [[Papers/2400-AguvisUnifiedPureVision]] | 规模数字未经核实 | 纯视觉多模态 grounding+推理标注，两阶段课程（先 grounding 再 planning/reasoning） | 具体准确率数字未经核实，不采信；仅两阶段课程设计（grounding 先于 reasoning）可信 |
 
-GroundCUA 与 OS-Atlas/ScaleCUA 之间的对比构成了这一层最有信息量的张力：自动化 pipeline（A11y 遍历、agent 探索）能便宜地把元素数量堆到千万级，但平均每张截图的标注密度低；GroundCUA 用真人标注把密度做到平均每图约 64 个元素（笔记 Table 1：64.1 vs OS-Atlas 7.8、UGround 11.6，约 8× / 5.5×），覆盖到自动化流程常漏掉的 icon/toolbar/control，最终以 13 倍小的数据量反超。这说明 desktop grounding 的真正瓶颈不是截图数量，而是密集小元素的标注覆盖，这一结论目前只在 GroundCUA 单篇工作中被验证，尚未被独立复现。
+GroundCUA 与 OS-Atlas/ScaleCUA 之间的对比构成了这一层最有信息量的张力：自动化 pipeline（A11y 遍历、agent 探索）能便宜地把元素数量堆到千万级，但平均每张截图的标注密度低；GroundCUA 用真人标注把密度做到平均每图约 64 个元素（据 GroundCUA 报告：64.1 vs OS-Atlas 7.8、UGround 11.6，约 8× / 5.5×），覆盖到自动化流程常漏掉的 icon/toolbar/control，最终以 13 倍小的数据量反超。这说明 desktop grounding 的真正瓶颈不是截图数量，而是密集小元素的标注覆盖，这一结论目前只在 GroundCUA 单篇工作中被验证，尚未被独立复现。
 
-近期补充：[[Papers/2505-Jedi]] 用 user interface decomposition and synthesis 把 computer-use grounding 数据规模化，是继 GroundCUA 之后 grounding 数据一侧的又一条合成路线（库内暂无独立验证）。
+近期补充：[[Papers/2505-Jedi]] 用 user interface decomposition and synthesis 把 computer-use grounding 数据规模化，是继 GroundCUA 之后 grounding 数据一侧的又一条合成路线（尚未见独立验证）。
 
 ### 5.3 Atomic Action Data
 
@@ -480,13 +480,13 @@ Atomic action data 监督单步、至多短程的 observation→action 映射，
 
 | 数据集 | 规模 | 层级 | 证据与边界 |
 |:--|:--|:--|:--|
-| AITW / AndroidControl（canon） | — | single-app 单步/短程动作 | 已确立为社区 canon 训练/评测数据，但 vault 内未见对应原始论文的独立笔记，无法核实其精确规模数字，见 gaps |
+| AITW / AndroidControl（canon） | — | single-app 单步/短程动作 | 已确立为社区 canon 训练/评测数据，但本文未独立核阅其原始论文，精确规模数字未经核实 |
 | AMEX [[Papers/2400-AmexAndroidMultiAnnotation]] | 104K+ 高分辨率截图 | 三层标注：GUI 交互元素定位 + 屏幕/元素功能描述 + 复杂指令-GUI 操作链 | 在 SPHINX agent 上验证有效；针对性解决 AITW/AndroidControl 类数据集"标注不准确、任务多样性不足"的问题 |
 | GUI-Odyssey [[Papers/2400-GuiodysseyComprehensiveDatasetCross]] | 8,334 episodes、平均 15.3 步、6 设备、212 apps、1,357 种 app 组合 | cross-app 导航，每步带 semantic reasoning 标注 | 相比 AITW/AndroidControl 的 single-app 限制，首次系统覆盖跨应用上下文迁移；配套 OdysseyAgent 的 history resampler 对 in-domain 与 out-of-domain 跨 app 任务均有提升 |
 
 AMEX 与 GUI-Odyssey 的分工体现了 atomic action 层的演化方向：前者在单 app 内把标注密度做深，后者把动作序列的边界从单 app 推到跨 app 组合，两者共同暴露的问题是——原子动作数据的"原子性"本身是相对的，跨 app 切换点才是长程任务失败最常见的断裂处，而这恰恰是本层数据历史上覆盖最弱的部分。
 
-AndroidControl 的原始工作 [[Papers/2406-DataScaleUIControl]] 系统研究了数据规模对 UI control agent 的影响（域内外泛化随数据量的不同曲线），是本节 atomic-action 数据的规模化锚点（库内暂无独立验证）。
+AndroidControl 的原始工作 [[Papers/2406-DataScaleUIControl]] 系统研究了数据规模对 UI control agent 的影响（域内外泛化随数据量的不同曲线），是本节 atomic-action 数据的规模化锚点（尚未见独立验证）。
 
 ### 5.4 Interaction Trajectory Data
 
@@ -516,9 +516,9 @@ AndroidControl 的原始工作 [[Papers/2406-DataScaleUIControl]] 系统研究�
 
 OpenCUA 把推理标注分成 L1（reasoning）、L2（planning+reflection）、L3（observation）三层，并用 reflector/generator/summarizer 的合成 pipeline 生成反思式思维链。其核心发现是：仅在 state-action pair 上做 SFT 几乎不 scale（OSWorld 4.4%），但加入 reflector 合成的 reflection thought 后才解锁数据 scaling 收益（提升至 18.5%+）——这意味着错误标注不是训练噪声，只要能被识别，就能教会模型 error recovery。论文还报告 L2 优于 L1/L3，这与更早的 Aguvis 系列"L1 最优"的结论相反，作者将差异归因于自己的 L2 包含更多 planning+reflection 内容，而 L3（observation）反而引入了与任务无关的视觉干扰；这是单篇工作的反直觉发现，尚待独立复现。
 
-vault 内另可见两个更早期、抽象层级的推理数据合成尝试：[[Papers/2501-InfiGUIAgent- A Multimodal Generalist GUI Agent with Native Reasoning and Reflection]] 采用两阶段 SFT，第一阶段做 GUI understanding/grounding，第二阶段用合成数据训练 hierarchical reasoning 与 expectation-reflection 能力；[[Papers/2500-UI-TARS- Pioneering Automated GUI Interaction with Native Agents]] 提出 System-2 Reasoning（任务分解、反思思维、里程碑识别等多种推理模式）并配合"数百台虚拟机上自动采集-过滤-反思精炼"的迭代训练。这两篇笔记目前只基于 abstract，具体标注规模、CoT 质量的量化审计均未获取，只能作为方法方向的佐证，不作为数字依据。
+另有两个更早期、抽象层级的推理数据合成尝试：[[Papers/2501-InfiGUIAgent- A Multimodal Generalist GUI Agent with Native Reasoning and Reflection]] 采用两阶段 SFT，第一阶段做 GUI understanding/grounding，第二阶段用合成数据训练 hierarchical reasoning 与 expectation-reflection 能力；[[Papers/2500-UI-TARS- Pioneering Automated GUI Interaction with Native Agents]] 提出 System-2 Reasoning（任务分解、反思思维、里程碑识别等多种推理模式）并配合"数百台虚拟机上自动采集-过滤-反思精炼"的迭代训练。对这两篇工作的考察目前仅基于 abstract，具体标注规模与 CoT 质量均未核实，只能作为方法方向的佐证，不作为数字依据。
 
-邻域方法证据（非 GUI-core）：[[Papers/2505-AgentX]] 面向 vision-centric agentic 任务评测深层多模态推理，其 reasoning-trace 质量评测思路可迁移到 GUI CoT faithfulness 审计，但对象不是 computer-use loop（库内暂无独立验证）。
+邻域方法证据（非 GUI-core）：[[Papers/2505-AgentX]] 面向 vision-centric agentic 任务评测深层多模态推理，其 reasoning-trace 质量评测思路可迁移到 GUI CoT faithfulness 审计，但对象不是 computer-use loop（尚未见独立验证）。
 
 ### 5.6 Failure and Recovery Data
 
@@ -528,7 +528,7 @@ vault 内另可见两个更早期、抽象层级的推理数据合成尝试：[[
 
 前一类的代表是 [[Papers/2500-UiGenieSelfImproving]]：其 UI-Genie-RM-517k reward 数据集不只收集正例，还系统性构造难负例——规则验证提供初始监督、controlled trajectory corruption 人为篡改单步或多步动作制造"接近正确但实际错误"的轨迹、hard negative mining 从模型易混淆样本中挑选困难案例；配套的 UI-Genie-Agent-16k 轨迹数据则用于 agent/reward model 联合迭代自增强。同样把失败纳入训练闭环的还有 [[Papers/2508-OpenCUA]]（放宽"全对轨迹"要求，保留标注错误作 reflection 信号）以及 [[Papers/2603-CAPTCHA Solving for Native GUI Agents- Automated Reasoning-Action Data Generation and Self-Correctiv]]（用失败的 CAPTCHA 交互轨迹构造 self-correction 数据，作者报告 CAPTCHA 求解成功率从约 30% 提升到 80%，但该数字仅来自论文 abstract，全文证据未核实）。
 
-当前 vault 内失败数据的共同特征是：每篇工作都自建了自己的失败分类体系（four failure modes / hard negative / self-correction），彼此之间没有统一的 failure taxonomy 或可复用的标注 schema，系统性、跨方法可比的失败语料仍然稀缺。
+上述失败数据工作的共同特征是：每篇工作都自建了自己的失败分类体系（four failure modes / hard negative / self-correction），彼此之间没有统一的 failure taxonomy 或可复用的标注 schema，系统性、跨方法可比的失败语料仍然稀缺。
 
 ### 5.7 Preference and Safety Data
 
@@ -536,7 +536,7 @@ Preference data 把"哪条轨迹更好"变成可学习的相对信号，主要�
 
 [[Papers/2408-AgentQ]] 是较早的完整闭环：用 guided MCTS 在网页上探索，同一 LLM 对候选动作做 AI 过程监督排序得到 Q 值，再用 |Q(h,a^w)−Q(h,a^l)|≥θ 的节点构造 step-level 偏好对，做 off-policy DPO。这套方法把失败轨迹也变成了监督来源（RFT 只能扔掉失败）：WebShop 上从 xLAM 零样本 28.6% 经 RFT 31.3%、outcome-only DPO 40.6% 提升到 Agent Q 50.5%（≈人类均值 50.0%）；真实网站 OpenTable 上从零样本 18.6% 一天训到 81.7%（+MCTS 达 95.4%），GPT-4o 零样本仅 62.6%。[[Papers/2500-UiGenieSelfImproving]] 的 UI-Genie-RM-517k（见 §5.6）同样属于这一层——其难负例构造方式本质是为 reward model 生产偏好对。
 
-Safety 方向的代表是 [[Papers/2606-PrivacyAlign]]：其数据集包含 1,350 个 agentic 场景、来自 599 个独立标注者的 3,516 条详细标注，核心 insight 是 privacy violation 不只是被标注的，更是被人类判断所定义的——因此把人类标注同时用于 annotation-conditioned reward modeling/RL 训练和 annotation-conditioned LLM judge 评估，试图解决"规则匹配/敏感词过滤"这类 proxy 指标与真实人类判断脱节的问题。该笔记目前仅基于 abstract，方法细节与训练结果尚未核实。
+Safety 方向的代表是 [[Papers/2606-PrivacyAlign]]：其数据集包含 1,350 个 agentic 场景、来自 599 个独立标注者的 3,516 条详细标注，核心 insight 是 privacy violation 不只是被标注的，更是被人类判断所定义的——因此把人类标注同时用于 annotation-conditioned reward modeling/RL 训练和 annotation-conditioned LLM judge 评估，试图解决"规则匹配/敏感词过滤"这类 proxy 指标与真实人类判断脱节的问题。对该工作的考察目前仅基于 abstract，方法细节与训练结果尚未核实。
 
 ### 5.8 Personalized User Data
 
@@ -544,16 +544,16 @@ Safety 方向的代表是 [[Papers/2606-PrivacyAlign]]：其数据集包含 1,35
 
 | 数据集/benchmark | 规模 | 个性化维度 | 证据与边界 |
 |:--|:--|:--|:--|
-| PSPA-Bench [[Papers/2603-PSPA-Bench- A Personalized Benchmark for Smartphone GUI Agent]] | 12,855 条个性化指令，覆盖 10 个日常场景、22 个 mobile app | 真实用户行为衍生的个性化指令 | 作者报告 11 个 SOTA GUI agent 在个性化设置下普遍表现差；论文目前 abstract-only，聚合分数未核实 |
+| PSPA-Bench [[Papers/2603-PSPA-Bench- A Personalized Benchmark for Smartphone GUI Agent]] | 12,855 条个性化指令，覆盖 10 个日常场景、22 个 mobile app | 真实用户行为衍生的个性化指令 | 作者报告 11 个 SOTA GUI agent 在个性化设置下普遍表现差；该结论仅基于论文 abstract，聚合分数未核实 |
 | PersonaVLM [[Papers/2603-PersonaVLM]] | 30k+ 交互、500 personas 合成训练集 + 2000+ case 评测集 | 长期 memory（core/semantic/episodic/procedural）+ Big Five 人格向量的 persona 建模 | Persona-MME 上比 baseline +22.4%、超 GPT-4o +5.2%（128k 设置）；是本节唯一同时发布大规模合成训练集的工作 |
 | MyPCBench [[Papers/2606-MyPCBench]] | 17 个模拟 web app 的完整 Linux 桌面（预登录账号、历史数据）+ 184 个源自真实社区请求的任务 | 登录态、个人文件、跨 app 生活上下文 | 最强模型 Claude Opus 4.6 也仅 fully-solve 55.4%，失败集中在 long-horizon、multi-app 任务 |
 | AgentCIBench [[Papers/2606-AgentCIBench]] | multi-app personal workspace 场景（contextual integrity 框架） | 信息流是否符合 sender/recipient/transmission principle 规范，而非"是否敏感" | 无 adversary 的正常使用中测得平均 contextual leakage 67.9%——任务完成本身就会过度披露个人状态 |
 | PIRA-Bench [[Papers/2603-PIRABench]] | 100 条 mobile/desktop trajectories，平均约 32 张截图，每条搭配 3 个不同 socio-economic/preferences profile | 依赖 profile 的 proactive intent 推断 + 纯噪声负样本 | 最佳模型 final score 仅 28.05，远低于人类 90.35，主要差距来自 false positive（过度主动）而非 recall |
-| AndroidInteraction [[Papers/2500-AgentInitiatedInteractionPhone]] | 规模数字未在摘录中给出 | 基于 AndroidControl 衍生，标注"何时该主动询问用户、问什么" | 论文承认标注人数、IAA、筛选阈值等实现细节"摘录未充分提供"，只能确认存在系统性标注流程 |
+| AndroidInteraction [[Papers/2500-AgentInitiatedInteractionPhone]] | 规模数字未能核实 | 基于 AndroidControl 衍生，标注"何时该主动询问用户、问什么" | 标注人数、IAA、筛选阈值等实现细节未能核实，只能确认存在系统性标注流程 |
 
 这六份材料共享一个结构：几乎都是评测集，PersonaVLM 是唯一明确发布大规模（30k+）可训练合成语料的工作。个性化数据与隐私数据高度纠缠——MyPCBench 需要真实登录态、AgentCIBench 直接把"过度披露"作为核心指标——这意味着构建更大规模个性化训练语料的同时，几乎必然放大隐私风险，两者目前没有被同一份数据集系统地联合处理。
 
-近期工作：[[Papers/2601-PersonalAlign]] 用长期 user-centric records 做分层隐式意图对齐，把个性化从评测集推进到训练语料方向，直接对应本节此前的语料缺口（库内暂无独立验证）。
+近期工作：[[Papers/2601-PersonalAlign]] 用长期 user-centric records 做分层隐式意图对齐，把个性化从评测集推进到训练语料方向，直接对应本节此前的语料缺口（尚未见独立验证）。
 
 ### 5.9 Human, Synthetic, and Agent-Generated Data
 
@@ -566,7 +566,7 @@ Safety 方向的代表是 [[Papers/2606-PrivacyAlign]]：其数据集包含 1,35
 | Reverse task synthesis（模型驱动） | [[Papers/2412-OSGenesis]] | 成本低于 live 人工采集，多样性高于 task-driven 合成 | 与 human 数据 SR retention >80%，但该 gap 是否在更大 scale 依然成立未被验证；pipeline 核心引擎仍是 GPT-4o，尚不能纯开源复现 |
 | 混合闭环（human + rule + model） | [[Papers/2509-ScaleCUA]]、[[Papers/2607-HyMobileAgent]] | 用人工补采 goal-directed 轨迹弥补自动化探索的目标缺失 | ScaleCUA 明确报告"完全依赖 VLM agent 探索多样性不足"是促使其转向混合方案的直接原因 |
 
-三种范式的分工并非静态：GroundCUA 的"质量>规模"结论目前只在 desktop grounding 单一任务上成立，尚不清楚是否推广到 trajectory 层；OS-Genesis 的 synthetic-human gap 收窄证据来自 1K 量级的特定 backbone 实验。跨方法在同一 benchmark 上直接对比数据效率曲线的研究目前不存在，这是本节最大的空白（见 gaps）。
+三种范式的分工并非静态：GroundCUA 的"质量>规模"结论目前只在 desktop grounding 单一任务上成立，尚不清楚是否推广到 trajectory 层；OS-Genesis 的 synthetic-human gap 收窄证据来自 1K 量级的特定 backbone 实验。跨方法在同一 benchmark 上直接对比数据效率曲线的研究目前不存在，这是本节最大的空白。
 
 ### 5.10 Data Processing and Mixture
 
@@ -584,17 +584,17 @@ Contamination 方面，[[Papers/2606-CUAGym]] 指出一个具体风险：其 16 
 
 数据投毒是一个更少被讨论的风险面：[[Papers/2606-IAG]] 展示了针对 VLM-based visual grounding 的 input-aware backdoor 攻击——攻击者在下游模型常见的开放平台分发的预训练权重中注入少量 poisoned 样本，用 text-conditioned U-Net 根据攻击目标描述生成动态 trigger，使模型在触发条件下无视用户 query、转而定位攻击者指定目标，同时尽量维持 clean accuracy。这一威胁模型直接指向 CUA 数据供给链的一个薄弱环节：现有 grounding 数据集（如 §5.2 列出的开源语料）本身依赖公开权重与公开数据的组合，攻击面尚未被系统评估。
 
-隐私标注体系方面，[[Papers/2601-GUIGuardBench]] 提供了目前 vault 内最完整的标注 schema：241 条 Android/PC 真实 agent trajectories、4,080 张截图，每个 privacy element 标注 bounding box、三档风险等级、六类语义类别以及 task-necessity 标签。其核心发现——平均 binary privacy detection 在 Android/PC 达 89.0%/63.3%，但 strict full match 仅 8.8%/0.6%——说明"知道存在隐私风险"和"精确指出哪些信息不该披露"是两种不同难度的标注目标，现有数据体系在后者上几乎没有覆盖。[[Papers/2606-PrivacyAlign]]（见 §5.7）从另一个方向回应这一缺口：用人类标注本身（而非规则/关键词）作为隐私判断的 ground truth。
+隐私标注体系方面，[[Papers/2601-GUIGuardBench]] 提供了本文覆盖的工作中最完整的标注 schema：241 条 Android/PC 真实 agent trajectories、4,080 张截图，每个 privacy element 标注 bounding box、三档风险等级、六类语义类别以及 task-necessity 标签。其核心发现——平均 binary privacy detection 在 Android/PC 达 89.0%/63.3%，但 strict full match 仅 8.8%/0.6%——说明"知道存在隐私风险"和"精确指出哪些信息不该披露"是两种不同难度的标注目标，现有数据体系在后者上几乎没有覆盖。[[Papers/2606-PrivacyAlign]]（见 §5.7）从另一个方向回应这一缺口：用人类标注本身（而非规则/关键词）作为隐私判断的 ground truth。
 
-邻域方法（非 GUI 专用）：[[Papers/2411-MMDetect]] 系统分析多模态 LLM 训练数据污染，提出 text 与 image 双模态泄漏的联合检测，其审计方法可迁移到 GUI trajectory/screenshot 语料，但本身不在 GUI 域验证（库内暂无独立验证）。
+邻域方法（非 GUI 专用）：[[Papers/2411-MMDetect]] 系统分析多模态 LLM 训练数据污染，提出 text 与 image 双模态泄漏的联合检测，其审计方法可迁移到 GUI trajectory/screenshot 语料，但本身不在 GUI 域验证（尚未见独立验证）。
 
 ### 5.12 Open Problems
 
-本章尚未解决的核心分歧是 **compositional long horizon** 与 **causal long horizon** 的区别。前者只需把可行的 transition edge 接成一条长路径（§5.4 中 transition-graph composition、policy-frontier task factory 等大多数自动化方案属于此类）；后者必须包含状态依赖、不可逆副作用、失败分支与恢复，并由独立 verifier 判断最终后果。当前没有任何一份 vault 内的数据工作声称同时满足这两个条件，多数"长程"数据集的"长"指的是步数而非因果复杂度。
+本章尚未解决的核心分歧是 **compositional long horizon** 与 **causal long horizon** 的区别。前者只需把可行的 transition edge 接成一条长路径（§5.4 中 transition-graph composition、policy-frontier task factory 等大多数自动化方案属于此类）；后者必须包含状态依赖、不可逆副作用、失败分支与恢复，并由独立 verifier 判断最终后果。在本文覆盖的数据工作中，尚无一份声称同时满足这两个条件，多数"长程"数据集的"长"指的是步数而非因果复杂度。
 
-未来的数据报告应当同时给出 state/transition coverage、task feasibility、validator validity、recovery coverage、benchmark overlap 与 cross-domain transfer 六个维度，而不是只报轨迹数和平均步数——这是对整章材料的横向观察：§5.4 的代表工作大多只报告其中一到两个维度（如 SEE 报 step success、EvoCUA 报 hard-task 比例），没有一份工作提供全部六项，使得跨工作的数据质量比较缺乏共同尺度。
+未来的数据报告应当同时给出 state/transition coverage、task feasibility、validator validity、recovery coverage、benchmark overlap 与 cross-domain transfer 六个维度，而不是只报轨迹数和平均步数：§5.4 的代表工作大多只报告其中一到两个维度（如 SEE 报 step success、EvoCUA 报 hard-task 比例），没有一份工作提供全部六项，使得跨工作的数据质量比较缺乏共同尺度。
 
-分层级看，薄弱环节集中在三处。第一，§5.3 的 atomic action 层仍依赖 AITW/AndyroidControl 这类未被 vault 独立消化的原始论文作为 canon，规模数字只能通过二手引用推断。第二，§5.6/§5.7 的失败与偏好数据几乎每篇工作各自定义 taxonomy，缺乏可复用、跨方法可比的标注 schema，"失败恢复"作为监督信号的价值被反复验证（OpenCUA、UI-Genie、Learning from Failure 独立得出相似结论），但从未被统一到同一套语料里。第三，§5.8 的个性化数据与 §5.11 的隐私标注在结构上互相拉扯——更真实的个人上下文（登录态、历史数据）天然放大隐私风险，但目前没有工作把"个性化收益"和"隐私成本"放进同一份数据集的联合评估里。
+分层级看，薄弱环节集中在三处。第一，§5.3 的 atomic action 层仍依赖 AITW/AndroidControl 这类本文未独立核阅其原始论文的数据集作为 canon，规模数字只能通过二手引用推断。第二，§5.6/§5.7 的失败与偏好数据几乎每篇工作各自定义 taxonomy，缺乏可复用、跨方法可比的标注 schema，"失败恢复"作为监督信号的价值被反复验证（OpenCUA、UI-Genie、Learning from Failure 独立得出相似结论），但从未被统一到同一套语料里。第三，§5.8 的个性化数据与 §5.11 的隐私标注在结构上互相拉扯——更真实的个人上下文（登录态、历史数据）天然放大隐私风险，但目前没有工作把"个性化收益"和"隐私成本"放进同一份数据集的联合评估里。
 
 
 ## 6. Models and Agent-System Paradigms
@@ -603,23 +603,23 @@ Contamination 方面，[[Papers/2606-CUAGym]] 指出一个具体风险：其 16 
 
 GUI grounding 从外观模板匹配演进为 instruction-conditioned localization，再分化出高分辨率编码、跨平台数据扩展、显式解析器、注意力监督与离散动作 token 等路线。它们共同改善"目标在哪里"，但静态 grounding 增益能否稳定转化为长程任务成功仍未被充分证明。
 
-[[Papers/0910-Sikuli]] 已确立 pixels-in、keyboard/mouse-out 的跨接口路线，但其 MSER+SIFT 模板匹配只能识别已知外观。[[Papers/2400-SeeclickHarnessingGuiGrounding]] 将语义 grounding 作为视觉 GUI agent 的独立预训练目标；[[Papers/2312-CogAgent]] 通过 dual-resolution 编码保留小文字和图标；[[Papers/2410-OSAtlas]] 则以跨 Web、Mobile、Desktop 的数据与统一 action space 扩展基础动作模型。UGround 在当前 vault 中仅通过 OS-Atlas 等工作的 comparator 记录间接覆盖，缺少可独立引用的专门笔记。
+[[Papers/0910-Sikuli]] 已确立 pixels-in、keyboard/mouse-out 的跨接口路线，但其 MSER+SIFT 模板匹配只能识别已知外观。[[Papers/2400-SeeclickHarnessingGuiGrounding]] 将语义 grounding 作为视觉 GUI agent 的独立预训练目标；[[Papers/2312-CogAgent]] 通过 dual-resolution 编码保留小文字和图标；[[Papers/2410-OSAtlas]] 则以跨 Web、Mobile、Desktop 的数据与统一 action space 扩展基础动作模型。UGround 的结果本文仅经 OS-Atlas 等工作的对比实验间接覆盖，未对其原始论文做一手核验。
 
 | 路线 | 代表工作 | 核心机制 | 已知边界 |
 |:--|:--|:--|:--|
 | 高分辨率视觉编码 | [[Papers/2312-CogAgent]] | 低分辨率主干与高分辨率 cross-module 并行 | 单图定位不自动解决 history、planning 与 recovery |
 | Grounding pre-training | [[Papers/2400-SeeclickHarnessingGuiGrounding]]、[[Papers/2410-OSAtlas]] | 从 GUI metadata 构造 instruction–element–coordinate 监督 | 自动标注可能遗漏密集小元素；跨平台数据不等于跨平台执行能力 |
-| Expert-dense data | [[Papers/2511-GroundCUA]] | 从真人 desktop demonstration 提取 keyframe，并做密集元素标注 | 当前笔记尚无 claim-level Evidence Ledger，本节只采纳其方法定位，不使用数值比较 |
+| Expert-dense data | [[Papers/2511-GroundCUA]] | 从真人 desktop demonstration 提取 keyframe，并做密集元素标注 | 其数值结果本文尚未逐项核验，本节只采纳其方法定位，不使用数值比较 |
 | 轻量数据配方 | [[Papers/2601-ZonUI3B]] | 跨平台、多分辨率数据与分阶段 specialization | 证据集中在 static point grounding，未证明长程收益 |
 | 可插拔 parser | [[Papers/2408-OmniParser]] | detector、OCR 与 icon caption 组成外部 perception layer | parser error 会成为新的级联错误源 |
 | 离散相对动作 | [[Papers/2602-ToolTok]] | coarse-to-fine tool-token pathfinding 代替一步绝对坐标 | 多步定位增加 latency，online 长程效果未知 |
 | 内生注意力监督 | [[Papers/2511-GuiAima]] | `<ANCHOR>` token 的 patch attention 直接接受 grounding 监督 | 效果依赖 backbone 原生视觉定位能力与 zoom 策略 |
 
-GUI-AIMA 提供了当前 vault 中这一方向最完整的 claim-level 证据：3B 模型用 509k 样本达到 ScreenSpot-Pro 61.5、ScreenSpot-v2 92.1；移除 training-free zoom 后 ScreenSpot-Pro 降至 53.8，而迁移到 InternVL3.5-4B 的增益仅为 1.8 个百分点。单篇结果表明，attention supervision 可以降低额外 grounding head 的需求，但最终表现仍由 backbone 与推理期视觉缩放共同决定 [[Papers/2511-GuiAima]]。
+GUI-AIMA 提供了本文所覆盖工作中这一方向最完整的定量证据：3B 模型用 509k 样本达到 ScreenSpot-Pro 61.5、ScreenSpot-v2 92.1；移除 training-free zoom 后 ScreenSpot-Pro 降至 53.8，而迁移到 InternVL3.5-4B 的增益仅为 1.8 个百分点。单篇结果表明，attention supervision 可以降低额外 grounding head 的需求，但最终表现仍由 backbone 与推理期视觉缩放共同决定 [[Papers/2511-GuiAima]]。
 
 ### 6.2 Vision-Language-Action Models
 
-CUA 与 embodied VLA 共享"视觉观察与语言目标条件化动作"的形式，但数字环境的动作包含坐标、element ID、键盘快捷键、API/CLI 调用和 terminal action，不能直接套用连续机器人控制的 VLA taxonomy。当前 vault 对 GUI-specific VLA 的完整、source-verified 覆盖薄弱，见 gaps；本节暂不使用 embodied VLA 结果替代 CUA 证据。
+CUA 与 embodied VLA 共享"视觉观察与语言目标条件化动作"的形式，但数字环境的动作包含坐标、element ID、键盘快捷键、API/CLI 调用和 terminal action，不能直接套用连续机器人控制的 VLA taxonomy。GUI-specific VLA 方向本文尚缺乏完整、经一手核验的文献覆盖；本节暂不使用 embodied VLA 结果替代 CUA 证据。
 
 ### 6.3 Native End-to-End CUA Models
 
@@ -630,9 +630,9 @@ Native CUA 把 perception、grounding、reasoning、短期记忆与 action gener
 | UI-TARS | screenshot 与有限历史直接生成 thought/action | 统一跨平台动作与 reasoning pattern [[Papers/2501-UITARS]] | 内部状态不可审计；完整 observation history 受 context 限制 |
 | UI-TARS-2 | 在 native policy 上加入 multi-turn RL、分层记忆及 GUI/SDK action | 从纯 GUI 扩展到 terminal、filesystem 与工具调用 [[Papers/2509-UITARS2]] | 已跨入 hybrid architecture；收益无法只归因于模型参数 |
 | ScaleCUA | 同一 VLM 支持 grounding、direct action 与 reasoned action | 跨平台数据使模型既可独立执行，也可作为 grounder [[Papers/2509-ScaleCUA]] | 强局部 grounding 未稳定转化为 desktop/mobile 长程执行 |
-| GUI-Owl-1.5 | technical report 将其描述为多规模、多平台 native agent | 覆盖 grounding、automation、tool use 与 memory [[Papers/2602-Mobile-Agent-v3.5- Multi-platform Fundamental GUI Agents]] | 当前笔记为 pending、abstract-only；架构和 benchmark 数字不进入强结论 |
+| GUI-Owl-1.5 | technical report 将其描述为多规模、多平台 native agent | 覆盖 grounding、automation、tool use 与 memory [[Papers/2602-Mobile-Agent-v3.5- Multi-platform Fundamental GUI Agents]] | 本文仅依据其摘要收录该工作；架构和 benchmark 数字不进入强结论 |
 
-UI-TARS 系列说明 native model 可以形成统一的数据飞轮；ScaleCUA 则提供反向边界：扩大 grounding 与跨平台训练数据仍可能留下明显的端到端执行缺口。现有证据因此不支持"native 化自动消除系统设计"，只支持把部分系统边界从显式模块接口迁移到训练数据、context policy 与 action schema。
+UI-TARS 系列说明 native model 可以形成统一的 data flywheel；ScaleCUA 则提供反向边界：扩大 grounding 与跨平台训练数据仍可能留下明显的端到端执行缺口。现有证据因此不支持"native 化自动消除系统设计"，只支持把部分系统边界从显式模块接口迁移到训练数据、context policy 与 action schema。
 
 ### 6.4 Modular Agent Systems
 
@@ -701,7 +701,7 @@ Web reduction 的独立结果进一步强化这一边界：
 - Prune4Web 将候选元素减少 25–50 倍，并在其 low-level grounding 设置中把准确率从 46.8 提到 88.28；但对 GPT-4o 的 task-level 结果没有提升 [[Papers/2511-Prune4Web]]。
 - FocusAgent 剪除约一半 AXTree 后，在 WebArena 上低于完整 observation（GPT-4.1 32.3 vs 36.5、Claude 39.9 vs 44.6，51–59% pruning），说明选择性 reduction 的代价并非免费 [[Papers/2510-FocusAgent]]。
 
-视觉 history 的效率优化则形成正交路线。STaR-KV 在 UI-TARS 的 40% cache budget 下得到 49.94，对应 full cache 的 49.75；20% budget 将 ScreenSpot-Pro 峰值显存由 37.36 GB 降至 22.97 GB [[Papers/2606-StarKV]]。Compress-to-Focus 用 action-relevant ROI 裁剪历史截图，使 observation 数从 1 增至 3 时的 token 增幅由 semi-online RL 的 41% 降至约 4%，并在 GUI-Odyssey 的三项设置之一取得 21.4pp 提升 [[Papers/2601-CompressToFocus]]。ST-Lite 在 10–20% cache budget 下报告 2.45× decoding acceleration；该笔记整体为 partial verification，本节仅采用已逐项核验的 acceleration 与"GUI attention 跨层高稀疏"结论 [[Papers/2603-STLiteKV]]。
+视觉 history 的效率优化则形成正交路线。STaR-KV 在 UI-TARS 的 40% cache budget 下得到 49.94，对应 full cache 的 49.75；20% budget 将 ScreenSpot-Pro 峰值显存由 37.36 GB 降至 22.97 GB [[Papers/2606-StarKV]]。Compress-to-Focus 用 action-relevant ROI 裁剪历史截图，使 observation 数从 1 增至 3 时的 token 增幅由 semi-online RL 的 41% 降至约 4%，并在 GUI-Odyssey 的三项设置之一取得 21.4pp 提升 [[Papers/2601-CompressToFocus]]。ST-Lite 在 10–20% cache budget 下报告 2.45× decoding acceleration；该工作其余结果本文未逐项核验，此处仅采用已核验的 acceleration 与"GUI attention 跨层高稀疏"结论 [[Papers/2603-STLiteKV]]。
 
 这些工作优化的是保留哪些 token，而不是某条 evidence 是否仍然为真。Perception 的下一阶段需要把 saliency、provenance、freshness 与 action-induced invalidation 联合建模。
 
@@ -711,7 +711,7 @@ Planning 从扩大 history 与生成一次性计划，发展为可复用 workflo
 
 Agent S2 在每个 subgoal 后主动重规划，代表 observation-conditioned hierarchical planning [[Papers/2504-AgentS2]]。[[Papers/2409-AgentWorkflowMemory]] 与 [[Papers/2504-SkillWeaver]] 则把成功轨迹分别压缩为自然语言 workflow 与可执行 skill，使 planning 从单次生成转向跨任务复用。
 
-SKILL.nb 将两者连接为 selective formalization：每个步骤依据执行证据选择代码或自然语言表示，gate 失败时按代码、自然语言、裸意图逐级回退。其 WebArena-Verified 单轮 success 为 53.7%，三次重跑保留 91.7% 初始成功任务；有限修复回收 72.9% 失败，修复后 regression 为 4.2%，而移除 gate 后 regression 从 3.3% 升至 18.6% [[Papers/2606-SkillNb]]。这些是单工作的 source-verified 结果，支持"可靠复用依赖 execution gate"，不构成所有 skill system 的普遍定律。
+SKILL.nb 将两者连接为 selective formalization：每个步骤依据执行证据选择代码或自然语言表示，gate 失败时按代码、自然语言、裸意图逐级回退。其 WebArena-Verified 单轮 success 为 53.7%，三次重跑保留 91.7% 初始成功任务；有限修复回收 72.9% 失败，修复后 regression 为 4.2%，而移除 gate 后 regression 从 3.3% 升至 18.6% [[Papers/2606-SkillNb]]。这些是经原文核验的单篇工作结果，支持"可靠复用依赖 execution gate"，不构成所有 skill system 的普遍定律。
 
 Explicit task state 同样具有条件性。[[Papers/2607-TSR]] 报告其作用会随环境与 backbone 改变方向，说明额外状态只有在 horizon 与状态密度足以抵消 context 和维护误差时才有净收益。[[Papers/2607-Plover]] 把 plan 变成 persistent、inspectable、editable artifact，使局部修复可以保留已完成进度；它证明的是专家介入下的 recoverability upper bound，而非普通用户性能。
 
@@ -735,7 +735,7 @@ MGA 用双帧验证将 observation change 分为 Success、Failure、Uncertain�
 
 Mem-W 则将 working 与 experiential memory 经共享 Q-Former 压成 soft token，在 MMInA-Shop 上从 18.50 提升到 48.50，在 AndroidControl-v2 High 的 Pass@1 上从 49.30 提升到 63.07；消融显示两类 memory 互补 [[Papers/2605-MemW]]。这些结果支持 latent compression 的有效性，却同时暴露可验证性张力：policy 能利用 memory，但外部系统难以判断某次动作受哪条历史证据影响。
 
-[[Papers/2605-MementoGUI]] 代表多模态 memory controller；[[Papers/2606-MemGUI]] 则在 abstract-only 笔记中把 context management 建模为 policy action，并维护 folded action history、folded UI state 与 recent step record。后者目前只作为新问题 formulation 纳入，不采用其性能主张。
+[[Papers/2605-MementoGUI]] 代表多模态 memory controller；[[Papers/2606-MemGUI]] 则把 context management 建模为 policy action，并维护 folded action history、folded UI state 与 recent step record。后者本文仅依据摘要收录，只作为新问题 formulation 纳入，不采用其性能主张。
 
 可靠 state tracking 至少需要记录 value、source、timestamp/freshness、confidence、last validating observation、supersession 和 downstream actions。仅保存摘要而丢弃这些元数据，会把 memory 从辅助信息变成不可追责的隐藏状态。
 
@@ -849,7 +849,7 @@ TeachStop 的 SA-OPSD 将 clipped GRPO 与 advantage-gated behavior cloning 结�
 
 Curriculum 已从预设的任务难度排序演进为 policy-relative task allocation：固定 multi-task 训练先解决平台与动作空间异构，失败驱动课程再扩充学习材料，online frontier sampling 最后根据当前成功率动态分配 rollout。每一步提高了训练信号密度，同时暴露出新的问题——静态难度会随 policy 更新而失效，生成任务也可能可执行但语义无效。
 
-OS-ATLAS 用 unified action space 支撑跨平台 multi-task fine-tuning。[[Papers/2410-OSAtlas]] WebRL 将失败轨迹转成下一轮课程任务，并联合 ORM、KL 约束和经验回放稳定在线更新。[[Papers/2411-WebRL]] AgentGym-RL 通过逐步扩大 interaction horizon，避免初期直接训练长轨迹导致优化崩溃。[[Papers/2509-AgentGymRL]] SCALECUA 与 EvoCUA-1.5 则按当前 policy 的 success frontier 选择任务。[[Papers/2607-SCALECUA]] [[Papers/2607-EvoCUA15]] 已知（多篇独立支持）：task difficulty 是 policy-relative 变量；未知的是不同环境中可学习区间能否由统一阈值描述。
+OS-ATLAS 用 unified action space 支撑跨平台 multi-task fine-tuning。[[Papers/2410-OSAtlas]] WebRL 将失败轨迹转成下一轮课程任务，并联合 ORM、KL 约束和经验回放稳定在线更新。[[Papers/2411-WebRL]] AgentGym-RL 通过逐步扩大 interaction horizon，避免初期直接训练长轨迹导致优化崩溃。[[Papers/2509-AgentGymRL]] SCALECUA 与 EvoCUA-1.5 则按当前 policy 的 success frontier 选择任务。[[Papers/2607-SCALECUA]] [[Papers/2607-EvoCUA15]] task difficulty 是 policy-relative 变量这一结论已获多篇工作独立支持；尚不清楚的是，不同环境中的可学习区间能否由统一阈值描述。
 
 ### 7.5 Preference Optimization
 
@@ -857,7 +857,7 @@ Preference optimization 将失败经验从轨迹级排序细化到关键决策�
 
 EvoCUA 在成功与失败轨迹的首个分叉点构造两类 step-level offline DPO 数据：Action Correction 比较错误动作与正确动作，Reflection & Recovery 比较恢复策略与盲目继续。[[Papers/2601-EvoCUA]] 该方法说明失败轨迹可以转化为边界监督，但不能证明单一示范动作是某状态下唯一正确选择；GUI-Libra 所揭示的 partial verifiability 正是这种离线偏好数据的主要边界。[[Papers/2602-GUILibra]]
 
-GUI 侧近期实例：[[Papers/2505-MobileIPL]] 用迭代式 preference learning 改进 mobile agent 的 thinking process，把偏好优化从单轮 response 扩展到多步 reasoning trace（库内暂无独立验证）。
+GUI 侧近期实例：[[Papers/2505-MobileIPL]] 用迭代式 preference learning 改进 mobile agent 的 thinking process，把偏好优化从单轮 response 扩展到多步 reasoning trace（暂未检索到独立验证）。
 
 ### 7.6 Reward and Process Models
 
@@ -873,13 +873,13 @@ Offline optimization 通过静态轨迹、rejection sampling 与 preference pair
 
 EvoCUA 的离线路线依次使用 cold-start SFT、成功轨迹 RFT 与首分叉 step-level DPO，并强调数据价值取决于生成它的 policy。[[Papers/2601-EvoCUA]] GUI-Libra 面对离线 step-wise verification 的 partial verifiability，保留 KL trust region 并缩放不可靠负梯度；其结论是"去 KL"只适用于 reward 充分可验证的条件，不能直接迁移到多解 GUI 状态。[[Papers/2602-GUILibra]] 已知的是 offline learning 能高效消费已有经验；未知的是离线 step metric 在何种 verifier coverage 下足以预测 live end-to-end success。
 
-代表工作：[[Papers/2502-DigiQ]] 为 device-control agent 学习 Q-value function、从静态轨迹做 value-based offline RL，是本节 value-based 路线在 GUI/device-control 上的锚点（库内暂无独立验证）。
+代表工作：[[Papers/2502-DigiQ]] 为 device-control agent 学习 Q-value function、从静态轨迹做 value-based offline RL，是本节 value-based 路线在 GUI/device-control 上的锚点（暂未检索到独立验证）。
 
 ### 7.8 Online and Multi-Turn RL
 
 Online RL 把策略更新置于真实状态转移中，能够学习恢复、终止和长程决策，却同时放大环境吞吐、reset、reward coverage 与统计方差问题。算法名称不是首要选择依据；应先诊断 policy support、任务边界、rollout group 和环境可靠性。
 
-下表是前置诊断清单而非 optimizer 排名。任何一项不满足时，应先补数据、修 verifier 或改环境，而不是继续调整 policy-gradient 变体。
+下表给出 online RL 训练前的逐项诊断清单。任何一项不满足时，应先补数据、修 verifier 或改环境，而不是继续调整 policy-gradient 变体。
 
 | 前置变量 | 诊断 | 失败时优先选择 | 证据 |
 |:--|:--|:--|:--|
@@ -928,17 +928,17 @@ SKILL.nb 是非参数路线的具体实例：workflow step 只有通过 environm
 
 ### 7.12 Continual Learning
 
-当前 vault 覆盖薄弱，见 gaps
+本节方向的文献证据仍然薄弱：跨 UI version 与 domain 的长期顺序适应缺少系统性研究（另见 §7.15）。
 
-近期补录：[[Papers/2602-ACuRL]] 提出面向环境适应的 computer-use agent 自主持续学习，直接对应本节跨 UI version/domain 顺序适应的缺口，但仍为单 agent digest、库内暂无独立验证。
+近期工作 [[Papers/2602-ACuRL]] 提出面向环境适应的 computer-use agent 自主持续学习，直接对应本节跨 UI version/domain 顺序适应的缺口；该证据来自单篇工作，暂未检索到独立验证。
 
 ### 7.13 Distillation and On-Device
 
 Distillation 在训练侧用于把 policy support 之外的 teacher correction 写入较小模型，on-device 路线则试图降低运行时参数量、延迟与外部服务依赖。两者的共同问题是压缩不能只保持单步 grounding，还必须保留长程状态、恢复和安全边界。
 
-TeachStop 表明 self-distillation 可以安装 sparse reward 无法自行发现的 correction，但开放式生成行为的稳定性显著弱于固定动作。[[Papers/2607-TeachStop]] Ferret-UI Lite 探索 compact end-to-end on-device GUI agent，并结合混合数据、RL 与 inference-time visual tools；当前笔记足以支持其研究定位，却缺少 source-verified latency、energy、memory footprint 与长期真机评测，因此不能把小参数模型直接表述为已完成可部署验证。[[Papers/2500-FerretUiLiteLessons]]
+TeachStop 表明 self-distillation 可以安装 sparse reward 无法自行发现的 correction，但开放式生成行为的稳定性显著弱于固定动作。[[Papers/2607-TeachStop]] Ferret-UI Lite 探索 compact end-to-end on-device GUI agent，并结合混合数据、RL 与 inference-time visual tools；现有证据足以支持其研究定位，却缺少 source-verified latency、energy、memory footprint 与长期真机评测，因此不能把小参数模型直接表述为已完成可部署验证。[[Papers/2500-FerretUiLiteLessons]]
 
-近期补录：[[Papers/2605-LiteGUI]] 用 reinforcement learning 蒸馏出紧凑 GUI agent，指向端侧/低成本部署方向；real-device latency/energy 等硬指标仍缺 source-verified 证据（库内暂无独立验证）。
+近期工作 [[Papers/2605-LiteGUI]] 用 reinforcement learning 蒸馏出紧凑 GUI agent，指向端侧/低成本部署方向；real-device latency/energy 等硬指标仍缺 source-verified 证据，且暂未检索到独立验证。
 
 ### 7.14 Inference-Time Planning, Reflection, Search
 
@@ -990,14 +990,14 @@ Offline action benchmark 将固定 trajectory 中的 action type、target、valu
 
 下表回答每类离线协议保留了什么信号、又丢掉了什么闭环信息。
 
-| 协议 / Benchmark | 主要信号 | 代表笔记 | 主要缺失 |
+| 协议 / Benchmark | 主要信号 | 代表工作 | 主要缺失 |
 |:--|:--|:--|:--|
 | AITW、AndroidControl、GUI-Odyssey | action type、grounding、step success 与 trajectory match | [[Papers/2601-CompressToFocus]]、[[Papers/2603-STLiteKV]] | 替代动作、环境反馈、恢复与副作用 |
 | Multimodal-Mind2Web、MMInA | web/mobile trajectory 上的 action 与 memory-conditioned decision | [[Papers/2605-MemW]] | live drift、真实后端状态与运行时成本 |
 | EvoGUI | temporal ordering、inverse action/value、logged successor discrimination | [[Papers/2607-EvoGUI]] | sampled distractor 不是 executable counterfactual |
 | OS-Critic Bench | 给定 goal、memory、screenshot 与 candidate action 判断 step correctness | [[Papers/2606-OSOracle]] | candidate 分布受生成模型影响；offline critic accuracy 不保证 online gain |
 
-source-verified 对照进一步显示 benchmark horizon 会改变方法结论。在 GUI-Odyssey 的 offline TM/GR/SR 口径中，CCPO-3B-3AO（Qwen2.5-VL-3B）为 90.6/88.5/80.9，论文对照的 UI-S1-7B 为 76.3/61.7/59.5；二者 backbone 不同，因此只能视作该论文内的 benchmark comparison。相同工作在 Android Control 上，CCPO-7B-3AO 的 SR 为 73.3、GR 为 79.7，而 UI-TARS-7B 分别为 72.5 与 80.5，说明短程 setting 下 success 与 grounding 指标甚至可能反向变化 [[Papers/2601-CompressToFocus]]。两组都是离线评分，execution step budget 不适用，不能与 real-device task success 裸比。
+source-verified 对照进一步显示 benchmark horizon 会改变方法结论。在 GUI-Odyssey 的 offline TM/GR/SR 口径中，CCPO-3B-3AO（Qwen2.5-VL-3B）为 90.6/88.5/80.9，论文对照的 UI-S1-7B 为 76.3/61.7/59.5；二者 backbone 不同，因此只能视作该论文内的 benchmark comparison。相同工作在 Android Control 上，CCPO-7B-3AO 的 SR 为 73.3、GR 为 79.7，而 UI-TARS-7B 分别为 72.5 与 80.5，说明短程 setting 下 success 与 grounding 指标甚至可能反向变化 [[Papers/2601-CompressToFocus]]。两组都是离线评分，execution step budget 不适用，不能与 real-device task success 直接比较。
 
 ### 8.3 Web Agent
 
@@ -1019,9 +1019,9 @@ Web benchmark 的演进由 static trajectory 推向 self-hosted functional state
 
 网站本身也可能是混淆变量。[[Papers/2607-AgentReadyWeb]] 用合成双站点探索结构化标记、语义 actionability 与 API/MCP 暴露对 agent 的影响，但该工作仍是单一电商 proof-of-concept；它更适合作为 website-side ablation 的起点，而不是现实 web 总体水平的估计。
 
-【gap】当前 vault 覆盖薄弱：缺少同一 backbone、scaffold、step budget 与 verifier 下 static-to-live 的 source-verified paired rerun 数字，见 gaps。
+本综述未检索到同一 backbone、scaffold、step budget 与 verifier 下 static-to-live 的 source-verified paired rerun 数字，这是本节的主要开放缺口。
 
-真实域补充：[[Papers/2508-AmazonBench]] 是 e-commerce 域的 functionality-grounded web agent 基准，用功能性判定而非字符串匹配评测下单/检索类任务，补充本节的真实商业站点评测（库内暂无独立验证）。
+[[Papers/2508-AmazonBench]] 是 e-commerce 域的 functionality-grounded web agent 基准，用功能性判定而非字符串匹配评测下单/检索类任务，补充本节的真实商业站点评测（本文尚未独立核验其结果）。
 
 ### 8.4 Mobile Agent
 
@@ -1068,7 +1068,7 @@ Desktop benchmark 已从单应用 task completion 推进到 professional workflo
 | SaaS-Bench [[Papers/2605-SaaSBench]] | browser-only 操作真实 SaaS | state/content checks + judge | 可作为 hybrid benchmark 的纯 GUI 控制组 |
 | ToolVerse [[Papers/2607-ToolVerse]] | 大规模 mock MCP/tool environment | turn-level dictionary matching | 不含 GUI handoff，不能直接测跨接口 orchestration |
 
-当前 vault 缺少 source-verified 的等预算实验：同一 task、同一 backbone、同一 verifier 下，比较 GUI-only、API-only、MCP-only 与 adaptive hybrid，并审计 UI bypass、permission escalation、state divergence 与切换成本。该缺口不能由 tool-use benchmark 或 browser-only benchmark 单独填补，见 gaps。
+本综述未检索到 source-verified 的等预算实验：同一 task、同一 backbone、同一 verifier 下，比较 GUI-only、API-only、MCP-only 与 adaptive hybrid，并审计 UI bypass、permission escalation、state divergence 与切换成本。该缺口不能由 tool-use benchmark 或 browser-only benchmark 单独填补。
 
 ### 8.7 Long-Horizon/Professional
 
@@ -1096,11 +1096,11 @@ Personalization benchmark 需要区分四件事：读取个人历史、遵循稳
 | Benchmark / Protocol | 个性化状态 | 评测重点 | 缺失 |
 |:--|:--|:--|:--|
 | MyPCBench [[Papers/2606-MyPCBench]] | logged-in-like desktop、跨 app 历史与 persona data | task rubric、partial progress 与 trajectory efficiency | 单一 persona；privacy leakage 不是主指标 |
-| PSPA-Bench [[Papers/2603-PSPA-Bench- A Personalized Benchmark for Smartphone GUI Agent]] | smartphone workflow preference 与 personalized instruction | structure-aware process evaluation | 当前 vault 笔记仅 abstract-level，不能承载强定量结论 |
+| PSPA-Bench [[Papers/2603-PSPA-Bench- A Personalized Benchmark for Smartphone GUI Agent]] | smartphone workflow preference 与 personalized instruction | structure-aware process evaluation | 目前仅依据 abstract 收录，不能承载强定量结论 |
 | MemGUI-Bench [[Papers/2602-MemGUIBench]] | session 内外的任务记忆 | retention、recovery 与 memory proficiency | 记忆能力不等于用户偏好或身份治理 |
 | AOEP-v0 [[Papers/2606-AlwaysOnAgents]] | persistent state 的 authority、scope、provenance 与 rollback obligation | obligation pass 与 negative-invariant pass 分离 | 通用 LLM-agent pilot，非 GUI end-to-end benchmark |
 
-Personalization 不能只看"用了多少用户历史后成功率提高"。同一 benchmark 还应检查与任务无关的信息是否被读取或披露、撤销是否传播、偏好是否越过 user/task scope、错误个性化是否可回滚，以及 agent 能否解释某个动作由哪条个人状态授权。当前 vault 在多 persona、跨 session、带 permission/privacy verifier 的 source-verified end-to-end 结果上仍薄弱，见 gaps。
+Personalization 不能只看"用了多少用户历史后成功率提高"。同一 benchmark 还应检查与任务无关的信息是否被读取或披露、撤销是否传播、偏好是否越过 user/task scope、错误个性化是否可回滚，以及 agent 能否解释某个动作由哪条个人状态授权。多 persona、跨 session、带 permission/privacy verifier 的 source-verified end-to-end 证据目前仍然薄弱，是本节的主要缺口。
 
 ### 8.9 Safety and Security
 
@@ -1138,11 +1138,11 @@ Safety benchmark 应至少分开报告 attack success、executed violation、ben
 
 MFS Coverage 提供了 source-verified 的 evaluation-cost 例子：WorkArena L1 的 33 个任务上，11 种方法 × 32 个配置的端到端评测累计为 232.4 小时，而 coverage 评测为 48.2 分钟，约 290×；WebLINX test-iid 的对应累计时间为 117.0 小时与 28.5 分钟，约 246×。policy setting 为 Qwen3.5-122B-A10B 与 MiniMax-M2.5；Evidence Ledger 未核定统一 action step cap，因此这些数字只比较同一研究中的累计评测时间，不支持跨 agent 的 success 排名 [[Papers/2605-MFSCoverage]]。
 
-agent-side 也需要同样严格的 setting card。A11y-Compressor 在 OSWorld 的 358-task、Qwen3-VL-32B、每任务两次且 best-of-2、OSWorld verifier 口径下，把输入 token 压到 linearized a11y 的约 22%，同时 success 从 0.156 到 0.207；Evidence Ledger 未给出 step cap，因此该结果不能与其他 OSWorld leaderboard 裸比 [[Papers/2605-A11yCompressor]]。STaR-KV 则在 ScreenSpot-Pro 的 offline setting、UI-TARS-1.5-7B、execution step budget 不适用的条件下，把 20% cache budget 的峰值显存从 37.36 GB 降到 22.97 GB [[Papers/2606-StarKV]]。
+agent-side 也需要同样严格的 setting card。A11y-Compressor 在 OSWorld 的 358-task、Qwen3-VL-32B、每任务两次且 best-of-2、OSWorld verifier 口径下，把输入 token 压到 linearized a11y 的约 22%，同时 success 从 0.156 到 0.207；Evidence Ledger 未给出 step cap，因此该结果不能与其他 OSWorld leaderboard 分数直接比较 [[Papers/2605-A11yCompressor]]。STaR-KV 则在 ScreenSpot-Pro 的 offline setting、UI-TARS-1.5-7B、execution step budget 不适用的条件下，把 20% cache budget 的峰值显存从 37.36 GB 降到 22.97 GB [[Papers/2606-StarKV]]。
 
 最低报告集应包含美元/任务、input/output token、wall-clock、agent steps/tool calls、retry、hardware、peak memory、verifier cost 与价格时间戳；结果应画在 cost–accuracy Pareto frontier 上，而不是只报最贵配置。
 
-近期补录：[[Papers/2506-OSWorldHuman]] 以 human 完成效率为基线评测 computer-use agent 的步数/时间效率，把成本-效率维度从 token 计价推进到 human-normalized efficiency（库内暂无独立验证）。
+[[Papers/2506-OSWorldHuman]] 以 human 完成效率为基线评测 computer-use agent 的步数/时间效率，把成本-效率维度从 token 计价推进到 human-normalized efficiency（本文尚未独立核验其结果）。
 
 ### 8.11 Evaluation Metrics
 
@@ -1220,7 +1220,7 @@ CUA benchmark 的不可复现性来自四个不同层面：任务/参考答案�
 
 Verified 重发不是对旧分数的简单修补，而是新的 benchmark release。论文必须标明原版/Verified、task exclusions、checker version、environment image、step budget、backbone/scaffold 与 verifier；无法对齐时只能并列报告，不能计算跨 release 的相对进步。
 
-当前 vault 在 WebArena/OSWorld exploit、gold leakage 与 original-to-verified checker 修订的 primary audit Evidence Ledger 上仍薄弱，见 gaps。
+WebArena/OSWorld exploit、gold leakage 与 original-to-verified checker 修订的 primary audit 证据目前仍然薄弱，本节相关论断的证据基础因此偏弱。
 
 ### 8.14 Open Problems
 
@@ -1249,7 +1249,7 @@ Computer-use 能力已从研究原型收敛为几家前沿实验室以 **API/工
 | Amazon | Nova Act（`nova-act` SDK / AWS 服务） | Python SDK + AWS 托管服务，基于 Playwright 驱动浏览器 | 浏览器 UI workflow，支持 MCP / Strands 等框架 | research preview 2025-03 → GA（AWS 服务）2025-12-02（GitHub/官方） |
 | Microsoft | Copilot Studio "computer-using agents" | 企业 agent 构建平台（非自研 CU 基座，复用 OpenAI CUA + Claude Sonnet 4.5） | 浏览器 + Windows 桌面应用（desktop 为 preview） | GA 2026-05-13，覆盖全部商用 Power Platform 地域（官方 Tech Community） |
 
-**OpenAI.** OpenAI 的 Computer-Using Agent（CUA）最初随 Operator 于 2025-01 亮相，官方 CUA 页自述在 OSWorld 达 38.1%、WebArena 58.1%、WebVoyager 87%（厂商自述，as of 2026-07，来源 openai.com/index/computer-using-agent）。开发者侧现有两条路径：早期的 `computer-use-preview` 模型，以及新版 computer use tool——后者官方文档将 CU 训练并入 `gpt-5.4` 及后续模型，通过 Responses API 内置 loop 或自建 harness（Playwright/Selenium/VNC）调用（官方文档，as of 2026-07）。计价方面仅检索到第三方聚合站将 `computer-use-preview` 列为 input \$3 / output \$12 每百万 token（未经官方页确认，as of 2026-07，来源 economize.cloud），官方价目需人工复核。
+**OpenAI.** OpenAI 的 Computer-Using Agent（CUA）最初随 Operator 于 2025-01 亮相，官方 CUA 页自述在 OSWorld 达 38.1%、WebArena 58.1%、WebVoyager 87%（厂商自述，as of 2026-07，来源 openai.com/index/computer-using-agent）。开发者侧现有两条路径：早期的 `computer-use-preview` 模型，以及新版 computer use tool——后者官方文档将 CU 训练并入 `gpt-5.4` 及后续模型，通过 Responses API 内置 loop 或自建 harness（Playwright/Selenium/VNC）调用（官方文档，as of 2026-07）。计价方面仅检索到第三方聚合站将 `computer-use-preview` 列为 input \$3 / output \$12 每百万 token（未经官方页确认，as of 2026-07，来源 economize.cloud）。
 
 **Anthropic.** Claude 的 computer use tool 自 2024-10（Claude 3.5 Sonnet）起以 beta 形态提供，是最早对外开放的 CU 开发者接口之一。官方文档（as of 2026-07）显示当前经 `computer-use-2025-11-24` beta header 支持 Claude Sonnet 5、Opus 4.8/4.7/4.6/4.5、Sonnet 4.6，经 `computer-use-2025-01-24` 支持 Sonnet 4.5、Haiku 4.5 等；工具提供截图、鼠标、键盘与桌面自动化，可与 bash、text-editor 工具组合成完整自动化链，并同时上架 AWS Bedrock 与 Google Vertex。相较 OpenAI，Anthropic 的差异化在于把同一套能力延伸到"在你自己机器上工作"的产品形态（Claude Code / 桌面产品，见 §9.2）。
 
@@ -1271,7 +1271,7 @@ Computer-use 能力已从研究原型收敛为几家前沿实验室以 **API/工
 | Project Mariner | Google | 独立 agentic 浏览器扩展（Gemini 2.0/2.5） | Chrome 扩展 | 2024-12-11 prototype → **2026-05-04 discontinued**（Wikipedia/Digital Trends） |
 | Comet | Perplexity | agentic 浏览器（Comet Assistant 侧栏） | macOS/Windows/Android/iOS | 2025-07 Max 独占 → **2025-10 全球免费**；Android 2025-11、iOS 2026-03 |
 
-**OpenAI 产品线的三次折叠。** Operator 于 2025-01-23 作为 research preview 面向美国 ChatGPT Pro（\$200/月）推出，2025-07 被 **ChatGPT Agent** 取代并于 2025-08-31 关停——CU 能力自此以 ChatGPT 内 "agent mode" 形态提供给 Plus/Pro/Team 等付费层（官方，运行在带浏览器/终端的虚拟机中，执行高风险动作前请求确认）。2025-10-21 OpenAI 又推出 agentic 浏览器 **ChatGPT Atlas**（macOS，agent mode 面向 Plus/Pro/Business 预览）；但不到一年，2026-07-09 OpenAI 宣布把 Atlas 的 agentic browsing 能力并回 ChatGPT 桌面端与一个 Chrome 扩展，**Atlas 于 2026-08-09 停止运行**，同时推出基于 GPT-5.6、跑数小时长任务产出成品文档的 **ChatGPT Work**（TechCrunch / The Register，as of 2026-07；这些为 2026-07 时点信息，建议投稿前复核）。这条时间线本身即是 §9.2 开头"品牌收敛"论断的最强证据。
+**OpenAI 产品线的三次折叠。** Operator 于 2025-01-23 作为 research preview 面向美国 ChatGPT Pro（\$200/月）推出，2025-07 被 **ChatGPT Agent** 取代并于 2025-08-31 关停——CU 能力自此以 ChatGPT 内 "agent mode" 形态提供给 Plus/Pro/Team 等付费层（官方，运行在带浏览器/终端的虚拟机中，执行高风险动作前请求确认）。2025-10-21 OpenAI 又推出 agentic 浏览器 **ChatGPT Atlas**（macOS，agent mode 面向 Plus/Pro/Business 预览）；但不到一年，2026-07-09 OpenAI 宣布把 Atlas 的 agentic browsing 能力并回 ChatGPT 桌面端与一个 Chrome 扩展，**Atlas 于 2026-08-09 停止运行**，同时推出基于 GPT-5.6、跑数小时长任务产出成品文档的 **ChatGPT Work**（TechCrunch / The Register，as of 2026-07）。这条时间线本身即是 §9.2 开头"品牌收敛"论断的最强证据。
 
 **Anthropic：从扩展到"在你机器上工作"。** **Claude for Chrome** 于 2025-08-26 以 research preview 形态放给 1000 名 Max 用户（其余排 waitlist），Anthropic 公开的红队数据显示无防护时浏览器攻击成功率 23.6%、加固后降至 11.2%、部分浏览器专属攻击从 35.7% 降至 0%（厂商自述），并配套高风险站点拦截、逐站授权、管理员 allow/blocklist 等机制。该扩展于 2025-12 从 Max 独占扩展到全部付费计划（Pro/Max/Team/Enterprise，as of 2026-07）。与浏览器沙箱路线并行，Anthropic 还把 CU 延伸到用户本机（Claude Code / 桌面产品由产品侧管理会话与授权升级），形成"沙箱 API vs 本机产品"两套执行契约。
 
@@ -1336,7 +1336,7 @@ Computer-use 能力已从研究原型收敛为几家前沿实验室以 **API/工
 
 - **小模型 grounding 已接近可用**：Ferret-UI Lite（Apple，3B）在 ScreenSpot-V2 / ScreenSpot-Pro / OSWorld-G 上达 91.6% / 53.3% / 61.2%，grounding 上反超多个更大模型；[[Papers/2601-ZonUI3B|ZonUI-3B]]（WACV'26）证明单张 RTX 4090 即可训出 ScreenSpot 84.9% 的 3B grounder；UGround / UI-TARS / ShowUI 均提供 2B 档，Qwen2.5-VL-3B 被官方定位为 edge AI 方案。
 - **long-horizon 仍是端侧短板**：同一 Ferret-UI Lite 在多步导航上仅 AndroidWorld 28.0% / OSWorld 19.8%，作者直言小模型 long-horizon reasoning 是固有挑战。这与"grounding 可小模型化、planning 仍需大模型"的整体判断一致。
-- **分级/云端接力成为务实折衷**：OpenPhone（Qwen2.5-VL-3B）默认端侧执行、仅把复杂子任务实时上抛云端，显著降低云成本；GUI-Owl-1.5 / Mobile-Agent-v3.5 提供 2B（edge）到 235B（cloud-only）的连续尺度谱系；[[Papers/2606-XiaomiGUI0|Xiaomi-GUI-0]] 则走真实设备闭环路线，把异常态恢复能力烘焙进 30B-A3B（激活 3B）权重。
+- **分级/云端接力成为务实折衷**：OpenPhone（Qwen2.5-VL-3B）默认端侧执行、仅把复杂子任务实时上抛云端，显著降低云成本；GUI-Owl-1.5 / Mobile-Agent-v3.5 提供 2B（edge）到 235B（cloud-only）的连续尺度谱系；[[Papers/2606-XiaomiGUI0|Xiaomi-GUI-0]] 则走真实设备闭环路线，把异常态恢复能力训练进 30B-A3B（激活 3B）权重。
 - **本地部署 infra 已成熟**：上述开源权重普遍支持 vLLM（OpenCUA 官方支持 7B/32B/72B）与 Ollama 本地服务；编排层 browser-use / Skyvern / OpenAdapt 均可本地/on-prem 运行，端侧模型 + 本地编排可构成完全离线的 CUA 栈。
 
 小结：截至 2026-07，端侧 CUA 的现实形态是"端侧小模型负责 grounding / 单步交互 + 云端大模型补 planning / 长程"的混合架构；纯端侧、全离线的长程 agent 尚未达到实用成功率，是明确的开放问题。
@@ -1353,13 +1353,13 @@ Computer-use 能力已从研究原型收敛为几家前沿实验室以 **API/工
 | **金融后台 / 会计** | **Pilot**（"AI Accountant"）、**Coasty**、Akira AI、Vic.ai、Docyt | computer-use agent 直接操作会计/ERP UI 做发票录入、对账、PO 匹配 | 新兴：多为 vendor 早期方案，重人工复核 |
 | **医疗行政** | prior-authorization agents：Latent Health、Tandem、Innovaccer **Flow**、Cohere Health | 从 EHR 抽数、填 payer 表单/提交；voice agent 导航 payer IVR 电话系统 | 新兴：受监管，AI 不得单独作医疗必要性拒付 |
 
-**编码 agent——最成熟的专业垂直。** Cognition Devin 是自主 SWE 代表：在 Dev Box（Linux shell + 编辑器 + 浏览器 + agent）内规划/写/测/调/部署代码，数据可全程留在客户 VPC；Devin 2.0（2025-04）把入门价从 \$500/月降到 \$20/月，并称 per-ACU 完成的初级任务量较 1.x 提升 83%（厂商自述）。企业侧的标志性验证是 Goldman Sachs 于 2025-07 试点，与 12,000 名工程师组成"hybrid workforce"、宣称 ~20% 效率提升（Goldman/Cognition 自述，未独立验证，且需数周知识库配置与专人管理）；Cognition 2025-07 收购 AI-native IDE Windsurf，估值从 2025-03 的 \$4B 升至约 \$10.2B，并于 2026-05 前后洽谈以 \$25B pre-money 融资（as of 2026-07，来源：Contrary Research、SiliconANGLE）。平台侧，GitHub Copilot coding agent 于 2025-09 GA（接 issue → 自主开 draft PR，需人工 review 才触发 CI/CD），并通过 Agent HQ 把 Anthropic Claude、OpenAI Codex 作为可选 agent 纳入同一平台（2026-02 起对 Business/Pro 开放）；OpenAI 称 Codex 周活超 500 万（来源：分析媒体，非官方一手，待核）。架构层面的一个 grounding：逆向 Claude Code 源码显示仅约 1.6% 是 AI 决策逻辑、其余 98.4% 是确定性基础设施（权限门控、上下文管理、恢复机制），印证"生产级 agent 竞争壁垒已从模型转向 harness"（见 [[Papers/2604-ClaudeCode]]）。
+**编码 agent——最成熟的专业垂直。** Cognition Devin 是自主 SWE 代表：在 Dev Box（Linux shell + 编辑器 + 浏览器 + agent）内规划/写/测/调/部署代码，数据可全程留在客户 VPC；Devin 2.0（2025-04）把入门价从 \$500/月降到 \$20/月，并称 per-ACU 完成的初级任务量较 1.x 提升 83%（厂商自述）。企业侧的标志性验证是 Goldman Sachs 于 2025-07 试点，与 12,000 名工程师组成"hybrid workforce"、宣称 ~20% 效率提升（Goldman/Cognition 自述，未独立验证，且需数周知识库配置与专人管理）；Cognition 2025-07 收购 AI-native IDE Windsurf，估值从 2025-03 的 \$4B 升至约 \$10.2B，并于 2026-05 前后洽谈以 \$25B pre-money 融资（as of 2026-07，来源：Contrary Research、SiliconANGLE）。平台侧，GitHub Copilot coding agent 于 2025-09 GA（接 issue → 自主开 draft PR，需人工 review 才触发 CI/CD），并通过 Agent HQ 把 Anthropic Claude、OpenAI Codex 作为可选 agent 纳入同一平台（2026-02 起对 Business/Pro 开放）；OpenAI 称 Codex 周活超 500 万（来源：分析媒体，非官方一手）。架构层面的一个佐证：逆向 Claude Code 源码显示仅约 1.6% 是 AI 决策逻辑、其余 98.4% 是确定性基础设施（权限门控、上下文管理、恢复机制），印证"生产级 agent 竞争壁垒已从模型转向 harness"（见 [[Papers/2604-ClaudeCode]]）。
 
 **客服 agent——营收与规模化最快。** Sierra（Bret Taylor 与 Clay Bavor 联创）以 Agent OS + 语音 agent 驱动增长，2025-11 越过 \$100M ARR、进入第三年时 ARR >\$150M、服务超 40% 的 Fortune 50；融资从 2024 年 \$4.5B 估值一路到 2025-09 的 \$10B（\$350M 轮）与 2026-05 的 \$15.8B（\$950M E 轮）（as of 2026-07，来源：Sacra、CMSWire、Axios）。Decagon 用第三方（OpenAI/Anthropic/Cohere）+ 自研微调模型做文本与语音客服，2025-06 完成 \$131M C 轮、估值 \$1.5B，客户含 Hertz、Duolingo、Chime（Chime 报告联络中心成本降 60%，客户自述）。Salesforce Agentforce 360 于 2025-10-13 GA，基于超 12,000 次 Agentforce 实施；客户 Reddit 报告 46% 案件 deflection、解决时间降 84%（厂商/客户自述）。值得注意的反直觉信号：Salesforce Agentic Enterprise Index 显示 2025 上半年 agent 主导对话量增 22×，但**升级到人工的比例从 Q1 的 22% 升到 Q2 的 32%**——规模化伴随更多而非更少的 human handoff。三家共性是 outcome-based 定价（按 conversation/resolution 计费），把商业模式与 agent 实际成效绑定。
 
-**QA/测试、金融、医疗——差异化的成熟度。** 测试领域，Tricentis 把 Agentic Test Automation 嵌入 Tosca（自然语言自动生成用例），其 Vision AI 以像素级图像识别操作 SAP GUI、Citrix 虚拟桌面与遗留企业应用——这是传统 Web 自动化框架够不到的场景（Tricentis 获 2025 Gartner AI-Augmented Software Testing MQ Leader，来源：Tricentis blog / 分析媒体）。金融后台与会计出现明确的 computer-use 叙事：agent 像人一样"看屏幕、动鼠标键盘"直接操作会计软件做发票录入/PO 匹配/对账，规避 API 集成与 selector 脚本脆弱性（Pilot 于 2026-02 宣称推出首个 SMB"全自主 AI Accountant"；Coasty 提供操作真实桌面/浏览器的 computer-use agent）——但此处证据多来自 vendor blog，成本/效率数字（如手工发票 \$18–\$40/张、Gartner 预测 2027 年底 40%+ agentic 项目被取消）应视为方向性而非独立核实。医疗行政以 prior authorization 为主战场（Menlo Ventures 估该类工具支出从 2024 的 \$10M 十倍增至 2025 的 \$100M）：agent 从 EHR 抽取临床文档、填 payer 表单并提交，voice agent 自主导航 payer IVR 电话；但监管是硬约束——Texas（2025）、Arizona、Maryland 立法禁止仅凭自动化系统作出医疗必要性拒付，CMS-0057-F 自 2026-01-01 起生效，使该垂直**结构性地保留 human-in-the-loop**（来源：Innovaccer、Forbes Councils、Healthcare Huddle）。
+**QA/测试、金融、医疗——差异化的成熟度。** 测试领域，Tricentis 把 Agentic Test Automation 嵌入 Tosca（自然语言自动生成用例），其 Vision AI 以像素级图像识别操作 SAP GUI、Citrix 虚拟桌面与遗留企业应用——这是传统 Web 自动化框架够不到的场景（Tricentis 获 2025 Gartner AI-Augmented Software Testing MQ Leader，来源：Tricentis blog / 分析媒体）。金融后台与会计出现明确的 computer-use 叙事：agent 像人一样"看屏幕、动鼠标键盘"直接操作会计软件做发票录入/PO 匹配/对账，规避 API 集成与 selector 脚本脆弱性（Pilot 于 2026-02 宣称推出首个 SMB"全自主 AI Accountant"；Coasty 提供操作真实桌面/浏览器的 computer-use agent）——但此处证据多来自 vendor blog，成本/效率数字（如手工发票 \$18–\$40/张、Gartner 预测 2027 年底 40%+ agentic 项目被取消）应视为方向性而非独立核实。医疗行政以 prior authorization 为最主要的应用场景（Menlo Ventures 估该类工具支出从 2024 的 \$10M 十倍增至 2025 的 \$100M）：agent 从 EHR 抽取临床文档、填 payer 表单并提交，voice agent 自主导航 payer IVR 电话；但监管是硬约束——Texas（2025）、Arizona、Maryland 立法禁止仅凭自动化系统作出医疗必要性拒付，CMS-0057-F 自 2026-01-01 起生效，使该垂直**结构性地保留 human-in-the-loop**（来源：Innovaccer、Forbes Councils、Healthcare Huddle）。
 
-**横向判断。** 垂直 agent 的落地深度与两个变量强相关：(1) 任务是否有可验证的成功信号（编码有测试/CI、客服有 resolution，故最快成熟）；(2) 领域是否受合规约束（医疗、金融判断型任务被立法钉在 human oversight）。这解释了为何 2026-07 时点上编码与客服已产生规模化营收与受监管企业部署，而金融后台与医疗仍停留在点解决方案 + 重人工复核阶段。
+**横向判断。** 垂直 agent 的落地深度与两个变量强相关：(1) 任务是否有可验证的成功信号（编码有测试/CI、客服有 resolution，故最快成熟）；(2) 领域是否受合规约束（医疗、金融判断型任务被立法要求保留 human oversight）。这解释了为何 2026-07 时点上编码与客服已产生规模化营收与受监管企业部署，而金融后台与医疗仍停留在点解决方案 + 重人工复核阶段。
 
 ### 9.6 Browser, VM, and Sandbox Infrastructure
 
@@ -1370,11 +1370,11 @@ Computer-Use Agent 的能力上限由模型决定，但**可用性上限由运�
 | 服务 | 形态 / 开源 | 关键能力 | 时点信息（as of 2026-07） |
 |:--|:--|:--|:--|
 | **Browserbase** | 闭源托管；开源 SDK **Stagehand**（Playwright+AI）| 云端 Chrome 会话、stealth/反指纹、residential proxy、自动 CAPTCHA、认证态、live view+录制回放、MCP server | 2024 年由 Paul Klein IV 创立；2025-06 完成 \$40M B 轮（约 \$300M 估值，Notable Capital 领投，CRV/Kleiner Perkins 跟投），累计约 \$68M；厂商自述 2025 年处理 50M+ 会话、1,000+ 客户 |
-| **Steel** | **开源**浏览器 API（`steel-dev/steel-browser`）+ 托管云 | RESTful 会话管理、Stealth Browser、专用 IP、auth-walled 站点访问、CAPTCHA、Session Viewer；Rust/Go/原生 SDK；单会话最长 24h | 定位"开源、透明的浏览器层"；厂商自述同区域会话冷启 <1s（其自published benchmark 对自身有利，需谨慎） |
+| **Steel** | **开源**浏览器 API（`steel-dev/steel-browser`）+ 托管云 | RESTful 会话管理、Stealth Browser、专用 IP、auth-walled 站点访问、CAPTCHA、Session Viewer；Rust/Go/原生 SDK；单会话最长 24h | 定位"开源、透明的浏览器层"；厂商自述同区域会话冷启 <1s（其自行发布的 benchmark 对自身有利，需谨慎） |
 | **Hyperbrowser** | 闭源托管 | stealth-first、云原生、高并发容器化浏览器，面向 agentic 用例打包 | 主打"路线图明确 agentic"的差异化定位 |
 | **Anchor Browser** | 闭源托管 | 云端浏览器自动化、stealth、proxy fingerprinting、session management、CAPTCHA | 厂商自述 WebVoyager 89% 任务完成率；免费档 \$10/月额度 + 100 浏览器小时 |
 | **Cloudflare Browser Run**（原 Browser Rendering）| 闭源，随 Cloudflare 平台 | 全球网络上的 headless Chrome、Live View、**Human in the Loop**、CDP 访问、session recording、WebMCP | 2026-04-15 更名/重构；2026-05 迁移至 Cloudflare Containers，并发 30→120、响应快 50%；属其"六层 agent 基建栈"的 browsing 层 |
-| **Kernel** | 托管浏览器基建 | 面向 agent 的远程浏览器 | 独立公司，公开细节有限（见 uncovered）|
+| **Kernel** | 托管浏览器基建 | 面向 agent 的远程浏览器 | 独立公司，公开细节有限|
 
 **代码沙箱与桌面 VM**面向"agent 需要执行不受信代码或操作 GUI 之外的桌面软件"的场景，核心竞争点是**隔离模型**与**冷启延迟**的权衡。
 
@@ -1384,7 +1384,7 @@ Computer-Use Agent 的能力上限由模型决定，但**可用性上限由运�
 | **Modal** | **gVisor** 容器隔离，deny-by-default 入站 | Python 原生 serverless 云，支持 A100/H100 GPU | 厂商自述支持 100,000+ 并发沙箱 |
 | **Daytona** | 默认 **Docker 容器**，可选 Kata/Sysbox 加固 | 沙箱生命周期自动化（auto-stop/archive/delete）、warm-start | 2025-02 从 dev-environment 转型为 agent 代码运行时；2026-02 完成 \$24M A 轮；**2026-06 生产代码闭源**（开源仓归档）|
 | **Fly Machines** | microVM | 低层原始 primitive，供自建 | 供团队自搭沙箱 |
-| **Vercel Sandbox** | Firecracker | 面向 agent 的托管代码执行 | 见 uncovered（细节未充分核实）|
+| **Vercel Sandbox** | Firecracker | 面向 agent 的托管代码执行 | 细节未充分核实|
 | **Scrapybara** | 完整 VM / 桌面 | **Ubuntu / Windows / Mac** + 纯 browser 三档实例；Act SDK；ComputerTool/BashTool | YC F24；厂商自述 <1s 启动、可扩至数百实例；对接 OpenAI CUA API；按用量计费（Windows/Mac 为 early-access/企业档）|
 
 从这张图景可以提炼三条 pattern。**其一，隔离模型是安全与延迟的核心 trade-off**：Firecracker（E2B、Vercel）给每个沙箱独立内核，隔离最强但冷启略高；gVisor（Modal）居中；Docker（Daytona 默认）启动最快但共享宿主内核、边界最弱——这直接决定了"能否安全运行 agent 生成的不受信代码"。**其二，能力正在同质化**：stealth 反指纹、residential proxy、CAPTCHA 求解、**认证态/会话持久化**、live view + Human-in-the-Loop 接管，已从差异化卖点变成入场券（Browserbase、Steel、Cloudflare Browser Run 均已具备），竞争转向延迟、并发规模与计量计费精度。**其三，开源与托管两条路线并存**：Browser Use（Magnus Müller / Gregor Žunič，Playwright 之上的开源 agent 库，2025-01 已 21k+ stars）与 Stagehand、Steel 提供开源运行时/SDK，让团队可自托管；而 Browserbase/Scrapybara 则以托管舰队 + 按会话计费取胜。值得注意 Daytona 在 2026-06 反向从开源转闭源（理由是"AI 辅助漏洞挖掘对公开仓库的风险"），暗示安全基建的开源合规边界仍在拉扯。
@@ -1449,7 +1449,7 @@ Computer-use agent 的经济学有一个反直觉的核心：单 token 价格持
 
 **（3）定价模型与 cost-accuracy Pareto 的产业含义。** 消费级 computer-use 产品的计价仍在演化：OpenAI Operator（2025-01-23 发布、2025-08-31 关停）从未按任务计费，而是打包进 ChatGPT Pro 订阅；其继任者 ChatGPT agent 对消费者按订阅 + 月度用量上限（如 Plus 约 400 次 agent run），对企业/Workspace 则于 2025-07 转向 token/credit 计价（[OpenAI Operator 维基, 2026-07 检索](https://en.wikipedia.org/wiki/OpenAI_Operator)；[OpenAI 官方介绍, 2026-07 检索](https://openai.com/index/introducing-operator/)；[ChatGPT Rate Card, 2026-07 检索](https://help.openai.com/en/articles/11481834-chatgpt-rate-card-business-enterpriseedu)）。这印证了 [[Papers/2407-AgentsThatMatter]] 与 [[Papers/2510-HAL]] 的方法学警告在产业上的现实意义：(a) accuracy 可被 retry 等"科学上无意义"的手段刷高，HumanEval 上 LATS 成本比简单 warming 策略高 50× 而 accuracy 无实质差异（arXiv 2407.01502）；(b) 最贵模型极少落在 accuracy-cost Pareto 前沿（9 个 benchmark 仅 1 个），提高 reasoning effort 在 36 个组合中 21 个"持平或更低"，且 per-token 成本作为 proxy 高度误导（token 前沿 ≠ 美元前沿；o3 发布后 3 个月价格跌 80%）——对采购方意味着"按当前价规划长期策略不可靠"（arXiv 2510.11977）。产业含义（本文推断）：computer-use agent 的选型不应看 leaderboard 峰值 accuracy，而应报"cost–accuracy Pareto + scaffold 匹配 + per-task 延迟"三联指标。
 
-**（4）商业价值与 ROI。** 需坦诚区分：目前最响亮的企业 agent ROI 案例多为对话式/客服 agent 而非 computer-use agent，直接可比的 computer-use production ROI 数据仍稀缺（见 uncovered）。作为邻近证据：McKinsey State of AI 2025 显示 AI 采用率约 78%，但仅 23% 在至少一个职能中 scaling AI agents，仅 6% 属"AI 高绩效者"（EBIT 影响 ≥5%），39% 报告企业级 EBIT 影响——价值高度依赖工作流重构而非简单替换人力（[McKinsey, 2026-07 检索](https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-state-of-ai)）。Klarna 常被引为标杆：其 OpenAI 驱动的客服助手上线首月处理 2/3 客服对话，官方称相当于 700 名全职坐席、预计 2024 年增利 \$40M、平均对话时长从 11 分钟降到 2 分钟（[Klarna 官方新闻, 2026-07 检索](https://www.klarna.com/international/press/klarna-ai-assistant-handles-two-thirds-of-customer-service-chats-in-its-first-month/)；均为厂商自述、未经独立审计）——但 2025-05 CEO Siemiatkowski 向 Bloomberg 承认"砍人过深、质量下降"，重新招募人工坐席（二手报道），这一反转本身是"AI-first scoping"教训的重要 datapoint。综合判断：ROI 真实存在但强烈依赖 scoping 与工作流重设计，"按 chatbot 时代 token 假设算出的 ROI 会系统性低估真实成本"（[Cockroach Labs, 2026-07 检索](https://www.cockroachlabs.com/blog/agentic-ai-costs-at-scale/)）。
+**（4）商业价值与 ROI。** 需坦诚区分：目前最响亮的企业 agent ROI 案例多为对话式/客服 agent 而非 computer-use agent，直接可比的 computer-use production ROI 数据仍稀缺。作为邻近证据：McKinsey State of AI 2025 显示 AI 采用率约 78%，但仅 23% 在至少一个职能中 scaling AI agents，仅 6% 属"AI 高绩效者"（EBIT 影响 ≥5%），39% 报告企业级 EBIT 影响——价值高度依赖工作流重构而非简单替换人力（[McKinsey, 2026-07 检索](https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-state-of-ai)）。Klarna 常被引为标杆：其 OpenAI 驱动的客服助手上线首月处理 2/3 客服对话，官方称相当于 700 名全职坐席、预计 2024 年增利 \$40M、平均对话时长从 11 分钟降到 2 分钟（[Klarna 官方新闻, 2026-07 检索](https://www.klarna.com/international/press/klarna-ai-assistant-handles-two-thirds-of-customer-service-chats-in-its-first-month/)；均为厂商自述、未经独立审计）——但 2025-05 CEO Siemiatkowski 向 Bloomberg 承认"砍人过深、质量下降"，重新招募人工坐席（二手报道），这一反转本身是"AI-first scoping"教训的重要 datapoint。综合判断：ROI 真实存在但强烈依赖 scoping 与工作流重设计，"按 chatbot 时代 token 假设算出的 ROI 会系统性低估真实成本"（[Cockroach Labs, 2026-07 检索](https://www.cockroachlabs.com/blog/agentic-ai-costs-at-scale/)）。
 
 ### 9.10 Industry Maturity and Deployment Gaps
 
@@ -1539,7 +1539,7 @@ Verification-centric CUA 应把 verifier 当作与 actor、environment 同级的
 
 ### 10.7 Personalization and Continual Learning
 
-Personalization 正从一次性读取用户资料，走向长期维护偏好、历史、权限与工作流。[[Papers/2606-MyPCBench]] 将 logged-in personal context 与跨应用历史变成评测状态；[[Papers/2600-ContinualGuiAgents]] 开始研究 GUI domain 与 resolution 顺序变化下的持续适应；[[Papers/2600-UiMemSelfEvolving]] 则探索随在线训练更新的 workflow、subtask 与 failure-pattern memory。后两项在当前笔记中主要提供 problem formulation 与系统形态，尚无可用于跨论文比较的 source-verified 数字。
+Personalization 正从一次性读取用户资料，走向长期维护偏好、历史、权限与工作流。[[Papers/2606-MyPCBench]] 将 logged-in personal context 与跨应用历史变成评测状态；[[Papers/2600-ContinualGuiAgents]] 开始研究 GUI domain 与 resolution 顺序变化下的持续适应；[[Papers/2600-UiMemSelfEvolving]] 则探索随在线训练更新的 workflow、subtask 与 failure-pattern memory。后两项在本综述的证据范围内主要提供 problem formulation 与系统形态，尚无可用于跨论文比较的 source-verified 数字。
 
 **[Observed Tension] Continual adaptation 与 governed persistent state。** 学习得越积极，stale preference、错误经验和越权信息就越可能进入未来决策；遗忘得越保守，又越难适应 UI 更新与用户习惯变化。[[Papers/2606-AlwaysOnAgents]] 提出的 authority、scope、mutability、provenance、recoverability 与 actionability，为这一张力提供了治理轴，但其与真实个性化 CUA 行动后果的闭环尚未建立。
 
@@ -1551,7 +1551,7 @@ Personalized CUA 不应只测当前任务准确率。评测还需要覆盖旧能
 
 Safety 已从 instruction screening 推进到 action-consequence prediction 与 architecture-level isolation；human oversight 也从持续盯屏，拆分为 interruption timing、plan edit、evidence presentation 与 context resumption。两条路线共享同一前提：风险必须在动作执行前预测、执行后核验，并在证据不足时允许 abstain、确认或升级给人类。
 
-下表区分两条从原 Agenda C 迁移而来的 roadmap。它们相互依赖，但不能用"有人类在环"替代系统安全，也不能用 trust boundary 替代可用的干预界面。
+下表区分 architecture-level safety 与 attention-aware oversight 两条 roadmap。它们相互依赖，但不能用"有人类在环"替代系统安全，也不能用 trust boundary 替代可用的干预界面。
 
 | Roadmap item | 证据标签 | 已有进展 | 尚未闭合的边界 |
 |:--|:--|:--|:--|
@@ -1566,13 +1566,13 @@ Architecture-level safety 需要把 instruction screening、least privilege、ty
 
 效率研究已从减少 action steps，推进到压缩多轮视觉历史、KV cache 与训练 context。现有证据主要来自 GPU 上的 7B 级模型或训练管线，能够证明资源瓶颈与压缩收益，却不能直接证明真实 mobile/edge device 上的可部署性。
 
-下表只并列各论文自身的 source-verified 设置，不据此做跨论文排名。
+下表并列各论文在其自身设置下 source-verified 的结果；由于各行评测设置互不可比，这些数字不支持跨论文排名。
 
 | 路线 | Source-verified signal | 解释边界 |
 |:--|:--|:--|
 | KV cache 的 spatio-temporal reweighting | [[Papers/2606-StarKV]]：UI-TARS-1.5-7B 在 40% 预算下四 benchmark 平均精度 49.94，full cache 为 49.75；ScreenSpot-Pro 的峰值显存由 37.36 GB 降至 22.97 GB（20% 预算） | 只测两个 7B 开源模型；FLOPs 不等于 wall-clock latency，且 attention redundancy 不等于 evidence freshness |
 | Coordinate-aware history compression | [[Papers/2601-CompressToFocus]]：1AO→3AO 时 token 增幅约 4%，其 semi-online RL 对照为 41%；3AO 设置报告 3.5–3.8× training speedup | 长程与短程收益不均；ROI crop 可能继续保留已经过期的界面状态 |
-| Uniform-budget KV compression | [[Papers/2603-STLiteKV]]：在特定长历史样本上达到 2.45× decoding acceleration，但 end-to-end 最高仅 1.40× | 该笔记为 partial verification；论文的"平均 7.3%"宣称与表格矛盾，不能采用 |
+| Uniform-budget KV compression | [[Papers/2603-STLiteKV]]：在特定长历史样本上达到 2.45× decoding acceleration，但 end-to-end 最高仅 1.40× | 该工作的 claim 仅部分经过核验；论文的"平均 7.3%"宣称与表格矛盾，不能采用 |
 
 **[Observed Tension] Resource compression 与 evidential integrity。** 压缩可降低显存、token 与延迟，但 saliency、坐标或相似度启发式并不知道被保留的 observation 是否仍然反映当前 GUI state。效率优化因此需要与 provenance/freshness audit 联合设计，否则它可能更高效地保留错误证据。
 
@@ -1608,15 +1608,15 @@ CUA evaluation 已从静态终局 success，推进到 versioned environment、pa
 
 ### 11.1 From GUI Grounding to Reliable Workflows
 
-GUI Agent 的优化单元正从局部 grounding 精度收束为可问责的状态转移，这一收束由五阶段演进的最后一跳共同倒逼而成。ScreenSpot-Pro 头部已达 80.3（[[Papers/2602-Mobile-Agent-v3.5- Multi-platform Fundamental GUI Agents]]），AndroidWorld、ScreenSpot-V2 均已饱和，但局部定位可靠并不会自动传递到长程正确：[[Papers/2607-GUIStateBelief]] 的 735 个跨 Web/Mobile/Desktop 的 paired probes 显示，即使 image-only 读取接近饱和，模型仍会在证据冲突下跟随 stale structure（真实网页结构跟随率最高 0.88），且首步冲突后 self-recovery 不超过 0.03；[[Papers/2511-GuiAima]] 的 grounding 增益（ScreenSpot-Pro 61.5）依赖 training-free 两步 zoom（去掉降到 53.8）与 backbone 自身质量（迁到 InternVL3.5-4B 仅 +1.8pp）；[[Papers/2509-ScaleCUA]] 用 6 平台、17.1M grounding 数据换来很强的局部能力，OSWorld 端到端却只有 17.7%。三者共同的教训是：一个动作必须能追溯到 pixels、structure、memory 或 prior 中的具体 belief source，并在执行后留下可核验的 state change，否则更多 hybrid observation 通道只会为模型跟随过期证据提供更强的理由。架构比较的合法单位因此不再是 grounding accuracy 或 end-to-end success 单独一项，而是在固定 backbone、预算与环境下分别测 belief formation、state ownership、action semantics 与 recovery——把增益分别记到该记的层，而不是笼统归给主模型。
+GUI Agent 的优化单元正从局部 grounding 精度转向可问责的状态转移，这一转变由五阶段演进最后一个阶段的多条证据共同推动。ScreenSpot-Pro 头部已达 80.3（[[Papers/2602-Mobile-Agent-v3.5- Multi-platform Fundamental GUI Agents]]），AndroidWorld、ScreenSpot-V2 均已饱和，但局部定位可靠并不会自动传递到长程正确：[[Papers/2607-GUIStateBelief]] 的 735 个跨 Web/Mobile/Desktop 的 paired probes 显示，即使 image-only 读取接近饱和，模型仍会在证据冲突下跟随 stale structure（真实网页结构跟随率最高 0.88），且首步冲突后 self-recovery 不超过 0.03；[[Papers/2511-GuiAima]] 的 grounding 增益（ScreenSpot-Pro 61.5）依赖 training-free 两步 zoom（去掉降到 53.8）与 backbone 自身质量（迁到 InternVL3.5-4B 仅 +1.8pp）；[[Papers/2509-ScaleCUA]] 用 6 平台、17.1M grounding 数据换来很强的局部能力，OSWorld 端到端却只有 17.7%。三者共同的教训是：一个动作必须能追溯到 pixels、structure、memory 或 prior 中的具体 belief source，并在执行后留下可核验的 state change，否则更多 hybrid observation 通道只会为模型跟随过期证据提供更强的理由。架构比较的合法单位因此不再是 grounding accuracy 或 end-to-end success 单独一项，而是在固定 backbone、预算与环境下分别测 belief formation、state ownership、action semantics 与 recovery——从而将增益归因于对应层，而非笼统归因于主模型。
 
 ### 11.2 From Agent Frameworks to Native Agent Models
 
-模型侧的主流路线正从"通用 LLM + 脚手架"式 agent framework，转向把 grounding、planning 与 action 内化进单一 policy 的 native end-to-end 模型，但这一转向并非框架路线被淘汰，而是训练闭环归属发生了转移。[[Papers/2509-UITARS2]] 用 CT/SFT/RL 数据飞轮（每轮 RL 用 rejection sampling 生成新轨迹，高质量轨迹推向下一轮 SFT、低质量退回 CT）加多轮 RL，把单一 GUI 模型练成同时驾驭 GUI、终端、文件系统的统一 agent，OSWorld 47.5、AndroidWorld 73.3、Online-Mind2Web 88.2；[[Papers/2602-Mobile-Agent-v3.5- Multi-platform Fundamental GUI Agents]] 在 ScreenSpot-Pro 上进一步把头部推到 80.3。这条路线把此前分散在 orchestration 代码里的 grounding–plan–act 决策收进模型参数与 RL reward，换来更简单的数据闭环与更自然的跨平台迁移。但反向证据同样成立：[[Papers/2504-AgentS2]] 的 Manager/Worker + Mixture of Grounding 说明专用小模块仍可以胜过让同一大模型兼任所有角色；[[Papers/2509-ScaleCUA]] 的大规模 grounding 数据未能自动兑现为端到端能力（OSWorld 仅 17.7%），说明"更强的 grounder"不是完整 agent 架构的充分条件。native 与 compositional 之争的现状因此不是一方取代另一方，而是失败可诊断性与数据闭环简洁性之间的取舍：native 模型把闭环做进参数，代价是 grounding/planning/memory 错误难以隔离定位；compositional 系统保留组件可替换性与失败诊断，代价是 latency 与 cascading error。
+模型侧的主流路线正从"通用 LLM + 脚手架"式 agent framework，转向把 grounding、planning 与 action 内化进单一 policy 的 native end-to-end 模型，但这一转向并非框架路线被淘汰，而是训练闭环归属发生了转移。[[Papers/2509-UITARS2]] 用 CT/SFT/RL 数据飞轮（每轮 RL 用 rejection sampling 生成新轨迹，高质量轨迹推向下一轮 SFT、低质量退回 CT）加多轮 RL，把单一 GUI 模型训练成能同时操作 GUI、终端、文件系统的统一 agent，OSWorld 47.5、AndroidWorld 73.3、Online-Mind2Web 88.2；[[Papers/2602-Mobile-Agent-v3.5- Multi-platform Fundamental GUI Agents]] 在 ScreenSpot-Pro 上进一步把头部推到 80.3。这条路线把此前分散在 orchestration 代码里的 grounding–plan–act 决策收进模型参数与 RL reward，换来更简单的数据闭环与更自然的跨平台迁移。但反向证据同样成立：[[Papers/2504-AgentS2]] 的 Manager/Worker + Mixture of Grounding 说明专用小模块仍可以胜过让同一大模型兼任所有角色；[[Papers/2509-ScaleCUA]] 的大规模 grounding 数据未能自动兑现为端到端能力（OSWorld 仅 17.7%），说明"更强的 grounder"不是完整 agent 架构的充分条件。native 与 compositional 之争的现状因此不是一方取代另一方，而是失败可诊断性与数据闭环简洁性之间的取舍：native 模型把闭环做进参数，代价是 grounding/planning/memory 错误难以隔离定位；compositional 系统保留组件可替换性与失败诊断，代价是 latency 与 cascading error。
 
 ### 11.3 Convergence of Models and Systems
 
-模型与系统的边界正被两条独立证据同时侵蚀：runtime 把动作对象从"预测哪个 token"升级为"是否暴露可执行且可核验的接口"，workflow/skill 记忆则把部分决策从模型参数移到系统侧的 gate 机制。[[Papers/2607-Tactile]] 把 accessibility semantics、OCR text 与 visual fallback 编译成带 source label、geometry、affordance 和 verification cue 的语义动作对象，使同一模型在 macOSWorld-style 任务上把 Codex Success@100 从 41.1% 提到 50.0%（AX-adapted 场景 +10.04pp）；但 Limited-AX 场景只提升 5.55 个百分点，说明上限由 runtime 暴露的结构质量而非模型能力单独决定——同一个"模型"配不同 runtime contract 会得到实质不同的可靠性。[[Papers/2606-SkillNb]] 的 selective formalization 走另一条路：按执行证据把 workflow 步骤动态固化成代码或保留为自然语言，运行时 gate 校验不过就地回退，WebArena-Verified 上三次重跑保住 91.7% 初始成功任务（比次优高 15.5 分）、有限修复回收 72.9% 失败且把修复后回归压到 4.2%（持续型 baseline 15–17%），消融显示这一可靠性收益几乎全来自 gate 本身（去 gate 回归从 3.3% 爆到 18.6%），而非"把 skill 写成代码"这一表示形式。可靠性因此来自系统侧的校验机制，而非模型参数或代码化程度本身。架构比较表中"Hybrid native + tools"一行（主模型保留 end-to-end policy、按需调用 API/CLI/search/verifier）也不再是性能与效率的简单折中，而是把原本模型内部的决策显式转移给路由与权限系统，新的瓶颈也随之从"模型输出对不对"转移到"路由策略和权限边界设计得对不对"。
+两条独立证据共同表明，模型与系统的边界正在模糊：runtime 把动作对象从"预测哪个 token"升级为"是否暴露可执行且可核验的接口"，workflow/skill 记忆则把部分决策从模型参数移到系统侧的 gate 机制。[[Papers/2607-Tactile]] 把 accessibility semantics、OCR text 与 visual fallback 编译成带 source label、geometry、affordance 和 verification cue 的语义动作对象，使同一模型在 macOSWorld-style 任务上把 Codex Success@100 从 41.1% 提到 50.0%（AX-adapted 场景 +10.04pp）；但 Limited-AX 场景只提升 5.55 个百分点，说明上限由 runtime 暴露的结构质量而非模型能力单独决定——同一个"模型"配不同 runtime contract 会得到实质不同的可靠性。[[Papers/2606-SkillNb]] 的 selective formalization 走另一条路：按执行证据把 workflow 步骤动态固化成代码或保留为自然语言，运行时 gate 校验不过就地回退，WebArena-Verified 上三次重跑保住 91.7% 初始成功任务（比次优高 15.5 分）、有限修复回收 72.9% 失败且把修复后回归压到 4.2%（持续型 baseline 15–17%），消融显示这一可靠性收益几乎全来自 gate 本身（去 gate 回归从 3.3% 升至 18.6%），而非"把 skill 写成代码"这一表示形式。可靠性因此来自系统侧的校验机制，而非模型参数或代码化程度本身。架构比较表中"Hybrid native + tools"一行（主模型保留 end-to-end policy、按需调用 API/CLI/search/verifier）也不再是性能与效率的简单折中，而是把原本模型内部的决策显式转移给路由与权限系统，新的瓶颈也随之从"模型输出对不对"转移到"路由策略和权限边界设计得对不对"。
 
 ### 11.4 Verifiable Data Flywheels
 
@@ -1628,11 +1628,11 @@ GUI Agent 的优化单元正从局部 grounding 精度收束为可问责的状�
 
 ### 11.6 From Task Success to Deployment Utility
 
-部署可靠性正在从错误检测扩展为 architecture-level isolation 与 attention-aware oversight，同时任务成功率本身也不再能代表部署价值。在安全侧，[[Papers/2607-UCM]] 在 privileged planner 看到页面前遮蔽 untrusted DOM region、只允许 quarantined model 通过 typed query 返回数据，把强化版 WASP 的 ASR 压到 0%、benign utility 保持不变，但保证只覆盖 control-flow injection——trust label 错误、typed value corruption、selection hijacking 与必须读取 free-form untrusted text 的任务仍在边界外，prompt-level 提醒不能替代这层 trust boundary。在监督侧，[[Papers/2607-Sidekick]] 把交互拆成 background ambient cue、resume-time multimodal summary 与 foreground reasoning visualization，30 人实验中 spreadsheet errors 从 2.51/2.32 降到 1.31；但它没有显著降低 task switch 或 monitoring time，也没有显著改变 trust/confidence——"展示更多信息"不会自动等于更好的监督，human-in-the-loop 也不能等同于持续盯屏。这与 [[Papers/9706-AutomationMisuse]] 早年区分的 omission/commission 两类监控失败、以及告警的 base-rate（cry wolf）问题一致：系统应联合优化何时停止、何时求助、展示什么证据，并把 alarm fatigue 与 automation bias 作为正式指标，而非事后轶事。即使可靠性与安全都达标，任务成功率仍不等价于部署效用：[[Papers/2407-AgentsThatMatter]] 与 [[Papers/2510-HAL]] 指出 accuracy 可被"多试几次"这类无科学意义的手段刷高，HAL 一次 21,730 rollout 的复现中 9 个 benchmark 只有 1 个（CORE-Bench Hard）的最贵模型落在美元 Pareto 前沿，提高 reasoning effort 在 36 个 model×agent×benchmark 组合中 21 个只得到持平或更低 accuracy，同一 benchmark 换 scaffold 可差 9 倍成本。部署效用因此应联合报告 task success、cost-accuracy Pareto 位置、干预时延与不可逆副作用风险，而不是裸报一个 success rate。
+部署可靠性正在从错误检测扩展为 architecture-level isolation 与 attention-aware oversight，同时任务成功率本身也不再能代表部署价值。在安全侧，[[Papers/2607-UCM]] 在 privileged planner 看到页面前遮蔽 untrusted DOM region、只允许 quarantined model 通过 typed query 返回数据，把强化版 WASP 的 ASR 压到 0%、benign utility 保持不变，但保证只覆盖 control-flow injection——trust label 错误、typed value corruption、selection hijacking 与必须读取 free-form untrusted text 的任务仍在边界外，prompt-level 提醒不能替代这层 trust boundary。在监督侧，[[Papers/2607-Sidekick]] 把交互拆成 background ambient cue、resume-time multimodal summary 与 foreground reasoning visualization，30 人实验中 spreadsheet errors 从 2.51/2.32 降到 1.31；但它没有显著降低 task switch 或 monitoring time，也没有显著改变 trust/confidence——"展示更多信息"不会自动等于更好的监督，human-in-the-loop 也不能等同于持续盯屏。这与 [[Papers/9706-AutomationMisuse]] 早年区分的 omission/commission 两类监控失败、以及告警的 base-rate（cry wolf）问题一致：系统应联合优化何时停止、何时求助、展示什么证据，并把 alarm fatigue 与 automation bias 作为正式指标，而非事后轶事。即使可靠性与安全都达标，任务成功率仍不等价于部署效用：[[Papers/2407-AgentsThatMatter]] 与 [[Papers/2510-HAL]] 指出 accuracy 可通过增加尝试次数这类缺乏科学意义的操作被人为提高，HAL 一次 21,730 rollout 的复现中 9 个 benchmark 只有 1 个（CORE-Bench Hard）的最贵模型落在美元 Pareto 前沿，提高 reasoning effort 在 36 个 model×agent×benchmark 组合中 21 个只得到持平或更低 accuracy，同一 benchmark 换 scaffold 可差 9 倍成本。部署效用因此应联合报告 task success、cost-accuracy Pareto 位置、干预时延与不可逆副作用风险，而不是裸报一个 success rate。
 
 ## 12. Conclusion
 
-GUI/Computer-Use Agent 研究经历了五次可辨认的抽象升级——结构化接口、screenshot-native、agent-system 化、闭环学习、萌芽中的可问责系统——每一跳都解决了上一阶段的结构性瓶颈，又暴露出新的瓶颈：从依赖网页结构到跨平台观察，从局部 grounding 到长程状态维护，从静态分工到可学习 reward，直至当前把"成功"本身变成可检查对象。这条脉络的净效果是，领域的前沿问题已经从"能不能点对像素"（ScreenSpot-Pro 头部 80.3、AndroidWorld/ScreenSpot-V2 饱和）转移到"能否在长程、跨平台、GUI+API 混合的真实工作流中，维持并证明正确的状态转移，同时把安全边界和人类监督成本控制在可接受范围"。
+GUI/Computer-Use Agent 研究经历了五次可辨认的抽象升级——结构化接口、screenshot-native、agent-system 化、闭环学习、萌芽中的可问责系统——每一次升级都解决了上一阶段的结构性瓶颈，又暴露出新的瓶颈：从依赖网页结构到跨平台观察，从局部 grounding 到长程状态维护，从静态分工到可学习 reward，直至当前把"成功"本身变成可检查对象。这条脉络的净效果是，领域的前沿问题已经从"能不能点对像素"（ScreenSpot-Pro 头部 80.3、AndroidWorld/ScreenSpot-V2 饱和）转移到"能否在长程、跨平台、GUI+API 混合的真实工作流中，维持并证明正确的状态转移，同时把安全边界和人类监督成本控制在可接受范围"。
 
 贯穿模型、学习、数据、环境、评测与部署各章的一条反复出现的模式是：某一层面上看似的进步——grounding 分数、RL reward 曲线、benchmark 成功率、safety detector 命中率——经独立核查后常被发现部分来自抽样方差、verifier 偏差、环境版本或额外调用预算，而非论文宣称的机制。[[Papers/2607-GUIStateBelief]]、[[Papers/2607-TeachStop]]、[[Papers/2607-SCALECUA]] 的人工审计与 [[Papers/2510-HAL]] 的 cost-Pareto 复现，在不同层面独立验证了这一模式。
 
@@ -1661,7 +1661,7 @@ GUI/Computer-Use Agent 研究经历了五次可辨认的抽象升级——结构
 
 ### 2026-07-23 CUA-Survey 重构（从 GUIAgent-Survey 迁移到 12 节完整目录）
 
-- **触发**：Supervisor 给出一份 12 节完整 CUA survey 目录（约 100 子节），要求把现有 [[Topics/GUIAgent-Survey]] 内容按新目录重排、缺失部分用文献检索/paper-digest 补全，并派发 subagent + codex agent 完成，且「最好的总结不要丢弃」。
+- **触发**：Supervisor 给出一份 12 节完整 CUA survey 目录（约 100 子节），要求把现有 GUIAgent-Survey 内容按新目录重排、缺失部分用文献检索/paper-digest 补全，并派发 subagent + codex agent 完成，且「最好的总结不要丢弃」。
 - **迁移**：现有 GUIAgent-Survey（9 节、111 篇、~6k 词、accountable-state 脊柱）的全部高价值内容（五阶段演进、benchmark 大表、verifier 谱系、环境六轴、Open Problems 三 Agenda 与各「最小决定性实验」）整体迁入新 12 节结构，无删除。
 - **多 agent 编排**（成本分流：vault/推理走 Codex 以省 Claude 额度，实时 web 走 Claude）：
   - 章节起草 10 个 Codex 子代理（§1-8/10/11-12），各迁移对应旧章 + 挖 589 篇 GUI 相关 vault 笔记补细分子节；
@@ -1671,7 +1671,7 @@ GUI/Computer-Use Agent 研究经历了五次可辨认的抽象升级——结构
 - **gap 性质澄清**：起草阶段浮现的 39 条「gap」经核，约 2/3 是 Open Problem（无对应文献，已归入 §10 roadmap），仅少数是真·缺论文；因此按证据纪律补录 14 篇真实新论文（非凑满 30），均 `verification_status: unverified`（单 agent digest 无独立 verifier），只作子节 enrichment，未升格为共识/Takeaway。
 - **计数**：papers_analyzed 111 → 180（唯一 Papers wikilink 口径）；新增 14 篇均已分配 cite_key + 缓存权威 BibTeX（7 篇触发 [[assign-cite-keys-empty-string-noop]] 空串 no-op，已修复）。
 - **引用完整性**：全文 180 个唯一 Papers/ wikilink 全部指向真实存在的笔记，0 hallucination（构建期一次全量 link audit + 修订后复审）。
-- **收尾**：[[Topics/GUIAgent-Survey]] 转 `status: merged` redirect 指向本文；DomainMap 追加一条格局变化。
+- **收尾**：GUIAgent-Survey 转 `status: merged` redirect 指向本文；DomainMap 追加一条格局变化。
 - **过程事故**：首轮两个 fleet 因 Claude 月度 spend limit 全数 error（0 产出）；canary 探测确认额度恢复后重跑，并按 Supervisor 指示把可离线的重活迁到 Codex runtime。
 - **建议加入 DomainMaps**：GUI-Agent DomainMap 可记「survey 已升级为 12 节完整 CUA 参考（CUA-Survey），accountable-state 论断保留为作者押注」。
 

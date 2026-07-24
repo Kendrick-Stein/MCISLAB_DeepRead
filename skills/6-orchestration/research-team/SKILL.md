@@ -165,7 +165,7 @@ Coordinator 逐个处理 artifact：
 3. Digest preparers 按配置 bounded parallel，返回 15 个 artifact；coordinator 串行 commit
 4. Source verifier / Judge 降级 unsupported claims，gap reviewer 只补验证后缺口
 5. Survey agent 基于已 source-check 的新笔记 + 已有证据生成 GUI Agent Survey
-6. 输出：Topics/GUIAgent-Survey.md
+6. 输出：Topics/CUA-Survey.md
 
 ---
 

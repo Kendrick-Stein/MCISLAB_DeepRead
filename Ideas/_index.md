@@ -23,10 +23,10 @@ title: Ideas
 
 | 想法 | 状态 | 来源 | 核心假设 |
 |------|------|------|----------|
-| [[Ideas/ForkPoint-CreditAssignment-GUI]] | raw | GUIAgent-Survey | Fork-point detection for long-horizon credit assignment |
-| [[Ideas/ScaleInvariant-Grounding-GUI]] | raw | GUIAgent-Survey | FPN-like scale handling for GUI grounding |
-| [[Ideas/AdversarialVerification-SelfImproving-GUI]] | raw | GUIAgent-Survey | Adversarial verifier for self-improving bias correction |
-| [[Ideas/AgentFacing-WebRuntime]] | validated | AgentEnvironment-Survey | Non-oracle runtime affordances for zero-training web agents |
+| [[Ideas/ForkPoint-CreditAssignment-GUI]] | raw | CUA-Survey | Fork-point detection for long-horizon credit assignment |
+| [[Ideas/ScaleInvariant-Grounding-GUI]] | raw | CUA-Survey | FPN-like scale handling for GUI grounding |
+| [[Ideas/AdversarialVerification-SelfImproving-GUI]] | raw | CUA-Survey | Adversarial verifier for self-improving bias correction |
+| [[Ideas/AgentFacing-WebRuntime]] | validated | CUA-Survey | Non-oracle runtime affordances for zero-training web agents |
 | [[Ideas/HybridVerifier-GUIRuntime]] | raw | GUI Environment / WeaveBench | Agent-facing cross-channel verifier to reduce reward hacking |
 | [[Ideas/EvidenceDependence-GUIGrounding]] | raw | VisualFLIP / GUI grounding | Action Collapse Rate for counterfactual GUI evidence dependence |
 | [[Ideas/PersonalizedSafety-CUA]] | raw | MyPCBench / BraveGuard | Task-scoped permission + trajectory privacy guard for personal CUA |

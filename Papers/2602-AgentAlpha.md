@@ -77,5 +77,5 @@ mindmap
 ## Notes
 
 - 与 [[2510-ScalingAgents]]（Agent S3/bBoN）是 test-time scaling 两条路线的直接对话：任务级 wide scaling vs step 级树搜索；Agent Alpha 用后者在同预算下压过前者，但依赖沙盒确定性——live 场景下 bBoN 仍是唯一选择。
-- 状态恢复靠 reset+replay，与 [[2407-TreeSearchLMAgents]] 同谱系、未见改进——[[Topics/AgentRuntimePrimitives-Survey]] 的"恢复保真度决定收益上限"论断在 2026 年仍成立。
+- 状态恢复靠 reset+replay，与 [[2407-TreeSearchLMAgents]] 同谱系、未见改进——[[Topics/CUA-Survey]] §10.5 指出的全栈 fork 与 non-idempotent recovery 缺口在 2026 年仍未补上。
 - 对比式评估（相对分替代绝对分）与 [[2607-EvoCUA15]] 的 PRM reward hacking 发现互补：两者都指向"LLM 绝对打分不可靠"，但解法不同（结构化比较 vs 锚定环境状态）。

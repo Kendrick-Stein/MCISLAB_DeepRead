@@ -43,7 +43,7 @@ date_added: "2026-07-08"
 
 **局限**：(1) 作者自认**单浏览器 session、不并行分支探索**——并行被明确列为 future work，恰说明 agent 侧做并行分支的工程门槛；(2) URL+局部重放仍无法恢复后端状态（与 [[Papers/2504-WebRollback]] 同一天花板）；(3) 无 live 站点验证，WebArena 确定性沙盒里 replay 假设才成立。
 
-对本方向的意义：agent 侧 branching 的效率优化已经卷到 memory/离线推理层面，但状态恢复和并行两个根子问题仍受"无引擎支持"约束——补强 [[Topics/AgentEnvironment-Survey]] 轴 4 的"agent 侧模拟天花板"论据。
+对本方向的意义：agent 侧 branching 的效率优化已经卷到 memory/离线推理层面，但状态恢复和并行两个根子问题仍受"无引擎支持"约束——补强 [[Topics/CUA-Survey]] 轴 4 的"agent 侧模拟天花板"论据。
 
 ## Mind Map
 ```mermaid

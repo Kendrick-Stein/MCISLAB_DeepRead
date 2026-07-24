@@ -99,6 +99,6 @@ mindmap
 ```
 
 ## Notes
-- 与今天 GUI agent survey 的连接点：Sikuli 是"pixel/vision grounding without accessibility tree"这条支线的源头。可作为 GUIAgent-Survey 中 grounding 章节的历史起点，对照后续 SeeClick / UGround / OmniParser 等学习式 grounding，突出"从手写 CV 模板匹配 → 端到端学习 → VLM 语义 grounding"的演进主线。
+- 与今天 GUI agent survey 的连接点：Sikuli 是"pixel/vision grounding without accessibility tree"这条支线的源头。可作为 CUA-Survey 中 grounding 章节的历史起点，对照后续 SeeClick / UGround / OmniParser 等学习式 grounding，突出"从手写 CV 模板匹配 → 端到端学习 → VLM 语义 grounding"的演进主线。
 - 原文一处术语疑似笔误：template matching 写作 "normalized cross-validation"，按 OpenCV 实现与上下文应为 **normalized cross-correlation**。
-- 待办（主线程统一处理）：cite_key 由 assign_cite_keys.py 分配、BibTeX 由 fetch_bibtex.py 缓存；本篇属 GUIAgent-Survey，需在下一轮 survey-refresh 整合（GUI survey integration pending）。
+- 待办（主线程统一处理）：cite_key 由 assign_cite_keys.py 分配、BibTeX 由 fetch_bibtex.py 缓存；本篇属 CUA-Survey，需在下一轮 survey-refresh 整合（GUI survey integration pending）。

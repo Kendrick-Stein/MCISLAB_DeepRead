@@ -71,5 +71,5 @@ mindmap
 ## Notes
 
 - 对"multi-agent = 并行原语"的流行叙事是一盆冷水：**并行的价值取决于任务可分解性与验证瓶颈**，GUI/web 的顺序依赖使其属于最难受益的域——与 [[2510-ScalingAgents]]（任务级并行 + 选优在 OSWorld 大赢）表面矛盾，实则区分了两种并行：bBoN 是同任务多副本（无需分解），MAS 是子任务分工（需要分解）。前者绕过了本文识别的失败模式。
-- Independent 17.2× 错误放大为 [[Topics/AgentRuntimePrimitives-Survey]] 的并行瓶颈论断（"瓶颈不在生成而在评估"）补充了另一半：无验证的并行不仅选不出好轨迹，还主动放大错误。
+- Independent 17.2× 错误放大说明无验证的并行不仅选不出好轨迹，还主动放大错误；[[Topics/CUA-Survey]] §6.5 将其定位为 multi-agent 架构边界证据。
 - 45% 基线阈值可用于判断当前 GUI agent 是否到了 multi-agent 有益的区间：OSWorld SOTA 已过 60%，按此规则单 agent + test-time 搜索比加 orchestrator 更划算——与 [[2602-AgentAlpha]] 的路线选择一致。

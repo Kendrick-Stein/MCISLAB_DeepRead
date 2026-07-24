@@ -94,6 +94,6 @@ mindmap
 ```
 
 ## Notes
-- 与本 vault 的连接：可对照 `2504-OnlineMind2Web`（MM2W/在线评测口径）、`2411-WebRL`（web agent RL 训练）、`2512-WebOperator`（planning 分解）。DOM/observation 压缩这一主线也与 GUI/computer-use 的 a11y tree 处理相关，值得在 GUIAgent-Survey 里作为“observation 压缩”分支的一个数据点。
+- 与本 vault 的连接：可对照 `2504-OnlineMind2Web`（MM2W/在线评测口径）、`2411-WebRL`（web agent RL 训练）、`2512-WebOperator`（planning 分解）。DOM/observation 压缩这一主线也与 GUI/computer-use 的 a11y tree 处理相关，值得在 CUA-Survey 里作为“observation 压缩”分支的一个数据点。
 - 待验证疑点：(1) 25∼50× 的分母口径（原始 DOM vs prefilter 后）；(2) baseline 是否统一 observation setting；(3) 0.5B/3B 同为 88.28% 是否触及某种 metric ceiling。若后续引用其数字，建议直接核对 Table 2/Table 3 原文。
-- 路由提示：本笔记 tags 含 `gui-agent`，按 skill 协议 direct commit 时应触发 GUIAgent-Survey 记账（本次 prepare-only 未写入）。
+- 路由提示：本笔记 tags 含 `gui-agent`，按 skill 协议 direct commit 时应触发 CUA-Survey 记账（本次 prepare-only 未写入）。

@@ -12,7 +12,7 @@ date_updated: "2026-04-28"
 
 ## Motivation
 
-**知识空白**：GUIAgent-Survey 明确指出 self-improving agent 的系统性偏差风险是关键开放问题——"若 RM 或 experience template 存在错误抽象，自增强过程可能放大偏差而非纠错"。当前 self-improving 方法（UI-TARS, UI-Genie, UI-Voyager, UI-Mem）都依赖 verifier/RM 来筛选高质量轨迹，但这些 verifier 本身是静态训练的，无法适应 agent 能力的演化——agent 学会了 verifier 的偏好后，可能 exploit verifier 的盲区。
+**知识空白**：CUA-Survey 明确指出 self-improving agent 的系统性偏差风险是关键开放问题——"若 RM 或 experience template 存在错误抽象，自增强过程可能放大偏差而非纠错"。当前 self-improving 方法（UI-TARS, UI-Genie, UI-Voyager, UI-Mem）都依赖 verifier/RM 来筛选高质量轨迹，但这些 verifier 本身是静态训练的，无法适应 agent 能力的演化——agent 学会了 verifier 的偏好后，可能 exploit verifier 的盲区。
 
 **为什么重要**：Self-improving 是 GUI Agent 领域最重要的范式转变——从依赖人工标注到自主数据生成。但如果自增强不可靠（放大偏差、overfit 训练分布），整个范式的可信度会崩塌。Adversarial verification 提供了一种"可纠错"（而非仅"可增强"）的自进化机制。
 

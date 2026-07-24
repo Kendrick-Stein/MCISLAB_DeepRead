@@ -108,6 +108,6 @@ mindmap
 
 ## Notes
 - **与 2605.29397 的关系**：本文（method/findings 向，主张“能力 × 思考预算决定观察表示”）与并行消化的 arXiv:2605.29397《Revisiting Observation Reduction for Web Agents: Comprehensive Evaluation with a Lightweight Framework》（评测框架向）标题相近但为不同论文，注意 cross-link 时勿混淆。
-- **对 GUI/Web survey 的信号**：为 GUIAgent-Survey 提供一个反主流数据点——observation reduction 不是免费午餐，对强模型可能有害。可与 `2605-A11yCompressor.md`（规则式 a11y 压缩，主打 token 效率）形成对照：A11yCompressor 假设“压缩普遍有益”，本文则给出“取决于模型能力”的边界条件。
+- **对 GUI/Web survey 的信号**：为 CUA-Survey 提供一个反主流数据点——observation reduction 不是免费午餐，对强模型可能有害。可与 `2605-A11yCompressor.md`（规则式 a11y 压缩，主打 token 效率）形成对照：A11yCompressor 假设“压缩普遍有益”，本文则给出“取决于模型能力”的边界条件。
 - **待跟进疑问**：作者的“能力”轴是定性分组；是否存在一个可预测“某模型该用 a11y 还是 HTML”的量化 proxy（如 long-context retrieval 得分或 grounding 准确率）？这是把该经验结论工程化的关键缺口。
 - **机构**：arXiv abs 页未标注 affiliation，故 `institute` 留空，未据作者推断填写。

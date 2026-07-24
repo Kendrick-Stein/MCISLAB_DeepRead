@@ -66,6 +66,6 @@ mindmap
 ```
 
 ## Notes
-这篇是“模拟器替代真实 rollout”的关键锚点，和 [[Papers/2511-DreamGym]] / [[Papers/2411-WebDreamer]] 同属 world-model training infra。它对 [[Topics/AgentEnvironment-Survey]] 的补充是：environment engine 不一定只是真实 browser 的工程化封装，也可以是可控的 learned/synthetic transition system。
+这篇是“模拟器替代真实 rollout”的关键锚点，和 [[Papers/2511-DreamGym]] / [[Papers/2411-WebDreamer]] 同属 world-model training infra。它对 [[Topics/CUA-Survey]] 的补充是：environment engine 不一定只是真实 browser 的工程化封装，也可以是可控的 learned/synthetic transition system。
 
 对 AFE 的直接问题：如果把 UI-Simulator 暴露给 agent 使用，agent 应该知道这是 simulated state 还是 real state 吗？训练 infra 可以容忍 simulator bias，但 agent-facing runtime 如果把模拟状态当真，可能放大 hallucinated affordance。

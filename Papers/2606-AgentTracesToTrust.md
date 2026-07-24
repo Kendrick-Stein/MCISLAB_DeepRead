@@ -103,6 +103,6 @@ mindmap
 
 ## Notes
 - **与本 vault 的连接**：可与 [[2605-AgentTrust]]（agent 可信）、[[2606-AgentMemorySystem]] 与 [[2606-ProceduralMemoryAFTER]]（memory 系统/lineage）、[[2500-TowardsTrustworthyGuiAgents]]（GUI 侧可信）交叉参照。本文提供的是 general LLM-agent 层的 provenance 词汇表，GUI 侧论文可视其为上位框架。
-- **Scope note**：这是一篇**通用 LLM-agent survey**（arXiv cs.CR），不专门针对 GUI，但与 GUI agent 的可信状态问题邻接；因此按 tags.md 未打 `gui-agent`/`computer-use` umbrella，避免误路由到 GUIAgent-Survey。
+- **Scope note**：这是一篇**通用 LLM-agent survey**（arXiv cs.CR），不专门针对 GUI，但与 GUI agent 的可信状态问题邻接；因此按 tags.md 未打 `gui-agent`/`computer-use` umbrella，避免误路由到 CUA-Survey。
 - **Thesis relation**（vs "action 必须可追溯到某个 belief source——pixels / structure / memory / prior——并留下可验证的 state change；hybrid observation 会放大 stale evidence"）：本 survey 正是这一论点在通用 agent 层的系统化支撑。它用 Support/Derive 关系形式化"action 追溯到 belief source"，用 Generate/Update 关系形式化"留下可验证的 state change"，并用 memory 的 validity status + Invalidate/Supersede 关系直接刻画"stale evidence 被放大"的问题及其 selective invalidation 补救。它是 "accountable state transition" 的**概念锚点**，但停留在框架层，未提供 hybrid observation 放大 stale evidence 的具体机制或量化证据。
 - **待追问**：typed provenance graph 的记录 overhead 在真实 agent runtime 下是否可承受？claim-level provenance 的自动构建（而非人工标注）是否可行？这些是把该框架从愿景推向系统的关键。

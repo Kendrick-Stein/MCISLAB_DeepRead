@@ -64,6 +64,6 @@ mindmap
 ```
 
 ## Notes
-这篇应该和 [[Papers/2510-UISimulator]]、[[Papers/2411-WebDreamer]]、[[Papers/2511-DreamGym]] 放在同一条 world-model synthesis 线里看。它对 [[Topics/AgentRuntimePrimitives-Survey]] 的补充是：rollback 不只是一种 runtime recovery tool，也可以是离线训练数据形态。
+这篇应该和 [[Papers/2510-UISimulator]]、[[Papers/2411-WebDreamer]]、[[Papers/2511-DreamGym]] 放在同一条 world-model synthesis 线里看。它对 [[Topics/CUA-Survey]] 的补充是：rollback 不只是一种 runtime recovery tool，也可以是离线训练数据形态。
 
 对 AFE 的启发：如果真实 browser runtime 能低成本提供 fork/rollback，那么 WebSynthesis 里的“虚拟 rollback 轨迹”就可以被真实状态分支替换或校准，这可能比继续堆 world-model fidelity 更有差异化。

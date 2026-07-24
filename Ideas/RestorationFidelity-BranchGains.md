@@ -16,7 +16,7 @@ veto_reason: "Supervisor 2026-07-20：这是 infra/测量问题而非算法问�
 
 可证伪预测：
 
-- **测试侧**：同一环境、同一搜索算法，只换恢复层（URL / replay / snapshot 三档），成功率单调排序且顶底差 ≥8pp。若三档无显著差异，则 [[Topics/AgentRuntimePrimitives-Survey]] Takeaway 1 的"保真度决定收益上限"推断被推翻——agent 对恢复误差鲁棒、引擎级快照的必要性存疑，同样是可发表结论（双向都有产出）。
+- **测试侧**：同一环境、同一搜索算法，只换恢复层（URL / replay / snapshot 三档），成功率单调排序且顶底差 ≥8pp。若三档无显著差异，则本 idea 基于 [[Topics/CUA-Survey]] §10.5 恢复缺口提出的"保真度决定收益上限"推断被推翻——agent 对恢复误差鲁棒、引擎级快照的必要性存疑，同样是可发表结论（双向都有产出）。
 - **预测力**：fidelity metric 能预测单次回溯是否导致后续失败（AUC ≥0.75）。
 - **可修复性**：divergence-aware search（恢复后 state-diff 自检，高误差节点重验证或局部修复）在 replay 档回收 replay 与 snapshot 档差距的 ≥50%。
 - **训练侧**：用 fidelity metric 过滤 replay 噪声样本后，同量数据下游 SFT 提升 ≥2pp；若无提升，说明模型对前缀-状态失配鲁棒，同样值得报告。

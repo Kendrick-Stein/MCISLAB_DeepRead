@@ -87,5 +87,5 @@ mindmap
 ## Notes
 - **thesis 关联**：与"行动必须可追溯到某个 belief source（pixels/structure/memory/prior）并留下可验证的状态变更；hybrid observation 会放大 stale evidence"的论点高度共振。本 survey 在 memory 轴上把它形式化为 `provenance preservation` 不变量 + `rollback traceability`；RECLAIM 结果正是"丢掉 source → 证据被放大成 confidently-wrong → 劣于空记忆"的直接实证，mem0 pilot 则是"抽取式记忆丢 governance envelope"的实测版本。可作为"stale evidence amplification"论点的强外部支撑与术语来源。
 - **可复用术语/构件**：6 诊断轴、5 不变量、AOEP 的 obligation-pass/negative-invariant-pass 拆分、source-first write policy、controlled-compounding criterion——都是干净可迁移到 GUI agent memory / long-horizon computer-use 的分析工具。
-- **scope 提醒**：这是 general LLM-agent 记忆/状态/治理 survey，非 GUI 专题（web/computer-use 只作为 §10 应用域之一出现）；勿路由到 GUIAgent-Survey。可与 `Papers/2606-AgentMemorySystem.md`、`Papers/2606-ProceduralMemoryAFTER.md`、`Papers/2606-ViLoMem.md`、`Papers/2606-MemGUI.md` 交叉链接。
+- **scope 提醒**：这是 general LLM-agent 记忆/状态/治理 survey，非 GUI 专题（web/computer-use 只作为 §10 应用域之一出现）；勿路由到 CUA-Survey。可与 `Papers/2606-AgentMemorySystem.md`、`Papers/2606-ProceduralMemoryAFTER.md`、`Papers/2606-ViLoMem.md`、`Papers/2606-MemGUI.md` 交叉链接。
 - **待追**：RECLAIM (Kwon 2026)、MEME (Jung et al. 2026)、GEM/Governed Evolving Memory (Orogat & Mansour 2026)、Asawa et al. 2026 均为高价值单篇，值得后续 digest 以验证转述细节。

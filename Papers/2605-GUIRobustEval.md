@@ -84,4 +84,4 @@ mindmap
 
 - **error depth 作为难度旋钮**是可复用的评测原语——可迁移到 mobile（结合 Xiaomi-GUI-0 的异常态）、web。与 [[Papers/2604-VeriGUI]] 的 recovery success、[[Papers/2600-BeapAgentBacktrackableExecution]] 的 backtracking 一起构成"错误恢复"技术路线的三个数据点：造失败数据(RoTS) / 内建验证(VeriGUI) / 搜索式回溯(BEAP)。
 - **"意识到错了"比"恢复"更早失败**：Error Awareness 58.8% 意味着 ~40% 情况 agent 根本没察觉偏离——这与 [[Papers/2503-OS-Kairos]] 的 over-execution（不评估自身 action confidence）、[[Papers/2606-AgenticAbstention]] 的"太晚 abstain"同源。错误觉察 = abstention/verification 的共同前置能力。
-- 关联：[[Topics/GUIAgent-Survey]]、[[Papers/2606-OSWorld2]]（长程 desktop）、[[Papers/2605-WorkspaceBench]]。
+- 关联：[[Topics/CUA-Survey]]、[[Papers/2606-OSWorld2]]（长程 desktop）、[[Papers/2605-WorkspaceBench]]。

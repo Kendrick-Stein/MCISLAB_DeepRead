@@ -91,4 +91,4 @@ mindmap
 ## Notes
 - 与本人 thesis（"action 必须可追溯到一个 belief source——pixels/structure/memory/prior——并留下可验证的状态改变；hybrid observation 会放大过期证据"）的关系：CCPO 某种意义上**部分操作化了 pixel belief source 的裁剪**——它精确保留每个历史 action 锚定的坐标像素区域、丢弃其余，从而 prune 掉大量 stale 视觉历史；但它锚定的是"action 发生在哪"而非"保留的 crop 是否仍等于当前状态"，因此只是**缓解**而非消除 thesis 警示的 hybrid/stale-evidence 放大问题。这提示一个 idea 缺口：在坐标锚定压缩之上再加一层"保留区域的状态改变校验"。
 - 验证记录：独立 verifier 复核 8 条高风险 claim，7 条 source-verified，C3（GUI-Odyssey）初稿把 baseline 误写成 UI-S1-3B 且数字有误，已按原文表格纠正为 UI-S1-7B / 90.6·88.5·80.9。
-- GUI canonical survey integration pending：本篇属 GUI 论文，下一轮应优先 survey-refresh GUIAgent-Survey。
+- GUI canonical survey integration pending：本篇属 GUI 论文，下一轮应优先 survey-refresh CUA-Survey。

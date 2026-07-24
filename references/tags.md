@@ -15,7 +15,7 @@
 - 方法 tag 不能替代 umbrella tag。GUI RL 用 `[gui-agent, agentic-RL, ...]`；GUI/Web 环境与 runtime 用 `[gui-agent, web-agent, ...]`；GUI reliability/safety 仍须包含 `gui-agent`。
 - `web-agent` 只表示会观察并改变网页/浏览器状态的交互式 agent。只做开放网络检索、证据综合与回答生成的系统用 `deep-research`，不要仅因调用浏览器就标成 GUI/Web operation。
 - 同时包含信息检索与真实 GUI state transition 的 hybrid 论文必须带 `gui-agent` 或 `computer-use`；自动路由以 GUI canonical 为 primary home，Deep Research 专题只在综合判断确有必要时 cross-link。
-- GUI 论文的 canonical survey 是 `Topics/GUIAgent-Survey.md`；交叉 tag 用于检索与 cross-link，不再为算法、环境、runtime、可靠性分别维护重复 survey。
+- GUI 论文的 canonical survey 是 `Topics/CUA-Survey.md`；交叉 tag 用于检索与 cross-link，不再为算法、环境、runtime、可靠性分别维护重复 survey。
 
 ## 设计原则
 
@@ -105,7 +105,7 @@
 ## 更新记录
 
 - **2026-07-22** — 新增跨领域 tag `hci`：覆盖 mixed-initiative / human-in-the-loop / agent oversight / interruptibility 等 HCI 基础问题（引入于消化 Horvitz 1999 "Principles of Mixed-Initiative User Interfaces"，该文是 GUI agent oversight 根祖）。GUI 相关论文使用时须与 `gui-agent`/`computer-use` umbrella 复合，不得单独替代 umbrella。
-- **2026-07-21** — GUI survey 统一后增加复合归属规则：GUI RL/environment/reliability 必须保留 `gui-agent` 或 `computer-use` umbrella tag；将 `web-agent` 收窄为网页状态交互，新增 `deep-research` 区分纯信息检索。该规则保证 paper-digest 后只把 GUI 论文路由到 canonical `GUIAgent-Survey`。
+- **2026-07-21** — GUI survey 统一后增加复合归属规则：GUI RL/environment/reliability 必须保留 `gui-agent` 或 `computer-use` umbrella tag；将 `web-agent` 收窄为网页状态交互，新增 `deep-research` 区分纯信息检索。该规则保证 paper-digest 后只把 GUI 论文路由到 canonical `CUA-Survey`。
 - **2026-04-13 (audit)** — 全 vault tag 审计：新增 `spatial-reasoning`（Embodied/感知）、`embodied-reasoning`（跨领域）、`LLM`（跨领域，重新引入：2026-03-26 曾因过宽删除，本次按 use-with-discipline 原则重新加入，仅在笔记真正聚焦语言模型基座/推理/post-training 时使用，避免给所有 LLM-based 论文都打）；明确 `daily-papers`/`weekly` 为 meta tag 例外。修正 13 个文件的非规范 tag（含 `agentic-rl` 大小写、`spatial-representation`/`spatial-intelligence` 等 alias、`Atari`/`game-engine` 等过细 tag、`survey`/`skill-design` 等 meta tag）。
 - **2026-04-13** — 按三大研究方向（Multimodal Understanding / AI Agent / Embodied AI）重组 taxonomy，跨领域 tag（`world-model`、`RL`、`task-planning`、`instruction-following`）单列；组内 tag 按对研究兴趣（VLA / Spatial Intelligence / World Model / Agentic RL）的相关性从高到低排序。Multimodal Understanding 新增 `video-LLM`、`video-understanding`；AI Agent 新增 `agentic-RL`、`computer-use`、`gui-agent`，原 `RL` tag 窄化为通用 RL。
 - **2026-03-26** — 删除 `LLM` tag（过于宽泛），从 3 篇论文笔记中移除。新增 `auto-research` tag。全面校准：所有论文 tags 与 taxonomy 一致。

@@ -27,7 +27,7 @@ test-time deliberation（在真实环境中分支验证多个假设后再承诺�
 
 ### Motivation
 
-五条证据链（详见 [[Ideas/SelfInitiatedFork-GUI]] 与 [[Topics/AgentRuntimePrimitives-Survey]] 能力语义节）：
+五条证据链（详见 [[Ideas/SelfInitiatedFork-GUI]] 与 [[Topics/CUA-Survey]] 能力语义节）：
 
 - **收益已证 + 成本痛点**：[[Papers/2602-AgentAlpha]] step 级搜索 OSWorld ~77%、救回 bBoN 失败任务 33.9%，但 3.6× 墙钟——全程搜索为不需要 deliberation 的步骤付费。
 - **价值集中有先例**：ARPO (2507.19849) 分支收益集中在高熵步；WebOperator 消融显示 naive 全程搜索可为负收益。

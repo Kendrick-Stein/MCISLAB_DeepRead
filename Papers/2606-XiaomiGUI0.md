@@ -98,4 +98,4 @@ mindmap
 - **与 primary direction（AFE Runtime）的连接**：这是把"环境真实执行分布"当一等训练目标的工业实证。它的异常态 14 类分布 = observe affordance 要暴露的 state 类型清单；teacher-takeover 的 recovery segment = wrong-turn recovery 的监督形态。但 Xiaomi 走的是"把恢复能力**烘焙进模型权重**"的路线，与 AFE 假设的"把 affordance **暴露给 frozen agent**"路线正交——可作为对照：如果 AFE 的 agent-facing 暴露真能带来因果收益，应能在**不做 flywheel 重训**的前提下达到相近的异常态恢复率。这是一个潜在的 baseline 对照设计点。
 - **reward design 子方向**：cascade reward 的 early-exit 分层与 [[Papers/2606-QVal]]（"simple prompting/ranking 已最优"）的张力值得注意——Xiaomi 用多级 judge，但没有证据表明分层 judge 优于单级 rule+outcome。增量空间可能仍在 signal 使用方式。
 - **待验证疑问**：RealMobile 72% 中，异常态相关子任务（Safety & Reflection 域）的单独成功率是多少？report 未拆分，这恰是判断"真实设备训练是否真的提升异常态处理"的关键数字。
-- 关联 survey：[[Topics/GUIAgent-Survey]]、[[Topics/AgentEnvironment-Survey]]、[[Topics/RealWorldGUIAgent-Reliability-Survey]]。
+- 关联 survey：[[Topics/CUA-Survey]]。

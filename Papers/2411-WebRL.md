@@ -64,5 +64,5 @@ mindmap
 ```
 
 ## Notes
-- 与 vault 的"造失败→学恢复"范式（[[Topics/RealWorldGUIAgent-Reliability-Survey]]）同源但更早：WebRL 是"造失败→当课程"，二者都把失败轨迹当一等训练资源。
+- 与 vault 的"造失败→学恢复"范式（[[Topics/CUA-Survey]]）同源但更早：WebRL 是"造失败→当课程"，二者都把失败轨迹当一等训练资源。
 - 属 Zhipu/THUDM 系（与 [[Papers/2508-ComputerRL]] 同门），可视为 desktop ComputerRL 的 web 前身。

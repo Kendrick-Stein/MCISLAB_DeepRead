@@ -31,7 +31,7 @@ VisualWebArena 在 [[Papers/2307-WebArena]] 基础上扩到**多模态视觉 web
 - 成为 visual web agent 路线的标准评测，后续 [[Papers/2606-WebGym]] 等 pixel-based agent 的重要对照。
 
 ## Strengths & Weaknesses
-**亮点**：(1) 首个大规模、self-hosted、可复现的多模态 web benchmark，把"视觉是否必要"做成任务设计原则；(2) 复用 WebArena 基建，functional correctness 评测可信；(3) 明确了 visual grounding 是 web agent 的独立瓶颈（与 [[Topics/GUIAgent-Survey]] grounding 结论一致）。
+**亮点**：(1) 首个大规模、self-hosted、可复现的多模态 web benchmark，把"视觉是否必要"做成任务设计原则；(2) 复用 WebArena 基建，functional correctness 评测可信；(3) 明确了 visual grounding 是 web agent 的独立瓶颈（与 [[Topics/CUA-Survey]] grounding 结论一致）。
 
 **局限**：(1) 只 3 站点、沙盒环境，真实 live 泛化未测（[[Papers/2504-OnlineMind2Web]] 后来证明沙盒分会崩）；(2) 静态任务集，随模型进步会饱和；(3) 视觉任务占比与难度分布可进一步细化。属 [[Topics/WebAgent-Survey]] 的观察/grounding 与 benchmark 路线。
 

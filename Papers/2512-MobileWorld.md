@@ -105,4 +105,4 @@ mindmap
 - 与 AndroidWorld 的对照数字（27.8 vs 14.3 步、62.2% vs 9.5% 多应用）是这篇最有说服力的"难度锚点"，可直接引用做 mobile benchmark 演进的证据点。
 - "开源替身换后端可验证性"这一 trick 值得记入 DomainMap：它是 online GUI benchmark 在"真实感 vs 可复现"张力上的一个通用解法，可推广到 desktop/web。
 - 待核验（如后续拿到全文）：MCP context overflow 的具体触发阈值、agent-user interaction 的澄清轮次统计、planner-executor 与端到端模型接口是否公平。
-- 归属：mobile GUI agent benchmark，canonical survey 为 GUIAgent-Survey，应记账待整合。
+- 归属：mobile GUI agent benchmark，canonical survey 为 CUA-Survey，应记账待整合。

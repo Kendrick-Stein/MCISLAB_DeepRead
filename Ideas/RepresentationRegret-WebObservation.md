@@ -21,7 +21,7 @@ web agent 每一步都在某个固定的观察表示下决策（全 a11y tree、
 
 ### 问题为什么重要且现在能做
 
-"喂优化版 DOM 而非 raw DOM"这条线已方法饱和（见 [[Topics/GUIAgent-Survey]] §2.1），但一个基本的部署决策仍无证据支撑：**给定一个 agent，运行时到底该用哪种表示？** Read-More 把答案锁在"每模型一条静态规则"上，可它自己的 Table 3 就显示 HTML 的收益**按任务类别分化**（Filter/Sort/Dashboard↑、Form/Knowledge/Catalog↓）——这直接暗示最优表示是 **page-level** 而非 model-level 的属性。若真如此，任何固定表示（包括静态规则）都在系统性丢分，而这个 gap 从未被直接测过。
+"喂优化版 DOM 而非 raw DOM"这条线已方法饱和（见 [[Topics/CUA-Survey]] §4.5），但一个基本的部署决策仍无证据支撑：**给定一个 agent，运行时到底该用哪种表示？** Read-More 把答案锁在"每模型一条静态规则"上，可它自己的 Table 3 就显示 HTML 的收益**按任务类别分化**（Filter/Sort/Dashboard↑、Form/Knowledge/Catalog↓）——这直接暗示最优表示是 **page-level** 而非 model-level 的属性。若真如此，任何固定表示（包括静态规则）都在系统性丢分，而这个 gap 从未被直接测过。
 
 现在能做的两个条件都已就绪：(1) 可复位的 deterministic web 环境（WorkArena sandbox、[[Papers/2504-REAL]]、WebArena self-hosted）让 same-state fork 可行；(2) [[Papers/2605-MFSCoverage]] 提供了无需 web access/LLM 推理的廉价 value proxy，可把"全 fork 测 SR"的成本压下来做大规模 pilot。
 

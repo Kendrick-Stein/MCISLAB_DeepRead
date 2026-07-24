@@ -12,7 +12,7 @@ date_updated: "2026-05-06"
 
 ## Motivation
 
-**知识空白**：GUIAgent-Survey 将 Credit Assignment 列为长程 GUI 任务的第一大核心挑战。UI-Voyager 的 GRSD (Group Relative Self-Distillation) 提出了 fork point 定位的思路，通过成组 rollout 对比找到分叉位置并构造步级监督，但该方法依赖人工设计的对比策略，未系统研究：(1) 如何在单条轨迹内部自动检测关键决策点；(2) 如何在高噪声、部分可观测的真实界面中稳定定位 fork point。
+**知识空白**：CUA-Survey 将 Credit Assignment 列为长程 GUI 任务的第一大核心挑战。UI-Voyager 的 GRSD (Group Relative Self-Distillation) 提出了 fork point 定位的思路，通过成组 rollout 对比找到分叉位置并构造步级监督，但该方法依赖人工设计的对比策略，未系统研究：(1) 如何在单条轨迹内部自动检测关键决策点；(2) 如何在高噪声、部分可观测的真实界面中稳定定位 fork point。
 
 **为什么重要**：长程 Credit Assignment 是 RL 的经典难题，但在 GUI Agent 场景下有独特结构可利用——GUI 动作空间结构化（action type + coordinate + element），状态变化可通过 screenshot differencing 检测。成功解决将使 RL-based GUI Agent 训练从"依赖稀疏终点奖励"升级为"自动获得稠密步级监督"，这是 GUI Agent 规模化训练的关键使能技术。
 

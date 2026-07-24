@@ -4,7 +4,7 @@ description: >
   当 Workbench/survey-updates.json 中某 survey 积压了新消化的论文（autoresearch 检测到 ≥5 篇
   或最老条目超 7 天），或 Supervisor 说"刷新一下 XX survey"时，
   把新论文笔记增量合并进对应 Topics/*-Survey.md，并同步刷新其 DomainMap。
-argument-hint: "<survey-name，如 GUIAgent-Survey>"
+argument-hint: "<survey-name，如 CUA-Survey>"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 
@@ -43,7 +43,7 @@ Key Takeaways / Open Questions。
 - `unverified` / 缺少字段的 legacy note：可作为论文存在性与主题归类证据，但不得凭它新增关键数字、共识、Key Takeaway 或 Validated Gap。
 - `abstract-only`：不得支撑机制、失败条件、benchmark 横向比较或强 novelty claim。
 
-处理 `GUIAgent-Survey` 时，额外建立一行分类记录再决定落点：
+处理 `CUA-Survey` 时，额外建立一行分类记录再决定落点：
 
 | 字段 | 允许值 / 判断 |
 |:--|:--|
@@ -72,7 +72,7 @@ Key Takeaways / Open Questions。
 4. 更新 frontmatter：`date_updated` 设为今天，`papers_analyzed` 增加新并入篇数。
 5. 若本轮改变 Overview、benchmark 横向判断、Key Takeaways 或 Open Problems，同步更新 `## Key Evidence Matrix` 的 state、claim IDs/locators 与 contradiction boundary；普通增量无需新增矩阵行。
 
-`GUIAgent-Survey` 的额外更新规则：
+`CUA-Survey` 的额外更新规则：
 
 - 按 canonical 六层结构落位，不新建按单篇论文或临时热词命名的平行 taxonomy。
 - Benchmark 数字必须对应 Evidence Ledger 中 `source-verified` 的 claim row，并同时写清 environment setting、verifier、step budget（笔记有记录时）与是否同 backbone 对照。
@@ -132,6 +132,6 @@ python3 scripts/survey_updates.py clear --survey {survey-name} --papers "Papers/
 
 ## Examples
 
-`survey-refresh GUIAgent-Survey` → pending 6 篇 → 并入 5 篇（2 篇进"Grounding"小节、
+`survey-refresh CUA-Survey` → pending 6 篇 → 并入 5 篇（2 篇进"Grounding"小节、
 3 篇进"RL 训练"）+ 1 篇误报跳过（VLM 安全论文与 GUI 无关）→ 刷新 DomainMaps/GUI-Agent.md
 近期格局变化 → 清账 6 篇 → 日志。

@@ -89,5 +89,5 @@ mindmap
 
 ## Notes
 - 定位：这是一篇 **inference-efficiency** 论文——压缩的是存进 KV cache 的历史观察上下文，不改变 action 追溯到什么 belief source，与"action 必须追溯到 belief source（pixels/structure/memory/prior）并留下可验证 state change；hybrid observation 会放大 stale evidence"的 thesis 基本正交。唯一切点是 TEM 轴显式 down-weight 来自持久 UI 结构的 stale visual cache entry，但它按 **attention 稳定性（≈跨帧冗余）** 打折，而非按 evidence 是否仍反映当前真实 GUI 状态——因此不能当作 belief-source tracing 或 stale-evidence 检测；反例：若某 token 对应的 UI 已变但仍被高注意力 attended，STaR-KV 不会因此淘汰它。
-- Connections：baseline GUIKV 已有笔记 [[2500-GuiKvEfficientGui]]（two-axis：residual-stream saliency + pairwise frame redundancy），本文正是对其"共享 saliency + 固定 cutoff"两假设的直接反驳与升级；可作为 GUIAgent-Survey 中"GUI agent 部署/推理效率"支线的一条数据点。
+- Connections：baseline GUIKV 已有笔记 [[2500-GuiKvEfficientGui]]（two-axis：residual-stream saliency + pairwise frame redundancy），本文正是对其"共享 saliency + 固定 cutoff"两假设的直接反驳与升级；可作为 CUA-Survey 中"GUI agent 部署/推理效率"支线的一条数据点。
 - 待验证疑问：40% 预算反超 full cache 是普适现象还是 benchmark 特例？若成立，是否说明 GUI 历史 visual token 存在系统性冗余，可用更激进的 prefill-阶段裁剪而非只在 decode 侧压 cache？

@@ -83,4 +83,4 @@ mindmap
 
 - **对 AFE Runtime 方向的启示**：TVAE 的 "expected effect → 下一步验证" 是把 verify affordance **内建进 agent 权重**的路线；AFE 假设的是把 verify affordance **暴露给 frozen agent**。VeriGUI 恰好提供了"内建版"的收益上界参照——如果 AFE 的 agent-facing verify 能在不重训的前提下达到相近 recovery rate，则证明 affordance 暴露的因果价值。
 - **failure idempotency 的边界**是全文最脆弱处：它对 GUI（点错通常无变化）成立，但对 web 表单提交、支付、导航等 non-idempotent 场景失效——这正是 [[Papers/2605-SaaSBench]]/[[Papers/2606-OSWorld2]] 长程失败的高发区。一个 idea 缺口：non-idempotent 失败的检测需要 external state observation（AFE observe affordance），单靠屏幕对照不够。
-- 关联：[[Papers/2606-OSOracle]]（step critic 外部版）、[[Papers/2600-BeapAgentBacktrackableExecution]]（backtracking 恢复）、[[Topics/GUIAgent-Survey]]。
+- 关联：[[Papers/2606-OSOracle]]（step critic 外部版）、[[Papers/2600-BeapAgentBacktrackableExecution]]（backtracking 恢复）、[[Topics/CUA-Survey]]。

@@ -102,7 +102,7 @@ mindmap
 ```
 
 ## Notes
-- 与本 vault 的对照关系：`Workbench/cua-survey-build/gaps.json` 明确把本文（2604.27955）列为缺口——CUA survey 原稿引用了这份 2026 RL-focused GUI survey 但 Papers/ 无对应笔记，无法比较其 RL taxonomy / 文献截止 / verifier·environment 覆盖；本笔记即为补齐。`Topics/GUIAgent-Survey.md` 的外部检索记录亦提及本文。
+- 与本 vault 的对照关系：`Workbench/cua-survey-build/gaps.json` 明确把本文（2604.27955）列为缺口——CUA survey 原稿引用了这份 2026 RL-focused GUI survey 但 Papers/ 无对应笔记，无法比较其 RL taxonomy / 文献截止 / verifier·environment 覆盖；本笔记即为补齐。`Topics/CUA-Survey.md` 的外部检索记录亦提及本文。
 - 竞争综述：arXiv:2504.20464（2025-04，RL-enhanced GUI agents survey）、以及 vault 已有的 `Papers/2411-GUIAgentSurvey.md`、`Papers/2508-OSAgentsSurvey.md`、`Papers/2503-SurveyLlmBasedGui.md`。定位本文时应说明它是 RL-first 视角，与上述 general GUI/OS agent survey 互补。
 - institute 字段（Shandong University / HKUST / SJTU / Tencent）来自 web search 摘要，未在 arxiv abstract 页直接确认，置信度中等。
 - 待办（若后续 verify）：回 arxiv html 原文 table 核对 C2–C5 的具体数字与所属 table/figure 编号，并确认 world-model gains（C6）是否在正文某处有量化。

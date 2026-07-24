@@ -27,7 +27,7 @@ web agent 的落地大头是**企业办公自动化**（ITSM、HR、CRM 等 SaaS
 ## Key Results
 - 当前 agent 在 WorkArena 上**有 promise 但离全任务自动化差距明显**——企业任务的长程性、精确性要求高。
 - **开源 vs 闭源差距显著**：闭源模型（GPT-4 系）明显优于开源，说明企业级复杂交互对 backbone 能力要求高。
-- WorkArena++ 的组合长程任务进一步拉低成功率，呼应 vault 的"真实长程/组合工作流远未饱和" validated insight（[[Topics/RealWorldGUIAgent-Reliability-Survey]]）。
+- WorkArena++ 的组合长程任务进一步拉低成功率，呼应 vault 的"真实长程/组合工作流远未饱和" validated insight（[[Topics/CUA-Survey]]）。
 
 ## Strengths & Weaknesses
 **亮点**：(1) 首个基于真实企业平台（ServiceNow）的 web agent benchmark，补上"企业办公"这一最大落地场景；(2) 随附 BrowserGym 成为领域基础设施（gym 生态源头之一）；(3) WorkArena++ 的长程组合任务对可靠性研究有价值。

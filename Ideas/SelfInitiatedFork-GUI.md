@@ -13,12 +13,12 @@ veto_reason: "Supervisor 2026-07-20：新颖性不达标——Learning to Explor
 可证伪预测：
 
 - **预算-收益**：selective fork（agent 决定调用点）相比 always-search（Agent Alpha 式全程 step 级 MCTS），以 ≤1/3 的墙钟/token 预算保留 ≥70% 的成功率增益；相比 never-fork baseline 在长程任务上 success +≥8pp。
-- **调用质量**：agent 学到的 fork 调用点与外部信号（token 熵 / critique 分数）定位点的重合度 <80%——若接近 100%，说明学习调用无独立价值、外部熵触发即可，本假设不成立（这同时回答 [[Topics/AgentRuntimePrimitives-Survey]] Open Problem 3 的"agent 自主 vs 算法控制"边界问题，否证也有产出）。
+- **调用质量**：agent 学到的 fork 调用点与外部信号（token 熵 / critique 分数）定位点的重合度 <80%——若接近 100%，说明学习调用无独立价值、外部熵触发即可，本假设不成立（这同时回答 [[Topics/CUA-Survey]] Open Problem 3 的"agent 自主 vs 算法控制"边界问题，否证也有产出）。
 - **组件归因**：fork 收益应集中在环境反馈可区分分支优劣的步骤（如提交表单前、多入口导航点）；若收益均匀分布，则说明来自变相多采样而非 deliberation，应退回 wide scaling 解释。
 
 ## Motivation
 
-三原语的 action 化谱系（[[Topics/AgentRuntimePrimitives-Survey]] 能力语义节）中，branch 是唯一空白：
+三原语的 action 化谱系（[[Topics/CUA-Survey]] 能力语义节）中，branch 是唯一空白：
 
 - **Recovery**：prompted（[[Papers/2504-WebRollback]]、[[Papers/2604-Crab]]）→ learned（Learning to Explore, 2605.08978：SFT 教 rollback 动作 + variational 探索奖励，text+GUI）——已闭环。
 - **Parallelism**：spawn 已被 MARL 训练成动作（[[Papers/2602-WideSeekR1]] 的 `call_subagent`），但仅无状态检索域。

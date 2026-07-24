@@ -327,7 +327,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - **status**: success
 
 ### 2026-07-22 增量更新（survey-refresh）
-- 并入 2 篇（均 GUI 域跨域 VLM 能力证据，primary home 为 GUIAgent-Survey）：[[2607-GUIStateBelief]]（§2.8，跨模态证据冲突=readout gap 的 modality-trust 变体）、[[2607-EvoGUI]]（§2.8 + benchmark 表，VLM 状态转移/时序理解缺口）
+- 并入 2 篇（均 GUI 域跨域 VLM 能力证据，primary home 为 CUA-Survey）：[[2607-GUIStateBelief]]（§2.8，跨模态证据冲突=readout gap 的 modality-trust 变体）、[[2607-EvoGUI]]（§2.8 + benchmark 表，VLM 状态转移/时序理解缺口）
 - 跳过：无
 - 结构变化：仅增量并入——§2.8 代表论文 +2、关键发现 +2 bullet；benchmark 表 +2 行；未改 Key Takeaways / Open Problems（两篇强化既有 readout 主题，未推翻结论）
 - domain_map: skipped（无格局级变化，仅强化 §2.8 "decodable ≠ used" 主题）

@@ -52,7 +52,7 @@ date_added: "2026-07-08"
 
 **局限**：(1) 隔离测试台、无外部依赖——自认真实部署更糟；(2) 只测延迟不测存储/架构改造成本；(3) 无解决方案，checkpoint-lite 原型仍不可用；(4) **视角纯 trainer/infra 侧**：讨论的是运行时给搜索算法供 fork，未讨论把 fork 作为 affordance 暴露给 agent policy 本身的接口与因果收益——与 [[Papers/2510-WebServ]] 同样停在引擎层。
 
-对本方向的意义：系统社区已在 2025-10 正面认领这个问题——AFE 的竞争与合作对象。其"外部副作用"挑战与 [[Papers/2512-WebOperator]] 动作可逆性、[[Topics/AgentEnvironment-Survey]] Open Problem 2（fork 恢复不了外部世界）三方汇合。
+对本方向的意义：系统社区已在 2025-10 正面认领这个问题——AFE 的竞争与合作对象。其"外部副作用"挑战与 [[Papers/2512-WebOperator]] 动作可逆性、[[Topics/CUA-Survey]] Open Problem 2（fork 恢复不了外部世界）三方汇合。
 
 ## Mind Map
 ```mermaid

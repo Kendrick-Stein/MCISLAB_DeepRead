@@ -12,7 +12,7 @@ date_updated: "2026-04-28"
 
 ## Motivation
 
-**知识空白**：GUIAgent-Survey 指出 Grounding 是 GUI Agent 的"基础瓶颈"，而跨域/跨分辨率稳定性是 grounding 的核心未解决问题。Continual GUI Agents 提出了 Anchoring Point Reward (APR-iF) 在分布漂移中保持 grounding，但该方法在 RL 训练层面工作，未从模型架构层面解决分辨率不变性问题。GoClick 展示了小模型（230M）可达大模型精度，但其 encoder-decoder 架构未显式建模多尺度特征。
+**知识空白**：CUA-Survey 指出 Grounding 是 GUI Agent 的"基础瓶颈"，而跨域/跨分辨率稳定性是 grounding 的核心未解决问题。Continual GUI Agents 提出了 Anchoring Point Reward (APR-iF) 在分布漂移中保持 grounding，但该方法在 RL 训练层面工作，未从模型架构层面解决分辨率不变性问题。GoClick 展示了小模型（230M）可达大模型精度，但其 encoder-decoder 架构未显式建模多尺度特征。
 
 **为什么重要**：真实部署中，同一 app 在不同设备（手机/平板/桌面）、不同分辨率、不同 DPI 下呈现截然不同的像素布局。若 grounding 模型对分辨率敏感，则每换一个设备就需要重新适配——这与"跨平台统一 agent"的趋势矛盾。架构级的 scale invariance 是 grounding 泛化的基础。
 

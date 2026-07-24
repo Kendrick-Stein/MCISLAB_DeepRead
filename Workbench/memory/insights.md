@@ -126,7 +126,7 @@
 - **evidence**: [[Workbench/logs/2026-07-06]] (VeriGUI 合成失败恢复轨迹; RoTS 80 万恢复样本; Xiaomi-GUI-0 error-driven flywheel; LearningFromFailure runtime patch; WebRL 失败→curriculum; Reliability-Survey 判定"造失败→学恢复"为跨路线共同范式), [[Workbench/logs/2026-07-08]] (SRC: rollback 造纠正数据，下游 SFT +9.7~12.9pp)
 - **confidence**: medium
 - **source**: cross-validation
-- **impact**: RL-based GUI Agent Training（reward/数据设计的低竞争切入点）、Agent-Facing Environment Runtime（环境应暴露 failure evidence 作为 affordance，使 harness 能把错误转成可执行恢复策略）、[[Topics/GUIAgent-Survey]] Takeaway 15、[[Topics/RealWorldGUIAgent-Reliability-Survey]]
+- **impact**: RL-based GUI Agent Training（reward/数据设计的低竞争切入点）、Agent-Facing Environment Runtime（环境应暴露 failure evidence 作为 affordance，使 harness 能把错误转成可执行恢复策略）、[[Topics/CUA-Survey]] Takeaway 15、[[Topics/CUA-Survey]]
 - **status**: provisional
 
 ### [2026-07-15] Judge/reward model 可靠性是 agent 评测与 RL 的公共上游瓶颈

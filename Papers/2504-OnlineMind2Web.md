@@ -33,7 +33,7 @@ web agent 领域近一年宣称的"大幅进步"很可能是评测假象。作�
 ## Strengths & Weaknesses
 **亮点**：(1) 领域急需的"打假 + 立新标"工作，Online-Mind2Web + WebJudge 已成为真实 web agent 评测的事实参考（COLM 2025）；(2) 把"评测方法学"提升为一等研究对象，与 [[Papers/2400-WebcanvasBenchmarkingWebAgents]]（keynode 在线评测）、[[Papers/2600-HowSmartIsYour]] 等构成"评测可信度"证据链；(3) 难度分层 + 反 shortcut 的任务筛选协议可复用。
 
-**局限**：(1) 规模仍有限（300 任务），且真实站点会漂移，长期维护成本高（这正是 [[Papers/2600-WebHarbor]] 用 Docker mirror 想规避的张力）；(2) WebJudge 85% 一致性意味着 ~15% 误判仍会污染排行；(3) 只测 end-to-end success，不诊断失败归因（互补于 [[Topics/RealWorldGUIAgent-Reliability-Survey]] 的 verify/recover 视角）。这篇是 [[Topics/WebAgent-Survey]] 中"评测 realism"主线的核心锚点。
+**局限**：(1) 规模仍有限（300 任务），且真实站点会漂移，长期维护成本高（这正是 [[Papers/2600-WebHarbor]] 用 Docker mirror 想规避的张力）；(2) WebJudge 85% 一致性意味着 ~15% 误判仍会污染排行；(3) 只测 end-to-end success，不诊断失败归因（互补于 [[Topics/CUA-Survey]] 的 verify/recover 视角）。这篇是 [[Topics/WebAgent-Survey]] 中"评测 realism"主线的核心锚点。
 
 ## Mind Map
 ```mermaid

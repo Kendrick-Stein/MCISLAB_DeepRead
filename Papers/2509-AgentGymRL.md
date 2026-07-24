@@ -69,6 +69,6 @@ mindmap
 
 ## Notes
 
-- **对 AFE / 环境引擎的证据价值**：与 [[Papers/2511-DreamGym]] 的"4 并发证词"同源但走了相反路线——DreamGym 放弃真实环境，AgentGym-RL 花工程把 WebArena 改造成勉强 RL-ready。改造清单（并行化、full-reset、内存治理）正是 [[Topics/AgentEnvironment-Survey]] 轴 1/轴 3 的需求实例；其"状态不一致累积毁训练"的观察给 reset 需求补了训练侧动机（评测侧动机来自任务间污染）。
+- **对 AFE / 环境引擎的证据价值**：与 [[Papers/2511-DreamGym]] 的"4 并发证词"同源但走了相反路线——DreamGym 放弃真实环境，AgentGym-RL 花工程把 WebArena 改造成勉强 RL-ready。改造清单（并行化、full-reset、内存治理）正是 [[Topics/CUA-Survey]] 轴 1/轴 3 的需求实例；其"状态不一致累积毁训练"的观察给 reset 需求补了训练侧动机（评测侧动机来自任务间污染）。
 - "horizon 课程防崩溃"与 [[Papers/2606-AsyncWebRL]] 的"归一化项鼓励长失败轨迹"可互为印证：长 horizon RL 的不稳定既有算法项也有环境项。
 - 环境侧仍缺的：fork/分支支持 GRPO group rollout（他们用重复 reset 凑）、中间态注入、可编程 init——都是 MiniSuite 可对照的点。

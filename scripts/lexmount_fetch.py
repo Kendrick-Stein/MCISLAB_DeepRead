@@ -45,19 +45,28 @@ def require_api_key() -> str:
 
 
 def base_url() -> str:
-    return os.environ.get("LEXMOUNT_WEBFETCH_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
+    # 优先 LEXMOUNT_WEBFETCH_BASE_URL；其次 LEXMOUNT_BASE_URL（api.lexmount.cn/.com，
+    # 与 .env 对齐）；都缺才落回旧默认主机。
+    url = os.environ.get("LEXMOUNT_WEBFETCH_BASE_URL", "").strip() or \
+        os.environ.get("LEXMOUNT_BASE_URL", "").strip() or DEFAULT_BASE_URL
+    return url.rstrip("/")
 
 
 def post_json(path: str, payload: dict, timeout_ms: int = 30000) -> dict:
     api_key = require_api_key()
+    headers = {
+        "content-type": "application/json",
+        "X-API-Key": api_key,
+        "User-Agent": "read-paper-machine/lexmount-fetch",
+    }
+    # api.lexmount.* 端点要求 project id 头；旧 webfetch 主机忽略该头。
+    project_id = os.environ.get("LEXMOUNT_PROJECT_ID", "").strip()
+    if project_id:
+        headers["x-project-id"] = project_id
     req = Request(
         f"{base_url()}{path}",
         data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "content-type": "application/json",
-            "X-API-Key": api_key,
-            "User-Agent": "read-paper-machine/lexmount-fetch",
-        },
+        headers=headers,
         method="POST",
     )
 

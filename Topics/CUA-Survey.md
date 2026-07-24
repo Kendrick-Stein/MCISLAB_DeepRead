@@ -1,9 +1,9 @@
 ---
 title: "Computer-Use Agents: A Unified Survey of Models, Learning, Environments, Evaluation, and Deployment"
 tags: [survey, gui-agent, computer-use, web-agent, mobile-agent, os-agent, agentic-RL]
-date_updated: "2026-07-23"
+date_updated: "2026-07-24"
 year_range: 1997-2026
-papers_analyzed: 180
+papers_analyzed: 181
 keywords: [gui-agent, gui grounding, computer-use, computer use agent, cua, web agent, browser agent, mobile agent, desktop agent, os agent]
 exclude_tags: [deep-research]
 exclude_keywords: [deep research, information seeking, browsecomp, research agent, search agent]
@@ -566,7 +566,7 @@ Safety 方向的代表是 [[Papers/2606-PrivacyAlign]]：其数据集包含 1,35
 | Reverse task synthesis（模型驱动） | [[Papers/2412-OSGenesis]] | 成本低于 live 人工采集，多样性高于 task-driven 合成 | 与 human 数据 SR retention >80%，但该 gap 是否在更大 scale 依然成立未被验证；pipeline 核心引擎仍是 GPT-4o，尚不能纯开源复现 |
 | 混合闭环（human + rule + model） | [[Papers/2509-ScaleCUA]]、[[Papers/2607-HyMobileAgent]] | 用人工补采 goal-directed 轨迹弥补自动化探索的目标缺失 | ScaleCUA 明确报告"完全依赖 VLM agent 探索多样性不足"是促使其转向混合方案的直接原因 |
 
-三种范式的分工并非静态：GroundCUA 的"质量>规模"结论目前只在 desktop grounding 单一任务上成立，尚不清楚是否推广到 trajectory 层；OS-Genesis 的 synthetic-human gap 收窄证据来自 1K 量级的特定 backbone 实验。跨方法在同一 benchmark 上直接对比数据效率曲线的研究目前不存在，这是本节最大的空白。
+三种范式的分工并非静态：GroundCUA 的"质量>规模"结论目前只在 desktop grounding 单一任务上成立，尚不清楚是否推广到 trajectory 层；OS-Genesis 的 synthetic-human gap 收窄证据来自 1K 量级的特定 backbone 实验。跨方法在同一 benchmark 上直接对比数据效率曲线的研究目前不存在，这是本节最大的空白。在 trajectory 与标注之外，人类既有多模态资源（tutorial video、代码仓库、文章）构成第四类供给：Resource2Skill 将其蒸馏为可执行 skill 资产而非训练语料，其中 video 是单一最有价值来源（去除后平均下降 9.5 个百分点）；该路线目前只在 programmatic 接口的软件创作任务上验证（详见 §7.11）[[Papers/2606-Resource2Skill]]。
 
 ### 5.10 Data Processing and Mixture
 
@@ -925,6 +925,8 @@ Data flywheel 将 rollout、验证、筛选、更新与新任务生成闭合为�
 EvoCUA 将 task、initial state 与 executable validator 共生成，再用异步 sandbox rollout 产生新经验；EvoCUA-1.5 进一步说明 task value 与 PRM reliability 都随 policy 改变。[[Papers/2601-EvoCUA]] [[Papers/2607-EvoCUA15]] 因而不能把"生成更多数据"等同于"形成正向 flywheel"，每轮更新都需要独立、可追溯且难以被当前 policy 操纵的 gate。
 
 SKILL.nb 是非参数路线的具体实例：workflow step 只有通过 environment-observable gate 才被固化，并按 repair burden 自动 demote 或 retire。在 GitLab 版本漂移测试中，frozen-vs-fresh 差距为 −1.7/+0.6 percentage points；去掉 gates 后，hard subset 的回归率由完整系统的 3.3% 上升到 18.6%，说明收益主要来自验收闸门，而不是单纯生成可执行 skill。[[Papers/2606-SkillNb]]
+
+Resource2Skill 把 skill 的来源轴从 agent 自身经验扩展到人类既有多模态资源：tutorial video、代码仓库、文章与参考 artifact 经 vision-capable LM 蒸馏为 4,893 条分层 Skill Wiki 条目，入库前须通过五道 deterministic acceptance gates（schema 完整性、provenance、SHA1 去重、模态一致性、sandbox 可执行性）。在 PPT/Excel/Web/Blender 等七个软件创作 domain、四个 GPT-5.x backbone 的同 backbone 对照中，带 skill 平均 56.8% 对 no-skill 45.0%（GPT-5.4 rubric judge 评分，self-hosted programmatic 执行）；去掉 video 源平均下降 9.5 个百分点而 video 单源即达 66.8%，0→200 条 skill 已获得大部分收益；online 补库仅在缺失能力压力集上有效（41.2%→62.8%），标准集上接近噪声（+0.7 pp）[[Papers/2606-Resource2Skill]]。它与 SKILL.nb 相互独立地指向同一结论：可执行 skill 资产的可靠性主要由验收闸门而非生成量决定。证据边界：七个 domain 全部经 programmatic 接口执行（openpyxl、bpy、ReaScript 等），无 screenshot 观察与 GUI 动作，对 screenshot-based CUA 只能作为邻接可迁移证据；judge 与被测 agent 同属 GPT-5.x 家族（judge-human 一致性 ρ=0.71 为中等水平），且缺少 matched-budget 原始资源 RAG 对照，蒸馏环节相对"直接提供原始资源"的净价值尚未被隔离。
 
 ### 7.12 Continual Learning
 

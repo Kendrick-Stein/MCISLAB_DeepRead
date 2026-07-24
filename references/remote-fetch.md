@@ -13,12 +13,13 @@
 - `extract` 返回 Markdown 摘要（标题、作者、正文、链接），token 开销小，daily-papers / news-digest 场景基本够用。
 - browser-cli 临时 session 用完必须关闭。
 
-## 配置
+## 配置（2026-07-24 起双账号）
 
-- 凭据：`~/.config/lexmount/{browser-cli,webfetch-cli}/credentials.json`（project_id + api_key，权限 0600）。
-- **端点必须是 `https://api.lexmount.com`**（写在 credentials.json 的 `api_base_url` 字段）。CLI 内置默认值是 `api.lexmount.cn`，对本账号返回 Unauthorized——账号注册在 browser.lexmount.com（.com 站），两站凭据不互通。
-- 健康检查：`webfetch-cli auth status`、`browser-cli doctor --json`。
-- 凭据失效时到 https://browser.lexmount.com 控制台重新签发；不要把 API key 粘贴到对话里。
+- **repo Python 脚本**（`scripts/lexmount_fetch.py`、daily-papers `fetch_and_score.py`）：凭据在仓库根 `.env`（已 gitignore）。主账号为 .cn 站：`LEXMOUNT_API_KEY` / `LEXMOUNT_PROJECT_ID` / `LEXMOUNT_BASE_URL=https://api.lexmount.cn`；备用 .com 账号存于 `LEXMOUNT_COM_*` 前缀变量，需要时经环境变量覆盖使用。脚本 base URL 解析链：`LEXMOUNT_WEBFETCH_BASE_URL` → `LEXMOUNT_BASE_URL` → 旧默认主机；并对 api.lexmount.* 端点发送 `x-project-id` 头（必需，缺失返回 400；key 无效返回 401）。
+- **CLI 工具**：凭据 `~/.config/lexmount/{browser-cli,webfetch-cli}/credentials.json`（project_id + api_key + `"api_base_url": "https://api.lexmount.com"`，权限 0600），使用 .com 账号。
+- **key 与站点绑定，两站凭据不互通**：.cn key 只对 `api.lexmount.cn` 有效，.com key 只对 `api.lexmount.com`。旧主机 `webfetch.lexmount.com` 对两个账号均 401，视为废弃。
+- 健康检查：`webfetch-cli auth status`、`browser-cli doctor --json`、`python3 scripts/lexmount_fetch.py extract https://example.com`。
+- 凭据失效时到对应站点控制台（browser.lexmount.com / browser.lexmount.cn）重新签发；不要把 API key 粘贴到对话、日志或可提交文件里。
 
 ## 使用原则
 

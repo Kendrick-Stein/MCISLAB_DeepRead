@@ -110,8 +110,14 @@ def score_paper(paper: dict) -> int:
 # ── 数据抓取 ───────────────────────────────────────────────────────────────
 
 def fetch_url(url: str, timeout: int = 30) -> str:
+    # thecvf.com 对非浏览器 UA 返回 403，与 paper-digest 下载 CVF PDF 同样处理
+    ua = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        if "openaccess.thecvf.com" in url
+        else "daily-papers-bot/1.0"
+    )
     try:
-        req = Request(url, headers={"User-Agent": "daily-papers-bot/1.0"})
+        req = Request(url, headers={"User-Agent": ua})
         with urlopen(req, timeout=timeout) as resp:
             text = resp.read().decode("utf-8")
             if text:
@@ -133,7 +139,11 @@ def fetch_url_via_lexmount(url: str, timeout: int = 30) -> str:
         print("  [INFO] Lexmount fallback skipped: LEXMOUNT_API_KEY not set", file=sys.stderr)
         return ""
 
-    base_url = os.environ.get("LEXMOUNT_WEBFETCH_BASE_URL", "https://webfetch.lexmount.com").rstrip("/")
+    base_url = (
+        os.environ.get("LEXMOUNT_WEBFETCH_BASE_URL", "").strip()
+        or os.environ.get("LEXMOUNT_BASE_URL", "").strip()
+        or "https://webfetch.lexmount.com"
+    ).rstrip("/")
     endpoint = f"{base_url}/v1/dom/dump"
     payload = {
         "url": url,
@@ -151,6 +161,8 @@ def fetch_url_via_lexmount(url: str, timeout: int = 30) -> str:
             headers={
                 "content-type": "application/json",
                 "X-API-Key": api_key,
+                # api.lexmount.* 端点要求 project id 头；旧主机忽略该头
+                **({"x-project-id": pid} if (pid := os.environ.get("LEXMOUNT_PROJECT_ID", "").strip()) else {}),
                 "User-Agent": "daily-papers-bot/1.0",
             },
             method="POST",
@@ -170,7 +182,13 @@ def fetch_url_via_lexmount(url: str, timeout: int = 30) -> str:
         print(f"  [WARN] Lexmount fallback error {url}: {data['error']}", file=sys.stderr)
         return ""
 
-    return _html_to_text(data.get("html", ""))
+    # 返回原始 HTML（调用方解析器需要标签结构）；dom dump 会把非 HTML 响应
+    # （如 arXiv XML）包在 <pre> 里，占主体时解包还原原始报文
+    html_payload = data.get("html", "")
+    pre_match = re.search(r"<pre[^>]*>(.*?)</pre>", html_payload, flags=re.IGNORECASE | re.DOTALL)
+    if pre_match and len(pre_match.group(1)) > 0.5 * len(html_payload):
+        return html_lib.unescape(pre_match.group(1)).strip()
+    return html_payload
 
 
 def _html_to_text(raw_html: str) -> str:

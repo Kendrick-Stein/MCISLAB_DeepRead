@@ -6,8 +6,9 @@ date_publish: 2026
 venue: "WACV 2026"
 tags: [gui-agent, VLM, computer-use]
 url: "https://openaccess.thecvf.com/content/WACV2026/html/Hsieh_ZonUI-3B_Competitive_GUI_Grounding_with_a_3B_VLM_Trained_on_WACV_2026_paper.html"
+arxiv_id: "2506.23491"
 cite_key: hsieh2026zonui
-code: ""
+code: "https://github.com/Han1018/ZonUI-3B"
 rating: 4
 date_added: 2026-06-26
 ---

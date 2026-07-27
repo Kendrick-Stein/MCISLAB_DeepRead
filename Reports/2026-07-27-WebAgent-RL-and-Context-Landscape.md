@@ -4,6 +4,7 @@ date: 2026-07-27
 tags: [report, web-agent, agentic-RL, context-engineering, agent-interface]
 related:
   - "[[Reports/2026-07-27-WebAgentRL-Loss-Formulas]]"
+  - "[[Reports/2026-07-27-Agent-Friendly-Browser-Interaction-Rules]]"
   - "[[Topics/CUA-Survey]]"
 ---
 
@@ -161,16 +162,16 @@ related:
 
 这是数量最大、证据最弱的一族。主线主张一致——为 agent 单独暴露一层结构化接口，而不是让 agent 去解析人类 UI——但实现层散成互不兼容的提案：VOIX（2511.11287）用声明式 HTML `<tool>` / `<context>` 标签；CI4A（2601.14790）把 UI 组件交互逻辑封装成统一工具原语；webMCP（2508.09171）把交互元数据直接嵌进页面；DMI（2510.04607，EuroSys '26，★★）把既有 GUI 抽象成 access/state/observation 三个声明式原语并做 policy-mechanism 分离；Typed Actions（2602.17245）主张用"web verbs"取代点击；AWI（2506.10953）给出六条设计原则。这些提案彼此没有共同的评测底座。
 
-本族仅有的两处硬证据方向相反且都需谨慎读：MCP vs RAG vs NLWeb vs HTML（2511.23281）在四个模拟电商上报告 F1 0.67→0.75–0.77、token 从约 241k 降到 47k–140k（**作者自报**，模拟环境）；而 Unbrowse（2604.00694，★★）走的是完全相反的路——不要求站点改造，而是从真实浏览流量被动学出可调用的第一方 "shadow API" 路由图并做共享索引。后者不依赖生态采纳，是本族最具可行性的一支。同族的 WebMCP Tool Surface Poisoning（2606.06387）已经给出该方向的第一份安全刻画：第三方脚本可在会话中注入恶意工具（Mid-Session Tool Injection）。
+本族仅有的两处看似硬的证据在回到原文后都不成立，详见 [[Reports/2026-07-27-Agent-Friendly-Browser-Interaction-Rules]] §3.4。MCP vs RAG vs NLWeb vs HTML（2511.23281）报告的 F1 0.67→0.75–0.77、token 从约 241k 降到 47k–140k（**作者自报**，模拟环境）里，效果那一半被论文自己的 Table 4 推翻（vague 与 cheapest 两类上 HTML 反超），且三条非 HTML 臂共用作者自建的语义索引后端而 HTML 臂只有店内关键词搜索框——真正的自变量是有无语义索引，不是暴露协议；token 比值方向可信，美元比值因未开 prompt caching 不可用。Unbrowse（2604.00694）"不要求站点改造、从真实浏览流量被动学出第一方 shadow API 路由图"这条路线的加速证据同样不成立：作者发布的 benchmark 脚本给 Playwright 基线硬插了 2,000 ms 无条件 sleep 且未用论文声称的 CSS selector 定向抽取，扣掉后均值加速从 3.58× 降到 1.49×、21/94 个域名反而更慢；全文无任何 task success rate，robots.txt 检查与自动下线逻辑均自陈未实现。同族的 WebMCP Tool Surface Poisoning（2606.06387）给出该方向的第一份安全刻画，也是本族目前唯一的受控证据：第三方脚本可在会话中注入恶意工具（Mid-Session Tool Injection），注册竞态 ASR 100%，且模型从 GPT-4o 代升级到 GPT-5.4 代 ASR 变化 0%。
 
 Search API as Decision Surface（2607.10198，★）值得单列：它论证商业搜索 API 返回的排序摘要/URL/元数据本身就是决策面——在冻结模型下改变 API 即改变 agent 是回答、再搜还是开页——这是把"每步 context"和"外部服务契约"接起来的少数实证之一。
 
 | 方法 | arXiv | 一句话 |
 |:--|:--|:--|
-| ★★ Unbrowse (shadow API) | 2604.00694 | 从真实流量被动学第一方隐藏 API，共享路由图，无需站点改造 |
+| · Unbrowse (shadow API) | 2604.00694 | 从真实流量被动学第一方隐藏 API 做共享路由图；加速对照的基线被削弱，无成功率指标 |
 | ★★ DMI | 2510.04607 | GUI 抽象成 access/state/observation 三原语，policy-mechanism 分离 |
 | ★ Search API as Decision Surface | 2607.10198 | 冻结模型下搜索 API 的返回面本身决定 agent 的下一步 |
-| ★ MCP vs RAG vs NLWeb vs HTML | 2511.23281 | 同商品四种暴露方式对比，非 HTML 路线在效果与 token 上都占优（模拟） |
+| ★ MCP vs RAG vs NLWeb vs HTML | 2511.23281 | 同商品四种暴露方式对比；token 省约 3×，但效果优势只在意图明确的检索与交易类任务上成立（模拟） |
 | ★ VOIX | 2511.11287 | 声明式 `<tool>` / `<context>` 标签暴露站点能力契约 |
 | ★ CI4A | 2601.14790 | UI 组件交互逻辑封装为统一工具原语 |
 | ★ webMCP | 2508.09171 | 交互元数据嵌入页面，agent 消费预结构化数据而非全 HTML |

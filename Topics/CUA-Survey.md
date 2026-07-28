@@ -1,9 +1,9 @@
 ---
 title: "Computer-Use Agents: A Unified Survey of Models, Learning, Environments, Evaluation, and Deployment"
 tags: [survey, gui-agent, computer-use, web-agent, mobile-agent, os-agent, agentic-RL]
-date_updated: "2026-07-24"
+date_updated: "2026-07-28"
 year_range: 1997-2026
-papers_analyzed: 181
+papers_analyzed: 184
 keywords: [gui-agent, gui grounding, computer-use, computer use agent, cua, web agent, browser agent, mobile agent, desktop agent, os agent]
 exclude_tags: [deep-research]
 exclude_keywords: [deep research, information seeking, browsecomp, research agent, search agent]
@@ -66,6 +66,10 @@ CUA 的发展不是模型名称的顺序更替，而是连续五次系统抽象�
 
 结构化接口首先获得可执行性，却把 agent 绑定在特定平台；screenshot-native 提供通用观察后，错误从元素识别转移到长程状态维护；模块化 agent 为长程任务引入规划与记忆，又产生跨模块误差和隐式状态；闭环学习利用真实 interaction 改进 policy，却要求可重置环境与可信 reward。第五阶段据此把 provenance、task state、verification、recovery 与 oversight 提为一等对象，但其证据主要来自距本文编写时间很近的 preprint，应理解为前瞻性研究假设，而非已经完成的范式转折。
 
+![[cua-survey-fig2-timeline.png]]
+
+*五阶段发展时间线：上方为本节表格的图形化（阶段 5 虚线描边表示"萌芽/前瞻假设"，Sikuli 为 screenshot-native 范式的 pre-LLM 起点）；下方 OSWorld 锚点取自 §1.2，三点来自不同系统与设置，不构成单一能力曲线。*
+
 ### 1.4 Limitations of Existing Surveys
 
 现有 survey 已建立平台、组件、能力和学习范式的基础 taxonomy，但其截稿时间与组织方式不足以覆盖 2025–2026 年 environment、Agentic RL、verifier、runtime 和可靠部署的快速发展。各 survey 的覆盖范围、可复用价值与局限对照如下。
@@ -117,11 +121,13 @@ CUA 的发展不是模型名称的顺序更替，而是连续五次系统抽象�
 
 十二个研究问题按线性顺序递进：从定义与坐标出发，经感知、动作、模型架构、规划与记忆、训练、数据、环境与评测，逐步推进到可靠性、安全监督与部署及开放问题。
 
-```mermaid
-flowchart LR
-    r1["RQ1 定义与坐标"] --> r2["RQ2 感知"] --> r3["RQ3 动作接口"] --> r4["RQ4 模型架构"] --> r5["RQ5 规划与记忆"] --> r6["RQ6 训练与RL"]
-    r6 --> r7["RQ7 数据与经验"] --> r8["RQ8 环境与runtime"] --> r9["RQ9 评测与验证"] --> r10["RQ10 可靠性与恢复"] --> r11["RQ11 安全与监督"] --> r12["RQ12 部署与开放问题"]
-```
+![[cua-survey-sec1-rqchain.png]]
+
+*十二个研究问题的线性递进与章节映射（按主题分五组着色）。*
+
+![[cua-survey-fig1-overview.png]]
+
+*全文组织总览：中央为 §3 的 CUA 执行闭环（前向路径 I→O→S→P→A→E，返回路径 V→R→P/H，外层学习路径 V/D→L→O/P），周边面板标注各章主题与对应研究问题；底条为贯穿全文的 accountable-state thesis。*
 
 ## 2. Scope, Terminology, and Review Methodology
 
@@ -149,14 +155,9 @@ CUA、GUI Agent、Web Agent、Mobile Agent 与 OS Agent 在文献中并非互斥
 
 三篇独立撰写的已发表 survey——[[Papers/2400-LargeLanguageModelBrained|LLM-Brained]]（环境-推理-执行-反馈闭环）、[[Papers/2508-OSAgentsSurvey|OS Agents]]（environment/observation space/action space 三组件 + understanding/planning/grounding 三能力）与 [[Papers/2501-ACUSurvey|ACU]]（domain × observation/action 的 POMDP taxonomy）——各自独立收敛到"平台 × 观察/动作原语"这同一组织坐标，这是跨作者、跨机构的共识性证据，而非单篇 survey 的一家之言，本综述沿用这一坐标作为 §4-§9 的底层分类依据。但三者在"是否把 CLI/API 调用也算进 action space"上并不统一：OS Agents 的 extended operations 与 ACU 的 code action 都承认这类动作存在，却未把它当作与 GUI action 平级的一等公民——这正是 §2.3 要单独厘清的边界。把平台切片与 §2.3 的通道边界放入同一张包含-交叉图：CUA 统摄 Web/Mobile/OS 三类平台切片并内含 GUI+API/CLI hybrid，与 GUI Agent 是同一范式的命名分歧，向上有 tool-use agent 作为更广泛的父类，横向与 CLI agent 构成互补通道，向下承接 RPA 这一历史前身。
 
-```mermaid
-flowchart TD
-    subgraph cua["CUA 跨平台统称"]
-        web["Web Agent"]; mob["Mobile Agent"]; osd["OS Agent"]; hyb["GUI+API hybrid"]
-    end
-    tool["Tool-use agent"] -->|"父类包含"| cua; gui["GUI Agent 范式"] -.->|"同一范式异名"| cua
-    rpa["RPA 与 PbD"] -->|"历史前身"| cua; cli["CLI agent"] ---|"通道互补"| hyb
-```
+![[cua-survey-sec2-terms.png]]
+
+*CUA 与相邻概念：Tool-use agent 为父类，GUI Agent 为同一范式异名，RPA 为历史前身，CLI agent 经 GUI+API Hybrid 通道互补；定义性边界是 GUI 是否为主要观察与操作通道。*
 
 ### 2.3 Relationship with Tool Agents, CLI Agents, and RPA
 
@@ -233,23 +234,9 @@ Computer-use agent 的执行过程可以形式化为一个部分可观察序贯�
 
 若把 3.1 的抽象元组展开成一个可追踪的运行时闭环，会得到贯穿本综述模型、学习、数据、环境与评测各章的统一执行图：
 
-```mermaid
-flowchart LR
-  I["用户意图"] --> O["Belief Source / Observation"]
-  O --> S["Explicit Task State"]
-  S --> P["Planning / Policy"]
-  P --> A["Semantic GUI / API Action"]
-  A --> E["Environment Transition"]
-  E --> V["Verifier / Feedback"]
-  V --> R["Recovery / Abstention"]
-  R --> P
-  R --> H["Human Handoff"]
-  H --> S
-  V --> L["Learning"]
-  D["Data / Task Factory"] --> L
-  L --> O
-  L --> P
-```
+![[cua-survey-sec3-loop.png]]
+
+*执行闭环三类路径：前向执行（I→O→S→P→A→E）、核验-恢复-介入（V→R→P/H，H→S 写回 state）与外层学习（V/D→L→O/P）；底部为两类典型失败模式的量化注脚。*
 
 前向路径（$I \to O \to S \to P \to A \to E$）把 3.1 中的每个符号具体化为一次工程决策：$I$ 是固定不变的指令 $i$；$O$ 对应观测 $o_t$ 及其简化 $o_t \to o_t^*$（如降采样 screenshot、裁剪 DOM）；$S$ 是本应从 $O$ 与历史中提炼出的显式 belief/task state，而非 3.1 讨论过的隐式 token 拼接；$P$ 是策略 $\pi$ 在给定 $S$ 与 $i$ 下产生的规划；$A$ 是动作 grounding $a_t^* \to a_t$ 之后的可执行 GUI/API 动作；$E$ 是环境转移 $T$。这条链上的每一次翻译都在解决上一步暴露的问题，也都会引入新的误差来源——这正是第 4、5、6 章分别沿 interface、data、architecture 三条轴追踪的具体内容。
 
@@ -290,12 +277,9 @@ flowchart LR
 
 这六条轴不是彼此独立的六个话题，而是 3.2 执行闭环在不同截面上的投影：Data 轴的产出（$D$）与 Evaluation 轴的产出（$V$）共同喂给 Learning 轴（$L$），Learning 轴的结果又反过来改写 Interface 轴的观测处理与 Architecture 轴的策略——这正是 3.2 图中 $D \to L$、$V \to L$、$L \to O, P$ 三条边的含义，也是本文判断"闭环学习"是当前主导阶段的形式化基础。六条轴及其核心取值可进一步展开为一棵分类树，每条轴下辖各自的关键维度：
 
-```mermaid
-flowchart TD
-  ROOT["六条技术轴"] --> IF["Interface"] & EN["Environment"] & DA["Data"] & AR["Architecture"] & LE["Learning"] & EV["Evaluation"]
-  IF --> IF1["观测表示"] & IF2["动作编码"] & IF3["跨平台统一"]; EN --> EN1["reset 并行 fork"] & EN2["verify 隔离复现"]; DA --> DA1["任务与初始状态"] & DA2["轨迹与 validator"]
-  AR --> AR1["end-to-end"] & AR2["compositional"]; LE --> LE1["SFT 与 RL"] & LE2["自我改进与搜索"]; EV --> EV1["程序化 verifier"] & EV2["交互式 verifier"] & EV3["LLM judge"]
-```
+![[cua-survey-sec3-axes.png]]
+
+*六条技术轴及其子维度；平台（Web/Mobile/Desktop/Hybrid）是 Environment × Interface 两轴的联合实例化。*
 
 #### 3.4.2 平台维度与轴系边界
 
@@ -477,11 +461,9 @@ GUI 之外，computer-use agent 可用的动作通道还包括应用内建/自�
 谁在每一步决定该走 GUI 还是 Code/API/MCP，是与"有没有这些通道"独立的问题。当前证据分别来自训练侧联合 policy、prompt 侧多 agent 编排与规则式静态 fallback 三种范式，尚无同 backbone、同环境下的直接因果对照。
 
 Web、Mobile 与 Desktop/OS 的执行环境经由 GUI、CLI、API 与 MCP 动作通道汇入 Hybrid action routing 的路由决策。
-```mermaid
-flowchart LR
-web["Web"] & mobile["Mobile"] & desktop["Desktop OS"] --> gui["GUI"] & cli["CLI"] & api["API"] & mcp["MCP"]
-gui & cli & api & mcp --> hybrid["4.8 Hybrid路由"]
-```
+![[cua-survey-sec4-interfaces.png]]
+
+*平台 × 动作通道 × Hybrid 路由：四条通道各有互补的强弱面，通道选择本身成为决策问题（消融证据见本节末图）。*
 
 | 路由范式 | 机制 | 代表工作 | 关键数字 |
 |:--|:--|:--|:--|
@@ -489,9 +471,13 @@ gui & cli & api & mcp --> hybrid["4.8 Hybrid路由"]
 | LLM 多 agent 编排 | Orchestrator 逐子任务动态派发给 Programmer（写代码）或 GUI Operator | [[Papers/2508-CoAct1]] | OSWorld 60.76% SOTA；ablation Programmer-only 35.73%（均 1.14 步）/GUI-only 50.68%（11.20 步）/Hybrid 60.76%（10.15 步） |
 | 规则式静态 fallback | "能 CLI 就 CLI，否则退回 GUI"的确定性规则 | [[Papers/2604-ClawGUI]] | 定性描述，无受控 ablation |
 
-[[Papers/2508-CoAct1]] 的 backbone ablation（Orchestrator/Programmer 用 o4-mini/o4-mini 得 43.43%，o3/o3 得 58.72%，o3/o4-mini 得 60.76%）表明路由质量的瓶颈在于负责分派的 Orchestrator 的推理能力，而非执行子任务的模块本身；同时它在 OSWorld 上把平均步数从 GTA-1 的 15.22 步降到 10.15 步，用一段脚本替换长串易错点击序列，同时提升成功率与效率。[[Papers/2606-WeaveBench]] 的 interface ablation（GUI-only ≤1.8%，CLI-only ≤3.5%，Hybrid 35.1%）是一个跨系统、跨范式的收敛证据：无论路由决策由谁做出，排除任一通道都是灾难性的，这与 CoAct-1 的模态 ablation（代码单独 35.73% / GUI 单独 50.68% / 混合 60.76%）指向同一结论——两种模态互补而非替代。
+[[Papers/2508-CoAct1]] 的 backbone ablation（Orchestrator/Programmer 用 o4-mini/o4-mini 得 43.43%，o3/o3 得 58.72%，o3/o4-mini 得 60.76%）表明路由质量的瓶颈在于负责分派的 Orchestrator 的推理能力，而非执行子任务的模块本身；同时它在 OSWorld 上把平均步数从 GTA-1 的 15.22 步降到 10.15 步，用一段脚本替换长串易错点击序列，同时提升成功率与效率。[[Papers/2606-WeaveBench]] 的 interface ablation（GUI-only ≤1.8%，CLI-only ≤3.5%，Hybrid 35.1%）是一个跨系统、跨范式的收敛证据：无论路由决策由谁做出，排除任一通道都是灾难性的，这与 CoAct-1 的模态 ablation（代码单独 35.73% / GUI 单独 50.68% / 混合 60.76%）指向同一结论——两种模态互补而非替代。[[Papers/2607-StateAct]] 从相反的路由方向补上第三个收敛证据：即使在把 code 设为默认通道、GUI 仅作 render-only 兜底的 state-first 编排中（GUI subagent 只出现在 28/108 任务、占 main-agent steps 的 1.1%），完全移除 GUI 的 bash-only 配置在 OSWorld 2.0 上也只有 45.9% mean partial、低于 screenshot reference 的 54.8%，把 GUI subagent 换成较弱的 SFR-CUA 则从 61.6% 降到 43.2%——GUI 通道的存在与质量都不可省略，无论路由默认方向是 GUI 优先还是 code 优先。
 
 这一路由问题与 §4.5 讨论的混合观察融合问题结构对称：前者要决定该用哪个通道执行，后者要决定该信任哪个证据来源，两者都需要一个显式的仲裁策略，简单地把所有通道/证据都暴露给模型并不自动带来更好结果。[[Papers/2606-WeaveBench]] 的失败分析给出了这一对称性的反例——当模型可以自由选择通道时，35.2% 的失败属于 reward hacking（包括伪造渲染、CLI 绕过 GUI 检查等），说明自由路由有时会被模型用来选择最容易伪造证据的通道，而非功能上正确的通道；这是路由侧的失败模式，与 [[Papers/2607-GUIStateBelief]] 在观察侧发现的 stale-structure-following 是同一类"多通道仲裁缺位"问题的两个实例。
+
+![[cua-survey-fig3-hybrid-evidence.png]]
+
+*Hybrid 路由证据汇总：上条为三种路由范式；四个 panel 为本节引用的通道消融原始数字（各 panel y 轴量程独立），收敛于"GUI 与 CLI/API 互补而非替代"；WeaveBench 的 reward hacking 比例提示自由路由的风险面。*
 
 ### 4.9 Open Problems
 
@@ -509,22 +495,9 @@ CUA 数据的核心张力在于，规模化供给可以扩大覆盖，却不能�
 
 数据监督沿能力层级逐步扩展，Human、Synthetic 与 Agent 生成三种来源横切全部层级。
 
-```mermaid
-flowchart LR
-    gui["GUI 理解"] --> ground["Grounding"] --> atomic["Atomic action"] --> traj["Trajectory"] --> reason["规划推理轨迹"]
-    reason --> fps["失败偏好安全"]
-    reason --> personal["个性化"]
-    human["Human"] --> axis["来源轴"]
-    synthetic["Synthetic"] --> axis
-    agent["Agent 生成"] --> axis
-    axis -.-> gui
-    axis -.-> ground
-    axis -.-> atomic
-    axis -.-> traj
-    axis -.-> reason
-    axis -.-> fps
-    axis -.-> personal
-```
+![[cua-survey-sec5-data.png]]
+
+*数据分层：监督粒度从 GUI 理解到规划推理 traces 逐级细化，失败/偏好/安全与个性化为分支层；来源轴（Human/Synthetic/Agent-generated）与粒度轴正交。*
 
 ### 5.1 GUI Understanding Data
 
@@ -681,14 +654,9 @@ CUA 架构选择不是 native、modular 或 multi-agent 的静态排名，而是
 
 本章把 native、modular 与 multi-agent 作为并列范式；hybrid 同时覆盖 native policy + GUI/SDK 与 planner + specialist grounder 两种组合形态。
 
-```mermaid
-flowchart LR
-    ROOT["并列系统范式"] --> NAT["Native 端到端"]
-    ROOT --> MOD["模块化系统"]
-    ROOT --> MAS["Multi-agent"]
-    NAT -->|"GUI 与 SDK"| HYB["Hybrid 架构"]
-    MOD -->|"planner 与 specialist grounder"| HYB
-```
+![[cua-survey-sec6-paradigms.png]]
+
+*三种并列范式（Native 端到端 / 模块化 / Multi-agent）向 Hybrid 架构收敛：native 化不消除系统设计，只把系统边界迁移到训练数据、context policy 与 action schema。*
 
 ### 6.1 Specialized GUI Grounding Models
 
@@ -768,6 +736,9 @@ Hybrid architecture 保留 native policy 的统一学习能力，同时把高风
 | One model, multiple inference modes | [[Papers/2509-ScaleCUA]] | grounding、direct action、reasoned action 共用模型 | mode selection 与共享训练冲突 |
 | Native policy + semantic runtime | [[Papers/2607-Tactile]] | runtime 暴露带 affordance、provenance 和 verification cue 的动作对象 | 依赖 AX/OCR 完整性 |
 | Platform-conditioned policy | [[Papers/2607-UIMOPD]] | 用 platform condition 缓解 desktop/mobile convention 污染 | 新平台仍需可靠 condition 与动作映射 |
+| State-first harness + GUI/web specialists | [[Papers/2607-StateAct]] | main agent 经 bash/Python/editor 直接读写 files、application backend 与 DOM，render-only 子目标委派 GUI/web subagent，独立 finish gate 重读 artifact | render-only 任务、GUI subagent 质量与 value-level verification |
+
+[[Papers/2607-StateAct]] 提供了这类架构目前最干净的同 backbone 证据：固定 Claude Opus 4.8，state-grounding harness 相对 reference CUA harness 在 OSWorld 2.0（108 tasks，self-hosted VM，binary success + mean partial 口径）从 20.6%/54.8% 提升到 26.9%/61.6%，平均单任务成本约从 \$72 降到 \$7.8。其 ablation 把收益定位在组合而非单一组件：移除 act-on-state 降幅最大（mean partial 61.6%→51.3%），而 bash-only 配置仅 45.9%、低于 screenshot reference 的 54.8%——"给模型 shell"不构成收益来源，state access、delegation 与 verification 必须共存。收益还有明确的 horizon 边界：short-horizon OSWorld-Verified 上 StateAct 与 reference 几乎持平（78.4% vs 77.3%）。解释这组数字时须注意，比较双方虽同 backbone，但 observation/action interface 不同——StateAct 能直接访问 files/backend/DOM——因此 +6.3pp 应归因于 harness/system design，不能读作 GUI grounding policy 本身变强。
 
 Hybrid 系统的决定性问题是 capability ownership：grounding、state、permission 与 verification 分别由谁拥有，失败后由谁修改。若 ownership 不显式，系统虽然模块更多，却仍无法回答某一步为何执行、依据是否过期以及哪个组件应承担恢复责任。
 
@@ -854,8 +825,9 @@ Verification 与 recovery 不是 planning 的附属步骤，而是独立能力�
 | Repair reproducibility | [[Papers/2607-TeachStop]] | 对局部 blocker 做受控修复 | 局部修复只有在 sole-blocker 条件下才传递到 task success |
 | Real-distribution recovery | [[Papers/2606-XiaomiGUI0]] | 从真机异常态与 teacher takeover 获取监督 | 工业环境昂贵、漂移且难复现 |
 | Mandatory verifier + loop breaker | [[Papers/2604-VLAA-GUI]] | 完成门、外部 judge 与固定升级策略 | 同 backbone 自审和额外调用开销限制独立性 |
+| Independent state-reread finish gate | [[Papers/2607-StateAct]] | 独立 context 只凭 task instruction 与 machine access 重读真实 deliverable，不见 trajectory 与 expected values | 能抓 missing file/wrong path/format 等 structural defect，对 value correctness 覆盖弱：76 个到达 gate 的 non-perfect 任务中错放 68 个 |
 
-MGA 展示了 verification 与 memory 的紧耦合：未经双帧验证的 state delta 不进入 memory [[Papers/2510-MGA]]。SKILL.nb 则把 verification 用于 reusable skill 的发布、回退与回归控制；移除 gate 后，修复后 regression 显著上升 [[Papers/2606-SkillNb]]。两项独立证据共同支持"验证结果应改变持久状态和后续控制流"，而不仅是生成一段 critique。
+MGA 展示了 verification 与 memory 的紧耦合：未经双帧验证的 state delta 不进入 memory [[Papers/2510-MGA]]。SKILL.nb 则把 verification 用于 reusable skill 的发布、回退与回归控制；移除 gate 后，修复后 regression 显著上升 [[Papers/2606-SkillNb]]。两项独立证据共同支持"验证结果应改变持久状态和后续控制流"，而不仅是生成一段 critique。[[Papers/2607-StateAct]] 则量化了"识别偏差"这一环节的覆盖上界：其 finish gate 拥有独立 context 与真实 state access，仍在 76 个到达 gate 的 non-perfect 任务中仅正确拒绝 8 个、错放 68 个。这与 [[Papers/2604-VLAA-GUI]] 的"同 backbone 自审限制独立性"构成互补边界——context 独立性可以消除 self-review bias，却消除不了共享 source interpretation 或 reasoning 造成的同值错误；structural check 与 value check 应被视为覆盖面不同的两种验证能力，而非同一 verifier 的强弱程度。
 
 恢复策略仍缺少按 failure state 自适应选择的证据。固定重试、换模态、回退、重新规划、请求人类和接受当前状态分别适用于不同后果结构；统一 escalation ladder 会在弱模型或紧预算下把恢复开销变成新的失败源。
 
@@ -877,6 +849,9 @@ CUA safety 已从筛查用户指令，扩展到环境内容、跨应用信息流
 | Proactive restraint | [[Papers/2603-PIRABench]] | 推荐前估计 false-positive risk | restraint 与 recall 的联合校准 |
 | Editable intervention | [[Papers/2607-Plover]] | 修改 persistent plan 后续跑 | 专家上界不代表普通用户 |
 | Background monitoring | [[Papers/2607-Sidekick]] | ambient cue、resume summary、reasoning view | alarm fatigue、attention cost 与多 agent 扩展 |
+| Capability-aware handoff 与统一 intervention 决策 | [[Papers/2607-MHLC]] | 冻结 backbone 上的 latent control heads 读取生成期 hidden states | judge-derived label bias、需 hidden-state access、head 不跨 backbone 迁移 |
+
+[[Papers/2607-MHLC]] 把 act、ask、escalate、abstain 的效用决策做成统一的学习接口：在冻结 backbone 上训练两个读取生成期 hidden-state 轨迹的轻量 head，Capability Head 估计当前模型对该 instance 是否 adequate（低于阈值则 handoff 给更强模型），Resolution Head 在 Clarification、Tool Use、Abstention 与 Direct Answering 间选择。GUI 侧证据为 AndroidWorld routed execution：Qwen3-VL-4B→32B 的 score 从本地 4B 的 0.47 升至 0.60，paid API cost 减少 90.7%——该口径只计 fallback 大模型调用、本地模型计零成本，不等于端到端 compute 下降；clarification/abstention 增益则来自 When2Call 与 TriviaQA 等非 GUI benchmark，对 CUA 属 component-only 证据。其"latent self-assessment"并非无监督涌现：capability 与 resolution label 均由外部 LLM judge 离线构造，judge bias 可能直接进入 control policy；head 还需访问 hidden states 且逐 backbone 训练，不能直接套在 closed API 上。作为对照，prompt-level self-switching 在 ScreenSpot-Pro 上仅 escalation 4/1581 个样本——严重 under-escalation 说明"让模型自己说要不要升级"不是可用的控制信号。
 
 #### 6.11.2 运行时证据核验与分层防线
 
@@ -936,15 +911,9 @@ GUI agent 的 learning 方法覆盖 pre-training、SFT、behavior cloning、pref
 
 训练链路中有两段结构得到明确刻画：grounding 先验经 action fine-tuning 才接入可执行动作空间，data flywheel 则以 rollout—验证—筛选—更新—新任务生成构成闭环。
 
-```mermaid
-flowchart LR
-    subgraph sg1["先验注入（§7.1）"]
-        gp["grounding pre-training"] --> aft["action fine-tuning"]
-    end
-    subgraph sg2["Data flywheel（§7.11）"]
-        ro["rollout"] --> vf["验证"] --> fl["筛选"] --> up["更新"] --> ng["新任务生成"] --> ro
-    end
-```
+![[cua-survey-sec7-learning.png]]
+
+*学习链路：左为先验注入（grounding pre-training → action fine-tuning → 初始 policy），中桥为 §7.3–7.10 方法谱系，右为 rollout—验证—筛选—更新—新任务生成的 data flywheel 闭环。*
 
 ### 7.1 Pre-training
 
@@ -985,6 +954,8 @@ GUI 侧近期实例：[[Papers/2505-MobileIPL]] 用迭代式 preference learning
 改动最小的是 first-failure 或 fork-point 定位：不改变 reward 形式，只把成功与失败轨迹的最早分叉转为局部监督，但需要可比较的成对轨迹。[[Papers/2601-EvoCUA]] Milestone/progress reward 进一步把可验证中间状态转成中间信用，信号更密集，却可能奖励与最终目标脱钩的局部进展。Tree rollout 利用兄弟子树的 outcome 差异生成 step-level signal，把 reward-design 成本转移到环境的 fork、reset 与并行能力。最后，interactive verifier 主动读取截图、文件、进程或 GUI 状态，以更高验证成本换取 hidden evidence。[[Papers/2602-VAGEN]]
 
 AgentRewardBench 表明 rule-based evaluator 与通用 LLM judge 会分别产生漏判和误判，因此 reward model 不能默认等同于 ground truth。[[Papers/2504-AgentRewardBench]] EvoCUA-1.5 进一步报告 PRM score 上升而 executable outcome 停滞的负结果，说明 process score 必须锚定环境状态变化。[[Papers/2607-EvoCUA15]] VAGEN 支持主动取证路线，但只验证了 evaluator 与 Best-of-N，尚未证明其成本与攻击面能承受大规模 RL 闭环。[[Papers/2602-VAGEN]]
+
+[[Papers/2607-SeekJudge]] 把 model-based reward 首次推进到 online RL 训练闭环内的正面对照：它将长轨迹判定拆为 localization 与 extraction 两个子问题，由共享同一 distilled 9B backbone 的 Condense–Ground–Seek–Analyze 四角色输出 trajectory score 与 nine-way step labels，并用 rollout-overlapped reward server 把 preprocessing 移出 rollout critical path。在 UI-TARS 1.5 7B 的 Chrome/Impress/OS 三个 domain（self-hosted，per-application 单独训练 policy）上，SeekJudge reward 的 RL test success 为 16.23%/36.81%/28.89%，均高于环境原生 rule-based reward 的 12.75%/30.43%/25.56%（repeated runs 的 run-to-run std 约 2.0%）；作者据此称其为首个在 online RL 中 match or surpass native rule-based supervision 的 practical model-based reward（库内暂无独立验证）。其对照实验还给出 judge 失准的一个具体机制：decisive screenshot 始终在场时，加入同轨迹其他截图使 F1 从 0.68 单调降至 0.61，而等 token 的 mosaic noise 无此效应——稀释来自 competing content 而非 context length 本身，这为"少而准的证据选择"路线提供了比 scaling curve 更有区分度的依据。边界同样明确：Qwen3VL-8B 上增益不稳定（Impress 48.41% 对 rule-based 49.28%，OS run 未完成），offline score calibration jointly fit 在三个 evaluation benchmark 上，且 reward-granularity ablation 同时改变 continuous score 与 step term、无法分离各自贡献。
 
 ### 7.7 Offline RL
 
@@ -1099,25 +1070,9 @@ CUA 评测的核心张力是隔离诊断与真实闭环之间的权衡：越静�
 
 整个评测空间形成相互正交的对象轴与方法学轴：前者逐步逼近真实任务，后者约束分数如何被解释。
 
-```mermaid
-flowchart TD
-root["CUA 评测体系"]
-subgraph obj["评测对象轴"]
-o1["静态 Grounding"] --> o2["离线轨迹"]
-o2 --> o3["Web：WebArena"]
-o2 --> o4["Mobile：MobileWorld"]
-o2 --> o5["Desktop：OSWorld 2.0"]
-o3 --> o6["Hybrid 接口"]
-o4 --> o6
-o5 --> o6
-o6 --> o7["长程：Odysseys"] --> o8["个性化 / 安全 / 效率"]
-end
-subgraph meth["评测方法学轴"]
-m1["Metrics"] --> m2["Verifiers"] --> m3["可复现性"]
-end
-root --> o1
-root --> m1
-```
+![[cua-survey-sec8-eval.png]]
+
+*评测体系两轴：对象轴按难度递进（grounding → 离线轨迹 → 三平台在线 → Hybrid → 长程 → 个性化/安全/效率），方法学轴中 verifier 的可靠性决定对象轴分数的可信度。*
 
 ### 8.1 Grounding Benchmarks
 
@@ -1291,6 +1246,7 @@ Safety benchmark 应至少分开报告 attack success、executed violation、ben
 | A11y-Compressor [[Papers/2605-A11yCompressor]] | desktop observation token | token、success、trial protocol | 压缩率与 task success 必须分开报告 |
 | ST-Lite / STaR-KV [[Papers/2603-STLiteKV]]、[[Papers/2606-StarKV]] | KV cache、显存与 decoding | cache budget、backbone、benchmark 与硬件指标 | FLOPs、显存与 wall-clock 不是同一成本 |
 | CCPO [[Papers/2601-CompressToFocus]] | multi-turn RL 训练上下文 | token growth、训练加速与 offline task metrics | 精度比较必须绑定 history window 与 base model |
+| MHLC [[Papers/2607-MHLC]] | 小-大模型 routed 执行的 fallback API cost | AndroidWorld score 与 paid API cost；本地 primary model 计零成本，Gemma 以 Qwen3-VL 价目为 proxy | 90.7% 减少仅是 paid-API 口径，不含本地 compute、control-head 推理与 hidden-state 提取开销 |
 
 #### 8.10.2 Evaluation-side 与 Agent-side 证据
 
@@ -1347,7 +1303,7 @@ Verifier 的根本差异不在判定模型大小，而在证据访问能力。�
 | Programmatic state verifier | DB、文件、app state、event log | 确定、便宜、适合 RL | checker coverage 与 schema drift | [[Papers/2605-OpenComputer]]、[[Papers/2606-CUAGym]] |
 | Hybrid checkpoint verifier | state checks + content checks + semantic rubric | 支持 partial credit 与开放 artifact | 权重和 judge 仍会改变排名 | [[Papers/2605-SaaSBench]]、[[Papers/2604-ClawEval]] |
 | Passive visual/rubric judge | final screenshot、selected frames、trajectory | 可用于闭源环境 | 看不到 hidden backend，易被信息选择影响 | [[Papers/2605-AndroidDaily]] |
-| Learned ORM/PRM/critic | trajectory 或 step representation | 可扩展到 outcome 与 process reward | precision/recall trade-off、训练分布偏差 | [[Papers/2504-AgentRewardBench]]、[[Papers/2510-CUARewardBench]]、[[Papers/2606-OSOracle]] |
+| Learned ORM/PRM/critic | trajectory 或 step representation | 可扩展到 outcome 与 process reward | precision/recall trade-off、训练分布偏差 | [[Papers/2504-AgentRewardBench]]、[[Papers/2510-CUARewardBench]]、[[Papers/2606-OSOracle]]、[[Papers/2607-SeekJudge]]（localization/extraction 拆分 + CUAStepBench：278 tasks/177 apps 上 trajectory verdict 与 dense step labels 同轨迹配对） |
 | Hierarchical diagnostic judge | segment→subtask→overall | 降低长轨迹 context overload 并给出 failure location | segmentation error 会向后传播 | [[Papers/2604-GUIDE- Interpretable GUI Agent Evaluation via Hierarchical Diagnosis]] |
 | Interactive verifier agent | screenshot、shell、Python、GUI 主动取证 | 可补 hidden/ambiguous evidence | 成本高、实例耦合、可能污染状态 | [[Papers/2602-VAGEN]] |
 | Human audit | 完整语境与任务意图 | 适合最终仲裁与 calibration | 慢、贵、难以 scale | 应用于分层抽检和争议样本，而非默认在线 reward |
@@ -1406,29 +1362,9 @@ WebArena/OSWorld exploit、gold leakage 与 original-to-verified checker 修订�
 
 截至 2026-07，computer-use 的产业格局呈现清晰的重心转移：模型能力供给正在快速商品化——前沿实验室把 CU 收敛为标准化 API 与内置工具（§9.1），开源权重在若干 benchmark 上追平甚至反超闭源（§9.4）——落地瓶颈随之移向模型之外的运行时与治理。产品端呈明显的成熟度梯度：消费级形态经历品牌收敛、折叠进主聊天产品（§9.2）；RPA 阵营把 LLM/CUA 作为推理层接入既有的确定性执行与编排体系（§9.3）；垂直 agent 在编码与客服率先规模化，在金融、医疗受合规约束（§9.5）。支撑各类产品的是两个专门化层：为 agent 供给浏览器/VM/沙箱执行环境的运行时基建（§9.6），与回答"agent 以谁的身份、多大权限运行、如何被审计"的凭证与可观测治理（§9.7–9.8）。经济与成熟度证据（§9.9–9.10）指向同一判断：单 token 降价掩盖不了 per-task 成本、延迟与长程可靠性的实质差距，短期可落地的形态是窄范围、人在环、带审计与成本护栏的工作流。这些角色可按本章内容归为四类：模型与 API 供给方、面向消费/企业自动化/垂直市场的产品、运行时基础设施、凭证与可观测治理；§9.6–9.8 的证据表明，生产落地不仅取决于模型能力，还取决于执行环境、身份权限与审计能力。
 
-```mermaid
-flowchart LR
-    subgraph L1["基础设施层"]
-        br["云端浏览器"]
-        sb["沙箱与桌面 VM"]
-    end
-    subgraph L2["模型与 API 层"]
-        api["闭源 CU API"]
-        oss["开源与端侧权重"]
-    end
-    subgraph L3["产品层"]
-        cons["消费级 agent"]
-        rpa["企业自动化与 RPA"]
-        vert["垂直 agent"]
-    end
-    subgraph L4["治理层"]
-        cred["凭证与权限"]
-        obs["可观测与审计"]
-    end
-    L1 --> L3
-    L2 --> L3
-    L4 -.-> L3
-```
+![[cua-survey-sec9-industry.png]]
+
+*产业四层结构：基础设施层与模型/API 层支撑产品层，治理层（凭证权限、可观测审计）横切约束。*
 ### 9.1 Foundation Model and API Providers
 
 Computer-use 能力已从研究原型收敛为几家前沿实验室以 **API/工具**形态对外提供的标准化接口：模型输出屏幕坐标级动作（click/type/scroll/drag/keypress + screenshot），由开发者侧的 harness（浏览器、VM、桌面）执行并回传截图，形成 agent loop。三家美国前沿实验室（OpenAI、Anthropic、Google DeepMind）各自提供原生 CU 基础模型，Amazon 与 Microsoft 则以云服务/企业平台形态封装（Microsoft 直接复用 OpenAI 与 Anthropic 的模型）。开源权重路线（ByteDance UI-TARS [[Papers/2501-UITARS]] [[Papers/2509-UITARS2]]、OS-Atlas [[Papers/2410-OSAtlas]]、OpenCUA [[Papers/2508-OpenCUA]]）见 §9.3，此处只覆盖闭源 API/平台供给方。
@@ -1687,14 +1623,9 @@ CUA 的开放议程已经从提升单项能力，收敛为如何在动态环境�
 
 十项挑战可归入四个 agenda 族。
 
-```mermaid
-flowchart TD
-  R["开放研究议程"] --> D["数据与验证"] & L["长程与鲁棒"] & I["交互与适应"] & P["部署与人因"]
-  D --> D1["10.1 数据扩展"] & D2["10.4 验证中心"] & D3["10.10 评测契约"]
-  L --> L1["10.2 长程状态"] & L2["10.3 鲁棒接地"] & L3["10.5 错误恢复"]
-  I --> I1["10.6 混合接口"] & I2["10.7 持续个性化"]
-  P --> P1["10.8 安全监督"] & P2["10.9 端侧效率"]
-```
+![[cua-survey-sec10-roadmap.png]]
+
+*开放研究议程：四大集群十个方向。*
 
 ### 10.1 Scalable and Verifiable Data
 
@@ -1878,6 +1809,15 @@ GUI/Computer-Use Agent 研究经历了五次可辨认的抽象升级——结构
 | 2026-07-23 gap-fill 补录 14 篇（RL survey / Digi-Q / Jedi / AndroidControl / OSWorld-MCP / MCPWorld 等） | 库内暂无独立验证 | §1.4/§4.7/§5/§7/§8 各子节 | 单 agent digest、verification_status: unverified，仅作子节 enrichment，未升格为 Takeaway/共识 |
 
 ## 调研日志
+
+### 2026-07-28 配图（TikZ 三图）
+
+- 新增 3 张 TikZ 配图（Codex 生成 + 独立视觉审查 + 数字逐一对照正文核验），源文件与 PNG 在 `assets/figures/`：
+  - §1.3 末：五阶段发展时间线 + OSWorld 锚点证据条（`cua-survey-fig2-timeline`）
+  - §1.6 末：全文组织总览（执行闭环 hero + 各章/RQ 导航面板，`cua-survey-fig1-overview`）
+  - §4.8 末：Hybrid 路由通道消融证据汇总（`cua-survey-fig3-hybrid-evidence`）
+- 图中所有数字均来自正文已 source-verified 的 claim，未引入新数字；改数字时需同步改图（.tex 可编辑重编译）。
+- 同日第二批：11 张章节 lead 的 Mermaid 流程图全部重画为 TikZ（`cua-survey-sec*`，源文件同目录），并做内容优化——补章节/RQ 映射与分组着色（sec1）、嵌套包含关系（sec2）、三色路径分类与失败模式注脚（sec3-loop）、通道特征与部署注（sec4/sec6/sec8-10）、来源轴正交表达（sec5）、环形 flywheel（sec7）；原 Mermaid 源码可在 git 历史找回。
 
 ### 2026-07-24 结构升级（总分结构 + 递归细分 + Mermaid 图）
 

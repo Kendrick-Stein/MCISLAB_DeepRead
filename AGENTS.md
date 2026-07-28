@@ -102,6 +102,8 @@ daily-papers / news-digest / literature-survey 的关键词打分均从该文件
 | `academic-slides` | 学术报告 slides | Supervisor 说"准备一个 talk / 答辩 slides" |
 | `paper-figures` | 出版级 matplotlib 图表 | Supervisor 给出数据要画论文用图 |
 | `paper-graph` | 领域 lineage Mermaid 图 | Supervisor 要看某方向的"技术演进族谱" |
+| `research-figure` | TikZ 方法流程图 + Blender 3D 渲染（模板/配色/元素库） | Supervisor 要 method/pipeline 图、3D teaser |
+| `thesis-figure-skill` | TikZ 学术结构图（snippet 库 + 视觉审查闭环；代码地基见 `tikz-figure-code`） | Supervisor 要架构图/技术路线图/survey 配图 |
 
 ### Skill 协议
 

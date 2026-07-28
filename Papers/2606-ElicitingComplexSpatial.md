@@ -8,7 +8,7 @@ tags: [spatial-reasoning, VLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Zhong_Eliciting_Complex_Spatial_Reasoning_in_MLLMs_through_Wide-Baseline_Matching_CVPR_2026_paper.html"
 arxiv_id: "2606.03577"
 doi: ""
-cite_key: ""
+cite_key: zhong2026eliciting
 code: ""
 rating: 4
 date_added: 2026-06-26

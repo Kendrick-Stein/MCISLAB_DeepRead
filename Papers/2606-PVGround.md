@@ -8,7 +8,7 @@ tags: [scene-understanding, 3D-representation, spatial-reasoning]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Shang_PV-Ground_Text-Guided_Point-Voxel_Interaction_for_3D_Visual_Grounding_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: shang2026pv
 code: "https://github.com/AaNnWwTt/PV-Ground"
 rating: 4
 date_added: "2026-06-26"

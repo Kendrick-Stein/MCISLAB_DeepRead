@@ -8,7 +8,7 @@ tags: [video-LLM, video-understanding, VLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Wang_Think_Then_Verify_A_Hypothesis-Verification_Multi-Agent_Framework_for_Long_Video_CVPR_2026_paper.html"
 arxiv_id: "2603.04977"
 doi: ""
-cite_key: ""
+cite_key: wang2026think
 code: "https://github.com/Haorane/VideoHV-Agent"
 rating: 4
 date_added: 2026-06-26

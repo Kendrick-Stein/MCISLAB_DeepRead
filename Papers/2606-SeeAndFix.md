@@ -18,7 +18,7 @@ tags:
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Park_See_and_Fix_the_Flaws_Enabling_VLMs_and_Diffusion_Models_CVPR_2026_paper.html"
 arxiv_id: "2602.20951v2"
 doi: ""
-cite_key: ""
+cite_key: park2026see
 code: ""
 rating: 4
 date_added: "2026-06-26"

@@ -8,7 +8,7 @@ tags: [spatial-reasoning, VLM, embodied-reasoning]
 url: "https://openaccess.thecvf.com/content/CVPR2025/html/Marsili_Visual_Agentic_AI_for_Spatial_Reasoning_with_a_Dynamic_API_CVPR_2025_paper.html"
 arxiv_id: "2502.06787"
 doi: ""
-cite_key: ""
+cite_key: marsili2025visual
 code: ""
 rating: 4
 date_added: "2026-06-26"

@@ -8,7 +8,7 @@ tags: [RL]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Choi_TaskForce_Cooperative_Multi-agent_Reinforcement_Learning_for_Multi-task_Optimization_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: choi2026taskforce
 code: ""
 rating: 3
 date_added: 2026-06-26

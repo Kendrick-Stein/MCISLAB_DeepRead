@@ -8,7 +8,7 @@ tags: ["spatial-reasoning", "VLM", "scene-understanding"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Ryu_Hear_you_are_Teaching_LLMs_Spatial_Reasoning_with_Vision_and_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: ryu2026hear
 code: ""
 rating: 4
 date_added: 2026-06-26

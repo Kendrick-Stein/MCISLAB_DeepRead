@@ -19,7 +19,7 @@ tags:
 url: "https://openaccess.thecvf.com/content/WACV2025/html/Arai_CoVLA_Comprehensive_Vision-Language-Action_Dataset_for_Autonomous_Driving_WACV_2025_paper.html"
 arxiv_id: "2408.10845"
 doi: ""
-cite_key: ""
+cite_key: arai2025covla
 code: ""
 rating: 3
 date_added: 2026-06-26

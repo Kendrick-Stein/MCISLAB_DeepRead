@@ -8,7 +8,7 @@ tags: ["spatial-reasoning", "VLM", "3D-representation"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Zhang_SpatialStack_Layered_Geometry-Language_Fusion_for_3D_VLM_Spatial_Reasoning_CVPR_2026_paper.html"
 arxiv_id: "2603.27437"
 doi: ""
-cite_key: ""
+cite_key: zhang2026spatialstack
 code: ""
 rating: 4
 date_added: 2026-06-26

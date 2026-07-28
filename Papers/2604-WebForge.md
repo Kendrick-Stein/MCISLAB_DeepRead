@@ -8,7 +8,7 @@ tags: [gui-agent, web-agent]
 url: https://arxiv.org/abs/2604.10988
 arxiv_id: "2604.10988"
 doi:
-cite_key:
+cite_key: yuan2026webforge
 code:
 rating: 4
 date_added: 2026-07-21

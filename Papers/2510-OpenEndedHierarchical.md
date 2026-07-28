@@ -8,7 +8,7 @@ tags: [video-LLM, video-understanding, VLM]
 url: "https://openaccess.thecvf.com/content/ICCV2025/html/Kang_Open-ended_Hierarchical_Streaming_Video_Understanding_with_Vision_Language_Models_ICCV_2025_paper.html"
 arxiv_id: "2509.12145"
 doi: ""
-cite_key: ""
+cite_key: kang2025open
 code: ""
 rating: 4
 date_added: 2026-06-26

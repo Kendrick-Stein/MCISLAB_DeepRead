@@ -8,7 +8,7 @@ tags: ["VLM", "scene-understanding", "LLM"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Li_AgentDet_A_Shared-Blackboard_Multi-Agent_Framework_for_Zero-Few-Shot_Object_Detection_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: li2026agentdet
 code: ""
 rating: 4
 date_added: 2026-06-26

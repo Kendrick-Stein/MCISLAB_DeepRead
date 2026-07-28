@@ -8,7 +8,7 @@ tags: [scene-understanding, 3D-representation, spatial-reasoning]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Yang_Towards_Foundation_Models_for_3D_Scene_Understanding_Instance-Aware_Self-Supervised_Learning_CVPR_2026_paper.html"
 arxiv_id: "2603.25165"
 doi: ""
-cite_key: ""
+cite_key: yang2026foundation
 code: ""
 rating: 4
 date_added: "2026-06-26"

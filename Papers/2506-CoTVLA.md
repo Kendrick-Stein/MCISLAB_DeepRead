@@ -8,7 +8,7 @@ tags: [VLA, embodied-reasoning, manipulation]
 url: "https://openaccess.thecvf.com/content/CVPR2025/html/Zhao_CoT-VLA_Visual_Chain-of-Thought_Reasoning_for_Vision-Language-Action_Models_CVPR_2025_paper.html"
 arxiv_id: "2503.22020"
 doi: ""
-cite_key: ""
+cite_key: zhao2025cot
 code: ""
 rating: 4
 date_added: "2026-06-26"

@@ -8,7 +8,7 @@ tags: [spatial-reasoning, VLM, embodied-reasoning]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Zhu_Exploring_Spatial_Intelligence_from_a_Generative_Perspective_CVPR_2026_paper.html"
 arxiv_id: "2604.20570"
 doi: ""
-cite_key: ""
+cite_key: zhu2026exploring
 code: ""
 rating: 4
 date_added: 2026-06-26

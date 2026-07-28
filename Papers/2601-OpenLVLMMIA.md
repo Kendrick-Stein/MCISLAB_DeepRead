@@ -8,7 +8,7 @@ tags: [VLM]
 url: "https://openaccess.thecvf.com/content/WACV2026/html/Miyamoto_OpenLVLM-MIA_A_Controlled_Benchmark_Revealing_the_Limits_of_Membership_Inference_WACV_2026_paper.html"
 arxiv_id: "2510.16295"
 doi: ""
-cite_key: ""
+cite_key: miyamoto2025openlvlm
 code: "https://github.com/yamanalab/openlvlm-mia"
 rating: 3
 date_added: 2026-06-26

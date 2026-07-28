@@ -8,7 +8,7 @@ tags: ["agentic-RL", "VLA", "task-planning"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/He_Training_One_Model_to_Master_Cross-Level_Agentic_Actions_via_Reinforcement_CVPR_2026_paper.html"
 arxiv_id: "2512.09706v2"
 doi: ""
-cite_key: ""
+cite_key: he2026training
 code: "https://github.com/CraftJarvis/OpenHA"
 rating: 4
 date_added: "2026-06-26"

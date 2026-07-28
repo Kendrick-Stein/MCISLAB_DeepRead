@@ -8,7 +8,7 @@ tags: [VLA, manipulation, flow-matching]
 url: https://arxiv.org/abs/2607.01804
 arxiv_id: "2607.01804"
 doi:
-cite_key:
+cite_key: pan2026vla
 code:
 rating: 4
 date_added: 2026-07-07

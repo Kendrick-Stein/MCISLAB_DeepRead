@@ -8,7 +8,7 @@ tags: [gui-agent]
 url: https://arxiv.org/abs/2605.27761
 arxiv_id: "2605.27761"
 doi: ""
-cite_key: ""
+cite_key: sui2026androiddaily
 code:
 rating: 4
 date_added: 2026-07-06

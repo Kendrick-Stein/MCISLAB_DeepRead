@@ -8,7 +8,7 @@ tags: [VLM, task-planning, spatial-reasoning]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Xu_VS-Bench_Evaluating_VLMs_for_Strategic_Abilities_in_Multi-Agent_Environments_CVPR_2026_paper.html"
 arxiv_id: "2506.02387"
 doi: ""
-cite_key: ""
+cite_key: xu2026vs
 code: ""
 rating: 4
 date_added: 2026-06-26

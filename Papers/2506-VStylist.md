@@ -12,7 +12,7 @@ tags: [VLM, task-planning, instruction-following]
 url: "https://openaccess.thecvf.com/content/CVPR2025/html/Yue_V-Stylist_Video_Stylization_via_Collaboration_and_Reflection_of_MLLM_Agents_CVPR_2025_paper.html"
 arxiv_id: "2503.12077"
 doi: ""
-cite_key: ""
+cite_key: yue2025stylist
 code: "https://V-Stylist.github.io"
 rating: 3
 date_added: "2026-06-26"

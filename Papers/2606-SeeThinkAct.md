@@ -23,7 +23,7 @@ tags:
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Wu_See_Think_Act_Teaching_Multimodal_Agents_to_Effectively_Interact_with_CVPR_2026_paper.html"
 arxiv_id: "2509.13615"
 doi: ""
-cite_key: ""
+cite_key: wu2026see
 code: "https://github.com/ZrW00/StaR"
 rating: 4
 date_added: "2026-06-26"

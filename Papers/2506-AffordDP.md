@@ -8,7 +8,7 @@ tags: ["diffusion-policy", "manipulation", "spatial-reasoning"]
 url: "https://openaccess.thecvf.com/content/CVPR2025/html/Wu_AffordDP_Generalizable_Diffusion_Policy_with_Transferable_Affordance_CVPR_2025_paper.html"
 arxiv_id: "2412.03142"
 doi: ""
-cite_key: ""
+cite_key: wu2025afforddp
 code: ""
 rating: 4
 date_added: 2026-06-26

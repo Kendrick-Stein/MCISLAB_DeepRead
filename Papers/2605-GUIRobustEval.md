@@ -8,7 +8,7 @@ tags: [gui-agent, agentic-RL]
 url: https://arxiv.org/abs/2605.29447
 arxiv_id: "2605.29447"
 doi: ""
-cite_key: ""
+cite_key: bu2026recovering
 code:
 rating: 4
 date_added: 2026-07-06

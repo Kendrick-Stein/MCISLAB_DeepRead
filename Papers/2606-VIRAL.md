@@ -8,7 +8,7 @@ tags: [mobile-manipulation, legged, manipulation]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/He_VIRAL_Visual_Sim-to-Real_at_Scale_for_Humanoid_Loco-Manipulation_CVPR_2026_paper.html"
 arxiv_id: "2511.15200v2"
 doi: ""
-cite_key: ""
+cite_key: he2025viral
 code: ""
 rating: 4
 date_added: "2026-06-26"

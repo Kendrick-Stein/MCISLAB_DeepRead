@@ -8,7 +8,7 @@ tags: [spatial-reasoning, VLM, embodied-reasoning]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Jang_Keep_it_SymPL_Symbolic_Projective_Layout_for_Allocentric_Spatial_Reasoning_CVPR_2026_paper.html"
 arxiv_id: "2602.19117"
 doi: ""
-cite_key: ""
+cite_key: jang2026keep
 code: ""
 rating: 4
 date_added: 2026-06-26

@@ -8,7 +8,7 @@ tags: [navigation, spatial-reasoning, semantic-map]
 url: "https://openaccess.thecvf.com/content/CVPR2024/html/Wang_An_Interactive_Navigation_Method_with_Effect-oriented_Affordance_CVPR_2024_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: wang2024interactive
 code: "https://github.com/polkalian/ADIN"
 rating: 4
 date_added: 2026-06-26

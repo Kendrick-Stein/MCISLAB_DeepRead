@@ -8,7 +8,7 @@ tags: [diffusion-policy, manipulation, task-planning]
 url: "https://openaccess.thecvf.com/content/CVPR2024/html/Ma_Hierarchical_Diffusion_Policy_for_Kinematics-Aware_Multi-Task_Robotic_Manipulation_CVPR_2024_paper.html"
 arxiv_id: "2403.03890"
 doi: ""
-cite_key: ""
+cite_key: ma2024hierarchical
 code: ""
 rating: 4
 date_added: 2026-06-26

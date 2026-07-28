@@ -8,7 +8,7 @@ tags: [spatial-reasoning, VLM]
 url: "https://openaccess.thecvf.com/content/ICCV2025/html/Pothiraj_CAPTURE_Evaluating_Spatial_Reasoning_in_Vision_Language_Models_via_Occluded_ICCV_2025_paper.html"
 arxiv_id: "2504.15485v2"
 doi: ""
-cite_key: ""
+cite_key: pothiraj2025capture
 code: "https://github.com/atinpothiraj/CAPTURe"
 rating: 4
 date_added: 2026-06-26

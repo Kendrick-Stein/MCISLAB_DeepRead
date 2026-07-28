@@ -8,7 +8,7 @@ tags: [VLM, LLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Lai_Agent4FaceForgery_Multi-Agent_LLM_Framework_for_Realistic_Face_Forgery_Detection_CVPR_2026_paper.html"
 arxiv_id: "2509.12546"
 doi: ""
-cite_key: ""
+cite_key: lai2025agent4faceforgery
 code: ""
 rating: 3
 date_added: "2026-06-26"

@@ -8,7 +8,7 @@ tags: [gui-agent, computer-use, video-understanding]
 url: "https://openaccess.thecvf.com/content/CVPR2025/html/Jang_Scalable_Video-to-Dataset_Generation_for_Cross-Platform_Mobile_Agents_CVPR_2025_paper.html"
 arxiv_id: "2505.12632"
 doi: ""
-cite_key: ""
+cite_key: jang2025scalable
 code: "https://monday-dataset.github.io"
 rating: 4
 date_added: 2026-06-26

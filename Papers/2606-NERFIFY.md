@@ -16,7 +16,7 @@ tags:
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Jain_NERFIFY_A_Multi-Agent_Framework_for_Turning_NeRF_Papers_into_Code_CVPR_2026_paper.html"
 arxiv_id: "2603.00805"
 doi: ""
-cite_key: ""
+cite_key: jain2026nerfify
 code: ""
 rating: 4
 date_added: "2026-06-26"

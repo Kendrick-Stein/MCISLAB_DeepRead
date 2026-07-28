@@ -8,7 +8,7 @@ tags: ["VLM"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Sinha_Quantized_Residuals_to_Continuous_Prompts_for_Few-Shot_Class_Incremental_Learning_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: sinha2026quantized
 code: ""
 rating: 3
 date_added: 2026-06-26

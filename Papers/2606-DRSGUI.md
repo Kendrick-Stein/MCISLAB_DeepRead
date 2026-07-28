@@ -8,7 +8,7 @@ tags: [gui-agent, VLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Liu_DRS-GUI_Dynamic_Region_Search_for_Training-Free_GUI_Grounding_CVPR_2026_paper.html"
 arxiv_id: "2605.15542"
 doi: ""
-cite_key: ""
+cite_key: liu2026drs
 code: ""
 rating: 4
 date_added: "2026-06-26"

@@ -8,7 +8,7 @@ tags: [SLAM, navigation, RL]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Pan_Dual-Agent_Reinforcement_Learning_for_Adaptive_and_Cost-Aware_Visual-Inertial_Odometry_CVPR_2026_paper.html"
 arxiv_id: "2511.21083"
 doi: ""
-cite_key: ""
+cite_key: pan2026dual
 code: ""
 rating: 3
 date_added: "2026-06-26"

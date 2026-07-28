@@ -8,7 +8,7 @@ tags: ["VLM"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Liu_Resolving_Evidence_Sparsity_Agentic_Context_Engineering_for_Long-Document_Understanding_CVPR_2026_paper.html"
 arxiv_id: "2511.22850"
 doi: ""
-cite_key: ""
+cite_key: liu2025resolving
 code: ""
 rating: 4
 date_added: "2026-06-26"

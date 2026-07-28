@@ -8,7 +8,7 @@ tags: [spatial-reasoning, VLM, embodied-reasoning]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Chen_Geometrically-Constrained_Agent_for_Spatial_Reasoning_CVPR_2026_paper.html"
 arxiv_id: "2511.22659"
 doi: ""
-cite_key: ""
+cite_key: chen2025geometrically
 code: ""
 rating: 4
 date_added: 2026-06-26

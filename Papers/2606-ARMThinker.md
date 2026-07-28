@@ -8,7 +8,7 @@ tags: [agentic-RL, VLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Ding_ARM-Thinker_Reinforcing_Multimodal_Generative_Reward_Models_with_Agentic_Tool_Use_CVPR_2026_paper.html"
 arxiv_id: "2512.05111"
 doi: ""
-cite_key: ""
+cite_key: ding2025arm
 code: "https://github.com/InternLM/ARM-Thinker"
 rating: 4
 date_added: "2026-06-26"

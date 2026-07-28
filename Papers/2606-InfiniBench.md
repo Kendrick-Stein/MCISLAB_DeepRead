@@ -8,7 +8,7 @@ tags: ["spatial-reasoning", "VLM", "scene-understanding"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Wang_InfiniBench_Infinite_Benchmarking_for_Visual_Spatial_Reasoning_with_Customizable_Scene_CVPR_2026_paper.html"
 arxiv_id: "2511.18200"
 doi: ""
-cite_key: ""
+cite_key: wang2025infinibench
 code: "https://github.com/pittisl/infinibench"
 rating: 4
 date_added: "2026-06-26"

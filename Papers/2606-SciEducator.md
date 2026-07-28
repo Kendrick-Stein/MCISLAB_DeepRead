@@ -8,7 +8,7 @@ tags: ["video-understanding", "task-planning", "video-LLM"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Xu_SciEducator_Scientific_Video_Understanding_and_Educating_via_Deming-Cycle_Multi-Agent_System_CVPR_2026_paper.html"
 arxiv_id: "2511.17943"
 doi: ""
-cite_key: ""
+cite_key: xu2025scieducator
 code: ""
 rating: 4
 date_added: 2026-06-26

@@ -8,7 +8,7 @@ tags: [video-understanding, VLM, video-LLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Berman_Scene-VLM_Multimodal_Video_Scene_Segmentation_via_Vision-Language_Models_CVPR_2026_paper.html"
 arxiv_id: "2512.21778"
 doi: ""
-cite_key: ""
+cite_key: berman2026scene
 code: ""
 rating: 4
 date_added: 2026-06-26

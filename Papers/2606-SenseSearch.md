@@ -8,7 +8,7 @@ tags: [VLM, agentic-RL, web-agent]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Chng_SenseSearch_Empowering_Vision-Language_Models_with_High-Resolution_Agentic_Search-Reasoning_via_Reinforcement_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: chng2026sensesearch
 code: "https://github.com/OpenSenseNova/SenseNova-MARS"
 rating: 4
 date_added: "2026-06-26"

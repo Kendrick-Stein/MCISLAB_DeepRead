@@ -8,7 +8,7 @@ tags: [world-model, scene-understanding, 3D-representation]
 url: "https://openaccess.thecvf.com/content/ICCV2025/html/Zhou_HERMES_A_Unified_Self-Driving_World_Model_for_Simultaneous_3D_Scene_ICCV_2025_paper.html"
 arxiv_id: "2501.14729"
 doi: ""
-cite_key: ""
+cite_key: zhou2025hermes
 code: "https://github.com/LMD0311/HERMES"
 rating: 4
 date_added: 2026-06-26

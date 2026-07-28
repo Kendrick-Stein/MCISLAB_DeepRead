@@ -8,7 +8,7 @@ tags: [scene-understanding, spatial-reasoning, 3D-representation]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/He_Curvature-Aware_Captioning_Leveraging_Geodesic_Attention_for_3D_Scene_Understanding_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: he2026curvature
 code: ""
 rating: 4
 date_added: "2026-06-26"

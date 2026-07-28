@@ -8,7 +8,7 @@ tags: ["VLM", "instruction-following"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Yang_WeMMU_Enhanced_Bridging_of_Vision-Language_Models_and_Diffusion_Models_via_CVPR_2026_paper.html"
 arxiv_id: "2512.02536"
 doi: ""
-cite_key: ""
+cite_key: yang2025wemmu
 code: ""
 rating: 3
 date_added: "2026-06-26"

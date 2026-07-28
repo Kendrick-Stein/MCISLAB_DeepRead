@@ -8,7 +8,7 @@ tags: [embodied-reasoning, task-planning, scene-understanding]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Li_SyncMos_Scalable_Motion_Synchronisation_for_Multi-Agent_Scene_Interaction_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: li2026syncmos
 code: ""
 rating: 3
 date_added: "2026-06-26"

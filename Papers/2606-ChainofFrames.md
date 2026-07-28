@@ -8,7 +8,7 @@ tags: [video-LLM, video-understanding, VLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Ghazanfari_Chain-of-Frames_Advancing_Video_Understanding_in_Multimodal_LLMs_via_Frame-Aware_Reasoning_CVPR_2026_paper.html"
 arxiv_id: "2506.00318"
 doi: ""
-cite_key: ""
+cite_key: ghazanfari2026chain
 code: "GitHub"
 rating: 4
 date_added: 2026-06-26

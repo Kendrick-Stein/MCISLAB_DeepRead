@@ -8,7 +8,7 @@ tags: ["scene-understanding", "3D-representation", "spatial-reasoning"]
 url: "https://openaccess.thecvf.com/content/CVPR2025/html/Liu_ReasonGrounder_LVLM-Guided_Hierarchical_Feature_Splatting_for_Open-Vocabulary_3D_Visual_Grounding_CVPR_2025_paper.html"
 arxiv_id: "2503.23297"
 doi: ""
-cite_key: ""
+cite_key: liu2025reasongrounder
 code: ""
 rating: 4
 date_added: 2026-06-26

@@ -8,7 +8,7 @@ tags: [spatial-reasoning, VLM, 3D-representation]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Liu_Abstract_3D_Perception_for_Spatial_Intelligence_in_Vision-Language_Models_CVPR_2026_paper.html"
 arxiv_id: "2511.10946"
 doi: ""
-cite_key: ""
+cite_key: liu2026abstract
 code: ""
 rating: 4
 date_added: 2026-06-26

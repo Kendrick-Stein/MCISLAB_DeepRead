@@ -8,7 +8,7 @@ tags: [spatial-reasoning, VLM, scene-understanding]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Zhou_Scalable_Object_Relation_Encoding_for_Better_3D_Spatial_Reasoning_in_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: zhou2026scalable
 code: "https://github.com/oceanflowlab/QuatRoPE"
 rating: 4
 date_added: 2026-06-26

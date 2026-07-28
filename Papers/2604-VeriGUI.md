@@ -8,7 +8,7 @@ tags: [gui-agent, agentic-RL]
 url: https://arxiv.org/abs/2604.05477
 arxiv_id: "2604.05477"
 doi: ""
-cite_key: ""
+cite_key: zhang2026dona
 code:
 rating: 4
 date_added: 2026-07-06

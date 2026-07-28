@@ -8,7 +8,7 @@ tags: [spatial-reasoning, scene-understanding, LLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Jeon_Masking_Matters_Unlocking_the_Spatial_Reasoning_Capabilities_of_LLMs_for_CVPR_2026_paper.html"
 arxiv_id: "2512.02487"
 doi: ""
-cite_key: ""
+cite_key: jeon2026masking
 code: "https://github.com/Jyerim/3D-SLIM"
 rating: 4
 date_added: 2026-06-26

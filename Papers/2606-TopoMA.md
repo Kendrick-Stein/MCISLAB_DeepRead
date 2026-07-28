@@ -20,7 +20,7 @@ tags:
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Zhang_TopoMA_Topology-Guided_Multi-Agent_Dense_RGB_3D_Reconstruction_via_Distributed_Inference_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: zhang2026topoma
 code: ""
 rating: 3
 date_added: "2026-06-26"

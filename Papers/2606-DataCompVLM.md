@@ -8,7 +8,7 @@ tags: [VLM]
 url: https://arxiv.org/abs/2606.28551
 arxiv_id: "2606.28551"
 doi:
-cite_key:
+cite_key: farina2026datacomp
 code: https://datacomp.ai/dcvlm/
 rating: 4
 date_added: 2026-07-07

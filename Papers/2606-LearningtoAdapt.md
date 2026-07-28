@@ -8,7 +8,7 @@ tags: ["web-agent", "gui-agent", "VLM"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Chen_Learning_to_Adapt_Self-Improving_Web_Agent_via_Cognitive-Aware_Exploration_CVPR_2026_paper.html"
 arxiv_id: "2605.31365"
 doi: ""
-cite_key: ""
+cite_key: chen2026learning
 code: ""
 rating: 4
 date_added: "2026-06-26"

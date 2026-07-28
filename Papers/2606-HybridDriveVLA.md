@@ -8,7 +8,7 @@ tags: [VLA, embodied-reasoning, world-model]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Bassole_HybridDriveVLA_Vision-Language-Action_Model_with_Visual_CoT_reasoning_and_ToT_Evaluation_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: bassole2026hybriddrivevla
 code: ""
 rating: 3
 date_added: 2026-06-26

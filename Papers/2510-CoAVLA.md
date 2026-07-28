@@ -8,7 +8,7 @@ tags: ["VLA", "embodied-reasoning", "spatial-reasoning"]
 url: "https://openaccess.thecvf.com/content/ICCV2025/html/Li_CoA-VLA_Improving_Vision-Language-Action_Models_via_Visual-Text_Chain-of-Affordance_ICCV_2025_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: li2025coa
 code: ""
 rating: 4
 date_added: "2026-06-26"

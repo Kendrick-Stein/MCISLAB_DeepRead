@@ -8,7 +8,7 @@ tags: [VLM]
 url: "https://openaccess.thecvf.com/content/ICCV2025/html/Li_MaTVLM_Hybrid_Mamba-Transformer_for_Efficient_Vision-Language_Modeling_ICCV_2025_paper.html"
 arxiv_id: "2503.13440v2"
 doi: ""
-cite_key: ""
+cite_key: li2025matvlm
 code: "https://github.com/hustvl/MaTVLM"
 rating: 4
 date_added: "2026-06-26"

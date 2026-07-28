@@ -8,7 +8,7 @@ tags: ["spatial-reasoning", "VLM", "3D-representation"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Cheng_Grounded_3D-Aware_Spatial_Vision-Language_Modeling_CVPR_2026_paper.html"
 arxiv_id: "2605.30307"
 doi: ""
-cite_key: ""
+cite_key: cheng2026grounded
 code: ""
 rating: 4
 date_added: "2026-06-26"

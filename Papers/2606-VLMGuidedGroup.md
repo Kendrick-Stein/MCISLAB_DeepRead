@@ -23,7 +23,7 @@ tags:
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Shen_VLM-Guided_Group_Preference_Alignment_for_Diffusion-based_Human_Mesh_Recovery_CVPR_2026_paper.html"
 arxiv_id: "2602.19180v1"
 doi: ""
-cite_key: ""
+cite_key: shen2026vlm
 code: ""
 rating: 4
 date_added: "2026-06-26"

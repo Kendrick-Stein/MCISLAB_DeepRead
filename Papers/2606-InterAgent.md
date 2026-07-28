@@ -8,7 +8,7 @@ tags: [diffusion-policy, instruction-following, world-model]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Li_InterAgent_Physics-based_Multi-agent_Command_Execution_via_Diffusion_on_Interaction_Graphs_CVPR_2026_paper.html"
 arxiv_id: "2512.07410"
 doi: ""
-cite_key: ""
+cite_key: li2026interagent
 code: "https://binlee26.github.io/InterAgent-Page"
 rating: 4
 date_added: "2026-06-26"

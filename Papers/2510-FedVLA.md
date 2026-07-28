@@ -8,7 +8,7 @@ tags: ["VLA", "manipulation"]
 url: "https://openaccess.thecvf.com/content/ICCV2025/html/Miao_FedVLA_Federated_Vision-Language-Action_Learning_with_Dual_Gating_Mixture-of-Experts_for_Robotic_ICCV_2025_paper.html"
 arxiv_id: "2508.02190v1"
 doi: ""
-cite_key: ""
+cite_key: miao2025fedvla
 code: ""
 rating: 4
 date_added: "2026-06-26"

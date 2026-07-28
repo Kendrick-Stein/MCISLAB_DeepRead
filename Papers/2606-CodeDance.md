@@ -8,7 +8,7 @@ tags: [VLM, agentic-RL]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Song_CodeDance_A_Dynamic_Tool-integrated_MLLM_for_Executable_Visual_Reasoning_CVPR_2026_paper.html"
 arxiv_id: "2512.17312"
 doi: ""
-cite_key: ""
+cite_key: song2026codedance
 code: ""
 rating: 4
 date_added: "2026-06-26"

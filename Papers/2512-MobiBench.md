@@ -8,7 +8,7 @@ tags: [gui-agent]
 url: https://arxiv.org/abs/2512.12634
 arxiv_id: "2512.12634"
 doi:
-cite_key:
+cite_key: im2025mobibench
 code:
 rating: 4
 date_added: 2026-07-21

@@ -8,7 +8,7 @@ tags: ["VLM", "scene-understanding"]
 url: "https://openaccess.thecvf.com/content/WACV2026/html/Hicsonmez_VLMDiff_Leveraging_Vision-Language_Models_for_Multi-Class_Anomaly_Detection_with_Diffusion_WACV_2026_paper.html"
 arxiv_id: "2511.08173"
 doi: ""
-cite_key: ""
+cite_key: hicsonmez2025vlmdiff
 code: "https://github.com/giddyyupp/VLMDiff"
 rating: 3
 date_added: 2026-06-26

@@ -8,7 +8,7 @@ tags: ["scene-understanding", "3D-representation"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Yang_Unsupervised_Multi-agent_and_Single-agent_Perception_from_Cooperative_Views_CVPR_2026_paper.html"
 arxiv_id: "2604.05354"
 doi: ""
-cite_key: ""
+cite_key: yang2026unsupervised
 code: ""
 rating: 4
 date_added: "2026-06-26"

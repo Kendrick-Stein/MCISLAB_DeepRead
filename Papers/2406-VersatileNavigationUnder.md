@@ -8,7 +8,7 @@ tags: ["navigation", "diffusion-policy"]
 url: "https://openaccess.thecvf.com/content/CVPR2024/html/Zhang_Versatile_Navigation_Under_Partial_Observability_via_Value-guided_Diffusion_Policy_CVPR_2024_paper.html"
 arxiv_id: "2404.02176"
 doi: ""
-cite_key: ""
+cite_key: zhang2024versatile
 code: ""
 rating: 4
 date_added: 2026-06-26

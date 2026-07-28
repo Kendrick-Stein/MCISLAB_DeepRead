@@ -8,7 +8,7 @@ tags: [VLA, embodied-reasoning, manipulation]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Li_TRM-VLA_Temporal-Aware_Chain-of-Thought_Reasoning_and_Memorization_for_Vision-Language-Action_Models_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: li2026trm
 code: ""
 rating: 4
 date_added: "2026-06-26"

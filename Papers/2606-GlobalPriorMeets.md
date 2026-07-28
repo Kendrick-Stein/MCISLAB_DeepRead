@@ -8,7 +8,7 @@ tags: [VLA, manipulation]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Li_Global_Prior_Meets_Local_Consistency_Dual-Memory_Augmented_Vision-Language-Action_Model_for_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: li2026global
 code: ""
 rating: 4
 date_added: "2026-06-26"

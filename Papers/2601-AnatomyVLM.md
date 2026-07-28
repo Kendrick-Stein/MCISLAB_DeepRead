@@ -8,7 +8,7 @@ tags: [VLM]
 url: "https://openaccess.thecvf.com/content/WACV2026/html/Gu_Anatomy-VLM_A_Fine-grained_Vision-Language_Model_for_Medical_Interpretation_WACV_2026_paper.html"
 arxiv_id: "2511.08402"
 doi: ""
-cite_key: ""
+cite_key: gu2025anatomy
 code: ""
 rating: 3
 date_added: 2026-06-26

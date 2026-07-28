@@ -8,7 +8,7 @@ tags: [scene-understanding, 3D-representation, semantic-map]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Huang_OpenVoxel_Training-Free_Grouping_and_Captioning_Voxels_for_Open-Vocabulary_3D_Scene_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: huang2026openvoxel
 code: ""
 rating: 4
 date_added: "2026-06-26"

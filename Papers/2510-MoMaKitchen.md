@@ -8,7 +8,7 @@ tags: [mobile-manipulation, navigation, scene-understanding]
 url: "https://openaccess.thecvf.com/content/ICCV2025/html/Zhang_MoMa-Kitchen_A_100K_Benchmark_for_Affordance-Grounded_Last-Mile_Navigation_in_Mobile_ICCV_2025_paper.html"
 arxiv_id: "2503.11081"
 doi: ""
-cite_key: ""
+cite_key: zhang2025moma
 code: ""
 rating: 4
 date_added: "2026-06-26"

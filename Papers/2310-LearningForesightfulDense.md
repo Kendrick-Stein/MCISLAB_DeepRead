@@ -8,7 +8,7 @@ tags: [manipulation, scene-understanding]
 url: "https://openaccess.thecvf.com/content/ICCV2023/html/Wu_Learning_Foresightful_Dense_Visual_Affordance_for_Deformable_Object_Manipulation_ICCV_2023_paper.html"
 arxiv_id: "2303.11057v3"
 doi: ""
-cite_key: ""
+cite_key: wu2023learning
 code: ""
 rating: 4
 date_added: 2026-06-26

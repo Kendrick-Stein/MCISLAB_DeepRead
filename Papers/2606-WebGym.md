@@ -8,7 +8,7 @@ tags: [web-agent, gui-agent, agentic-RL]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Bai_WebGym_Scaling_Training_Environments_for_Long-Horizon_Visual_Web_Agents_with_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: bai2026webgyma
 code: ""
 rating: 5
 date_added: 2026-06-26

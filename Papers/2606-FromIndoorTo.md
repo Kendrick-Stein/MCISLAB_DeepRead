@@ -8,7 +8,7 @@ tags: [spatial-reasoning, VLM, embodied-reasoning]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Wu_From_Indoor_to_Open_World_Revealing_the_Spatial_Reasoning_Gap_CVPR_2026_paper.html"
 arxiv_id: "2512.19683"
 doi: ""
-cite_key: ""
+cite_key: wu2025indoor
 code: ""
 rating: 5
 date_added: "2026-06-26"

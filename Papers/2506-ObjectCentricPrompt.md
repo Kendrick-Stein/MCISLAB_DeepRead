@@ -8,7 +8,7 @@ tags: [VLA, manipulation, instruction-following]
 url: "https://openaccess.thecvf.com/content/CVPR2025/html/Li_Object-Centric_Prompt-Driven_Vision-Language-Action_Model_for_Robotic_Manipulation_CVPR_2025_paper.html"
 arxiv_id: "2505.02166"
 doi: ""
-cite_key: ""
+cite_key: li2025crayonrobo
 code: ""
 rating: 4
 date_added: 2026-06-26

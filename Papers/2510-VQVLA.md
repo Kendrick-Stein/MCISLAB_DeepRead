@@ -8,7 +8,7 @@ tags: ["VLA", "manipulation", "imitation-learning"]
 url: "https://openaccess.thecvf.com/content/ICCV2025/html/Wang_VQ-VLA_Improving_Vision-Language-Action_Models_via_Scaling_Vector-Quantized_Action_Tokenizers_ICCV_2025_paper.html"
 arxiv_id: "2507.01016v1"
 doi: ""
-cite_key: ""
+cite_key: wang2025vq
 code: ""
 rating: 4
 date_added: "2026-06-26"

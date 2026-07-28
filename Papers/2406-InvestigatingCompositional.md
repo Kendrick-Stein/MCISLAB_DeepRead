@@ -8,7 +8,7 @@ tags: [VLM, scene-understanding]
 url: "https://openaccess.thecvf.com/content/CVPR2024/html/Zeng_Investigating_Compositional_Challenges_in_Vision-Language_Models_for_Visual_Grounding_CVPR_2024_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: zeng2024investigating
 code: "论文正文称 Code is available at link，但未给出可解析 URL"
 rating: 4
 date_added: "2026-06-26"

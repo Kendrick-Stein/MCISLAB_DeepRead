@@ -8,7 +8,7 @@ tags: [gui-agent, web-agent, VLM]
 url: https://arxiv.org/abs/2401.01614
 arxiv_id: "2401.01614"
 doi:
-cite_key:
+cite_key: zheng2024gpt
 code: https://github.com/OSU-NLP-Group/SeeAct
 rating: 4
 date_added: 2026-07-21

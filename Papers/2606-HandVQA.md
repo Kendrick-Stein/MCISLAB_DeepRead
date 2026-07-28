@@ -8,7 +8,7 @@ tags: [spatial-reasoning, VLM, embodied-reasoning]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Sayem_HandVQA_Diagnosing_and_Improving_Fine-Grained_Spatial_Reasoning_about_Hands_in_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: sayem2026handvqa
 code: "https://kcsayem.github.io/handvqa/"
 rating: 4
 date_added: "2026-06-26"

@@ -8,7 +8,7 @@ tags: [RL, manipulation]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Shibata_Learning_to_Assist_Physics-Grounded_Human-Human_Control_via_Multi-Agent_Reinforcement_Learning_CVPR_2026_paper.html"
 arxiv_id: "2603.11346"
 doi: ""
-cite_key: ""
+cite_key: shibata2026learning
 code: ""
 rating: 4
 date_added: 2026-06-26

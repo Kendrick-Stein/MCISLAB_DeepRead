@@ -8,7 +8,7 @@ tags: ["VLM"]
 url: "https://openaccess.thecvf.com/content/WACV2026/html/Dinca_Safe_Vision-Language_Models_via_Unsafe_Weights_Manipulation_WACV_2026_paper.html"
 arxiv_id: "2503.11742"
 doi: ""
-cite_key: ""
+cite_key: dinc2026safe
 code: "https://github.com/Moreno98/UWM"
 rating: 4
 date_added: 2026-06-26

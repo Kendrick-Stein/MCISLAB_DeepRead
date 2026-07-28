@@ -8,7 +8,7 @@ tags: [gui-agent, agentic-RL]
 url: https://arxiv.org/abs/2606.31410
 arxiv_id: "2606.31410"
 doi: ""
-cite_key: ""
+cite_key: cao2026xiaomi
 code:
 rating: 4
 date_added: 2026-07-06

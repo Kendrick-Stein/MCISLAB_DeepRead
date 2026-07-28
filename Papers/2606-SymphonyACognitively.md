@@ -19,7 +19,7 @@ tags:
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Yan_Symphony_A_Cognitively-Inspired_Multi-Agent_System_for_Long-Video_Understanding_CVPR_2026_paper.html"
 arxiv_id: "2603.17307"
 doi: ""
-cite_key: ""
+cite_key: yan2026symphony
 code: "https://github.com/Haiyang0226/Symphony"
 rating: 4
 date_added: "2026-06-26"

@@ -24,7 +24,7 @@ tags:
 url: "https://openaccess.thecvf.com/content/CVPR2025/html/Wang_MP-GUI_Modality_Perception_with_MLLMs_for_GUI_Understanding_CVPR_2025_paper.html"
 arxiv_id: "2503.14021"
 doi: ""
-cite_key: ""
+cite_key: wang2025mp
 code: "https://github.com/BigTaige/MP-GUI"
 rating: 4
 date_added: "2026-06-26"

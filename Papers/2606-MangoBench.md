@@ -8,7 +8,7 @@ tags: ["RL", "manipulation", "navigation"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Wang_MangoBench_A_Benchmark_for_Multi-Agent_Goal-Conditioned_Offline_Reinforcement_Learning_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: wang2026mangobench
 code: ""
 rating: 4
 date_added: 2026-06-26

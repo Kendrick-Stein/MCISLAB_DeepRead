@@ -8,7 +8,7 @@ tags: ["navigation", "spatial-reasoning", "scene-understanding"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Jang_Context-Nav_Context-Driven_Exploration_and_Viewpoint-Aware_3D_Spatial_Reasoning_for_Instance_CVPR_2026_paper.html"
 arxiv_id: "2603.09506"
 doi: ""
-cite_key: ""
+cite_key: jang2026context
 code: ""
 rating: 4
 date_added: 2026-06-26

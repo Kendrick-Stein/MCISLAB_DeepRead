@@ -12,7 +12,7 @@ tags: ["spatial-reasoning", "VLM", "RL"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Lin_PanoEnv_Exploring_3D_Spatial_Intelligence_in_Panoramic_Environments_with_Reinforcement_CVPR_2026_paper.html"
 arxiv_id: "2602.21992"
 doi: ""
-cite_key: ""
+cite_key: lin2026panoenv
 code: "https://github.com/7zk1014/PanoEnv"
 rating: 4
 date_added: "2026-06-26"

@@ -8,7 +8,7 @@ tags: [VLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Wang_Rethinking_Token_Reduction_for_Large_Vision-Language_Models_CVPR_2026_paper.html"
 arxiv_id: "2603.21701"
 doi: ""
-cite_key: ""
+cite_key: wang2026rethinking
 code: "https://github.com/MArSha1147/MetaCompress"
 rating: 4
 date_added: 2026-06-26

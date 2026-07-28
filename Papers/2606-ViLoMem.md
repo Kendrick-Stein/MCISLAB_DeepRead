@@ -8,7 +8,7 @@ tags: [VLM, LLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Bo_ViLoMem_Agentic_Learner_with_Grow-and-Refine_Multimodal_Semantic_Memory_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: bo2026vilomem
 code: ""
 rating: 4
 date_added: "2026-06-26"

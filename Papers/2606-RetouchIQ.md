@@ -20,7 +20,7 @@ tags:
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Wu_RetouchIQ_MLLM_Agents_for_Instruction-Based_Image_Retouching_with_Generalist_Reward_CVPR_2026_paper.html"
 arxiv_id: "2602.17558"
 doi: ""
-cite_key: ""
+cite_key: wu2026retouchiq
 code: ""
 rating: 4
 date_added: 2026-06-26

@@ -8,7 +8,7 @@ tags: [VLA, manipulation]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Xiao_AVA-VLA_Improving_Vision-Language-Action_models_with_Active_Visual_Attention_CVPR_2026_paper.html"
 arxiv_id: "2511.18960"
 doi: ""
-cite_key: ""
+cite_key: xiao2026ava
 code: ""
 rating: 4
 date_added: "2026-06-26"

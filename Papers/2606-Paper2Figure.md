@@ -8,7 +8,7 @@ tags: ["auto-research", "LLM", "instruction-following"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Han_Paper2Figure_A_Multi-Agent_Collaborative_System_for_Figure_Generation_Towards_Academic_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: han2026paper2figure
 code: ""
 rating: 4
 date_added: 2026-06-26

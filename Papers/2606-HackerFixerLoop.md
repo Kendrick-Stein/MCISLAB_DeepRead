@@ -8,7 +8,7 @@ tags: [agentic-RL, LLM]
 url: https://arxiv.org/abs/2606.08960
 arxiv_id: "2606.08960"
 doi:
-cite_key:
+cite_key: zhong2026hardening
 code: https://github.com/few-sh/harden-v0
 rating: 4
 date_added: 2026-07-21

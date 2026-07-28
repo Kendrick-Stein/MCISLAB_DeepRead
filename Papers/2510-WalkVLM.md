@@ -8,7 +8,7 @@ tags: ["VLM", "navigation", "embodied-reasoning"]
 url: "https://openaccess.thecvf.com/content/ICCV2025/html/Yuan_WalkVLM_Aid_Visually_Impaired_People_Walking_by_Vision_Language_Model_ICCV_2025_paper.html"
 arxiv_id: "2412.20903"
 doi: ""
-cite_key: ""
+cite_key: yuan2025walkvlm
 code: "https://walkvlm2024.github.io"
 rating: 4
 date_added: 2026-06-26

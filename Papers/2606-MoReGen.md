@@ -8,7 +8,7 @@ tags: [world-model, LLM, VLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Bai_MoReGen_Multi-Agent_Motion-Reasoning_Engine_for_Code-based_Text-to-Video_Synthesis_CVPR_2026_paper.html"
 arxiv_id: "2512.04221v2"
 doi: ""
-cite_key: ""
+cite_key: bai2025moregen
 code: "https://github.com/ostadabbas/MoReGen-Multi-Agent-Motion-Reasoning-Engine"
 rating: 3
 date_added: "2026-06-26"

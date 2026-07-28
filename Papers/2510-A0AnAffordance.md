@@ -8,7 +8,7 @@ tags: [manipulation, spatial-reasoning, VLA]
 url: "https://openaccess.thecvf.com/content/ICCV2025/html/Xu_A0_An_Affordance-Aware_Hierarchical_Model_for_General_Robotic_Manipulation_ICCV_2025_paper.html"
 arxiv_id: "2504.12636"
 doi: ""
-cite_key: ""
+cite_key: xu2026a0
 code: ""
 rating: 4
 date_added: 2026-06-26

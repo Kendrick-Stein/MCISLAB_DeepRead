@@ -16,7 +16,7 @@ tags:
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Kumbhar_Towards_GUI_Agents_Vision-Language_Diffusion_Models_for_GUI_Grounding_CVPR_2026_paper.html"
 arxiv_id: "2603.26211"
 doi: ""
-cite_key: ""
+cite_key: kumbhar2026gui
 code: ""
 rating: 4
 date_added: 2026-06-26

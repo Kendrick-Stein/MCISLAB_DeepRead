@@ -8,7 +8,7 @@ tags: [spatial-reasoning, VLM, embodied-reasoning]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Wu_SpatialScore_Towards_Comprehensive_Evaluation_for_Spatial_Intelligence_CVPR_2026_paper.html"
 arxiv_id: "2505.17012"
 doi: ""
-cite_key: ""
+cite_key: wu2026spatialscore
 code: "https://github.com/haoningwu3639/SpatialScore/"
 rating: 5
 date_added: 2026-06-26

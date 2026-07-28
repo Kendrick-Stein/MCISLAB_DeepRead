@@ -8,7 +8,7 @@ tags: [agentic-RL, VLM, embodied-reasoning]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Wei_GTR-Turbo_Merged_Checkpoint_is_Secretly_a_Free_Teacher_for_Agentic_CVPR_2026_paper.html"
 arxiv_id: "2512.13043"
 doi: ""
-cite_key: ""
+cite_key: wei2026gtr
 code: ""
 rating: 4
 date_added: 2026-06-26

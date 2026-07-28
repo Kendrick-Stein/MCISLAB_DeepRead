@@ -19,7 +19,7 @@ tags:
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Chen_AdapAction_Adaptive_Target_Action_Backdoor_Attack_against_GUI_Agents_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: chen2026adapaction
 code: ""
 rating: 4
 date_added: "2026-06-26"

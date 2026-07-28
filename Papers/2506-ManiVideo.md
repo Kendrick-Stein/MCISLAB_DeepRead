@@ -8,7 +8,7 @@ tags: ["manipulation", "3D-representation", "world-model"]
 url: "https://openaccess.thecvf.com/content/CVPR2025/html/Pang_ManiVideo_Generating_Hand-Object_Manipulation_Video_with_Dexterous_and_Generalizable_Grasping_CVPR_2025_paper.html"
 arxiv_id: "2412.16212"
 doi: ""
-cite_key: ""
+cite_key: pang2024manivideo
 code: ""
 rating: 3
 date_added: 2026-06-26

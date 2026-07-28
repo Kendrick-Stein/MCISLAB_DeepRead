@@ -8,7 +8,7 @@ tags: ["VLA", "manipulation", "embodied-reasoning"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Gu_From_Manuals_to_Actions_A_Unified_VLA_Model_for_Chain-of-Thought_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: gu2026manuals
 code: ""
 rating: 4
 date_added: 2026-06-26

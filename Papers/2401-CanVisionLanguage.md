@@ -8,7 +8,7 @@ tags: [VLM, scene-understanding, spatial-reasoning]
 url: "https://openaccess.thecvf.com/content/WACV2024/html/Zhang_Can_Vision-Language_Models_Be_a_Good_Guesser_Exploring_VLMs_for_WACV_2024_paper.html"
 arxiv_id: "2307.06166"
 doi: ""
-cite_key: ""
+cite_key: zhang2023can
 code: "https://github.com/gengyuanmax/WikiTiLo"
 rating: 3
 date_added: "2026-06-26"

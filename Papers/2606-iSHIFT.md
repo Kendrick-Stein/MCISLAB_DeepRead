@@ -8,7 +8,7 @@ tags: ["gui-agent", "computer-use", "VLM"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Mehrotra_iSHIFT_Lightweight_Slow-Fast_GUI_Agent_with_Adaptive_Perception_CVPR_2026_paper.html"
 arxiv_id: "2512.22009"
 doi: ""
-cite_key: ""
+cite_key: mehrotra2026ishift
 code: ""
 rating: 4
 date_added: 2026-06-26

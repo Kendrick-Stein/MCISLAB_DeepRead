@@ -8,7 +8,7 @@ tags: [manipulation, embodied-reasoning, scene-understanding]
 url: "https://openaccess.thecvf.com/content/ICCV2025/html/Wu_RAGNet_Large-scale_Reasoning-based_Affordance_Segmentation_Benchmark_towards_General_Grasping_ICCV_2025_paper.html"
 arxiv_id: "2507.23734"
 doi: ""
-cite_key: ""
+cite_key: wu2025ragnet
 code: ""
 rating: 4
 date_added: 2026-06-26

@@ -8,7 +8,7 @@ tags: [manipulation, world-model, VLA]
 url: "https://arxiv.org/abs/2607.04927"
 arxiv_id: "2607.04927"
 doi:
-cite_key:
+cite_key: zhu2026dswam
 code:
 rating: 2
 date_added: "2026-07-07"

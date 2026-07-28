@@ -8,7 +8,7 @@ tags: [VLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Deng_VLM-PTQ_Efficient_Post-Training_Quantization_for_Large_Vision-Language_Models_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: deng2026vlm
 code: ""
 rating: 4
 date_added: "2026-06-26"

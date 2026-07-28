@@ -28,7 +28,7 @@ tags:
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Zhao_Localizing_Structuring_and_Rendering_Bridging_3D_and_2D_Vision-Language-Action_Models_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: zhao2026localizing
 code: "https://github.com/zyl123456aB/DIFFVLA"
 rating: 4
 date_added: 2026-06-26

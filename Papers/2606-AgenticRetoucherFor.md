@@ -8,7 +8,7 @@ tags: [VLM, task-planning, agentic-RL]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Shen_Agentic_Retoucher_for_Text-To-Image_Generation_CVPR_2026_paper.html"
 arxiv_id: "2601.02046"
 doi: ""
-cite_key: ""
+cite_key: shen2026agentic
 code: ""
 rating: 4
 date_added: "2026-06-26"

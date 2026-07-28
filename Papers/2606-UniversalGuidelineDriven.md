@@ -8,7 +8,7 @@ tags: [VLM, LLM, instruction-following]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Zhong_Universal_Guideline-Driven_Image_Clustering_via_a_Hybrid_LLM_Agent_CVPR_2026_paper.html"
 arxiv_id: "2606.24094"
 doi: ""
-cite_key: ""
+cite_key: zhong2026universal
 code: ""
 rating: 3
 date_added: "2026-06-26"

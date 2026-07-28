@@ -8,7 +8,7 @@ tags: [VLM, spatial-reasoning]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Tortei_VisRes_Bench_On_Evaluating_the_Visual_Reasoning_Capabilities_of_VLMs_CVPR_2026_paper.html"
 arxiv_id: "2512.21194"
 doi: ""
-cite_key: ""
+cite_key: trtei2025visres
 code: ""
 rating: 4
 date_added: "2026-06-26"

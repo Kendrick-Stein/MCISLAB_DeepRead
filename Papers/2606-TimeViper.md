@@ -8,7 +8,7 @@ tags: [video-LLM, video-understanding, VLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Xu_TimeViper_A_Hybrid_Mamba-Transformer_Vision-Language_Model_for_Efficient_Long_Video_CVPR_2026_paper.html"
 arxiv_id: "2511.16595"
 doi: ""
-cite_key: ""
+cite_key: xu2025timeviper
 code: ""
 rating: 4
 date_added: "2026-06-26"

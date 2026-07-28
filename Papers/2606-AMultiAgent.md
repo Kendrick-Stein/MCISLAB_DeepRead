@@ -22,7 +22,7 @@ tags:
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Xu_A_Multi-Agent_Perception-Action_Alliance_for_Efficient_Long_Video_Reasoning_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: xu2026multi
 code: "https://github.com/git-disl/A4VL"
 rating: 4
 date_added: 2026-06-26

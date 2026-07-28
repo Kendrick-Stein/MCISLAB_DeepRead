@@ -8,7 +8,7 @@ tags: [spatial-reasoning, VLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Kang_VLM-Loc_Localization_in_Point_Cloud_Maps_via_Vision-Language_Models_CVPR_2026_paper.html"
 arxiv_id: "2603.09826"
 doi: ""
-cite_key: ""
+cite_key: kang2026vlm
 code: ""
 rating: 4
 date_added: 2026-06-26

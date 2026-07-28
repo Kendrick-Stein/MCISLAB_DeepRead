@@ -8,7 +8,7 @@ tags: [VLM, scene-understanding]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Shi_VLM4RSDet_Collaborative_Optimization_with_Vision-Language_Model_for_Enhancing_Remote_Sensing_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: shi2026vlm4rsdet
 code: "https://github.com/cszzshi/VLM4RSDet"
 rating: 4
 date_added: 2026-06-26

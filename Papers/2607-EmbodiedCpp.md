@@ -8,7 +8,7 @@ tags: [VLA, world-model, manipulation]
 url: https://arxiv.org/abs/2607.02501
 arxiv_id: "2607.02501"
 doi:
-cite_key:
+cite_key: xu2026embodied
 code: https://github.com/SEU-PAISys/Embodied.cpp
 rating: 2
 date_added: 2026-07-07

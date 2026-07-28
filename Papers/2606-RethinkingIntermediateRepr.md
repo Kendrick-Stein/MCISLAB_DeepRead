@@ -8,7 +8,7 @@ tags: ["manipulation", "VLM", "embodied-reasoning"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Tang_Rethinking_Intermediate_Representation_for_VLM-based_Robot_Manipulation_CVPR_2026_paper.html"
 arxiv_id: "2511.19315"
 doi: ""
-cite_key: ""
+cite_key: tang2025rethinking
 code: ""
 rating: 4
 date_added: 2026-06-26

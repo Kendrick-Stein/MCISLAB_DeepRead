@@ -31,7 +31,7 @@ tags:
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Lin_EvoGraph-R1_Self-Evolving_Multimodal_Knowledge_Hypergraphs_for_Agentic_Retrieval_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: lin2026evograph
 code: ""
 rating: 4
 date_added: "2026-06-26"

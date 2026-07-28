@@ -8,7 +8,7 @@ tags: [VLM]
 url: "https://openaccess.thecvf.com/content/WACV2026/html/Rahman_FairVLM_Enhancing_Fairness_and_Prompt_Sensitivity_in_Vision_Language_Models_WACV_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: rahman2026fairvlm
 code: "https://github.com/Rahman-Motiur/FairVLM"
 rating: 3
 date_added: "2026-06-26"

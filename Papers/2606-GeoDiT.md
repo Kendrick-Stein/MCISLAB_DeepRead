@@ -8,7 +8,7 @@ tags: [VLM, spatial-reasoning, scene-understanding]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Liu_GeoDiT_A_Diffusion-based_Vision-Language_Model_for_Geospatial_Understanding_CVPR_2026_paper.html"
 arxiv_id: "2512.02505"
 doi: ""
-cite_key: ""
+cite_key: liu2026geodit
 code: "https://github.com/ViTBerger/GeoDiT"
 rating: 4
 date_added: 2026-06-26

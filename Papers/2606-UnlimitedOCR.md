@@ -8,7 +8,7 @@ tags: [VLM, LLM]
 url: https://arxiv.org/abs/2606.23050
 arxiv_id: "2606.23050"
 doi:
-cite_key:
+cite_key: yin2026unlimited
 code: https://github.com/baidu/Unlimited-OCR
 rating: 3
 date_added: 2026-07-07

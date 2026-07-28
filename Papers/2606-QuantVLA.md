@@ -8,7 +8,7 @@ tags: [VLA, manipulation]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Zhang_QuantVLA_Scale-Calibrated_Post-Training_Quantization_for_Vision-Language-Action_Models_CVPR_2026_paper.html"
 arxiv_id: "2602.20309"
 doi: ""
-cite_key: ""
+cite_key: zhang2026quantvla
 code: ""
 rating: 4
 date_added: "2026-06-26"

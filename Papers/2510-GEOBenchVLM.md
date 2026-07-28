@@ -8,7 +8,7 @@ tags: [VLM, spatial-reasoning, scene-understanding]
 url: "https://openaccess.thecvf.com/content/ICCV2025/html/Danish_GEOBench-VLM_Benchmarking_Vision-Language_Models_for_Geospatial_Tasks_ICCV_2025_paper.html"
 arxiv_id: "2411.19325"
 doi: ""
-cite_key: ""
+cite_key: danish2025geobench
 code: "https://github.com/The-AI-Alliance/GEO-Bench-VLM"
 rating: 3
 date_added: "2026-06-26"

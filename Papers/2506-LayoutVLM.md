@@ -8,7 +8,7 @@ tags: [spatial-reasoning, VLM, 3D-representation]
 url: "https://openaccess.thecvf.com/content/CVPR2025/html/Sun_LayoutVLM_Differentiable_Optimization_of_3D_Layout_via_Vision-Language_Models_CVPR_2025_paper.html"
 arxiv_id: "2412.02193"
 doi: ""
-cite_key: ""
+cite_key: sun2025layoutvlm
 code: ""
 rating: 4
 date_added: "2026-06-26"

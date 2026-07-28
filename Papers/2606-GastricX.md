@@ -8,7 +8,7 @@ tags: [VLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Li_Gastric-X_A_Multimodal_Multi-Phase_Benchmark_Dataset_for_Advancing_Vision-Language_Models_CVPR_2026_paper.html"
 arxiv_id: "2603.19516"
 doi: ""
-cite_key: ""
+cite_key: lu2026gastric
 code: ""
 rating: 3
 date_added: 2026-06-26

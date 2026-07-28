@@ -8,7 +8,7 @@ tags: [VLM, task-planning, instruction-following]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Xiong_Beyond_Sequential_Tools_A_Unified_VLM_Agent_System_for_Photographic_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: xiong2026beyond
 code: ""
 rating: 4
 date_added: "2026-06-26"

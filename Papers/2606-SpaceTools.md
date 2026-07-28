@@ -8,7 +8,7 @@ tags: [spatial-reasoning, agentic-RL, embodied-reasoning]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Chen_SpaceTools_Tool-Augmented_Spatial_Reasoning_via_Double_Interactive_RL_CVPR_2026_paper.html"
 arxiv_id: "2512.04069"
 doi: ""
-cite_key: ""
+cite_key: chen2026spacetools
 code: ""
 rating: 5
 date_added: 2026-06-26

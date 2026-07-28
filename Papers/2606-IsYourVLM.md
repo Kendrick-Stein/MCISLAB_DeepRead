@@ -8,7 +8,7 @@ tags: [spatial-reasoning, VLM, navigation]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Zhang_Is_your_VLM_Sky-Ready_A_Comprehensive_Spatial_Intelligence_Benchmark_for_CVPR_2026_paper.html"
 arxiv_id: "2511.13269"
 doi: ""
-cite_key: ""
+cite_key: zhang2025your
 code: "https://github.com/linglingxiansen/SpatialSKy"
 rating: 4
 date_added: 2026-06-26

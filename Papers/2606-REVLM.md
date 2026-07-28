@@ -8,7 +8,7 @@ tags: [VLM, scene-understanding]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Liu_RE-VLM_Event-Augmented_Vision-Language_Model_for_Scene_Understanding_CVPR_2026_paper.html"
 arxiv_id: "2605.19329v2"
 doi: ""
-cite_key: ""
+cite_key: liu2026re
 code: ""
 rating: 4
 date_added: "2026-06-26"

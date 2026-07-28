@@ -8,7 +8,7 @@ tags: ["VLM"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Pi_Jailbreaking_Vision-Language_Models_via_Dissonance-Guided_Suffix_Optimization_and_Image-Phrase_Injection_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: pi2026jailbreaking
 code: "https://github.com/Trusted-LLM/DGSIP"
 rating: 4
 date_added: 2026-06-26

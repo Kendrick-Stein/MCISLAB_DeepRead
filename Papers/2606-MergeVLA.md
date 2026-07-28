@@ -8,7 +8,7 @@ tags: [VLA, manipulation, cross-embodiment]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Fu_MergeVLA_Cross-Skill_Model_Merging_Toward_a_Generalist_Vision-Language-Action_Agent_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: fu2026mergevla
 code: ""
 rating: 4
 date_added: "2026-06-26"

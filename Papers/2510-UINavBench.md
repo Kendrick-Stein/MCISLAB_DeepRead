@@ -27,7 +27,7 @@ tags:
 url: "https://openaccess.thecvf.com/content/ICCV2025/html/Agrawal_UINavBench_A_Framework_for_Comprehensive_Evaluation_of_Interactive_Digital_Agents_ICCV_2025_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: agrawal2025uinavbench
 code: ""
 rating: 5
 date_added: "2026-06-26"

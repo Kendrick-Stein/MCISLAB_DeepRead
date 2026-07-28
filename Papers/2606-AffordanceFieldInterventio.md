@@ -8,7 +8,7 @@ tags: [VLA, manipulation, spatial-reasoning]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Xu_Affordance_Field_Intervention_Enabling_VLAs_to_Escape_Memory_Traps_in_CVPR_2026_paper.html"
 arxiv_id: "2512.07472"
 doi: ""
-cite_key: ""
+cite_key: xu2025affordance
 code: ""
 rating: 4
 date_added: "2026-06-26"

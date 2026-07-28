@@ -8,7 +8,7 @@ tags: [VLM, LLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Xiang_Fine-Grained_Post-Training_Quantization_for_Large_Vision_Language_Models_with_Quantization-Aware_CVPR_2026_paper.html"
 arxiv_id: "2603.17809"
 doi: ""
-cite_key: ""
+cite_key: xiang2026fine
 code: "https://github.com/ucas-xiang/QIG"
 rating: 4
 date_added: "2026-06-26"

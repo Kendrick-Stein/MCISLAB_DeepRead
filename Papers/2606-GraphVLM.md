@@ -8,7 +8,7 @@ tags: [VLM, LLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Liu_GraphVLM_Benchmarking_Vision_Language_Models_for_Multimodal_Graph_Learning_CVPR_2026_paper.html"
 arxiv_id: "2603.13370"
 doi: ""
-cite_key: ""
+cite_key: liu2026graphvlm
 code: "https://github.com/oamyjin/GraphVLM"
 rating: 4
 date_added: 2026-06-26

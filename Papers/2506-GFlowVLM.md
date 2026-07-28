@@ -8,7 +8,7 @@ tags: ["VLM", "agentic-RL", "embodied-reasoning"]
 url: "https://openaccess.thecvf.com/content/CVPR2025/html/Kang_GFlowVLM_Enhancing_Multi-step_Reasoning_in_Vision-Language_Models_with_Generative_Flow_CVPR_2025_paper.html"
 arxiv_id: "2503.06514"
 doi: ""
-cite_key: ""
+cite_key: kang2025gflowvlm
 code: ""
 rating: 4
 date_added: "2026-06-26"

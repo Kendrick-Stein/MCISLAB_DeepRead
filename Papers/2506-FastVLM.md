@@ -8,7 +8,7 @@ tags: ["VLM"]
 url: "https://openaccess.thecvf.com/content/CVPR2025/html/Vasu_FastVLM_Efficient_Vision_Encoding_for_Vision_Language_Models_CVPR_2025_paper.html"
 arxiv_id: "2412.13303"
 doi: ""
-cite_key: ""
+cite_key: vasu2025fastvlm
 code: "https://github.com/apple/ml-fastvlm"
 rating: 4
 date_added: 2026-06-26

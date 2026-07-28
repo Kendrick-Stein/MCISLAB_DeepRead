@@ -8,7 +8,7 @@ tags: ["VLA", "embodied-reasoning", "manipulation"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Zhong_ACoT-VLA_Action_Chain-of-Thought_for_Vision-Language-Action_Models_CVPR_2026_paper.html"
 arxiv_id: "2601.11404"
 doi: ""
-cite_key: ""
+cite_key: zhong2026acot
 code: "https://github.com/AgibotTech/ACoT-VLA"
 rating: 4
 date_added: 2026-06-26

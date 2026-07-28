@@ -8,7 +8,7 @@ tags: ["manipulation", "imitation-learning", "spatial-reasoning"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Zhang_AffordGen_Generating_Diverse_Demonstrations_for_Generalizable_Object_Manipulation_with_Affordance_CVPR_2026_paper.html"
 arxiv_id: "2604.10579"
 doi: ""
-cite_key: ""
+cite_key: zhang2026affordgen
 code: ""
 rating: 4
 date_added: "2026-06-26"

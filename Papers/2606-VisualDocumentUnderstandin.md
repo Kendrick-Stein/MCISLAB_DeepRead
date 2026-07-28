@@ -8,7 +8,7 @@ tags: ["VLM", "task-planning", "agentic-RL"]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Yu_Visual_Document_Understanding_and_Reasoning_A_Multi-Agent_Collaboration_Framework_with_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: yu2026visual
 code: ""
 rating: 4
 date_added: 2026-06-26

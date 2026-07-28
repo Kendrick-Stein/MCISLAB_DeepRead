@@ -8,7 +8,7 @@ tags: [VLM, LLM]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Wei_Tackling_Model_Bias_via_Game-theoretic_Multi-agent_Collaboration_Framework_for_Hateful_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: wei2026tackling
 code: "https://github.com/NagisaG/GECO"
 rating: 3
 date_added: "2026-06-26"

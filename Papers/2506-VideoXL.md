@@ -8,7 +8,7 @@ tags: [video-LLM, video-understanding, VLM]
 url: "https://openaccess.thecvf.com/content/CVPR2025/html/Shu_Video-XL_Extra-Long_Vision_Language_Model_for_Hour-Scale_Video_Understanding_CVPR_2025_paper.html"
 arxiv_id: "2409.14485"
 doi: ""
-cite_key: ""
+cite_key: shu2024video
 code: "https://github.com/VectorSpaceLab/Video-XL"
 rating: 4
 date_added: "2026-06-26"

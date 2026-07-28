@@ -8,7 +8,7 @@ tags: [VLM, spatial-reasoning, agentic-RL]
 url: "https://openaccess.thecvf.com/content/CVPR2026/html/Jiao_Socratic-Geo_Synthetic_Data_Generation_and_Cross-Modal_Geometric_Reasoning_via_Multi-Agent_CVPR_2026_paper.html"
 arxiv_id: ""
 doi: ""
-cite_key: ""
+cite_key: jiao2026socratic
 code: ""
 rating: 4
 date_added: 2026-06-26

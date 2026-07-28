@@ -3,7 +3,7 @@ title: "Computer-Use Agents: A Unified Survey of Models, Learning, Environments,
 tags: [survey, gui-agent, computer-use, web-agent, mobile-agent, os-agent, agentic-RL]
 date_updated: "2026-07-28"
 year_range: 1997-2026
-papers_analyzed: 184
+papers_analyzed: 188
 keywords: [gui-agent, gui grounding, computer-use, computer use agent, cua, web agent, browser agent, mobile agent, desktop agent, os agent]
 exclude_tags: [deep-research]
 exclude_keywords: [deep research, information seeking, browsecomp, research agent, search agent]
@@ -414,7 +414,7 @@ Desktop 供给最先在大规模 VM 并行与可验证状态上成熟，随后�
 
 hybrid observation 并非没有代价：多通道叠加暴露了新问题——若没有 provenance、freshness 与一致性检查，更多通道会把 stale structure 变成更强的错误证据。[[Papers/2607-GUIStateBelief]] 用 735 个跨 Web、Mobile、Desktop 的 paired probes 证明这一点：模型在 image-only 读取接近饱和时，仍会在冲突下跟随 stale structure，真实网页中的结构跟随率最高达 0.88；在最多六步的 MiniWoB++ click-style episodes 中，首步冲突导致 structure-following error 后，self-recovery 不超过 0.03。这一发现改变了"通道更多、因而更可靠"的默认判断——环境暴露多少种 observation 通道，不等于模型能安全地整合它们。
 
-与视觉/结构侧的表示重构平行，web agent 有一条独立成型的 **observation reduction** 线，针对 raw DOM/HTML 常达 10k–100k token 的问题优化喂给 agent 的观察。四条路线已固化：程序化剪枝（[[Papers/2511-Prune4Web]]，候选削减 25–50×，low-level grounding 46.8→88.28）、LLM 选行检索（[[Papers/2510-FocusAgent]]，削减 >50%）、规则式结构重构（[[Papers/2605-A11yCompressor]]，OSWorld input token 压到约 22% 的同时 success +5.1pp）、与"缩短"正交的表示对齐（[[Papers/2410-AgentOccam]]）。这条线最有价值的产出是三个跨论文的校正性发现：其一，**优化 ≠ 省 token**——AgentOccam 每步观察 token 反而从 vanilla 的 2210 升到 2930，真正起作用的机制是"对齐 LLM 预训练分布 + 降噪"而非缩短长度；其二，**压缩并非普遍有益、且高度依赖底座**——[[Papers/2604-ReadMoreThinkMore]] 显示强模型（gpt-5.1、claude-sonnet-4-6）用完整 HTML 反而 +14.6~17.5pp、弱开源模型用 HTML 大幅退化（gpt-oss-20b −18.8pp）；其三，**收益随模型变强而蒸发**——Prune4Web 对 GPT-4o 零提升、FocusAgent 在 WebArena 反低于全观察（32.3 vs 36.5）。该子领域已成熟到自建廉价评测代理（[[Papers/2605-MFSCoverage]]），侧面印证方法层面接近饱和。
+与视觉/结构侧的表示重构平行，web agent 有一条独立成型的 **observation reduction** 线，针对 raw DOM/HTML 常达 10k–100k token 的问题优化喂给 agent 的观察。四条路线已固化：程序化剪枝（[[Papers/2511-Prune4Web]]，候选削减 25–50×，low-level grounding 46.8→88.28）、LLM 选行检索（[[Papers/2510-FocusAgent]]，削减 >50%）、规则式结构重构（[[Papers/2605-A11yCompressor]]，OSWorld input token 压到约 22% 的同时 success +5.1pp）、与"缩短"正交的表示对齐（[[Papers/2410-AgentOccam]]）。这条线最有价值的产出是三个跨论文的校正性发现：其一，**优化 ≠ 省 token**——AgentOccam 每步观察 token 反而从 vanilla 的 2210 升到 2930，真正起作用的机制是"对齐 LLM 预训练分布 + 降噪"而非缩短长度；其二，**压缩并非普遍有益、且高度依赖底座**——[[Papers/2604-ReadMoreThinkMore]] 显示强模型（gpt-5.1、claude-sonnet-4-6）用完整 HTML 反而 +14.6~17.5pp、弱开源模型用 HTML 大幅退化（gpt-oss-20b −18.8pp）；其三，**收益随模型变强而蒸发**——Prune4Web 对 GPT-4o 零提升、FocusAgent 在 WebArena 反低于全观察（32.3 vs 36.5）。该子领域已成熟到自建廉价评测代理（[[Papers/2605-MFSCoverage]]），侧面印证方法层面接近饱和。这条线的方法都在内容与长度轴上操作；[[Papers/2409-ElementOrdering]] 补上第三个轴——元素**呈现顺序**的扰动伤害与删除全部可见文本相当（GPT-4V 74.07→44.44，详见 §6.7.2），改变顺序的重构方案应报告顺序保持性。
 
 局部 grounding 与结构压缩之外，还有一条正交的推理期效率线——当 observation 与历史轨迹撑大 context 时如何在不掉精度下压缩存储。[[Papers/2606-StarKV]] 用 spatial mutual-information prior 替代通用 KV cache 压缩的单一 saliency 先验，在 40% 预算下与 full cache 持平；[[Papers/2601-CompressToFocus]] 把压缩折进多轮 RL，GUI-Odyssey 长程 SR +21.4pp；[[Papers/2603-STLiteKV]] 更具实质性的贡献是诊断——GUI 注意力在所有层都均匀高稀疏，导致分层预算先验（PyramidKV/VL-Cache）在低预算下崩溃。这条线与前述 belief-source 讨论正交：它按 attention/redundancy 启发式决定留哪些 token，而非按证据来源或新鲜度决定，裁剩的 token 不保证仍反映当前 UI state。
 
@@ -452,7 +452,7 @@ GUI 之外，computer-use agent 可用的动作通道还包括应用内建/自�
 
 混合通道的现有证据共同表明，效率收益与 context、权限和验证成本同时上升。
 
-[[Papers/2508-ComputerRL]] 把 API 通道系统化为工程流程：为应用自动构建 workflow API（103 个 API，覆盖 Code/Chrome/LibreOffice 三件套/VLC 共 6 类应用），在 system prompt 里同时暴露 API 函数和 10 个 GUI 原语，让 agent 自行选择；GPT-4o 上的框架消融显示纯 GUI 11.2% 到 API+GUI 26.2%（+134%），Office 域从 6.2% 升到 27.9%，说明相当一部分收益来自工程化的 API 注入而非策略本身。[[Papers/2606-WeaveBench]] 则从 benchmark 侧证实了单一通道的系统性不足：114 个覆盖 8 个真实工作领域的长 horizon 任务上，GUI-only 与 CLI-only 两种单通道设置全面崩溃（GUI-only ≤1.8%，CLI-only ≤3.5%），同一 interface ablation 下 Hybrid 升到 35.1%（Claude Opus 4.7，Δ+31.6）；全局最高 41.2% PassRate 来自另一 runtime 组合（Claude Code），与前两者非同一实验轴。最佳 rollout 中位数 76 次工具调用、16 次 GUI↔CLI 通道切换；trajectory-aware judge 相比 outcome-only grading 系统性拉低 10–20 个百分点，失败分析显示 35.2% 的失败源于 reward hacking 而非能力不足。MCP 作为最新一类通道，本综述覆盖的文献中证据仍然稀薄：[[Papers/2512-MobileWorld]] 首创的 MCP-Augmented 任务类别（40/201，19.9%）显示混合工具调用与 GUI 操作是真实 mobile 使用中被现有 benchmark 忽略的能力维度，最优框架在该类别达 51.6% SR，但最主要的失败模式是 context overflow——MCP 工具返回内容过大，直接撑爆 agent 的 context window。生产级参考架构上，[[Papers/2604-ClaudeCode]] 对 Claude Code 源码的逆向分析显示，其扩展机制按上下文代价分四层递增：Hooks（零成本）→ Skills（极低成本）→ Plugins（中等成本）→ MCP Servers（高成本，8+ 传输协议的远程工具墙），这一层级结构本身即说明 MCP 在生产系统中被当作最昂贵、需要最谨慎路由的扩展手段，而非默认通道。
+[[Papers/2508-ComputerRL]] 把 API 通道系统化为工程流程：为应用自动构建 workflow API（103 个 API，覆盖 Code/Chrome/LibreOffice 三件套/VLC 共 6 类应用），在 system prompt 里同时暴露 API 函数和 10 个 GUI 原语，让 agent 自行选择；GPT-4o 上的框架消融显示纯 GUI 11.2% 到 API+GUI 26.2%（+134%），Office 域从 6.2% 升到 27.9%，说明相当一部分收益来自工程化的 API 注入而非策略本身。[[Papers/2606-WeaveBench]] 则从 benchmark 侧证实了单一通道的系统性不足：114 个覆盖 8 个真实工作领域的长 horizon 任务上，GUI-only 与 CLI-only 两种单通道设置全面崩溃（GUI-only ≤1.8%，CLI-only ≤3.5%），同一 interface ablation 下 Hybrid 升到 35.1%（Claude Opus 4.7，Δ+31.6）；全局最高 41.2% PassRate 来自另一 runtime 组合（Claude Code），与前两者非同一实验轴。[[Papers/2606-GUIvsCLI]] 把 CLI 通道"已知边界"进一步量化为第一失败源：440 桌面任务的 matched 对照下，原始 CLI-Anything skill 库仅覆盖 37.6% 的 verifier checkpoints，CLI 失败 93.8% 归因于 skill coverage & contract gap（接口未暴露所需操作、或文档与实现不符）——CLI 侧瓶颈是接口生态覆盖而非模型能力，与 GUI 侧以执行可靠性为主的失败构成（61.3% workflow execution + 38.7% control discovery）异质。最佳 rollout 中位数 76 次工具调用、16 次 GUI↔CLI 通道切换；trajectory-aware judge 相比 outcome-only grading 系统性拉低 10–20 个百分点，失败分析显示 35.2% 的失败源于 reward hacking 而非能力不足。MCP 作为最新一类通道，本综述覆盖的文献中证据仍然稀薄：[[Papers/2512-MobileWorld]] 首创的 MCP-Augmented 任务类别（40/201，19.9%）显示混合工具调用与 GUI 操作是真实 mobile 使用中被现有 benchmark 忽略的能力维度，最优框架在该类别达 51.6% SR，但最主要的失败模式是 context overflow——MCP 工具返回内容过大，直接撑爆 agent 的 context window。生产级参考架构上，[[Papers/2604-ClaudeCode]] 对 Claude Code 源码的逆向分析显示，其扩展机制按上下文代价分四层递增：Hooks（零成本）→ Skills（极低成本）→ Plugins（中等成本）→ MCP Servers（高成本，8+ 传输协议的远程工具墙），这一层级结构本身即说明 MCP 在生产系统中被当作最昂贵、需要最谨慎路由的扩展手段，而非默认通道。
 
 针对上述 MCP 证据稀薄的缺口，近期已出现专门评测：[[Papers/2510-OSWorldMCP]] 在 computer-use agent 内基准化 MCP tool invocation，[[Papers/2506-MCPWorld]] 提供统一 API/GUI/Hybrid 测试床——两者把 MCP 从被忽略的旁路通道推进为可独立度量的接口维度（均为新近收录的工作，其结果尚未经独立验证）。
 
@@ -471,7 +471,7 @@ Web、Mobile 与 Desktop/OS 的执行环境经由 GUI、CLI、API 与 MCP 动作
 | LLM 多 agent 编排 | Orchestrator 逐子任务动态派发给 Programmer（写代码）或 GUI Operator | [[Papers/2508-CoAct1]] | OSWorld 60.76% SOTA；ablation Programmer-only 35.73%（均 1.14 步）/GUI-only 50.68%（11.20 步）/Hybrid 60.76%（10.15 步） |
 | 规则式静态 fallback | "能 CLI 就 CLI，否则退回 GUI"的确定性规则 | [[Papers/2604-ClawGUI]] | 定性描述，无受控 ablation |
 
-[[Papers/2508-CoAct1]] 的 backbone ablation（Orchestrator/Programmer 用 o4-mini/o4-mini 得 43.43%，o3/o3 得 58.72%，o3/o4-mini 得 60.76%）表明路由质量的瓶颈在于负责分派的 Orchestrator 的推理能力，而非执行子任务的模块本身；同时它在 OSWorld 上把平均步数从 GTA-1 的 15.22 步降到 10.15 步，用一段脚本替换长串易错点击序列，同时提升成功率与效率。[[Papers/2606-WeaveBench]] 的 interface ablation（GUI-only ≤1.8%，CLI-only ≤3.5%，Hybrid 35.1%）是一个跨系统、跨范式的收敛证据：无论路由决策由谁做出，排除任一通道都是灾难性的，这与 CoAct-1 的模态 ablation（代码单独 35.73% / GUI 单独 50.68% / 混合 60.76%）指向同一结论——两种模态互补而非替代。[[Papers/2607-StateAct]] 从相反的路由方向补上第三个收敛证据：即使在把 code 设为默认通道、GUI 仅作 render-only 兜底的 state-first 编排中（GUI subagent 只出现在 28/108 任务、占 main-agent steps 的 1.1%），完全移除 GUI 的 bash-only 配置在 OSWorld 2.0 上也只有 45.9% mean partial、低于 screenshot reference 的 54.8%，把 GUI subagent 换成较弱的 SFR-CUA 则从 61.6% 降到 43.2%——GUI 通道的存在与质量都不可省略，无论路由默认方向是 GUI 优先还是 code 优先。
+[[Papers/2508-CoAct1]] 的 backbone ablation（Orchestrator/Programmer 用 o4-mini/o4-mini 得 43.43%，o3/o3 得 58.72%，o3/o4-mini 得 60.76%）表明路由质量的瓶颈在于负责分派的 Orchestrator 的推理能力，而非执行子任务的模块本身；同时它在 OSWorld 上把平均步数从 GTA-1 的 15.22 步降到 10.15 步，用一段脚本替换长串易错点击序列，同时提升成功率与效率。[[Papers/2606-WeaveBench]] 的 interface ablation（GUI-only ≤1.8%，CLI-only ≤3.5%，Hybrid 35.1%）是一个跨系统、跨范式的收敛证据：无论路由决策由谁做出，排除任一通道都是灾难性的，这与 CoAct-1 的模态 ablation（代码单独 35.73% / GUI 单独 50.68% / 混合 60.76%）指向同一结论——两种模态互补而非替代。[[Papers/2607-StateAct]] 从相反的路由方向补上第三个收敛证据：即使在把 code 设为默认通道、GUI 仅作 render-only 兜底的 state-first 编排中（GUI subagent 只出现在 28/108 任务、占 main-agent steps 的 1.1%），完全移除 GUI 的 bash-only 配置在 OSWorld 2.0 上也只有 45.9% mean partial、低于 screenshot reference 的 54.8%，把 GUI subagent 换成较弱的 SFR-CUA 则从 61.6% 降到 43.2%——GUI 通道的存在与质量都不可省略，无论路由默认方向是 GUI 优先还是 code 优先。[[Papers/2606-GUIvsCLI]] 在无路由的 matched 设置下补上第四个数据点——类别级互补：Web 类 GUI 88.2% vs CLI 35.3%（skill 修补亦无改善），CAD & 3D 类 CLI 67.3% vs GUI 46.9%，互补性不只出现在系统级消融，也直接体现在受控的任务类别分布上（该文两侧禁用对方通道，故对"谁来路由"不提供证据）。
 
 这一路由问题与 §4.5 讨论的混合观察融合问题结构对称：前者要决定该用哪个通道执行，后者要决定该信任哪个证据来源，两者都需要一个显式的仲裁策略，简单地把所有通道/证据都暴露给模型并不自动带来更好结果。[[Papers/2606-WeaveBench]] 的失败分析给出了这一对称性的反例——当模型可以自由选择通道时，35.2% 的失败属于 reward hacking（包括伪造渲染、CLI 绕过 GUI 检查等），说明自由路由有时会被模型用来选择最容易伪造证据的通道，而非功能上正确的通道；这是路由侧的失败模式，与 [[Papers/2607-GUIStateBelief]] 在观察侧发现的 stale-structure-following 是同一类"多通道仲裁缺位"问题的两个实例。
 
@@ -764,6 +764,8 @@ Observation reduction 的证据否定了"越短越好"的简单目标。A11yComp
 
 Web reduction 的独立结果进一步强化这一边界。Prune4Web 将候选元素减少 25–50 倍，并在其 low-level grounding 设置中把准确率从 46.8 提到 88.28，但对 GPT-4o 的 task-level 结果没有提升 [[Papers/2511-Prune4Web]]；FocusAgent 剪除约一半 AXTree 后，在 WebArena 上低于完整 observation，说明选择性 reduction 的代价并非免费 [[Papers/2510-FocusAgent]]。
 
+内容与长度之外，**呈现顺序**是被长期忽略的第三个变量。[[Papers/2409-ElementOrdering]] 在 VisualWebArena easy 子集上做顺序隔离消融：随机打乱元素顺序使 GPT-4V 从 74.07% 降到 44.44%（Gemini 1.5 从 64.03% 到 37.04%），伤害与删除全部可见 HTML 文本相当、超过删除任何其他单一属性——DOM pre-order 序携带的层级/功能分组信息本身就是内容。无结构的 pixel-only 场景中，对检测元素 bbox 坐标做 t-SNE 2D→1D 排序稳定优于 raster 扫描序（三模型 +2~5pp），但最优序依赖元素来源质量（人工标注 bbox 时 raster 反超）。对本节 reduction/重构类方法的直接含义：改变元素顺序的重构可能在不知情中付出该代价，重构方案应报告顺序保持性。证据边界：2024 年 GPT-4V/Gemini 1.5 代际，强推理模型上的顺序敏感性未测——按 ReadMoreThinkMore 的能力×表示交互模式，顺序敏感性也可能是 regime 依赖的。
+
 #### 6.7.3 视觉 history 的压缩路线
 
 视觉 history 的效率优化则形成正交路线。STaR-KV 在 UI-TARS 的 40% cache budget 下得到 49.94，对应 full cache 的 49.75；20% budget 将 ScreenSpot-Pro 峰值显存由 37.36 GB 降至 22.97 GB [[Papers/2606-StarKV]]。Compress-to-Focus 用 action-relevant ROI 裁剪历史截图，使 observation 数从 1 增至 3 时的 token 增幅由 semi-online RL 的 41% 降至约 4%，并在 GUI-Odyssey 的三项设置之一取得 21.4pp 提升 [[Papers/2601-CompressToFocus]]。ST-Lite 在 10–20% cache budget 下报告 2.45× decoding acceleration；该工作其余结果本文未逐项核验，此处仅采用已核验的 acceleration 与"GUI attention 跨层高稀疏"结论 [[Papers/2603-STLiteKV]]。
@@ -795,8 +797,11 @@ Memory 研究已经从"是否保存历史"转向"保存什么证据、何时失�
 | Raw trajectory / screenshot history | 原始 observations 与 actions | 高保真、实现简单 | context 膨胀、无关像素干扰、stale evidence |
 | Validated delta chain | 双帧验证后的 `ΔS_t` | 只保存已确认状态变化 | append-only 链仍可能累积 verifier error |
 | Latent memory | 压缩成 soft token | 紧凑、可端到端训练 | belief source 不可读、难审计 |
-| Workflow / skill memory | 自然语言或代码化过程 | 跨任务复用 | UI drift、权限变化与回归 |
+| Workflow / skill memory | 自然语言或代码化过程 | 跨任务复用 | UI drift、权限变化与回归；online 积累在预算匹配下净值可为负、资产约半数被失败轨迹污染 [[Papers/2606-SkillMemoryBudget]] |
 | Context-as-action | policy 主动折叠 history/state | 将保留决策内化到模型 | 需要训练 context action；错误折叠难恢复 |
+| 外置 curator 模型 | 独立小模型每 turn 重写 workspace | 兼容冻结/闭源 executor；curation 作为专门技能单独训练 | curator 自身推理开销易漏记；与 executor 无联合优化 |
+
+外置路线的首个 RL 实例是 [[Papers/2604-ActiveContextCurator]]：7B curator（MT-GRPO，稀疏任务完成 reward）配冻结 executor，WebArena 上 Gemini-3.0-flash 36.4→41.2%、GPT-4o-mini 12.7→21.8%——因执行权重全程冻结，这是"只改 context 内容"的干净因果对照，且 RL 后的 7B 追平 GPT-4o 作 curator（curation 是可训练专门技能的证据）。证据边界：其 token 节省口径仅计 executor 侧输入 context，curator 自身推理开销未入账，不能读作端到端成本下降；论文正文与结果表的 WebArena 域数不一致（四 vs 五），无多 run 方差。
 
 #### 6.9.2 Verified delta 与 latent compression
 
@@ -1026,6 +1031,8 @@ SKILL.nb 与 Resource2Skill 相互独立地指向同一结论：可执行 skill 
 
 Resource2Skill 把 skill 的来源轴从 agent 自身经验扩展到人类既有多模态资源：tutorial video、代码仓库、文章与参考 artifact 经 vision-capable LM 蒸馏为 4,893 条分层 Skill Wiki 条目，入库前须通过五道 deterministic acceptance gates（schema 完整性、provenance、SHA1 去重、模态一致性、sandbox 可执行性）。在 PPT/Excel/Web/Blender 等七个软件创作 domain、四个 GPT-5.x backbone 的同 backbone 对照中，带 skill 平均 56.8% 对 no-skill 45.0%（GPT-5.4 rubric judge 评分，self-hosted programmatic 执行）；去掉 video 源平均下降 9.5 个百分点而 video 单源即达 66.8%，0→200 条 skill 已获得大部分收益；online 补库仅在缺失能力压力集上有效（41.2%→62.8%），标准集上接近噪声（+0.7 pp）[[Papers/2606-Resource2Skill]]。证据边界：七个 domain 全部经 programmatic 接口执行（openpyxl、bpy、ReaScript 等），无 screenshot 观察与 GUI 动作，对 screenshot-based CUA 只能作为邻接可迁移证据；judge 与被测 agent 同属 GPT-5.x 家族（judge-human 一致性 ρ=0.71 为中等水平），且缺少 matched-budget 原始资源 RAG 对照，蒸馏环节相对"直接提供原始资源"的净价值尚未被隔离。
 
+[[Papers/2606-SkillMemoryBudget]] 从预算侧给验收闸门论点加上更严苛的对照条件：online 设置（每任务都付检索/归纳/注入开销）下，AWM/ASI/ReasoningBank 三种自积累方法在 token-matched vanilla 对照（同预算换 15 步交互上限）面前于 3 模型 × 3 WebArena 域全面失守（Gemini 3 Flash 聚合 50.74% vs 三方法 44.98–47.86%，GPT-5.4-mini 与 Qwen 3.6-27B 同向），WorkArena-L1 上仅 ReasoningBank 追平。机制是双重成本（模块显式调用 + 注入导致的 actor prompt 膨胀，如 Admin 域 98.4K→135.0K）叠加资产污染：AWM 归纳的 workflow 约半数源自失败轨迹（49.5/52.3%）、ReasoningBank 过半 success 标签实为失败轨迹（52.9/59.5%）、ASI 的 skill 验证高假阳（首步失败率跨 9.8–72.2%，失败多被 actor 兜底后坏函数照常入库）。这与 SKILL.nb 的 gate 消融（去 gate 回归率 3.3%→18.6%）互为正反面：现有 online 方法自带的验收环节不合格，合格闸门是这条路线成立的前提。结论边界在 offline 摊销（Resource2Skill 式预构建）之外；此后任何 online skill/memory 增益主张应默认要求 budget-matched vanilla 对照与多 run 方差报告。
+
 ### 7.12 Continual Learning
 
 本节方向的文献证据仍然薄弱：跨 UI version 与 domain 的长期顺序适应缺少系统性研究（另见 §7.15）。
@@ -1174,8 +1181,9 @@ Desktop benchmark 已从单应用 task completion 推进到 professional workflo
 | CHI-Bench [[Papers/2605-CHIBench]] | policy-rich professional workflow，经 MCP tools 操作多系统状态 | deterministic contract + rubric judge | 医疗行政模拟；更接近 MCP/service agent 而非纯视觉 CUA |
 | SaaS-Bench [[Papers/2605-SaaSBench]] | browser-only 操作真实 SaaS | state/content checks + judge | 可作为 hybrid benchmark 的纯 GUI 控制组 |
 | ToolVerse [[Papers/2607-ToolVerse]] | 大规模 mock MCP/tool environment | turn-level dictionary matching | 不含 GUI handoff，不能直接测跨接口 orchestration |
+| GUI-vs-CLI matched [[Papers/2606-GUIvsCLI]] | 440 桌面任务上 GUI 与 skill-mediated CLI 同目标/初态/verifier，各限 modality-native 动作 | executable final-state verifier | 无 hybrid/MCP arm；应用入选以存在 CLI-Anything skill 为条件 |
 
-本综述未检索到 source-verified 的等预算实验：同一 task、同一 backbone、同一 verifier 下，比较 GUI-only、API-only、MCP-only 与 adaptive hybrid，并审计 UI bypass、permission escalation、state divergence 与切换成本。该缺口不能由 tool-use benchmark 或 browser-only benchmark 单独填补。
+上述缺口的 GUI/CLI 两臂已被 [[Papers/2606-GUIvsCLI]] 部分补上：440 桌面任务的 matched 对照（含同 backbone 配对——GPT-5.4 GUI 59.1% vs Codex GPT-5.4 CLI 24.3%；最强对最强 59.1% vs 48.2%）显示原始 skill 库仅覆盖 37.6% 的 verifier checkpoints、CLI 失败 93.8% 归因 skill coverage & contract gap；verifier-guided 修补把 Codex GPT-5.5 提到 69.3%，但作者明示修补使用了 verifier 信息，该数字只能读作覆盖补齐后的上界估计而非公平模态对照。仍然缺失的是 hybrid 与 MCP arm 的同场对照、adaptive 切换，以及 UI bypass、permission escalation、state divergence 与切换成本的审计——该剩余缺口不能由 tool-use benchmark 或 browser-only benchmark 单独填补。
 
 ### 8.7 Long-Horizon/Professional
 
@@ -1334,13 +1342,13 @@ CUA benchmark 的不可复现性来自四个不同层面：任务/参考答案�
 | Gold / grader leakage | [[Papers/2510-HAL]] 报告 benchmark example 进入 scaffold 的单项泄漏；[[Papers/2606-WeaveBench]] 将读取 ground-truth artifact 与伪造 output 列为作弊模式 | grader 在运行后注入、reference 与 task config 分离、agent-visible filesystem 审计 |
 | Original→Verified release | WebArena-Verified 的使用见 [[Papers/2606-SkillNb]]；OSWorld-Verified 与后继 release 的边界见 [[Papers/2606-OSWorld2]] | release ID、checker commit、task exclusions 与 migration table；原版和 Verified 不共用 leaderboard denominator |
 | Static→Live drift | [[Papers/2504-OnlineMind2Web]]、[[Papers/2604-Odysseys]] | 时间戳、paired rerun、site-failure breakdown 与维护窗口 |
-| Data draw / run nondeterminism | [[Papers/2607-TeachStop]] 的单工作 variance decomposition | data-draw × seed crossed design、paired task statistics、完整 run distribution |
+| Data draw / run nondeterminism | [[Papers/2607-TeachStop]] 的单工作 variance decomposition；[[Papers/2606-SkillMemoryBudget]] 的 any/all-of-3 区间（web 域） | data-draw × seed crossed design、paired task statistics、完整 run distribution |
 | Partial evaluation bias | [[Papers/2607-AgentBenchmarkBudget]] 的 completed-record replay | 预注册 pairwise error、task-group coverage、unresolved rate 与 selection policy |
 | Persistent-state contamination | [[Papers/2606-AlwaysOnAgents]]、[[Papers/2606-AgentTracesToTrust]] | provenance、freshness、deletion propagation、rollback trace 与 session isolation |
 
 #### 8.13.2 方差、Release 与证据边界
 
-[[Papers/2607-TeachStop]] 的结论应表述为某一训练系统中的发现：evaluation noise 较小，而 data draw 与 run-to-run nondeterminism 主导结果；它尚不是 Android、desktop 与 live web 的普遍定律。对应的最低报告单位应从单次 headline gain 改为 task-level paired outcomes、多个独立 data draws、多个 runs、环境故障和完整分布形态。
+[[Papers/2607-TeachStop]] 的结论应表述为某一训练系统中的发现：evaluation noise 较小，而 data draw 与 run-to-run nondeterminism 主导结果；它尚不是 Android、desktop 与 live web 的普遍定律。[[Papers/2606-SkillMemoryBudget]] 在 web 评测侧补上第二个独立数据点：WebArena/WorkArena 上 any-of-3 与 all-of-3 成功率差距可达 10–19pp（GPT-5.4-mini Vanilla Shopping 46.52 vs 27.81），对跨任务积累状态的方法更严重，作者将 multi-run 方差与全模块 token 总量并列为一等评测标准。对应的最低报告单位应从单次 headline gain 改为 task-level paired outcomes、多个独立 data draws、多个 runs、环境故障和完整分布形态。
 
 Verified 重发不是对旧分数的简单修补，而是新的 benchmark release。论文必须标明原版/Verified、task exclusions、checker version、environment image、step budget、backbone/scaffold 与 verifier；无法对齐时只能并列报告，不能计算跨 release 的相对进步。
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-回归 eval harness — thesis-figure-skill 的"安全网"
+回归 eval harness — academic-diagram 的"安全网"
 
 目的：把"我觉得这次改好了"变成**可测量的前后 pass-rate 差**。
 对一组冻结的 fixture 跑完整确定性管线，与 baselines/ 对比；
@@ -212,7 +212,7 @@ def discover() -> list[tuple[str, str, Path]]:
 # ── 主流程 ───────────────────────────────────────────────────────────────
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="thesis-figure-skill 回归 eval harness")
+    ap = argparse.ArgumentParser(description="academic-diagram 回归 eval harness")
     ap.add_argument("--update-baselines", action="store_true",
                     help="把当前结果冻结为 baseline（先人工确认当前状态正确）")
     ap.add_argument("-k", "--filter", default="", help="只跑名字含该子串的 fixture")

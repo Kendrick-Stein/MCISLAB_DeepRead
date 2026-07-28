@@ -235,6 +235,17 @@ tags: [daily-papers, tag1, tag2, ...]
 
 **告知用户**：抓取 K 篇，精读 N 篇（rating 3: X / 2: Y / 1: Z），跳过 M 篇
 
+## Guard
+
+- **秘钥零泄漏**：`LEXMOUNT_API_KEY` 等 key 只从环境变量或被 `.gitignore` 忽略的 `.env` 读取，不得写入日志、总结文件或任何可提交文件。
+- **prepare 阶段零共享写入**：并行 preparer 禁止写 Papers、queue、日志、BibTeX cache、survey-updates 与 daily 文件；共享写入只由 coordinator 串行 commit。
+- **并发有界**：所有 preparer + nested verifier 不得突破 global `parallel_limit`，必须给 verifier 和 coordinator 留槽位；不得把候选无界并发派发。
+- **`--collect-only` 只收集**：返回分流结果与稳定 paper_key 后停止，禁止 enqueue 与 Step 3-5。
+- **partial 也要产出**：单篇 commit 失败不回滚已成功论文；不得因尾部 agent 超时让整轮无产物——输出 `run_status: partial` + 失败清单。
+- **evidence boundary 不包装**：Evidence Ledger 中 `unsupported` / `contradicted` / `not-checkable` 的 claim 不得写成肯定结论。
+- **公众号解读不当论文点评写**；搜狗限流时跳过公众号步骤，不阻塞主流程。
+- **Subagent prompt 完整性**：点评 subagent 必须携带完整的点评模板与点评原则，不得省略。
+
 ## Verify
 
 - [ ] `Workbench/daily/.candidates.json` 存在且非空

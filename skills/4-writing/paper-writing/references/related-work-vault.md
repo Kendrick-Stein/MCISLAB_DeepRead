@@ -1,20 +1,18 @@
----
-name: related-work
-description: >
-  当 Supervisor 给出自己论文的 LaTeX 草稿（.tex）并要求"写 related work""起草相关工作"时，
-  基于 Papers/ 已读论文与 Topics/ survey 起草英文 LaTeX Related Work 章节，
-  所有 \cite{} 来自 references.bib，evidence-driven 不编造。
-argument-hint: "<draft.tex 路径> [topic] [段落数预算，默认 4]"
-allowed-tools: Read, Write, Edit, Bash, Glob, Grep
----
+# Related Work — vault 溯源起草流程
 
-## Purpose
+（原独立 skill `related-work`，2026-07-28 并入 paper-writing，对应其 11-step 的 Step 7。
+触发：Supervisor 给出自己论文的 LaTeX 草稿并要求"写 related work""起草相关工作"。）
 
-LaTeX 投稿写作链的成文端。与既有 skill 的分工：
+基于 Papers/ 已读论文与 Topics/ survey 起草英文 LaTeX Related Work 章节，
+所有 `\cite{}` 来自 references.bib，evidence-driven 不编造。
+
+与 citation 链其他环节的分工：
 - `latex-citation-enhancer`：保证 references.bib 条目准确（引用身份）。
 - `auto-cite`：给**已写好**的草稿逐句补引用（引用位置）。
-- 本 skill：从零**起草** Related Work 章节本身（叙事 + 选文 + 成文），输出英文 LaTeX。
-- `draft-section`：中文 vault 笔记章节，与本 skill 输出物不同。
+- 本流程：从零**起草** Related Work 章节本身（叙事 + 选文 + 成文），输出英文 LaTeX。
+- Draft 模式（references/draft-mode.md）：中文 vault 笔记章节，与本流程输出物不同。
+
+参数：`<draft.tex 路径> [topic] [段落数预算，默认 4]`
 
 ## Steps
 
@@ -31,12 +29,12 @@ python3 skills/4-writing/latex-citation-enhancer/fetch_bibtex.py --offline
 
 ### Step 2：理解草稿定位
 
-用 Read 读取 draft.tex，提取：论文的核心贡献 claim、方法关键词、目标 venue 风格线索、
+Read draft.tex，提取：论文的核心贡献 claim、方法关键词、目标 venue 风格线索、
 已有的 Related Work 章节或占位符。据此确定本文需要"对比并区隔"的 2-5 条相关工作线。
 
 ### Step 3：借 survey 取叙事结构
 
-用 Grep 在 `Topics/*-Survey.md` 中找与 topic 匹配的 survey（frontmatter keywords），
+Grep `Topics/*-Survey.md` 找与 topic 匹配的 survey（frontmatter keywords），
 Read 其分类框架与 Key Takeaways。Related Work 的段落划分优先沿用 survey 的成熟分类，
 每段结尾回扣"本文与该线工作的区别"。
 
@@ -63,9 +61,9 @@ Read 其分类框架与 Key Takeaways。Related Work 的段落划分优先沿用
 ### Step 6：missing citations 清单
 
 在会话中输出库外必引论文清单（标题 + 一句话理由 + 建议的 arXiv 检索词），
-建议 Supervisor 先对它们跑 paper-digest 再重跑本 skill 补全。
+建议 Supervisor 先对它们跑 paper-digest 再重跑本流程补全。
 
-## Guard
+## Guard（Related Work 流程专属）
 
 - `\cite{}` 的 key 必须存在于 references.bib / paper_index.json——禁止编造 key 或凭
   训练记忆引用库外论文。
@@ -73,16 +71,18 @@ Read 其分类框架与 Key Takeaways。Related Work 的段落划分优先沿用
 - 不改动 draft.tex 中 Related Work 以外的任何内容。
 - 对 Supervisor 自己论文的贡献陈述不做修改，只写相关工作。
 
-## Verify
+## Verify（Related Work 流程专属）
 
 - [ ] 产出的所有 `\cite{key}` 均能在 .bib 中 grep 到
 - [ ] 每段有与本文的区隔句（"In contrast, ..." / "Unlike ..."）
 - [ ] EVIDENCE 注释完整；missing 清单已输出（可为空）
 - [ ] LaTeX 可编译（至少无未闭合环境；有条件时跑 pdflatex 冒烟）
 
-## Examples
+## Example
 
-`/related-work ~/papers/afe/main.tex "agent-facing environment" 4` →
-借 Topics/CUA-Survey 的分类起草 4 段（GUI agents、agent 环境与
-benchmark、verifier/reward、runtime affordance），28 个 cite 全部来自 references.bib，
+`main.tex + "agent-facing environment" + 4 段` →
+借 Topics/CUA-Survey 的分类起草 4 段（GUI agents、agent 环境与 benchmark、
+verifier/reward、runtime affordance），28 个 cite 全部来自 references.bib，
 missing 清单 2 篇。
+
+写作质量标准（三步流程、常见反模式）另见 [related-work-guide.md](related-work-guide.md)。

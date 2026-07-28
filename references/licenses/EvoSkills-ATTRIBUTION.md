@@ -37,7 +37,7 @@
    - `experiment-pipeline` / `experiment-craft` → `experiment-design` / `experiment-track` / `result-analysis`（产出改为指向 `Experiments/` 记录）
    - `paper-navigator` → `paper-digest` / `literature-survey`
    - `evo-memory` → `Workbench/memory/`
-   - `paper-writing` 的 Related Work 小节额外指向本 vault 的 `related-work` skill（确保 `\cite` 可溯源到 `references.bib`），原 `related-work-guide.md` 保留作为写作质量参考
+   - `paper-writing` 的 Related Work 小节额外指向本 vault 的 Related Work 溯源流程（原独立 `related-work` skill，2026-07-28 并入为 `paper-writing/references/related-work-vault.md`；确保 `\cite` 可溯源到 `references.bib`），原 `related-work-guide.md` 保留作为写作质量参考
 5. **协议整形**：为每个文件补齐 `## Purpose` 与 `## Steps` 两个必需 section（原文多为 `# Title` + `## When to Use` + 主题式小节），内容未改写，仅做标题降级/包裹。
 6. **署名头**：每个 SKILL.md 的 frontmatter 之后新增一行 `> Vendored from EvoScientist/EvoSkills ...` 指回本文件与 license 原文。
 

@@ -6,15 +6,43 @@ description: |
   附 8 条硬约束、canonical 箭头、before/after 范例、一个静态检查入口 (lint.sh)。
   Use when: 写/审 TikZ 或 LaTeX 图代码、修图的排版/对齐/溢出/箭头问题、
   tikz layout、latex figure code、tikz 编译报错、CJK 中文图渲染成色块。
+argument-hint: "[figure.tex 路径 / TikZ 代码问题描述]"
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 
 # TikZ Figure Code — 写对 + 编辑安全的工程基础
 
-这是**确定性地基**：怎么写出编译干净、不重叠、改一处不崩的 TikZ 代码。
-它**不**管"画什么图才美"——那是设计/编排层（见 [thesis-figure-skill](../thesis-figure-skill/SKILL.md)）的事。
-本技能管的是：无论画什么，代码本身得**写对、扛得住编辑**。
+## Purpose
 
-> 一句话定位：thesis-figure-skill 决定**画什么**，本技能保证**怎么写不出错**。
+这是**确定性地基**：怎么写出编译干净、不重叠、改一处不崩的 TikZ 代码。
+它**不**管"画什么图才美"——那是设计/编排层（见 [academic-diagram](../academic-diagram/SKILL.md)）的事。
+本技能管的是：无论画什么，代码本身得**写对、扛得住编辑**。
+输入是待写/待修的 TikZ 代码或排版 bug，输出是按构造布局、通过 lint 的 .tex。
+
+> 一句话定位：academic-diagram 决定**画什么**，本技能保证**怎么写不出错**。
+
+## Steps
+
+1. 写新图 / 审已有图前，按「5 条 idiom」检查布局写法（相对定位、anchor 连线、fit 容器）。
+2. 修排版/对齐/箭头 bug 时，先对照「8 条硬约束」定位违反项（全集加载 `references/hard-constraints.md`）。
+3. 写完/改完跑 `bash references/lint.sh figure.tex`（validator → 编译 → missing-char → overlap-checker → design-linter）。
+4. lint 退出码 0 后**仍必须 Read 渲染 PNG 亲眼确认**——static checker 对 zone 重叠/边框切穿内容类崩坏全盲。
+
+## Guard
+
+- **禁止手填绝对坐标搭宏观骨架**——模块/zone 层必须按构造布局（嵌入 viz 内部可局部手画，但须挂父节点 anchor）。
+- **禁止把同一间距/边界数字抄写在多处**——布局节奏只定义一次。
+- **禁止手写 `-{Stealth[scale=X]}` 箭头**——只用 canonical styles，调 `line width` 三档。
+- 8 条硬约束（CJK rotate=90、`\texttt` 中文、missing-char 静默、直线 rounded corners、
+  缺 bending library、`|-` pierce 等）违反必失败，不可绕过。
+- lint 通过 ≠ 图没问题——**不允许跳过看图直接交付**。
+
+## Verify
+
+- [ ] `bash references/lint.sh figure.tex` 退出码 0（无硬 bug）
+- [ ] `grep "Missing character" *.log` 为空
+- [ ] 渲染 PNG 已用 Read 亲眼查看，无 zone 重叠/切穿/大空白
+- [ ] 宏观骨架无绝对坐标、连线全部走节点 anchor
 
 ## 为什么需要它（问题的根）
 
@@ -92,7 +120,7 @@ description: |
 ## Canonical 箭头（别手写 `-{Stealth[scale=X]}`）
 
 用预定义 style，只调 `line width`（0.6/1.0/1.6pt 三档），tip 自动跟随。详见
-`../thesis-figure-skill/references/tikz-template.tex` 的 6 个 canonical styles。铁律：
+`../academic-diagram/references/tikz-template.tex` 的 6 个 canonical styles。铁律：
 - **< 1.5cm 短箭头**必用 `arrow short`（tip 3pt），否则默认 6.5pt tip 把 stem 吃光 = "只剩个头"。
 - **fan-out 分叉的 stub** 用 `fan_stub`（`shorten <=0pt`，紧贴 spine 无 gap），不用 `arrow`。
 - **`\usetikzlibrary{bending}` 必加载**。
@@ -110,14 +138,14 @@ bash references/lint.sh figure.tex
 （图记不记得住、跨面板数字自洽、新几何对不对）。**lint 过了仍必须亲眼看渲染 PNG**——
 很多崩坏（zone 重叠、边框切穿内容）static 全盲，只有看图才发现。
 
-## 何时用本技能 vs thesis-figure-skill
+## 何时用本技能 vs academic-diagram
 
 | 你要做的 | 用 |
 |---|---|
 | 写/审任何 TikZ 图代码、修排版/对齐/溢出/箭头 bug、CJK 渲染问题 | **本技能** |
-| 把论文文案/参考图变成成品配图（设计 + 编排 + 视觉迭代 + skeleton 复用） | thesis-figure-skill（它在代码正确性层 compose 本技能） |
+| 把论文文案/参考图变成成品配图（设计 + 编排 + 视觉迭代 + skeleton 复用） | academic-diagram（它在代码正确性层 compose 本技能） |
 
-thesis-figure-skill 的 6 个 `example-skeleton-*.tex` 已全部按这 5 条 idiom 重写，是本技能最好的 worked examples。
+academic-diagram 的 6 个 `example-skeleton-*.tex` 已全部按这 5 条 idiom 重写，是本技能最好的 worked examples。
 
 ## 按需加载
 

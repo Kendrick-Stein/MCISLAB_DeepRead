@@ -1,13 +1,22 @@
 ---
 name: domain-presentation
-description: 使用 guizang-ppt-skill 生成 Domain Map 的 HTML 可视化展示，可在网站直接浏览。当用户要求为某个 domain map 生成 PPT/可视化展示，或说"做个 domain presentation"、"生成领域地图网页"时使用。
+description: >
+  使用 guizang-ppt-skill 生成 Domain Map 的 HTML 可视化展示，可在网站直接浏览。
+  当用户要求为某个 domain map 生成 PPT/可视化展示，或说"做个 domain presentation"、
+  "生成领域地图网页"时使用。
+argument-hint: "<DomainName，对应 DomainMaps/{DomainName}.md>"
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 
 # Domain Map Presentation
 
-将 Domain Map 转化为可视化 HTML 演示文稿，可在 Quartz 站直接浏览。
+## Purpose
 
-## 工作流
+将 `DomainMaps/{DomainName}.md` 转化为可视化 HTML 演示文稿（10-15 页），发布到 Quartz 站
+`static/presentations/` 下供直接浏览。输入是已有的 Domain Map 笔记，输出是 HTML 演示 +
+一条待 Human 审核的导航链接建议（经 queue）。
+
+## Steps
 
 ### Step 1 · 选择 Domain Map
 
@@ -78,6 +87,21 @@ python3 skills/1-literature/daily-papers/queue_ops.py enqueue-review \
 ```
 
 Human 批准后再补入：`[🌐 在线浏览 HTML 演示](/static/presentations/{DomainName}/index.html)`。
+
+## Guard
+
+- **不直接修改 DomainMaps/ 文件**——导航链接建议只经 queue review 提交，Human 批准后才补入
+  （DomainMaps 的直接编辑仅由 survey-refresh 或 Human 完成）。
+- HTML 必须放在 `website/content/static/presentations/` 下——`content/` 里的 `.html` 会被
+  Quartz 处理掉扩展名，导致路径失效。
+- 演示内容只基于 Domain Map 已有内容组织重排，**不新增/虚构领域结论**。
+
+## Verify
+
+- [ ] `website/content/static/presentations/{DomainName}/index.html` 存在且本地可打开
+- [ ] `npx quartz build` 通过，无构建错误
+- [ ] queue.json 中已有对应的 Human review 条目
+- [ ] 页数在 10-15 页区间，封面/架构/路线/数据/问题五类页齐备
 
 ## 输出位置
 

@@ -1,7 +1,8 @@
 ---
 name: paper-writing
-description: "Guides writing academic papers section by section using an 11-step workflow with LaTeX templates and counterintuitive writing tactics. Covers Abstract, Introduction, Method, Experiments, Related Work, Conclusion, and Supplementary. Use when: user asks to write or draft a paper section, needs LaTeX templates, wants to improve academic writing quality, optimize novelty framing, or mentions 'write introduction', 'draft method', 'paper writing'. Do NOT use for pre-submission review (use paper-review), experiment execution (use experiment-design/experiment-track/result-analysis), or paper planning/story design (use paper-planning)."
-allowed-tools: Read, Write, Edit, Glob, Grep
+description: "统一写作技能：从 vault 素材起草章节（Draft 模式）到英文 LaTeX 论文分节写作（11-step Paper 模式，含 Related Work 溯源起草）。Use when: 用户说'写一下 introduction''起草 related work''起草报告章节''write introduction''draft method''paper writing'，需要 LaTeX 模板、优化学术写作质量或 novelty framing，或 autoresearch 判断某 direction 已积累足够素材需要成文。Do NOT use for: pre-submission review (paper-review)、experiment execution (experiment-design/track/result-analysis)、paper planning/story design (paper-planning)、打磨已有文稿 (writing-refine)。"
+argument-hint: "[draft: <target> <section> <sources>] 或 [paper: <draft.tex 路径> <section>]"
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 metadata:
   author: EvoScientist
   version: '1.0.0'
@@ -10,20 +11,33 @@ metadata:
   license: Apache-2.0
 ---
 
-> Vendored from [EvoScientist/EvoSkills](https://github.com/EvoScientist/EvoSkills) (Apache-2.0), adapted for ReadPaperMachine（工具名/交叉引用/Guard/Verify 本地化）。License: references/licenses/EvoSkills-Apache-2.0.txt
+> Paper 模式 vendored from [EvoScientist/EvoSkills](https://github.com/EvoScientist/EvoSkills) (Apache-2.0), adapted for ReadPaperMachine（工具名/交叉引用/Guard/Verify 本地化）。License: references/licenses/EvoSkills-Apache-2.0.txt
+> Draft 模式与 Related Work 流程来自本 vault 原 `draft-section` / `related-work` skill（2026-07-28 并入）。
 
 # Paper Writing
 
 ## Purpose
 
-按 11 步工作流系统性地撰写学术论文各个 section（Abstract、Introduction、Method、Experiments、Related Work、Conclusion、Supplementary），配套 LaTeX 模板与经过实践检验的写作原则。输入是 `paper-planning` 产出的 story/experiment plan 等 artifact，以及 `Experiments/` 中记录的实验结果；输出是可直接编译的 LaTeX 论文草稿，供 `paper-review` 做 self-review。
+MindFlow 的统一写作技能，覆盖"先 draft 再 paper"的完整成文链：
 
-## When to Use This Skill
+- **Draft 模式**：从 vault 素材（Papers/Experiments/Ideas/Topics 笔记）起草报告或论文的
+  指定章节，中文成文、claim 全部带 `[[wikilink]]`。详细流程见 [references/draft-mode.md](references/draft-mode.md)。
+- **Paper 模式**：按 11 步工作流撰写英文 LaTeX 论文各 section（Abstract、Introduction、
+  Method、Experiments、Related Work、Conclusion、Supplementary），配套模板与写作原则。
+  输入是 `paper-planning` 产出的 story/experiment plan artifact 与 `Experiments/` 实验结果；
+  输出是可编译的 LaTeX 草稿，供 `paper-review` 做 self-review。
+  其中 Related Work 一节用 vault 溯源流程起草（`\cite` 全部可溯到 references.bib），
+  见 [references/related-work-vault.md](references/related-work-vault.md)。
 
-- User asks to write or draft a paper or paper section
-- User needs LaTeX templates for Abstract, Introduction, Method, Experiments, etc.
-- User wants to improve academic writing quality
-- User mentions "paper writing", "write introduction", "draft method section", etc.
+## Mode Selection
+
+| 情形 | 走哪个模式 |
+|------|-----------|
+| 起草 Reports/、Topics/ 报告章节；论文早期中文草稿；autoresearch 素材成文 | **Draft 模式**（references/draft-mode.md） |
+| 英文 LaTeX 论文分节写作 / 全文推进 | **Paper 模式**（下方 11-step） |
+| 只写 Related Work（给定 .tex 草稿） | **Related Work 流程**（references/related-work-vault.md，即 Paper 模式 Step 7） |
+
+先 draft 再 paper：中文草稿在 Draft 模式打磨清楚 story 后，再进 Paper 模式英文化与 LaTeX 化。
 
 ## Artifact Sources
 
@@ -50,7 +64,7 @@ The 11-step writing process. Follow these steps in order — each step builds on
 4. **Revise Introduction and Method** — Iterate on both sections while experiments continue.
 5. **Write Experiments** — Once experiments are mostly done, organize the Experiments writing plan, then draft.
 6. **Polish figures** — Finalize the pipeline figure. Create the teaser figure.
-7. **Write Related Work** — List related papers, group into topics, write paragraphs. Prefer drafting this section with the vault's `related-work` skill so citations trace to `references.bib`.
+7. **Write Related Work** — List related papers, group into topics, write paragraphs. Draft this section with the vault-grounded procedure in [references/related-work-vault.md](references/related-work-vault.md) so citations trace to `references.bib`.
 8. **Review the paper** — Self-review Introduction, Method, and Experiments. Use the `paper-review` skill.
 9. **Write Abstract** — Organize the Abstract writing plan, then draft.
 10. **Choose the title** — List important keywords, then compose an informative title.
@@ -121,7 +135,7 @@ Three-step process:
 2. Determine topics based on research direction and algorithm techniques
 3. Organize writing plan based on listed papers
 
-> 该节优先用本 vault 的 `related-work` skill 起草——它能确保每个 `\cite` 都可溯源到 `references.bib` 中的真实 cite_key。本节及 [references/related-work-guide.md](references/related-work-guide.md) 作为写作质量的参考标准（三步流程、常见反模式），而非替代 `related-work` skill 的执行。
+> 该节按 [references/related-work-vault.md](references/related-work-vault.md) 的 vault 溯源流程起草——它能确保每个 `\cite` 都可溯源到 `references.bib` 中的真实 cite_key。本节及 [references/related-work-guide.md](references/related-work-guide.md) 作为写作质量的参考标准（三步流程、常见反模式），而非替代该溯源流程的执行。
 
 ### Conclusion
 
@@ -168,19 +182,26 @@ Visual polish directly influences review outcomes. See the `paper-planning` skil
 
 ## Guard
 
-- 所有引用一律走 vault 的 citation 链——cite_key 必须来自 `references.bib`，禁止编造不存在的文献或引用信息
-- Related Work 一节的起草交给本 vault 的 `related-work` skill 完成；本 skill 的 [related-work-guide.md](references/related-work-guide.md) 仅作为写作质量参考
+- 所有引用一律走 vault 的 citation 链——Paper 模式的 cite_key 必须来自 `references.bib`，
+  Draft 模式的 `[[wikilink]]` 必须指向 vault 中实际存在的文件；禁止编造文献或引用信息
+- Related Work 一节按 [related-work-vault.md](references/related-work-vault.md) 的溯源流程起草；[related-work-guide.md](references/related-work-guide.md) 仅作为写作质量参考
+- **Draft 模式**：只操作指定章节，不修改目标文件其他内容；目标章节已有实质性内容（>100 字）时不覆盖，停止并建议 writing-refine（完整 Guard 见 references/draft-mode.md）
 - 不修改用户论文中已有的作者贡献陈述（author contribution statement）
 - 不为了"读起来更强"而在 Abstract/Introduction 中加入没有实验支撑的 claim；underclaim in prose, overdeliver in evidence
 - Limitation 章节必须诚实反映 scope 边界，不得用它掩盖真实的技术缺陷或省略已知失败案例
 
 ## Verify
 
+Paper 模式：
+
 - [ ] 全文无残留 `\todo{}` 标记
 - [ ] 每条 claim（尤其 Abstract/Introduction）都锚定到具体的图/表/实验证据
 - [ ] LaTeX 可编译（无语法错误、无未闭合环境、引用/标签无悬空）
 - [ ] Related Work 中引用的 cite_key 均可在 `references.bib` 中找到
 - [ ] Method 每个模块都包含 design / motivation / advantage 三要素
+
+Draft 模式：见 [references/draft-mode.md](references/draft-mode.md) 的专属 Verify
+（章节写入 + wikilink 溯源 + 无占位符 + 未动其他章节 + 日志）。
 
 ## Handoff to Review
 
@@ -198,6 +219,8 @@ Before invoking `paper-review`, verify this checklist:
 
 | Section | Reference File | When to Load |
 |---------|---------------|--------------|
+| Draft 模式全流程 | [draft-mode.md](references/draft-mode.md) | 从 vault 素材起草报告/论文章节时 |
+| Related Work 溯源流程 | [related-work-vault.md](references/related-work-vault.md) | Step 7: 起草 Related Work |
 | Abstract | [abstract-templates.md](references/abstract-templates.md) | Step 9: Writing abstract |
 | Introduction | [introduction-templates.md](references/introduction-templates.md) | Step 2: Story design |
 | Method | [method-templates.md](references/method-templates.md) | Step 3: Writing method |

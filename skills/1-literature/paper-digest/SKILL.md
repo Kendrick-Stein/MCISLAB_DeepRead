@@ -115,6 +115,8 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch, Agent
 - **verification_status**：由 Step 4.5 的结果填写；不得把 source check 写成“独立复现”或“结论已被验证”
 - **Evidence Ledger**：每个高风险 claim 一行；原文短摘录最多 25 words，并保留 page/section/table/figure locator
 - **date_added**：填写今天日期，格式 `YYYY-MM-DD`
+- **配图**：Mind Map 一律用 Mermaid（笔记内原生渲染）；若论文架构复杂、Supervisor 明确要
+  出版级结构图，则在 digest 完成后另行调用 `academic-diagram`（不并入本轮，保持原子性）
 
 ### Step 4.5：独立 Source Verification
 
@@ -208,6 +210,10 @@ python3 scripts/survey_updates.py record "Papers/{文件名}.md"
   paper-digest 原子性，并由下一轮优先执行 `survey-refresh CUA-Survey`。GUI 论文的 tag
   必须遵守 `references/tags.md` 的 umbrella 规则，避免只标 `agentic-RL` 或宽泛 `environment`
   而漏记账。
+- **代码库标记**：若 frontmatter `code` 非空且论文属于系统/环境/基建类工作（runtime、
+  benchmark 环境、训练基建等——贡献主要在实现里），在日志 entry 末尾附一行
+  `repo_candidate: <code URL>`，供 Supervisor / autoresearch 决定是否另起一轮
+  `repo-digest` 深挖实现细节（保持本轮原子性，不在 digest 内执行）。
 
 记账结束后，用 Edit（或 Write 若文件不存在）把以下 entry 追加到 `Workbench/logs/YYYY-MM-DD.md`：
 

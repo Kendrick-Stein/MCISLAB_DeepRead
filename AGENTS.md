@@ -91,19 +91,20 @@ daily-papers / news-digest / literature-survey 的关键词打分均从该文件
 | Skill | 用途 | 触发场景 |
 |:------|:-----|:---------|
 | `paper-digest` | 消化论文 → Papers/笔记 | Supervisor 给论文 URL/标题/PDF |
+| `repo-digest` | 论文代码库静态分析 → 笔记补 Implementation Analysis（codex 并行 pass + 抽查核对） | 系统/环境类论文带代码库；日志有 repo_candidate 标记 |
 | `literature-survey` | 主题调研 | agenda 中某 direction 缺文献支撑 |
 | `idea-generate` | 生成研究 idea | Topics 中标注了知识空白 |
 | `idea-evaluate` | 评估 idea 可行性 | Ideas/ 中有 status: raw 的 idea |
 | `autoresearch` | 自主研究循环 | Supervisor 说"自己干活吧" |
 | `survey-refresh` | 把新读论文增量并入 survey | survey-updates.json 积压 ≥5 篇 |
 | `news-digest` | 非论文信息源摘要 | Supervisor 说"看看AI新闻"或 News/ 超期 |
-| `related-work` | 起草英文 LaTeX Related Work | Supervisor 给出 .tex 草稿 |
-| `paper-planning`/`paper-writing`/`paper-review`/`paper-rebuttal` 系列 | 论文投稿全流程（规划 → 分节写作 → 对抗式自审 → rebuttal） | Supervisor 说"准备投稿"/"写论文"/"审稿意见回来了" |
+| `paper-planning`/`paper-writing`/`paper-review`/`paper-rebuttal` 系列 | 论文投稿全流程（规划 → 分节写作 → 对抗式自审 → rebuttal）；paper-writing 含 **Draft 模式**（vault 素材起草报告/论文章节）与 **Related Work 溯源起草**（原 draft-section / related-work 已并入） | Supervisor 说"准备投稿"/"写论文"/"起草章节"/"写 related work" |
 | `academic-slides` | 学术报告 slides | Supervisor 说"准备一个 talk / 答辩 slides" |
 | `paper-figures` | 出版级 matplotlib 图表 | Supervisor 给出数据要画论文用图 |
 | `paper-graph` | 领域 lineage Mermaid 图 | Supervisor 要看某方向的"技术演进族谱" |
-| `research-figure` | TikZ 方法流程图 + Blender 3D 渲染（模板/配色/元素库） | Supervisor 要 method/pipeline 图、3D teaser |
-| `thesis-figure-skill` | TikZ 学术结构图（snippet 库 + 视觉审查闭环；代码地基见 `tikz-figure-code`） | Supervisor 要架构图/技术路线图/survey 配图 |
+| `academic-diagram` | TikZ/draw.io 学术结构图（skeleton 库 + 视觉审查闭环 + 独立多镜头 gate；代码地基见 `tikz-figure-code`） | Supervisor 要架构图/方法流程图/技术路线图；survey/report/digest 需要脉络配图 |
+| `blender-figure` | Blender 3D 渲染（SMPL/FBX teaser、方法对比、skeleton） | Supervisor 要 3D teaser / mesh 渲染 |
+| `vault-lint` | vault 机械质量检查（cite_key/wikilink/YAML/abstract-only/建站隐患） | 例行体检；批量 digest 后；建站前 |
 
 ### Skill 协议
 

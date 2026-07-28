@@ -99,7 +99,7 @@ Coordinator 逐个处理 artifact：
 ```
 每周或按需执行：
 - 读取 Workbench/memory/ 和近期 daily 总结
-- 执行 draft-section skill
+- 执行 paper-writing skill 的 Draft 模式（references/draft-mode.md）
 - 输出：Reports/YYYY-MM-DD-Progress.md
 ```
 

@@ -100,28 +100,31 @@ ReadPaperMachine/
 | Category | Skill | 功能 |
 |:---------|:------|:-----|
 | `1-literature` | `paper-digest` | 消化单篇论文 → Paper 笔记 |
-| | `literature-survey` | 主题级调研（搜索 + 批量 digest + 综合） |
+| | `repo-digest` | 论文代码库静态分析（codex 并行 pass）→ 笔记补 Implementation Analysis |
+| | `literature-survey` | 主题级调研（搜索 + 批量 digest + 综合 + 结构配图） |
 | | `daily-papers` | 抓取 HF Daily/Trending + arXiv，打分筛选 + 锐评 |
-| | `survey-refresh` | 把 digest 积压的新论文增量并入 survey + 刷新 DomainMap |
+| | `survey-refresh` | 把 digest 积压的新论文增量并入 survey + 刷新 DomainMap/配图 |
 | | `news-digest` | 非论文信息源（RSS/Atom 等）摘要 → News/ |
 | `2-ideation` | `idea-generate` | 从知识空白生成研究 idea |
 | | `idea-evaluate` | 评估 idea 可行性和新颖性 |
 | `3-experiment` | `experiment-design` | 设计实验方案 |
 | | `experiment-track` | 记录实验进展和结果 |
 | | `result-analysis` | 分析实验结果，提取 insight |
-| `4-writing` | `draft-section` | 起草论文/报告章节 |
-| | `writing-refine` | 打磨已有文稿 |
+| `4-writing` | `writing-refine` | 打磨已有文稿 |
 | | `latex-citation-enhancer` | 固化 cite_key + 抓权威 BibTeX → 生成 references.bib |
 | | `auto-cite` | 给 LaTeX 草稿逐条判断 + 确认后插入 `\cite{}`（基于 Papers/） |
-| | `related-work` | 起草英文 LaTeX Related Work 章节 |
 | | `paper-planning` | 论文投稿前规划：story/实验/图/时间线 |
-| | `paper-writing` | 英文论文分节写作，11 步 |
+| | `paper-writing` | 统一写作：Draft 模式（vault 素材起草章节，原 draft-section）+ 英文论文 11 步分节写作 + Related Work 溯源起草（原 related-work） |
 | | `paper-review` | 投稿前对抗式自审 |
 | | `paper-rebuttal` | 审稿后 rebuttal 策略与写作 |
 | | `paper-figures` | 出版级 matplotlib 图表 |
+| | `academic-diagram` | TikZ/draw.io 学术结构图（skeleton 库 + 视觉审查闭环 + 多镜头 gate） |
+| | `blender-figure` | Blender 3D 渲染（SMPL/FBX teaser、方法对比、skeleton） |
+| | `tikz-figure-code` | TikZ 代码正确性地基（按构造布局 + lint.sh） |
 | `5-evolution` | `memory-distill` | 从日志蒸馏记忆 |
 | | `agenda-evolve` | 演化研究议程 |
 | | `memory-retrieve` | 从记忆库检索相关经验 |
+| | `vault-lint` | vault 机械质量检查（cite_key/wikilink/YAML/abstract-only/建站隐患） |
 | `6-orchestration` | `autoresearch` | 核心研究循环 |
 | | `research-team` | 多 Agent 并行协作构建知识库 |
 | `7-presentation` | `domain-presentation` | Domain Map → HTML 可视化展示 |

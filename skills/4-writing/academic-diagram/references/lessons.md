@@ -812,7 +812,7 @@
   - dark theme `plt.style.use('dark_background')` 一句话搞定，TikZ 反转全色工程量大
   - Module-First 多次编译时 Python (1-3s) 比 xelatex (5-30s) 快
 - **核心问题**：Python 是**画起来更方便，不是画得更好**——
-  - ❌ 不能 `\input{figure.tex}` 嵌入 LaTeX 论文（必须 `\includegraphics{.png}`，破坏 thesis-figure-skill 价值主张）
+  - ❌ 不能 `\input{figure.tex}` 嵌入 LaTeX 论文（必须 `\includegraphics{.png}`，破坏 academic-diagram 价值主张）
   - ❌ dark theme 与学术论文 light bg 风格断裂
   - ❌ 公式渲染：matplotlib mathtext 不如 LaTeX 原生
   - ❌ 风格不一致：fig153 (Python dark) 和 fig151/152/154 (TikZ light) 不能共存于同一 paper

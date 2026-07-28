@@ -13,8 +13,8 @@
 #
 # Exit code:  0 = clean (no HARD issues)   1 = HARD issues found   2 = setup err
 #
-# Checkers live in the thesis-figure-skill bundle (single source of truth).
-# Override the location with:  TFS_REFS=/path/to/thesis-figure-skill/references
+# Checkers live in the academic-diagram bundle (single source of truth).
+# Override the location with:  TFS_REFS=/path/to/academic-diagram/references
 # =============================================================================
 set -uo pipefail
 
@@ -22,12 +22,12 @@ f="${1:-}"
 [ -z "$f" ] && { echo "usage: lint.sh <figure.tex>"; exit 2; }
 [ -f "$f" ] || { echo "no such file: $f"; exit 2; }
 
-# --- locate the checkers (sibling thesis-figure-skill by default) ------------
+# --- locate the checkers (sibling academic-diagram by default) ------------
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REFS="${TFS_REFS:-$here/../../thesis-figure-skill/references}"
+REFS="${TFS_REFS:-$here/../../academic-diagram/references}"
 if [ ! -f "$REFS/tikz-validator.py" ]; then
   echo "!! checkers not found under: $REFS"
-  echo "   set TFS_REFS to the thesis-figure-skill/references dir"
+  echo "   set TFS_REFS to the academic-diagram/references dir"
   exit 2
 fi
 

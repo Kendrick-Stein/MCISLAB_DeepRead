@@ -79,6 +79,17 @@ Key Takeaways / Open Questions。
 - 只有新论文改变已有判断时才修改 Key Takeaways / Open Problems；普通增量只更新 primary subsection 或矩阵。
 - `papers_analyzed` 按唯一 `Papers/` wikilink 口径机械复核，不把 redirect survey 的旧统计相加。
 
+### Step 4.5：配图刷新（条件触发，可选）
+
+仅当本轮发生**结构性变化**时执行——新增小节、分类框架重构、多篇论文形成新 pattern、
+时间线/族谱延长到需要重画：
+
+- 调用 `academic-diagram` skill 为变化的章节新增或重画脉络图（分类总览、方法演进时间线、
+  对比结构图），渲染 PNG 到 `assets/figures/`（命名沿用 `{survey缩写}-{章节}-{主题}.png`），
+  在 survey 对应小节以 `![[name.png]]` 嵌入。
+- 已有配图与新结构矛盾（分类变了、论文归属变了）→ 必须重画或撤下，不得让图文不一致过夜。
+- 普通增量（论文并入既有小节、无新 pattern）**不画图**——配图服务结构理解，不是装饰。
+
 ### Step 5：刷新 DomainMap（若有）
 
 读 survey frontmatter 的 `domain_map` 字段：
@@ -129,6 +140,7 @@ python3 scripts/survey_updates.py clear --survey {survey-name} --papers "Papers/
 - [ ] 并入的关键结论可溯到全文笔记；未把仅 abstract 或单篇支持的结论表述为共识
 - [ ] 新增关键数字均对应 source-verified claim row；partial/unverified/legacy note 未被用于升级强结论
 - [ ] 若高层判断发生变化，Key Evidence Matrix 已同步；普通增量未制造冗余 claim rows
+- [ ] 若本轮有结构性变化：受影响章节的配图已新增/重画/撤下，无图文不一致
 
 ## Examples
 

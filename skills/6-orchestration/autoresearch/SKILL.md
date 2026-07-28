@@ -48,13 +48,15 @@ autoresearch 是 MindFlow 的核心研究循环，实现了 PhD 导师制中 Res
 | survey-updates.json 中 `CUA-Survey` 有任意 pending（≥1 篇） | 下一轮优先读取 `skills/1-literature/survey-refresh/SKILL.md` 并执行；GUI canonical survey 不等待批量阈值 |
 | survey-updates.json 中其他 survey pending ≥5 篇，或最老条目 added_at 距今 >7 天 | 读取 `skills/1-literature/survey-refresh/SKILL.md` 并执行 |
 | News/ 最新一期超过 config `news.days` 天数（且 Supervisor 未禁用） | 读取 `skills/1-literature/news-digest/SKILL.md` 并执行（该 skill 已含博客/媒体/**公众号**三类源，公众号走搜狗微信搜索，见 `scripts/wechat_search/`） |
+| 近期日志有 `repo_candidate` 标记且论文属 primary direction 的系统/环境类工作 | 读取 `skills/1-literature/repo-digest/SKILL.md` 并执行 |
 | 近期有 Topics/*-Analysis.md 标注了知识空白 | 读取 `skills/2-ideation/idea-generate/SKILL.md` 并执行 |
 | Ideas/ 中有 status: raw 的 idea 待评估 | 读取 `skills/2-ideation/idea-evaluate/SKILL.md` 并执行 |
 | Ideas/ 中有 status: developing 的 idea 缺实验方案 | 读取 `skills/3-experiment/experiment-design/SKILL.md` 并执行 |
 | Experiments/ 中有 status: completed 且无 ## Analysis 节 | 读取 `skills/3-experiment/result-analysis/SKILL.md` 并执行 |
 | 最近一次 memory-distill 距今 >5 天（检查 logs） | 读取 `skills/5-evolution/memory-distill/SKILL.md` 并执行 |
+| 最近一次 vault-lint 距今 >7 天（检查 logs），或近一周 digest ≥10 篇 | 读取 `skills/5-evolution/vault-lint/SKILL.md` 并执行 |
 | 近期有新 validated insight 但 agenda 未反映 | 读取 `skills/5-evolution/agenda-evolve/SKILL.md` 并执行 |
-| 某 direction 已有充足论文+实验+idea，需要成文 | 读取 `skills/4-writing/draft-section/SKILL.md` 并执行 |
+| 某 direction 已有充足论文+实验+idea，需要成文 | 读取 `skills/4-writing/paper-writing/SKILL.md` 并执行其 **Draft 模式**（references/draft-mode.md） |
 
 判断时优先考虑：
 

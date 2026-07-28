@@ -1,14 +1,67 @@
 ---
-name: thesis-figure-skill
+name: academic-diagram
 description: |
-  生成学术论文配图：LaTeX/TikZ 代码（结构化图表，直接嵌入论文）或 draw.io XML
-  （技术路线图、汇报配图）。自动按论文领域风格设计，编译验证后交付。
-  Use when the user asks for: 论文配图、画架构图、画流程图、TikZ 图、draw.io 学术图、复刻论文图、tikz/latex diagram。
+  生成学术结构图：LaTeX/TikZ 代码（架构图、方法 pipeline、流程图、survey 配图，直接嵌入论文）
+  或 draw.io XML（技术路线图、汇报配图）。自动按论文领域风格设计，编译验证后交付。
+  Use when: 论文配图、画架构图、画流程图、方法流程图、pipeline figure、architecture diagram、
+  TikZ 图、draw.io 学术图、复刻论文图、survey/report 脉络配图。
+  3D 渲染用 blender-figure；matplotlib 数据图用 paper-figures。
+argument-hint: "<画图需求描述 / 参考图路径> [复杂度: 极简/中等/复杂] [格式: tikz/drawio]"
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent
 ---
 
-# Academic Diagram Skill (TikZ + draw.io)
+# Academic Diagram — TikZ / draw.io 学术结构图
 
-把论文中的系统架构/协议流程/技术方案转化为高质量配图。**目标：高信息密度 + 设计感 + 一次过编译**。失败模式：平庸、对齐松散、坐标凭感觉。
+## Purpose
+
+把论文/survey/report 中的系统架构、协议流程、技术方案转化为出版级结构图。输入是画图需求
+（文字描述或参考图），输出是编译验证过的 figure.tex（或 .drawio）+ 渲染 PNG。
+**目标：高信息密度 + 设计感 + 一次过编译**。失败模式：平庸、对齐松散、坐标凭感觉。
+
+服务两类场景：
+- **论文投稿**：method pipeline / architecture / teaser 结构图（paper-writing 的配图环节）
+- **知识库配图**：literature-survey / survey-refresh / 报告的脉络图——渲 PNG 到 `assets/figures/`
+  并以 `![[name.png]]` 嵌入笔记，帮读者降低阅读时间
+
+代码正确性地基复用 [tikz-figure-code](../tikz-figure-code/SKILL.md)；3D 渲染归 blender-figure；
+matplotlib 数据图归 paper-figures。
+
+## Steps
+
+完整工作流 ⓪→⑦ 见下文详述，执行顺序：
+
+1. **⓪ 依赖检测** + **⓪.5 入口模式分流**（A skeleton 复用 / C 原创设计 / D 沉淀入库；A/C 不明确时必须问用户）
+2. **① 画图指令**（图契约 + form A/B 设计文档，写进 figure.tex 头部注释）+ **①.5 图档判断**（极简/中等/复杂）
+3. **② 加载专项规则**（lessons.md + 类型专项文件，见「按需加载索引」）
+4. **③ 生成代码**（复杂档强制 Module-First；B 路 auto-layout / 从零路 snippet 拼装）
+5. **④ 编译验证**（xelatex + missing-char 闸门 + pdf-overlap-checker）
+6. **④.5 视觉反馈闭环**（Step 0 直觉 + 18 项 checklist + 独立多镜头审查 gate，无轮数上限）
+7. **⑤ 用户终审** → **⑥ 迭代到完美** → **⑦ 经验沉淀**（或 D 模式走 Φ 沉淀通道）
+
+## Guard
+
+- **只用 TikZ 或 draw.io**——禁止 Python/matplotlib/HTML/SVG 替代（数据图请路由 paper-figures）。
+- **默认 light background**；dark theme 仅在用户明确要求时使用。
+- **禁止跳过步骤①**直接写代码；figure.tex 头部必须有图契约 + 设计文档注释。
+- **模式 A/C 不明确时必须问用户**（⓪.5 判断规则第 5 条），禁止默认 A 静默开画。
+- **mode A/C 交付前必须过独立多镜头审查 gate**：由 orchestrator 真正 spawn 4 个空白上下文
+  审查 agent；spawn 不出时禁止自审蒙混，必须显式声明"gate 未运行"交给用户。
+- **已知语义遗留 = blocker**：自己列得出的语义缺陷必须修掉或升级给用户拍板，不得沉默交付。
+- **极简档不强加 hero/panel**——信息密度匹配论文复杂度，不是越满越好。
+- 交付前 orchestrator 必须**亲自 Read 渲染 PNG**；用户是最后闸门。
+
+## Verify
+
+- [ ] xelatex 编译通过且 `grep "Missing character" *.log` 为空
+- [ ] tikz-validator + pdf-overlap-checker 的 ERROR 类为 0（candidate 类已逐条 triage 并记录）
+- [ ] ④.5 Step 0 五段证据 + visual-review-checklist 全部条目 Y（含每项一句证据）
+- [ ] mode A/C：gate 举证完整——4 个独立审查 agent 的 ID + 各自返回的具体视觉证据
+- [ ] figure.tex 头部含 ①.0 图契约与 form A/B 注释块
+- [ ] 最终 PNG 已展示给用户终审
+
+---
+
+以下为完整工作流详述。
 
 ## 工具选择
 
@@ -110,7 +163,7 @@ description: |
 > "怎么写出编译干净、编辑安全的 TikZ 代码"（5 条按构造 idiom + 8 条硬约束全集 + canonical 箭头 + `lint.sh` 静态检查入口）
 > 沉淀在那个地基技能里。写从零图 / 改排版 bug / CJK 渲染问题时按需加载它。本节是其硬约束的高频子集。
 
-🔴 **工具铁律：只用 TikZ 或 draw.io，禁止 Python/matplotlib 替代**（2026-05-22 Batch 17 fig153 教训：sub-agent 在执行 Module-First 时用 Python+matplotlib 生成 `.py` 文件 = 完全偏离 thesis-figure-skill 价值主张）：
+🔴 **工具铁律：只用 TikZ 或 draw.io，禁止 Python/matplotlib 替代**（2026-05-22 Batch 17 fig153 教训：sub-agent 在执行 Module-First 时用 Python+matplotlib 生成 `.py` 文件 = 完全偏离 academic-diagram 价值主张）：
 - **Module-First 子流程（③.A→③.D）必须保持 TikZ**——即使 matplotlib 画嵌入 viz 更方便
 - **复杂嵌入 viz** 仍用 TikZ 原生（`\foreach` 画 cell / `pgfplots` 包 / `\draw` 手画 patch）
 - **学术论文图嵌入仍是金标准**：`\input{figure.tex}` 比 `\includegraphics{fig.png}` 在公式渲染、矢量缩放、风格统一上都优
@@ -660,7 +713,7 @@ draw.io：`xmllint --noout file.drawio && drawio -x -f pdf -o out.pdf file.drawi
 - Φ 沉淀**完整可复用的 figure 模板**（写入 `tikz-snippets/example-skeleton-X-*.tex`）
 - 两者独立工作，可在同一会话各做各的
 
-**Φ 的杠杆价值**：每入一个 skeleton，未来 N 个 user/session 都能复用。**库是 self-growing 的**——这是 thesis-figure-skill 长期复利的核心机制。
+**Φ 的杠杆价值**：每入一个 skeleton，未来 N 个 user/session 都能复用。**库是 self-growing 的**——这是 academic-diagram 长期复利的核心机制。
 
 ## 设计原则（对抗模型惯性）
 

@@ -166,6 +166,17 @@ Topic 名称根据主题生成（CamelCase，如 `VLA-Manipulation`、`Diffusion
 8. **章节成段叙事，不做罗列**（Supervisor 2026-07-21 补充）：每章开篇设"发展进程与研究现状"叙事段，章末有待解决问题段；概念分类、发展阶段、风险面等内容写成按因果链组织的完整段落（每一步解决了什么、又暴露了什么），不做方法名的 bullet 罗列。表格保留，但每张表前需 1-3 句框架段说明它回答什么问题，重要谱系表后加综合段。第 4 条的"演进链竖排"仅适用于单一机制的紧凑 lineage，不适用于章节级发展叙事。
 9. **正文零内部痕迹**（Supervisor 2026-07-24 review 确立）：(a) 给作者的写作要求不入正文（"避免按 X 罗列""以下不是质量排序"——文章要实现要求，不是写出要求）；(b) 作者论断用综述语言标示（"本文进一步论证 X；支撑证据集中于 §m/§n，尚缺独立复现"），不写"本综述提出一个作者综合论断……该论断不是领域共识"式官僚自指，hedge 保留但必须落在具体章节/证据指针上；(c) 内部工具词（vault/库内/本轮/paper-digest/verification_status/见 gaps）与比喻黑话（水位/押注/战场/收束/裸比）不入正文——内部记账只留在 Key Evidence Matrix 与调研日志；"库内暂无独立验证"的正文写法是"尚未见独立验证"，且范围限定词不可丢。
 
+#### 7a.5 结构配图
+
+Survey 定稿前为核心脉络配 1-3 张结构图，帮读者 5 秒抓住全貌、降低阅读时间：
+
+- **选点**：分类总览（taxonomy 一图收拢）、方法演进时间线、RQ/证据链结构图——挑收益最大的
+  1-3 处，不逐章配图。
+- **工具分层**：简单结构用 Mermaid 直接内嵌；信息密度高/出版级的图调用 `academic-diagram`
+  生成 TikZ，渲染 PNG 到 `assets/figures/`（命名 `{survey缩写}-{章节}-{主题}.png`），
+  正文以 `![[name.png]]` 嵌入并在图下加一句 caption。
+- **证据纪律同正文**：图不得引入正文没有的结论或数字；分类图的归属必须与正文表格一致。
+
 #### 7b. 追加日志
 
 用 Edit（若文件不存在则用 Write）将以下格式的 log entry 追加到 `Workbench/logs/YYYY-MM-DD.md`：
@@ -211,6 +222,7 @@ Topic 名称根据主题生成（CamelCase，如 `VLA-Manipulation`、`Diffusion
 - [ ] **独立验证**：高影响 claims 由不同于 Finder/Digest 的 verifier 检查；unsupported/contradicted 未进入强结论
 - [ ] **后置补洞**：deep gap pass 在 verification 后执行且未超过 3 query / 1 loop；vault-only 仅记录 gaps
 - [ ] **可恢复性**：run manifest 有 stage/checkpoint/claim counts；partial run 仍产出带边界的 survey/report
+- [ ] **配图**：核心脉络（taxonomy/演进线）至少 1 张结构图（Mermaid 或 academic-diagram PNG），图文一致
 
 ## Examples
 

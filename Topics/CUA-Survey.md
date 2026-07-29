@@ -1,9 +1,9 @@
 ---
 title: "Computer-Use Agents: A Unified Survey of Models, Learning, Environments, Evaluation, and Deployment"
 tags: [survey, gui-agent, computer-use, web-agent, mobile-agent, os-agent, agentic-RL]
-date_updated: "2026-07-28"
+date_updated: "2026-07-29"
 year_range: 1997-2026
-papers_analyzed: 188
+papers_analyzed: 189
 keywords: [gui-agent, gui grounding, computer-use, computer use agent, cua, web agent, browser agent, mobile agent, desktop agent, os agent]
 exclude_tags: [deep-research]
 exclude_keywords: [deep research, information seeking, browsecomp, research agent, search agent]
@@ -958,7 +958,7 @@ GUI 侧近期实例：[[Papers/2505-MobileIPL]] 用迭代式 preference learning
 
 改动最小的是 first-failure 或 fork-point 定位：不改变 reward 形式，只把成功与失败轨迹的最早分叉转为局部监督，但需要可比较的成对轨迹。[[Papers/2601-EvoCUA]] Milestone/progress reward 进一步把可验证中间状态转成中间信用，信号更密集，却可能奖励与最终目标脱钩的局部进展。Tree rollout 利用兄弟子树的 outcome 差异生成 step-level signal，把 reward-design 成本转移到环境的 fork、reset 与并行能力。最后，interactive verifier 主动读取截图、文件、进程或 GUI 状态，以更高验证成本换取 hidden evidence。[[Papers/2602-VAGEN]]
 
-AgentRewardBench 表明 rule-based evaluator 与通用 LLM judge 会分别产生漏判和误判，因此 reward model 不能默认等同于 ground truth。[[Papers/2504-AgentRewardBench]] EvoCUA-1.5 进一步报告 PRM score 上升而 executable outcome 停滞的负结果，说明 process score 必须锚定环境状态变化。[[Papers/2607-EvoCUA15]] VAGEN 支持主动取证路线，但只验证了 evaluator 与 Best-of-N，尚未证明其成本与攻击面能承受大规模 RL 闭环。[[Papers/2602-VAGEN]]
+AgentRewardBench 表明 rule-based evaluator 与通用 LLM judge 会分别产生漏判和误判，因此 reward model 不能默认等同于 ground truth。[[Papers/2504-AgentRewardBench]] EvoCUA-1.5 进一步报告 PRM score 上升而 executable outcome 停滞的负结果，说明 process score 必须锚定环境状态变化。[[Papers/2607-EvoCUA15]] VAGEN 支持主动取证路线，但只验证了 evaluator 与 Best-of-N，未进入训练闭环。[[Papers/2602-VAGEN]] 这一缺口已被 [[Papers/2607-InteractiveRewardAgent]] 部分补上：IRA 先由 VLM 从指令与首尾截图 propose 任务完成条件，再经 system（shell/文件/accessibility tree）、application（结构化文档检查）与 GUI 三类工具在 post-execution 环境中逐条核验，以其为 reward 用 DART 方法做 RL 训练在 OSWorld 达 34.0% success（同设置 script reward 34.9%），并在无 script 的自动生成任务上达 33.5%——interactive verifier reward 可近似替代 script reward 的 RL 闭环证据（库内暂无独立验证；单 backbone Qwen3.6-35B-A3B、Ubuntu-only，34.0% 是接近而非超越）。其失败分析同时把瓶颈移到上游：主要错误来自 condition proposal 失准（granularity 不当、过度字面化、遗漏 persistence 要求），而非核验环节。与 [[Papers/2607-SeekJudge]] 对照，两条路线从相反方向收敛于"model-based reward 可进 RL 闭环"：SeekJudge 靠证据选择（少而准的截图判定），IRA 靠证据获取（主动环境取证），等证据预算下孰优尚无对照。
 
 [[Papers/2607-SeekJudge]] 把 model-based reward 首次推进到 online RL 训练闭环内的正面对照：它将长轨迹判定拆为 localization 与 extraction 两个子问题，由共享同一 distilled 9B backbone 的 Condense–Ground–Seek–Analyze 四角色输出 trajectory score 与 nine-way step labels，并用 rollout-overlapped reward server 把 preprocessing 移出 rollout critical path。在 UI-TARS 1.5 7B 的 Chrome/Impress/OS 三个 domain（self-hosted，per-application 单独训练 policy）上，SeekJudge reward 的 RL test success 为 16.23%/36.81%/28.89%，均高于环境原生 rule-based reward 的 12.75%/30.43%/25.56%（repeated runs 的 run-to-run std 约 2.0%）；作者据此称其为首个在 online RL 中 match or surpass native rule-based supervision 的 practical model-based reward（库内暂无独立验证）。其对照实验还给出 judge 失准的一个具体机制：decisive screenshot 始终在场时，加入同轨迹其他截图使 F1 从 0.68 单调降至 0.61，而等 token 的 mosaic noise 无此效应——稀释来自 competing content 而非 context length 本身，这为"少而准的证据选择"路线提供了比 scaling curve 更有区分度的依据。边界同样明确：Qwen3VL-8B 上增益不稳定（Impress 48.41% 对 rule-based 49.28%，OS run 未完成），offline score calibration jointly fit 在三个 evaluation benchmark 上，且 reward-granularity ablation 同时改变 continuous score 与 step term、无法分离各自贡献。
 
@@ -1313,7 +1313,7 @@ Verifier 的根本差异不在判定模型大小，而在证据访问能力。�
 | Passive visual/rubric judge | final screenshot、selected frames、trajectory | 可用于闭源环境 | 看不到 hidden backend，易被信息选择影响 | [[Papers/2605-AndroidDaily]] |
 | Learned ORM/PRM/critic | trajectory 或 step representation | 可扩展到 outcome 与 process reward | precision/recall trade-off、训练分布偏差 | [[Papers/2504-AgentRewardBench]]、[[Papers/2510-CUARewardBench]]、[[Papers/2606-OSOracle]]、[[Papers/2607-SeekJudge]]（localization/extraction 拆分 + CUAStepBench：278 tasks/177 apps 上 trajectory verdict 与 dense step labels 同轨迹配对） |
 | Hierarchical diagnostic judge | segment→subtask→overall | 降低长轨迹 context overload 并给出 failure location | segmentation error 会向后传播 | [[Papers/2604-GUIDE- Interpretable GUI Agent Evaluation via Hierarchical Diagnosis]] |
-| Interactive verifier agent | screenshot、shell、Python、GUI 主动取证 | 可补 hidden/ambiguous evidence | 成本高、实例耦合、可能污染状态 | [[Papers/2602-VAGEN]] |
+| Interactive verifier agent | screenshot、shell、Python、GUI 主动取证 | 可补 hidden/ambiguous evidence | 成本高、实例耦合、可能污染状态；condition proposal 失准是主要误差源 | [[Papers/2602-VAGEN]]、[[Papers/2607-InteractiveRewardAgent]]（propose-then-verify + system/application/GUI 三类工具；GUI-RewardBench 321 条 desktop 轨迹 86.9% acc，最佳 passive DistRL 78.8%；同 backbone 消融显示增益来自环境证据访问，GPT-5.5 均摊 2.34 次 tool call/任务） |
 | Human audit | 完整语境与任务意图 | 适合最终仲裁与 calibration | 慢、贵、难以 scale | 应用于分层抽检和争议样本，而非默认在线 reward |
 
 可信协议应按以下顺序构建：
@@ -1358,7 +1358,7 @@ WebArena/OSWorld exploit、gold leakage 与 original-to-verified checker 修订�
 
 **Observed Tension — transition diagnosis 与 executable causality。** [[Papers/2607-EvoGUI]] 能从 logged trajectory 诊断 temporal ordering 和 successor discrimination，但 sampled distractor 不能证明反事实状态不可达。下一步应在可 snapshot/restore 的环境中，从同一 state 执行多个 action，发布 action-conditioned reachable-state set 与 hidden-state metadata，使 world-model 分数真正对应可执行因果结构。
 
-**Validated Gap — 等证据预算的 verifier 对照。** Programmatic、passive judge 与 interactive verifier 访问的证据不同，现有结果无法判断收益来自更好的推理还是更多取证。决定性实验应固定 actor、trajectory、environment snapshot 与 evidence budget，比较 precision、recall、coverage、abstention、cost、state pollution 和抗操纵能力，并由独立 human audit 仲裁 [[Papers/2504-AgentRewardBench]] [[Papers/2510-CUARewardBench]] [[Papers/2602-VAGEN]]。
+**Validated Gap — 等证据预算的 verifier 对照。** Programmatic、passive judge 与 interactive verifier 访问的证据不同，现有结果无法判断收益来自更好的推理还是更多取证。[[Papers/2607-InteractiveRewardAgent]] 的同 backbone 消融（VLM-only / GUI-only / 全工具）提供了最接近的系统内证据：只加 GUI 交互反而使 Qwen3.6 recall 大跌（找不到证据被误判失败），补全 system/application 工具后才改善 precision–recall trade-off——取证通道的构成而非有无决定收益；但跨 verifier 家族的等预算对照仍缺失，且其 benchmark 标签由 script 产生、覆盖天然限于 script 可判任务。决定性实验应固定 actor、trajectory、environment snapshot 与 evidence budget，比较 precision、recall、coverage、abstention、cost、state pollution 和抗操纵能力，并由独立 human audit 仲裁 [[Papers/2504-AgentRewardBench]] [[Papers/2510-CUARewardBench]] [[Papers/2602-VAGEN]] [[Papers/2607-InteractiveRewardAgent]]。
 
 **Validated Gap — adaptive hybrid routing。** WeaveBench 和 MobileWorld 说明多接口任务值得独立评测，但尚缺同一任务内可审计的 GUI/API/MCP routing contract。新 benchmark 应标注每个 state 下哪些接口合法、等价或禁止，并把 UI-visible side effect、permission boundary、channel-switch cost 与 state divergence 纳入 verifier，而不是只奖励最快路径 [[Papers/2606-WeaveBench]] [[Papers/2512-MobileWorld]]。
 
@@ -1814,6 +1814,7 @@ GUI/Computer-Use Agent 研究经历了五次可辨认的抽象升级——结构
 | TeachStop：最难 cell 中 data draw 解释 48% 方差，run distribution 呈 bimodal（Hartigan dip p=0.07） | source-verified [已修订] | [[Papers/2607-TeachStop]] | 原稿「30% 概率进入 failure mode」笔记查无依据（已改为 bimodal） |
 | GUI RL 是受 policy support 约束的分布重塑：SFT 已掌握任务上 GRPO 无可信提升，有 headroom 才 +22pp | source-verified | [[Papers/2607-GRPONullWebAgent]] | 单篇受控阴性结果，作方法学下限 |
 | observation reduction 非普遍有益、依赖 capability × thinking budget（强模型用完整 HTML 反而更好） | source-verified | [[Papers/2604-ReadMoreThinkMore]] | diff-history「相当或更好」仅限 gpt-5.1(low)/o3-mini（已加限定） |
+| Interactive verifier reward 进 RL 闭环：IRA reward 在 OSWorld RL 达 34.0%（script 34.9%）、无 script 生成任务 33.5%；GUI-RewardBench 86.9% acc vs 最佳 passive DistRL 78.8% | source-verified | [[Papers/2607-InteractiveRewardAgent]] Table 1/3（§7.6/§8.12） | 单 backbone（Qwen3.6-35B-A3B）、Ubuntu-only；接近而非超越 script；benchmark 标签由 script 产生、覆盖限 script 可判任务；库内暂无独立验证 |
 | 2026-07-23 gap-fill 补录 14 篇（RL survey / Digi-Q / Jedi / AndroidControl / OSWorld-MCP / MCPWorld 等） | 库内暂无独立验证 | §1.4/§4.7/§5/§7/§8 各子节 | 单 agent digest、verification_status: unverified，仅作子节 enrichment，未升格为 Takeaway/共识 |
 
 ## 调研日志

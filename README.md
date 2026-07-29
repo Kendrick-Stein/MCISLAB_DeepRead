@@ -12,10 +12,22 @@ ReadPaperMachine 是一个基于 Obsidian 的科研知识管理系统。核心�
 
 ## Quick Start（把它变成你自己的 research assistant）
 
+**方式一：轻量克隆（推荐）**——`clean-start` 分支只含 skill 框架（约 300 个文件），不含本库的论文笔记与工作状态，下载最快：
+
 ```bash
-git clone <this-repo> && cd ReadPaperMachine
+git clone -b clean-start --single-branch --depth 1 https://github.com/Kendrick-Stein/MCISLAB_DeepRead.git
+cd MCISLAB_DeepRead
+bash scripts/init.sh   # 向导设置你的研究方向与关键词
+```
+
+**方式二：完整克隆**——包含本库 900+ 篇论文笔记与 survey，可作参考示例：
+
+```bash
+git clone https://github.com/Kendrick-Stein/MCISLAB_DeepRead.git && cd MCISLAB_DeepRead
 bash scripts/init.sh --fresh   # 清空示例数据，向导设置你的研究方向与关键词
 ```
+
+（`clean-start` 由 `scripts/sync_clean_branch.sh` 从 main 单向同步，skills 更新会随之进入该分支。）
 
 然后在 Claude Code 中：
 

@@ -1,0 +1,182 @@
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+from survey_updates import match_surveys, record, load_pending, clear
+
+
+def make_vault(tmp_path):
+    (tmp_path / "Topics").mkdir()
+    (tmp_path / "Papers").mkdir()
+    (tmp_path / "Workbench").mkdir()
+    (tmp_path / "Topics" / "GUIAgent-Survey.md").write_text(
+        "---\ntitle: GUI Agent Survey\nkeywords: [gui-agent, web agent]\n"
+        "exclude_tags: [deep-research]\n"
+        "exclude_keywords: [deep research, information seeking, search agent]\n"
+        "hard_exclude_keywords: [browsecomp]\n"
+        "exclude_override_tags: [gui-agent, computer-use]\n"
+        "domain_map: GUI-Agent\n---\n"
+    )
+    (tmp_path / "Topics" / "WebAgent-Survey.md").write_text(
+        "---\ntitle: Deep Research Survey\n"
+        "keywords: [deep research, information seeking, browsecomp, search agent]\n"
+        "exclude_tags: [gui-agent, computer-use]\n"
+        "exclude_override_keywords: [browsecomp]\n"
+        "domain_map: AgenticRL\n---\n"
+    )
+    (tmp_path / "Topics" / "VLM-Survey.md").write_text(
+        "---\ntitle: VLM Survey\nkeywords: [vlm]\ndomain_map: VLM\n---\n"
+    )
+    paper = tmp_path / "Papers" / "2607-FooAgent.md"
+    paper.write_text("---\ntitle: FooAgent web agent benchmark\ntags: [gui-agent, benchmark]\n---\n")
+    return paper
+
+
+def test_match_by_tag_and_title(tmp_path):
+    paper = make_vault(tmp_path)
+    assert match_surveys(paper, tmp_path) == ["GUIAgent-Survey"]
+
+
+def test_match_normalizes_hyphens_vs_spaces(tmp_path):
+    """keyword 'web agent'（空格）必须命中 tag 'web-agent'（连字符），反向亦然。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2607-BarAgent.md"
+    paper.write_text("---\ntitle: BarAgent benchmark\ntags: [web-agent]\n---\n")
+    assert match_surveys(paper, tmp_path) == ["GUIAgent-Survey"]
+    paper2 = tmp_path / "Papers" / "2607-BazAgent.md"
+    paper2.write_text("---\ntitle: A GUI agent for spreadsheets\ntags: [misc]\n---\n")
+    assert match_surveys(paper2, tmp_path) == ["GUIAgent-Survey"]
+
+
+def test_excluded_tag_overrides_title_keyword(tmp_path):
+    """纯 Deep Research 即使标题含 web/browser agent，也不得误入 GUI survey。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2607-ResearchAgent.md"
+    paper.write_text(
+        "---\ntitle: Web Agents for Persistent Deep Research\n"
+        "tags: [web-agent, deep-research]\n---\n"
+    )
+    assert match_surveys(paper, tmp_path) == ["WebAgent-Survey"]
+
+
+def test_legacy_deep_research_title_routes_without_new_tag(tmp_path):
+    """旧笔记尚无 deep-research tag 时，Deep Research 标题仍应排除 GUI。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2607-LegacySearch.md"
+    paper.write_text(
+        "---\ntitle: Scaling Search Agents on the Open Web\n"
+        "tags: [web-agent, agentic-RL]\n---\n"
+    )
+    assert match_surveys(paper, tmp_path) == ["WebAgent-Survey"]
+
+
+def test_gui_umbrella_tag_wins_for_true_hybrid(tmp_path):
+    """真正操作 GUI 的 hybrid 论文以 GUI canonical 为 primary home。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2607-Hybrid.md"
+    paper.write_text(
+        "---\ntitle: Deep Research through Interactive GUI Workflows\n"
+        "tags: [gui-agent, deep-research]\n---\n"
+    )
+    assert match_surveys(paper, tmp_path) == ["GUIAgent-Survey"]
+
+
+def test_browsecomp_semantics_override_stale_gui_tag(tmp_path):
+    """BrowseComp 家族是 information seeking；旧 gui-agent 标签不得污染路由。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2607-KBrowseComp.md"
+    paper.write_text(
+        "---\ntitle: K-BrowseComp: A Web Browsing Agent Benchmark\n"
+        "tags: [web-agent, gui-agent]\n---\n"
+    )
+    assert match_surveys(paper, tmp_path) == ["WebAgent-Survey"]
+
+
+def test_merged_survey_never_routes_even_with_keywords(tmp_path):
+    """redirect 即使误留 keywords，也不得重新进入增量路由。"""
+    paper = make_vault(tmp_path)
+    (tmp_path / "Topics" / "Legacy-Survey.md").write_text(
+        "---\ntitle: Legacy Survey\nkeywords: [gui-agent]\n"
+        "status: merged\nmerged_into: Topics/GUIAgent-Survey\n---\n"
+    )
+    assert match_surveys(paper, tmp_path) == ["GUIAgent-Survey"]
+
+
+def test_match_multiline_tags(tmp_path):
+    """多行 YAML list 形式的 tags 也要参与匹配。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2607-MultiTag.md"
+    paper.write_text("---\ntitle: MultiTag benchmark\ntags:\n  - web-agent\n  - benchmark\n---\n")
+    assert match_surveys(paper, tmp_path) == ["GUIAgent-Survey"]
+
+
+def test_record_appends_and_dedups(tmp_path):
+    paper = make_vault(tmp_path)
+    record(paper, tmp_path)
+    record(paper, tmp_path)  # 幂等
+    pending = load_pending(tmp_path)
+    assert len(pending) == 1
+    assert pending[0]["survey"] == "GUIAgent-Survey"
+    assert pending[0]["paper"] == "Papers/2607-FooAgent.md"
+
+
+def test_clear_removes_processed(tmp_path):
+    paper = make_vault(tmp_path)
+    record(paper, tmp_path)
+    clear("GUIAgent-Survey", ["Papers/2607-FooAgent.md"], tmp_path)
+    assert load_pending(tmp_path) == []
+
+
+def test_missing_json_initialized(tmp_path):
+    make_vault(tmp_path)
+    assert load_pending(tmp_path) == []
+
+
+def test_corrupt_json_backed_up_and_recovered(tmp_path):
+    """损坏的账本不能被静默丢弃：备份为 .bak 后重建，record 仍可用。"""
+    paper = make_vault(tmp_path)
+    ledger = tmp_path / "Workbench" / "survey-updates.json"
+    ledger.write_text("{not valid json", encoding="utf-8")
+    assert load_pending(tmp_path) == []
+    assert (tmp_path / "Workbench" / "survey-updates.json.bak").exists()
+    record(paper, tmp_path)
+    data = json.loads(ledger.read_text(encoding="utf-8"))
+    assert data["version"] == 1
+    assert len(data["pending"]) == 1
+
+
+def test_wrong_shape_json_treated_as_corrupt(tmp_path):
+    """合法 JSON 但结构错误（如 [] 或缺 pending）同样视为损坏。"""
+    make_vault(tmp_path)
+    ledger = tmp_path / "Workbench" / "survey-updates.json"
+    ledger.write_text("[]", encoding="utf-8")
+    assert load_pending(tmp_path) == []
+    assert (tmp_path / "Workbench" / "survey-updates.json.bak").exists()
+
+
+def test_no_substring_false_positive(tmp_path):
+    """词边界：keyword 'cua' 不得命中 'evacuation'。"""
+    make_vault(tmp_path)
+    (tmp_path / "Topics" / "ComputerUse-Survey.md").write_text(
+        "---\ntitle: Computer Use Survey\nkeywords: [cua]\ndomain_map: GUI-Agent\n---\n"
+    )
+    paper = tmp_path / "Papers" / "2607-Crowd.md"
+    paper.write_text("---\ntitle: Simulating crowd evacuation dynamics\ntags: [simulation]\n---\n")
+    assert match_surveys(paper, tmp_path) == []
+
+
+def test_no_cross_tag_phrase_match(tmp_path):
+    """多词 keyword 不得跨 tag 边界拼接命中：[x-gui, agent-y] 不含 'gui agent'。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2607-CrossTag.md"
+    paper.write_text("---\ntitle: Something unrelated\ntags: [x-gui, agent-y]\n---\n")
+    assert match_surveys(paper, tmp_path) == []
+
+
+def test_plural_keyword_match(tmp_path):
+    """可选复数：keyword 'vlm' 须命中标题中的 'VLMs'。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2607-VlmSurvey.md"
+    paper.write_text("---\ntitle: A survey of VLMs\ntags: [misc]\n---\n")
+    assert match_surveys(paper, tmp_path) == ["VLM-Survey"]

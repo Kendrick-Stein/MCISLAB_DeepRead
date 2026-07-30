@@ -3,7 +3,7 @@ title: "Computer-Use Agents: A Unified Survey of Models, Learning, Environments,
 tags: [survey, gui-agent, computer-use, web-agent, mobile-agent, os-agent, agentic-RL]
 date_updated: "2026-07-29"
 year_range: 1997-2026
-papers_analyzed: 189
+papers_analyzed: 190
 keywords: [gui-agent, gui grounding, computer-use, computer use agent, cua, web agent, browser agent, mobile agent, desktop agent, os agent]
 exclude_tags: [deep-research]
 exclude_keywords: [deep research, information seeking, browsecomp, research agent, search agent]
@@ -848,6 +848,7 @@ CUA safety 已从筛查用户指令，扩展到环境内容、跨应用信息流
 |:--|:--|:--|:--|
 | Environmental prompt injection | [[Papers/2504-WASP]]、[[Papers/2409-EIA]] | observation filtering 与 instruction hierarchy | goal-aligned injection |
 | Contextual privacy leakage | [[Papers/2606-AgentCIBench]]、[[Papers/2601-GUIGuardBench]] | disclosure policy 与 least privilege | 精确识别应隐藏字段 |
+| Benign-experience safety drift | [[Papers/2604-ExperienceSafetyRisks]] | experience admission、retrieval composition 与 safety gate | refusal 经验压制 ASR 但诱发 over-refusal；只覆盖 AWM / ReasoningBank |
 | Consequence-level risk | [[Papers/2607-SeerGuard]] | 执行前预测动作后果 | world model 与环境漂移 |
 | Trust isolation | [[Papers/2607-UCM]] | privileged planner 与 quarantined content 分离 | trust-label error 与 typed value corruption |
 | Clarification / confirmation | [[Papers/2602-AmbiBench]]、[[Papers/2503-OS-Kairos- Adaptive Interaction for MLLM-Powered GUI Agents]] | ambiguity detection 与 adaptive autonomy | 频繁询问造成 interaction cost |
@@ -857,6 +858,8 @@ CUA safety 已从筛查用户指令，扩展到环境内容、跨应用信息流
 | Capability-aware handoff 与统一 intervention 决策 | [[Papers/2607-MHLC]] | 冻结 backbone 上的 latent control heads 读取生成期 hidden states | judge-derived label bias、需 hidden-state access、head 不跨 backbone 迁移 |
 
 [[Papers/2607-MHLC]] 把 act、ask、escalate、abstain 的效用决策做成统一的学习接口：在冻结 backbone 上训练两个读取生成期 hidden-state 轨迹的轻量 head，Capability Head 估计当前模型对该 instance 是否 adequate（低于阈值则 handoff 给更强模型），Resolution Head 在 Clarification、Tool Use、Abstention 与 Direct Answering 间选择。GUI 侧证据为 AndroidWorld routed execution：Qwen3-VL-4B→32B 的 score 从本地 4B 的 0.47 升至 0.60，paid API cost 减少 90.7%——该口径只计 fallback 大模型调用、本地模型计零成本，不等于端到端 compute 下降；clarification/abstention 增益则来自 When2Call 与 TriviaQA 等非 GUI benchmark，对 CUA 属 component-only 证据。其"latent self-assessment"并非无监督涌现：capability 与 resolution label 均由外部 LLM judge 离线构造，judge bias 可能直接进入 control policy；head 还需访问 hidden states 且逐 backbone 训练，不能直接套在 closed API 上。作为对照，prompt-level self-switching 在 ScreenSpot-Pro 上仅 escalation 4/1581 个样本——严重 under-escalation 说明"让模型自己说要不要升级"不是可用的控制信号。
+
+[[Papers/2604-ExperienceSafetyRisks]] 把风险面从恶意输入推进到**良性经验本身造成的安全漂移**：AWM（offline）与 ReasoningBank（online）在 WebArena / SafeAgentBench 的良性任务上积累经验后，7 个模型 × 3 个安全 benchmark 的 21 个组合全部出现 ASR 上升；例如 GPT-4o 在 BrowserART 从 37.0 升至 50.0。检索条数剂量实验与 length-matched 对照把退化定位到 experience 的 execution-oriented 语义，而非 context 变长；refusal-only 经验能压制 ASR，却同时降低良性任务成功率，形成 safety–utility trade-off。证据是 source-checked 的直接端到端测量，但仅覆盖 AWM / ReasoningBank、ASR 由 GPT-4o 自动判定且无 human calibration，不能外推到所有 skill/workflow 自演化路线。
 
 #### 6.11.2 运行时证据核验与分层防线
 
@@ -902,7 +905,7 @@ Architecture 的最小可审计单位应是一条 state transition：使用了�
 | Accountable state belief | Validated gap | [[Papers/2607-GUIStateBelief]] 显示视觉与结构冲突会诱发 stale-evidence following；[[Papers/2510-MGA]] 只写入 verified delta。下一步需要统一表示 source、freshness、confidence、supersession 与 downstream influence。 |
 | Architecture-level causal attribution | Validated gap | Native、modular 与 hybrid 比较通常同时改变模型调用量、工具权限和 observation access。需要等 backbone、等 trajectory、等 evidence budget、等 action budget 的 factorial ablation。 |
 | Adaptive observation policy | Observed tension | 完整 HTML 对强模型有益、对弱模型有害；剪枝既可能改善 grounding，也可能删除动作后果。需要让 agent 按 task、model capability、risk 与 freshness 动态选择 pixels、structure 和 history。 |
-| Verifiable memory lifecycle | Observed tension | Raw visual memory 会干扰 grounding，latent memory 又牺牲 provenance。Memory item 应支持 write-time source attribution、失效传播、选择性删除、回滚与对下游 action 的 influence tracking [[Papers/2606-AgentTracesToTrust]]。 |
+| Verifiable memory lifecycle | Observed tension | Raw visual memory 会干扰 grounding，latent memory 又牺牲 provenance；良性 experience 还可能通过 execution bias 提高 ASR，且 refusal 经验会引发 over-refusal [[Papers/2604-ExperienceSafetyRisks]]。Memory item 应支持 write-time source attribution、失效传播、选择性删除、回滚、safety label 与对下游 action 的 influence tracking [[Papers/2606-AgentTracesToTrust]]。 |
 | Recovery policy selection | Validated gap | 现有系统多用固定重试、回退或升级规则。需要在相同 detector、executor 与 verifier 下比较 continue、retry、change modality、backtrack、replan、ask human 和 abort，并显式纳入可逆性、成本与副作用。 |
 | Multi-agent state isolation | Observed tension | MACU 展示 DAG 协作的潜力，受控 MAS 研究则显示无协调并行会传播错误。需要 GUI-specific、等总预算实验，区分任务分解、同任务多副本探索和异构 specialist 协作 [[Papers/2606-MACU]]、[[Papers/2512-ScalingAgentSystems]]。 |
 | Consequence-aware safety | Validated gap | Instruction screening 无法覆盖良性指令触发的危险动作。Runtime 需要在执行前预测后果、执行时限制权限、执行后核验状态，并保留 parameter-level provenance。 |
@@ -1024,6 +1027,8 @@ Self-improvement 路线首先由改进对象区分，不同对象会分别把错
 | Workflow / harness | control flow | planner、retry、visual search、terminal assist | benchmark overfitting 与安全偏航 |
 
 EvoCUA 将 task、initial state 与 executable validator 共生成，再用异步 sandbox rollout 产生新经验；EvoCUA-1.5 进一步说明 task value 与 PRM reliability 都随 policy 改变。[[Papers/2601-EvoCUA]] [[Papers/2607-EvoCUA15]] 因而不能把"生成更多数据"等同于"形成正向 flywheel"，每轮更新都需要独立、可追溯且难以被当前 policy 操纵的 gate。
+
+经验资产的 gate 还必须同时审计 utility 与 safety。[[Papers/2604-ExperienceSafetyRisks]] 在 AWM / ReasoningBank 上发现，即使经验完全来自良性任务，experience-driven evolution 仍会强化 execution prior，使 7 个模型 × 3 个安全 benchmark 的 21 个组合全部出现 ASR 上升；增加检索条数总体加重退化，refusal-only 经验虽能压低 ASR，却以良性任务 over-refusal 为代价。这把 flywheel 的验收条件从"经验是否提升成功率"扩展为"经验是否在跨风险语境中保持安全且不过度拒绝"；其结论限 memory/experience 路线，不能直接外推到 tool/skill 或 workflow 演化。
 
 #### 7.11.2 非参数 skill 资产路线
 
@@ -1815,6 +1820,7 @@ GUI/Computer-Use Agent 研究经历了五次可辨认的抽象升级——结构
 | GUI RL 是受 policy support 约束的分布重塑：SFT 已掌握任务上 GRPO 无可信提升，有 headroom 才 +22pp | source-verified | [[Papers/2607-GRPONullWebAgent]] | 单篇受控阴性结果，作方法学下限 |
 | observation reduction 非普遍有益、依赖 capability × thinking budget（强模型用完整 HTML 反而更好） | source-verified | [[Papers/2604-ReadMoreThinkMore]] | diff-history「相当或更好」仅限 gpt-5.1(low)/o3-mini（已加限定） |
 | Interactive verifier reward 进 RL 闭环：IRA reward 在 OSWorld RL 达 34.0%（script 34.9%）、无 script 生成任务 33.5%；GUI-RewardBench 86.9% acc vs 最佳 passive DistRL 78.8% | source-verified | [[Papers/2607-InteractiveRewardAgent]] Table 1/3（§7.6/§8.12） | 单 backbone（Qwen3.6-35B-A3B）、Ubuntu-only；接近而非超越 script；benchmark 标签由 script 产生、覆盖限 script 可判任务；库内暂无独立验证 |
+| 良性 experience 也会造成 safety drift：AWM 演化后 7 模型 × 3 benchmark 的 21 格 ASR 全部上升；refusal 经验压 ASR 但诱发 over-refusal | source-verified | [[Papers/2604-ExperienceSafetyRisks]] Table 1 / Figure 3 / Table 3 / Figure 7（§6.11/§7.11） | 仅 AWM / ReasoningBank；ASR 由 GPT-4o 自动判定且无 human calibration；诊断结果未给出新缓解方法 |
 | 2026-07-23 gap-fill 补录 14 篇（RL survey / Digi-Q / Jedi / AndroidControl / OSWorld-MCP / MCPWorld 等） | 库内暂无独立验证 | §1.4/§4.7/§5/§7/§8 各子节 | 单 agent digest、verification_status: unverified，仅作子节 enrichment，未升格为 Takeaway/共识 |
 
 ## 调研日志

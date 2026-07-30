@@ -35,4 +35,5 @@ title: Ideas
 | [[Ideas/MismatchTriage-LongHorizonRecovery-GUI]] | developing → [[Projects/MismatchTriage]] | Reliability-Survey / TRIAGE | 最优恢复动作随 mismatch 点而变，固定策略留下可测量的 recovery-selection gap（2026-07-20 算法强化：分叉标签 = 免疫 PRM-hacking 的 counterfactual 监督；train-with-fork deploy-fork-free） |
 | [[Ideas/StateSufficiency-AmnesiaProbe-GUI]] | raw | EvoCUA / context management | 用遗忘探针测 GUI 任务的历史信息充分性边界 |
 | [[Ideas/SelfInitiatedFork-GUI]] | veto | AgentRuntimePrimitives-Survey | ~~fork 作为可学习的 agent 动作~~（Supervisor 否决：LtE/PGTS 已覆盖调用学习，属延伸非空白） |
+| [[Ideas/ExecutionPriorDrift-BenignGate]] | raw | ExperienceSafetyRisks / GRASP | 良性经验的安全退化由执行倾向漂移中介，可用全良性探针在准入时预测并拦截（不接触 harmful probe；prior-art PARTIALLY_ADDRESSED，最近邻 FATE 2605.11882） |
 | [[Ideas/RestorationFidelity-BranchGains]] | veto | AgentRuntimePrimitives-Survey OP4 | ~~恢复保真度测量~~（Supervisor 否决：infra 测量问题非算法问题，无亮点） |

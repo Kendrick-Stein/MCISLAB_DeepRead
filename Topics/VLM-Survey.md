@@ -1,9 +1,9 @@
 ---
 title: VLM Survey
 tags: [survey, VLM, multimodal, vision-language-model, visual-reasoning]
-date_updated: "2026-07-24"
+date_updated: "2026-07-29"
 year_range: 2023-2026
-papers_analyzed: 35
+papers_analyzed: 38
 keywords: [vlm, vision language model, multimodal llm, visual reasoning]
 domain_map: VLM
 ---
@@ -22,7 +22,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - **基础架构探索（2023）**：CLIP、BLIP 等视觉-语言对齐框架成熟；LLaVA 开启 instruction-following VLM 路线
 - **能力扩展期（2024）**：高分辨率 VLM（CogAgent 1120x1120）、专业领域 VLM（MobileFlow）、VLM for grounding 成为热点
 - **统一模型期（2025）**：理解+生成统一模型涌现（LLaDA2.0-Uni、Unify-Agent）；VLM 作为 agent backbone 广泛应用
-- **效率与对齐优化期（2026）**：KV cache 优化（GUI-KV）、human preference alignment、安全防御（LaSM）
+- **效率与对齐优化期（2026）**：KV cache 优化（GUI-KV）、codec-native pre-encoder sparsification（Mage-VL）、human preference alignment、安全防御（LaSM）
 - **后训练与机制分析期（2026H2）**：统一模型的 RL 后训练兴起（BRAID、SpectraReward）；因果干预式机制分析与受控诊断 benchmark（Visual Access Sweep、SynthDocBench）取代观察性分析；开源基座持续演进（Gemma 4 encoder-free、ScaleCUA 跨平台 CUA 语料）
 
 ---
@@ -88,7 +88,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 ### 2.5 效率优化路线
 
-**代表论文**：[[2500-GuiKvEfficientGui]]、[[2606-StarKV]]、[[2603-STLiteKV]]、[[2500-LasmLayerWiseScaling]]、[[2607-Gemma4]]
+**代表论文**：[[2500-GuiKvEfficientGui]]、[[2606-StarKV]]、[[2603-STLiteKV]]、[[2500-LasmLayerWiseScaling]]、[[2607-Gemma4]]、[[2607-MageVL]]
 
 **核心思路**：针对 VLM 在长序列高分辨率输入下的计算瓶颈，通过 KV cache 压缩、layer-wise scaling 等技术降低推理开销；基座侧则在训练阶段内建效率设计。
 
@@ -98,15 +98,16 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - **ST-Lite**：诊断出 GUI attention 在所有 transformer 层均匀高稀疏——与 PyramidKV/VL-Cache 分层预算分配的前提冲突（低预算下分层方法灾难性衰减，1% 预算 ST-Lite 7.3 vs VL-Cache 1.1）；Component-centric 空间显著性（3×3 邻域均匀度）+ 轨迹冗余门控双分支，10-20% 预算 decoding 加速 2.45×，AITW 上压缩历史反超全历史（less-is-more，归因于过滤 stale 视觉历史抑制 context poisoning）（[[2603-STLiteKV]]）。注意：其"平均超 baseline 7.3%"宣称经笔记核查为单格最优值（真实均值约 2.2-2.4%），且存在跨表数字不一致——less-is-more 定性结论在两表均成立，但精确增益幅度可信度有限
 - **LaSM**：Layer-wise scaling mechanism，通过 attention + MLP 联合缩放防御 pop-up attack（defense success rate 74.8%-100%）
 - **Gemma 4**：训练侧效率工程的集成样本（[[2607-Gemma4]]）——KV 共享使全局 KV cache −37.5%、int2/int4 QAT 使音频 encoder footprint −78%、MTP speculative decoding；12B 档给出 **encoder-free 统一架构**（35M 投影直接吃 raw image patch / raw audio），若该路线被证明无损，端侧多模态部署栈将大幅简化——但目前只有单一规模点，且缺"统一 vs 外挂 encoder"同规模对照
+- **Mage-VL**：把压缩点前移到 ViT 之前——用 codec motion vector 与 residual energy 只编码高信息 patches，再用 event gate 决定是否调用 language decoder；64-frame 设置约减 75% visual tokens，NExT-QA 报告 80.8/415s（Qwen3-VL-4B 79.8/1460s），但 TempCompass/VSI-Bench 反由 Qwen 更快，且 spatial/long-video 增益与自建 Mage-ViT、350M recaptioning、五阶段 curriculum 混在一起，不能归因于 codec sparsity（[[2607-MageVL]]）
 
 **跨论文 pattern（GUI KV 压缩支线）**：[[2606-StarKV]] 与 [[2603-STLiteKV]] 从不同诊断出发（subspace 级空间 MI 异质性 vs 全层均匀高稀疏）独立得到两个收敛结论——(1) 通用 LLM/VLM KV 压缩的结构先验（共享 saliency、分层预算）在 GUI attention 结构下失效；(2) 中等预算压缩可精度不降甚至略超 full cache，指向 GUI 历史 visual token 存在系统性冗余、stale 视觉历史会污染 context。但两者"反超"的幅度都很小（+0.19 / ~2 分）且均无方差报告，两者的 stale 判据也都是注意力/相似度启发式而非"证据是否仍反映当前界面状态"；该结论目前仅在 7B 开源模型（UI-TARS-1.5 / OpenCUA）上成立。
 
 **优势**：GUI-KV/STaR-KV/ST-Lite/LaSM 无需重新训练、plug-and-play；Gemma 4 的效率 recipe 可复用于端侧部署
-**局限**：缩放系数和关键层范围具有 model-specific 特性；对闭源模型难以应用；Gemma 4 未拆分 thinking mode 与架构本身的贡献占比；GUI KV 压缩支线均只报 analytic FLOPs 或受限样本上的加速比，端到端 wall-clock 收益证据薄弱
+**局限**：缩放系数和关键层范围具有 model-specific 特性；对闭源模型难以应用；Gemma 4 未拆分 thinking mode 与架构本身的贡献占比；GUI KV 压缩支线均只报 analytic FLOPs 或受限样本上的加速比。Mage-VL 虽补了端到端 wall-clock，但 3.5× 只是 8×B200 上的峰值案例、跨 benchmark 非单调，效率结论必须同时报告 token budget、source-frame horizon、latency breakdown 与 matched hardware
 
 ### 2.6 多模态 RL 后训练与 Reward 设计
 
-**代表论文**：[[2607-BRAID]]、[[2607-SpectraReward]]、[[2607-SearchGenBoundary]]、[[2606-VisPlay]]
+**代表论文**：[[2607-BRAID]]、[[2607-SpectraReward]]、[[2607-SearchGenBoundary]]、[[2606-VisPlay]]、[[2607-HyGAE]]
 
 **核心结论**：统一模型（UMM）的竞争焦点已从架构转向后训练——RL 信用分配如何贯穿异构模态、reward 如何免标注获得，且三篇 UMM 工作全部收敛到 BAGEL 系 hybrid AR-diffusion 基座。免标注 reward 的探索同时延伸到理解侧：[[2606-VisPlay]] 用完全自含的 self-play（自身 majority-voting 伪标签 + 不确定性课程）替代人工标注与外部裁判。
 
@@ -115,12 +116,13 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - **SpectraReward**：frozen MLLM 对"生成图像条件下原 prompt 的平均 log-likelihood"（一次 teacher-forced forward pass）即为 T2I RL reward，零偏好标注零 reward 训练；Self-SpectraReward 让 BAGEL 用 understanding 分支给 generation 分支打分（GenEval 84.0→89.5），且发现 **reward-policy 分布对齐比 reward model 规模更重要**——自打分追平 30B、超过 235B 外部 reward（[[2607-SpectraReward]]）
 - **SearchGen**：生成模型的 knowledge boundary（internalizable vs contextual）是 (prompt, generator) 的联合属性且随训练漂移——盲目接搜索会在模型本会做的 prompt 上倒退；teach-then-search co-training（DPO 内化可学知识 + RFT 校准 8B search reasoner）使 4B generator 达 Gemini-3-Flash oracle reasoner 水平（[[2607-SearchGenBoundary]]）
 - **VisPlay**：理解侧的 label-free RL——单一 base VLM 演化 Questioner/Reasoner 双角色交替 GRPO：Questioner 以 frozen Reasoner 的答案不确定性（confidence→0.5）为 reward 生成贴着能力边界的问题，Reasoner 以自身 majority-voting 伪标签作 verifiable reward；47K 无标注 web 图像、3 个 backbone 平均分随迭代上升（Qwen2.5-VL-3B 30.61→47.27），与人工标注数据 + standard GRPO 平均相当。但拆分显示优势几乎全在 HallusionBench 单项，MMMU/MM-Vet 反而更低；且同批图像的伪标签估计准确率逐代 72.0→61.0 下滑——自我共识监督随迭代自噬，是该范式（而非实现）的根本约束，论文自认缺 definitive verification（[[2606-VisPlay]]）
+- **HyGAE**：把 multi-turn VLM agent 的 turn-wise 与 token-wise GAE 线性混合，并在特定 discount relation 下用单一 critic 同时提供两级 value；Qwen2.5-VL-3B 在五类受控 benchmark 的平均成功率 0.91（Token-PPO 0.81），但环境最多 3–7 turns、VIRL 只执行与 ground-truth trajectory 对齐的动作，支持的是短 horizon credit-assignment 稳定性，不是开放式 long-horizon 泛化（[[2607-HyGAE]]）
 
-**共同弱点**：UMM 三篇的 reward/裁判高度依赖闭源强模型（BRAID 用 GPT-5.2 打 process reward、SearchGen 裁判与奖励同源、SpectraReward 零人类评估），增益中 judge preference fitting 的占比未被剥离；likelihood reward 的经典退化解（把 prompt 文字渲染进图像）未被验证；均只在 4B-7B 单 backbone 验证。[[2606-VisPlay]] 换掉了外部裁判依赖，代价是 majority-voting 伪标签继承模型自身系统性偏差、无外部纠错通路——免标注 reward 目前在"依赖闭源裁判"与"自我共识自噬"之间二选一，库内尚无同时摆脱两者的方案。
+**共同弱点**：UMM 三篇的 reward/裁判高度依赖闭源强模型（BRAID 用 GPT-5.2 打 process reward、SearchGen 裁判与奖励同源、SpectraReward 零人类评估），增益中 judge preference fitting 的占比未被剥离；likelihood reward 的经典退化解（把 prompt 文字渲染进图像）未被验证；均只在 4B-7B 单 backbone 验证。[[2606-VisPlay]] 换掉了外部裁判依赖，代价是 majority-voting 伪标签继承模型自身系统性偏差、无外部纠错通路。[[2607-HyGAE]] 换成显式 actor-critic，却只在 3B、3–7 turn 受控环境验证；两类路线共同缺少 long-horizon、distribution shift 与 failure-type 分解。
 
 ### 2.7 VLM as CUA 基座：数据 Scaling、动作表示与外挂验证
 
-**代表论文**：[[2509-ScaleCUA]]、[[2602-ToolTok]]、[[2511-GuiAima]]、[[2606-HiViG]]、[[2603-SecAgent]]
+**代表论文**：[[2509-ScaleCUA]]、[[2602-ToolTok]]、[[2511-GuiAima]]、[[2606-HiViG]]、[[2603-SecAgent]]、[[2607-MHLC]]
 
 **核心结论**：GUI/computer-use 场景对 VLM 的要求已从"看得清"（2.1 的高分辨率路线）推进到数据配比、动作表示、历史压缩与验证机制四个层面，且 grounding 能力与端到端 agent 能力被证明显著解耦。
 
@@ -130,6 +132,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - **GUI-AIMA**：与 ToolTok 同攻"文本生成坐标"范式的第二条独立路线——不新增 grounding head，在 [V,Q] 后追加可学习 `<ANCHOR>` token，用 KL loss 把它对 visual patch 的**内生**注意力分布直接对齐为 grounding 信号（visual-sink query token 选头 + overlap-aware/center-biased 软标签）；仅 509k 样本（约 101k 截图）使 3B 达 ScreenSpot-Pro 61.5（含 training-free zoom-in，无 zoom 为 53.8）/ ScreenSpot-v2 92.1 / OSWorld-G 68.1 的 3B 级 SOTA。跨 backbone 迁移增益有限（InternVL3.5-4B 仅 18.1→19.9），提示"点燃内生 grounding"的前提是 backbone 内生能力已足够强（[[2511-GuiAima]]）
 - **HiViG**：8B 多模态 critic 双任务——递归压缩 macro-action history + 在截图上渲染红 "X" 标记核对 policy 的实际坐标；对 frozen policy 平均 +7.3/+9.0（Qwen3-VL-32B / Gemini-3-Flash），而全部五种已有 critic baseline 对强 policy 增益近零或为负（[[2606-HiViG]]）
 - **SecAgent**：自然语言 semantic context 递归压缩历史，1 帧历史 + context 接近 5 帧性能（SA 94.8 vs 95.5）而 tokens/TTFT 显著更低；附中文 CMGUI 数据集（121K 已标注 steps / 44 apps）补非英语语料缺口（[[2603-SecAgent]]）
+- **MHLC**：把 generated-token hidden-state trajectory 读成两个 execution control signal——Capability Head 决定是否 handoff，Resolution Head 在 Clarification / Tool Use / Abstention / Direct Answering 间选择；AndroidWorld 的 Qwen3-VL-4B→32B routing 从 0.47 提至 0.60、按其“本地模型免费”口径 paid API cost 减 90.7%。它把 latent self-assessment 变成可执行接口，但监督来自外部 LLM judge、每个 backbone 需单独训练，且 hidden-state access 使其不能直接包装 closed API（[[2607-MHLC]]）
 
 **跨论文 pattern**：
 
@@ -212,6 +215,8 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 9. **GUI grounding 与端到端 agent 能力显著解耦**：[[2509-ScaleCUA]] grounding 开源 SOTA 但 OSWorld 仅 17.7%（落后 RL 系近一倍）；分辨率与数据配比对两种能力的影响方向相反——"grounding 强则 agent 强"的隐含假设不成立，data scaling（SFT）与 RL 是互补而非替代关系。
 
+10. **VLM agent 的新瓶颈是把内部信号变成可靠控制接口**：[[2607-MHLC]] 从 hidden-state trajectory 读出 handoff/tool/abstention 决策，[[2607-HyGAE]] 则把 token/turn credit 统一进同一 critic；两者分别处理 inference-time control 与 training-time credit assignment，但都只在可控、短 horizon setting 中成立。下一阶段不能只报 aggregate success，必须报告 false-retain/false-handoff、wrong intervention、trajectory 长度与 calibration drift。
+
 ---
 
 ## Open Problems
@@ -238,7 +243,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 ### 5.3 系统与应用挑战
 
-9. **VLM 作为 agent backbone 的决策可靠性**：当 VLM 用于 GUI agent、embodied agent 时，其 grounding 误差会直接影响动作执行。如何在多步任务中实现稳定的决策链，是走向实际部署的关键。[[2606-HiViG]] 给出一个反直觉证据：五种已有 critic（scalar PRM、zero-shot verbal critic、专训 critic）对强 policy 增益近零或为负——"拿通用 VLM 当 judge"在 CUA 上不成立，critic 必须专门训练且训练信号对准像素证据（visual marker + intent masking）。
+9. **VLM 作为 agent backbone 的决策可靠性**：当 VLM 用于 GUI agent、embodied agent 时，其 grounding 误差会直接影响动作执行。如何在多步任务中实现稳定的决策链，是走向实际部署的关键。[[2606-HiViG]] 给出一个反直觉证据：五种已有 critic（scalar PRM、zero-shot verbal critic、专训 critic）对强 policy 增益近零或为负——"拿通用 VLM 当 judge"在 CUA 上不成立，critic 必须专门训练且训练信号对准像素证据（visual marker + intent masking）。[[2607-MHLC]] 进一步说明 even when latent control works，judge-derived labels、fixed threshold、per-backbone head 与未计 hidden-state extraction 的成本会成为新依赖；[[2607-HyGAE]] 则把训练期稳定性问题推进到 token/turn 混合 credit，但 long-horizon 证据仍空白。
 
 10. **安全与隐私防护的系统化方案**：LaSM 针对 pop-up attack 的 layer-wise scaling 是有效局部方案，但对 instruction injection、adversarial OCR text 等其他攻击类型的系统性防御尚未成熟。隐私维度上 [[2601-GUIGuardBench]] 揭示层级断裂：binary detection 尚可（Android 89.0% / PC 63.3%）但 strict full match 仅 8.8%/0.6%，需要上下文推断的 Inferences & Profiling 类 recall 仅 2.4%——"知道有隐私"远不等于能最小化披露，selective disclosure policy 的学习尚属空白。
 
@@ -280,6 +285,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - [[2607-SpectraReward]] - SpectraReward: Frozen MLLM prompt likelihood 作 T2I reward
 - [[2607-SearchGenBoundary]] - SearchGen: Knowledge boundary 发现与 teach-then-search co-training
 - [[2606-VisPlay]] - VisPlay: 双角色 self-play 免标注 RL，majority-voting 伪标签 + 不确定性课程
+- [[2607-HyGAE]] - HyGAE: Turn-wise + token-wise GAE 与 unified critic
 
 **Human Preference Alignment**：
 - [[2500-AligningMultimodalLlmHuman]] - Aligning Multimodal LLM with Human Preference: A Survey
@@ -290,6 +296,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - [[2603-STLiteKV]] - ST-Lite: GUI attention 全层均匀高稀疏诊断 + CSS/TSG 双分支压缩
 - [[2500-LasmLayerWiseScaling]] - LaSM: Layer-wise scaling for pop-up attack defense
 - [[2607-Gemma4]] - Gemma 4: 开源原生多模态基座，encoder-free 12B + 端侧效率 recipe
+- [[2607-MageVL]] - Mage-VL: Codec-native pre-encoder sparsification + event-gated streaming generation
 
 **机制分析**：
 - [[2607-VisualAccessBoundary]] - Visual Access Sweep: CoT 视觉访问边界的因果干预
@@ -313,6 +320,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - [[2511-GuiAima]] - GUI-AIMA: anchor token + KL 对齐内生注意力的 coordinate-free grounding
 - [[2606-HiViG]] - HiViG: History-aware visually grounded critic
 - [[2603-SecAgent]] - SecAgent: Semantic context 历史压缩 + 中文 CMGUI 数据集
+- [[2607-MHLC]] - MHLC: Hidden-state trajectory 驱动 handoff / tool / clarification / abstention
 
 ---
 
@@ -350,4 +358,11 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - 跳过 1 篇：[[2606-Resource2Skill]]（skill library 系统层贡献，agent 走 programmatic 接口不做视觉观察，无 VLM 架构/多模态能力层增量；主场 CUA-Survey 已并入）
 - 结构变化：§2.6 更名"多模态 RL 后训练与 Reward 设计"（原限定统一模型，VisPlay 把免标注 reward 主题延伸到理解侧）；§2.5 新增"GUI KV 压缩支线"跨论文 pattern 段（两篇独立工作收敛于"通用压缩先验在 GUI 失效 + 中等预算压缩可反超 full cache"）；Takeaways 5/7、Open Problems 1/5 增量修订；ScreenSpot-Pro SOTA 更新为 GUI-AIMA-3B 61.5
 - domain_map: 更新 DomainMaps/VLM.md 近期格局变化（GUI KV 压缩 less-is-more 证据收敛；"文本生成坐标"范式受两条独立路线挑战）
+- **status**: success
+
+### 2026-07-29 增量更新（survey-refresh）
+- 并入 3 篇：[[2607-MageVL]]（§2.5，codec-native pre-encoder sparsification + event-gated streaming）、[[2607-HyGAE]]（§2.6，token/turn hybrid credit assignment）、[[2607-MHLC]]（§2.7，hidden-state latent control interface）
+- 跳过 1 篇：[[2409-ElementOrdering]]（GUI observation 表示编排工作，已完整并入 canonical [[Topics/CUA-Survey]] §4.5/§6.7.2；对 VLM 架构或多模态能力无独立增量）
+- 结构变化：未新增平行 taxonomy；扩展 §2.5/2.6/2.7，并新增 Takeaway 10（内部信号→可靠控制接口）与 Open Problem 9 的 calibration/long-horizon 边界
+- domain_map: [[DomainMaps/VLM]] 新增 2 条格局变化（pre-encoder sparsification；latent control + hybrid credit）
 - **status**: success

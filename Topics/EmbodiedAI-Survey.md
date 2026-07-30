@@ -1,9 +1,9 @@
 ---
 title: Embodied AI Survey
 tags: [survey, VLA, manipulation, navigation, embodied-ai, robotics, embodied-reasoning, mobile-manipulation]
-date_updated: "2026-07-21"
+date_updated: "2026-07-30"
 year_range: 2023-2026
-papers_analyzed: 103
+papers_analyzed: 104
 keywords: [embodied ai, robot learning, manipulation, embodied reasoning, spatial reasoning, mobile manipulation, language-conditioned, instruction following]
 domain_map: EmbodiedAI
 ---
@@ -22,7 +22,7 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 
 3. **能力边界拓展（2025-2026）**：研究从单一 manipulation 向 multi-agent、multi-view、long-horizon 场景扩展。安全与部署问题开始被系统性关注（VLA Safety Survey）。VLM→VLA 迁移的 data alignment 问题被深入分析（EmbodiedMidtrain）。
 
-4. **数据引擎与 world model 角色分化（2026）**：human/手持视频数据引擎给出 data scaling 直接证据（[[Papers/2607-EgoSteer|EgoSteer]] 9.6K 小时 egocentric、[[Papers/2607-XiaomiRobotics1|Xiaomi-Robotics-1]] 100K+ 小时 UMI）；world model 在机器人中分化为 policy（WAM）、数据引擎、policy evaluator 三种角色（详见路线 3、7）。
+4. **数据引擎与 world model 角色分化（2026）**：human/手持视频数据引擎给出 data scaling 直接证据（[[Papers/2607-EgoSteer|EgoSteer]] 9.6K 小时 egocentric、[[Papers/2607-XiaomiRobotics1|Xiaomi-Robotics-1]] 100K+ 小时 UMI）；[[Papers/2607-HiFiUMI|HiFi-UMI]] 进一步把高保真 UMI 从 pre-training 辅助源推进到无需 target-task real-robot teleoperation 的 post-training 数据源。world model 则分化为 policy（WAM）、数据引擎、policy evaluator 三种角色（详见路线 3、7）。
 
 **核心挑战**：Embodied AI 面临四大关键瓶颈：
 
@@ -237,7 +237,7 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 
 ### 7. Human Video / 数据引擎路线（2026-07 新增）
 
-**代表论文**：EgoSteer (2026)、Do as I Do (2026)、Xiaomi-Robotics-1 (2026)、RynnWorld-Teleop (2026)
+**代表论文**：EgoSteer (2026)、Do as I Do (2026)、Xiaomi-Robotics-1 (2026)、HiFi-UMI (2026)、RynnWorld-Teleop (2026)
 
 **核心思路**：绕开真机遥操作的吞吐瓶颈（每条 demo 绑死一台真机 + 操作者工时），从 human egocentric 视频、手持采集设备或生成式 world model 中规模化获取训练数据。
 
@@ -246,6 +246,7 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 | [[Papers/2607-EgoSteer|EgoSteer]] | in-the-wild egocentric 视频 | 9.6K 小时 / 1.04B 帧 | EgoSmith 4 阶段 curation + 统一 R^48 相机系相对 state-action 表示 + DAgger | 40 任务 75% SR；预训练量 0→9.6K 小时 log-linear 提升 |
 | [[Papers/2606-DoAsIDo|Do as I Do]] | 普通单目 RGB human 视频 | 500 条 human-verified 灵巧轨迹 | 4D hand-object 重建（SAM 3/3D + MoGe）+ physics-aware sampling retargeting | retarget 成功率 25%→71%（warmup 主增益）；22-DoF 双手真机部署 10 类任务 |
 | [[Papers/2607-XiaomiRobotics1|Xiaomi-Robotics-1]] | UMI 手持夹爪 | 100K+ 小时 | state-transition 自动标注（两周完成）+ cross-embodiment delta pose 归一 | unseen 真机 26%→75%（data scaling）；data > model size |
+| [[Papers/2607-HiFiUMI|HiFi-UMI]] | 高保真 UMI 手持双夹爪 | full 20K+ 小时 / released 2K 小时、482.1K+ episodes | pose、双夹爪相对位姿、<40 μs 同步与 six-view FoV 的 hardware-software co-design | 三 backbone 的 UMI−teleop aggregate gap 为 −2.5 / +3.1 / −0.6pp；但 3,200 vs ~300 trajectories，非等样本比较 |
 | [[Papers/2607-RynnWorldTeleop|RynnWorld-Teleop]] | world model 合成 | 40+ FPS 实时生成 | 数字遥操作（hand-pose 驱动视频生成） | π₀ 零样本迁移真机；数据饥饿任务 +20pts |
 
 **一致发现**：
@@ -253,8 +254,9 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 1. **Curation 比堆量重要**：EgoSteer noisy-data ablation（44%→33%）、Do as I Do 的在线视频仅 ~5% 直接可用、Xiaomi 的自动标注 infrastructure——三方独立指向数据质量管线是承重结构，不是把任意 human video 当可执行示范。
 2. **表示一致性是 human→robot 迁移的关键杠杆**：EgoSteer 统一相机系相对 R^48、Xiaomi 统一 end-effector delta pose、FlowWAM 用 flow 表示吃 EgoDex 无动作数据——共同点是回避 embodiment-specific 动作空间，使预训练与后训练共享同一表示。
 3. **Data scaling 的边际收益目前大于 model scaling**（Xiaomi-Robotics-1 的受控 scaling curve，见路线 1）。
+4. **Fidelity 可以改变 UMI 的训练阶段角色**：HiFi-UMI 的四任务、三 backbone、960 次 real-robot rollout 表明，联合提高 pose、relative geometry、synchronization 与 FoV 后，robot-free data 可以承担 target-task post-training；但现有比较没有匹配 sample count 或 scene exposure，且四个 fidelity factors 未做逐项降级，因此只能归因于整套系统，不能推出 equal-sample efficiency 或单因素因果贡献。
 
-**局限**：human 视频缺触觉与力信息，contact-rich 任务受限；机器人 DoF 上限使高灵巧 human 知识不能完全迁移；生成数据路线仍需真机种子数据启动；轨迹验证成本（human verification）尚未入账。
+**局限**：human 视频缺触觉与力信息，contact-rich 任务受限；机器人 DoF 上限使高灵巧 human 知识不能完全迁移；生成数据路线仍需真机种子数据启动；轨迹验证成本（human verification）尚未入账。HiFi-UMI 的 “zero-robot post-training” 仅表示 target-task 阶段不用 real-robot teleoperation；base checkpoint 仍可能含 robot data，最终证据也来自 real-robot evaluation。
 
 ---
 
@@ -277,6 +279,7 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 |:------------------|:-----|:-----|:---------|:-----|:-----|
 | **Open X-Embodiment** | Training Data | 22 robots, 1M+ episodes, 527 skills | - | RT-X models | 最大规模 cross-embodiment dataset |
 | **DROID** | Training Data | 多场景 manipulation demo | - | - | 多机构协作收集 |
+| **HiFi-UMI-2K** | Training Data | 2K 小时 / 482.1K+ episodes / 110+ scenes | - | [[Papers/2607-HiFiUMI|HiFi-UMI]] | CC BY 4.0；synchronized multi-view + calibrated bimanual trajectories，完整 processed corpus 为 20K+ 小时 |
 | **CALVIN** | Benchmark | Long-horizon manipulation | Success Rate, Sequence Length | - | Language-conditioned，要求 compositional reasoning |
 | **LIBERO** | Benchmark | Long-horizon manipulation | Success Rate, SPL | - | 多 task suite，测试 generalization |
 | **RLBench** | Benchmark | 100+ manipulation tasks | Success Rate | Diffusion Policy, ACT | Simulation benchmark，多样化 task |
@@ -312,7 +315,7 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 
 6. **安全与可靠性开始被系统性关注**：VLA Safety Survey 定义了新问题域——VLA 的不可逆物理后果、多模态攻击面、实时约束带来区别于 LLM safety 和 classical robotic safety 的 unique challenges；[[Papers/2607-BadWAM|BadWAM]] 补充 WAM 特有的 world-action drift 威胁，[[Papers/2607-RobustExecAgenticRL|RobustExec]] 给出 runtime 执行监控 + 回滚恢复的廉价方案（proprioception-only 指标，无需 VLM）。
 
-7. **数据瓶颈的答案正收敛到 human/手持视频 + 强 curation**：[[Papers/2607-EgoSteer|EgoSteer]]（9.6K 小时 egocentric，scaling log-linear）与 [[Papers/2607-XiaomiRobotics1|Xiaomi-Robotics-1]]（100K+ 小时 UMI，data scale 边际收益大于 model size）给出 data scaling 直接证据；三方独立证据（EgoSteer / Do as I Do / Xiaomi）表明 curation 质量管线是承重结构，表示一致性（相机系相对量 / delta pose / flow）是 human→robot 迁移的关键杠杆。
+7. **数据瓶颈的答案正收敛到 human/手持视频 + 强 curation + 可部署 fidelity**：[[Papers/2607-EgoSteer|EgoSteer]]（9.6K 小时 egocentric，scaling log-linear）与 [[Papers/2607-XiaomiRobotics1|Xiaomi-Robotics-1]]（100K+ 小时 UMI，data scale 边际收益大于 model size）给出 data scaling 直接证据；[[Papers/2607-HiFiUMI|HiFi-UMI]] 则表明 3 mm pose、原生双夹爪相对位姿、硬件同步与 wide FoV 的联合 fidelity 足以让 UMI 承担 target-task post-training。跨工作共同点不是“任意视频都可用”，而是 curation、表示一致性与 capture fidelity 共同构成数据引擎。
 
 ---
 
@@ -330,7 +333,7 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 
 ### 数据与评测挑战
 
-5. **高质量 Robot Demonstration 的获取成本**：Teleoperation data 质量高但收集成本高；autonomous collection 需要成熟 policy。Human 视频与手持采集路线（EgoSteer / Do as I Do / Xiaomi UMI）已给出部分答案，但可用率低（在线视频仅 ~5% 直接可用于灵巧学习）、缺触觉与力信息、human verification 成本未入账——数据获取瓶颈从"采集"转移到"curation 与验证"。
+5. **高质量 Robot Demonstration 的获取成本**：Teleoperation data 质量高但收集成本高；autonomous collection 需要成熟 policy。Human 视频与手持采集路线（EgoSteer / Do as I Do / Xiaomi UMI / HiFi-UMI）已给出部分答案，但瓶颈从“有没有数据”转移到 curation、fidelity specification 与验证：在线视频仅 ~5% 直接可用于灵巧学习；HiFi-UMI 的 parity 依赖约十倍 task-specific trajectory 数且没有逐因素 ablation。下一步需要固定 sample count 与 scene coverage，正交降级 pose、synchronization、relative-pose 与 FoV，才可形成可迁移的 deployment specification。
 
 6. **Cross-Embodiment Morphology Gap**：RT-X 展示 positive transfer，但不同 robot 的 kinematics、dynamics、action space 差异仍限制 transfer efficiency。如何设计更 universal action representation？候选正在收敛：相机系相对 state-action（EgoSteer）、end-effector delta pose（Xiaomi-Robotics-1）、optical flow（FlowWAM）、frame-level latent action（ABot-M0.5）——共同点是 embodiment-agnostic 的中间表示，但无定论。
 
@@ -505,6 +508,7 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 
 - [[Papers/2607-EgoSteer]] - 9.6K 小时 egocentric 视频 full-stack 系统
 - [[Papers/2606-DoAsIDo]] - 单目 human 视频 → 灵巧轨迹（physics-aware retargeting）
+- [[Papers/2607-HiFiUMI]] - 高保真 UMI 从 pre-training 推进到 target-task post-training
 
 ### Memory & Agent 系统层 Papers
 
@@ -542,6 +546,12 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 ---
 
 ## 调研日志
+
+### 2026-07-30 survey-refresh 增量并入 1 篇
+- **来源**：[[Papers/2607-HiFiUMI|HiFi-UMI]]（full-text，11/11 evidence-ledger claims source-verified）。
+- **结构变化**：路线 7 新增高保真 UMI 分支与 HiFi-UMI-2K dataset；将既有“human/手持视频 + curation”结论细化为“curation + 表示一致性 + capture fidelity”，并把 UMI 的适用边界从 pre-training 推进到 target-task post-training。
+- **证据边界**：三 backbone aggregate parity 来自 3,200 UMI vs ~300 teleoperation trajectories，非 sample-matched；四项 fidelity 因素联合实现但未做逐项 controlled degradation。“zero-robot post-training”不等于 base model 历史无 robot data，也不等于无需 real-robot evaluation。
+- **status**: success
 
 ### 2026-07-21 survey-refresh 增量并入 19 篇
 - **来源**: 2026-06/07 消化的 backlog 23 篇，相关性检查后并入 19 篇：world model 角色分化 6 篇（FlowWAM / ABot-M0.5 / RynnWorld-4D / RynnWorld-Teleop / GigaWorld-1 / BadWAM）、VLA foundation & finetuning 5 篇（Xiaomi-Robotics-1 / Anchor-Align / LoRA-VLA / Act2Answer / VLA Survey）、数据引擎 2 篇（EgoSteer / Do as I Do）、memory 2 篇（LaMem-VLA / ABot-AgentOS）、RL/agent 3 篇（RobustExec / REAL / BRAID）、导航 1 篇（ABot-N1）。

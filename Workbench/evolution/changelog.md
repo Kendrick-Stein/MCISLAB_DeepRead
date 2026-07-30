@@ -163,3 +163,26 @@
 - **directions_paused**: 0
 - **directions_abandoned**: 0
 - **reasoning**: 三个 active direction 的证据都在累积但均未有自有实验验证，故 confidence 均小幅上调而 status 保持 exploring。AFE 的关键变化是竞争情报——Crab/AgenticExplorationSystems 入场使时间窗口收窄，差异化落点从"全面 affordance 套件"修正为三条剩余空白；judge 可靠性 insight（precision 70–85%）转化为 verify affordance 的显式设计约束。另：Self-Improving Agent Reliability 的 resume_condition 已被 Misevolution 等论文触发，新增 Discussion Topic 请 Supervisor 在 resume / 并入 AFE / 先评 idea 三选项间决策（Researcher 倾向先 idea-evaluate 再并入 AFE）。
+
+### [2026-07-30] memory-distill
+
+- **period**: 2026-07-16 ~ 2026-07-30
+- **logs_processed**: 11（2026-07-16, 07-19, 07-20, 07-21, 07-22, 07-23, 07-24, 07-27, 07-28, 07-29, 07-30；共 1495 行）
+- **new_patterns**: 5（预算/口径匹配对照系统性推翻既有增益声明；上下文/观察表示最优点是 backbone 能力 × 任务阶段的非单调函数；GUI 长程失败主导形态是"自称完成"且对策收敛到执行后状态取证；agent 内部信念缺 provenance；学术 preprint 正文级数字错误与 overclaim 同样常态）
+- **promoted_to_insight**: 7（新 pattern 走情况 A 快速通道 3 条：观察表示条件化 7 source/3 日期、判定取证 7 source/3 日期、信念 provenance 3 一手 source/2 日期；既有 pattern 达阈值 4 条：GRPO headroom 条件化［PassKT 为第三独立表述］、on-policy distillation 迁移［Agents-A1 为第三数据点］、自演化闸门归因、agent-facing 原语暴露）
+- **validated_insights**: 1（"预算匹配对照是当前 agent 研究信息量最高的实验设计"：8 独立 source、4 独立日期，SkillMemoryBudget/AgentOccam/GUIvsCLI/ElementOrdering 的支撑 claim row 为 source-verified，反例审计后 claim 限定为"相当比例缩水/反向"而非全称）
+- **queued_for_review**: 1（上条 validated insight → 建议 DomainMaps/GUI-Agent.md，queue id 69262838；autoresearch 不得自批 DomainMap 晋升）
+- **evidence_appended**: 2（"Judge/reward model 可靠性是公共上游瓶颈" +VAGEN/SeekJudge/IRA，claim 保留但记录边界修订：70–85% 是**被动判分范式**的天花板，且"精度-召回权衡未解"已被 VAGEN 94.0 P/95.2 R 局部推翻；"工业技术报告 headline 降权" +7 篇学术 preprint 正文缺陷，记录为适用范围扩展）
+- **judgment_reversals**: 1（2026-07-15 pattern 判断"evolution-step verifier gating 是方法空白"被证伪——GRASP 去闸门 88.8→63.5、SKILL.nb 去 gate 回归 3.3%→18.6% 证明闸门已存在且是收益承重件；空白改判为"闸门只覆盖性能回归、安全维度缺失 + self-review 易 rubber-stamp"）
+- **not_promoted**: 1（"学术 preprint 核验命中率"保留为 pattern——可操作结论已被既有工业报告 insight 覆盖，只作范围扩展，避免重复立项）
+
+### [2026-07-30] agenda-evolve
+
+- **trigger**: 同日 memory-distill 产出 1 条 validated + 7 条 provisional insight，agenda `last_updated` 停留在 2026-07-21，其中 4 条直接触及 primary direction 的动机论证与实验设计
+- **insights_reviewed**: 8（validated "预算匹配对照是信息量最高的实验设计"；provisional 观察表示条件化 / 判定靠执行后取证 / 信念缺 provenance / 自演化闸门归因反转 / GRPO headroom 条件 / on-policy distillation 迁移 / agent-facing 原语差异化空间收窄）
+- **directions_added**: 0
+- **directions_updated**: 4（AFE: +4 条新 insight 证据、next_action 加三项设计修正［verify 实现为执行后取证接口不暴露 success label / observe 返回值带 provenance 字段 / 对照臂增 budget-matched arm 与 skill-repair arm］，confidence 0.5 维持；Self-Improving: hypothesis 中"evolution-step verifier gating 是方法空白"改判为闸门的判据维度与判定独立性，next_action 靶心迁移 + 建议 RetrievalMediated 补 GRASP 式配平算力对照臂，confidence 0.45 维持；RL Training: headroom 前置诊断获第三独立来源，新增强制口径［跨 seed × data draw 报告 + 声明 optimizer］，confidence 0.4 维持；GUI Grounding: +2 条新 insight，FPN 原型对照须 budget-matched、跨分辨率评估须分 regime 报告，confidence 0.55 维持）
+- **directions_paused**: 0
+- **directions_abandoned**: 0
+- **discussion_topics_added**: 1（"AFE 的动机前提被证伪，差异化是否重锚" — 请 Supervisor 决策 hypothesis 是否从"接口低效"改锚到"执行期可验证/可恢复状态缺失"，及 MiniSuite 是否保留双模态臂、主 claim 是否退到 false-completion/recovery 指标）
+- **reasoning**: 本轮四个方向全部只更新证据与实验口径、confidence 一律维持，是有意为之——新增 insight 大多是**方法论约束**（对照怎么做、指标怎么报）而非对方向核心假设的支持或反驳，这类证据提高的是未来实验的可信度门槛，不构成假设本身的置信度变化。唯一实质性判断变更有两处：(1) AFE 的动机前提被 GUIvsCLI 的 matched 对照证伪，但同期 verify/observe affordance 的具体形态首次被外部证据指定，两者方向相反，故 confidence 双向抵消维持 0.5，并把是否重写 hypothesis 上交 Supervisor 而非自行改写；(2) Self-Improving 的"gate 是方法空白"被 GRASP/SKILL.nb 的 ablation 反转，可攻面变窄（下调因素）但开放问题更锐利（上调因素），同样维持。未新增方向：validated insight 属方法论性质、不构成独立研究方向，两个相邻的 web-observation idea（AlignmentVsLength / RepresentationRegret）仍为 raw，未达开新方向的证据密度。

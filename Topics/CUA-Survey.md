@@ -1,9 +1,9 @@
 ---
 title: "Computer-Use Agents: A Unified Survey of Models, Learning, Environments, Evaluation, and Deployment"
 tags: [survey, gui-agent, computer-use, web-agent, mobile-agent, os-agent, agentic-RL]
-date_updated: "2026-07-29"
+date_updated: "2026-08-02"
 year_range: 1997-2026
-papers_analyzed: 190
+papers_analyzed: 193
 keywords: [gui-agent, gui grounding, computer-use, computer use agent, cua, web agent, browser agent, mobile agent, desktop agent, os agent]
 exclude_tags: [deep-research]
 exclude_keywords: [deep research, information seeking, browsecomp, research agent, search agent]
@@ -388,8 +388,11 @@ Mobile 没有 Web 式的单一 reset-cheap backend，覆盖需要同时组合 fu
 | [[Papers/2607-HyMobileAgent]] | mock + sandbox + real-device mixture | 2,000+ 实例；PhoneWorld 34 apps / 34,242 tasks | AndroidWorld 82.6% 到私有真机 42.0%；高风险状态被过滤 |
 | [[Papers/2512-MobileWorld]] | 开源应用替身 + agent-user interaction / MCP-augmented | 201 tasks / 20 apps，直连 PostgreSQL 后端做 deterministic 验证 | 子类样本偏薄（MCP 40、User-Interaction 45）；开源替身 UI 不等于真实商业 app 分布 |
 | [[Papers/2500-A3AndroidAgentArena]] | live dynamic online app | "essential-state"程序化评估，100 tasks / 20 apps | 依赖 MLLM 作 reward model；动态在线应用维护成本高 |
+| [[Papers/2607-QwenUIAgent]] | 生产规模真机集群 | 100+ 台物理设备 / 150+ app，health-aware scheduler + virtual display 并发（自报总 rollout 吞吐约 20×） | 自建 MobileWorld-Real 由自建 AutoJudge 评分且 env_error 不入分母；无隔离"真机训练"贡献的受控 ablation |
 
 [[Papers/2605-MobileGym]] 用可 fork 的 JSON state 与确定性 judge 把 mobile 环境的可复现性做到接近 web 的水平，但它面向 agent 暴露的接口仍是 screenshot + primitive action，没有把内部状态变成可核验的执行接口。[[Papers/2607-HyMobileAgent]] 是目前唯一同时覆盖 mock app、sandbox 与真机三层的供给方案，规模到 2,000+ 实例，但 AndroidWorld 82.6% 到私有真机骤降至 42.0% 说明 sim-to-real 缺口尚未被这套组合真正弥合，且高风险状态被主动过滤而非解决。[[Papers/2512-MobileWorld]] 走另一条路径：不用真实商业 app（不可控、不可复现），而是部署工业标准的开源替代品（如 Mattermost 替 Slack），换取可直连数据库的确定性验证，并首创 agent-user interaction 与 MCP-augmented 两类任务，把动作空间从纯 GUI 扩展到"发起用户交互"与"MCP 调用"。[[Papers/2500-A3AndroidAgentArena]] 则直接在真实在线 app 上运行，用"基本状态"程序化评估应对静态评估无法捕捉动态状态变化、连锁失败与替代路径的问题，但代价是评估准确性系于 MLLM reward model 本身的可靠性。
+
+真机一侧此前只有单点证据，[[Papers/2607-QwenUIAgent]] 把它推到可调度资源池的形态：100+ 台物理设备与 150+ app 由 health-aware scheduler 按设备、应用、账号、网络与显示的健康度租借并在失败时改路，不健康目标进动态黑名单待人工修复与复验，virtual display 使单机并发承载多个 app session（自报把集群总 rollout 吞吐提升约 20×）。它也暴露了真机供给特有的记账问题——"模型失败"与"环境失败"必须先分开才能计分，该系统用 VLM judge 对完整轨迹做 success / model failure / environment failure 三分类，并把确认的环境故障回流给 scheduler。这条路线的证据边界必须与其规模一并引用：主力数字 MobileWorld-Real 92.2% 建在作者自建的 409 任务 / 104 app benchmark 与自建 AutoJudge（5 个 VLM judge 多数投票、env_error 不计入分母、与人工标注一致率 92.8%）之上，其对次优系统 3.5pp 的领先小于该 judge 自身 7.2pp 的不一致率；且全文没有"同一模型加/不加真机数据"的受控对照。因此现有证据支持的是"真机供给可以被工程化到生产规模"，而非"真机训练是收益来源"。这与 [[Papers/2607-HyMobileAgent]] 构成互补：后者量化了 sim-to-real 缺口有多大（AndroidWorld 82.6% → 私有真机 42.0%），前者给出直接在真机侧建供给的工程形态，但两者都尚未把真机数据的因果贡献从"更多数据"中分离出来。
 
 ### 4.4 Desktop and OS Environments
 
@@ -417,6 +420,49 @@ hybrid observation 并非没有代价：多通道叠加暴露了新问题——�
 与视觉/结构侧的表示重构平行，web agent 有一条独立成型的 **observation reduction** 线，针对 raw DOM/HTML 常达 10k–100k token 的问题优化喂给 agent 的观察。四条路线已固化：程序化剪枝（[[Papers/2511-Prune4Web]]，候选削减 25–50×，low-level grounding 46.8→88.28）、LLM 选行检索（[[Papers/2510-FocusAgent]]，削减 >50%）、规则式结构重构（[[Papers/2605-A11yCompressor]]，OSWorld input token 压到约 22% 的同时 success +5.1pp）、与"缩短"正交的表示对齐（[[Papers/2410-AgentOccam]]）。这条线最有价值的产出是三个跨论文的校正性发现：其一，**优化 ≠ 省 token**——AgentOccam 每步观察 token 反而从 vanilla 的 2210 升到 2930，真正起作用的机制是"对齐 LLM 预训练分布 + 降噪"而非缩短长度；其二，**压缩并非普遍有益、且高度依赖底座**——[[Papers/2604-ReadMoreThinkMore]] 显示强模型（gpt-5.1、claude-sonnet-4-6）用完整 HTML 反而 +14.6~17.5pp、弱开源模型用 HTML 大幅退化（gpt-oss-20b −18.8pp）；其三，**收益随模型变强而蒸发**——Prune4Web 对 GPT-4o 零提升、FocusAgent 在 WebArena 反低于全观察（32.3 vs 36.5）。该子领域已成熟到自建廉价评测代理（[[Papers/2605-MFSCoverage]]），侧面印证方法层面接近饱和。这条线的方法都在内容与长度轴上操作；[[Papers/2409-ElementOrdering]] 补上第三个轴——元素**呈现顺序**的扰动伤害与删除全部可见文本相当（GPT-4V 74.07→44.44，详见 §6.7.2），改变顺序的重构方案应报告顺序保持性。
 
 局部 grounding 与结构压缩之外，还有一条正交的推理期效率线——当 observation 与历史轨迹撑大 context 时如何在不掉精度下压缩存储。[[Papers/2606-StarKV]] 用 spatial mutual-information prior 替代通用 KV cache 压缩的单一 saliency 先验，在 40% 预算下与 full cache 持平；[[Papers/2601-CompressToFocus]] 把压缩折进多轮 RL，GUI-Odyssey 长程 SR +21.4pp；[[Papers/2603-STLiteKV]] 更具实质性的贡献是诊断——GUI 注意力在所有层都均匀高稀疏，导致分层预算先验（PyramidKV/VL-Cache）在低预算下崩溃。这条线与前述 belief-source 讨论正交：它按 attention/redundancy 启发式决定留哪些 token，而非按证据来源或新鲜度决定，裁剩的 token 不保证仍反映当前 UI state。
+
+#### 4.5.1 开源 Web Agent Harness 与 Observation 空间
+
+开源 Web Agent 框架并不共享一种统一的 harness 抽象。本节用四种接口与状态组织方式归纳所核查的七个框架：以 browser session 为状态的 autonomous step loop，允许开发者在 code 与 natural-language primitive 之间切换的 hybrid SDK，把浏览器当作可丢弃执行环境的 code-as-action，以及将 task/reset/step/validate 标准化的 research harness。这是分析框架而非官方、互斥或穷尽的 taxonomy，部分系统跨越多类。因此，“observation space”不能只写成 DOM 或 screenshot；还必须说明它由 harness 每步自动注入、由 agent 按需调用，还是由 agent 自己编写程序探测。
+
+```mermaid
+flowchart LR
+  G["Task goal"]
+  subgraph A["Autonomous step loop"]
+    A1["Structured / visual observation"] --> A2["LLM predicts next action"] --> A3["Persistent browser session"] --> A1
+  end
+  subgraph H["Hybrid SDK"]
+    H1["Code or natural-language call"] --> H2["act / extract / agent"] --> H3["Browser session + cache"]
+  end
+  subgraph C["Code-as-action"]
+    C1["Write program"] --> C2["Run disposable browser"] --> C3["Inspect logs / screenshots"] --> C1
+  end
+  subgraph R["Research harness"]
+    R1["setup / reset"] --> R2["obs / action / reward"] --> R3["validate + trace"] --> R1
+  end
+  G --> A1
+  G --> H1
+  G --> C1
+  G --> R1
+```
+
+*四种 harness 的核心差异是状态归属与 observation 调度方式：浏览器状态、缓存动作、本地 workspace 与 benchmark episode 分别是四类系统的主要持久化对象。*
+
+下表只比较公开文档或源码中能核实的接口。对 Skyvern 一类未把“每步给模型的完整 observation object”当作稳定 public API 的系统，表中保留为“未文档化”，不从“vision-first”等定位反推 screenshot-only 实现。
+
+| 框架 | Harness 范式与状态归属 | 执行循环 | Agent-facing observation | Action / verification | 设计边界 |
+|:--|:--|:--|:--|:--|:--|
+| [browser-use](https://github.com/browser-use/browser-use) | Autonomous step loop；状态属于持久 `BrowserSession` 与 agent history | step start 取 browser state → LLM 产生一批可配置数量的 action → 页面变化时停止当前 batch → 重新观测；支持 before/after-step hook | 核心是经 paint-order 过滤的可交互 DOM/AX 节点、元素 index、URL/title/tabs；screenshot/vision 是否加入可配置 | CDP/browser tools 执行 index/coordinate/keyboard/navigation；action error 进 history，可选 LLM trace judge 在结束后评估轨迹，但无 benchmark-level `validate()` 或后端 state diff | 对通用自主浏览最直接；element map 是短期快照，页面更新后必须重建；默认成功判断仍主要由 agent 完成 |
+| [[Papers/2412-BrowserGymAgentLab|BrowserGym + AgentLab]] | Research/evaluation harness；状态属于 Gym episode，AgentLab 另管理 study/trace | task `setup()` / env `reset()` → `obs` → `step(action)` → task `validate()` → reward/done；AgentLab 并行调度多 benchmark/config/seed | 可配置 observation dict：task chat、tabs URL/title/active index、screenshot、DOM、AXTree、`bid`、bbox/visibility/SoM、focused element、last action/error | High-level action mapping 或 raw Python/Playwright；验证委托给各 benchmark 的 `validate()`，AgentXRay 保留逐步 trace | 最适合受控比较 observation/action 设计；统一调用层不等于统一 verifier，也不把 hidden backend state 暴露给 agent |
+| [Stagehand](https://docs.stagehand.dev/v3/basics/agent) | Hybrid code + AI SDK；状态属于 browser session，workflow 可缓存已解析动作 | 开发者在确定性 code、`act()` / `extract()` / `observe()` 与多步 `agent()` 之间选择；`observe()` 先返回候选动作再执行 | 三个 mode 定义的是可用 tool set：DOM 提供 semantic tools，并可按需调用 `ariaTree` / `screenshot`；Hybrid 另加 coordinate tools；CUA 是 provider screenshot loop。`observe()` 输出 selector/method/args 候选，不是完整 RL observation | DOM semantic actions、coordinate actions、structured extraction；支持 cache/self-healing 和 action/result trace，但 `completed` 只是 agent belief，不是应用后端 verifier | 适合“已知流程用 code，未知页面用 AI”的生产自动化；三种 mode 的分数与失败不能在不报 mode 时混比 |
+| [Skyvern](https://github.com/Skyvern-AI/skyvern) | Workflow/RPA platform；task/workflow、browser session 和 server-side run 状态持久化 | 多 agent 规划/执行高层 task；同时提供 Playwright-compatible `page.act/extract/validate/prompt` 与 workflow blocks | 官方定位是 Vision LLM 理解当前页面，但未将完整 per-step model observation 定义为稳定 public object；structured extraction 是公开输出面，livestream 服务于人类观测与调试 | AI page actions、表单、文件、login、HTTP/custom-code block；`validate(prompt)` 返回页面判定 | 适合跨站业务 workflow，但 observation 细节不适合当作可控学术变量；`validate(prompt)` 不等于确定性业务 state verifier |
+| [Magnitude](https://github.com/magnitudedev/browser-agent) | Vision-first controllable automation/test harness；状态以 browser run 与 test artifact 为主 | 开发者用高层或低层 `agent.act()` 组合 flow，另用 `extract()` 与 test runner 验证 | navigation/interaction 依赖 screenshot 与 VLM 像素坐标；structured extraction 另读 DOM content，因而是“视觉操作 + DOM 抽取”双路径，不是纯 screenshot 全栈 | 鼠标/键盘坐标动作、schema extraction、visual assertions/test runner | 绕开 DOM selector 对复杂视觉界面有利，但强依赖大型 visual-grounding model；学术评测仍需另接 reset/reward harness |
+| [Webwright](https://github.com/microsoft/Webwright) | Code-as-action；状态归属本地 workspace（code/logs/screenshots），浏览器可丢弃 | coding agent 写 Playwright Python → 执行 → 按需看 page state/screenshot/log → 修复脚本；最终产物是可重跑程序 | 没有固定每步 observation tensor/object；terminal output、agent 主动查询的 DOM/page state、保存的 screenshot 和 run artifact 构成按需观测 | Free-form Python/Playwright；通过脚本重跑、仪器化 screenshot 和视觉 self-check 验证 | 适合长程、可重复 workflow；动作空间和权限比离散 browser tools 更大，安全、sandbox 和 task verifier 由 host 负责 |
+| [LaVague](https://github.com/lavague-ai/LaVague) | 早期模块化 autonomous loop；状态属于 WebAgent/browser driver | World Model 读 objective + current page 生成 instruction，Action Engine 再编译为 Selenium/Playwright code 执行 | Driver 向 World Model 提供 screenshot + HTML source，WebAgent 另维护 short-term memory / past actions 与 interaction zone；未给出跨 driver 的 typed observation contract | instruction-to-code Action Engine；轨迹记录 action code、observation method、bbox/viewport 等 | 适合研究 planner/executor 解耦的历史设计；缺少 BrowserGym 式 benchmark contract 与 app-grounded verifier |
+
+这七个框架的交集比它们各自的功能列表更有研究价值。第一，主流系统已经不再在 DOM 与 screenshot 之间二选一，而是在“固定 hybrid”、“按需 vision”和“由 agent 主动写 probe”之间选择 observation policy。第二，状态所有权改变了错误恢复形态：browser-session loop 通常通过重观测继续，Webwright 通过修复并重跑程序恢复，BrowserGym 通过 episode reset 恢复；这三者不能用同一个“memory”概念概括。第三，在本次核查的 public interface 中，只有 BrowserGym 将 task `validate()` 纳入环境协议并由 `env.step()` 返回 reward/done，但它对 agent 不可见；其他框架的 `validate()`、visual assertion、trace judge 或 self-check 多数仍是模型/页面层判断。在本轮查阅的官方文档所列默认 public agent-facing contracts 中，未发现单一接口同时文档化 app-level state diff、后端副作用报告与 full-state rollback；这一结论不排除未公开的托管能力。
+
+这一结构也说明了 observation 设计的两个实证风险。首先，结构化通道可以更 token-efficient，但 [[Papers/2607-GUIStateBelief]] 已证明 stale structure 会在与截图冲突时主导模型信念；因此 element ID 或 selector 必须绑定 snapshot version/freshness，不能只追求“稳定 ID”。其次，按需 observation 减少了固定 context，但它同时把“什么时候看、看什么”变成策略能力；Webwright 与 browser-use `use_vision=auto` 的收益不能只按每步 token 数比较，还应同时报告额外 probe 数、wall-clock、capture race 与遗漏关键状态的比例。
 
 ### 4.6 GUI Action Spaces
 
@@ -467,11 +513,13 @@ Web、Mobile 与 Desktop/OS 的执行环境经由 GUI、CLI、API 与 MCP 动作
 
 | 路由范式 | 机制 | 代表工作 | 关键数字 |
 |:--|:--|:--|:--|
-| RL 训练联合 policy | 同一 policy 在 system prompt 中同时看到 API 函数与 GUI 原语，由 RL 学会选择 | [[Papers/2508-ComputerRL]] | GUI-only 11.2%→API+GUI 26.2%（+134%），Office 域 6.2%→27.9% |
+| RL 训练联合 policy | 同一 policy 在 system prompt 中同时看到 API 函数与 GUI 原语，由 RL 学会选择 | [[Papers/2508-ComputerRL]]、[[Papers/2607-QwenUIAgent]] | GUI-only 11.2%→API+GUI 26.2%（+134%），Office 域 6.2%→27.9%；后者不是消融而是使用分布：OSWorld-Verified / v2 上 CLI 占全部动作 40.7% / 55.1% |
 | LLM 多 agent 编排 | Orchestrator 逐子任务动态派发给 Programmer（写代码）或 GUI Operator | [[Papers/2508-CoAct1]] | OSWorld 60.76% SOTA；ablation Programmer-only 35.73%（均 1.14 步）/GUI-only 50.68%（11.20 步）/Hybrid 60.76%（10.15 步） |
 | 规则式静态 fallback | "能 CLI 就 CLI，否则退回 GUI"的确定性规则 | [[Papers/2604-ClawGUI]] | 定性描述，无受控 ablation |
 
 [[Papers/2508-CoAct1]] 的 backbone ablation（Orchestrator/Programmer 用 o4-mini/o4-mini 得 43.43%，o3/o3 得 58.72%，o3/o4-mini 得 60.76%）表明路由质量的瓶颈在于负责分派的 Orchestrator 的推理能力，而非执行子任务的模块本身；同时它在 OSWorld 上把平均步数从 GTA-1 的 15.22 步降到 10.15 步，用一段脚本替换长串易错点击序列，同时提升成功率与效率。[[Papers/2606-WeaveBench]] 的 interface ablation（GUI-only ≤1.8%，CLI-only ≤3.5%，Hybrid 35.1%）是一个跨系统、跨范式的收敛证据：无论路由决策由谁做出，排除任一通道都是灾难性的，这与 CoAct-1 的模态 ablation（代码单独 35.73% / GUI 单独 50.68% / 混合 60.76%）指向同一结论——两种模态互补而非替代。[[Papers/2607-StateAct]] 从相反的路由方向补上第三个收敛证据：即使在把 code 设为默认通道、GUI 仅作 render-only 兜底的 state-first 编排中（GUI subagent 只出现在 28/108 任务、占 main-agent steps 的 1.1%），完全移除 GUI 的 bash-only 配置在 OSWorld 2.0 上也只有 45.9% mean partial、低于 screenshot reference 的 54.8%，把 GUI subagent 换成较弱的 SFR-CUA 则从 61.6% 降到 43.2%——GUI 通道的存在与质量都不可省略，无论路由默认方向是 GUI 优先还是 code 优先。[[Papers/2606-GUIvsCLI]] 在无路由的 matched 设置下补上第四个数据点——类别级互补：Web 类 GUI 88.2% vs CLI 35.3%（skill 修补亦无改善），CAD & 3D 类 CLI 67.3% vs GUI 46.9%，互补性不只出现在系统级消融，也直接体现在受控的任务类别分布上（该文两侧禁用对方通道，故对"谁来路由"不提供证据）。
+
+上述证据都来自受控消融，回答的是"少一个通道会怎样"。[[Papers/2607-QwenUIAgent]] 补上互补的一类证据——统一动作空间在部署规模下**实际被怎么用**。其动作空间把 GUI 原语与 `cli_command`、`api_call`、`ask_user` 并列，并允许一个决策步输出有序动作序列（batched action：序列内连续执行、CLI 输出聚合成单次观测，从而压掉不需要中间反馈的那部分 observe–reason–act 循环）。OSWorld-Verified / OSWorld-v2 上的实测分布为：CLI 占全部动作的 40.7% / 55.1%，出现在 92.0% / 98.2% 的任务中；batched 动作占 39.6% / 41.6%，平均每批 3.1 个 primitive；批次构成上 GUI-only 从 75.8% 降到 64.7%，混合 GUI+CLI 批次从 11.0% 升到 20.3%。这把"通道互补"从消融结论推进为使用分布：任务变难时 policy 自发把过半动作放到 CLI 上，而 GUI 并未被挤出，两者在同一批次内交错。同一工作还报告了路由行为的一个来源证据：在 binary outcome reward、无任何显式模态协调目标的 online RL 之后，"先用 Bash 改变状态、再用只读 GUI 核验效果"的 execution→verification 转移从 40.2% 升到 52.4%，含验证动作的轨迹比例 +14.7%、false-stop rate −11.2%。这提示通道分工可以由 outcome reward 间接诱导，而不必显式设计 orchestrator；但它是同一系统内的训练前后对比，没有固定 backbone 的跨范式对照，因此它扩充的是表中"RL 训练联合 policy"一行的证据，不改变 §4.9 中"三种路由范式尚无同环境对照"的判断。
 
 这一路由问题与 §4.5 讨论的混合观察融合问题结构对称：前者要决定该用哪个通道执行，后者要决定该信任哪个证据来源，两者都需要一个显式的仲裁策略，简单地把所有通道/证据都暴露给模型并不自动带来更好结果。[[Papers/2606-WeaveBench]] 的失败分析给出了这一对称性的反例——当模型可以自由选择通道时，35.2% 的失败属于 reward hacking（包括伪造渲染、CLI 绕过 GUI 检查等），说明自由路由有时会被模型用来选择最容易伪造证据的通道，而非功能上正确的通道；这是路由侧的失败模式，与 [[Papers/2607-GUIStateBelief]] 在观察侧发现的 stale-structure-following 是同一类"多通道仲裁缺位"问题的两个实例。
 
@@ -690,8 +738,9 @@ Native CUA 把 perception、grounding、reasoning、短期记忆与 action gener
 | UI-TARS-2 | 在 native policy 上加入 multi-turn RL、分层记忆及 GUI/SDK action | 从纯 GUI 扩展到 terminal、filesystem 与工具调用 [[Papers/2509-UITARS2]] | 已跨入 hybrid architecture；收益无法只归因于模型参数 |
 | ScaleCUA | 同一 VLM 支持 grounding、direct action 与 reasoned action | 跨平台数据使模型既可独立执行，也可作为 grounder [[Papers/2509-ScaleCUA]] | 强局部 grounding 未稳定转化为 desktop/mobile 长程执行 |
 | GUI-Owl-1.5 | technical report 将其描述为多规模、多平台 native agent | 覆盖 grounding、automation、tool use 与 memory [[Papers/2602-Mobile-Agent-v3.5- Multi-platform Fundamental GUI Agents]] | 本文仅依据其摘要收录该工作；架构和 benchmark 数字不进入强结论 |
+| Qwen-UI-Agent | 单一 policy 覆盖 mobile / desktop / browser，动作空间并置 GUI 原语、CLI、API 与 `ask_user` | 分域 expert SFT + model merging，再叠 action RL 与 online RL [[Papers/2607-QwenUIAgent]] | 与 UI-TARS-2 同属 hybrid architecture；主力数字多建在作者可控的评测条件上（自建 benchmark、自建 judge、自行修正的官方评测脚本），不可被第三方直接复算 |
 
-UI-TARS 系列说明 native model 可以形成统一的 data flywheel；ScaleCUA 则提供反向边界：扩大 grounding 与跨平台训练数据仍可能留下明显的端到端执行缺口。现有证据因此不支持"native 化自动消除系统设计"，只支持把部分系统边界从显式模块接口迁移到训练数据、context policy 与 action schema。
+UI-TARS 系列说明 native model 可以形成统一的 data flywheel；ScaleCUA 则提供反向边界：扩大 grounding 与跨平台训练数据仍可能留下明显的端到端执行缺口。现有证据因此不支持"native 化自动消除系统设计"，只支持把部分系统边界从显式模块接口迁移到训练数据、context policy 与 action schema。[[Papers/2607-QwenUIAgent]] 另外留下一条与规模相关的未解释反常：同一 pipeline 下 27B dense 在 MobileWorld 上比 35B-A3B MoE 高 17.1pp（82.1 vs 65.0），真机上为 92.2 vs 87.4，论文只把 MoE 变体当作"激活 3B、部署效率更高"的选项带过。由于端侧部署压力恰好落在 MoE/小模型一侧，这个 gap 值得独立复核；在此之前它只是单一系统内的现象，不能读作 dense 优于 MoE 的一般结论。
 
 ### 6.4 Modular Agent Systems
 
@@ -782,7 +831,11 @@ SKILL.nb 将两者连接为 selective formalization：每个步骤依据执行�
 
 Explicit task state 同样具有条件性。[[Papers/2607-TSR]] 报告其作用会随环境与 backbone 改变方向，说明额外状态只有在 horizon 与状态密度足以抵消 context 和维护误差时才有净收益。[[Papers/2607-Plover]] 把 plan 变成 persistent、inspectable、editable artifact，使局部修复可以保留已完成进度；它证明的是专家介入下的 recoverability upper bound，而非普通用户性能。
 
-Planning 的核心对象正在从"下一步 thought"转为可检查的状态转换契约：当前 subgoal、前置条件、预期 UI 变化、完成证据、可逆性以及失败后的替代路径。缺少这些字段时，长 CoT 只是更长的不可审计内部状态。
+Planning 的时间轴此前几乎不作为变量出现。[[Papers/2607-AAPT]] 把它显式化：当界面按环境的时钟开合动作窗口（transient dialog、boot prompt、短时效认证、反应类游戏状态），autoregressive decoding 本身就占据了 decision-time critical path，动作算对了而窗口已关。其做法是在空闲期用同一个 frozen 模型预编译一棵**扁平**（非递归）的 contingency policy tree，节点携带预测状态、observable guard、pre-authorized 动作、per-branch deadline、置信度、风险等级与 fallback；事件发生时只做一次低 token 的 observer 调用把当前帧路由到某个分支，critical path 上不再生成，判据也随之改写为 `success = 正确动作 ∧ 动作在 deadline 之前`。该文最强的一击是排除了"提早行动就够了"这个自然的替代解释：open-loop 与 predict-and-replan 两条对照臂在竞争窗口下均为 0/42，实测 per-decision path 反而更长（observer 273 ms/30 tokens vs reactive 411 ms/48、predict-and-replan 484 ms/66）——anticipation 只有在把生成挪出 critical path 时才转化为延迟收益。可迁移的也不是这套机制（作者自陈其单个组件均不新颖），而是一条从独立测量量预测收益出现位置的规则：设 planner 端到端延迟的 95 分位为 $L_{p95}$、安全裕度为 $M$、树保持有效的墙钟区间为 $T_{cover}$，则要求 $T_{cover} \ge L_{p95}+M$；prep-budget sweep 的 crossover 实测落在 $L_{p95}+M \approx 2.4$ s（prep 0.5–1 s 时 0/42、2 s 打平、4 s 时 42/42），与规则预测一致。
+
+这条结果的外部效度必须与之一并引用。主证据链跑在作者自建的三键 `key_prompt` 计时 benchmark 上（650 ms 窗口 0.79 vs reactive 0.50，per-seed 配对 exact McNemar p=1.8e-3，端点预注册），理由是 OSWorld / WebArena / Mind2Web / AndroidWorld 均不提供隔离 deadline-sensitive 动作选择所需的毫秒级控制；而唯一的外部 benchmark DynaCU-Bench 上是平局（reactive 7/39 vs AAPT 6/39，p=1.0）。成立条件同样很硬：需要 $\ge L_{p95}+M$ 的静默期，需要解码足够快的模型（两个 dense 32B 模型 decode >1 s，AAPT 反而远劣于 reactive——EvoCUA-32B 0/43 对 22/43），且 guard 与动作必须在事件前可绑定，late-revealed 坐标与多步序列直接违约。分支预算 $K_{max}$ 还是一个手工设定的**正确性**参数而非性能参数：设小了 planner 写出泛化 guard，设大了用带默认动作的 catch-all 填满剩余槽位，两侧都把"错过"转成"按错键"（k=1 时 13/42、k=2 时 12/42、k=7 时 15/42，匹配预算 k=5 时 0/42）——而"下一步有几个可能结果"在真实 GUI 里恰恰是事先不知道的量。因此本节采纳的是它对 planning contract 的补充，而非把 anticipatory 预编译当作长程 planning 的一般方案。
+
+Planning 的核心对象正在从"下一步 thought"转为可检查的状态转换契约：当前 subgoal、前置条件、预期 UI 变化、完成证据、可逆性、失败后的替代路径，以及 [[Papers/2607-AAPT]] 补上的时间字段——该转换的有效窗口与决策 deadline。缺少这些字段时，长 CoT 只是更长的不可审计内部状态。
 
 ### 6.9 Memory and State Tracking
 
@@ -961,7 +1014,7 @@ GUI 侧近期实例：[[Papers/2505-MobileIPL]] 用迭代式 preference learning
 
 改动最小的是 first-failure 或 fork-point 定位：不改变 reward 形式，只把成功与失败轨迹的最早分叉转为局部监督，但需要可比较的成对轨迹。[[Papers/2601-EvoCUA]] Milestone/progress reward 进一步把可验证中间状态转成中间信用，信号更密集，却可能奖励与最终目标脱钩的局部进展。Tree rollout 利用兄弟子树的 outcome 差异生成 step-level signal，把 reward-design 成本转移到环境的 fork、reset 与并行能力。最后，interactive verifier 主动读取截图、文件、进程或 GUI 状态，以更高验证成本换取 hidden evidence。[[Papers/2602-VAGEN]]
 
-AgentRewardBench 表明 rule-based evaluator 与通用 LLM judge 会分别产生漏判和误判，因此 reward model 不能默认等同于 ground truth。[[Papers/2504-AgentRewardBench]] EvoCUA-1.5 进一步报告 PRM score 上升而 executable outcome 停滞的负结果，说明 process score 必须锚定环境状态变化。[[Papers/2607-EvoCUA15]] VAGEN 支持主动取证路线，但只验证了 evaluator 与 Best-of-N，未进入训练闭环。[[Papers/2602-VAGEN]] 这一缺口已被 [[Papers/2607-InteractiveRewardAgent]] 部分补上：IRA 先由 VLM 从指令与首尾截图 propose 任务完成条件，再经 system（shell/文件/accessibility tree）、application（结构化文档检查）与 GUI 三类工具在 post-execution 环境中逐条核验，以其为 reward 用 DART 方法做 RL 训练在 OSWorld 达 34.0% success（同设置 script reward 34.9%），并在无 script 的自动生成任务上达 33.5%——interactive verifier reward 可近似替代 script reward 的 RL 闭环证据（库内暂无独立验证；单 backbone Qwen3.6-35B-A3B、Ubuntu-only，34.0% 是接近而非超越）。其失败分析同时把瓶颈移到上游：主要错误来自 condition proposal 失准（granularity 不当、过度字面化、遗漏 persistence 要求），而非核验环节。与 [[Papers/2607-SeekJudge]] 对照，两条路线从相反方向收敛于"model-based reward 可进 RL 闭环"：SeekJudge 靠证据选择（少而准的截图判定），IRA 靠证据获取（主动环境取证），等证据预算下孰优尚无对照。
+AgentRewardBench 表明 rule-based evaluator 与通用 LLM judge 会分别产生漏判和误判，因此 reward model 不能默认等同于 ground truth。[[Papers/2504-AgentRewardBench]] [[Papers/2607-OSReward]] 把这一判断从"有噪声"收紧为"有方向"：1019 条 human-gold 轨迹上跨 27 个 judge 的同协议对照显示，over-accept（把未完成判为完成）占全部错误约三分之二且是每个 judge 的首要错误模式，而该偏差主要由"读 agent 自述多于读屏"造成（去掉每步 thought+action 文本 −7.2pp、翻转 22.7% 判定，视觉侧改动 <0.5pp）。对 RL 而言这不是可被平均掉的噪声——reward labeling 逐条消费标签，聚合稳定性帮不上忙（同 judge 同输入在 T=0.7 已翻转 6–9% 判定），而一个系统性偏宽松、且主要读文本的 reward 最先教会 policy 的恰恰是把成功宣言写得更可信。该文没有做下游 policy 训练实验，因此"judge 的 fail recall 与策略训练效果之间的函数关系"在库内仍是空的；其 verifier 侧的完整测量与边界见 §8.12。EvoCUA-1.5 进一步报告 PRM score 上升而 executable outcome 停滞的负结果，说明 process score 必须锚定环境状态变化。[[Papers/2607-EvoCUA15]] VAGEN 支持主动取证路线，但只验证了 evaluator 与 Best-of-N，未进入训练闭环。[[Papers/2602-VAGEN]] 这一缺口已被 [[Papers/2607-InteractiveRewardAgent]] 部分补上：IRA 先由 VLM 从指令与首尾截图 propose 任务完成条件，再经 system（shell/文件/accessibility tree）、application（结构化文档检查）与 GUI 三类工具在 post-execution 环境中逐条核验，以其为 reward 用 DART 方法做 RL 训练在 OSWorld 达 34.0% success（同设置 script reward 34.9%），并在无 script 的自动生成任务上达 33.5%——interactive verifier reward 可近似替代 script reward 的 RL 闭环证据（库内暂无独立验证；单 backbone Qwen3.6-35B-A3B、Ubuntu-only，34.0% 是接近而非超越）。其失败分析同时把瓶颈移到上游：主要错误来自 condition proposal 失准（granularity 不当、过度字面化、遗漏 persistence 要求），而非核验环节。与 [[Papers/2607-SeekJudge]] 对照，两条路线从相反方向收敛于"model-based reward 可进 RL 闭环"：SeekJudge 靠证据选择（少而准的截图判定），IRA 靠证据获取（主动环境取证），等证据预算下孰优尚无对照。
 
 [[Papers/2607-SeekJudge]] 把 model-based reward 首次推进到 online RL 训练闭环内的正面对照：它将长轨迹判定拆为 localization 与 extraction 两个子问题，由共享同一 distilled 9B backbone 的 Condense–Ground–Seek–Analyze 四角色输出 trajectory score 与 nine-way step labels，并用 rollout-overlapped reward server 把 preprocessing 移出 rollout critical path。在 UI-TARS 1.5 7B 的 Chrome/Impress/OS 三个 domain（self-hosted，per-application 单独训练 policy）上，SeekJudge reward 的 RL test success 为 16.23%/36.81%/28.89%，均高于环境原生 rule-based reward 的 12.75%/30.43%/25.56%（repeated runs 的 run-to-run std 约 2.0%）；作者据此称其为首个在 online RL 中 match or surpass native rule-based supervision 的 practical model-based reward（库内暂无独立验证）。其对照实验还给出 judge 失准的一个具体机制：decisive screenshot 始终在场时，加入同轨迹其他截图使 F1 从 0.68 单调降至 0.61，而等 token 的 mosaic noise 无此效应——稀释来自 competing content 而非 context length 本身，这为"少而准的证据选择"路线提供了比 scaling curve 更有区分度的依据。边界同样明确：Qwen3VL-8B 上增益不稳定（Impress 48.41% 对 rule-based 49.28%，OS run 未完成），offline score calibration jointly fit 在三个 evaluation benchmark 上，且 reward-granularity ablation 同时改变 continuous score 与 step term、无法分离各自贡献。
 
@@ -1275,6 +1328,8 @@ agent-side 也需要同样严格的 setting card。A11y-Compressor 在 OSWorld �
 
 [[Papers/2506-OSWorldHuman]] 以 human 完成效率为基线评测 computer-use agent 的步数/时间效率，把成本-效率维度从 token 计价推进到 human-normalized efficiency（本文尚未独立核验其结果）。
 
+这套报告集把 latency 当作成本项，却不把它当作**约束**。[[Papers/2607-AAPT]] 给出这一缺口的可测形式：当环境本身设定动作窗口时，成功判据是"正确且及时"，而现有 CUA benchmark 无一提供隔离该判据所需的毫秒级 deadline 控制。它实测 reactive 完整往返的 p50 为 567 ms（部分 block 730 ms），并把这一分位对齐到 19 个有官方文档的真实响应窗口（BIOS fast-boot 按键约 0–200 ms、Android double-tap 300 ms、Windows double-click 500 ms、Android Toast 2–3.5 s、GRUB 5 s、TOTP 30 s），论证亚秒级窗口在部署系统中确实存在；但它没有量化这类失败在现有 agent 失败构成中的占比，其外部 benchmark 上可预枚举的 deadline 任务也只占 9/39。因此本节采纳的是报告项而非优先级判断：效率报告应补上 decision-time latency 的分位（而非只报总 wall-clock），并标明任务是否存在环境侧 deadline。同一工作也提醒 latency 优化常常是把算力搬走而非消除——其 completion token 为 reactive 的 3.2×（342.8 vs 105.8），单 trial 墙钟 3.32 s vs 1.65 s，因此 latency 与 token 成本必须分列而不能互相代表。
+
 ### 8.11 Evaluation Metrics
 
 CUA 评测需要同时报告能力层级与 evidence setting。一个 task-success 数字混合了 perception、planning、execution、environment failure 与 verifier error，无法单独定位方法增益。
@@ -1315,11 +1370,17 @@ Verifier 的根本差异不在判定模型大小，而在证据访问能力。�
 |:--|:--|:--|:--|:--|
 | Programmatic state verifier | DB、文件、app state、event log | 确定、便宜、适合 RL | checker coverage 与 schema drift | [[Papers/2605-OpenComputer]]、[[Papers/2606-CUAGym]] |
 | Hybrid checkpoint verifier | state checks + content checks + semantic rubric | 支持 partial credit 与开放 artifact | 权重和 judge 仍会改变排名 | [[Papers/2605-SaaSBench]]、[[Papers/2604-ClawEval]] |
-| Passive visual/rubric judge | final screenshot、selected frames、trajectory | 可用于闭源环境 | 看不到 hidden backend，易被信息选择影响 | [[Papers/2605-AndroidDaily]] |
-| Learned ORM/PRM/critic | trajectory 或 step representation | 可扩展到 outcome 与 process reward | precision/recall trade-off、训练分布偏差 | [[Papers/2504-AgentRewardBench]]、[[Papers/2510-CUARewardBench]]、[[Papers/2606-OSOracle]]、[[Papers/2607-SeekJudge]]（localization/extraction 拆分 + CUAStepBench：278 tasks/177 apps 上 trajectory verdict 与 dense step labels 同轨迹配对） |
+| Passive visual/rubric judge | final screenshot、selected frames、trajectory | 可用于闭源环境 | 看不到 hidden backend，易被信息选择影响；偏差有方向性（系统性偏宽松），且主要来自读 agent 自述而非读屏 [[Papers/2607-OSReward]] | [[Papers/2605-AndroidDaily]] |
+| Learned ORM/PRM/critic | trajectory 或 step representation | 可扩展到 outcome 与 process reward | precision/recall trade-off、训练分布偏差；训练标签若取自同质 judge ensemble，上限被该 ensemble 锁住 | [[Papers/2504-AgentRewardBench]]、[[Papers/2510-CUARewardBench]]、[[Papers/2607-OSReward]]（27 judge 同协议对照 + 开源 OS-Shepherd 9B/35B）、[[Papers/2606-OSOracle]]、[[Papers/2607-SeekJudge]]（localization/extraction 拆分 + CUAStepBench：278 tasks/177 apps 上 trajectory verdict 与 dense step labels 同轨迹配对） |
 | Hierarchical diagnostic judge | segment→subtask→overall | 降低长轨迹 context overload 并给出 failure location | segmentation error 会向后传播 | [[Papers/2604-GUIDE- Interpretable GUI Agent Evaluation via Hierarchical Diagnosis]] |
 | Interactive verifier agent | screenshot、shell、Python、GUI 主动取证 | 可补 hidden/ambiguous evidence | 成本高、实例耦合、可能污染状态；condition proposal 失准是主要误差源 | [[Papers/2602-VAGEN]]、[[Papers/2607-InteractiveRewardAgent]]（propose-then-verify + system/application/GUI 三类工具；GUI-RewardBench 321 条 desktop 轨迹 86.9% acc，最佳 passive DistRL 78.8%；同 backbone 消融显示增益来自环境证据访问，GPT-5.5 均摊 2.34 次 tool call/任务） |
 | Human audit | 完整语境与任务意图 | 适合最终仲裁与 calibration | 慢、贵、难以 scale | 应用于分层抽检和争议样本，而非默认在线 reward |
+
+Passive judge 一类的上限此前只有定性判断，[[Papers/2607-OSReward]] 把它做成了可测量。它没有复用现成 benchmark 的轨迹——理由是那会把 judge 的错误、rollout 本身的质量缺陷与原 verifier 的假阳假阴混在一起，使失败不可归因——而是在 web、Android emulator、Ubuntu、Windows 四个平台自建环境与指令，由 3 名标注者独立标注、分歧升级两名 senior reviewer 共同审议（deliberation 而非多数投票），得到 1019 条 gold trajectory（43% success / 57% fail，calibrated Krippendorff α = 0.797）。在固定协议（末 5 张截图 + 每步 thought/action 文本、greedy、无 task-specific harness/工具/step 监督）下，27 个 reference judge 的全集最高 89.7%（Claude-Opus-4-8）、最低 69.4%；在由标注者自身分歧构造并经复核的 OSReward-Hard（284 条，30/70）上每个 judge 掉 20–43pp，最佳 69.7%、均值 52%。作者自己指出 Hard 上 raw accuracy 是陷阱——69.7% 恰好等于该分布下"恒判 fail"的常数判别器——须改看 BalAcc，引用时不应只搬这句对比。
+
+三条结构性发现比排名更重要。其一，**偏差有方向**：把错判分为 over-accept / over-reject 各三类后，"over-accept: task incomplete"占全部错误约三分之二，且是每一个 judge 的首要错误模式（在其错误中占比不低于 48%），池化后 over-accept 与 over-reject 约为 3:1。其二，**方向来自证据通道失衡**：去掉每步 thought+action 文本平均掉 7.2pp 并翻转 22.7% 的判定，而视觉侧改动（last-3 帧、first+last-2、去掉点击 marker）的 accuracy 变化都在半个点以内——judge 主要在读 agent 的自述而非读屏，这正好解释了"以成功宣言收尾的失败 run"为何是它的系统性盲区。其三，**ensembling 不是解**：top judge 之间 pairwise Cohen's κ ≈ 0.71，同家族（0.731）与跨家族（0.709）几乎无差别，top-3 majority vote 只比最佳单 judge 高约 1pp 而成本数倍；同一 judge 同一输入在 T=0.7 重采样已翻转 6–9% 判定，而 oracle（任取池中一个正确判定）可达 99.2%——池子里通常存在正确答案，缺的是"知道该信谁"。这一点修正了此前的一个隐含假设：[[Papers/2510-CUARewardBench]] 的 Unanimous Prompt Ensemble（全体一致才判、否则弃权）与 OSReward 建语料时的 agreement filter 是同一思路的两种用法，而同质性测量恰好解释了前者在推理期收益有限的原因。多 judge 投票在 CUA reward 上不能被默认为提升可靠性的手段；这类 ensemble 真正能提供的是弃权信号，而不是更准的判定。
+
+配套的开源 reward model 给出该发现的可操作一面，也划出它的边界。OS-Shepherd 不引入新的人工标注：由多个强 judge 的高一致性筛出 96,621 条 SFT 样本（保留 judge 的推理过程而非只有二元判定），再以约 3.1K 条以 false success 为主的样本做一轮 GRPO；9B 版本全集 86.1% / Hard 60.2%，其未调 base 只有 76.7% / 39.4%（base 的 Hard fail recall 仅 14.1%，即几乎全判 success），35B-A3B 为 85.6% / 62.7%，四倍参数只换到 2.4pp 的 Hard BalAcc——迁移的是配方不是规模。两条边界必须一并记录：其一，训练标签所依赖的强 judge 正是被证明共享同一 leniency 方向的那批模型，而被一致接受的 false success 恰恰最难被 agreement filter 捕获，OS-Shepherd 的上限因此被其标注 ensemble 的上限锁住，论文未讨论这一点；其二，全文没有把该 reward model 接进 RL 或 rejection sampling 去训练 policy 并测策略性能，"30–60× 降本"是一次假想 RL run 的 API 等价外推而非实测训练收益。其在三个未参与训练的外部 benchmark 上的迁移结果衡量的是与各自 human-written verifier 的一致率而非与真值的一致率，因此只支持"相对去偏迁移了"，不支持"绝对精度达到了 X"；同一节还给出一条与本节 verifier 谱系直接相关的观察——OSWorld 上 88% 的 judge 错误是假阳性，且超过 16 步后 accuracy 从 0.76 掉到 0.57、假阳率从 0.20 升到 0.37，说明固定张数的末尾截图确认不了长任务的完成。
 
 可信协议应按以下顺序构建：
 
@@ -1350,10 +1411,13 @@ CUA benchmark 的不可复现性来自四个不同层面：任务/参考答案�
 | Data draw / run nondeterminism | [[Papers/2607-TeachStop]] 的单工作 variance decomposition；[[Papers/2606-SkillMemoryBudget]] 的 any/all-of-3 区间（web 域） | data-draw × seed crossed design、paired task statistics、完整 run distribution |
 | Partial evaluation bias | [[Papers/2607-AgentBenchmarkBudget]] 的 completed-record replay | 预注册 pairwise error、task-group coverage、unresolved rate 与 selection policy |
 | Persistent-state contamination | [[Papers/2606-AlwaysOnAgents]]、[[Papers/2606-AgentTracesToTrust]] | provenance、freshness、deletion propagation、rollback trace 与 session isolation |
+| Serving-stack / compile-cache drift | [[Papers/2607-AAPT]]：仅改变 vLLM `torch.compile` 的 cache key（加 `--revision` 与一个 offline flag），在权重、prompt、sampler 与像素完全相同的条件下把 structured-output 合法率从 88.1% 打到 18.3% | 把 inference engine 版本、decoding backend 与 compile-cache key 记为实验条件并逐次核验；凡控制流依赖 schema 门限的系统须单独报告 structured-output 合法率 |
 
 #### 8.13.2 方差、Release 与证据边界
 
 [[Papers/2607-TeachStop]] 的结论应表述为某一训练系统中的发现：evaluation noise 较小，而 data draw 与 run-to-run nondeterminism 主导结果；它尚不是 Android、desktop 与 live web 的普遍定律。[[Papers/2606-SkillMemoryBudget]] 在 web 评测侧补上第二个独立数据点：WebArena/WorkArena 上 any-of-3 与 all-of-3 成功率差距可达 10–19pp（GPT-5.4-mini Vanilla Shopping 46.52 vs 27.81），对跨任务积累状态的方法更严重，作者将 multi-run 方差与全模块 token 总量并列为一等评测标准。对应的最低报告单位应从单次 headline gain 改为 task-level paired outcomes、多个独立 data draws、多个 runs、环境故障和完整分布形态。
+
+[[Papers/2607-AAPT]] 的 compile-cache 观察目前是单一 serving stack（vLLM `guided_json` / xgrammar 后端）内的单点证据，其跨引擎普遍性未经检验；但它指向的失败形态值得单独设防——当 agent 的控制流依赖一个阈值（schema 合法率、置信度门、路由准确率）时，服务栈层面的无声漂移不会表现为分数缓慢下滑，而是把整条 arm 打到接近零，且在权重、prompt、sampler 完全固定的情况下发生。因此复现协议的记录单位应包含推理服务栈本身，而不止于模型与数据。
 
 Verified 重发不是对旧分数的简单修补，而是新的 benchmark release。论文必须标明原版/Verified、task exclusions、checker version、environment image、step budget、backbone/scaffold 与 verifier；无法对齐时只能并列报告，不能计算跨 release 的相对进步。
 
@@ -1363,7 +1427,7 @@ WebArena/OSWorld exploit、gold leakage 与 original-to-verified checker 修订�
 
 **Observed Tension — transition diagnosis 与 executable causality。** [[Papers/2607-EvoGUI]] 能从 logged trajectory 诊断 temporal ordering 和 successor discrimination，但 sampled distractor 不能证明反事实状态不可达。下一步应在可 snapshot/restore 的环境中，从同一 state 执行多个 action，发布 action-conditioned reachable-state set 与 hidden-state metadata，使 world-model 分数真正对应可执行因果结构。
 
-**Validated Gap — 等证据预算的 verifier 对照。** Programmatic、passive judge 与 interactive verifier 访问的证据不同，现有结果无法判断收益来自更好的推理还是更多取证。[[Papers/2607-InteractiveRewardAgent]] 的同 backbone 消融（VLM-only / GUI-only / 全工具）提供了最接近的系统内证据：只加 GUI 交互反而使 Qwen3.6 recall 大跌（找不到证据被误判失败），补全 system/application 工具后才改善 precision–recall trade-off——取证通道的构成而非有无决定收益；但跨 verifier 家族的等预算对照仍缺失，且其 benchmark 标签由 script 产生、覆盖天然限于 script 可判任务。决定性实验应固定 actor、trajectory、environment snapshot 与 evidence budget，比较 precision、recall、coverage、abstention、cost、state pollution 和抗操纵能力，并由独立 human audit 仲裁 [[Papers/2504-AgentRewardBench]] [[Papers/2510-CUARewardBench]] [[Papers/2602-VAGEN]] [[Papers/2607-InteractiveRewardAgent]]。
+**Validated Gap — 等证据预算的 verifier 对照。** Programmatic、passive judge 与 interactive verifier 访问的证据不同，现有结果无法判断收益来自更好的推理还是更多取证。[[Papers/2607-InteractiveRewardAgent]] 的同 backbone 消融（VLM-only / GUI-only / 全工具）提供了最接近的系统内证据：只加 GUI 交互反而使 Qwen3.6 recall 大跌（找不到证据被误判失败），补全 system/application 工具后才改善 precision–recall trade-off——取证通道的构成而非有无决定收益；但跨 verifier 家族的等预算对照仍缺失，且其 benchmark 标签由 script 产生、覆盖天然限于 script 可判任务。[[Papers/2607-OSReward]] 从 passive 一侧补上跨模型的等协议对照（27 个 judge、human-gold 标签、四平台自建轨迹），把该家族的失败刻画为方向性的 leniency 而非对称噪声，并排除了两条常被默认有效的补救：多 judge 投票（top judge 间 κ≈0.71，top-3 vote 仅 +1pp）与加 thinking（收益随 base 变强单调缩小，最强 judge 仅 +0.4pp）。它同时把这条 gap 的另一半标了出来——全文没有把 reward model 接进策略训练，因此"verifier 质量到策略收益"的传递函数仍无任何数据点。决定性实验应固定 actor、trajectory、environment snapshot 与 evidence budget，比较 precision、recall、coverage、abstention、cost、state pollution 和抗操纵能力，由独立 human audit 仲裁，并在同一 verifier 差异下测下游 policy 训练结果 [[Papers/2504-AgentRewardBench]] [[Papers/2510-CUARewardBench]] [[Papers/2602-VAGEN]] [[Papers/2607-InteractiveRewardAgent]] [[Papers/2607-OSReward]]。
 
 **Validated Gap — adaptive hybrid routing。** WeaveBench 和 MobileWorld 说明多接口任务值得独立评测，但尚缺同一任务内可审计的 GUI/API/MCP routing contract。新 benchmark 应标注每个 state 下哪些接口合法、等价或禁止，并把 UI-visible side effect、permission boundary、channel-switch cost 与 state divergence 纳入 verifier，而不是只奖励最快路径 [[Papers/2606-WeaveBench]] [[Papers/2512-MobileWorld]]。
 
@@ -1821,9 +1885,19 @@ GUI/Computer-Use Agent 研究经历了五次可辨认的抽象升级——结构
 | observation reduction 非普遍有益、依赖 capability × thinking budget（强模型用完整 HTML 反而更好） | source-verified | [[Papers/2604-ReadMoreThinkMore]] | diff-history「相当或更好」仅限 gpt-5.1(low)/o3-mini（已加限定） |
 | Interactive verifier reward 进 RL 闭环：IRA reward 在 OSWorld RL 达 34.0%（script 34.9%）、无 script 生成任务 33.5%；GUI-RewardBench 86.9% acc vs 最佳 passive DistRL 78.8% | source-verified | [[Papers/2607-InteractiveRewardAgent]] Table 1/3（§7.6/§8.12） | 单 backbone（Qwen3.6-35B-A3B）、Ubuntu-only；接近而非超越 script；benchmark 标签由 script 产生、覆盖限 script 可判任务；库内暂无独立验证 |
 | 良性 experience 也会造成 safety drift：AWM 演化后 7 模型 × 3 benchmark 的 21 格 ASR 全部上升；refusal 经验压 ASR 但诱发 over-refusal | source-verified | [[Papers/2604-ExperienceSafetyRisks]] Table 1 / Figure 3 / Table 3 / Figure 7（§6.11/§7.11） | 仅 AWM / ReasoningBank；ASR 由 GPT-4o 自动判定且无 human calibration；诊断结果未给出新缓解方法 |
+| Passive VLM judge 的错误有方向性而非对称噪声：over-accept 占全部错误约 2/3 且是每个 judge 的首要错误模式（≥48%）；去掉每步 thought+action 文本 −7.2pp / 翻转 22.7%，视觉侧改动 <0.5pp | source-verified | [[Papers/2607-OSReward]] §4.3 / §5.1-5.2（§7.6/§8.12/§8.14） | 1019 条自建 human-gold 轨迹、固定 last-5 帧协议；未做下游 policy 训练实验，verifier 质量到策略收益的传递函数无数据点；库内暂无独立验证 |
+| Judge ensembling 在 CUA reward 上收益有限：top judge 间 pairwise Cohen's κ≈0.71（同家族 0.731 / 跨家族 0.709），top-3 majority vote 仅比最佳单 judge 高约 1pp，而 oracle 可达 99.2% | source-verified | [[Papers/2607-OSReward]] §5.3 / §E.4（§8.12/§8.14） | 与 [[Papers/2510-CUARewardBench]] 的 Unanimous Prompt Ensemble 构成同一思路的两种用法（推理期提精度 vs 建语料时选样本）；该对照为本文综合判断，非任一原文论断 |
+| Serving-stack 漂移是独立于数据与模型的复现威胁：仅改 vLLM `torch.compile` cache key，在权重/prompt/sampler/像素完全相同下 structured-output 合法率 88.1%→18.3% | source-verified | [[Papers/2607-AAPT]] App.（§8.13.1/§8.13.2） | 单一 serving stack（vLLM guided_json / xgrammar）内的单点证据，跨引擎普遍性未检验；其余 AAPT 结论建在作者自建的 `key_prompt` 微 benchmark 上，外部 DynaCU-Bench 为平局 |
 | 2026-07-23 gap-fill 补录 14 篇（RL survey / Digi-Q / Jedi / AndroidControl / OSWorld-MCP / MCPWorld 等） | 库内暂无独立验证 | §1.4/§4.7/§5/§7/§8 各子节 | 单 agent digest、verification_status: unverified，仅作子节 enrichment，未升格为 Takeaway/共识 |
 
 ## 调研日志
+
+### 2026-08-02 survey-refresh（并入 3 篇，190 → 193）
+
+- [[Papers/2607-QwenUIAgent]]（environment-runtime）：§4.3 新增生产规模真机集群一行 + 证据边界段；§4.8 表内并入"RL 训练联合 policy"行并补部署级 channel-mix 段（CLI 占动作 40.7%/55.1%、batched 39.6%/41.6%、execution→verification 转移 40.2%→52.4%）；§6.3 新增模型行与 27B dense vs 35B-A3B MoE 反常。未改 §11.5 Takeaway——它是对既有判断的佐证而非修正。
+- [[Papers/2607-AAPT]]（model-architecture）：§6.8 新增两段（decode 占 decision-time critical path、$T_{cover}\ge L_{p95}+M$ 规则、外部效度与成立条件），并把 deadline/覆盖窗口补进 planning contract 字段表述；§8.10.3 补 decision-time latency 报告项；§8.13.1 新增 serving-stack / compile-cache drift 威胁行 + §8.13.2 边界段。
+- [[Papers/2607-OSReward]]（evaluation-verifier）：§8.12 表内两行修订 + 新增三段（leniency 方向性、证据通道失衡的 ablation 归因、ensembling 同质性、OS-Shepherd 的两条边界）；§7.6 把"reward model ≠ ground truth"从"有噪声"收紧为"有方向"；§8.14 的等证据预算 verifier 对照 gap 补上 passive 侧对照与"无下游 policy 实验"这一半。
+- Key Evidence Matrix 新增 3 行（OSReward 方向性偏差、ensembling 同质性、AAPT serving-stack 漂移）。本轮无结构性重构，未新增/重画配图。
 
 ### 2026-07-28 配图（TikZ 三图）
 

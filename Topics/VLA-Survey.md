@@ -2,9 +2,9 @@
 title: Vision-Language-Action Models
 description: 从 2022 RT-1 到 2026 π0.7 / GEN-1 的 VLA 全景——按 action 表示与 data recipe 双轴组织，覆盖 AR token / 连续 flow matching / hierarchical / latent / reasoning-augmented / hybrid / world-model-conditioned / RL-post-trained 八类技术路线，重点分析 scaling law、cross-embodiment 统一、real-world RL、reasoning-action 融合、data engine 工学术分化等前沿议题
 tags: [VLA, manipulation, embodied-reasoning]
-date_updated: "2026-07-30"
+date_updated: "2026-08-02"
 year_range: 2022-2026
-papers_analyzed: 84
+papers_analyzed: 85
 keywords: [vla, vision-language-action, robot policy]
 domain_map: EmbodiedAI
 ---
@@ -139,6 +139,14 @@ VLA 试图解决的核心问题可以用 [[2509-PureVLA]] 的一句 framing 概�
   - **Reward hacking**：world model 的盲区被 policy exploit（[[2602-WorldVLALoop]] Fig 5 展示 policy 学会抓杯子背面），要 iterative close loop 才能稳住。
   - **数据壁垒**：GEN-0/1 完全 proprietary，500K 小时 wearable 数据 + 数据采集方法论不公开。学术社区系统性落后于工业实验室。
 
+### 对照组：不含 VLM 的 V+L→A 基线
+
+上述八条路线共享同一个前提——action policy 应当长在预训练 VLM 之上。[[2607-TurboVLA|TurboVLA]] 给了这个前提一次对照实验：执行路径上完全没有 LLM，DINOv3 编码图像、BERT 编码指令、6 层双向 cross-attention 做融合（权重初始化自 Grounding DINO，语言-视觉对齐先验来自 grounding 预训练而非 VLM），ACT decoder 出 action chunk。LIBERO 4-suite 平均 97.7%（0.2B / 0.9GB / 31.2ms，32 Hz），RoboTwin 2.0 Randomized 60.2%（0.4B / 43.4ms，≈23 Hz），真机 AgileX Piper 四任务 92.5 / 80 / 90 / 87.5%。
+
+按上表口径，它在 LIBERO 上与 [[2510-XVLA|X-VLA]]（0.9B，98.1）、[[2602-XiaomiRobotics0|Xiaomi-Robotics-0]]（4.7B，98.7）同处噪声带，参数少一到一个半数量级、延迟低到可裸机 32 Hz 闭环。这有两种读法，而论文自己的 ablation 支持后一种：把语言指令整体替换成 task-ID embedding，LIBERO 只掉 2.3pp（97.7→95.4）。该 benchmark 的语言条件因此接近闭集任务索引，VLM 语义先验在其上本就无处发力，"去掉 VLM 不掉点"主要是 benchmark 的性质而非 VLM 无用的证据。RoboTwin 2.0 上 60.2% 与 WAM 系 92-94% 的差距也指向同一方向——脱离闭集短程设定后差异重新出现。
+
+被这篇论文改变的不是路线排序，而是举证责任：任何"VLM 先验带来泛化"的主张，此后应当配一个语言鉴别力已被验证的评测，或至少一个同规模无 VLM 基线。TurboVLA 自身同样受此约束——全文没有 OOD、指令改写或未见物体实验，因而也不能宣称轻量架构可泛化；延迟数字未声明分辨率、数值精度与编译设置，LIBERO-Long 94.2% 在其对比表中仅第 6，无 seed 与误差棒，表中 "Emb. PT ✗" 指未做具身预训练而非从零训练。
+
 ### 8 条路线的实质 trade-off
 
 | 轴          | AR             | Flow/Diff      | Hierarchical   | Latent         | Reasoning       | Hybrid         | SoftPrompt   | WM/RL           |
@@ -249,6 +257,7 @@ VLA 试图解决的核心问题可以用 [[2509-PureVLA]] 的一句 framing 概�
 ### Benchmark 饱和度与评测 crisis
 
 - **LIBERO 已近饱和**：4-suite avg 98.7 / 98.2 / 98.1 差距在噪声量级；long-horizon sub-suite 仍可分辨（[[2602-XiaomiRobotics0\|Xiaomi]] 97.2 vs 次优 FLOWER 94.9）。
+- **LIBERO 的语言鉴别力不足（比饱和更严重）**：[[2607-TurboVLA]] 把语言指令替换为 task-ID embedding 后仅掉 2.3pp（97.7→95.4），说明该 benchmark 主要测闭集任务执行而非指令理解。凡是把收益归于语言/语义先验的方法（VLM backbone、reasoning trace、language intermediate），在 LIBERO 上的提升都不构成对该归因的支持；[[2604-DAERT]] 的 "no action" probe（π0.5 仍 54.9% 成功）与之互补——一个说语言可被无损替代，一个说语言可被直接忽略。
 - **CALVIN ABC→D OOD 仍有 headroom**：Xiaomi 88.1 vs FLOWER 77.8（Task-5 列）——10pp gap 尚未收窄。
 - **Real-robot 评测多样化但碎片化**：RoboChallenge、[[2511-PiStar06\|π*0.6]] business trial、AC-One long-horizon、PI UR5e 部署、[[2604-GEN1\|GEN-1]] 6-task mastery suite 各自独立；"RoboChallenge Specialist 榜首" 在月级时间尺度频繁易主。
 - **自建 benchmark bias**：[[2601-RoboBrain25\|RoboBrain 2.5]] / [[2602-RynnBrain\|RynnBrain]] / [[2510-VLASER|Vlaser]] / [[2603-ACEBrain0\|ACE-Brain-0]] / [[2511-PelicanVL\|Pelican-VL]] 各自在自家 benchmark 领先——横向对比困难；[[2512-GenieReasoner\|GenieReasoner]] ERIQ 试图用 "action-decoupled reasoning benchmark" 标准化但尚未被社区采纳。
@@ -291,6 +300,7 @@ VLA 试图解决的核心问题可以用 [[2509-PureVLA]] 的一句 framing 概�
 ### 5. Evaluation / reproducibility 危机
 
 - **Lab tabletop 饱和**：LIBERO 98+ 已在噪声量级，CALVIN ABCD→D 接近上限。
+- **语言鉴别力缺失**：LIBERO 上 task-ID embedding 可近乎无损替代自然语言指令（[[2607-TurboVLA]]，−2.3pp），主流短程 suite 因此无法验证任何以语义理解为卖点的设计。需要的最小改动是加入 held-out 指令改写与同义/反义配对，使"语言真的被用到"成为可检验命题。
 - **自建 benchmark bias**：RoboBrain 2.5 / RynnBrain / Vlaser / ACE-Brain-0 / Pelican-VL 都在自家 benchmark 上领先——难以横向对比。
 - **Metric 口径不齐**：π0 的 50 Hz 是 chunk-level，OpenVLA 的 6 Hz 是 token-level；TL（trajectory length）只算成功 episode 引入 selection bias（[[2604-BiCoord]]）。
 - **OOD 定义模糊**：[[2604-Pi07]] 自己承认"训练集太大无法严格定义 unseen"，compositional generalization claim 难证伪。
@@ -319,6 +329,13 @@ MEM（video encoder + language memory 解耦，15min 任务）、EchoVLA（PHC+h
 - 现有 safety 工作（ASIMOV-2.0 / Auto-Red-Teaming / Semantic Action Safety）主要围绕 semantic content，未触及物理 action 的 hazard 层面；Inference-Time Policy Steering 是可能方向。
 
 ## 调研日志
+
+### 2026-08-02 survey-refresh 增量并入 1 篇
+- **来源**：[[Papers/2607-TurboVLA|TurboVLA]]（full-text，verification_status: partial——仅使用其 evidence ledger 中 source-verified 的行）。
+- **结构变化**：技术路线部分新增"对照组：不含 VLM 的 V+L→A 基线"，作为八条路线共同前提（policy 长在预训练 VLM 之上）的对照实验；评测 crisis 与 Open Problem 5 新增"语言鉴别力缺失"条目——LIBERO 上 task-ID embedding 可近乎无损替代自然语言指令，使任何以语义先验为卖点的方法在其上的收益无法被归因。
+- **证据边界**：TurboVLA 无 OOD / 指令改写 / 未见物体评测，其结论只在闭集短程分布内成立；延迟数字未声明分辨率、数值精度与编译设置，无 seed 与误差棒；"Emb. PT ✗" 指未做具身预训练，不等于从零训练。RoboTwin 2.0 上 60.2% 与 WAM 系 92-94% 的差距未被论文讨论。
+- **domain_map**：[[DomainMaps/EmbodiedAI]]（与同轮 EmbodiedAI-Survey 的格局变化合并写入）。
+- **status**：success
 
 ### 2026-07-30 survey-refresh 增量并入 1 篇
 - **来源**：[[Papers/2607-HiFiUMI|HiFi-UMI]]（full-text，11/11 evidence-ledger claims source-verified）。

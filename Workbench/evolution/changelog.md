@@ -186,3 +186,11 @@
 - **directions_abandoned**: 0
 - **discussion_topics_added**: 1（"AFE 的动机前提被证伪，差异化是否重锚" — 请 Supervisor 决策 hypothesis 是否从"接口低效"改锚到"执行期可验证/可恢复状态缺失"，及 MiniSuite 是否保留双模态臂、主 claim 是否退到 false-completion/recovery 指标）
 - **reasoning**: 本轮四个方向全部只更新证据与实验口径、confidence 一律维持，是有意为之——新增 insight 大多是**方法论约束**（对照怎么做、指标怎么报）而非对方向核心假设的支持或反驳，这类证据提高的是未来实验的可信度门槛，不构成假设本身的置信度变化。唯一实质性判断变更有两处：(1) AFE 的动机前提被 GUIvsCLI 的 matched 对照证伪，但同期 verify/observe affordance 的具体形态首次被外部证据指定，两者方向相反，故 confidence 双向抵消维持 0.5，并把是否重写 hypothesis 上交 Supervisor 而非自行改写；(2) Self-Improving 的"gate 是方法空白"被 GRASP/SKILL.nb 的 ablation 反转，可攻面变窄（下调因素）但开放问题更锐利（上调因素），同样维持。未新增方向：validated insight 属方法论性质、不构成独立研究方向，两个相邻的 web-observation idea（AlignmentVsLength / RepresentationRegret）仍为 raw，未达开新方向的证据密度。
+
+### [2026-08-02] Domain Map updated: GUI-Agent
+
+- **added**: 关键洞察 Pattern 4「预算匹配对照是方法可信度的首要筛选条件」（L3 validated insight → L4）
+- **source**: [[Workbench/memory/insights.md#2026-07-30-预算匹配对照是当前-agent-研究信息量最高的实验设计未做对照的增强增益应默认视为未测量]]
+- **promoted_by**: human（Supervisor 批准 queue `69262838`，prio 90）
+- **content**: 四条 matched-control 证据（SkillMemoryBudget token-matched vanilla 追平 AWM/ASI/ReasoningBank；GUIvsCLI 440 任务 matched 下 GUI 59.1% > CLI 48.2%；MuonAgenticRL 仅换 optimizer 0.320→0.633；AgentOccam 观察 token 反增仍拿 43.1%）+ 反例边界（MHLC −90.7% 成本下 0.47→0.60；verifier-guided skill 修补 CLI→69.3%）+ 对自有实验的操作含义（budget-matched arm、seed × data-draw 交叉）
+- **frontmatter**: `last_updated` 2026-04-28 → 2026-08-02

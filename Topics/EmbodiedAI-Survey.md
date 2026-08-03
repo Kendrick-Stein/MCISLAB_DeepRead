@@ -1,9 +1,9 @@
 ---
 title: Embodied AI Survey
 tags: [survey, VLA, manipulation, navigation, embodied-ai, robotics, embodied-reasoning, mobile-manipulation]
-date_updated: "2026-07-30"
+date_updated: "2026-08-02"
 year_range: 2023-2026
-papers_analyzed: 104
+papers_analyzed: 107
 keywords: [embodied ai, robot learning, manipulation, embodied reasoning, spatial reasoning, mobile manipulation, language-conditioned, instruction following]
 domain_map: EmbodiedAI
 ---
@@ -69,8 +69,12 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 
 结论：防遗忘机制（VQA co-training / representation anchoring）与 EmbodiedMidtrain 的 data alignment 指向同一命题——保留预训练表征与动作学习不冲突，应成 VLA 训练默认件。
 
+**效率端的反向证据——去 LLM 的 V+L→A 架构**：[[Papers/2607-TurboVLA|TurboVLA]]（2026）表明在闭集任务分布上，把 VLM backbone 整个移出执行路径不损失成功率。架构为 DINOv3 视觉编码 + BERT 文本编码 + 6 层双向 cross-attention（权重初始化自 Grounding DINO）+ ACT decoder；LIBERO 平均 97.7%，0.2B 参数 / 0.9GB 显存 / 31.2ms（32 Hz），RoboTwin 2.0 60.2%（0.4B / 43.4ms / ≈23 Hz），真机 AgileX Piper 四任务 92.5 / 80 / 90 / 87.5%。
+
+该结论的边界由论文自身的 ablation 划定：把语言指令替换成 task-ID embedding 只掉 2.3pp（97.7→95.4），说明 LIBERO 的语言条件接近闭集任务分类，并不构成对语义理解的真实要求。全文没有 OOD、指令改写或未见物体的泛化评测，因此可支持的命题是"闭集任务分布下 LLM 不是必需品"，而非"VLA 不需要语义先验"——后者才是路线 1 的 foundation model 主张，本文并未触及。其余待补：LIBERO-Long 94.2% 在其对比表中仅列第 6，延迟数字未声明分辨率、数值精度与编译设置，无 seed 与误差棒；表中 "Emb. PT ✗" 指未做具身预训练，不等于从零训练。
+
 **优势**：Zero-shot/few-shot task generalization；可理解自然语言指令；利用 web knowledge（如 "how to use a tool"）。  
-**局限**：推理开销大；对 fine-grained manipulation（如 dexterous grasping）精度不足；real-time deployment 困难。
+**局限**：推理开销大；对 fine-grained manipulation（如 dexterous grasping）精度不足；real-time deployment 困难——但"大"是否为能力所必需，目前缺少能鉴别的评测（TurboVLA）。
 
 ---
 
@@ -109,11 +113,12 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 
 **核心思路**：构建环境的 predictive model，通过 imagined rollouts 进行 planning，减少真实环境交互成本。
 
-**2026-07 更新——机器人 world model 的角色分化**：world model 与 VLA 的结合方式已不再 unclear，而是分化为三种明确角色，外加一个新暴露的攻击面：
+**2026-07/08 更新——机器人 world model 的角色分化**：world model 与 VLA 的结合方式已不再 unclear，而是分化为四种明确角色，外加一个新暴露的攻击面：
 
 | 角色 | 代表工作 | 定位 |
 |:-----|:---------|:-----|
 | Policy（WAM） | [[Papers/2607-FlowWAM|FlowWAM]]、[[Papers/2607-ABotM05|ABot-M0.5]]、[[Papers/2607-RynnWorld4D|RynnWorld-4D]] | world modeling 与 action generation 共享同一生成骨干，RoboTwin 2.0 上已超纯 VLA baseline |
+| Planner / 搜索基底 | [[Papers/2607-WorldActionPlanner|WAP]] | 规划在想象中完成，policy 降级为被调用的执行工具 |
 | 数据引擎 | [[Papers/2607-RynnWorldTeleop|RynnWorld-Teleop]] | action-conditioned 实时视频生成替代真机采数（"数字遥操作"） |
 | Policy Evaluator | [[Papers/2607-GigaWorld1|GigaWorld-1]] | 以 evaluator-world outcome agreement 为标准的低成本 policy 评估 surrogate |
 | 攻击面 | [[Papers/2607-BadWAM|BadWAM]] | action 与 imagined future 可被视觉扰动解耦——"梦得合理、做得错误" |
@@ -126,6 +131,12 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 **World model 作为数据引擎**：[[Papers/2607-RynnWorldTeleop|RynnWorld-Teleop]] 用 40+ FPS 的 action-conditioned world model 实现"数字遥操作"——操作者 hand-pose 流实时驱动机器人 egocentric 视频合成，合成数据训练的 π₀ 可零样本迁移真机，数据饥饿的精细任务增强 +20pts。实际边界：仍需 1,800 条真机 demo 启动、跨 embodiment 需 per-platform 微调，是窄任务分布内的数据放大器而非"替代真机"；且高质量（FVD 550 / 2.8 FPS）与实时（40 FPS / FVD 1226）来自两个不同模型。
 
 **World model 作为 policy evaluator**：[[Papers/2607-GigaWorld1|GigaWorld-1]] 把 surrogate 评估的成功标准从视频观感改为 **evaluator-world agreement**（同一 policy 在 real 与 world model 中 outcome / ranking / failure profile 是否一致），WMBench 2,989 对 paired rollout + 324K challenge rollout 的受控研究给出设计结论：evaluator 质量取决于 long-horizon action fidelity、可迁移物理先验与空间对齐 control（channel-concat pose map 的 Trajectory Accuracy 0.353 远超 ControlNet 0.257 / cross-attention 0.162），而非短期视频指标。关键警示：video model 对 contact-sensitive failure 有 optimistic bias——这是 policy evaluator 最危险的误差类型，false-success rate 应成必报指标。
+
+**World model 作为 planner**：[[Papers/2607-WorldActionPlanner|WAP]] 把执行主体反转——VLM agent 提出子目标，action-conditioned world model 在想象中评估，policy 只作为被调用的工具执行已选中的方案，构成 propose → optimize → search 闭环。使这一反转在视频骨干上可行的是 pose-image conditioning：候选动作先经正向运动学渲染为骨架图像、再由 VAE 编码送入 Wan-T2V-1.3B（4 视角 2×2 拼图，21 帧 @7FPS 历史 → 20 帧 @20FPS 未来），从而绕开低维动作向量与视频生成骨干之间的接口失配。结果上，compositional LIBERO-Long 四设定 72/68/78/70，对照 π0.5 的 4/0/0/0 与 cosmos-policy 全 0；新布局六设定 88/86/90/66/84/78，baseline 多为 0；zero-shot Robosuite 80/76 对纯 VLM planner 的 58/22。消融阶梯从 56/28/46/32 起，依次加入 global optimization、local search、policy rollout imagination 逐级抬升；且 1 次想象即胜过带 ground-truth reward 的 BoN-8（60 vs 42）——在这一设定下想象比重采样更省。
+
+这些数字的可比性有明确边界：WAP 使用 URDF、相机标定与硬编码 GRASP/RELEASE 原语，"72 vs 0" 因此是"带特权信息的模块化系统 vs 端到端 policy"的对比，而非 world model 单独的贡献；全文只有 Table 9 隔离了 world model 本身的增益。世界建模指标（+11.4% ID / +16.8% 泛化）是 PSNR 与 LPIPS 相对提升再取平均，论文自己的 limitation (g) 已承认该构造可疑。全部实验在仿真中完成，无真机；无 imagination horizon 扫描与误差累积测量；50 次 trial 无误差棒。
+
+**表示层与物理保真度**：上述角色都默认 world model "懂物理"，[[Papers/2607-PhiZero|Phi-Zero]] 直接测这个假设并给出分离性证据。其做法是 reason-then-render 而非直接生成像素——先用自监督学到的离散"物理语言"推理（FSQ levels (8,5,5,5,5,5)、25K 词表，4 秒视频压成 256 个符号，Qwen3-VL-4B 作 reasoner），再由 Wan2.2-5B LoRA 扩散解码器渲染。生成端指标领先：Physics-IQ Verified IQ-Score 41.2 > Cosmos3-Super 39.5 > Wan2.2-14B 32.2，PhyGround Physics 3.01，WorldModelBench Total 8.19。判别端却没有同步：IntPhys2 Overall 56.34 而 Hard split 仅 52.38（随机基线 50，V-JEPA 57.42），LikePhys 上刚体 29.14 最好而流体 53.15 倒数第三，WS-IoU 27.6 落后。"生成得像"与"判得对"在同一模型上分离，对把 world model 当 planner 或 evaluator 的两条路线都是直接风险——它们消费的正是判别能力。方法层的关键缺口是没有同数据同算力、仅移除中间表示的对照，21.2→41.2 的增益混淆了表示、数据与训练三个变量；该表示本身是有损压缩（256 符号重建 PSNR 28.9，Wan2.2 VAE 用 44,800 token 达 37.7）；其 "zero-shot" 迁移仍需按源域微调 tokenizer，4 秒固定视界靠滑窗自回归外推，且无代码发布。
 
 **关键工作**：
 
@@ -146,7 +157,7 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
    - 400+ 工作综合分析
 
 **优势**：减少 real-world interaction cost；支持 counterfactual planning；可用于 safety verification。  
-**局限**：Model accuracy 限制 planning horizon；多 Agent 交互建模复杂；WAM 推理开销大且普遍回避报告（RynnWorld-4D 前向 890ms / 9Hz，FlowWAM 无 latency 数字）；action 与 imagination 的同步性可被攻击（[[Papers/2607-BadWAM|BadWAM]]，见路线 6）；evaluator 用途下对 contact-sensitive failure 有 optimistic bias（GigaWorld-1）。~~与 VLA 结合的方式仍 unclear~~——2026 年已由 WAM 路线给出可行答案，RoboTwin 2.0 上 WAM（ABot-M0.5 94.1 / FlowWAM 92.9）超过纯 VLA baseline。
+**局限**：Model accuracy 限制 planning horizon；多 Agent 交互建模复杂；WAM 推理开销大且普遍回避报告（RynnWorld-4D 前向 890ms / 9Hz，FlowWAM 无 latency 数字）；action 与 imagination 的同步性可被攻击（[[Papers/2607-BadWAM|BadWAM]]，见路线 6）；evaluator 用途下对 contact-sensitive failure 有 optimistic bias（GigaWorld-1）；planner 用途下增益尚未与特权信息（URDF / 相机标定 / 硬编码抓放原语）分离（[[Papers/2607-WorldActionPlanner|WAP]]）；生成保真与物理判别可在同一模型上背离（[[Papers/2607-PhiZero|Phi-Zero]] 于 Physics-IQ 领先却在 IntPhys2 Hard 接近随机）。~~与 VLA 结合的方式仍 unclear~~——2026 年已由 WAM 路线给出可行答案，RoboTwin 2.0 上 WAM（ABot-M0.5 94.1 / FlowWAM 92.9）超过纯 VLA baseline。
 
 ---
 
@@ -281,7 +292,8 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 | **DROID** | Training Data | 多场景 manipulation demo | - | - | 多机构协作收集 |
 | **HiFi-UMI-2K** | Training Data | 2K 小时 / 482.1K+ episodes / 110+ scenes | - | [[Papers/2607-HiFiUMI|HiFi-UMI]] | CC BY 4.0；synchronized multi-view + calibrated bimanual trajectories，完整 processed corpus 为 20K+ 小时 |
 | **CALVIN** | Benchmark | Long-horizon manipulation | Success Rate, Sequence Length | - | Language-conditioned，要求 compositional reasoning |
-| **LIBERO** | Benchmark | Long-horizon manipulation | Success Rate, SPL | - | 多 task suite，测试 generalization |
+| **LIBERO** | Benchmark | Long-horizon manipulation | Success Rate, SPL | - | 多 task suite；语言鉴别力存疑——把指令换成 task-ID embedding 仅掉 2.3pp（[[Papers/2607-TurboVLA|TurboVLA]]） |
+| **Physics-IQ / IntPhys2** | Benchmark | 视频物理一致性（生成 / 判别） | IQ-Score / Accuracy | [[Papers/2607-PhiZero|Phi-Zero]] 41.2（Physics-IQ） | 两类指标可给出相反排序：Phi-Zero 生成端第一，IntPhys2 Hard 52.38 却近随机基线 50 |
 | **RLBench** | Benchmark | 100+ manipulation tasks | Success Rate | Diffusion Policy, ACT | Simulation benchmark，多样化 task |
 | **RoboTwin 2.0** | Benchmark | 50 manipulation tasks | Success Rate | ABot-M0.5 94.1%（WAM 类 92-94% 已入饱和区） | Randomized settings，challenging |
 | **RoboCasa365** | Benchmark | 365 任务（Atomic + Composite） | Success Rate | Xiaomi-Robotics-1 57.4% | Composite-Unseen 极难（SOTA 仅 32.1%），长程组合泛化探针 |
@@ -298,6 +310,7 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 - 从 task-specific to language-conditioned generalization（CALVIN）
 - 从特权感知接口到 privilege-free 可部署接口（REAL-Bench：无 oracle object list / teleport 工具）
 - 评测对象从 policy 扩展到 world model evaluator 本身（WMBench：paired real/WM rollout 的 outcome agreement）
+- 反向趋势：主力 suite 的鉴别力在下降。LIBERO 上语言指令可被 task-ID 近乎无损替代、RoboTwin 2.0 已进 92-94% 饱和区，"更强"的边际证据越来越薄
 
 ---
 
@@ -309,13 +322,15 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 
 3. **VLM→VLA 迁移需要 data alignment 与表征保持**：EmbodiedMidtrain 发现 VLA data 与 VLM distribution 存在显著 gap；[[Papers/2606-Act2Answer|Act2Answer]] 进一步测得 robotics 微调使语义类知识掉 20-40 分（知识中层仍可解码、动作头读不出——问题在读出通路），[[Papers/2607-AnchorAlignVLA|Anchor-Align]] 证明 frozen VLM 锚定可低成本修复且不牺牲动作性能——防遗忘机制（co-training / anchoring）应成 VLA 训练默认件。
 
-4. **World Model 已分化出三种角色并成为 competitive policy 范式**：policy（WAM：[[Papers/2607-ABotM05|ABot-M0.5]] / [[Papers/2607-FlowWAM|FlowWAM]] 在 RoboTwin 2.0 超纯 VLA）、数据引擎（[[Papers/2607-RynnWorldTeleop|RynnWorld-Teleop]] 数字遥操作）、policy evaluator（[[Papers/2607-GigaWorld1|GigaWorld-1]] evaluator-world agreement）；代价是推理开销与新攻击面（[[Papers/2607-BadWAM|BadWAM]] 的 action-imagination 解耦）同步出现。
+4. **World Model 已分化出四种角色并成为 competitive policy 范式**：policy（WAM：[[Papers/2607-ABotM05|ABot-M0.5]] / [[Papers/2607-FlowWAM|FlowWAM]] 在 RoboTwin 2.0 超纯 VLA）、planner（[[Papers/2607-WorldActionPlanner|WAP]] 把 policy 降级为工具，compositional LIBERO-Long 72 对 π0.5 的 4）、数据引擎（[[Papers/2607-RynnWorldTeleop|RynnWorld-Teleop]] 数字遥操作）、policy evaluator（[[Papers/2607-GigaWorld1|GigaWorld-1]] evaluator-world agreement）；代价是推理开销与新攻击面（[[Papers/2607-BadWAM|BadWAM]] 的 action-imagination 解耦）同步出现。planner 与 evaluator 两个角色消费的是判别能力，而 [[Papers/2607-PhiZero|Phi-Zero]] 表明生成保真度不蕴含判别正确性——这两条路线不能靠视频质量指标验收。
 
 5. **RL 正从 imitation 走向 true policy optimization**：LongNav-R1 的 multi-turn RL + horizon-adaptive advantage 证明 trajectory-level optimization 比单步 SFT 更适合 long-horizon tasks；[[Papers/2607-REAL|REAL]] 补充了 BC 过拟合的直接观察（SFT 第 2 epoch 在开放词表 split 倒退、RL 修复并超越）。
 
 6. **安全与可靠性开始被系统性关注**：VLA Safety Survey 定义了新问题域——VLA 的不可逆物理后果、多模态攻击面、实时约束带来区别于 LLM safety 和 classical robotic safety 的 unique challenges；[[Papers/2607-BadWAM|BadWAM]] 补充 WAM 特有的 world-action drift 威胁，[[Papers/2607-RobustExecAgenticRL|RobustExec]] 给出 runtime 执行监控 + 回滚恢复的廉价方案（proprioception-only 指标，无需 VLM）。
 
 7. **数据瓶颈的答案正收敛到 human/手持视频 + 强 curation + 可部署 fidelity**：[[Papers/2607-EgoSteer|EgoSteer]]（9.6K 小时 egocentric，scaling log-linear）与 [[Papers/2607-XiaomiRobotics1|Xiaomi-Robotics-1]]（100K+ 小时 UMI，data scale 边际收益大于 model size）给出 data scaling 直接证据；[[Papers/2607-HiFiUMI|HiFi-UMI]] 则表明 3 mm pose、原生双夹爪相对位姿、硬件同步与 wide FoV 的联合 fidelity 足以让 UMI 承担 target-task post-training。跨工作共同点不是“任意视频都可用”，而是 curation、表示一致性与 capture fidelity 共同构成数据引擎。
+
+8. **实时性与能力未必互斥，但现有 benchmark 对二者都在丧失鉴别力**：[[Papers/2607-TurboVLA|TurboVLA]] 移除 LLM 后以 0.2B / 32 Hz 在 LIBERO 拿到 97.7%，同时自证 LIBERO 的语言条件近似闭集分类（task-ID 替换仅 −2.3pp）；[[Papers/2607-PhiZero|Phi-Zero]] 在生成类物理 benchmark 领先而在 IntPhys2 Hard 接近随机。两处的共同含义是，饱和或低鉴别力的评测让"更快"与"更懂"都难以证伪；效率与物理理解的下一步进展，前置条件是先造出能区分它们的评测，而不是继续在现有 suite 上刷分。
 
 ---
 
@@ -329,7 +344,7 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 
 3. **Long-Horizon Credit Assignment**：Multi-step tasks 中 reward 稀疏，LongNav-R1 的 horizon-adaptive advantage 是有价值的尝试，但 generalizable solution 仍需更多验证。
 
-4. **Real-Time Inference Constraint**：VLA 模型推理开销大，diffusion policy 需要 multiple denoising steps。如何在保持 policy quality 的同时满足 sub-second latency 是 deployment bottleneck。WAM 路线加剧此矛盾——每次出 action chunk 需跑 5B 级视频去噪（RynnWorld-4D 890ms 前向 / 9Hz），且多数 WAM 论文回避报告 latency（FlowWAM）。
+4. **Real-Time Inference Constraint**：VLA 模型推理开销大，diffusion policy 需要 multiple denoising steps。如何在保持 policy quality 的同时满足 sub-second latency 是 deployment bottleneck。WAM 路线加剧此矛盾——每次出 action chunk 需跑 5B 级视频去噪（RynnWorld-4D 890ms 前向 / 9Hz），且多数 WAM 论文回避报告 latency（FlowWAM）。反向证据来自 [[Papers/2607-TurboVLA|TurboVLA]]：完全不含 LLM 的 V+L→A 架构以 0.2B / 32 Hz 在 LIBERO 与 RoboTwin 2.0 保持竞争力，说明至少在闭集任务分布上 latency 与成功率不构成硬 trade-off。真正未解的是开放指令与 OOD 条件下这一 trade-off 是否重新出现——该文没有相应实验，问题从"能不能又快又准"变成"快的代价落在哪类泛化上"。
 
 ### 数据与评测挑战
 
@@ -337,7 +352,7 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 
 6. **Cross-Embodiment Morphology Gap**：RT-X 展示 positive transfer，但不同 robot 的 kinematics、dynamics、action space 差异仍限制 transfer efficiency。如何设计更 universal action representation？候选正在收敛：相机系相对 state-action（EgoSteer）、end-effector delta pose（Xiaomi-Robotics-1）、optical flow（FlowWAM）、frame-level latent action（ABot-M0.5）——共同点是 embodiment-agnostic 的中间表示，但无定论。
 
-7. **真实环境评测的覆盖率**：Benchmark 多在 simulation 或特定 lab setup，缺少真实 home/factory/outdoor 环境的 systematic evaluation。Safety-critical scenario testing 几乎空白。World model surrogate 评估（GigaWorld-1 / WMBench）提供低成本替代路径，但对 contact-sensitive failure 的 optimistic bias 未解——false-success 会系统性放行危险 checkpoint，false-success rate 应成必报指标。
+7. **真实环境评测的覆盖率与鉴别力**：Benchmark 多在 simulation 或特定 lab setup，缺少真实 home/factory/outdoor 环境的 systematic evaluation。Safety-critical scenario testing 几乎空白。World model surrogate 评估（GigaWorld-1 / WMBench）提供低成本替代路径，但对 contact-sensitive failure 的 optimistic bias 未解——false-success 会系统性放行危险 checkpoint，false-success rate 应成必报指标。覆盖率之外还有鉴别力：LIBERO 上把语言指令换成 task-ID embedding 只掉 2.3pp（[[Papers/2607-TurboVLA|TurboVLA]]），意味着它主要测闭集任务执行而非语言理解，"语言条件化"类方法的收益在其上无法被验证；物理侧同构——生成类指标（Physics-IQ）与判别类指标（IntPhys2 Hard）在 [[Papers/2607-PhiZero|Phi-Zero]] 上给出相反排序。需要的是带 held-out 指令改写、未见物体与显式判别项的评测设计。
 
 ### 安全与部署挑战
 
@@ -485,6 +500,7 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 - [[Papers/2607-AnchorAlignVLA]] - 表征锚定 + 语言-动作对齐
 - [[Papers/2607-LoRAVLA]] - LoRA finetuning 实证（r=32 recipe）
 - [[Papers/2606-Act2Answer]] - VLA 知识保留测量协议
+- [[Papers/2607-TurboVLA]] - 去 LLM 的轻量 V+L→A 架构（0.2B / 32 Hz）
 
 ### Diffusion Policy Papers
 
@@ -503,6 +519,8 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 - [[Papers/2607-RynnWorldTeleop]] - 数字遥操作数据引擎（40+ FPS）
 - [[Papers/2607-GigaWorld1]] - World model as policy evaluator（WMBench）
 - [[Papers/2607-BadWAM]] - World-Action Drift 攻击
+- [[Papers/2607-WorldActionPlanner]] - World model as planner（propose → optimize → search，pose-image conditioning）
+- [[Papers/2607-PhiZero]] - 离散物理语言 + reason-then-render 世界模型（生成保真 vs 物理判别的分离）
 
 ### Data Engine Papers
 
@@ -546,6 +564,12 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 ---
 
 ## 调研日志
+
+### 2026-08-02 survey-refresh 增量并入 3 篇
+- **来源**：[[Papers/2607-TurboVLA|TurboVLA]]（full-text / partial）、[[Papers/2607-PhiZero|Phi-Zero]]（full-text / source-checked）、[[Papers/2607-WorldActionPlanner|WAP]]（full-text / source-checked）。
+- **结构变化**：路线 3 的角色分化从三种扩为四种，新增 planner / 搜索基底（WAP）与"表示层与物理保真度"讨论（Phi-Zero）；路线 1 新增"效率端的反向证据"分支（TurboVLA）；Key Takeaway 4 改写并新增 Takeaway 8（评测鉴别力）；Open Problem 4 增补反向证据、Open Problem 7 由"覆盖率"扩为"覆盖率与鉴别力"；Benchmarks 表 LIBERO 行补语言鉴别力注记并新增 Physics-IQ / IntPhys2 行。
+- **证据边界**：TurboVLA 无任何 OOD / 指令改写评测，其结论只在闭集任务分布内成立，且 LIBERO 语言鉴别力问题正来自它自己的 ablation；WAP 全仿真、使用 URDF 与相机标定等特权信息且硬编码抓放原语，"72 vs 0" 不可读作 world model 单独贡献（仅 Table 9 隔离）；Phi-Zero 缺同数据同算力、仅移除中间表示的对照，21.2→41.2 混淆表示/数据/训练三变量。
+- **status**: success
 
 ### 2026-07-30 survey-refresh 增量并入 1 篇
 - **来源**：[[Papers/2607-HiFiUMI|HiFi-UMI]]（full-text，11/11 evidence-ledger claims source-verified）。

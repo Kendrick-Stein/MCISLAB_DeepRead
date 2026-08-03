@@ -1,9 +1,9 @@
 ---
 title: World Model Survey
 tags: [world-model, agent, simulation, planning, MBRL, VLA, diffusion-policy, cross-embodiment]
-date_updated: "2026-07-29"
+date_updated: "2026-08-02"
 year_range: 2024-2026
-papers_analyzed: 40
+papers_analyzed: 42
 keywords: [world model, video prediction, dynamics model, mbrl, world action model, action-conditioned, diffusion policy, cross-embodiment]
 domain_map: WorldModel
 ---
@@ -27,6 +27,8 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 9. **新发现**：实时 video WM 的关键转向 control–memory–distillation co-design；但 camera-controllable renderer 与 action-conditioned simulator 必须分开，16 FPS 不等于物理或决策可用（[[2607-Wonder]]）
 10. **新发现**：digital WM 出现两条显式 grounding 路线——外部 tutorial ground imagined rollout（[[2510-RWoM]]）与 executable object/procedure model（[[2607-ObjectCentricEnv]]）；前者延缓 compounding error，后者用代码执行保证内部一致性，但都没有解决语义正确性的外部审计
 11. **新发现**：Environment Engineering 把 world model 从单一模型提升为 environment lifecycle 的一个组件，正确性以外的 diversity / complexity / fidelity 仍缺成熟评估（[[2606-EnvEngineeringSurvey]]）
+12. **新发现**：生成保真与物理判别在同一模型上可以背离——[[2607-PhiZero]] 在 Physics-IQ 生成端第一却在 IntPhys2 Hard 接近随机基线，"视觉像 → 懂物理"的推定被直接反驳
+13. **新发现**：WM 的用法从训练期扩展到推理期——[[2607-WorldActionPlanner]] 把 policy 降级为工具、规划全程在想象中完成，1 次想象胜过带 ground-truth reward 的 BoN-8
 
 ## 技术路线
 
@@ -48,6 +50,10 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 - [[2607-RynnWorldTeleop]]（DAMO）："数字遥操作"data engine——hand-pose 流实时驱动 40+ FPS action-conditioned WM 合成机器人 egocentric 视频，合成数据可零样本迁移真机；但 headline 质量（FVD 550, 2.8 FPS 双向版）与速度（40 FPS causal 版, FVD 1226）来自两个不同模型，且 Stage 2 仍需 1,800 条真机 MoCap 数据——是窄分布内的数据放大器而非"替代真机"
 - [[2607-AlayaWorld]]：LTX-2.3 微调的可实时游玩视频世界（720p/24fps/1s chunk），双记忆（3D cache 几何持久 + 压缩帧历史）+ error bank（训练时注入 rollout 残差 artifact）应对长时程稳定性；零定量评估，处于 teaser 阶段
 - [[2607-Wonder]]：以 Pixel-Space Coordinate Field 把 camera trajectory 渲染成 frame-aligned visual evidence，结合 full-fidelity sparse KV retrieval、Sparse Context Forcing 与 few-step autoregressive distillation；作者报告 minute-scale 16 FPS，I2V average/RPE 为 0.8558 / 0.0132 / 0.0784，但未交代 inference GPU/分辨率、无 component ablation，long-term memory 只靠 Figure 9 qualitative revisit。它证明的是 camera-controllable navigable renderer，不是 agent-action simulator
+
+**路线内分支：reason-then-render**。[[2607-PhiZero]] 不在像素或 VAE latent 上直接做时序建模，而是先把视频压成自监督学到的离散"物理语言"（FSQ levels (8,5,5,5,5,5)、25K 词表，4 秒视频 → 256 个符号），由 Qwen3-VL-4B 在符号空间预测未来，再交给 Wan2.2-5B LoRA 扩散解码器渲染。动机是把"预测"与"渲染"解耦，让物理推理发生在低维离散空间。生成端指标支持这一设计：Physics-IQ Verified IQ-Score 41.2 > Cosmos3-Super 39.5 > Wan2.2-14B 32.2，PhyGround Physics 3.01，WorldModelBench Total 8.19。
+
+但判别端没有同步跟上：IntPhys2 Overall 56.34、Hard split 仅 52.38（随机基线 50，V-JEPA 57.42），LikePhys 刚体 29.14 最好而流体 53.15 倒数第三，WS-IoU 27.6 落后。这直接落在路线 6（evaluator）与本表下方 planner 分支的要害上——那两种用法消费的正是判别能力，而不是画面质量。方法层的关键缺口是没有同数据同算力、仅移除中间表示的对照，21.2→41.2 的增益混淆了表示、数据与训练三个变量；离散表示本身是有损压缩（256 符号重建 PSNR 28.9，Wan2.2 VAE 用 44,800 token 达 37.7）；其 "zero-shot" 迁移仍需按源域微调 tokenizer，4 秒固定视界靠滑窗自回归外推，无代码发布。
 
 **实际效果与优点**：视觉保真度天花板高（GameNGen 人类辨真伪仅 58–60%）；天然吸收 internet video prior；和成熟 video diffusion 工程栈复用。
 
@@ -119,6 +125,10 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 
 **缺点**：仿真器质量瓶颈（video WM action-following 普遍弱）；Long-horizon 死穴（AR video drift >200 帧；RehearseVLA LIBERO-Long 仅 +0.8）；评估样本量小。
 
+**推理期分支：WM-as-Planner**。上述用法都在训练期消费 world model（当仿真器、当 condition source），[[2607-WorldActionPlanner|WAP]] 把它整个挪到推理期：VLM agent 提出子目标，action-conditioned WM 在想象中评估，policy 降级为被调用的执行工具，构成 propose → optimize → search 闭环。让这一反转在视频骨干上可行的是 **pose-image conditioning**——候选动作先经正向运动学渲染成骨架图像、再由 VAE 编码送进 Wan-T2V-1.3B（4 视角 2×2 拼图，21 帧 @7FPS 历史 → 20 帧 @20FPS 未来），从而绕开低维动作向量与视频生成骨干之间的接口失配（与 [[2607-GigaWorld1]] 关于 channel-concat pose map 优于 cross-attention 的结论同向）。结果：compositional LIBERO-Long 四设定 72/68/78/70，对照 π0.5 的 4/0/0/0 与 cosmos-policy 全 0；新布局六设定 88/86/90/66/84/78，baseline 多为 0；zero-shot Robosuite 80/76 对纯 VLM planner 的 58/22。消融阶梯从 56/28/46/32 起，依次加入 global optimization、local search、policy rollout imagination 逐级抬升；1 次想象即胜过带 ground-truth reward 的 BoN-8（60 vs 42）——在这一设定下想象比重采样更省。
+
+边界同样清楚：WAP 使用 URDF、相机标定与硬编码 GRASP/RELEASE 原语，"72 vs 0" 因此是"带特权信息的模块化系统 vs 端到端 policy"，不是 world model 单独的贡献，全文只有 Table 9 隔离了 world model 自身增益。世界建模指标（+11.4% ID / +16.8% 泛化）是 PSNR 与 LPIPS 的相对提升再取平均，其 limitation (g) 已自承该构造可疑。全部实验在仿真中完成、无真机，无 imagination horizon 扫描与误差累积测量，50 次 trial 无误差棒。
+
 ### 6. WM-as-Policy-Evaluator（Robotic Policy Evaluation）
 
 **核心思路**：用 learned world model 作为 robot policy 的低成本 evaluation surrogate；成功标准是 **evaluator–world agreement**（同一 policy 在 real 与 WM rollout 中的 outcome 一致性），而非生成质量。
@@ -169,6 +179,7 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 | 3D/4D generative | HY-World 2.0 / OccSora / RynnWorld-4D | Scene generation / driving sim | 分钟级/场景 | dynamics 依赖伪标注几何 / 小物体精度 |
 | Unified VLA+WM | UWM / Motus / DreamZero / FlowWAM / ABot-M0.5 | VLA policy backbone | 百 ms 级（工程后） | 算力门槛 / unify 必要性 / action–imagination 同步性 |
 | WM-as-RL-simulator | World-VLA-Loop / GigaBrain-0.5M / RehearseVLA | VLA RL post-train | 30 h / 任务级 | Action-following / 样本量 |
+| WM-as-planner（推理期） | WAP | test-time 子目标搜索，policy 作工具 | 每候选一次视频生成 | 增益未与特权信息分离 / 无真机 / 无 horizon 扫描 |
 | WM-as-evaluator | GigaWorld-1 / dWorldEval | Policy checkpoint 筛选 | 视频生成级 | contact-sensitive failure 的 optimistic bias |
 | Digital text/code-space WM | DreamGym / UI-Simulator / WebDreamer / SeerGuard / R-WoM / OCM | Planning / RL sim / 轨迹合成 / safety guard / executable memory | LLM 推理级（\$0.02–1/轨迹） | 转移幻觉 / reward 无外部审计 / executable≠correct |
 
@@ -193,6 +204,9 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 | MobileSafetyBench | 250 任务（150 high-risk） | RCS / SUS | SeerGuard RCS 0.130 | GUI agent 安全；91% 风险在 action 级而非 instruction 级 |
 | Black Myth: Wukong data engine | 90+ 小时 30FPS | - | - | frame-aligned engine state + raw control + RGB/depth（[[2607-PixelsToStates]]） |
 | Wonder I2V / V2V | 1,000 images×5 trajectories / 500 videos×6 trajectories | VBench average + translational/rotational RPE | I2V 0.8558 / 0.0132 / 0.0784；V2V 0.8527 / 0.0187 / 0.1119 | 作者自建、未给 release URL；V2V 仅一 baseline；camera control 非 agent action（[[2607-Wonder]]） |
+| Physics-IQ | 生成式物理一致性 | Verified IQ-Score | 41.2（[[2607-PhiZero]]，> Cosmos3-Super 39.5 / Wan2.2-14B 32.2） | 评的是"生成得像不像物理"，与判别类指标可给出相反排序 |
+| IntPhys2 | 判别式直觉物理（violation-of-expectation） | Accuracy | Overall 56.34 / Hard 52.38（[[2607-PhiZero]]；随机 50，V-JEPA 57.42） | 生成端 SOTA 在 Hard split 逼近随机——WM 用作 planner/evaluator 时应以此类指标验收 |
+| LikePhys / WorldModelBench | 分材料物理合理性 / 综合 | 各自 score | Rigid 29.14 最佳、Fluid 53.15 倒数第三；Total 8.19（[[2607-PhiZero]]） | 物理能力按材料分层，聚合分掩盖流体等薄弱项 |
 
 ## Key Takeaways
 
@@ -207,7 +221,7 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 9. **VLA efficiency 优化显著**——CF-VLA 83.0% success + -75.4% latency
 10. **Action-following 是 video WM 的致命伤**——World-VLA-Loop 证明 video WM 对错 action 也生成成功 → policy reward-hack，SANS 式 near-success 数据 + reward head 是初步答案
 11. **Latent vs pixel 路线之争进入可比较阶段**——V-JEPA 2 给出 15× 计算优势 + success rate 反超 Cosmos；DreamZero 反过来用 14B pixel WAM 达到 62.2% task progress
-12. **WM × VLA 的五种耦合方式全部被实证验证**——offline data engine → inference-time latent conditioning → joint model → RL simulator → evaluator
+12. **WM × VLA 的六种耦合方式全部被实证验证**——offline data engine → inference-time latent conditioning → joint model → RL simulator → evaluator → test-time planner（[[2607-WorldActionPlanner]]）
 13. **scale 不能 alone 解决 physics**——Cosmos 7B vs 14B 在 rigid-body benchmark 上 IoU 基本不变（0.59 vs 0.60）
 14. **"video model as data engine" 是可 scale 的新 sub-paradigm**——DreamGen 从单一 pick-and-place teleop 数据解锁 22 个新动词 / 10 个新环境
 15. **PID > RL 在 sparse reward 场景**——RWM 的 autoregressive training + imagination-PPO 可换 250M transitions 的 model-free 水平
@@ -219,16 +233,18 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 21. **Memory 必须分开讨论 storage、active compute 与 semantic faithfulness**——[[2607-Wonder]] 固定 active KV set 只解决 attention cost，不限制 full historical KV storage；[[2603-HybridMemory]] 测动态主体 exit–reentry、Wonder 只给静态 revisit qualitative case，两者尚不能互相替代
 22. **Digital WM 的 grounding 开始分化为 external prior 与 executable structure 两条路线**——[[2510-RWoM]] 用 tutorial 把 imagined rollout 延长到约 3 steps，[[2607-ObjectCentricEnv]] 用 object/procedure code + re-execution gate 维护一致性；共同边界是“有依据/能执行”仍不等于环境语义真实
 23. **World model 不能脱离 environment lifecycle 单独评估**——[[2606-EnvEngineeringSurvey]] 将 model 放回 modeling→synthesis→evaluation→application 闭环，并指出除 correctness 外的 diversity/complexity/fidelity 仍 under-researched；这解释了为何视觉保真、action faithfulness 与 downstream policy success 长期互不等价
+24. **生成保真不蕴含物理判别**——[[2607-PhiZero]] 在 Physics-IQ 拿下 41.2（生成端第一）的同一模型，IntPhys2 Hard 只有 52.38（随机基线 50），LikePhys 流体倒数第三。Takeaway 16（evaluator 质量 ≠ 视觉保真）由此从 evaluator 场景推广为 WM 的一般性质：凡消费判别能力的用途（planner / evaluator / safety guard）都不能用生成指标验收，而分材料、分难度的判别 split 是目前唯一能暴露这一差距的手段
+25. **WM 的用法从训练期扩展到推理期，且想象比重采样更省**——[[2607-WorldActionPlanner]] 把 policy 降级为工具、规划全程在想象中完成，1 次想象胜过带 ground-truth reward 的 BoN-8（60 vs 42）；但该系统带 URDF、相机标定与硬编码抓放原语，"72 vs π0.5 的 4" 是模块化+特权信息 vs 端到端的对比，仅 Table 9 隔离了 world model 自身贡献——归因清楚前不可引作 WM 的能力证据
 
 ## Open Problems
 
 1. **Action-following faithfulness**：video WM 对错 action 也生成成功，policy 一定能找到 WM 盾区做 reward hacking。SANS 式 near-success 数据 + reward head 是初步答案，但是否 scale 到 long-horizon / multi-agent / deformable 尚未验证；[[2606-RehearseVLA]] 冻结 WM 且不处理该风险，[[2607-GigaWorld1]] 观察到 contact-sensitive failure 的 optimistic bias——同一问题在 evaluator 侧同样存在
-2. **Physics alignment 不随 scale 解决**：Cosmos 7B vs 14B 在 rigid-body benchmark 上 IoU 基本不变；候选方向：(a) hybrid physics (Genesis/PhysGen)；(b) RL on intuitive physics MCQ (Cosmos-Reason1)——但第二条只涨 VLM-level reasoning，不 carry over 到 video generation
+2. **Physics alignment 不随 scale 解决**：Cosmos 7B vs 14B 在 rigid-body benchmark 上 IoU 基本不变；候选方向：(a) hybrid physics (Genesis/PhysGen)；(b) RL on intuitive physics MCQ (Cosmos-Reason1)——但第二条只涨 VLM-level reasoning，不 carry over 到 video generation；(c) 离散符号中间表示 + reason-then-render（[[2607-PhiZero]]），生成端 Physics-IQ 41.2 领先，但缺同数据同算力、仅移除中间表示的对照，21.2→41.2 混淆表示/数据/训练三变量，且判别端未同步（IntPhys2 Hard 52.38）。三条候选都还没有把"物理"从"看起来像物理"里分离出来
 3. **Long-horizon drift**：所有 autoregressive video WM 超过训练 horizon 都退化——GameNGen 3 秒、DIAMOND frame-stacking、World-VLA-Loop 200 帧、OccSora 离开 32 帧 FID 飙 200+。Explicit compressed memory、retrieval-based context、LLM-style KV cache + streaming 都是候选，但没有任何一种在 robot-relevant setting 上 demonstrated；[[2607-AlayaWorld]] 的 error bank + 双记忆零定量评估，[[2607-Wonder]] 的 full-fidelity sparse KV 只固定 active attention 且长期一致性仍为 qualitative evidence。后续必须同时报告 quality/control/revisit metric、latency 与 total memory 随 horizon 的曲线
-4. **Latent vs pixel 的路线之争**：V-JEPA 2 给出 15× 计算优势 + success rate 反超 Cosmos；DreamZero 反过来用 14B pixel WAM 达到 62.2%。**真正的 open question**：long-term 哪一条路径 scale 更好？或两者互补（cloud-side pixel WM 做 data engine / policy evaluator，edge-side latent WM 做 on-device MPC）？
+4. **Latent vs pixel 的路线之争**：V-JEPA 2 给出 15× 计算优势 + success rate 反超 Cosmos；DreamZero 反过来用 14B pixel WAM 达到 62.2%。[[2607-PhiZero]] 提出第三种位置——在离散符号空间推理、再渲染回像素，兼取 latent 的低维推理与 pixel 的可视化输出，但它同时是这条路线最直接的警示：判别能力没有随生成能力一起上来（IntPhys2 Hard 52.38 落后于纯 latent 的 V-JEPA 57.42）。**真正的 open question**：long-term 哪一条路径 scale 更好？或三者按用途分工（cloud-side pixel WM 做 data engine，符号中间层做 planner，edge-side latent WM 做 on-device MPC）？
 5. **Cross-embodiment transfer 真能靠 video 做到吗？**：DreamZero 的 12 min 人类 egocentric / 20 min YAM robot video → unseen task +16pp 是至今最强信号；但 humanoid 五指手 vs bimanual gripper 级的 morphology gap 尚未被 video WM 路线 attack
-6. **Benchmark metric 的 unresolved confound**：video fidelity (FID/FVD) ↔ physical faithfulness (VBench-2.0, PhysBench) ↔ policy success (DreamGen Bench / LIBERO SR) 三者相关但不等价。系统化的"哪个 metric 评 WM 公平" 的框架尚未建立
-7. **WM × VLA 耦合方式的 trade-off space**：当前 5 种耦合方式都有代表工作，但没有 head-to-head 比较。在同等 compute / data 预算下，哪种耦合方式对 sample efficiency 最敏感？
+6. **Benchmark metric 的 unresolved confound**：video fidelity (FID/FVD) ↔ physical faithfulness (VBench-2.0, PhysBench) ↔ policy success (DreamGen Bench / LIBERO SR) 三者相关但不等价。系统化的"哪个 metric 评 WM 公平" 的框架尚未建立。[[2607-PhiZero]] 把 confound 收窄成一个可操作的判据：生成式（Physics-IQ）与判别式（IntPhys2 Hard）在同一模型上给出相反排序，因此 WM 论文至少应同时报告两类指标，并按材料/难度分层——聚合分会掩盖流体等薄弱项（LikePhys 刚体第一、流体倒数第三）
+7. **WM × VLA 耦合方式的 trade-off space**：当前 6 种耦合方式都有代表工作（offline data engine / inference-time latent conditioning / joint model / RL simulator / evaluator / test-time planner），但没有 head-to-head 比较。在同等 compute / data 预算下，哪种耦合方式对 sample efficiency 最敏感？新加入的 planner 分支还带一个专属问题：[[2607-WorldActionPlanner]] 显示 1 次想象胜过 BoN-8，但没有 imagination horizon 扫描，也没有测误差累积——想象的收益在多长 horizon 上翻转成 drift 的代价，目前无数据
 8. **开源 vs 工业化：可复现性断层**：Cosmos 10 000 H100 × 3 个月、Motus 18 000 GPU-hours、DreamZero 2×GB200——任何"主脉络" WM 都远超学术实验室预算
 9. **Agent memory 与 World Model 的边界**：OpenWorldLib 把 long-term memory 写进 world model 定义，但 Memory 接口留空。[[2603-Memoir]] 用 imagination 作 retrieval query，[[2607-Wonder]] 用 query-summary 选 full-resolution historical KV，[[2607-ObjectCentricEnv]] 则把 object/procedure memory 直接做成 executable environment model；三者分别是“想象→检索”“生成→记忆”“记忆→模型”，尚无统一接口或同任务比较
 10. **L3 Evolver 实现**：当 prediction 失败时如何自主修正模型？
@@ -245,6 +261,8 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 
 ## 调研日志
 
+- **2026-08-02 survey-refresh**：并入 2 篇（[[2607-PhiZero]] / [[2607-WorldActionPlanner]]，均 full-text + source-checked）。结构性变化：路线 1 新增 reason-then-render 分支（离散"物理语言"中间表示 + 扩散渲染），路线 5 新增推理期 WM-as-Planner 分支并在路线对比表 +1 行；Overview 趋势 +12/13；Key Takeaways +24（生成保真不蕴含物理判别，把 Takeaway 16 从 evaluator 场景推广为一般性质）、+25（推理期规划）；Takeaway 12 由五种耦合改为六种；Open Problems 2/4/6/7 更新；Benchmarks 表 +Physics-IQ / IntPhys2 / LikePhys-WorldModelBench 三行。未刷新配图。
+  - **证据边界**：Phi-Zero 缺同数据同算力、仅移除中间表示的对照，21.2→41.2 的增益混淆表示/数据/训练；其 "zero-shot" 迁移仍需按源域微调 tokenizer，无代码发布。WAP 全仿真无真机，使用 URDF、相机标定与硬编码抓放原语，"72 vs 0" 不可读作 world model 单独贡献（仅 Table 9 隔离）；+11.4%/+16.8% 为 PSNR 与 LPIPS 相对提升再平均，论文自承构造可疑。
 - **2026-07-29 survey-refresh**：并入 4 篇（[[2510-RWoM]] / [[2607-ObjectCentricEnv]] / [[2606-EnvEngineeringSurvey]] / [[2607-Wonder]]）。路线 1 新增 camera-controllable video WM 的 control–memory–distillation co-design 与严格证据边界；路线 7 补 external-tutorial grounding 与 executable object/procedure model；路线 9 引入 environment lifecycle 视角；Benchmark +1，Key Takeaways +21–23，Open Problems 更新 3/9/19 并新增 20。无新平行 taxonomy，未刷新配图。
 - **2026-07-21 survey-refresh**：并入 17 篇（WebDreamer / DreamGym / RynnWorld-Teleop / WAC / UI-Simulator / WebSynthesis / RynnWorld-4D / AlayaWorld / Memoir / FlowWAM / RehearseVLA / SeerGuard / ABot-M0.5 / BadWAM / Orca / GigaWorld-1 / PixelsToStates），skip 3 篇非 WM（LaMem-VLA / DART / Xiaomi-Robotics-1）。结构性变化：路线 6 更名 WM-as-Policy-Evaluator 并以 GigaWorld-1 为旗舰；路线 7 扩为 Digital-Domain World Model（Web/GUI）五用途表；路线对比表 +2 行；Key Takeaways +16–20；Open Problems +17–19。
 - **2026-07-20 合并 WorldActionModel-Survey**（Supervisor 指示同方向 survey 整合）：该 survey 的 8 篇论文（DreamZero/UWM/Motus/DreamGen/World-VLA-Loop/IRASim/Cosmos/RWM）本已全部覆盖于路线 1/2/4/5，属完全子集。本次仅并入其独有内容：路线 4 标题补 WAM 命名与 "world models are implicit policies" 范式定义、action-free video data 优势论证；Benchmark 表 +Push-T/DreamGen Bench/TokenBench；Open Problem +16（WAM scaling laws）。原文见 git history。

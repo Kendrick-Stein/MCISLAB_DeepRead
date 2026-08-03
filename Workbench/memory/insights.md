@@ -168,7 +168,7 @@
 - **impact**: 所有自有实验设计（AFE-MiniSuite、[[Ideas/MismatchTriage-LongHorizonRecovery-GUI]]、[[Ideas/AlignmentVsLength-WebObservation]]）必须内置 budget-matched arm 与 seed × data-draw 交叉，否则结果不可信；paper-digest 评分应把"有无匹配对照"提到与 novelty 同权；survey 引用增强类方法需标注对照口径
 - **status**: validated（8 个独立 source、4 个独立日期，其中 SkillMemoryBudget / AgentOccam / GUIvsCLI / ElementOrdering 的支撑 claim row 为 source-verified）
 - **contradiction_audit**: 存在增益在对照下**存活**的案例——MHLC 在 −90.7% 成本下仍把成功率 0.47→0.60；GUIvsCLI 中 verifier-guided skill 修补把 CLI 从 48.2% 推到 69.3%。故 claim 限定为"相当比例缩水/反向"与"对照是筛选条件"，**不主张所有增强都是预算假象**。另一边界：本条是对文献计量规律的归纳，非受控复现，不能用于反驳任何单篇具体工作
-- **status_history**: [2026-07-30] created as validated（新 pattern 当轮达 ≥3 source-verified + 通过反例审计，走 memory-distill 情况 A 快速通道）；已 enqueue human review，DomainMap 晋升待 Supervisor 批准
+- **status_history**: [2026-07-30] created as validated（新 pattern 当轮达 ≥3 source-verified + 通过反例审计，走 memory-distill 情况 A 快速通道）；已 enqueue human review，DomainMap 晋升待 Supervisor 批准。[2026-08-02] Supervisor 批准 review_insight `69262838` → L3 → L4，已写入 [[DomainMaps/GUI-Agent]] §关键洞察 Pattern 4（含反例边界与操作含义），queue 任务置 done
 
 ### [2026-07-30] 上下文/观察表示的最优点是 backbone 能力 × 任务阶段的函数，"压缩单调有益"已被证伪
 

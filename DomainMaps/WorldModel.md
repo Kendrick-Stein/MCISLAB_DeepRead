@@ -167,6 +167,8 @@ dWorldEval 将任务完成状态编码进 world model
 | Policy Eval | 研究 dWorldEval progress token 与 L3 Evolver 关联 |
 ## 近期格局变化
 
+- **2026-08-02｜"生成保真 ⇒ 懂物理"被同一模型内的指标背离直接反驳**：[[Papers/2607-PhiZero]] 用自监督离散"物理语言"（FSQ 25K 词表，4 秒视频 → 256 符号）先推理后渲染，Physics-IQ Verified 41.2 超 Cosmos3-Super 39.5 与 Wan2.2-14B 32.2，但 IntPhys2 Hard 仅 52.38（随机 50，纯 latent 的 V-JEPA 57.42），LikePhys 刚体第一而流体倒数第三。此前只在 evaluator 场景成立的"质量 ≠ 视觉保真"由此推广为 WM 的一般性质：凡消费判别能力的用途都不能用生成指标验收；且该文缺同数据同算力、仅移除中间表示的对照，21.2→41.2 混淆表示/数据/训练三变量（[[Topics/WorldModel-Survey]]）
+- **2026-08-02｜WM 的耦合方式从五种扩为六种，新增推理期 planner**：[[Papers/2607-WorldActionPlanner]] 把 world model 从训练期消费品挪到推理期——VLM 提子目标、WM 在想象中评估、policy 降级为工具，pose-image conditioning（正向运动学渲染骨架图再 VAE 编码）绕开低维动作与视频骨干的接口失配，compositional LIBERO-Long 72 对 π0.5 的 4、cosmos-policy 的 0，1 次想象胜过带 ground-truth reward 的 BoN-8（60 vs 42）；但系统带 URDF、相机标定与硬编码抓放原语，仅 Table 9 隔离 WM 自身贡献，全仿真无真机、无 imagination horizon 扫描（[[Topics/WorldModel-Survey]] / [[Topics/EmbodiedAI-Survey]]）
 - **2026-07-21｜Digital domain WM 收敛于文本语义状态空间**：[[Papers/2607-SeerGuard]]（8B 语义预测超 235B 基座）、[[Papers/2511-DreamGym]]（Theorem 1：ε_R+ε_P 与像素重建无关）、[[Papers/2510-UISimulator]]（合成经验 4× OS-Genesis）从安全/理论/训练三角度独立收敛——与 robotics 的 pixel/latent 路线形成清晰分野（[[Topics/WorldModel-Survey]]）
 - **2026-07-21｜WAM"可检查想象"安全假设被实证击穿**：[[Papers/2607-BadWAM]] 用 black-box 视觉扰动使 action 与 imagined future 解耦（LIBERO 96.5%→43.1%）；WAM 范式需要 action–imagination 同步性验证器这一新组件（[[Topics/WorldModel-Survey]]）
 - **2026-07-21｜"降级使用"成为 WM 落地的跨领域 pattern**：预测精度不足时选容错性高的用途——[[Papers/2603-Memoir]] imagination 作 retrieval query、[[Papers/2411-WebDreamer]] 仅 H=1 lookahead、[[Papers/2607-SeerGuard]] 仅二分类风险判定；WM 精度要求越低的用途落地越早（[[Topics/WorldModel-Survey]]）

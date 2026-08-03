@@ -1,9 +1,9 @@
 ---
 title: VLM Survey
 tags: [survey, VLM, multimodal, vision-language-model, visual-reasoning]
-date_updated: "2026-07-29"
+date_updated: "2026-08-02"
 year_range: 2023-2026
-papers_analyzed: 38
+papers_analyzed: 41
 keywords: [vlm, vision language model, multimodal llm, visual reasoning]
 domain_map: VLM
 ---
@@ -88,7 +88,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 ### 2.5 效率优化路线
 
-**代表论文**：[[2500-GuiKvEfficientGui]]、[[2606-StarKV]]、[[2603-STLiteKV]]、[[2500-LasmLayerWiseScaling]]、[[2607-Gemma4]]、[[2607-MageVL]]
+**代表论文**：[[2500-GuiKvEfficientGui]]、[[2606-StarKV]]、[[2603-STLiteKV]]、[[2500-LasmLayerWiseScaling]]、[[2607-Gemma4]]、[[2607-MageVL]]、[[Papers/2607-KimiK3]]
 
 **核心思路**：针对 VLM 在长序列高分辨率输入下的计算瓶颈，通过 KV cache 压缩、layer-wise scaling 等技术降低推理开销；基座侧则在训练阶段内建效率设计。
 
@@ -99,6 +99,10 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - **LaSM**：Layer-wise scaling mechanism，通过 attention + MLP 联合缩放防御 pop-up attack（defense success rate 74.8%-100%）
 - **Gemma 4**：训练侧效率工程的集成样本（[[2607-Gemma4]]）——KV 共享使全局 KV cache −37.5%、int2/int4 QAT 使音频 encoder footprint −78%、MTP speculative decoding；12B 档给出 **encoder-free 统一架构**（35M 投影直接吃 raw image patch / raw audio），若该路线被证明无损，端侧多模态部署栈将大幅简化——但目前只有单一规模点，且缺"统一 vs 外挂 encoder"同规模对照
 - **Mage-VL**：把压缩点前移到 ViT 之前——用 codec motion vector 与 residual energy 只编码高信息 patches，再用 event gate 决定是否调用 language decoder；64-frame 设置约减 75% visual tokens，NExT-QA 报告 80.8/415s（Qwen3-VL-4B 79.8/1460s），但 TempCompass/VSI-Bench 反由 Qwen 更快，且 spatial/long-video 增益与自建 Mage-ViT、350M recaptioning、五阶段 curriculum 混在一起，不能归因于 codec sparsity（[[2607-MageVL]]）
+
+- **Kimi K3**：3T-class 的 native multimodal MoE 基座（2.8T 总参 / 104B 激活 / 1M context），视觉侧的取舍与本节主题直接相关——MoonViT-V2（27 层 / ~401M）**完全从零用 next-token prediction 训练**，放弃 SigLIP 对比学习初始化，文本与视觉从第一步就联合优化、无 post-hoc 对齐阶段；论文给出的理由是训练稳定性（SigLIP-init 变体梯度范数持续更高且频繁 spike），并称视觉评测上与 SigLIP-init baseline 持平。效率侧 MXFP4 权重 / MXFP8 激活的 QAT 贯穿全部 post-training（rollout 与训练共享量化方案以消除 train–inference mismatch），长上下文全程 NoPE、靠 KDA 的 recurrent decay 隐式携带位置从而免去 RoPE 外推补丁（[[Papers/2607-KimiK3]]）。**引用时须打折**：所谓 2.5× scaling efficiency 是架构+数据+训练配方**同时变动**下的聚合自报值，无逐组件 ablation，且全文不披露预训练 token 量 / 总 FLOPs / GPU-hours；"与 SigLIP-init 持平"只给了梯度范数曲线与一句定性表述，未给对照分数——该反转（同团队 K2.5 主张 SigLIP 初始化）的证据强度弱于其结论强度，库内暂无独立验证
+
+**跨论文 pattern（视觉塔初始化）**：视觉侧"必须从对比学习预训练 encoder 出发"这一默认前提，正被两条互不相同的路线同时削弱——[[2607-Gemma4]] 的 encoder-free 直投（35M 投影吃 raw patch）取消 encoder 本身，[[Papers/2607-KimiK3]] 保留 ViT 但取消对比学习初始化。两者都只有单一规模点、都缺"统一/从零 vs 外挂 CLIP-init encoder"的同规模同数据对照，故目前只能记为**默认前提被质疑**，而非已被推翻。
 
 **跨论文 pattern（GUI KV 压缩支线）**：[[2606-StarKV]] 与 [[2603-STLiteKV]] 从不同诊断出发（subspace 级空间 MI 异质性 vs 全层均匀高稀疏）独立得到两个收敛结论——(1) 通用 LLM/VLM KV 压缩的结构先验（共享 saliency、分层预算）在 GUI attention 结构下失效；(2) 中等预算压缩可精度不降甚至略超 full cache，指向 GUI 历史 visual token 存在系统性冗余、stale 视觉历史会污染 context。但两者"反超"的幅度都很小（+0.19 / ~2 分）且均无方差报告，两者的 stale 判据也都是注意力/相似度启发式而非"证据是否仍反映当前界面状态"；该结论目前仅在 7B 开源模型（UI-TARS-1.5 / OpenCUA）上成立。
 
@@ -156,6 +160,45 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - **EvoGUI（时序变体）**：3,000 个 state-transition diagnostic VQA（temporal ordering / inverse action / one-step successor，120 domains），最强模型仅 60.4，且 model scale 与 GUI specialization 均非稳定预测因子——VLM 的状态动态理解是端到端分数掩盖的独立缺口（[[2607-EvoGUI]]）
 
 **含义**：对"拉长推理链提升 multimodal reasoning"和"扩数据防遗忘"两类流行方案都是警示——前者不扩张视觉访问、后者丢的不是知识而是读出。**适用边界**：VAS 的任务限于"一眼看完再算"型，visual search / 多步 grounding 上结论可能翻转；Act2Answer 的二选一格式分辨率有限。
+
+### 2.9 Agentic visual reasoning 的工具忠实性与自适应性
+
+**代表论文**：[[Papers/2607-Beacon]]、[[Papers/2607-FaithEyes]]、[[2606-CodeDance]]
+
+**核心结论**：thinking-with-images 路线的 aggregate accuracy 掩盖了两类结构性退化——模型的调用模式基本锁死在"几乎必调"或"几乎不调"的一端而非按题自适应，且工具在难题上的收益被易题上新引入的错误大部分抵消。两篇 2026-07 的工作分别补上诊断口径与 reward 侧修复，把该路线的评价单位从"平均准确率"改写为"调用时机 × 工具净效应"的分解。
+
+**诊断口径**：
+
+| 维度 | 定义 | 退化基线 | 出处 |
+|:--|:--|:--|:--|
+| Mode Adaptiveness（MA_text / MA_tool） | 易题上不调工具的比例 / 难题上调工具的比例；难易由 5 次纯文本采样投票判定（≥4 次对为 text-easy、≤1 次对为 text-hard，2–3 次判 ambiguous 剔除） | 恒调或恒不调的模型 MA_mean 恰为 50% | [[Papers/2607-Beacon]] |
+| Tool Effect（Tool-Gain / Tool-Harm / ΔTE） | 被工具解出的难题比例 − 被工具做错的易题比例 | ΔTE ≈ 0 | [[Papers/2607-Beacon]] |
+| Tool faithfulness ratio | 答对且含 process image 的轨迹中，是否存在真正呈现所问证据的图 | — | [[Papers/2607-FaithEyes]] |
+
+用这套口径重测既有方法，退化立刻显影：Thyme 的 MA_text 92.95 / MA_tool 4.28（几乎不调）、DeepEyesV2 的 MA_tool 99.71 / MA_text 0.63（几乎必调），两者 MA_mean 分别 48.61 与 50.17，与掷硬币无异；四个 baseline 的 ΔTE 均在 +0.04~+1.74 之间，即工具的净效应接近零。
+
+**两条修复路线**：
+
+- **Beacon（reward 内化"何时该调"）**：Necessity-Aware Adaptive Reward——rollout group 内已存在正确的纯文本回答时，正确的 code 回答 reward 从 1 降到 0.25；"这题需不需要工具"的标签由当前 policy 的组内表现在线决定，而非外部 teacher 打标，规避了 teacher-policy 分布错配与 teacher 工具能力封顶。配套 Hint-Guided Capability Expansion 处理 RLVR 在全错组上无 group-relative 信号的结构缺陷：对全错组注入 expert 生成的 answer-free hint 重采样，策略更新时从输入抽掉 hint、只在 old policy 的 importance-sampling 分母保留，约 40% 的全错组被回收为有效信号。Qwen3-VL-8B 基座，13 benchmark 平均 58.98、MA_mean 58.83（全场最高）、ΔTE +3.14（[[Papers/2607-Beacon]]）
+- **FaithEyes（reward + observation 同时补"有没有用上"）**：同一 VLM 换 prompt 兼任 subagent，只看 `(Q, I_t)` 逐张判定 process image 是否呈现所问证据；判词一物两用——注入 observation（判为无用时直接丢图只留判词）并作为 tool reward 的缩放因子 `r_tool = 1 − (n_fail + n_unhelpful)/n_tool`。两处机制选择可脱离本文迁移：reward 用**比例而非计数**，数学上封死"多调工具刷 bonus"（λ_tool 消融全程平均调用次数稳定在约 1 次）；reward **不以答案正确为门**，因为挂钩答案会使难题上失去维持代码可执行性的梯度压力——对照实验中该变体的执行失败率峰值约 18%、调用次数一路掉向零且不再恢复。Qwen2.5-VL-7B 基座，V\*/HR-4K/HR-8K 达 87.4/77.8/72.9（[[Papers/2607-FaithEyes]]）
+
+**必须打折的地方**：
+
+| 问题 | 证据 |
+|:--|:--|
+| 增益的主要来源不是新 RL 组件 | Beacon 相对 base 的 6.07 点中约 4.00 来自 SFT、整个 RL 阶段约 2.07，其中 vanilla GRPO 仅 +0.19；这恰好复现了它自己引用的"提升主要来自 SFT"的既有诊断 |
+| 基座代差混入主表 | Beacon 建在 Qwen3-VL-8B 上而四个 agentic baseline 为 Qwen2.5-VL-7B——未经任何 agentic 训练的 base 在其 Table 2 六项平均（43.97）已高于全部 7B agentic baseline（33.76~38.11）；同量级对照只有 Metis-8B，优势收窄到 +1.48 / +3.27 |
+| "省算力"的动机与实际行为相反 | Beacon 的 MA_text 仅 22.91，五个数据集实际调用率 70.65%~95.36%，高于被它批评为"缺自适应性"的 Metis（15.72%~54.32%）；其 MA_mean 优势几乎全部来自 MA_tool 一侧 |
+| Tool-Harm 未被控制 | Beacon 平均 Tool-Harm 6.15 为全表最高（Metis 仅 1.10），ΔTE 优势全来自 Tool-Gain；MathVista 上 ΔTE −0.38，按其自身口径工具净有害 |
+| 评测轴与训练目标同源 | FaithEyes 的评测 faithfulness rubric 是训练 subagent rubric 的加严版（同一概念"所问目标是否出现在处理图中"，差别在信息集与严格度），只有 FaithEyes 被直接优化到该轴上，baseline 从未见过 |
+| 只证到 action level | 两篇诊断问题时用的是"移除 process image 后预测几乎不变"这类反事实证据，验证自身修复时却换成 judge 打分的比例指标；FaithEyes 自认 answer-level reliance gap 未关闭 |
+| 无预算匹配对照 | FaithEyes 每次工具调用多一次 subagent forward，全文不报 latency 或 token 开销；其 Table 1 显示仅在推理期给 Thyme 插一个外部 32B 判词、不做任何训练，V\* 即从 82.7 升到 85.8（距 FaithEyes 87.4 仅 1.6 分），暗示相当部分增益来自"多一次带视觉的复核"这一通用机制。Beacon 调用频率远高于 baseline，等推理预算下的对比同样缺失 |
+| 强 teacher 依赖未被剥离 | Beacon 的 SFT 轨迹合成、RL hint 生成与答案判分兜底同为 Gemini 3.1 Pro；FaithEyes 的判定 rationale 由 Qwen3-VL-32B 生成、accuracy/consistency 兜底由 Qwen2.5-VL-72B、faithfulness 评测由 Qwen3-VL-235B-A22B。两篇均无 teacher 消融，"机制有效"与"强 teacher 蒸馏有效"无法分开 |
+| baseline 数字跨论文不一致 | 同一 DeepEyes-7B 在 [[2606-CodeDance]] 记 V\* 90.4 / MathVerse 47.3，在 [[Papers/2607-FaithEyes]] 记 84.3 / 44.3——这批 benchmark 的评测协议（分辨率上限、温度、答案抽取）远未统一，1.6~2.6 分的领先须在同一 harness 下复现才成立 |
+
+**与 §2.8 的关系**：这是 "decodable ≠ used" 在工具层的同构变体——process image 被生成（证据在）但答案并不依赖它（读不出）。差别在于 §2.8 的证据藏在 hidden states、只能靠 probe 与注意力屏蔽间接检验，而此处证据就在 observation 通道里，本可以直接做干预（移除或替换被判 helpful 的裁图，看答案是否改变），两篇却都停在 judge 打分的代理指标上。
+
+**适用边界**：全部结论建立在"工具 = 沙箱内确定性、无副作用、可回滚的 Python 代码"这一设定上。工具自身带噪声（检索、真实 GUI 操作、物理执行）时，NAAR 依赖的"组内是否存在正确纯文本回答"这一在线标签会被工具噪声污染，text-easy/text-hard 的划分也不再稳定——这是把该框架迁移到 GUI 或 embodied 场景时最先断裂的地方。
 
 ---
 
@@ -217,6 +260,10 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 10. **VLM agent 的新瓶颈是把内部信号变成可靠控制接口**：[[2607-MHLC]] 从 hidden-state trajectory 读出 handoff/tool/abstention 决策，[[2607-HyGAE]] 则把 token/turn credit 统一进同一 critic；两者分别处理 inference-time control 与 training-time credit assignment，但都只在可控、短 horizon setting 中成立。下一阶段不能只报 aggregate success，必须报告 false-retain/false-handoff、wrong intervention、trajectory 长度与 calibration drift。
 
+11. **"有没有调工具"必须与"调了有没有用"分开测量**：[[Papers/2607-Beacon]] 给出的 MA_mean = 50% 退化基线立刻暴露出现有 agentic VLM 基本锁死在"几乎必调"（DeepEyesV2 MA_tool 99.71）或"几乎不调"（Thyme MA_text 92.95）的一端，四个 baseline 的 Tool-Gain 减 Tool-Harm 净效应均在 +0.04~+1.74；[[Papers/2607-FaithEyes]] 从另一侧证明"答对但 process image 与问题无关"是常态，并给出两条可迁移的 reward 设计（按有用比例而非调用计数计分、不以答案正确为门）。这套分解可直接搬到 GUI agent 的"何时该截图放大"与 deep research agent 的"何时该检索"。但两篇都只证到 action level（裁得准），未证到 evidence-dependence level（答案真的靠它），且都缺等推理预算对照。
+
+12. **开源基座的视觉侧默认前提正在松动，但证据强度不足**：[[2607-Gemma4]] 取消视觉 encoder（encoder-free 直投）、[[Papers/2607-KimiK3]] 保留 ViT 但取消对比学习初始化（MoonViT-V2 从零 NTP 训练），两条路线同时质疑"必须从 CLIP/SigLIP 预训练 encoder 出发"。两者都只有单一规模点，且都未给同规模同数据的对照分数——Kimi K3 对该反转只提供了梯度范数曲线与一句"视觉评测持平"的定性表述，而它自己上一代 K2.5 的结论恰恰相反。
+
 ---
 
 ## Open Problems
@@ -239,7 +286,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 7. **3D grounding benchmark 的规模局限**：ScanRefer、Nr3D 数据规模有限（~50K），且场景类型偏室内家居。开放世界 3D grounding、跨场景泛化评测仍缺乏。
 
-8. **MLLM-as-reward / as-judge 的可信度**：2.6 节三篇工作的 reward 或评测均依赖闭源强模型且缺独立人评交叉验证（[[2607-SpectraReward]] 零人类评估、[[2607-SearchGenBoundary]] 裁判与奖励同源）；[[2607-SynthDocBench]] 的 rendering-familiarity confound（D3.js 渲染分布可能偏向特定模型家族）提示合成评测同样有系统性偏差。Reward hacking、judge 亲和偏差的系统性度量方法缺失。
+8. **MLLM-as-reward / as-judge 的可信度**：2.6 节三篇工作的 reward 或评测均依赖闭源强模型且缺独立人评交叉验证（[[2607-SpectraReward]] 零人类评估、[[2607-SearchGenBoundary]] 裁判与奖励同源）；[[2607-SynthDocBench]] 的 rendering-familiarity confound（D3.js 渲染分布可能偏向特定模型家族）提示合成评测同样有系统性偏差。Reward hacking、judge 亲和偏差的系统性度量方法缺失。§2.9 把该问题推到极端形态：[[Papers/2607-FaithEyes]] 的 tool reward 完全由与 policy **共享权重**的 subagent 给出，RL 全程只在训练结束后做过一次外部 judge 检查，而稳步上升的 tool reward 恰恰是被 hack 时同样会上升的量；该 subagent 的判定质量从未被独立测量（无人工标注一致率、无相对 235B judge 的混淆矩阵），其 SFT 判定标签还建立在"两次调用轨迹的第一次必然无用"这一未核验的结构性假设上。可行的最小检验是记录 RL 全程 subagent True-rate 与外部 judge 判定的偏离曲线，成本不高但尚无人做。
 
 ### 5.3 系统与应用挑战
 
@@ -250,6 +297,8 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 11. **理解-生成统一模型的推理效率**：MoE + diffusion + LLM 的组合导致显存和推理速度挑战。如何在保持统一能力的前提下实现高效推理，需要架构层面的创新。[[2607-Gemma4]] 的 encoder-free 直投路线（raw patch/audio 直接进 LLM embedding 空间）是候选方向之一，但目前只有 12B 单点、缺同规模对照。
 
 12. **下游微调的知识侵蚀**：[[2606-Act2Answer]] 显示 robotics 微调让 VLM 语义类知识掉 20-40 分且下游 SFT 继续恶化；VQA co-training 有保护作用但 Emotion/Attribute 类仍在 chance 水平——如何系统性防止微调侵蚀预训练能力（对 VLA、GUI agent 微调同样适用）未解决。
+
+13. **工具忠实性缺 answer-level 干预检验**：§2.9 两篇诊断问题时用的是干预式证据（移除 process image 后预测几乎不变），验证自身修复时却退回 judge 打分的比例指标，因此"faithful tool use"目前只被证到裁得准、未被证到答案真的依赖它。可直接借用的范式已在库内——[[2606-VisualFLIP]] 的 same-question paired perturbation 让 gold answer 确定性翻转，用 Pair Accuracy / Collapse Rate 度量证据依赖；把它套到被判 helpful 的裁图上（扰动该图看答案是否更新）就是缺失的决定性实验。同一层问题还有"等推理预算"这一侧：[[Papers/2607-FaithEyes]] 的 Table 1 显示纯推理期插一个外部判词就能让 Thyme 从 82.7 涨到 85.8，而多出的 subagent forward 从未被计入任何开销表。
 
 ### 5.4 研究方向建议
 
@@ -297,6 +346,11 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - [[2500-LasmLayerWiseScaling]] - LaSM: Layer-wise scaling for pop-up attack defense
 - [[2607-Gemma4]] - Gemma 4: 开源原生多模态基座，encoder-free 12B + 端侧效率 recipe
 - [[2607-MageVL]] - Mage-VL: Codec-native pre-encoder sparsification + event-gated streaming generation
+- [[Papers/2607-KimiK3]] - Kimi K3: 3T-class native multimodal MoE，MoonViT-V2 从零 NTP 训练（无 SigLIP 初始化）+ 全程 NoPE 1M context + MXFP4 QAT
+
+**Agentic visual reasoning 的工具使用**：
+- [[Papers/2607-Beacon]] - Beacon: Mode Adaptiveness / Tool Effect 诊断口径 + NAAR 在线自适应奖励 + HCE 全错组回收
+- [[Papers/2607-FaithEyes]] - FaithEyes: 自判 subagent 的 process-image 有用性判词双用（observation 反馈 + tool reward 缩放）
 
 **机制分析**：
 - [[2607-VisualAccessBoundary]] - Visual Access Sweep: CoT 视觉访问边界的因果干预
@@ -365,4 +419,11 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - 跳过 1 篇：[[2409-ElementOrdering]]（GUI observation 表示编排工作，已完整并入 canonical [[Topics/CUA-Survey]] §4.5/§6.7.2；对 VLM 架构或多模态能力无独立增量）
 - 结构变化：未新增平行 taxonomy；扩展 §2.5/2.6/2.7，并新增 Takeaway 10（内部信号→可靠控制接口）与 Open Problem 9 的 calibration/long-horizon 边界
 - domain_map: [[DomainMaps/VLM]] 新增 2 条格局变化（pre-encoder sparsification；latent control + hybrid credit）
+- **status**: success
+
+### 2026-08-02 增量更新（survey-refresh）
+- 并入 3 篇：[[Papers/2607-KimiK3]]（§2.5，3T-class native multimodal 基座 + MoonViT-V2 从零 NTP 训练）、[[Papers/2607-Beacon]]（新增 §2.9，MA/TE 诊断口径 + NAAR/HCE）、[[Papers/2607-FaithEyes]]（新增 §2.9，process-image 有用性判词双用）
+- 跳过：无
+- 结构变化：新增 §2.9「Agentic visual reasoning 的工具忠实性与自适应性」（两篇独立工作形成新 pattern：aggregate accuracy 掩盖调用模式退化与工具净效应近零，且该主题是 §2.8 "decodable ≠ used" 在工具层的同构变体）；§2.5 新增"视觉塔初始化"跨论文 pattern 段（encoder-free 与 contrastive-init-free 两条路线同时质疑 CLIP/SigLIP-init 默认前提，但均缺同规模对照）；Key Takeaways +2（11、12）；Open Problem 8 追加自判自奖闭环的漂移监测缺口、新增 Open Problem 13（answer-level 干预检验与等预算对照）
+- domain_map: 更新 [[DomainMaps/VLM]] 近期格局变化（开放基座推进到 3T-class native multimodal；工具使用的忠实性/自适应性成为独立评价轴）
 - **status**: success

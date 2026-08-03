@@ -1,9 +1,9 @@
 ---
 title: "Computer-Use Agents: A Unified Survey of Models, Learning, Environments, Evaluation, and Deployment"
 tags: [survey, gui-agent, computer-use, web-agent, mobile-agent, os-agent, agentic-RL]
-date_updated: "2026-08-02"
+date_updated: "2026-08-03"
 year_range: 1997-2026
-papers_analyzed: 193
+papers_analyzed: 195
 keywords: [gui-agent, gui grounding, computer-use, computer use agent, cua, web agent, browser agent, mobile agent, desktop agent, os agent]
 exclude_tags: [deep-research]
 exclude_keywords: [deep research, information seeking, browsecomp, research agent, search agent]
@@ -477,7 +477,7 @@ flowchart LR
 | Structured GUI action | click/type/scroll/drag 语义清晰 | 长尾交互 modality 覆盖不足 | [[Papers/2605-CUActSpot]] |
 | Semantic action object | target、affordance、provenance、verification cue 一体化 | 依赖可用 AX/OCR；canvas 与 remote desktop 会退回视觉歧义 | [[Papers/2607-Tactile]]（详见 §4.4） |
 
-统一 Agent 不等于统一动作 token。跨平台模型必须保留 platform convention 或显式路由，否则 mixed-SFT 会让 desktop/mobile 的交互规则相互污染；[[Papers/2607-UIMOPD]] 的 platform-conditioned distillation 就是在解决这一冲突——desktop teacher 与 mobile teacher 各自 SFT 后，再按 rollout 来自哪个平台施加对应的 on-policy 蒸馏监督，在 OSWorld / MobileWorld 上分别达 38.2% / 12.0%。长尾交互 modality 仍是这条线最薄弱的一环：[[Papers/2605-CUActSpot]] 的 206 eval + 50M synthetic 长尾 action grounding 数据上，最强的 Phi-Ground-Any-4B 也只有 44.4%；单篇工作 [[Papers/2601-SwipeGen- Bridging the Execution Gap in GUI Agents via Human-like Swipe Synthesis|SwipeGen]] 把 swipe 手势分解为多个可量化维度、自动合成 human-like swipe 数据，其 GUISwiper 达到 69.07% 的 swipe 执行准确率（较已有 VLM baseline +214%），指出当前 GUI action 覆盖的另一个缺口是执行层面的手势精细度，而非仅是定位精度。
+统一 Agent 不等于统一动作 token。跨平台模型必须保留 platform convention 或显式路由，否则 mixed-SFT 会让 desktop/mobile 的交互规则相互污染；[[Papers/2607-UIMOPD]] 的 platform-conditioned distillation 就是在解决这一冲突——desktop teacher 与 mobile teacher 各自 SFT 后，再按 rollout 来自哪个平台施加对应的 on-policy 蒸馏监督，在 OSWorld / MobileWorld 上分别达 38.2% / 12.0%。[[Papers/2607-MAGA]] 给出这一冲突的量化下界：在三个 domain expert 判断分歧的样本上，Model Soup / TIES 类参数合并使动作成功率相对单个专家下降 10–24 个百分点，66 条高分歧 MobileWorld 任务（29 Click / 37 Swipe，三个 teacher 坐标两两最大距离 > 0.07）上准确率从 Weight Soup 的 71.2% 升到 84.8%——跨平台统一的代价并非均匀摊在所有样本上，而集中在专家分歧处（方法与边界见 §7.13）。长尾交互 modality 仍是这条线最薄弱的一环：[[Papers/2605-CUActSpot]] 的 206 eval + 50M synthetic 长尾 action grounding 数据上，最强的 Phi-Ground-Any-4B 也只有 44.4%；单篇工作 [[Papers/2601-SwipeGen- Bridging the Execution Gap in GUI Agents via Human-like Swipe Synthesis|SwipeGen]] 把 swipe 手势分解为多个可量化维度、自动合成 human-like swipe 数据，其 GUISwiper 达到 69.07% 的 swipe 执行准确率（较已有 VLM baseline +214%），指出当前 GUI action 覆盖的另一个缺口是执行层面的手势精细度，而非仅是定位精度。
 
 ### 4.7 CLI, Code, API, and MCP Actions
 
@@ -784,7 +784,7 @@ Hybrid architecture 保留 native policy 的统一学习能力，同时把高风
 | Planner + specialist grounder | [[Papers/2504-AgentS2]] | 强 planner 保留任务所有权，grounder 负责落点 | planner–grounder 语义对齐 |
 | One model, multiple inference modes | [[Papers/2509-ScaleCUA]] | grounding、direct action、reasoned action 共用模型 | mode selection 与共享训练冲突 |
 | Native policy + semantic runtime | [[Papers/2607-Tactile]] | runtime 暴露带 affordance、provenance 和 verification cue 的动作对象 | 依赖 AX/OCR 完整性 |
-| Platform-conditioned policy | [[Papers/2607-UIMOPD]] | 用 platform condition 缓解 desktop/mobile convention 污染 | 新平台仍需可靠 condition 与动作映射 |
+| Platform-conditioned policy | [[Papers/2607-UIMOPD]]、[[Papers/2607-MAGA]] | 用 platform condition 缓解 desktop/mobile convention 污染；MAGA 进一步按 structured action 重分配蒸馏权重并扩到三域 | 新平台仍需可靠 condition 与动作映射；正确性门控是 offline single-step exact-action 匹配而非 task success |
 | State-first harness + GUI/web specialists | [[Papers/2607-StateAct]] | main agent 经 bash/Python/editor 直接读写 files、application backend 与 DOM，render-only 子目标委派 GUI/web subagent，独立 finish gate 重读 artifact | render-only 任务、GUI subagent 质量与 value-level verification |
 
 [[Papers/2607-StateAct]] 提供了这类架构目前最干净的同 backbone 证据：固定 Claude Opus 4.8，state-grounding harness 相对 reference CUA harness 在 OSWorld 2.0（108 tasks，self-hosted VM，binary success + mean partial 口径）从 20.6%/54.8% 提升到 26.9%/61.6%，平均单任务成本约从 \$72 降到 \$7.8。其 ablation 把收益定位在组合而非单一组件：移除 act-on-state 降幅最大（mean partial 61.6%→51.3%），而 bash-only 配置仅 45.9%、低于 screenshot reference 的 54.8%——"给模型 shell"不构成收益来源，state access、delegation 与 verification 必须共存。收益还有明确的 horizon 边界：short-horizon OSWorld-Verified 上 StateAct 与 reference 几乎持平（78.4% vs 77.3%）。解释这组数字时须注意，比较双方虽同 backbone，但 observation/action interface 不同——StateAct 能直接访问 files/backend/DOM——因此 +6.3pp 应归因于 harness/system design，不能读作 GUI grounding policy 本身变强。
@@ -1105,6 +1105,10 @@ TeachStop 表明 self-distillation 可以安装 sparse reward 无法自行发现
 
 近期工作 [[Papers/2605-LiteGUI]] 用 reinforcement learning 蒸馏出紧凑 GUI agent，指向端侧/低成本部署方向；real-device latency/energy 等硬指标仍缺 source-verified 证据，且暂未检索到独立验证。
 
+Distillation 的另一条问题线不是"压缩多少"，而是"监督分配给谁"。[[Papers/2607-MAGA]] 把这一分配失衡做成可测量的量：GUI response 中真正被执行的 structured action 只占 3.9%–7.1% 的 token，在常规 routed on-policy distillation 的均匀加权下也只拿到 4.0%–7.0% 的蒸馏信号，而参数合并类方法（Model Soup、TIES）在三个 domain expert 判断分歧的样本上会把动作成功率相对单个专家压低 10–24 个百分点。其做法是按 action 结构重分配 token 权重——rollout 动作全对则整条移出蒸馏，type 对而参数错则放大整个 action span，type 错则只放大 type 并 mask 掉参数（错误 type 选中的参数 schema 语义上无效）——并在训练时只给被路由到的 teacher（不给 student）追加一条仅含正确 action type 的 hint，因此 student 的输入输出分布不变，改变的只是 advantage 中的 teacher 项。8B 规模在 MobileWorld GUI 子集 117 题 / OSWorld 全集 369 题 / WebVoyager 140 题子集上为 34.2 / 45.3 / 74.3 SR，mean SR 51.2%、Teacher-Normalized Score 99.9%，较最强 baseline [[Papers/2607-UIMOPD]] 的 49.2 / 95.4 高 2.0 / 4.4。比主表更有信息量的是一次 oracle 干预：136 条 action type 预测错误的 response 中，只把 type 替换为 ground truth、参数仍由 frozen student 重新生成，就救回 68.4%（需要坐标参数的 87 条救回 57 条），说明失败大量落在离散 type 决策而非参数生成能力上——这条证据独立于 SR，直接支撑"优先加强 type 监督"的设计而非事后合理化。
+
+证据边界需与数字同列。三个 benchmark 分别只有 117 / 369 / 140 题，MobileWorld 上 1 题约合 0.85 点，ablation 中 1.4–3.4 点的差异只相当于个位数题目，论文未报 seed 或多次运行方差。训练侧的"正确性"门控是 offline single-step 的 rule-based exact-action 匹配（action type 与全部必需参数都被接受才算通过，无部分给分），不是 live 交互的 task success；这意味着同一界面状态下的合法替代路径会被判错并触发放大监督，作者亦自陈 single-step 训练与真实多步执行不对齐。2B 规模上融合远未追平专家（MAGA mean SR 25.3 / TNS 77.1，teacher mean 32.6），"与 teacher 平均性能相当"只在 8B 成立。343k 训练数据因隐私与 NDA 不可发布且无公开代码，外部只能在自有数据上重实现，库内暂无独立验证。
+
 ### 7.14 Inference-Time Planning, Reflection, Search
 
 Inference-time optimization 不修改权重，而是通过规划、主动验证、局部搜索、回退与 workflow fallback 改变一次任务中的控制流。它能在训练覆盖之外处理错误，却会增加环境交互成本，并受到不可逆动作与 verifier 误判的约束。
@@ -1332,7 +1336,7 @@ agent-side 也需要同样严格的 setting card。A11y-Compressor 在 OSWorld �
 
 ### 8.11 Evaluation Metrics
 
-CUA 评测需要同时报告能力层级与 evidence setting。一个 task-success 数字混合了 perception、planning、execution、environment failure 与 verifier error，无法单独定位方法增益。
+CUA 评测需要同时报告能力层级与 evidence setting。一个 task-success 数字混合了 perception、planning、execution、environment failure 与 verifier error，无法单独定位方法增益。[[Papers/2607-MisScoreCUA]] 给出这一混合的第一份量化分解：对 5 个 benchmark 的 150 条 zero-reward 轨迹逐条归因后，122 条真失败中 verification/feedback 类占 39.3%（其中"重复发出同一动作而界面毫无变化"的 feedback-blind no-op 单类 29.5%，为最大单一类别）、planning 类 35.2%、execution/grounding 类仅 13.9%。可安全引用的结论是后者远小于前两者——把研究预算默认投向 GUI grounding 与当前失败分布不匹配；但 Tier 3 与 Tier 1 之间 4.1pp 的差距不应被读成排序，因为该论文自报的诊断阶段标注一致性只有 κ=0.41（同一集合上 verdict 阶段为 0.71），差距落在该一致性所允许的噪声内（审计设置与其余边界见 §8.12）。
 
 能力层级应至少覆盖：
 
@@ -1368,7 +1372,7 @@ Verifier 的根本差异不在判定模型大小，而在证据访问能力。�
 
 | Verifier | 证据访问 | 优点 | 上限 / 风险 | 代表工作 |
 |:--|:--|:--|:--|:--|
-| Programmatic state verifier | DB、文件、app state、event log | 确定、便宜、适合 RL | checker coverage 与 schema drift | [[Papers/2605-OpenComputer]]、[[Papers/2606-CUAGym]] |
+| Programmatic state verifier | DB、文件、app state、event log | 确定、便宜、适合 RL | checker coverage 与 schema drift；偏差方向为偏严（假阴），[[Papers/2607-MisScoreCUA]] 审计 150 条 FAIL 得 10.7% 为 evaluator false negative | [[Papers/2605-OpenComputer]]、[[Papers/2606-CUAGym]]、[[Papers/2607-MisScoreCUA]] |
 | Hybrid checkpoint verifier | state checks + content checks + semantic rubric | 支持 partial credit 与开放 artifact | 权重和 judge 仍会改变排名 | [[Papers/2605-SaaSBench]]、[[Papers/2604-ClawEval]] |
 | Passive visual/rubric judge | final screenshot、selected frames、trajectory | 可用于闭源环境 | 看不到 hidden backend，易被信息选择影响；偏差有方向性（系统性偏宽松），且主要来自读 agent 自述而非读屏 [[Papers/2607-OSReward]] | [[Papers/2605-AndroidDaily]] |
 | Learned ORM/PRM/critic | trajectory 或 step representation | 可扩展到 outcome 与 process reward | precision/recall trade-off、训练分布偏差；训练标签若取自同质 judge ensemble，上限被该 ensemble 锁住 | [[Papers/2504-AgentRewardBench]]、[[Papers/2510-CUARewardBench]]、[[Papers/2607-OSReward]]（27 judge 同协议对照 + 开源 OS-Shepherd 9B/35B）、[[Papers/2606-OSOracle]]、[[Papers/2607-SeekJudge]]（localization/extraction 拆分 + CUAStepBench：278 tasks/177 apps 上 trajectory verdict 与 dense step labels 同轨迹配对） |
@@ -1381,6 +1385,10 @@ Passive judge 一类的上限此前只有定性判断，[[Papers/2607-OSReward]]
 三条结构性发现比排名更重要。其一，**偏差有方向**：把错判分为 over-accept / over-reject 各三类后，"over-accept: task incomplete"占全部错误约三分之二，且是每一个 judge 的首要错误模式（在其错误中占比不低于 48%），池化后 over-accept 与 over-reject 约为 3:1。其二，**方向来自证据通道失衡**：去掉每步 thought+action 文本平均掉 7.2pp 并翻转 22.7% 的判定，而视觉侧改动（last-3 帧、first+last-2、去掉点击 marker）的 accuracy 变化都在半个点以内——judge 主要在读 agent 的自述而非读屏，这正好解释了"以成功宣言收尾的失败 run"为何是它的系统性盲区。其三，**ensembling 不是解**：top judge 之间 pairwise Cohen's κ ≈ 0.71，同家族（0.731）与跨家族（0.709）几乎无差别，top-3 majority vote 只比最佳单 judge 高约 1pp 而成本数倍；同一 judge 同一输入在 T=0.7 重采样已翻转 6–9% 判定，而 oracle（任取池中一个正确判定）可达 99.2%——池子里通常存在正确答案，缺的是"知道该信谁"。这一点修正了此前的一个隐含假设：[[Papers/2510-CUARewardBench]] 的 Unanimous Prompt Ensemble（全体一致才判、否则弃权）与 OSReward 建语料时的 agreement filter 是同一思路的两种用法，而同质性测量恰好解释了前者在推理期收益有限的原因。多 judge 投票在 CUA reward 上不能被默认为提升可靠性的手段；这类 ensemble 真正能提供的是弃权信号，而不是更准的判定。
 
 配套的开源 reward model 给出该发现的可操作一面，也划出它的边界。OS-Shepherd 不引入新的人工标注：由多个强 judge 的高一致性筛出 96,621 条 SFT 样本（保留 judge 的推理过程而非只有二元判定），再以约 3.1K 条以 false success 为主的样本做一轮 GRPO；9B 版本全集 86.1% / Hard 60.2%，其未调 base 只有 76.7% / 39.4%（base 的 Hard fail recall 仅 14.1%，即几乎全判 success），35B-A3B 为 85.6% / 62.7%，四倍参数只换到 2.4pp 的 Hard BalAcc——迁移的是配方不是规模。两条边界必须一并记录：其一，训练标签所依赖的强 judge 正是被证明共享同一 leniency 方向的那批模型，而被一致接受的 false success 恰恰最难被 agreement filter 捕获，OS-Shepherd 的上限因此被其标注 ensemble 的上限锁住，论文未讨论这一点；其二，全文没有把该 reward model 接进 RL 或 rejection sampling 去训练 policy 并测策略性能，"30–60× 降本"是一次假想 RL run 的 API 等价外推而非实测训练收益。其在三个未参与训练的外部 benchmark 上的迁移结果衡量的是与各自 human-written verifier 的一致率而非与真值的一致率，因此只支持"相对去偏迁移了"，不支持"绝对精度达到了 X"；同一节还给出一条与本节 verifier 谱系直接相关的观察——OSWorld 上 88% 的 judge 错误是假阳性，且超过 16 步后 accuracy 从 0.76 掉到 0.57、假阳率从 0.20 升到 0.37，说明固定张数的末尾截图确认不了长任务的完成。
+
+上述方向性结论只对 passive VLM judge 成立，programmatic oracle 的偏差方向相反。[[Papers/2607-MisScoreCUA]] 对 5 个 benchmark 的 150 条 zero-reward 轨迹做 FAIL 侧审计（OSWorld-Verified 57 + AgentRewardBench 93，deterministic stratified sampling；GPT-5.5 与 Claude Sonnet-5 对全部 150 条独立标注，两个人工组再对 104 行——全部 74 条 LLM 分歧行加 30 条一致行分层抽样——盲评），测得 15.3% 的 FAIL 判定是错的（95% Wilson CI [10.4, 22.0]），其中 10.7% 是 evaluator false negative、4.7% 是任务本身不可解。误判率跨 benchmark 高度不均且病因异质：WorkArena 24 条 0 误判，WebArena 的 21.7% 全部来自 evaluator，AssistantBench 的 21.7% 全部来自 broken task。这把上表 programmatic verifier 一行的"checker coverage 与 schema drift"从定性风险变成有量级、有方向的判断——同一类规则式 oracle 在结构化后端状态可直接查询时（WorkArena）能做到零误判，在依赖 URL 与文本等价性判断时（WebArena）则系统性偏严。与 [[Papers/2607-OSReward]] 合看可得出一条本节此前缺失的区分：verifier 的偏差方向由其证据通道决定，而非"verifier 会出错"一句话可概括——主要读 agent 自述的 passive judge 系统性偏宽松（over-accept 与 over-reject 约 3:1），只认可执行状态匹配的 programmatic checker 系统性偏严格；两者不能共用同一套纠偏策略，把任一方向的结论推广到整个 verifier 谱系都是错的。
+
+该结果的证据边界比通常更需要一并记录。其 93/150 轨迹取自 [[Papers/2504-AgentRewardBench]]，而后者已为同一批轨迹释出 6 名专家标注的 gold label（inter-annotator agreement 89.3%）并已报告 rule-based evaluator 的 recall 仅 55.9%；MisScoreCUA 全文未把自身标签与这批既有 gold label 做任何对照（本综述核对其 §4，未出现 gold / ground truth / human label 的相应表述）。因此 15.3% 只能作为 FAIL 侧误判率的又一次量级估计引用，**不构成对 AgentRewardBench 结论的独立复现**——两者数据重叠，而成本最低的那次交叉校准恰恰没有做。其余三条：human–LLM pairwise κ 仅 0.19–0.32、四标注者 Fleiss' κ 0.36，且 150 行中有 46 行未经任何人工复核、直接采纳两 LLM 共识（作者的辩护是所有分歧行都已人工复核，但这防不住两个 LLM 一致地错）；单标注者口径下 wrong-verdict 率在 7.7%–20.2% 之间摆动（mean 13.7%，sd 5.1pp），即真实不确定度宽于摘要给出的抽样 CI；审计只覆盖 FAIL 侧，因此不提供 false positive 的量级，与本节 passive judge 一侧的证据不对称。移除截图后两个 LLM 标注者分别翻转 12 / 13 条判定、检出的 evaluator false negative 从 14→8 与 10→6，这一点与 OSReward 的证据通道消融同向，共同支持"verifier 结论必须绑定证据访问条件"这一协议要求。
 
 可信协议应按以下顺序构建：
 
@@ -1407,7 +1415,7 @@ CUA benchmark 的不可复现性来自四个不同层面：任务/参考答案�
 | Shortcut / hard-code | [[Papers/2407-AgentsThatMatter]] 讨论 benchmark-specific shortcut；[[Papers/2510-HAL]] 报告 scaffold 与日志中的 gaming case | task-level holdout、未见网站/任务模板、禁止 benchmark-specific branch |
 | Gold / grader leakage | [[Papers/2510-HAL]] 报告 benchmark example 进入 scaffold 的单项泄漏；[[Papers/2606-WeaveBench]] 将读取 ground-truth artifact 与伪造 output 列为作弊模式 | grader 在运行后注入、reference 与 task config 分离、agent-visible filesystem 审计 |
 | Original→Verified release | WebArena-Verified 的使用见 [[Papers/2606-SkillNb]]；OSWorld-Verified 与后继 release 的边界见 [[Papers/2606-OSWorld2]] | release ID、checker commit、task exclusions 与 migration table；原版和 Verified 不共用 leaderboard denominator |
-| Static→Live drift | [[Papers/2504-OnlineMind2Web]]、[[Papers/2604-Odysseys]] | 时间戳、paired rerun、site-failure breakdown 与维护窗口 |
+| Static→Live drift | [[Papers/2504-OnlineMind2Web]]、[[Papers/2604-Odysseys]]；[[Papers/2607-MisScoreCUA]] 把 broken task 从 evaluator error 中单列，占 FAIL 的 4.7%（AssistantBench 5/23、OSWorld-Verified 2/57，其余三个 benchmark 为 0） | 时间戳、paired rerun、site-failure breakdown 与维护窗口；报告时把 task-unsolvable 与 verdict-wrong 分开计数 |
 | Data draw / run nondeterminism | [[Papers/2607-TeachStop]] 的单工作 variance decomposition；[[Papers/2606-SkillMemoryBudget]] 的 any/all-of-3 区间（web 域） | data-draw × seed crossed design、paired task statistics、完整 run distribution |
 | Partial evaluation bias | [[Papers/2607-AgentBenchmarkBudget]] 的 completed-record replay | 预注册 pairwise error、task-group coverage、unresolved rate 与 selection policy |
 | Persistent-state contamination | [[Papers/2606-AlwaysOnAgents]]、[[Papers/2606-AgentTracesToTrust]] | provenance、freshness、deletion propagation、rollback trace 与 session isolation |
@@ -1888,9 +1896,17 @@ GUI/Computer-Use Agent 研究经历了五次可辨认的抽象升级——结构
 | Passive VLM judge 的错误有方向性而非对称噪声：over-accept 占全部错误约 2/3 且是每个 judge 的首要错误模式（≥48%）；去掉每步 thought+action 文本 −7.2pp / 翻转 22.7%，视觉侧改动 <0.5pp | source-verified | [[Papers/2607-OSReward]] §4.3 / §5.1-5.2（§7.6/§8.12/§8.14） | 1019 条自建 human-gold 轨迹、固定 last-5 帧协议；未做下游 policy 训练实验，verifier 质量到策略收益的传递函数无数据点；库内暂无独立验证 |
 | Judge ensembling 在 CUA reward 上收益有限：top judge 间 pairwise Cohen's κ≈0.71（同家族 0.731 / 跨家族 0.709），top-3 majority vote 仅比最佳单 judge 高约 1pp，而 oracle 可达 99.2% | source-verified | [[Papers/2607-OSReward]] §5.3 / §E.4（§8.12/§8.14） | 与 [[Papers/2510-CUARewardBench]] 的 Unanimous Prompt Ensemble 构成同一思路的两种用法（推理期提精度 vs 建语料时选样本）；该对照为本文综合判断，非任一原文论断 |
 | Serving-stack 漂移是独立于数据与模型的复现威胁：仅改 vLLM `torch.compile` cache key，在权重/prompt/sampler/像素完全相同下 structured-output 合法率 88.1%→18.3% | source-verified | [[Papers/2607-AAPT]] App.（§8.13.1/§8.13.2） | 单一 serving stack（vLLM guided_json / xgrammar）内的单点证据，跨引擎普遍性未检验；其余 AAPT 结论建在作者自建的 `key_prompt` 微 benchmark 上，外部 DynaCU-Bench 为平局 |
+| Programmatic oracle 的偏差方向与 passive judge 相反（偏严/假阴）：150 条 FAIL 审计中 15.3% 判错（Wilson CI [10.4, 22.0]），10.7% 为 evaluator false negative、4.7% 为 broken task；WorkArena 0/24、WebArena 21.7% 全为 evaluator、AssistantBench 21.7% 全为 broken | source-verified（与 passive judge 的方向对照为本综述综合判断，非任一原文论断） | [[Papers/2607-MisScoreCUA]] §4.3 / Table 2（§8.11/§8.12/§8.13.1） | 93/150 轨迹取自 [[Papers/2504-AgentRewardBench]] 且全文未与其已释出的 6 专家 gold label 对照，故**不构成**对后者 rule-based recall 55.9% 的独立复现；46/150 行无人工复核，human–LLM κ 0.19–0.32，单标注者口径 wrong-verdict 率摆动 7.7–20.2%；仅审计 FAIL 侧，无 false positive 量级 |
 | 2026-07-23 gap-fill 补录 14 篇（RL survey / Digi-Q / Jedi / AndroidControl / OSWorld-MCP / MCPWorld 等） | 库内暂无独立验证 | §1.4/§4.7/§5/§7/§8 各子节 | 单 agent digest、verification_status: unverified，仅作子节 enrichment，未升格为 Takeaway/共识 |
 
 ## 调研日志
+
+### 2026-08-03 survey-refresh（并入 2 篇，193 → 195）
+
+- [[Papers/2607-MisScoreCUA]]（evaluation-verifier / cross-platform / app workflow / offline / meta-evaluation of programmatic oracle）：§8.12 新增两段——programmatic oracle 的偏差方向与 passive judge 相反（15.3% FAIL 判错 = 10.7% EFN + 4.7% broken task；WorkArena 0/24 vs WebArena 21.7% 全为 evaluator vs AssistantBench 21.7% 全为 broken），并把"偏差方向由证据通道决定"这一区分显式写入；表内 programmatic verifier 行的风险列由定性改为带方向与量级。§8.11 补失败结构的首份量化分解（Tier3 39.3% / Tier1 35.2% / Tier2 13.9%），同时标明 κ=0.41 使 Tier3 与 Tier1 的 4.1pp 差距不可读作排序。§8.13.1 的 Static→Live drift 行补入 broken-task 单列证据。
+- **本轮最重要的一条记账**：MisScoreCUA 的 93/150 轨迹取自 [[Papers/2504-AgentRewardBench]]，后者已为同一批轨迹释出 6 专家 gold label（一致性 89.3%）且已报告 rule-based recall 55.9%，而该文全文未做交叉校准（核对其 §4 无 gold / ground truth / human label 表述）。因此正文与矩阵均按"又一次量级估计"而非"独立复现"表述，避免把重叠数据上的复述升格为跨来源收敛。
+- [[Papers/2607-MAGA]]（training-RL / cross-platform / step / offline / programmatic）：§7.13 新增两段（structured action 蒸馏权重再分配 + oracle type intervention 68.4% 救回 + 完整证据边界）；§4.6 在 UI-MOPD 句后补 weight merging 在高分歧样本上 −10–24pp 的量化下界；§6.6 表内 Platform-conditioned policy 行并入 MAGA 并补 offline exact-action 门控这一边界。未改 §11.5 Takeaway——MAGA 是"跨平台统一代价集中在专家分歧处"的佐证而非修正。
+- Key Evidence Matrix 新增 1 行（programmatic oracle 偏差方向 + 重叠数据边界）。MAGA 未进矩阵：其结论只作用于 §4.6/§6.6/§7.13 子节，未进入 Overview/§10/§11。本轮无结构性重构，未新增或重画配图。
 
 ### 2026-08-02 survey-refresh（并入 3 篇，190 → 193）
 

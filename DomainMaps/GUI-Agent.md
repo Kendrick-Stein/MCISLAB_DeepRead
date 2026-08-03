@@ -1,6 +1,6 @@
 ---
 title: GUI Agent Domain Map
-last_updated: "2026-04-28"
+last_updated: "2026-08-02"
 status: active
 paper_count: 190+
 survey: "[[Topics/CUA-Survey]]"
@@ -116,6 +116,23 @@ mindmap
 - UI-Genie 自增强后期 OOD 性能下降（overfitting to verifier preference）
 - Verifier 本身需要 external grounding
 
+### Pattern 4: 预算匹配对照是方法可信度的首要筛选条件
+
+*[2026-08-02] 由 validated insight 经 Human review 晋升（queue 69262838）；源条目 [[Workbench/memory/insights.md]] [2026-07-30]，8 独立 source / 4 独立日期*
+
+Agent 增强模块（memory/skill 库、观察削减、context 治理、优化器替换）的报告增益中，有相当比例来自未被计入的额外推理预算或不可比的实验口径。一旦补上"总预算固定 / 同 backbone 同 verifier / matched run"这类对照，增益普遍缩水甚至反向：
+
+- **memory/skill 库**：[[Papers/2606-SkillMemoryBudget]] 给 AWM/ASI/ReasoningBank 做 token-matched vanilla 对照（同预算换 15 步），3 模型 × 3 WebArena 域聚合 SR 全被 vanilla 追平/反超
+- **模态选择**：[[Papers/2606-GUIvsCLI]] 在 440 桌面任务上解耦模态-任务-verifier，最强 screen-only GUI 59.1% 反高于最强 original-skill CLI 48.2%，否定"CLI/API 优于 GUI"的无条件版本
+- **优化器**：[[Papers/2607-MuonAgenticRL]] matched run 下仅替换 optimizer 即把 ALFWorld/GiGPO final checkpoint 从 0.320 抬到 0.633——优化器不统一时跨论文比数字无效
+- **观察削减**：[[Papers/2410-AgentOccam]] per-step 观察 token 反增（2210.2 → 2930.9）仍拿 WebArena 43.1%，杠杆是动作空间对齐而非省 token；"优化观察" ≠ "省预算"
+
+因此**"是否给出预算与口径匹配对照"是判断一项 GUI/web agent 方法是否成立的首要筛选条件**，而非审稿时的附加要求；反过来，把对照补上本身已是当前最高价值的一类贡献。
+
+**边界**：不主张所有增强都是预算假象——[[Papers/2607-MHLC]] 在 −90.7% 成本下仍把成功率 0.47 → 0.60，GUIvsCLI 中 verifier-guided skill 修补把 CLI 从 48.2% 推到 69.3%（含 verifier leakage，只能作上界）。本条是对文献计量规律的归纳而非受控复现，不能用于反驳任何单篇具体工作。
+
+**操作含义**：本 domain 下的自有实验（AFE-MiniSuite、[[Ideas/MismatchTriage-LongHorizonRecovery-GUI]]、[[Ideas/ScaleInvariant-Grounding-GUI]] 的 FPN 原型对照）必须内置 budget-matched arm 与 seed × data-draw 交叉；引用增强类方法时标注其对照口径。
+
 ## 待解决问题
 
 1. 如何在不增加推理开销下实现 robust cross-resolution grounding？
@@ -154,3 +171,4 @@ mindmap
 - **[2026-07-29] 良性 experience 被实证为 CUA self-evolution 的内生安全风险**：[[Papers/2604-ExperienceSafetyRisks]] 在 AWM / ReasoningBank 上观察到 7 模型 × 3 安全 benchmark 的 21 个组合 ASR 全部随良性经验积累上升；剂量与等长对照把机制收窄到 execution-oriented experience 语义，refusal 经验虽压低 ASR 却诱发 over-refusal。memory gate 因而必须联合审计 utility、safety 与拒绝校准，而非只按 task success 接纳资产。证据限两种 memory 框架，ASR judge 无 human calibration。见 [[Topics/CUA-Survey]] §6.11 与 §7.11。
 - **[2026-08-02] Judge 噪声被证明是有方向的，且 ensemble 不是解药——verifier 线的既有补救默认被否**：[[Papers/2607-OSReward]] 在四平台 1019 条 gold 轨迹（3 标注者 + 2 资深审核者协商定标，Krippendorff α = 0.797）上以统一协议横评 27 个 judge，得到三个结构性结论：(1) **偏差有方向**——over-accept 约占全部错误 2/3、每个 judge ≥48%，是 27 个 judge 无一例外的首位错误模式，即 judge 系统性偏宽松而非对称噪声；(2) **偏差来自读 agent 自述而非读屏**——去掉文本 thought/action 通道 BalAcc 掉 7.2pp、22.7% 判定翻转，去掉视觉通道 <0.5pp；(3) **多 judge 投票不解决它**——judge 间 κ≈0.71 且同族 0.731 / 跨族 0.709 几无差别，top-3 投票仅 +1pp，而 T=0.7 重采样已能翻转 6–9%、oracle 上界 99.2%，说明 ensemble 真正能提供的是弃权信号而非精度。这直接约束 [[Papers/2510-CUARewardBench]] 的 Unanimous Prompt Ensemble 这类做法，也把 §8.14 的"等证据预算 verifier 对照"gap 从缺 passive 侧数据收窄到只缺下游 policy 训练实验。配套 OS-Shepherd（9B 86.1/60.2 vs base 76.7/39.4）证明配方可迁移，但训练标签取自同一批共享宽松倾向的 judge，上限被该 ensemble 锁住（原文未讨论）。库内暂无独立验证。见 [[Topics/CUA-Survey]] §8.12 与 §7.6。
 - **[2026-08-02] 模态互补从"系统消融"升级为部署规模的使用分布实测，执行/验证分工可由 outcome reward 自发涌现**：[[Papers/2607-QwenUIAgent]] 报告同一 policy 在 OSWorld-Verified / v2 上 CLI 占全部动作的 40.7% / 55.1%、出现在 92.0% / 98.2% 的任务中——四方收敛（WeaveBench/CoAct-1/[[Papers/2607-StateAct]]/[[Papers/2606-GUIvsCLI]]）此前给的是"两种通道都不能移除"，这里首次给出实际调用比例；且随 RL 进行，GUI-only batch 75.8%→64.7%、GUI+CLI 混合 batch 11.0%→20.3%，execution→verification 状态转移 40.2%→52.4%、含验证行为的轨迹 +14.7%、false-stop −11.2%，即"Bash 当手、GUI 当眼"的分工在仅有结果奖励下自发出现（同系统前后对比，非跨系统对照，不改变"三种路由范式尚无同环境对照"的判断）。基础设施侧同时证明真机供给可工程化到生产规模（100+ 物理设备 / 150+ app，health-aware scheduler + virtual display，自报吞吐约 20×）。**但收益归因不成立**：主力数字 MobileWorld-Real 92.2% 建在作者自建的 409 任务 benchmark 与自建 AutoJudge（5 VLM 多数投票、env_error 不入分母）之上，对次优系统 3.5pp 的领先小于该 judge 自身 7.2pp 的不一致率，全文无"同模型加/不加真机数据"的受控对照。见 [[Topics/CUA-Survey]] §4.8 与 §4.3。
+- **[2026-08-03] Verifier 的偏差方向由证据通道决定，不是 verifier 的普遍属性——上一条"judge 系统性偏宽松"须限定在 passive VLM judge**：[[Papers/2607-MisScoreCUA]] 审计 5 个 benchmark 的 150 条 zero-reward 轨迹，测得 15.3% 的 FAIL 判定是错的（Wilson CI [10.4, 22.0]）= 10.7% evaluator false negative + 4.7% broken task，即 programmatic oracle 的偏差方向与 [[Papers/2607-OSReward]] 测出的 passive judge 宽松倾向（over-accept 约 3:1）**恰好相反**：读 agent 自述的判宽，只认可执行状态匹配的判严。两者不能共用同一套纠偏策略，把任一方向推广到整个 verifier 谱系都是错的。跨 benchmark 病因异质同样重要——WorkArena 24 条 0 误判（结构化后端状态可直接查询），WebArena 的 21.7% 全部来自 evaluator（依赖 URL/文本等价性），AssistantBench 的 21.7% 全部来自 broken task（live 站点腐化）——"benchmark 不可靠"至少是两种独立病，修法不同。**证据边界须与结论同引**：该文 93/150 轨迹取自 [[Papers/2504-AgentRewardBench]]，后者已为同一批轨迹释出 6 专家 gold label（一致性 89.3%）并已报告 rule-based recall 55.9%，而该文全文未做交叉校准，因此只是同一现象的又一次量级估计，不构成独立复现；另有 46/150 行无人工复核、human–LLM κ 仅 0.19–0.32、仅审计 FAIL 侧故无 false positive 量级。附带一份可用的失败结构分解（Tier3 verification/feedback 39.3%，其中 feedback-blind no-op 单类 29.5%；Tier1 planning 35.2%；Tier2 execution/grounding 仅 13.9%），但诊断阶段 κ=0.41 使 Tier3 与 Tier1 的 4.1pp 差距不可读作排序。见 [[Topics/CUA-Survey]] §8.12、§8.11 与 §8.13.1。

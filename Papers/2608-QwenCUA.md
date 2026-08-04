@@ -5,8 +5,8 @@ institute: [Qwen Team, XLang Lab]
 date_publish: 2026-08-02
 venue: Tech Report
 tags: [computer-use, gui-agent, agentic-RL]
-url: "https://github.com/xlang-ai/Qwen-CUA"
-arxiv_id:
+url: "https://arxiv.org/abs/2608.02352"
+arxiv_id: "2608.02352"
 doi:
 cite_key: lu2026qwen
 code: "https://github.com/xlang-ai/Qwen-CUA"

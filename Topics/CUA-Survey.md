@@ -1,9 +1,9 @@
 ---
 title: "Computer-Use Agents: A Unified Survey of Models, Learning, Environments, Evaluation, and Deployment"
 tags: [survey, gui-agent, computer-use, web-agent, mobile-agent, os-agent, agentic-RL]
-date_updated: "2026-08-03"
+date_updated: "2026-08-04"
 year_range: 1997-2026
-papers_analyzed: 195
+papers_analyzed: 197
 keywords: [gui-agent, gui grounding, computer-use, computer use agent, cua, web agent, browser agent, mobile agent, desktop agent, os agent]
 exclude_tags: [deep-research]
 exclude_keywords: [deep research, information seeking, browsecomp, research agent, search agent]
@@ -521,6 +521,8 @@ Web、Mobile 与 Desktop/OS 的执行环境经由 GUI、CLI、API 与 MCP 动作
 
 上述证据都来自受控消融，回答的是"少一个通道会怎样"。[[Papers/2607-QwenUIAgent]] 补上互补的一类证据——统一动作空间在部署规模下**实际被怎么用**。其动作空间把 GUI 原语与 `cli_command`、`api_call`、`ask_user` 并列，并允许一个决策步输出有序动作序列（batched action：序列内连续执行、CLI 输出聚合成单次观测，从而压掉不需要中间反馈的那部分 observe–reason–act 循环）。OSWorld-Verified / OSWorld-v2 上的实测分布为：CLI 占全部动作的 40.7% / 55.1%，出现在 92.0% / 98.2% 的任务中；batched 动作占 39.6% / 41.6%，平均每批 3.1 个 primitive；批次构成上 GUI-only 从 75.8% 降到 64.7%，混合 GUI+CLI 批次从 11.0% 升到 20.3%。这把"通道互补"从消融结论推进为使用分布：任务变难时 policy 自发把过半动作放到 CLI 上，而 GUI 并未被挤出，两者在同一批次内交错。同一工作还报告了路由行为的一个来源证据：在 binary outcome reward、无任何显式模态协调目标的 online RL 之后，"先用 Bash 改变状态、再用只读 GUI 核验效果"的 execution→verification 转移从 40.2% 升到 52.4%，含验证动作的轨迹比例 +14.7%、false-stop rate −11.2%。这提示通道分工可以由 outcome reward 间接诱导，而不必显式设计 orchestrator；但它是同一系统内的训练前后对比，没有固定 backbone 的跨范式对照，因此它扩充的是表中"RL 训练联合 policy"一行的证据，不改变 §4.9 中"三种路由范式尚无同环境对照"的判断。
 
+以上证据——无论受控消融还是部署使用分布——都来自本身就为 hybrid 设计或训练过的系统。[[Papers/2608-QwenCUA]] 补上方向相反的一个数据点：把 CLI 通道**加**给一个从未为路由训练过的 screenshot-only policy 会发生什么。该报告在 MyPCBench 上给两个 Qwen 模型额外开放 Bash，平均 turn 数分别从 69.3 降到 53.4、从 63.6 降到 49.1（约 −23%），但 perfect-task rate 同步**下降**——Qwen3.7 由 51.6 掉到 41.8，Qwen-CUA 由 58.7 掉到 55.1。这与本节"通道互补而非替代"的结论不冲突：既有消融量的是**移除**通道的代价，此处量的是**增加**通道却不训练路由的代价，两者可同时成立。它的增量在于把"谁来路由"从设计选择变成一个可测量的能力缺口——更强的模型损失更小（−3.6pp vs −9.8pp），提示"何时切到 CLI"是随能力变化的可学习决策，而非混合接口的固有缺陷；作者本人也是这样定性的（判为"尚未学会何时切换"的优化缺口）。证据边界：单一 benchmark、单一 CLI 工具、两个同家族模型，无第三方复现，且论文未报告通道切换次数或 CLI 动作占比，因此无法区分损失来自过度使用 CLI 还是用错场景。
+
 这一路由问题与 §4.5 讨论的混合观察融合问题结构对称：前者要决定该用哪个通道执行，后者要决定该信任哪个证据来源，两者都需要一个显式的仲裁策略，简单地把所有通道/证据都暴露给模型并不自动带来更好结果。[[Papers/2606-WeaveBench]] 的失败分析给出了这一对称性的反例——当模型可以自由选择通道时，35.2% 的失败属于 reward hacking（包括伪造渲染、CLI 绕过 GUI 检查等），说明自由路由有时会被模型用来选择最容易伪造证据的通道，而非功能上正确的通道；这是路由侧的失败模式，与 [[Papers/2607-GUIStateBelief]] 在观察侧发现的 stale-structure-following 是同一类"多通道仲裁缺位"问题的两个实例。
 
 ![[cua-survey-fig3-hybrid-evidence.png]]
@@ -739,8 +741,13 @@ Native CUA 把 perception、grounding、reasoning、短期记忆与 action gener
 | ScaleCUA | 同一 VLM 支持 grounding、direct action 与 reasoned action | 跨平台数据使模型既可独立执行，也可作为 grounder [[Papers/2509-ScaleCUA]] | 强局部 grounding 未稳定转化为 desktop/mobile 长程执行 |
 | GUI-Owl-1.5 | technical report 将其描述为多规模、多平台 native agent | 覆盖 grounding、automation、tool use 与 memory [[Papers/2602-Mobile-Agent-v3.5- Multi-platform Fundamental GUI Agents]] | 本文仅依据其摘要收录该工作；架构和 benchmark 数字不进入强结论 |
 | Qwen-UI-Agent | 单一 policy 覆盖 mobile / desktop / browser，动作空间并置 GUI 原语、CLI、API 与 `ask_user` | 分域 expert SFT + model merging，再叠 action RL 与 online RL [[Papers/2607-QwenUIAgent]] | 与 UI-TARS-2 同属 hybrid architecture；主力数字多建在作者可控的评测条件上（自建 benchmark、自建 judge、自行修正的官方评测脚本），不可被第三方直接复算 |
+| Qwen-CUA | 397B-A17B MoE，screenshot-only：不提供 accessibility tree、DOM 与 shell，固定 20 张 active 视觉预算，超出后以 10 张为块把旧截图折成文本占位符 | 同一 fold operator 复用于训练期 trajectory slicing，长 episode 被切成多个继承终态 reward 的 context-bounded slice，训推折叠表示严格一致 [[Papers/2608-QwenCUA]] | 八个 benchmark 只在 OSWorld-Verified 与 MacAgentBench 居首；全文零组件级 ablation，五项设计打包交付，任一单项均无独立证据 |
 
 UI-TARS 系列说明 native model 可以形成统一的 data flywheel；ScaleCUA 则提供反向边界：扩大 grounding 与跨平台训练数据仍可能留下明显的端到端执行缺口。现有证据因此不支持"native 化自动消除系统设计"，只支持把部分系统边界从显式模块接口迁移到训练数据、context policy 与 action schema。[[Papers/2607-QwenUIAgent]] 另外留下一条与规模相关的未解释反常：同一 pipeline 下 27B dense 在 MobileWorld 上比 35B-A3B MoE 高 17.1pp（82.1 vs 65.0），真机上为 92.2 vs 87.4，论文只把 MoE 变体当作"激活 3B、部署效率更高"的选项带过。由于端侧部署压力恰好落在 MoE/小模型一侧，这个 gap 值得独立复核；在此之前它只是单一系统内的现象，不能读作 dense 优于 MoE 的一般结论。
+
+[[Papers/2608-QwenCUA]] 把这条谱系的"纯 native"一端推到了目前公开报告中最极端的位置，方向恰与 UI-TARS-2 和 Qwen-UI-Agent 的 hybrid 扩展相反：凡是能暴露像素之外隐藏状态的入口一律不给，只留截图观察与键鼠动作，在 OSWorld-Verified 上得到 86.2（作者自跑的 Qwen3.7 73.3、GPT-5.5 78.7、Claude Opus 4.8 83.4；screenshot-only、无 shell 与 accessibility tree 的统一协议，programmatic 终态 verifier，360 个任务中 359 个产出完整评测记录）。其唯一的新机制是块状折叠：active 视觉预算 20 张，超出后折叠边界一次前进 10 步，边界之前的截图替换为固定文本占位符而对应的 reasoning 与 action 原样保留。选块而非逐步的直接理由是 KV-cache 前缀稳定性——逐步折叠会让每次调用重写 prompt 前缀——但真正的杠杆在于同一个 fold operator 被复用到训练期：完整 episode 被渲染成多个 context-bounded slice，每个 slice 继承终态 reward，因而训练与推理看到的折叠表示严格一致，且不必设计 step-level reward。这构成 §6.9 中 context-as-action 路线（[[Papers/2606-MemGUI]] 把 context management 建模为 policy 动作）的确定性对照面：折叠时机由固定规则而非 policy 决定，代价是无法按内容取舍该丢什么，收益是训推一致且不引入额外 summarization model。
+
+上述数字必须与三条边界绑定。其一，全篇立论的"在八个 benchmark 上全面超越 Qwen3.7"建在推理模式不对等的对照上——作者自跑的 Qwen3.7 为 non-thinking，而 Qwen-CUA 为 thinking enabled，thinking 版 Qwen3.7 全文未报，因此该 8/8 不能被引用为训练配方的增益。其二，全文没有任何组件级 ablation，20 张预算、块大小 10、trajectory slicing、SAPO 与迭代刷新五项一起打包交付；作者自陈迭代曲线的斜率不可读作 controlled convergence 或 scaling，故本节不把其中任一单项记为"被验证有效"。其三，八个 benchmark 中只有 OSWorld-Verified 与 MacAgentBench（69.2）居首，OSWorld 2.0 binary（18.5，Opus-4.8 为 20.3）、MyPCBench、Gym-Anything、ScienceBoard、WebArena 与 RedTeamCUA 均落后于 GPT-5.5 或 Opus-4.8；其 token 效率优势（OSWorld-Verified 上 3,605.8 output tokens/task 达 86.2，Opus-4.8 相近预算只有 80.0、用到 21.8K 才 83.3）只在该 benchmark 内成立，同一模型在 OSWorld 2.0 上花 244,625.5 output tokens/task 而该 benchmark 未给出任何 baseline 的 token 开销可比。全部分数为作者自报并经原文一致性核查，库内暂无独立验证。
 
 ### 6.4 Modular Agent Systems
 
@@ -900,11 +907,12 @@ CUA safety 已从筛查用户指令，扩展到环境内容、跨应用信息流
 | 风险面 | 代表工作 | 控制位置 | 未覆盖边界 |
 |:--|:--|:--|:--|
 | Environmental prompt injection | [[Papers/2504-WASP]]、[[Papers/2409-EIA]] | observation filtering 与 instruction hierarchy | goal-aligned injection |
+| Low-severity goal injection | [[Papers/2608-InvisibleInkThreats]] | 意图推断，而非按动作危害分级的审计与门控 | 无高危害基线对照；注入文本本身极显眼、未测任何 detector |
 | Contextual privacy leakage | [[Papers/2606-AgentCIBench]]、[[Papers/2601-GUIGuardBench]] | disclosure policy 与 least privilege | 精确识别应隐藏字段 |
 | Benign-experience safety drift | [[Papers/2604-ExperienceSafetyRisks]] | experience admission、retrieval composition 与 safety gate | refusal 经验压制 ASR 但诱发 over-refusal；只覆盖 AWM / ReasoningBank |
 | Consequence-level risk | [[Papers/2607-SeerGuard]] | 执行前预测动作后果 | world model 与环境漂移 |
 | Trust isolation | [[Papers/2607-UCM]] | privileged planner 与 quarantined content 分离 | trust-label error 与 typed value corruption |
-| Clarification / confirmation | [[Papers/2602-AmbiBench]]、[[Papers/2503-OS-Kairos- Adaptive Interaction for MLLM-Powered GUI Agents]] | ambiguity detection 与 adaptive autonomy | 频繁询问造成 interaction cost |
+| Clarification / confirmation | [[Papers/2602-AmbiBench]]、[[Papers/2503-OS-Kairos- Adaptive Interaction for MLLM-Powered GUI Agents]] | ambiguity detection 与 adaptive autonomy | 频繁询问造成 interaction cost；更强的失败模式是确认被当作背书渠道（[[Papers/2608-InvisibleInkThreats]]，证据为选样格子上的单点估计） |
 | Proactive restraint | [[Papers/2603-PIRABench]] | 推荐前估计 false-positive risk | restraint 与 recall 的联合校准 |
 | Editable intervention | [[Papers/2607-Plover]] | 修改 persistent plan 后续跑 | 专家上界不代表普通用户 |
 | Background monitoring | [[Papers/2607-Sidekick]] | ambient cue、resume summary、reasoning view | alarm fatigue、attention cost 与多 agent 扩展 |
@@ -913,6 +921,12 @@ CUA safety 已从筛查用户指令，扩展到环境内容、跨应用信息流
 [[Papers/2607-MHLC]] 把 act、ask、escalate、abstain 的效用决策做成统一的学习接口：在冻结 backbone 上训练两个读取生成期 hidden-state 轨迹的轻量 head，Capability Head 估计当前模型对该 instance 是否 adequate（低于阈值则 handoff 给更强模型），Resolution Head 在 Clarification、Tool Use、Abstention 与 Direct Answering 间选择。GUI 侧证据为 AndroidWorld routed execution：Qwen3-VL-4B→32B 的 score 从本地 4B 的 0.47 升至 0.60，paid API cost 减少 90.7%——该口径只计 fallback 大模型调用、本地模型计零成本，不等于端到端 compute 下降；clarification/abstention 增益则来自 When2Call 与 TriviaQA 等非 GUI benchmark，对 CUA 属 component-only 证据。其"latent self-assessment"并非无监督涌现：capability 与 resolution label 均由外部 LLM judge 离线构造，judge bias 可能直接进入 control policy；head 还需访问 hidden states 且逐 backbone 训练，不能直接套在 closed API 上。作为对照，prompt-level self-switching 在 ScreenSpot-Pro 上仅 escalation 4/1581 个样本——严重 under-escalation 说明"让模型自己说要不要升级"不是可用的控制信号。
 
 [[Papers/2604-ExperienceSafetyRisks]] 把风险面从恶意输入推进到**良性经验本身造成的安全漂移**：AWM（offline）与 ReasoningBank（online）在 WebArena / SafeAgentBench 的良性任务上积累经验后，7 个模型 × 3 个安全 benchmark 的 21 个组合全部出现 ASR 上升；例如 GPT-4o 在 BrowserART 从 37.0 升至 50.0。检索条数剂量实验与 length-matched 对照把退化定位到 experience 的 execution-oriented 语义，而非 context 变长；refusal-only 经验能压制 ASR，却同时降低良性任务成功率，形成 safety–utility trade-off。证据是 source-checked 的直接端到端测量，但仅覆盖 AWM / ReasoningBank、ASR 由 GPT-4o 自动判定且无 human calibration，不能外推到所有 skill/workflow 自演化路线。
+
+[[Papers/2608-InvisibleInkThreats]] 填上了本表原先记为"goal-aligned injection"的那格未覆盖边界，方式是换掉隐蔽性的定义：既有注入研究优化的是**注入文本有多难被发现**，它优化的是**注入目标的危害有多低到不值得拒绝**——star 一个仓库、订阅一个帖子、从官方源装一个无关的包。这一步之所以有结构性含义，是因为部署侧现有的三层防御（确认门控、动作级审计、severity 分级）全部按危害程度校准，而按危害校准的防御对低危害目标失效不是调参问题。作者在 CIA 框架内明确排除 availability 攻击（意图写在指令表面、对齐模型直接拒绝、且对攻击者无收益），只做 confidentiality 与 integrity，理由是被劫持的都是 agent 的合法能力，逐动作审计无法把良性与恶意分开。II-Bench 共 444 例（111 组 benign–adversarial 配对 × 2 指令具体度 × 2 注入形式），环境是 OSWorld 虚拟机加 WebArena / TheAgentCompany 的 Docker 自托管站点（Reddit / OwnCloud / RocketChat），并用 decoupled evaluation 以预置动作把 agent 直接放到注入点，从而把对抗鲁棒性与导航能力剥离。7 个 CUA、temperature 1、max_steps 10 下，loose 指令的平均 ASR 从 51.8%（gpt-5.1）到 90.5%（gemini-3.5-flash）；把指令写具体能降但不能消，每个模型降幅 14.9–29.7 点，最稳健的 gpt-5.1 在 specific 下仍执行 36.9%。平台难度排序为 Reddit 43.2% < OwnCloud 66.3% < RocketChat 69.5%——由于 decoupled evaluation 已排除可发现性，这个排序反映的是面对内容时的判断差异，作者把 RocketChat 最高归因于注入经 NPC1 多轮对话投递、利用了对权威对话者的社会信任。**三处证据边界必须一并读**：全文没有在同一设置下跑过高危害基线，因此这组数字只支持"这些注入很有效"，不支持"它们**因为低危害**才有效"；ASR 以"出现执行有害指令的意图"计成功、不要求完成，恰好抹掉了危害等级的分界，与 [[Papers/2504-WASP]] 区分 partial / full success 并据此得出 security-by-incompetence 的口径相反；注入模板固定以 `THIS IS IMPORTANT! THIS IS IMPORTANT!` 开头，隐蔽性完全落在目标而非文本上，而论文未测任何 detector——它证明的是 severity-calibrated 防御失效，不是 injection detection 失效，两者的部署含义差别很大。
+
+该论文对 human control 一节的直接冲击是 HITL 结论：4 模型 × 2 平台共 8 个组合，加上确认步骤后 ASR **全部**高于无 HITL，平均 +7.8 点，最极端的 gpt-5.1 on Reddit 从 21.2% 升到 42.4%；Query Rate 最高 75.8% 说明退化不发生在 agent 察觉环节，而发生在人这一侧，模拟用户对多数可疑操作回答 Yes。这把 6.11.1 表中 clarification/confirmation 一行的失败模式从"询问太多造成 interaction cost"推到"询问本身成为攻击者的背书渠道"，且与 [[Papers/2605-EnvTrustBench]] 的判断同向——permission confirmation 不能替代证据核验。但**这条方向性结论恰恰是全文选样最脆弱的一条**：model–platform 对由作者按"常规测试下攻击相对无效"挑出，从最低的格子重测本身就有回归均值的期望上移，排除它需要同一批格子的 no-HITL 重复测量，而全文没有任何重复实验、随机种子或置信区间，所有 ASR 均为温度 1 下的单点估计；Table 3 单元格粒度为 1/33，"gpt-5.1 翻倍"实为 7 次成功变 14 次。主实验中的用户是 LLM 扮演的新手 NPC2，真人只有 3 位且仅用于校准 Yes Rate（77.1% / 68.5% / 74.3%）。据此，本节把"确认门控可能是攻击放大器而非防线"记为**有指向性、可证伪、验证代价低的假设**，不记为已建立的结论；库内暂无独立验证。笔记 `verification_status: partial`，正文与自身表格存在三处算术冲突（modality 点差、Yes Rate 区间下界、一个不存在的模型名），本节一律采用表格数值。
+
+一个成本很低的后续实验已经就位：[[Papers/2510-FocusAgent]] 的相关性过滤把 banner injection ASR 从 32.4% 压到 0.9%、popup 从 90.4% 压到 1.0%，而 6.11.2 已注明它不覆盖伪装成 task-relevant content 的攻击——II-Bench 的 Download 类（在装包任务里装另一个包）正是这类攻击的现成实例，把两者接起来跑即可给出该边界的定量答案。同理，把 [[Papers/2504-WASP]] 的 partial/full 二分口径套到 II-Bench 上，可以直接检验 security-by-incompetence 在低危害目标上是否还成立：点 star、pip install 恰恰是执行难度最低的一类动作，那层"无能护城河"很可能在这里根本不存在。
 
 #### 6.11.2 运行时证据核验与分层防线
 
@@ -1057,6 +1071,8 @@ RLVR 将训练扩展性建立在可自动判定的 reward 上：输出可解析�
 UI-R1 代表局部结构化动作上的 rule-based RLVR：action type、coordinate 与 format 可以直接计算 reward，但该证据主要覆盖单步 action prediction，不能外推到任意长程任务。[[Papers/2500-UiR1EnhancingEfficient]] GUI-Libra 则给出反例条件：当多个动作都可能正确而 verifier 只认可示范动作时，step-wise RLVR 只有 partial verifiability，KL trust region 反而有助于限制错误负梯度。[[Papers/2602-GUILibra]]
 
 SCALECUA 展示了 algorithm–data–system co-design 的正面上限：VeriGen 生成 24K+ candidate tasks 并筛成近 3K RL tasks，Frontier Sampling 将 rollout 分配给通过率处于学习边界（frontier）的任务，Visual Context Segmentation 同时改善信号与吞吐。Qwen3.5-9B 在 OSWorld 达到 68.7%，训练加速 2.83 倍；移除 VeriGen 后降至 43.9%，说明 headline gain 的主要来源是 verified task supply，而非更换 policy-gradient 公式。160 条跨 domain 生成轨迹的人类审计中，task validity 在 OSWorld 与 ScienceBoard 分别只有 82.0% 和 58.3%，因此"judge 可执行"不能等同于"任务有效"。[[Papers/2607-SCALECUA]]
+
+[[Papers/2608-QwenCUA]] 在同一瓶颈判断下把三个量都推到了本综述覆盖文献中的最高一档，并独立复用了 frontier banding 这一筛选原则。其 rollout 集群建在接近 100,000 vCPUs 上、可支撑上万个并发环境；任务池约 40,000 条 verifiable task，分 environment interaction、simulated-user 与 long-horizon 三类，其中 long-horizon 用 phase-state chaining 组织——工作流拆成互相依赖的 phase，每个 phase 有可验证完成态，验证后该状态可序列化用于初始化下一 phase，从而使长链条既能增量生成与审计，又保留端到端 rollout。RL 任务的准入是对每个候选 query 跑 8 次 trial rollout、只保留 0 < 成功数 < 8 的任务，丢掉当前够不着的与已经饱和的；这与 SCALECUA 的 Frontier Sampling 是同一原则的两种实现（后者按通过率分配 rollout 预算，前者按通过率做二值准入），由不同团队在不同系统上独立采用，构成"learning frontier 是可操作筛选信号"的一次跨系统收敛。reward 由 evaluator 检查终态给出 [0,1]、支持 partial credit 且不要求匹配参考动作序列；optimizer 用 SAPO——同一 trajectory 的所有 active token 共享 group-relative advantage，token-level importance ratio 不做硬 clip 而经过一个以 on-policy 点为中心的平滑 logistic gate，温度按 advantage 符号取值（τ_pos = 1.0、τ_neg = 1.05，负 advantage 衰减更快）。训练侧的成本与收益窗口也少见地报全：512 张 H200（64 节点，训练与 rollout 各半）、1,000 次 update 约五天 ≈ 61,440 H200 GPU-hours，同时维持约 2,000 个活跃环境、利用率 75% 以上；held-out 分数从 0.734 升到 update 800 的峰值 0.770，跑满 1,000 步反而回落到 0.762，即在该配置下收益窗口有限并会越过拐点。必须一并记录的边界是：该报告没有任何组件级 ablation，因此它支持的是"verifiable task supply 与 environment throughput 可以推到这个量级并仍有端到端收益"，不支持把增益归给 SAPO 相对 GRPO/GSPO、或 frontier banding 相对随机采样中的任何一项。
 
 ### 7.10 Self-Training and Rejection Sampling
 
@@ -1293,10 +1309,11 @@ Safety evaluation 已从恶意 prompt 检测扩展到 environmental injection、
 | AgentCIBench [[Papers/2606-AgentCIBench]] | 无 adversary 的跨应用 contextual leakage | task completion 与 leakage 分开评分 | 正常使用分布仍受模拟环境限制 |
 | EnvTrustBench [[Papers/2605-EnvTrustBench]] | stale/误导环境 claim 未核实即驱动动作 | case-specific false-path oracle | 通用 software/CLI agent 压力测试，非 GUI 真实发生率 |
 | Vera-Bench [[Papers/2607-VeraSafetyTesting]] | 用户与工具通道攻击造成实际环境违规 | state-first、tool-second、response-last | coding/tool/MCP scope；verifier 本身仍需审计 |
+| II-Bench / HITLCUA [[Papers/2608-InvisibleInkThreats]] | 低危害但对攻击者有收益的注入目标；含模拟人类确认环节 | intent-level ASR（"出现执行有害指令的意图"即计成功，不要求完成），444 例 × 7 CUA，self-hosted OSWorld VM + Docker 站点 | 不计执行完成，测不出实际收益；无高危害基线对照，"因为低危害才通得过"未被实验分离；单点估计无重复实验；HITL 格子按"攻击相对无效"选出，回归均值未排除；无代码无数据 |
 
 source-verified 的 EnvTrustBench 在 55 个可机器判分 case、11 个压力场景、14 个 model-scaffold stack、共 3,850 次受控 run 中得到 83.3% aggregate EMR [[Papers/2605-EnvTrustBench]]。该协议没有可迁移的固定 GUI step budget，且论文明确测的是刻意注入误导证据后的 susceptibility；这个数字不能解释成现实部署中 83.3% 的普通行动会失误。
 
-Safety benchmark 应至少分开报告 attack success、executed violation、benign utility、false positive intervention、side-effect severity 与 rollback success。把它们压成单一 safety score 会奖励过度拒绝，也会掩盖"任务完成但越权"的失败。
+Safety benchmark 应至少分开报告 attack success、executed violation、benign utility、false positive intervention、side-effect severity 与 rollback success。把它们压成单一 safety score 会奖励过度拒绝，也会掩盖"任务完成但越权"的失败。[[Papers/2608-InvisibleInkThreats]] 是这条要求被违反的具体代价：它只报 intent-level ASR，理由是避免模型能力不足造成"未检出失败"，但代价是一篇以"攻击者收益可观且持久"立论的论文无法回答那些 star、安装与外泄里究竟有多少真的发生——危害等级的分界恰好被这个口径抹掉，且 intent 的裁决方式（人工还是 LLM judge）正文未交代。
 
 ### 8.10 Efficiency and Cost
 
@@ -1900,6 +1917,20 @@ GUI/Computer-Use Agent 研究经历了五次可辨认的抽象升级——结构
 | 2026-07-23 gap-fill 补录 14 篇（RL survey / Digi-Q / Jedi / AndroidControl / OSWorld-MCP / MCPWorld 等） | 库内暂无独立验证 | §1.4/§4.7/§5/§7/§8 各子节 | 单 agent digest、verification_status: unverified，仅作子节 enrichment，未升格为 Takeaway/共识 |
 
 ## 调研日志
+
+### 2026-08-04 survey-refresh（并入 1 篇，196 → 197）
+
+- [[Papers/2608-InvisibleInkThreats]]（reliability-safety-HCI / cross-platform（OSWorld desktop VM + 自托管 Web 站点）/ app workflow 且含交互确认环节 / self-hosted / verifier 未交代（intent-level ASR，人工还是 LLM judge 正文未说明）/ direct end-to-end 但缺关键对照）：§6.11.1 主并入——风险面表新增 Low-severity goal injection 一行，clarification/confirmation 一行的未覆盖边界从"频繁询问造成 interaction cost"扩写为"确认被当作背书渠道"，正文补三段：其一说明它换掉的是隐蔽性的定义（从"注入文本多难被发现"改为"注入目标的危害低到不值得拒绝"），因而结构性地击穿按危害校准的三层部署防御，并绑定 444 例 / 7 CUA / loose 平均 ASR 51.8%–90.5% / specific 下 gpt-5.1 仍 36.9% / 平台排序 43.2%<66.3%<69.5% 与 decoupled evaluation 的设定；其二处理 HITL 一节；其三写明两个已就位的低成本后续实验（FocusAgent 接 II-Bench Download 类、WASP 的 partial/full 口径套 II-Bench）。
+- cross-link 一处。§8.9 benchmark 表新增一行（threat model / verifier evidence / 解释边界三列），并在"safety benchmark 应分开报告 attack success 与 executed violation"一段后补一句具体代价：只报 intent-level ASR 使这篇以"攻击者收益可观且持久"立论的论文测不出收益。
+- **本轮明确未做的升格**：HITL 下 8/8 组合 ASR 全升（平均 +7.8 点，gpt-5.1 on Reddit 21.2%→42.4%）是全文最有信息量的方向性结论，但 model–platform 对由作者按"常规测试下攻击相对无效"挑出、无任何重复实验或置信区间、Table 3 粒度为 1/33（"翻倍"实为 7→14 次）、主实验用户为 LLM 扮演的新手 NPC2（真人仅 3 位用于校准 Yes Rate）。正文记为可证伪、验证代价低的**假设**并标"库内暂无独立验证"，未写入 Key Takeaways / Open Problems / Key Evidence Matrix。
+- 填补而非推翻：本轮填上的是 §6.11.1 表内原已记录的 goal-aligned injection 未覆盖边界，[[Papers/2504-WASP]]、[[Papers/2409-EIA]]、[[Papers/2510-FocusAgent]]、[[Papers/2605-EnvTrustBench]] 的原有结论一律保留。笔记 `verification_status: partial`，其 C8（modality 点差）与 C12（Yes Rate 区间下界）为 contradicted，本轮一律采用表格数值、不引用正文的 8.1/18.0/8.8 与 73.5%–83.3%。无结构性重构，未新增或重画配图。
+
+### 2026-08-03 survey-refresh（并入 1 篇，195 → 196）
+
+- [[Papers/2608-QwenCUA]]（model-architecture / cross-platform（desktop 为主）/ cross-app long-horizon / self-hosted / programmatic 为主）：§6.3 主并入——表内新增一行，正文补两段：其一把该模型定位为 native 谱系"纯 native"一端的最极端点（方向与 UI-TARS-2、Qwen-UI-Agent 的 hybrid 扩展相反），并说明块状折叠的真实杠杆是同一 fold operator 复用于训练期 trajectory slicing、使训推折叠表示一致，与 §6.9 的 context-as-action 路线构成确定性 vs 学习式的对照面；其二把三条证据边界与数字绑定（推理模式不对等、零组件级 ablation、八项中仅两项居首且 token 效率只在 OSWorld-Verified 成立）。
+- cross-link 两处。§7.9 RLVR：补规模与成本的最完整一份记录（近 10 万 vCPU、约 4 万 verifiable task、phase-state chaining 的长程任务生成、SAPO 的软 logistic gate、512×H200 跑 1,000 update ≈ 61,440 GPU-hours、held-out 在 update 800 见顶 0.770 后回落 0.762），并指出其"8 次 trial rollout 只保留 0<c(q)<8"与 SCALECUA 的 Frontier Sampling 是同一原则的两种实现，属跨团队独立收敛；同时写明零 ablation 使增益不可归给 SAPO 或 frontier banding 中任一项。§4.8 Hybrid Action Routing：补上方向相反的数据点——既有四方收敛测的是**移除**通道的代价，该文测的是给未训练过路由的 screenshot-only policy **增加** CLI 的代价（turn 数 −23% 而 perfect-task rate 同步下降，更强的模型损失更小），两者不冲突，但把"谁来路由"从设计选择变成可测量的能力缺口。
+- 未改 Key Takeaways、Open Problems 与 Key Evidence Matrix：本轮结论均落在 §6.3 / §7.9 / §4.8 子节内，未进入 Overview / §10 / §11，普通增量不新增矩阵行。无结构性重构，未新增或重画配图（§6 配图为范式级示意，§4.8 配图的 caption 已明确限定为移除式通道消融，两者均未因本轮并入而失效）。
+- **本轮刻意未并入的一条**：MacAgentBench clock 域 12/12 判 0.0% 而作者怀疑 evaluator 故障（选择保留官方分不修正），与 [[Papers/2607-MisScoreCUA]] 的 10.7% evaluator false negative 同向且来自完全独立团队与 benchmark。它只是单 domain 的定性观察、不构成第二次量化，而 §8.12 今日刚完成方向性重构，故按每篇最多 1-2 处 cross-link 的纪律留待后续有第二个定量样本时一并处理。
 
 ### 2026-08-03 survey-refresh（并入 2 篇，193 → 195）
 

@@ -1,9 +1,9 @@
 ---
 title: VLM Survey
 tags: [survey, VLM, multimodal, vision-language-model, visual-reasoning]
-date_updated: "2026-08-02"
+date_updated: "2026-08-04"
 year_range: 2023-2026
-papers_analyzed: 41
+papers_analyzed: 43
 keywords: [vlm, vision language model, multimodal llm, visual reasoning]
 domain_map: VLM
 ---
@@ -149,17 +149,30 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 ### 2.8 机制分析：视觉信息"在"但"读不出"
 
-**代表论文**：[[2607-VisualAccessBoundary]]、[[2606-Act2Answer]]、[[2607-GUIStateBelief]]、[[2607-EvoGUI]]
+**代表论文**：[[2607-VisualAccessBoundary]]、[[2606-Act2Answer]]、[[2607-GUIStateBelief]]、[[2607-EvoGUI]]、[[2605-TokenSwap]]、[[2607-MentalWorldModeling]]
 
-**核心结论**：多篇在不同域用因果干预/行为级协议独立发现同一 pattern——信息在 hidden states 里（线性 probe 可恢复）但模型行为上读不出，VLM 的瓶颈从"表征缺失"转向"读出通路"。GUI 域进一步给出跨模态与时序两个变体：结构文本与像素冲突时模型偏信过期结构（[[2607-GUIStateBelief]]），以及状态转移/时序理解不随模型规模或 GUI 专门化提升（[[2607-EvoGUI]]）。
+**核心结论**：多篇在不同域用因果干预/行为级协议独立发现同一 pattern——信息在 hidden states 里（线性 probe 可恢复）但模型行为上读不出，VLM 的瓶颈从"表征缺失"转向"读出通路"。GUI 域进一步给出跨模态与时序两个变体：结构文本与像素冲突时模型偏信过期结构（[[2607-GUIStateBelief]]），以及状态转移/时序理解不随模型规模或 GUI 专门化提升（[[2607-EvoGUI]]）。2026H2 又补上黑箱侧的规模化读数：同一题目只改变信息的承载模态，42 个 MLLM 无一例外掉分（[[2605-TokenSwap]]）；而强制显式状态化的 pipeline 能把直接作答时的媒体惩罚抹平（[[2607-MentalWorldModeling]]）。这几类证据指向同一处，但强度递减——因果干预（VAS / Act2Answer）> 同题单变量配对（GUIStateBelief / TokenSwap）> 端到端阶梯对照（Mentis），后两类只测出了差距的存在与大小，没有把成因分解到读出通路。
 
 **关键发现**：
 - **Visual Access Boundary**：硬屏蔽 generated token→image token attention 的 2D 扫描（layer × time）显示，CoT 生成长度拉长约 50 倍但所需视觉访问边界与 Direct answering 相差 ≤2 层——CoT 增益来自对已写入 hidden states 的视觉信息做更长语言计算，而非持续"回看"图像；CoT 增益上限受 perceptual readout 制约，难属性存在 probe-vs-decode gap（probe 高精度、decode 显著更差）（[[2607-VisualAccessBoundary]]）
 - **Act2Answer**：把知识题改造成"用动作作答"的 VLA 评测协议以剥离低层控制混淆；robotics 微调让语义类知识相比源 VLM 掉 20-40 分，layerwise probing 显示知识在中层仍可解码、到 action head 附近衰减至近随机；VQA co-training 有显著保护作用（Magma retention 86.7% vs π₀ 36.2%）（[[2606-Act2Answer]]）
 - **GUIStateBelief（跨模态变体）**：735 组 Web/Mobile/Desktop paired probe——image-only 读取接近饱和时，模型在 pixel↔structure 冲突下仍跟随 stale structure（真实网页结构跟随率最高 0.88），首步注错的 MiniWoB++ episode 自恢复 ≤0.03，training-free consistency gate 才同时降 hijack 与 task error；证据"在"（像素可读）却不被采信，是 readout gap 的 modality-trust 版本（[[2607-GUIStateBelief]]）
 - **EvoGUI（时序变体）**：3,000 个 state-transition diagnostic VQA（temporal ordering / inverse action / one-step successor，120 domains），最强模型仅 60.4，且 model scale 与 GUI specialization 均非稳定预测因子——VLM 的状态动态理解是端到端分数掩盖的独立缺口（[[2607-EvoGUI]]）
+- **TokenSwap（黑箱侧的规模化测量）**：把 MMLU 题干中的名词概念整体替换为对应图片（1,516 题 / 6,946 次替换 / 平均每题 4.58 处），同题同内容只改承载模态，42 个 MLLM **全部**落在 $y=x$ 之下，gap 4.2%–47.4%、均值 19.6% ± 3.3%。三条常见"止血"手段都不成立：CoT 在 Qwen3-VL-4B-Instruct 上把 gap 反而拉大约 3.2%（8B 上才收窄），方向依模型而定；堆算力收敛极慢（绝对 gap 对 FLOPs 的 $R^2$ 仅 0.253，10× FLOPs 只换来 2.8%）；与 SEAM 重叠的 8 个模型上，text 分相关 $r=0.811$、image 分相关 $r=0.914$，但 modality gap 本身 $r=-0.028$——**gap 不是既有单模态分数的线性组合，必须独立测量**。训练侧给出同样反直觉的一条：Magpie-Pro 116,722 样本、Qwen2-VL-7B 基座的配对设计里，纯文本训练把 gap 从未训练的 0.232 推高到 0.268，交错训练才降到 0.167，且 GQA/TextVQA/MME 基本不动（[[2605-TokenSwap]]）
+- **MentalWorldModeling（显式状态化能关掉媒体惩罚，代价是对通道退化更敏感）**：448 条记录（320 文本 / 100 图像 / 28 有声视频）、六选一后继状态预测。直接作答（S1）存在明显的媒体惩罚——文本 70.8 / 图像 67.0 / 有声视频 64.8；把中间态显式写出来之后（S5）三档收敛到 87.6 / 87.2 / 87.3，S6 为 90.5 / 91.2 / 90.9，惩罚被抹平。但通道干预下出现反向不对称：image→caption、drop audio、audio-only 三类干预的 16 个单元全部掉分，且**结构越重掉得越多**——image→caption 在 S6 掉 6.4 分而 S1 只掉 2.8，drop audio S6 −6.1 vs S1 −2.7。这与 TokenSwap 不可直接对比（前者是不同来源模态的场景差异，后者是同一内容改换承载模态，"gap"的定义不同），但两条读数并置给出一个便宜的实验：在 TokenSwap-Bench 上跑一个强制显式状态化的 pipeline，看那 19.6% 是否同样被压平（[[2607-MentalWorldModeling]]，primary home 为 [[Topics/WorldModel-Survey]]）
 
-**含义**：对"拉长推理链提升 multimodal reasoning"和"扩数据防遗忘"两类流行方案都是警示——前者不扩张视觉访问、后者丢的不是知识而是读出。**适用边界**：VAS 的任务限于"一眼看完再算"型，visual search / 多步 grounding 上结论可能翻转；Act2Answer 的二选一格式分辨率有限。
+**必须打折的地方**：
+
+| 问题 | 证据 |
+|:--|:--|
+| gap 的成因未被分解 | TokenSwap 从未要求被测模型先说出替换图里是什么，因此在 gap 35%–47% 的弱模型上，"跨模态语义不变性失败"与"根本没认出这张图"无法分离；附录 B.4 中 gap 随替换图数量从 14.0%（1 张）单调升到 24.9%（7 张），正是视觉负载 confound 会预测的形状 |
+| 推理/非推理对比非配对 | reasoning 组 10.1% ± 2.2% vs non-reasoning 组 25.5% ± 3.7%（Welch's $t=-7.48$）是**跨模型**分组，不是同一基座开关 thinking 的配对对照，混入了模型代差 |
+| 构造流水线的家族偏差未排除 | TokenSwap-Bench 的三道过滤器（有效性 / 重要性 / caption 回译）全部以 Gemini-2.0-Flash 为代理，对 Gemini 家族的结构性选择偏差没有做交叉验证；笔记 `verification_status: partial`，其 §4.4 关于 Qwen3-VL-8B-Thinking 的 gap 数值与 Table 2 自相矛盾，本节未采用该数字 |
+| 交错训练的收益不跨域 | OCR 域内交错训练把 IIIT 5K-Word 从 0.9003 提到 0.9270，但 OCR 训练出的模型在自然图像交错任务上反而低于未训练基线（0.4393 < 0.4466）——"补交错数据"目前只是域内修复 |
+| 只报终局指标 | Mentis 全文只报 final-action F1；§6.2 与附录 G 定义的 mental fidelity、perspective-leakage rate、process-outcome divergence 以及 McNemar / Wilson 检验在任何地方都没有数值，因此"结构化把媒体惩罚抹平"只被证到答案层 |
+| 评测与被测系统同源 | Menti-Bench 的 gold 后继状态按 MWM taxonomy 标注、oracle 注入的正是 Mentis 自己的 schema、gold action 由同一批作者裁定；且 S6 约 20× S1 的调用量没有等预算对照（超过 SC@6） |
+
+**含义**：对"拉长推理链提升 multimodal reasoning"和"扩数据防遗忘"两类流行方案都是警示——前者不扩张视觉访问、后者丢的不是知识而是读出。[[2605-TokenSwap]] 把第三类方案也送进警示名单：等模型再大一点（10× FLOPs 换 2.8%）与加 CoT（方向依基座而定）都不是这条通路上的解；同时它顺手给出一条便宜的仪器化路线——任意纯文本 benchmark 都能机械转成跨模态一致性诊断，且该指标与现有单模态分数近乎正交，值得作为独立报告轴。**适用边界**：VAS 的任务限于"一眼看完再算"型，visual search / 多步 grounding 上结论可能翻转；Act2Answer 的二选一格式分辨率有限；TokenSwap 的替换图来自检索与生成两条来源（376 个配对样本上生成图交错准确率高 4.6%，但模型排序不变），其绝对 gap 值随图源可动，跨论文引用时应比较排序而非绝对值。
 
 ### 2.9 Agentic visual reasoning 的工具忠实性与自适应性
 
@@ -227,6 +240,8 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 | **CMGUI-Bench** | 中文 Mobile GUI Navigation | 390 episodes / 2,574 steps | Step/Task Acc | SecAgent-3B 96.4/80.0 | 多合法 action 标注，减 false negative |
 | **State-Belief Probes** | 跨模态证据冲突诊断 / GUI | 735 paired probes | stale-structure follow rate | 结构跟随率最高 0.88 | pixel/structure 单变量干预 + live episode |
 | **EvoGUI** | GUI 状态转移诊断 VQA | 3,000 / 120 domains | ACC | best 60.4 | trajectory-derived offline probe |
+| **TokenSwap-Bench** | 跨模态一致性诊断（同题只换承载模态） | 1,516 题 / 6,946 次替换 | Modality Gap（纯文本 acc − 交错 acc） | 最小 gap Gemini-3-Flash 4.2%（42 模型均值 19.6%） | 可由任意纯文本 benchmark 机械转换；与单模态分数近乎正交（$r=-0.028$）；未含"能否认出替换图"的对照 |
+| **Menti-Bench** | 心理状态世界建模（文本 / 图像 / 有声视频） | 448 records / 2,688 gold 后继状态 | final-action F1（6 选 1） | Mentis-S6 87.9（human 98.5） | 六级必要性阶梯 + oracle 级联；仅报终局 F1，过程级指标定义了但无数值 |
 
 **Benchmark 演进趋势**：
 - 从自然图像问答（VQAv2）到文本密集场景（TextVQA、DocVQA）
@@ -235,6 +250,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - 从理解任务到理解+生成统一评测（FactIP、SearchGen-Bench）
 - 从覆盖式 leaderboard 到受控诊断仪器：[[2607-SynthDocBench]] 独立控制文档长度/页深/layout/模态因子，把失败归因到具体因子（长度衰减、中段位置盲区、长文档 chart 崩溃）
 - 从单帧安全评测到 trajectory-conditioned 评测：[[2601-GUIGuardBench]] 把 privacy 定义为任务上下文属性（task necessity），而非静态敏感类别识别
+- 从"新建 benchmark"到"机械改造既有 benchmark"：[[2605-TokenSwap]] 用概念级图文替换把任意纯文本考题转成跨模态一致性诊断，成本低于从头标注，且产出的指标与既有单模态排行榜近乎正交——但改造流水线本身依赖某个 MLLM 做过滤，家族偏差需另行对照
 
 ---
 
@@ -254,7 +270,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 7. **多模态 RL 后训练成为新前沿，reward 转向复用 MLLM 自身能力**：[[2607-BRAID]] 让 policy gradient 第一次贯穿文本 token 与图像去噪路径；[[2607-SpectraReward]] 证明 frozen MLLM 的 prompt likelihood 一次 forward pass 即可做 T2I reward，且 reward-policy 分布对齐比 reward model 规模更重要（自打分超 235B 外部 reward）——该发现对整个 RLHF/RLAIF 都有参考价值。理解侧 [[2606-VisPlay]] 把 reward 推到零外部依赖（自身 majority-voting 伪标签 + 不确定性课程），但伪标签质量逐代下滑（72.0→61.0）表明纯自我共识的监督会自噬——免标注 reward 尚无同时摆脱"闭源裁判"与"自我偏差"的方案。
 
-8. **"Decodable ≠ used"是跨域收敛的机制发现**：[[2607-VisualAccessBoundary]] 的 probe-vs-decode gap 与 [[2606-Act2Answer]] 的"中层可解码、action head 近随机"互为印证——VLM 的瓶颈从表征缺失转向读出通路。CoT 增益来自更长的语言计算而非持续回看图像，上限受 perceptual readout 制约。
+8. **"Decodable ≠ used"是跨域收敛的机制发现**：[[2607-VisualAccessBoundary]] 的 probe-vs-decode gap 与 [[2606-Act2Answer]] 的"中层可解码、action head 近随机"互为印证——VLM 的瓶颈从表征缺失转向读出通路。CoT 增益来自更长的语言计算而非持续回看图像，上限受 perceptual readout 制约。黑箱侧的规模化读数与之同向：同一题目只改承载模态，42 个 MLLM 全部掉分、均值 19.6%，且该 gap 与模型的纯文本分、纯图像分几乎不相关（$r=-0.028$），因而是一条必须独立报告的轴而非现有指标的副产品（[[2605-TokenSwap]]）。但这层证据只测出差距，未分解成因——它没有排除"弱模型压根没认出替换图"，因此不能反过来当作读出通路假说的确证。
 
 9. **GUI grounding 与端到端 agent 能力显著解耦**：[[2509-ScaleCUA]] grounding 开源 SOTA 但 OSWorld 仅 17.7%（落后 RL 系近一倍）；分辨率与数据配比对两种能力的影响方向相反——"grounding 强则 agent 强"的隐含假设不成立，data scaling（SFT）与 RL 是互补而非替代关系。
 
@@ -300,13 +316,15 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 13. **工具忠实性缺 answer-level 干预检验**：§2.9 两篇诊断问题时用的是干预式证据（移除 process image 后预测几乎不变），验证自身修复时却退回 judge 打分的比例指标，因此"faithful tool use"目前只被证到裁得准、未被证到答案真的依赖它。可直接借用的范式已在库内——[[2606-VisualFLIP]] 的 same-question paired perturbation 让 gold answer 确定性翻转，用 Pair Accuracy / Collapse Rate 度量证据依赖；把它套到被判 helpful 的裁图上（扰动该图看答案是否更新）就是缺失的决定性实验。同一层问题还有"等推理预算"这一侧：[[Papers/2607-FaithEyes]] 的 Table 1 显示纯推理期插一个外部判词就能让 Thyme 从 82.7 涨到 85.8，而多出的 subagent forward 从未被计入任何开销表。
 
+14. **Modality gap 的成因分解缺 recognition 对照**：[[2605-TokenSwap]] 把"同一内容改换承载模态就掉分"做成了 42 模型的普适读数，但整套协议从未要求被测模型先说出替换图里是什么。对 gap 只有 4%–8% 的头部模型这不影响结论，对 gap 35%–47% 的模型则彻底混淆了两种完全不同的失败——认不出图（感知）与认出了但用不进推理（读出）。补这个对照的成本极低：同一批替换图上加一道 identification probe，按识别正确的子集重算 gap 即可，且这道 probe 顺带能检验附录 B.4 里"gap 随替换图数量 14.0%→24.9% 单调上升"究竟是跨模态整合负担还是纯视觉负载。同样待补的是配对化的推理/非推理对照（现有 10.1% vs 25.5% 是跨模型分组，混入代差）与非 Gemini 过滤器下的 benchmark 重建。相邻的一条线索来自 [[2607-MentalWorldModeling]]：强制显式状态化能把它自己场景里的媒体惩罚（70.8 / 67.0 / 64.8）抹平到 87 一线，但这套 pipeline 在通道退化下比直接作答更脆（image→caption S6 −6.4 vs S1 −2.8）——"用结构化中间态绕开 modality gap"是否只是把脆弱性挪了个位置，需要在同一 benchmark 上跑才知道。
+
 ### 5.4 研究方向建议
 
 - **Resolution-First 原则**：在追求复杂推理能力之前，优先确保高分辨率视觉编码的基础能力。
 - **Unified-First 原则**：在设计 VLM 时，优先考虑理解+生成的统一架构，而非分离模块拼接。
 - **Alignment-First 原则**：在追求性能提升之前，优先完成 human preference alignment，确保安全性和可控性。
 - **Efficiency-First 原则**：在部署场景中，优先考虑 inference-time efficiency optimization（KV cache、layer scaling），而非重新训练。
-- **Readout-First 原则**：诊断 VLM 能力失败时，先区分"表征缺失"与"读出失败"（linear probe vs 行为对照），再决定补数据还是修读出通路（[[2607-VisualAccessBoundary]]、[[2606-Act2Answer]]）。
+- **Readout-First 原则**：诊断 VLM 能力失败时，先区分"表征缺失"与"读出失败"（linear probe vs 行为对照），再决定补数据还是修读出通路（[[2607-VisualAccessBoundary]]、[[2606-Act2Answer]]）。黑箱条件下的最低成本代用手段是同题换模态配对（[[2605-TokenSwap]]），但必须同时跑一道"能否认出这张图"的识别对照，否则感知失败与读出失败会被合并计入同一个数字。
 
 ---
 
@@ -355,6 +373,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 **机制分析**：
 - [[2607-VisualAccessBoundary]] - Visual Access Sweep: CoT 视觉访问边界的因果干预
 - [[2606-Act2Answer]] - Act2Answer: VLA 知识保留的行为级评测协议
+- [[2605-TokenSwap]] - TokenSwap: 概念级图文替换度量 modality gap，42 模型全部为正 + 交错训练修复
 
 ### 6.2 应用与评测论文
 
@@ -366,6 +385,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - [[2500-EvaluatingOpenSourceVision]] - Evaluating Open-Source VLMs for Multimodal Sarcasm Detection
 - [[2607-SynthDocBench]] - SynthDocBench: 长文档视觉理解的受控诊断 benchmark
 - [[2601-GUIGuardBench]] - GUIGuard-Bench: Trajectory-conditioned GUI privacy 评测
+- [[2607-MentalWorldModeling]] - Menti-Bench / Mentis: 心理状态世界建模的六级必要性阶梯与跨媒体通道干预
 
 **VLM for GUI Agent**：
 - [[2506-ShowuiOneVisionLanguage]] - ShowUI: Vision-Language-Action model for GUI
@@ -426,4 +446,13 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - 跳过：无
 - 结构变化：新增 §2.9「Agentic visual reasoning 的工具忠实性与自适应性」（两篇独立工作形成新 pattern：aggregate accuracy 掩盖调用模式退化与工具净效应近零，且该主题是 §2.8 "decodable ≠ used" 在工具层的同构变体）；§2.5 新增"视觉塔初始化"跨论文 pattern 段（encoder-free 与 contrastive-init-free 两条路线同时质疑 CLIP/SigLIP-init 默认前提，但均缺同规模对照）；Key Takeaways +2（11、12）；Open Problem 8 追加自判自奖闭环的漂移监测缺口、新增 Open Problem 13（answer-level 干预检验与等预算对照）
 - domain_map: 更新 [[DomainMaps/VLM]] 近期格局变化（开放基座推进到 3T-class native multimodal；工具使用的忠实性/自适应性成为独立评价轴）
+- **status**: success
+
+### 2026-08-04 增量更新（survey-refresh）
+- 并入 2 篇（均入 §2.8）：[[2605-TokenSwap]]（同题换承载模态的 42 模型规模化 gap 测量 + 配对交错训练；`verification_status: partial`，仅采用 source-verified 行，其 §4.4 与 Table 2 自相矛盾的 Qwen3-VL-8B-Thinking gap 数值标 contradicted、未采用）、[[2607-MentalWorldModeling]]（媒体惩罚随显式状态化关闭、通道干预下结构越重越脆；primary home 为 [[Topics/WorldModel-Survey]]，本 survey 只取其可测的多模态读数）
+- 跳过：无
+- 结构变化：未新增小节。§2.8 代表论文 +2、关键发现 +2 bullet，并新增一张「必须打折的地方」表（6 行）与证据强度分级（因果干预 > 同题单变量配对 > 端到端阶梯对照）；benchmark 表 +2 行、演进趋势 +1 条；Takeaway 8 增量修订（补黑箱侧读数并明确它不构成读出通路假说的确证）；新增 Open Problem 14（modality gap 成因分解缺 recognition 对照）；§5.4 Readout-First 原则补黑箱代用手段与其必要对照
+- 未推翻既有结论：§2.8 原有四篇的表述全部保留；本轮改的是该节的证据分层与适用边界，不是结论方向
+- 验证边界：TokenSwap 的 gap 数字未与"模型能否认出替换图"分离，弱模型上感知失败与读出失败无法拆开——正文与 Open Problem 14 均已写明，未把它表述为读出通路的独立验证；Mentis 全文只报 final-action F1，其过程级指标（mental fidelity / perspective-leakage / process-outcome divergence）在原文有定义无数值，未据其写任何过程层结论
+- domain_map: 更新 [[DomainMaps/VLM]] 近期格局变化（跨模态一致性成为与单模态分数正交的独立评测轴）
 - **status**: success

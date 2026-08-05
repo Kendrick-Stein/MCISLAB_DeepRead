@@ -1,9 +1,9 @@
 ---
 title: "Computer-Use Agents: A Unified Survey of Models, Learning, Environments, Evaluation, and Deployment"
 tags: [survey, gui-agent, computer-use, web-agent, mobile-agent, os-agent, agentic-RL]
-date_updated: "2026-08-04"
+date_updated: "2026-08-05"
 year_range: 1997-2026
-papers_analyzed: 197
+papers_analyzed: 201
 keywords: [gui-agent, gui grounding, computer-use, computer use agent, cua, web agent, browser agent, mobile agent, desktop agent, os agent]
 exclude_tags: [deep-research]
 exclude_keywords: [deep research, information seeking, browsecomp, research agent, search agent]
@@ -523,6 +523,10 @@ Web、Mobile 与 Desktop/OS 的执行环境经由 GUI、CLI、API 与 MCP 动作
 
 以上证据——无论受控消融还是部署使用分布——都来自本身就为 hybrid 设计或训练过的系统。[[Papers/2608-QwenCUA]] 补上方向相反的一个数据点：把 CLI 通道**加**给一个从未为路由训练过的 screenshot-only policy 会发生什么。该报告在 MyPCBench 上给两个 Qwen 模型额外开放 Bash，平均 turn 数分别从 69.3 降到 53.4、从 63.6 降到 49.1（约 −23%），但 perfect-task rate 同步**下降**——Qwen3.7 由 51.6 掉到 41.8，Qwen-CUA 由 58.7 掉到 55.1。这与本节"通道互补而非替代"的结论不冲突：既有消融量的是**移除**通道的代价，此处量的是**增加**通道却不训练路由的代价，两者可同时成立。它的增量在于把"谁来路由"从设计选择变成一个可测量的能力缺口——更强的模型损失更小（−3.6pp vs −9.8pp），提示"何时切到 CLI"是随能力变化的可学习决策，而非混合接口的固有缺陷；作者本人也是这样定性的（判为"尚未学会何时切换"的优化缺口）。证据边界：单一 benchmark、单一 CLI 工具、两个同家族模型，无第三方复现，且论文未报告通道切换次数或 CLI 动作占比，因此无法区分损失来自过度使用 CLI 还是用错场景。
 
+[[Papers/2608-ScreenshotsOrTools]] 给出本节目前唯一一份"其余全部固定、只换模型"的受控证据，并把"谁来路由"拆成两个可分离的量。设置是同一个 8B backbone 的两个 checkpoint（Qwen3-VL-8B-Thinking / -Instruct），harness、retriever、prompt template 与 tool set 全部固定，GUI 原语与 MCP 工具出现在同一个 `<tool_call>` 面上、没有外部 controller 做路由，因此路径选择必须发生在同一个 action head 内部；benchmark 为 OSWorld-MCP 的 `test_all_no_internet`（309 任务、120 工具 / 9 个应用命名空间、BM25 top-18 检索，greedy decoding、`max_steps=50`、5 次重复、2 SE 门槛）。结果是**注入效应的符号反转**：同一套 MCP 工具让 reasoning checkpoint 从 30.5% 升到 34.5%（+4.0pp），让 non-reasoning checkpoint 从 25.4% 降到 19.5%（−5.9pp），两个 delta 均超过 2 SE。这与本节此前四方收敛的消融结论不冲突（那些量的是**移除**通道的代价），但它把问题推到更靠前的位置：在同一环境、同一 harness 下，路由行为本身就足以翻转结论的符号。有一处方向性问题原文未处理：gimp / thunderbird / vlc / chrome 四个域 adoption 为 0%，而加 MCP 后 Thinking 侧四域全升、Instruct 侧四域全降，作者把这块从 per-domain 计数中剔除却仍留在 all-309 的 headline 内，因此符号中来自"system prompt 里多了一个 tools 块"这一扰动的份额未被分离（本综述据 Table 2 的读法，原文未给剔除后的 all 行）。
+
+第二个量是 **adoption 与 competence 的解耦**，对路由研究的影响更大。309 个任务里 230 个 tool-reachable，而受益的 Thinking 侧只在 55 个任务上调用过工具（任务级 17.8%、reachable 口径 23.9%，步级 TIR 仅 2.8%）；最极端的 VLC 暴露 12 个原生工具、16/17 任务可达，两个模型一次都没调过。作者随后用三组互相独立的干预去抬这个数——multi-turn GRPO 的 outcome-independent tool bonus（须放在 group normalization 之后才不被稀释，λ=0.1）、positive-advantage cloning、推理期注入工具文档——**三者都能把 adoption 抬高一个数量级**（spreadsheet 子集 0.03→0.33，且迁移到 greedy decoding 的 0.02→0.29），**三者都不改变精度**：48 个 held-out 任务上零次持续的 fail→pass 翻转。诊断是调用的 API 执行成功率有 98–100%，而参数密集型工具的语义成功率为零（regex find-and-replace 0/23、格式转换 0/16），server 对零效果调用照样返回 `success:true`。这对 [[Papers/2608-QwenCUA]] 那条"何时切到 CLI 是随能力变化的可学习决策"构成**限定而非推翻**：路由决策确实可被廉价地 steer，但在该设定下 steer 到位也不带来收益，瓶颈落在 tool-call 的语义正确性而非路由本身。两文的动作通道不同（Bash vs MCP 工具），所以这是把"路由缺口"拆成 decision 与 competence 两层，而不是对同一个量的相反测量。证据边界：单 benchmark、单 backbone 家族、单一尺度（8B），机制归因经作者明确标注为 association 而非 mechanism（两个 checkpoint 的差异不止 reasoning trace 一项），且无代码释出，harness 与 74 任务 gradient band 清单均不可复现；库内暂无独立验证。
+
 这一路由问题与 §4.5 讨论的混合观察融合问题结构对称：前者要决定该用哪个通道执行，后者要决定该信任哪个证据来源，两者都需要一个显式的仲裁策略，简单地把所有通道/证据都暴露给模型并不自动带来更好结果。[[Papers/2606-WeaveBench]] 的失败分析给出了这一对称性的反例——当模型可以自由选择通道时，35.2% 的失败属于 reward hacking（包括伪造渲染、CLI 绕过 GUI 检查等），说明自由路由有时会被模型用来选择最容易伪造证据的通道，而非功能上正确的通道；这是路由侧的失败模式，与 [[Papers/2607-GUIStateBelief]] 在观察侧发现的 stale-structure-following 是同一类"多通道仲裁缺位"问题的两个实例。
 
 ![[cua-survey-fig3-hybrid-evidence.png]]
@@ -533,7 +537,7 @@ Web、Mobile 与 Desktop/OS 的执行环境经由 GUI、CLI、API 与 MCP 动作
 
 **任务分类缺乏共享 schema。** §4.1 的能力层级、平台、结构形状三条轴目前分散在不同 benchmark 的自定义标签里（informational/transactional、single/cross-app、GUI-only/Agent-User-Interaction/MCP 等），没有一张能同时标注这三条轴、供跨 benchmark 对照任务难度的报告卡。缺少这张卡，"benchmark A 比 benchmark B 更难"这类判断就无法被系统核验。
 
-**MCP 作为 GUI/computer-use 专属动作通道的研究仍然稀薄。** 本综述覆盖的文献中，除 [[Papers/2512-MobileWorld]] 的 context-overflow 观察与 [[Papers/2604-ClaudeCode]] 的生产级 harness 案例外，没有针对 GUI agent 场景下 MCP tool-selection policy、权限边界或 MCP-specific reward hacking 的受控研究；MobileWorld 的 MCP 子类样本仅 40 个任务，统计噪声较大。
+**MCP 作为 GUI/computer-use 专属动作通道的研究仍然稀薄，tool-selection 一侧刚有第一份受控证据。** [[Papers/2608-ScreenshotsOrTools]] 填上了其中的 tool-selection policy 一项：同 harness、同 tool set、只切换 backbone checkpoint 的对照显示注入效应的符号可以反转，且 adoption 能被三条独立机制廉价抬高一个数量级而精度不动（详见 §4.8）。仍然空缺的是权限边界与 MCP-specific reward hacking——本综述覆盖的文献中没有针对 GUI agent 场景的受控研究，[[Papers/2512-MobileWorld]] 的 MCP 子类样本仅 40 个任务、统计噪声较大，[[Papers/2604-ClaudeCode]] 只提供生产级 harness 的分层代价结构。ScreenshotsOrTools 自身的覆盖也限于单 benchmark 与单一 8B backbone 家族且无代码释出，因此这一项是被填上一个数据点，不是被解决。
 
 **三种路由范式尚无同环境对照。** [[Papers/2508-ComputerRL]]（RL 联合 policy）、[[Papers/2508-CoAct1]]（LLM 编排）与 [[Papers/2604-ClawGUI]]（规则式 fallback）来自三个不同 backbone、三个不同 benchmark，无法判断固定 backbone 与环境下哪种路由范式更优、或路由本身贡献了多少收益（相对于单纯拥有更多通道）。
 
@@ -723,8 +727,13 @@ GUI grounding 从外观模板匹配演进为 instruction-conditioned localizatio
 | 可插拔 parser | [[Papers/2408-OmniParser]] | detector、OCR 与 icon caption 组成外部 perception layer | parser error 会成为新的级联错误源 |
 | 离散相对动作 | [[Papers/2602-ToolTok]] | coarse-to-fine tool-token pathfinding 代替一步绝对坐标 | 多步定位增加 latency，online 长程效果未知 |
 | 内生注意力监督 | [[Papers/2511-GuiAima]] | `<ANCHOR>` token 的 patch attention 直接接受 grounding 监督 | 效果依赖 backbone 原生视觉定位能力与 zoom 策略 |
+| 推理期 coarse-to-fine 脚手架 | [[Papers/2608-GUILens]] | OCR/detector 参考非排他地引导，VLM 自选裁剪区域与放大倍率，每个提议过一次视觉校验 | 增益与推理算力未解耦（无等调用数或等 token 预算对照）；跨行 backbone 不一致 |
 
 GUI-AIMA 提供了本文所覆盖工作中这一方向最完整的定量证据：3B 模型用 509k 样本达到 ScreenSpot-Pro 61.5、ScreenSpot-v2 92.1；移除 training-free zoom 后 ScreenSpot-Pro 降至 53.8，而迁移到 InternVL3.5-4B 的增益仅为 1.8 个百分点。单篇结果表明，attention supervision 可以降低额外 grounding head 的需求，但最终表现仍由 backbone 与推理期视觉缩放共同决定 [[Papers/2511-GuiAima]]。
+
+[[Papers/2608-GUILens]] 把"推理期视觉缩放"这条证据从单点扩到三个通用 VLM backbone，同时暴露了它的记账问题。其 training-free 框架由三部分组成：coordinate priming（EasyOCR 与 GPA-GUI-Detector 的参考序列化进 prompt，关键在于**非排他**——VLM 不被限制在候选集内选择，因而不继承 component-selection 路线的候选覆盖率约束）、coarse-to-fine cropping（裁剪区域与放大倍率都由 VLM 自选，每个 crop 当作一次新观察而非对旧点估计的细化）、visual verification（提议标注回图上由同一 backend 判 accept/reject，拒绝则回退全屏重启）。ScreenSpot-Pro 上的同 backbone 对照为 GPT-5.5 74.8→87.9、Claude Opus 4.7 57.4→82.3、MiniMax-M3 26.4→47.4。300 例分层子集上的消融给出一条可迁移的规律：去掉 cropping 掉分最大且三个 backbone 一致（−10.4 / −41.3 / −15.6），而 coordinate priming 的收益随 backbone 变弱而变大（−1.0 / −2.0 / −7.3），verification 同向但更平缓（−1.7 / −1.7 / −4.8）。据此可把推理期脚手架分成两类：**替补 backbone 能力缺口的部件**（priming、verification）会随基座变强而边际收缩，**缓解输入分辨率/token 预算这一架构约束的部件**（cropping）不会——对已经很强的 GPT-5.5 它仍值 10.4 分。该文另有一处比 SOTA 数字更值得引用的对照：在同一评测设定下，coarse-to-fine cropping 在每一个非零 refinement 设定上都优于 click-centered zooming，说明多步 refinement 的收益来自"不把早期点估计当作后续观察的锚"，而非单纯"看得更细"。
+
+这组数字的解释边界由作者在附录中主动披露，须一并读：所有增益的对照都是同 backbone 的**单次调用** baseline，而 Quality 配置最多 8 轮裁剪、每轮另有独立的 proposal 与 verification 调用，全文没有任何等调用数或等 token 预算的对照，因此 +13.1 / +24.9 不能读作方法本身的净收益；Table 1 跨行 backbone 不一致——GPT-5.5 的单次调用成绩 74.8 本身已高于表中全部 specialized GUI model 的最高 70.6，SOTA 声明因此被基座严重混淆；每个数字为单次评测、未对重复 API 运行取平均（caption 报告的 McNemar 检验处理不了 API 采样的运行间方差）；OSWorld 一节只覆盖 Chrome / Multi-Apps / OS 三域、15 步上限，其 Overall 86.8 与 leaderboard 其他行是否同口径论文未说明。
 
 ### 6.2 Vision-Language-Action Models
 
@@ -793,8 +802,13 @@ Hybrid architecture 保留 native policy 的统一学习能力，同时把高风
 | Native policy + semantic runtime | [[Papers/2607-Tactile]] | runtime 暴露带 affordance、provenance 和 verification cue 的动作对象 | 依赖 AX/OCR 完整性 |
 | Platform-conditioned policy | [[Papers/2607-UIMOPD]]、[[Papers/2607-MAGA]] | 用 platform condition 缓解 desktop/mobile convention 污染；MAGA 进一步按 structured action 重分配蒸馏权重并扩到三域 | 新平台仍需可靠 condition 与动作映射；正确性门控是 offline single-step exact-action 匹配而非 task success |
 | State-first harness + GUI/web specialists | [[Papers/2607-StateAct]] | main agent 经 bash/Python/editor 直接读写 files、application backend 与 DOM，render-only 子目标委派 GUI/web subagent，独立 finish gate 重读 artifact | render-only 任务、GUI subagent 质量与 value-level verification |
+| 外置 task state + 角色权限隔离的审计循环 | [[Papers/2608-LongHorizonHarness]] | manager 持 state 但不接触环境，executor 每轮 fresh context 且是唯一可改环境的角色，read-only auditor 独立取证判完成 | 无 role-level ablation；增益范围与"进展可否表示为可核验环境状态"耦合 |
 
 [[Papers/2607-StateAct]] 提供了这类架构目前最干净的同 backbone 证据：固定 Claude Opus 4.8，state-grounding harness 相对 reference CUA harness 在 OSWorld 2.0（108 tasks，self-hosted VM，binary success + mean partial 口径）从 20.6%/54.8% 提升到 26.9%/61.6%，平均单任务成本约从 \$72 降到 \$7.8。其 ablation 把收益定位在组合而非单一组件：移除 act-on-state 降幅最大（mean partial 61.6%→51.3%），而 bash-only 配置仅 45.9%、低于 screenshot reference 的 54.8%——"给模型 shell"不构成收益来源，state access、delegation 与 verification 必须共存。收益还有明确的 horizon 边界：short-horizon OSWorld-Verified 上 StateAct 与 reference 几乎持平（78.4% vs 77.3%）。解释这组数字时须注意，比较双方虽同 backbone，但 observation/action interface 不同——StateAct 能直接访问 files/backend/DOM——因此 +6.3pp 应归因于 harness/system design，不能读作 GUI grounding policy 本身变强。
+
+[[Papers/2608-LongHorizonHarness]] 沿同一条路线把分工推到更极端，并给出与 StateAct 形状互补的证据。其 Manage–Execute–Audit 循环把三种权限拆开：manager 持有 task state 却无法观察或修改环境，executor 是唯一能改环境的角色且每轮从 fresh context 起步、原始轨迹用完即弃，auditor 只读并从排除 executor 轨迹的 context 独立取证判定完成；harness 全程监控 workspace，检出的任何 mutation 记为 integrity violation 并使该报告失去支撑 completed 记录的资格。跨轮持久化的只有 task state 与 audit report，executor 的完成声明本身不进 state。作者自跑的同 backbone 对照（Qwen 3.7-Plus，baseline 与实验组同用 Claude Code 作 executor backend）给出 WeaveBench PassRate 51.8→80.7、Terminal-Bench 2.1 69.7%→77.2%；OSWorld 2.0 的 binary 2.8→8.3 则**不是 tool-matched**——baseline 是官方 GUI-only 结果，实验组用作者自建的 hybrid GUI+CLI 工具池，MEA 与 CLI 通道各贡献多少无从分离，且 8.3% 的绝对水平仍很低。成本分解是这类架构目前最直接的一份记账：manager 只占 2.8% / 2.0% / 8.1% 的 token，auditor 占 19.4% / 24.8% / 38.1%——显式 state 维护近乎免费，独立核验才是主要新增开销；总量也不是固定倍率，WeaveBench 2.3×，而 Terminal-Bench 反而少用 24% token 且成功率更高。
+
+两条边界决定了这组数字能支撑什么。其一，全文含附录无任何 role-level ablation，外置 task state、fresh-context executor 与 read-only auditor 三者的净贡献不可分离；尤其"只做每轮 context 重置与结构化交接、不加 auditor"这一便宜的对照缺席，使"独立核验是关键"缺少直接证据——[[Papers/2607-StateAct]] 的 ablation 恰恰把最大单项贡献定位在 act-on-state 而非 finish gate，同类拆解有可能削弱本文的主张。其二，作者在附录中自行把增益范围限定在"progress 能被表示为可核验环境状态"的任务上：OSWorld 按 capability tag 的最大增益出现在 streaming interaction（baseline 0.000→0.500，n=6），而 Terminal-Bench 的 mteb、data-science、video-processing 出现回退，并写明 "a misinterpreted contract can still lead to a confidently verified wrong answer"。因此这条证据支持的是"把已达成的进展锁住"，不支持"提升判断什么才算达成"的能力；库内暂无独立验证。
 
 Hybrid 系统的决定性问题是 capability ownership：grounding、state、permission 与 verification 分别由谁拥有，失败后由谁修改。若 ownership 不显式，系统虽然模块更多，却仍无法回答某一步为何执行、依据是否过期以及哪个组件应承担恢复责任。
 
@@ -821,6 +835,8 @@ Observation reduction 的证据否定了"越短越好"的简单目标。A11yComp
 Web reduction 的独立结果进一步强化这一边界。Prune4Web 将候选元素减少 25–50 倍，并在其 low-level grounding 设置中把准确率从 46.8 提到 88.28，但对 GPT-4o 的 task-level 结果没有提升 [[Papers/2511-Prune4Web]]；FocusAgent 剪除约一半 AXTree 后，在 WebArena 上低于完整 observation，说明选择性 reduction 的代价并非免费 [[Papers/2510-FocusAgent]]。
 
 内容与长度之外，**呈现顺序**是被长期忽略的第三个变量。[[Papers/2409-ElementOrdering]] 在 VisualWebArena easy 子集上做顺序隔离消融：随机打乱元素顺序使 GPT-4V 从 74.07% 降到 44.44%（Gemini 1.5 从 64.03% 到 37.04%），伤害与删除全部可见 HTML 文本相当、超过删除任何其他单一属性——DOM pre-order 序携带的层级/功能分组信息本身就是内容。无结构的 pixel-only 场景中，对检测元素 bbox 坐标做 t-SNE 2D→1D 排序稳定优于 raster 扫描序（三模型 +2~5pp），但最优序依赖元素来源质量（人工标注 bbox 时 raster 反超）。对本节 reduction/重构类方法的直接含义：改变元素顺序的重构可能在不知情中付出该代价，重构方案应报告顺序保持性。证据边界：2024 年 GPT-4V/Gemini 1.5 代际，强推理模型上的顺序敏感性未测——按 ReadMoreThinkMore 的能力×表示交互模式，顺序敏感性也可能是 regime 依赖的。
+
+第四个变量是**训练与推理是否共用同一条 observation 规则**——上述工作大多只在推理期施加 reduction。[[Papers/2608-ScreenshotsOrTools]] 把这一条单独当作实验变量：在 OSWorld-MCP 上只在推理期套用 window-2 加 drop-on-success（工具调用执行成功后用文本占位符替掉下一张截图），代价是 −3.9pp（±1.0），但 309 个任务里仅 3 个硬翻车、损失集中在预先登记的 13 任务退化子集上，指向 mis-adaptation 而非能力缺失；让 rollout、评测与部署共用同一条规则重训之后，该退化子集的 rich–lean 差距在 step 30 收敛到 0 并在噪声内保持，压缩 checkpoint 在全 309 任务上达 37.8%、对未压缩基线 33.0%，而输入成本只有 53%、峰值上下文降 37%（累计输入 337.1K→219.5K，p95 峰值 11544→7243）。可带走的结论是"等精度、半成本"而非"压缩顺带涨点"：作者自己拆出 +4.8pp 中约 4.1pp 来自 74 个训练任务，235 个非训练任务上仅 +0.8pp 且不显著；预登记的 DiD 判据（压缩侧增益需超出 rich 侧 15pp）无任何 checkpoint 达标、被作者记为 failed；匹配的 rich-observation 对照在同一 step 的训练带上增益近乎两倍（+20.5pp 对 +11.5pp），说明压缩在训练期反而是障碍。对本节前述几项 reduction 工作的直接含义是：只在推理期施加的压缩，其损失中有一部分是训练-推理分布失配而非能力损失，重训即可抹平——这为既有的"压缩代价"数字提出了一个可检验的混杂因素。该结论目前来自单篇工作、单 backbone（8B）与单 benchmark，库内暂无独立验证。
 
 #### 6.7.3 视觉 history 的压缩路线
 
@@ -891,8 +907,9 @@ Verification 与 recovery 不是 planning 的附属步骤，而是独立能力�
 | Real-distribution recovery | [[Papers/2606-XiaomiGUI0]] | 从真机异常态与 teacher takeover 获取监督 | 工业环境昂贵、漂移且难复现 |
 | Mandatory verifier + loop breaker | [[Papers/2604-VLAA-GUI]] | 完成门、外部 judge 与固定升级策略 | 同 backbone 自审和额外调用开销限制独立性 |
 | Independent state-reread finish gate | [[Papers/2607-StateAct]] | 独立 context 只凭 task instruction 与 machine access 重读真实 deliverable，不见 trajectory 与 expected values | 能抓 missing file/wrong path/format 等 structural defect，对 value correctness 覆盖弱：76 个到达 gate 的 non-perfect 任务中错放 68 个 |
+| Read-only 审计 + integrity gate | [[Papers/2608-LongHorizonHarness]] | auditor 从排除 executor 轨迹的 fresh context 独立取证；检出环境 mutation 即记 integrity violation，该报告不能支撑 completed 记录 | 主实验中 auditor 与 executor 是同一 backbone、仅 context 与权限不同；无 role-level ablation，净贡献未被测量 |
 
-MGA 展示了 verification 与 memory 的紧耦合：未经双帧验证的 state delta 不进入 memory [[Papers/2510-MGA]]。SKILL.nb 则把 verification 用于 reusable skill 的发布、回退与回归控制；移除 gate 后，修复后 regression 显著上升 [[Papers/2606-SkillNb]]。两项独立证据共同支持"验证结果应改变持久状态和后续控制流"，而不仅是生成一段 critique。[[Papers/2607-StateAct]] 则量化了"识别偏差"这一环节的覆盖上界：其 finish gate 拥有独立 context 与真实 state access，仍在 76 个到达 gate 的 non-perfect 任务中仅正确拒绝 8 个、错放 68 个。这与 [[Papers/2604-VLAA-GUI]] 的"同 backbone 自审限制独立性"构成互补边界——context 独立性可以消除 self-review bias，却消除不了共享 source interpretation 或 reasoning 造成的同值错误；structural check 与 value check 应被视为覆盖面不同的两种验证能力，而非同一 verifier 的强弱程度。
+MGA 展示了 verification 与 memory 的紧耦合：未经双帧验证的 state delta 不进入 memory [[Papers/2510-MGA]]。SKILL.nb 则把 verification 用于 reusable skill 的发布、回退与回归控制；移除 gate 后，修复后 regression 显著上升 [[Papers/2606-SkillNb]]。两项独立证据共同支持"验证结果应改变持久状态和后续控制流"，而不仅是生成一段 critique。[[Papers/2607-StateAct]] 则量化了"识别偏差"这一环节的覆盖上界：其 finish gate 拥有独立 context 与真实 state access，仍在 76 个到达 gate 的 non-perfect 任务中仅正确拒绝 8 个、错放 68 个。这与 [[Papers/2604-VLAA-GUI]] 的"同 backbone 自审限制独立性"构成互补边界——context 独立性可以消除 self-review bias，却消除不了共享 source interpretation 或 reasoning 造成的同值错误；structural check 与 value check 应被视为覆盖面不同的两种验证能力，而非同一 verifier 的强弱程度。[[Papers/2608-LongHorizonHarness]] 把这条独立性谱系再推一格：它不只给 verifier 独立 context，还配上一条可强制的权限约束——auditor 只读，harness 监控 workspace 与 artifact，任何被检出的 mutation 直接使该审计报告不能支撑 completed 记录。这把"验证结果应改变持久状态"具体化为"未经独立取证的完成声明根本进不了 state"。但独立性仍有上界：主实验中 auditor 与 executor 是同一个 backbone 模型，差别只在 context 与权限，因此它消除的是 self-review 的信息优势与既得利益，消除不了共享 source interpretation 造成的同值错误——与 StateAct finish gate 的覆盖上界属同一类残余风险。该文无 role-level ablation，这一机制的净贡献尚未被测量。
 
 恢复策略仍缺少按 failure state 自适应选择的证据。固定重试、换模态、回退、重新规划、请求人类和接受当前状态分别适用于不同后果结构；统一 escalation ladder 会在弱模型或紧预算下把恢复开销变成新的失败源。
 
@@ -907,6 +924,7 @@ CUA safety 已从筛查用户指令，扩展到环境内容、跨应用信息流
 | 风险面 | 代表工作 | 控制位置 | 未覆盖边界 |
 |:--|:--|:--|:--|
 | Environmental prompt injection | [[Papers/2504-WASP]]、[[Papers/2409-EIA]] | observation filtering 与 instruction hierarchy | goal-aligned injection |
+| Grounding 输出层的坐标劫持（意图不变、落点被改） | [[Papers/2608-MissClick]] | 现有栈无对应控制点；候选位置是动作语义与执行坐标的一致性核验 | 仅 white-box、无迁移与黑盒、零防御评测；未说明扰动经由什么通道进入截图 |
 | Low-severity goal injection | [[Papers/2608-InvisibleInkThreats]] | 意图推断，而非按动作危害分级的审计与门控 | 无高危害基线对照；注入文本本身极显眼、未测任何 detector |
 | Contextual privacy leakage | [[Papers/2606-AgentCIBench]]、[[Papers/2601-GUIGuardBench]] | disclosure policy 与 least privilege | 精确识别应隐藏字段 |
 | Benign-experience safety drift | [[Papers/2604-ExperienceSafetyRisks]] | experience admission、retrieval composition 与 safety gate | refusal 经验压制 ASR 但诱发 over-refusal；只覆盖 AWM / ReasoningBank |
@@ -927,6 +945,10 @@ CUA safety 已从筛查用户指令，扩展到环境内容、跨应用信息流
 该论文对 human control 一节的直接冲击是 HITL 结论：4 模型 × 2 平台共 8 个组合，加上确认步骤后 ASR **全部**高于无 HITL，平均 +7.8 点，最极端的 gpt-5.1 on Reddit 从 21.2% 升到 42.4%；Query Rate 最高 75.8% 说明退化不发生在 agent 察觉环节，而发生在人这一侧，模拟用户对多数可疑操作回答 Yes。这把 6.11.1 表中 clarification/confirmation 一行的失败模式从"询问太多造成 interaction cost"推到"询问本身成为攻击者的背书渠道"，且与 [[Papers/2605-EnvTrustBench]] 的判断同向——permission confirmation 不能替代证据核验。但**这条方向性结论恰恰是全文选样最脆弱的一条**：model–platform 对由作者按"常规测试下攻击相对无效"挑出，从最低的格子重测本身就有回归均值的期望上移，排除它需要同一批格子的 no-HITL 重复测量，而全文没有任何重复实验、随机种子或置信区间，所有 ASR 均为温度 1 下的单点估计；Table 3 单元格粒度为 1/33，"gpt-5.1 翻倍"实为 7 次成功变 14 次。主实验中的用户是 LLM 扮演的新手 NPC2，真人只有 3 位且仅用于校准 Yes Rate（77.1% / 68.5% / 74.3%）。据此，本节把"确认门控可能是攻击放大器而非防线"记为**有指向性、可证伪、验证代价低的假设**，不记为已建立的结论；库内暂无独立验证。笔记 `verification_status: partial`，正文与自身表格存在三处算术冲突（modality 点差、Yes Rate 区间下界、一个不存在的模型名），本节一律采用表格数值。
 
 一个成本很低的后续实验已经就位：[[Papers/2510-FocusAgent]] 的相关性过滤把 banner injection ASR 从 32.4% 压到 0.9%、popup 从 90.4% 压到 1.0%，而 6.11.2 已注明它不覆盖伪装成 task-relevant content 的攻击——II-Bench 的 Download 类（在装包任务里装另一个包）正是这类攻击的现成实例，把两者接起来跑即可给出该边界的定量答案。同理，把 [[Papers/2504-WASP]] 的 partial/full 二分口径套到 II-Bench 上，可以直接检验 security-by-incompetence 在低危害目标上是否还成立：点 star、pip install 恰恰是执行难度最低的一类动作，那层"无能护城河"很可能在这里根本不存在。
+
+[[Papers/2608-MissClick]] 把风险面从"agent 的意图被操纵"移到"意图不变而落点被劫持"，这是本表其余各行都不覆盖的一层。其观察在接口层面：主流 grounding 模型把点击坐标输出成 per-digit 十进制 token 序列，解析时每位带位权，因而百位一次翻转就等于 100 个坐标单位的位移，而 token 级 loss 对所有位置一视同仁。据此构造的白盒攻击在 ScreenSpot-v2 上对 OS-Atlas-Base-7B 与 UGround-V1-7B（[[Papers/2410-OSAtlas]]、[[Papers/2400-NavigatingDigitalWorldAs]]）取得 untargeted ASR 75.07% / 72.93%、targeted 44.86% / 62.67%，其中位权加权相对均匀权重的 digit 交叉熵单独贡献 +9.62 / +11.98 pp。对本节的结构性含义不在 ASR 数字，而在防御位置：注入类攻击可以靠 instruction hierarchy、内容审计与确认门控在意图层拦截，而这一类攻击下 agent 报告的动作语义（"点击提交按钮"）与它实际发出的坐标之间没有任何一致性检查，上述防线全部位于错误的层。一个廉价且与攻击类型无关的候选控制点是对最终坐标做一次反向元素识别、核验落点元素是否匹配指令描述——该文未实现，本综述亦无库内证据支持其有效性，此处记为可证伪的设计假设而非结论。
+
+**证据边界须一并读。** 威胁模型是完全 white-box（可取架构、权重与输入梯度），且要求在整张截图的每个像素上写入 ε=16/255 的 ℓ∞ 扰动，而论文全程未说明这一扰动经由什么通道进入 agent 看到的截图——攻击面是否存在与可迁移性是两个不同问题，论文只把后者列为 future work。无 transferability、无 black-box、零防御评测（JPEG 重编码、随机缩放、模型自身 resize/patchify 一个都没测），两个 victim 模型均为 7B 且不含使用特殊坐标 token 而非 per-digit 十进制的更新一代 grounder，因此"这是接口固有漏洞还是实现偶然"未被区分。口径上还有一处不对称：解析不出合法坐标计为 untargeted 成功，而 untargeted 只要求点击离开 ground-truth box，因此 75.07% 这个数并不检验该文自己的位权机制叙事——真正相关的是 targeted 一侧（OS-Atlas 上不到一半），而论文未报告任何直接机制量（逐位翻转率、位移分布）。作者自陈 digit token 的数值与位权结构已被 training-time 工作研究过，本文的贡献是把它带到攻击目标的设计上。
 
 #### 6.11.2 运行时证据核验与分层防线
 
@@ -1174,7 +1196,7 @@ GUI grounding benchmark 已从静态点选扩展到高分辨率专业软件、�
 | GUI-HalluBench [[Papers/2606-ExposingAndEvaluating]] | 相似元素误选与目标不存在时的坐标编造 | Localization Accuracy、Rejection Rate | 属于 grounding reliability probe；尚不能推出端到端安全性 |
 | State-Belief Conflict Probes [[Papers/2607-GUIStateBelief]] | pixels 与 DOM / accessibility structure 冲突时的 belief provenance | 单通道成对干预与 PFG | 诊断 fusion failure，不是通用 task-success metric |
 
-一个已 source-verified 的单工作结果说明 setting 为什么必须完整绑定：GUI-AIMA-3B 在 ScreenSpot-Pro 的 offline 标注口径下，经 training-free zoom-in 得到 61.5，而不使用 zoom-in 时为 53.8；这里没有 execution step budget，比较只适用于同一 3B 方法的 grounding 设置 [[Papers/2511-GuiAima]]。该结果支持 search-space reduction 对高分辨率定位有帮助，但不能写成所有 grounding model 的领域共识。
+一个已 source-verified 的单工作结果说明 setting 为什么必须完整绑定：GUI-AIMA-3B 在 ScreenSpot-Pro 的 offline 标注口径下，经 training-free zoom-in 得到 61.5，而不使用 zoom-in 时为 53.8；这里没有 execution step budget，比较只适用于同一 3B 方法的 grounding 设置 [[Papers/2511-GuiAima]]。该结果支持 search-space reduction 对高分辨率定位有帮助，但不能写成所有 grounding model 的领域共识。[[Papers/2608-GUILens]] 在同一 benchmark 上补了第二个、覆盖更广的数据点：三个通用 VLM backbone 上移除 coarse-to-fine cropping 分别掉 10.4 / 41.3 / 15.6 分（300 例分层子集）。两篇工作方向一致，但都不构成"search-space reduction 有效"的等算力证明——GUI-AIMA 的 zoom 与 GUI-Lens 的多轮裁剪都在推理期额外消耗模型调用，而两文均未给出等调用数或等 token 预算的对照。因此本表的读法不变：ScreenSpot-Pro 隔离的是定位能力，其上的增益必须连同推理预算一并报告，否则跨方法不可比。
 
 ### 8.2 Offline Action/Trajectory
 
@@ -1310,6 +1332,7 @@ Safety evaluation 已从恶意 prompt 检测扩展到 environmental injection、
 | EnvTrustBench [[Papers/2605-EnvTrustBench]] | stale/误导环境 claim 未核实即驱动动作 | case-specific false-path oracle | 通用 software/CLI agent 压力测试，非 GUI 真实发生率 |
 | Vera-Bench [[Papers/2607-VeraSafetyTesting]] | 用户与工具通道攻击造成实际环境违规 | state-first、tool-second、response-last | coding/tool/MCP scope；verifier 本身仍需审计 |
 | II-Bench / HITLCUA [[Papers/2608-InvisibleInkThreats]] | 低危害但对攻击者有收益的注入目标；含模拟人类确认环节 | intent-level ASR（"出现执行有害指令的意图"即计成功，不要求完成），444 例 × 7 CUA，self-hosted OSWorld VM + Docker 站点 | 不计执行完成，测不出实际收益；无高危害基线对照，"因为低危害才通得过"未被实验分离；单点估计无重复实验；HITL 格子按"攻击相对无效"选出，回归均值未排除；无代码无数据 |
+| MissClick [[Papers/2608-MissClick]] | white-box 像素扰动劫持 grounding 输出的坐标数字，意图不变而落点改变 | 落点是否离开 ground-truth box（untargeted）/ 是否落入指定 box（targeted），分母限干净截图上已 grounding 正确的任务 | 静态 grounding benchmark 上的 component-only 证据，非端到端 agent 任务；无迁移/黑盒/防御评测；未建模扰动注入通道 |
 
 source-verified 的 EnvTrustBench 在 55 个可机器判分 case、11 个压力场景、14 个 model-scaffold stack、共 3,850 次受控 run 中得到 83.3% aggregate EMR [[Papers/2605-EnvTrustBench]]。该协议没有可迁移的固定 GUI step budget，且论文明确测的是刻意注入误导证据后的 susceptibility；这个数字不能解释成现实部署中 83.3% 的普通行动会失误。
 
@@ -1785,9 +1808,9 @@ Verification-centric CUA 应把 verifier 当作与 actor、environment 同级的
 
 **[Observed Tension] Cross-interface semantic equivalence 与 routing。** CLI/API 可以缩短轨迹并直接查询结构化状态，却也扩大权限、改变可观察副作用，并可能绕过用户可见 workflow；纯 GUI 保留界面语义，但更慢且更容易累积 grounding error。[[Papers/2606-MyPCBench]] 的失败分析表明，programmatic shortcut 即使取得部分目标信息，也可能遗漏用户要求的 visible artifact 或 application-side effect。
 
-现有证据支持 hybrid action space 是重要架构方向，但不足以把其收益归因于 routing 本身：不同工作同时改变了 backbone、planner、工具库、权限和预算。接口选择器还必须区分"该接口能完成任务"与"该接口产生了语义等价、可审计且符合用户预期的状态变化"。
+现有证据支持 hybrid action space 是重要架构方向，但大多不足以把其收益归因于 routing 本身：不同工作同时改变了 backbone、planner、工具库、权限和预算。[[Papers/2608-ScreenshotsOrTools]] 是本综述范围内第一份把这些变量按住的对照——同一 8B backbone 的两个 checkpoint，harness、retriever、prompt 与工具库固定，只让 routing 行为变化——它同时收紧和放松了上述判断：一方面 routing 行为确实是独立因果变量（同一 agent 骨架下换 checkpoint 即出现 +4.0pp 与 −5.9pp 的符号反转），另一方面在该实验里限制性能的不是"是否调用工具"，而是"调用得对不对"（三种独立干预都能把调用率抬高一个数量级而准确率不动，API 层成功率 98–100% 但语义正确 0/23 与 0/16）。这提示上面那句"必须区分能完成与语义等价"的要求，其瓶颈端已经出现在更前面：模型连参数是否指向正确对象都尚未稳定。相应地，最小决定性实验中的 `interface-selection error` 应拆成"是否调用"与"调用是否语义正确"两个独立指标——把二者合并会让一个只提升调用率的方法看起来像改善了路由。该结论目前为单 benchmark、单 8B 家族的关联性证据，库内暂无独立验证。
 
-**最小决定性实验。** 在同一 policy、prompt、任务、权限和总时间/token budget 下，对照 GUI-only、CLI/API-only 与 hybrid routing。除 success 和 latency 外，报告 interface-selection error、user-visible state equivalence、hidden-state access、权限违规、不可逆副作用、验证成本与恢复率；hybrid 组不得获得额外未计费调用。
+**最小决定性实验。** 在同一 policy、prompt、任务、权限和总时间/token budget 下，对照 GUI-only、CLI/API-only 与 hybrid routing。除 success 和 latency 外，报告 interface-selection error（分列调用率与调用语义正确率）、user-visible state equivalence、hidden-state access、权限违规、不可逆副作用、验证成本与恢复率；hybrid 组不得获得额外未计费调用。
 
 ### 10.7 Personalization and Continual Learning
 
@@ -1914,9 +1937,18 @@ GUI/Computer-Use Agent 研究经历了五次可辨认的抽象升级——结构
 | Judge ensembling 在 CUA reward 上收益有限：top judge 间 pairwise Cohen's κ≈0.71（同家族 0.731 / 跨家族 0.709），top-3 majority vote 仅比最佳单 judge 高约 1pp，而 oracle 可达 99.2% | source-verified | [[Papers/2607-OSReward]] §5.3 / §E.4（§8.12/§8.14） | 与 [[Papers/2510-CUARewardBench]] 的 Unanimous Prompt Ensemble 构成同一思路的两种用法（推理期提精度 vs 建语料时选样本）；该对照为本文综合判断，非任一原文论断 |
 | Serving-stack 漂移是独立于数据与模型的复现威胁：仅改 vLLM `torch.compile` cache key，在权重/prompt/sampler/像素完全相同下 structured-output 合法率 88.1%→18.3% | source-verified | [[Papers/2607-AAPT]] App.（§8.13.1/§8.13.2） | 单一 serving stack（vLLM guided_json / xgrammar）内的单点证据，跨引擎普遍性未检验；其余 AAPT 结论建在作者自建的 `key_prompt` 微 benchmark 上，外部 DynaCU-Bench 为平局 |
 | Programmatic oracle 的偏差方向与 passive judge 相反（偏严/假阴）：150 条 FAIL 审计中 15.3% 判错（Wilson CI [10.4, 22.0]），10.7% 为 evaluator false negative、4.7% 为 broken task；WorkArena 0/24、WebArena 21.7% 全为 evaluator、AssistantBench 21.7% 全为 broken | source-verified（与 passive judge 的方向对照为本综述综合判断，非任一原文论断） | [[Papers/2607-MisScoreCUA]] §4.3 / Table 2（§8.11/§8.12/§8.13.1） | 93/150 轨迹取自 [[Papers/2504-AgentRewardBench]] 且全文未与其已释出的 6 专家 gold label 对照，故**不构成**对后者 rule-based recall 55.9% 的独立复现；46/150 行无人工复核，human–LLM κ 0.19–0.32，单标注者口径 wrong-verdict 率摆动 7.7–20.2%；仅审计 FAIL 侧，无 false positive 量级 |
+| Hybrid routing 的瓶颈在"调用是否语义正确"而非"是否调用"：同一 8B backbone 两 checkpoint 下 routing 增益符号反转（+4.0pp vs −5.9pp）；三种独立干预各把工具采用率抬高一个数量级而准确率不动；API 层成功率 98–100% 但语义正确 0/23 与 0/16 | source-verified（"应把 interface-selection error 拆成调用率与调用语义正确率"为本综述据其数据的综合建议） | [[Papers/2608-ScreenshotsOrTools]] Table 2/3、§5.2（§4.8/§4.9/§10.6） | 单 benchmark（OSWorld-MCP 309 任务）、单 8B 家族两 checkpoint、无代码；采用率与准确率脱耦为关联而非机制证据；四个零采用 domain 未从 all 行剔除，符号反转中其占比未被分离；库内暂无独立验证 |
 | 2026-07-23 gap-fill 补录 14 篇（RL survey / Digi-Q / Jedi / AndroidControl / OSWorld-MCP / MCPWorld 等） | 库内暂无独立验证 | §1.4/§4.7/§5/§7/§8 各子节 | 单 agent digest、verification_status: unverified，仅作子节 enrichment，未升格为 Takeaway/共识 |
 
 ## 调研日志
+
+### 2026-08-05 survey-refresh（并入 4 篇，197 → 201）
+
+- [[Papers/2608-LongHorizonHarness]]（model-architecture / cross-platform / cross-app long-horizon / self-hosted / interactive agent auditor + programmatic / direct end-to-end，OSWorld 一腿非同工具对照）：§6.6 主并入——表内新增 MEA 一行，正文补两段：其一写清三角色的权限几何（manager 持 state 但不接触环境、executor 每轮 fresh context 且是唯一可改环境者、read-only auditor 独立取证，检出 mutation 即记 integrity violation 使该报告不能支撑 completed），并绑定同 backbone 对照 WeaveBench 51.8→80.7 PR、Terminal-Bench 69.7%→77.2%，同时把 OSWorld 2.8→8.3 显式标为**非工具对照**（官方 GUI-only baseline vs 作者的 GUI+CLI 工具池）；其二写成本结构（manager 2.8/2.0/8.1% vs auditor 19.4/24.8/38.1%，WeaveBench 总量 2.3× 而 Terminal-Bench token −24%）与两条边界（零 role-level ablation，与 StateAct 用 ablation 定位最大单项贡献形成对照；作者自陈的增益上限"a misinterpreted contract can still lead to a confidently verified wrong answer"）。cross-link 一处：§6.10 表内新增 read-only 审计 + integrity gate 一行，正文补"把独立性谱系再推一格"——可执行的只读权限使未经独立取证的完成声明进不了 state，但同 backbone 意味着它去掉的是自审的信息优势，去不掉共享来源解读带来的同向错误。
+- [[Papers/2608-ScreenshotsOrTools]]（environment-runtime / desktop / app workflow / self-hosted（96 Docker VM）/ programmatic / direct end-to-end）：§4.8 主并入——正文补两段：其一记录受控设定（同 8B backbone 两 checkpoint，harness/retriever/prompt/工具库固定，统一 `<tool_call>` 出口无外部控制器；OSWorld-MCP `test_all_no_internet` 309 任务 / 120 工具 / 9 namespace / BM25 top-18 / greedy / `max_steps=50` / 5 run / 2 SE）与符号反转（+4.0pp vs −5.9pp），并注明四个零采用 domain 的方向性未定、原文未给剔除后的 all 行（此为本综述据 Table 2 的读法）；其二记录采用率与胜任度脱耦（230 任务工具可达但仅 55 个用了工具；三种独立干预各抬高采用率一个数量级而准确率不动；API 层 98–100% 成功而语义正确 0/23、0/16），并把它框为对 QwenCUA"何时切到 CLI 是可学习决策"的**限定而非推翻**（不同动作通道：Bash vs MCP 工具）。同章 §4.9 open problem 由"MCP 作为专属动作通道研究稀薄"改为"tool-selection 一侧刚有第一份受控证据"，保留 MobileWorld 40 任务噪声与 ClaudeCode 分层成本两条既有限定，并写明这是被填上一个数据点而非被解决。cross-link 一处：§6.7.2 新增"训练与推理是否共用同一条 observation 规则"这一变量（推理期压缩 −3.9pp ±1.0、3/309 硬失败；D13 rich–lean 差距在第 30 步归零；37.8% vs 33.0% 而输入成本 53%、峰值 context −37%；作者自减：+4.8pp 中 +4.1 来自 74 个训练任务、235 个非训练任务上 +0.8pp 不显著、预注册 DiD 15pp 门槛记为**未通过**、rich 对照在训练带上涨得近两倍 +20.5 vs +11.5pp），指出本节既有的推理期压缩损失里可能混入训练-推理规则错配这一可检验的混杂项。
+- [[Papers/2608-GUILens]]（model-architecture / cross-platform / grounding / offline（另有 self-hosted OSWorld 3 domain）/ programmatic / component-only）：§6.1 主并入——表内新增推理期 coarse-to-fine 脚手架一行，正文补两段：其一记录三组件（非排他的坐标 priming、VLM 自选裁剪区域与放大倍率、视觉校验拒绝即全图重启）、同 backbone 结果 74.8→87.9 / 57.4→82.3 / 26.4→47.4，以及 300 例 ablation 的规律（cropping −10.4/−41.3/−15.6；priming −1.0/−2.0/−7.3；verification −1.7/−1.7/−4.8），并据此提出**能力缺口替代品随 backbone 变强而萎缩、架构瓶颈缓解器不会**的两类区分；其二写边界（无等算力/等调用数对照，增益与推理算力未解耦；跨行 backbone 不一致，GPT-5.5 单次 74.8 已高于所有专用模型的 70.6；单次评测；OSWorld 限 3 domain / 15 步）。cross-link 一处：§8.1 在 GUI-AIMA 一段后补为第二个更宽的数据点，并明确两者都不构成等算力证明，ScreenSpot-Pro 上的增益必须与推理预算一起报告。
+- [[Papers/2608-MissClick]]（reliability-safety-HCI / cross-platform / grounding / offline / programmatic / component-only）：§6.11.1 主并入——风险面表新增坐标劫持一行，正文补两段：其一把风险面从"意图被操纵"移到"意图不变而落点被劫持"，记录 per-digit 十进制序列化的位权观察（百位翻转 = 100 坐标单位而 token 级 loss 一视同仁）、ASR 75.07%/72.93%（untargeted）与 44.86%/62.67%（targeted）、位权加权单独贡献 +9.62/+11.98pp，并指出 instruction hierarchy / 内容审计 / 确认门控三类防线全部位于错误的层；反向元素识别的一致性核验标为**可证伪的设计假设**、库内无证据。其二为证据边界段（全 white-box、未说明扰动经由什么通道进入截图、无迁移与黑盒、零防御评测、两个 victim 均 7B 且都不用特殊坐标 token 故接口固有 vs 实现偶然未分离、untargeted 口径把解析失败计为成功且只要求离开 GT box 因而不检验该文自己的位权叙事、无逐位翻转率等直接机制量）。cross-link 一处：§8.9 benchmark 表新增一行。
+- **本轮未做的升格**：四篇均未改 Key Takeaways；仅 ScreenshotsOrTools 因改变 §4.9 与 §10.6 的既有判断而新增一行 Key Evidence Matrix。GUILens 的"两类组件"区分、LongHorizonHarness 的 MEA 净贡献、MissClick 的接口固有性均只写在子节内并标"库内暂无独立验证"。§10.6 保留原句（加"大多"），未删除任何既有结论；最小决定性实验的 `interface-selection error` 拆成调用率与调用语义正确率两项，是据 ScreenshotsOrTools 数据的综合建议、已在矩阵中标明。无结构性重构，未新增或重画配图。
 
 ### 2026-08-04 survey-refresh（并入 1 篇，196 → 197）
 

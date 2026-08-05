@@ -1,9 +1,9 @@
 ---
 title: World Model Survey
 tags: [world-model, agent, simulation, planning, MBRL, VLA, diffusion-policy, cross-embodiment]
-date_updated: "2026-08-04"
+date_updated: "2026-08-05"
 year_range: 2024-2026
-papers_analyzed: 47
+papers_analyzed: 48
 keywords: [world model, video prediction, dynamics model, mbrl, world action model, action-conditioned, diffusion policy, cross-embodiment]
 domain_map: WorldModel
 ---
@@ -32,6 +32,7 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 14. **新发现**："被预测的未来该是什么表示"成为 WAM 的显式设计轴——[[2607-STWAM]] 在 VAE 未来之外并行预测 DINO 语义未来，[[2607-N0TWAM]] 把触觉与视觉一起当生成目标；但两篇的消融同向指向一个反直觉结论：新增的那条**预测**通路不是主要收益来源
 15. **新发现**：world prediction 进入 RL 的 critic 侧——[[2607-WCM]] 让 critic 在预测 return 的同时预测下一帧 latent，drop-in 替换四种 VLA RL 算法的原 critic；λ=0 的 history-ViT 对照把增益与"多看几帧"分开
 16. **新发现**：Levels × Laws 中长期空置的 **Social 约束域**出现第一篇正面工作——[[2607-MentalWorldModeling]] 把 belief/goal/intention 升格为随动作演化的状态变量；但其消融显示移除 physical 通道（−16.5）比移除 mental 通道（−12.1）代价更大
+17. **新发现**：评测侧出现 **explicit fulfillment vs. inherent reactivity** 的切分——[[2608-WorldExam]] 把"指令写明的后果"与"须自行推断的后果"分开报告，得到一次方向反转：action 接口控制更准却让世界毫无反应，language 接口反之；同一批模型的视觉质量层几乎不含区分度（General 79.64–81.04），任务层却铺开 25 分（39.85–65.02）
 
 ## 技术路线
 
@@ -62,6 +63,7 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 
 **缺点与未解 gap**：
 - **Action-following 不可靠**：[[2602-WorldVLALoop|World-VLA-Loop]] 展示 Cosmos-Predict 2 在错 action 下仍 hallucinate 成功——policy 在此类 WM 上做 RL 会 reward-hack
+- **控制被执行但世界不回应**（与上一条相互独立的失效面）：[[2608-WorldExam]] 把"指令写明的后果"与"须自行推断的后果"分开评后出现方向反转——action 接口在 Subject Control 上领先（55.47 对 language 最好的 37.28），Terrain / Object Interaction 却只有 27.49 / 33.75 对 64.39 / 75.96。动作被照做了，地形、被接触物体与附近 agent 却纹丝不动（详见路线 10）
 - **长时序 drift**：GameNGen 3 秒 context、DIAMOND memory bottleneck、World-VLA-Loop 主动放弃 LIBERO-Long——>200 帧后视觉/几何普遍漂移；Wonder 用固定 active set 检索 full-fidelity historical KV 把 active attention cost 与 history length 解耦，但 total KV storage 仍增长、revisit 无定量 metric，尚不能算解决
 - **物理对齐不随 scale 解决**（Cosmos Tab. 20）：需 data curation 或 hybrid physics inductive bias
 - **推理成本高**：典型 14B DiT naive 5.7 s/chunk，即使 38× 工程栈加速后仍需 2×GB200 才能 7 Hz 闭环
@@ -152,7 +154,7 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 - [[2607-GigaWorld1]] (🔥 Rating 5, GigaAI)：**WMBench**——2,989 条 paired real/WM rollout + 324K challenge rollout 的 controlled study。结论：evaluator 质量取决于 long-horizon action fidelity、可迁移 physical prior、空间对齐的 action control（channel-concat Trajectory Accuracy 0.3528 vs ControlNet 0.2566 vs cross-attention 0.1620），而非短期视频观感；综合 evaluator score 超最强通用 Wan baseline 14.9%；VLM-assisted WMES 与人类评分 exact agreement 87.80%
 - [[2604-dWorldEval]] (Rating 2)：discrete diffusion WM + **progress token**（progress=1 判 success）+ 统一 token space + sparse keyframe memory
 
-**关键 gap**：video model 对 contact-sensitive failure 有 **optimistic bias**（GigaWorld-1 closed-loop 观察）——这是 policy evaluator 最危险的误差类型，optimistic evaluator 会系统性放行危险 checkpoint；false-success rate 应作为第一汇报指标。
+**关键 gap**：video model 对 contact-sensitive failure 有 **optimistic bias**（GigaWorld-1 closed-loop 观察）——这是 policy evaluator 最危险的误差类型，optimistic evaluator 会系统性放行危险 checkpoint；false-success rate 应作为第一汇报指标。[[2608-WorldExam]] 从生成质量一侧给出方向一致的读数：Object Interaction 的典型失败正是"被接触物体保持不变"或"主体直接穿过去"，最好的 action-driven 只有 33.75。两处证据的数据、团队与评测目标都不同，但库内尚无对该失效机制的独立解释或复现。
 
 ### 7. Digital-Domain World Model（Web/GUI）
 
@@ -186,11 +188,34 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 - [[2607-MentalWorldModeling]]（MWM / Mentis）：Levels × Laws 中 **Social 约束域**在本 survey 的第一篇正面工作——把 belief / goal / intention / emotion / norm 从"事后 rationale"升格为 world state 的一等成分，状态空间因子化为 $S = S_{\text{phy}} \times S_{\text{men}}$，观测定义为从第三人称联合状态渲染出的 target 第一人称部分观测（允许与真实心理状态不符，这正是 false belief 得以被表达的形式化理由），动作写成 (physical carrier, mental content) 的耦合对，物理转移不直接条件于 mental content。实例化为 training-free 的六阶段 pipeline Mentis + 448 条 process-annotated 的 Menti-Bench（2,688 个 gold 后继状态）。最值得借用的是它的审计模板：necessity ladder（S0 options-only floor 31.3 → S1 direct 63.3 → S2 CoT 74.6 → S3 SC@6 77.9 → S4 free-text state 80.3 → S5 structured state 82.6 → S6 full MWM 87.9，human 98.5，每级只增加一个建模承诺）+ channel intervention + oracle cascade，其中 oracle 增益的 sub-additivity（四个单增益之和 8.7 > 四者组合 6.3）干净地量化了模块化 pipeline 的跨阶段误差税。边界：全文只报 final-action F1，6.2 节与 Appendix G 定义的 mental fidelity / perspective-leakage rate / process-outcome divergence 一个数值都没报，因此"涨点是因为心理状态被正确建模"没有中间证据；消融是纯信息移除、无等量非心理内容的对照，且移除 physical 通道（−16.5）比移除 mental 通道（−12.1）代价更大，与标题重心相反；S6 的调用量约为 S1 的二十几倍而全文无 token 成本表；Menti-Bench 的 gold 按 MWM 自身 taxonomy 标注、gold 动作由同一批作者裁定为"唯一可辩护最优"，S6 天然享有 schema 对齐红利；单步转移、封闭 6 选项动作空间
 - [[2606-EnvEngineeringSurvey]]：以 environment lifecycle 而非单个 model 组织领域——八属性二分 × 八 domain → symbolic/neural synthesis → correctness/diversity/complexity/fidelity evaluation → agent/environment co-evolution。它补充 Levels × Laws 的“能力/约束”视角：world model 只是 neural environment synthesis 的 pixel/word/latent 三层之一；survey 自身也承认 correctness 之外三项质量维度 under-researched，co-evolution 仍是未来方向而非已完成机制
 
+### 10. 诊断式评测：把"指令写明的后果"与"须自行推断的后果"分开
+
+**核心问题**：现有 world-model benchmark 绝大多数评的是 explicit instruction fulfillment——预先指定 layout、相机轨迹、动作序列或交互后果，再检查它是否被实现。这漏掉了一整类能力：从初始状态可以推出、但指令里完全没有描述的后果。主体走上台阶时高度应随地形变化并保持接触，靠近障碍物时应出现接触、绕行或阻挡，进入另一个 agent 的社交距离时对方应有反应——这些都不是输入的直接描绘，而是场景条件下的推论。[[2608-WorldExam]] 把它命名为 inherent reactivity，并把"评什么"从单一总分改成四个分别报告的诊断层级——Visual Quality、Control Adherence、Spatial Consistency、World Reactivity，共 8 个任务、1,474 个 case。放回 Levels × Laws 的坐标里，前两层大致仍在考 L1 Predictor，后两层才踏进 L2 Simulator；这让 [[2604-AgenticWorldModel]] 的层级框架第一次有了对应的可测量刻度，从而能回答"现有模型卡在 L1→L2 的哪一步"。
+
+两处设计决定了它的结论能否被引用。其一是 **interface adaptation**：把可控行为写成 atomic control unit 的有序组合，再适配成 SE(3) 相机轨迹、离散动作序列或自然语言，把 camera-、action-、language-driven 三类模型放到同一批 case 上；代价是语言 prompt 只保留控制顺序、不含各段时长，其恢复轨迹须先用 change-point detection 切段再逐段比对，而另两类按预分配帧区间比对。其二是**两条 track、不出全局总分**：static-scene track（Camera Control + Scene Revisit）三类范式全跑，dynamic-interaction track（Subject Control + 五个 reactivity 任务）只跑 9 个能可靠控制第三人称主体的模型，Goal Completion 仅限 language-driven，明确拒绝把"接口不支持"记成"做得差"。camera-driven 因接口只控相机整体而全数排除在 dynamic track 之外，这与 [[2607-Wonder]] 划出的 camera-controllable renderer 与 action-conditioned simulator 之分是同一条界线，只是这次由评测口径给出。case 构造上，reaction 类任务只给一个触发用的控制、把由此诱发的场景反应整个留空，这个"留空诱因"的原则本身不限于视频生成。
+
+**核心读数是一次方向反转**（下列数字的原文一致性已核查）：Control Adherence 上 action 接口领先，World Reactivity 上 language 接口大幅领先，且反转幅度远大于领先幅度。
+
+| 任务 | action-driven 最好 | language-driven 最好 |
+|:--|--:|--:|
+| Subject Control | **55.47** | 37.28 |
+| Terrain Interaction | 27.49 | **64.39** |
+| Object Interaction | 33.75 | **75.96** |
+| Social Interaction | 60.37 | **85.10** |
+| Physical Reaction | 33.43 | **63.84** |
+| Goal Completion | 接口不支持 | **85.33** |
+
+论文对失败模式的描述是：把请求的主体运动变成相机运动或让场景静止；让被接触物体保持不变或让主体穿过去；让附近 agent 毫无反应。Terrain Interaction 这一列尤其硬——它先用 Subject Control 分数做 gate、未通过直接记 0，而 action-driven 的 Subject Control 明显更高，这个 gate 系统性地更宽容 action-driven，它们仍只有 27.49 对 64.39。"水平控制准"与"垂直地形适配"因此是两件事。
+
+**视觉质量与其余三层解耦，且证据是多点位的**：dynamic track 上 language-driven 的 General 均值挤在 79.64–81.04 这个 1.4 分窄带里，Task 均值却从 39.85 铺到 65.02；ReCamMaster / FantasyWorld 的 General 是 80.97 / 80.23，Camera Control 只有 38.64 / 18.46；Kling 2.5 的 General 均值在 language-driven 中最高（81.04），Goal Completion 只有 48.25。三处证据分布在不同范式与不同层级上。可靠性一侧，VLM judge 与人的一致性为 Spearman 0.8614 / PLCC 0.8583（800 实例、5,793 个 checklist item、3 名标注者多数票），分任务最低是 Social Interaction 0.7019；把几何后端从 VGGT-Ω 换成 Depth Anything 3 后，static track Overall 平均绝对相对变化 3.09%（camera-driven 0.44% / action-driven 3.08% / language-driven 5.36%）、dynamic track 平均 0.57%，且 dynamic 各范式内排名全部保持。
+
+**证据边界**（须随数字一起传播）。接口范式与模型档次共线是最主要的问题：dynamic track 上 action-driven 只有两个本地部署模型，language-driven 七个全部走 API，"action 接口 → 世界不反应"与"这两个特定模型 → 世界不反应"在这份数据里分不开，而论文自己承认闭源系统的 proprietary prompt enhancement 可能参与场景 grounding 与执行规划——这条限制未被列入 limitation。范式内方差大于范式间差距：language-driven 的 Kling 2.5 dynamic Task 均值 39.85 低于 action-driven 的 LingBot-World 39.91，范式内跨度达 25 分，"language-driven 更会反应"实际由 Veo 3.1 / Vidu Q3 / Hailuo 2.3 三个最强系统撑起。四个 checklist 任务的 ground truth 由未具名的 LLM case composer 起草、image-conditioned refiner 改写后定稿，人工介入只在候选初始图筛选；上述 human alignment 验证的是"judge 按给定 checklist 打分与人一致"，不是"checklist 抓对了该发生的反应"。judge 只看均匀采样的 10 帧，而 Social Interaction 与 Physical Reaction 要判的恰恰是时序性质，10 这个数无敏感性分析。六个动态任务的初始场景全为合成图、未说明生成模型与候选数，与 static track 的真实数据集输入分布不同源；每个 case 只跑一次生成，无重复采样方差。引用"20 个模型"时须注明那是 static-scene track 的规模，reactivity 层实际只有 9 个。数据与评测工具包写的是"will publicly release"，目前只有项目主页。
+
 **路线间对比小结**：
 
 | 路线 | 代表 | 主要 use case | 推理代价 | 主要 open gap |
 |---|---|---|---|---|
-| Pixel video diffusion | Cosmos / DreamGen / IRASim / Wonder | Data engine / Evaluator / camera exploration | 14B × 多步 → 秒级；Wonder 报 16 FPS（硬件未披露） | Action-following / physics / AR drift / total KV growth |
+| Pixel video diffusion | Cosmos / DreamGen / IRASim / Wonder | Data engine / Evaluator / camera exploration | 14B × 多步 → 秒级；Wonder 报 16 FPS（硬件未披露） | Action-following / world reactivity / physics / AR drift / total KV growth |
 | Latent JEPA | V-JEPA 2 / RWM / Orca | Agent brain / MPC | 16s → ms 级 | Goal spec / cross-embodiment / 不生成像素 |
 | 3D/4D generative | HY-World 2.0 / OccSora / RynnWorld-4D | Scene generation / driving sim | 分钟级/场景 | dynamics 依赖伪标注几何 / 小物体精度 |
 | Unified VLA+WM | UWM / Motus / DreamZero / FlowWAM / ABot-M0.5 / ST-WAM / N0-TWAM | VLA policy backbone | 百 ms 级（工程后） | 算力门槛 / unify 必要性 / action–imagination 同步性 / 新增预测通道归因不清 |
@@ -227,6 +252,7 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 | LIBERO-Plus | 10,030 例 / 七维扰动 | 零样本 Success Rate | ST-WAM 72.8（Fast-WAM 51.5） | LIBERO 的扰动版，已成为 WAM 视觉鲁棒性主力评测；ST-WAM 表中 baseline 数字引自第三方而非重跑（[[2607-STWAM]]） |
 | UniVTAC | 8 个触觉操作任务 | Success Rate | N0-TWAM 84.5（InternVLA-A1 67.1） | 唯一第三方公开的触觉 manipulation 套件；纯视觉 WAM 在此反而落后 VLA（FastWAM 48.0 / LingBot-VA 31.4），该异常低水位未被解释（[[2607-N0TWAM]]） |
 | Menti-Bench | 448 条（320 text / 100 image / 28 video），2,688 个 gold 后继状态 | final-action F1 | full MWM 87.9（human 98.5） | 心理-社会状态的 process-annotated 世界建模评测；只报 outcome 级指标，且 gold 与被测 pipeline schema 同源（[[2607-MentalWorldModeling]]） |
+| WorldExam | 1,474 case / 8 任务 / 4 诊断层级；static track 20 模型、dynamic track 仅 9 模型 | 四层分报（几何重建 + GPT-5.5 checklist），不出全局总分 | 各范式最好：Subject Control 55.47（action）；Object Interaction 75.96 / Goal Completion 85.33（language） | 唯一把"指令写明的后果"与"须自行推断的后果"分开报告的 WM 评测；引用"20 个模型"须注明 reactivity 层实际只有 9 个；数据与 toolkit 尚未发布（[[2608-WorldExam]]） |
 
 ## Key Takeaways
 
@@ -253,13 +279,15 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 21. **Memory 必须分开讨论 storage、active compute 与 semantic faithfulness**——[[2607-Wonder]] 固定 active KV set 只解决 attention cost，不限制 full historical KV storage；[[2603-HybridMemory]] 测动态主体 exit–reentry、Wonder 只给静态 revisit qualitative case，两者尚不能互相替代
 22. **Digital WM 的 grounding 开始分化为 external prior 与 executable structure 两条路线**——[[2510-RWoM]] 用 tutorial 把 imagined rollout 延长到约 3 steps，[[2607-ObjectCentricEnv]] 用 object/procedure code + re-execution gate 维护一致性；共同边界是“有依据/能执行”仍不等于环境语义真实
 23. **World model 不能脱离 environment lifecycle 单独评估**——[[2606-EnvEngineeringSurvey]] 将 model 放回 modeling→synthesis→evaluation→application 闭环，并指出除 correctness 外的 diversity/complexity/fidelity 仍 under-researched；这解释了为何视觉保真、action faithfulness 与 downstream policy success 长期互不等价
-24. **生成保真不蕴含物理判别**——[[2607-PhiZero]] 在 Physics-IQ 拿下 41.2（生成端第一）的同一模型，IntPhys2 Hard 只有 52.38（随机基线 50），LikePhys 流体倒数第三。Takeaway 16（evaluator 质量 ≠ 视觉保真）由此从 evaluator 场景推广为 WM 的一般性质：凡消费判别能力的用途（planner / evaluator / safety guard）都不能用生成指标验收，而分材料、分难度的判别 split 是目前唯一能暴露这一差距的手段
+24. **生成保真不蕴含物理判别**——[[2607-PhiZero]] 在 Physics-IQ 拿下 41.2（生成端第一）的同一模型，IntPhys2 Hard 只有 52.38（随机基线 50），LikePhys 流体倒数第三。Takeaway 16（evaluator 质量 ≠ 视觉保真）由此从 evaluator 场景推广为 WM 的一般性质：凡消费判别能力的用途（planner / evaluator / safety guard）都不能用生成指标验收，而分材料、分难度的判别 split 是目前唯一能暴露这一差距的手段。[[2608-WorldExam]] 从第三个角度给出同向的独立证据：同一批模型的视觉质量层几乎不含区分度（language-driven General 挤在 79.64–81.04），任务层却铺开 25 分（39.85–65.02），另有 ReCamMaster / FantasyWorld 的 General 80.97 / 80.23 配 Camera Control 38.64 / 18.46、Kling 2.5 的 General 最高配 Goal Completion 48.25。三处证据切的层不同（生成 vs 判别、视觉质量 vs 任务能力、几何类 vs checklist 类），结论同一：视觉指标不构成对 WM 能力的验收
 25. **WM 的用法从训练期扩展到推理期，且想象比重采样更省**——[[2607-WorldActionPlanner]] 把 policy 降级为工具、规划全程在想象中完成，1 次想象胜过带 ground-truth reward 的 BoN-8（60 vs 42）；但该系统带 URDF、相机标定与硬编码抓放原语，"72 vs π0.5 的 4" 是模块化+特权信息 vs 端到端的对比，仅 Table 9 隔离了 world model 自身贡献——归因清楚前不可引作 WM 的能力证据
 26. **给 WAM 增加新的预测通道，收益未必来自"预测"那一半**——[[2607-STWAM]] 的语义未来必须与 VAE 未来并存（DINO-only future 39.7 < 纯 VAE 的 51.5），[[2607-N0TWAM]] 的预测触觉输给反应式的观测触觉（去 observed 掉到 70.5 / 29.6，去 predicted 只掉到 71.8 / 41.1），且预训练规模才是 UniVTAC 上最大的单一因素（84.5→65.4）。两条独立证据同向，但均为库内单篇、无独立复现，应作为 WAM 表示设计的边界条件而非定论
 27. **检索式上下文的收益是有条件的，条件不满足时为负**——[[2607-STWAM]] 的三个对照（无锚点 DINO history 56.5 / 仅当前帧语义 62.3 / VAE history 64.7）全部低于完全不用 intent 条件的 66.4；收益要求 query 被当前状态锚定 **且** 被检索表示对无关扰动不变，缺一即掉点。这与 GUI / long-horizon agent 里"多喂历史反而掉点"是同一现象的不同实例
 28. **正则项的好坏取决于梯度场而非统计功效**——[[2607-QQWorld]] 指出 Epps–Pulley 的恢复力在偏差超过 $\sqrt{2}$ 后超指数衰减，正好放过最该被拉回的离群点，而 quantile–quantile 匹配的梯度对偏差线性；换掉正则后 latent WM 的 planning 平均 79.75→85.08、tail rate 0.315→0.123。可迁移的判据是：一个善于**度量**分布差异的统计量未必是好的**训练目标**
 29. **world prediction 也可以放在 critic 一侧**——[[2607-WCM]] 让 critic 联合预测 return 与下一帧 latent，drop-in 替换四种 VLA RL 算法的 critic；λ=0 的 history-ViT 对照（同样的时序容量、没有世界预测目标，依然无效）把增益与"多看几帧"分开。但全文无 value-accuracy 指标，中间机制未被直接测量，增益幅度也只有 0.8–2.3
 30. **"世界"里缺的那一块是人在想什么**——[[2607-MentalWorldModeling]] 把心理变量升格为随动作演化的状态变量，填上 Levels × Laws 中长期空置的 Social 约束域；但它自己的消融显示移除 physical 通道代价更大（−16.5 vs −12.1），且只报 outcome 级指标——目前证据支撑的是"结构化 prompting 有效"，不是"心理状态被正确建模"
+31. **控制被执行不等于世界会回应**——把"指令写明的后果"与"须自行推断的后果"分开报告后会出现方向反转：[[2608-WorldExam]] 中 action 接口在 Subject Control 领先（55.47 对 37.28），却在 Terrain / Object / Physical Reaction 上落后 37 / 42 / 30 分，反转幅度远大于领先幅度；Terrain 那一列的 gate 还系统性地偏袒 action-driven，差距依然成立。这在 action-following（错动作也生成成功）之外定位了一个独立失效面——动作被照做了，世界不动。边界是接口范式与模型档次共线：dynamic track 上 action-driven 仅 2 个本地模型对 language-driven 7 个 API 系统，"接口属性"与"模型档次"在现有数据里分不开
+32. **contact 是不同评测目标收敛到的同一处失效点**——[[2607-GigaWorld1]] 从 policy evaluation 角度报告 video model 对 contact-sensitive failure 有 optimistic bias，[[2608-WorldExam]] 从生成质量角度给出对应读数：Object Interaction 的典型失败正是"被接触物体不变"或"主体穿过去"，最好的 action-driven 只有 33.75。两者的数据、团队与评测目标都不同而指向同一处，这比任一单篇的排名更值得写进 mental model；但库内暂无对该失效机制的独立解释或复现，目前只能作为待验证的跨论文 pattern
 
 ## Open Problems
 
@@ -268,7 +296,7 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 3. **Long-horizon drift**：所有 autoregressive video WM 超过训练 horizon 都退化——GameNGen 3 秒、DIAMOND frame-stacking、World-VLA-Loop 200 帧、OccSora 离开 32 帧 FID 飙 200+。Explicit compressed memory、retrieval-based context、LLM-style KV cache + streaming 都是候选，但没有任何一种在 robot-relevant setting 上 demonstrated；[[2607-AlayaWorld]] 的 error bank + 双记忆零定量评估，[[2607-Wonder]] 的 full-fidelity sparse KV 只固定 active attention 且长期一致性仍为 qualitative evidence。后续必须同时报告 quality/control/revisit metric、latency 与 total memory 随 horizon 的曲线
 4. **Latent vs pixel 的路线之争**：V-JEPA 2 给出 15× 计算优势 + success rate 反超 Cosmos；DreamZero 反过来用 14B pixel WAM 达到 62.2%。[[2607-PhiZero]] 提出第三种位置——在离散符号空间推理、再渲染回像素，兼取 latent 的低维推理与 pixel 的可视化输出，但它同时是这条路线最直接的警示：判别能力没有随生成能力一起上来（IntPhys2 Hard 52.38 落后于纯 latent 的 V-JEPA 57.42）。**真正的 open question**：long-term 哪一条路径 scale 更好？或三者按用途分工（cloud-side pixel WM 做 data engine，符号中间层做 planner，edge-side latent WM 做 on-device MPC）？
 5. **Cross-embodiment transfer 真能靠 video 做到吗？**：DreamZero 的 12 min 人类 egocentric / 20 min YAM robot video → unseen task +16pp 是至今最强信号；但 humanoid 五指手 vs bimanual gripper 级的 morphology gap 尚未被 video WM 路线 attack
-6. **Benchmark metric 的 unresolved confound**：video fidelity (FID/FVD) ↔ physical faithfulness (VBench-2.0, PhysBench) ↔ policy success (DreamGen Bench / LIBERO SR) 三者相关但不等价。系统化的"哪个 metric 评 WM 公平" 的框架尚未建立。[[2607-PhiZero]] 把 confound 收窄成一个可操作的判据：生成式（Physics-IQ）与判别式（IntPhys2 Hard）在同一模型上给出相反排序，因此 WM 论文至少应同时报告两类指标，并按材料/难度分层——聚合分会掩盖流体等薄弱项（LikePhys 刚体第一、流体倒数第三）
+6. **Benchmark metric 的 unresolved confound**：video fidelity (FID/FVD) ↔ physical faithfulness (VBench-2.0, PhysBench) ↔ policy success (DreamGen Bench / LIBERO SR) 三者相关但不等价。系统化的"哪个 metric 评 WM 公平" 的框架尚未建立。[[2607-PhiZero]] 把 confound 收窄成一个可操作的判据：生成式（Physics-IQ）与判别式（IntPhys2 Hard）在同一模型上给出相反排序，因此 WM 论文至少应同时报告两类指标，并按材料/难度分层——聚合分会掩盖流体等薄弱项（LikePhys 刚体第一、流体倒数第三）。[[2608-WorldExam]] 给出两条方法层的部分答案：把"指令写明的"与"须自行推断的"分层报告，以及用两条 track 拒绝把"接口不支持"平均进总分；但它自己也承认 Task / General / Overall 都是跨异质指标（几何法 0–100 分与 checklist 满足比例）的算术平均，单个聚合分跨范式引用意义有限。一个不需复现即可做的收窄动作是把公开表里每个模型的 General 均值对其 Task 均值作回归，直接量化视觉质量对能力的解释力——原文只给了范围，未给相关系数
 7. **WM × VLA 耦合方式的 trade-off space**：当前 7 种耦合方式都有代表工作（offline data engine / inference-time latent conditioning / joint model / RL simulator / evaluator / test-time planner / RL critic 辅助目标），但没有 head-to-head 比较。在同等 compute / data 预算下，哪种耦合方式对 sample efficiency 最敏感？新加入的 planner 分支还带一个专属问题：[[2607-WorldActionPlanner]] 显示 1 次想象胜过 BoN-8，但没有 imagination horizon 扫描，也没有测误差累积——想象的收益在多长 horizon 上翻转成 drift 的代价，目前无数据
 8. **开源 vs 工业化：可复现性断层**：Cosmos 10 000 H100 × 3 个月、Motus 18 000 GPU-hours、DreamZero 2×GB200——任何"主脉络" WM 都远超学术实验室预算
 9. **Agent memory 与 World Model 的边界**：OpenWorldLib 把 long-term memory 写进 world model 定义，但 Memory 接口留空。[[2603-Memoir]] 用 imagination 作 retrieval query，[[2607-Wonder]] 用 query-summary 选 full-resolution historical KV，[[2607-ObjectCentricEnv]] 则把 object/procedure memory 直接做成 executable environment model；三者分别是“想象→检索”“生成→记忆”“记忆→模型”，尚无统一接口或同任务比较
@@ -286,9 +314,13 @@ World Model 是 AI Agent 的环境建模能力——预测行动后果、模拟�
 21. **扩展"被预测的未来"，边际收益到底来自哪里**：[[2607-STWAM]] 与 [[2607-N0TWAM]] 各加了一条新的未来预测通道（语义 / 触觉），两篇的消融却都显示新增的**预测**通路不是主要收益来源；N0-TWAM 从未做"去掉 future-vision 预测"的消融，也无"两条触觉通路同时关闭"的联合对照，ST-WAM 则无参数量、主表 baseline 来源不明。需要的是在同一 backbone、同一数据与算力下逐条移除预测目标的 matched 对照，否则这条路线的收益无法与规模、额外参数与冻结 encoder 的先验分离
 22. **表示的"不变性 × 可分性"在何种偏移下同时成立**：[[2607-STWAM]] 依赖 DINOv3 对外观扰动的不变性，而其评测的偏移恰好全是外观级；[[2607-N0TWAM]] 的 NeoForce 只在其预训练传感器（InTac S1）上验证，仿真因传感器不匹配直接放弃 force space。换成物理动力学、embodiment 或传感器型号级别的偏移时，什么表示能同时做到"对无关扰动不变"与"对任务状态可分"，两篇都把它列为 future work
 23. **心理 / 社会状态的 world model 缺过程级验收**：[[2607-MentalWorldModeling]] 定义了 mental fidelity、perspective-leakage rate、process-outcome divergence 却一个数值都没报，benchmark 与被测 pipeline 共享 schema、gold 由同一批作者裁定为唯一可辩护最优（真正有多个可辩护答案的社会决策因此被系统性排除）。要让 Social 约束域从 position 变成技术路线，缺的是 learned transition、心理变量的不确定性表示，以及过程级保真度的独立测量
+24. **接口属性与模型档次如何拆开**：[[2608-WorldExam]] 的核心结论"能力沿控制接口分裂且互补"建立在 dynamic track 的 9 个模型上，其中 action-driven 只有 2 个本地部署模型、language-driven 7 个全部走 API，论文亦承认闭源系统的 proprietary prompt enhancement 可能参与场景 grounding 与执行规划。判定这是接口的属性还是模型档次的属性，需要同一生成底座分别接动作接口与语言接口的 matched 对照，目前无人做。这也意味着"三种接口能力互补"的保质期可能很短——一旦强动作接口接到强生成底座上，整张表就会重画
+25. **checklist 作为 ground truth 缺独立审计**：reactivity 类任务的判定链条是"LLM 起草 checklist → VLM judge 按 checklist 打分"，[[2608-WorldExam]] 的 human alignment（Spearman 0.8614 / PLCC 0.8583，800 实例 / 5,793 item）验证的只是链条后半段；checklist 本身是否抓对了该发生的物理与社会反应无人验证，人工介入只在候选初始图筛选。judge 只看均匀采样的 10 帧，而 timely adjustment、premature onset、freezing 这类判定恰恰依赖帧序，Social Interaction 的一致性也正好最低（0.7019），10 这个数无敏感性分析。与 [[2607-GigaWorld1]] 的 WMES（与人 Spearman 0.7574）合看，VLM judge 与人的一致性目前落在 0.75–0.86 这个带子里，可作为后续报告的参照带；但一致性带子解决不了"评分标准本身对不对"。另有一条未被任何一方测过的旁路：judge 把"无法核实"记为不满足时，画面质量可能从后门渗进 reactivity 分数（推测，两篇均无相关分析）
 
 ## 调研日志
 
+- **2026-08-05 survey-refresh**：并入 1 篇（[[2608-WorldExam]]，full-text + source-checked，Evidence Ledger 23 行全为 source-verified）。结构性变化：新增路线 10「诊断式评测：把"指令写明的后果"与"须自行推断的后果"分开」——survey 此前只有 Open Problem 6 承载评测方法论、无对应正文小节，这一篇给了它锚点。路线 1 的缺点表新增"控制被执行但世界不回应"作为与 action-following 相互独立的失效面；路线 6 的 optimistic bias gap 补入方向一致的生成侧读数；路线对比表 pixel 行的 open gap 加入 world reactivity。Overview 趋势 +17；Key Takeaways +31/32，Takeaway 24 由单篇（Phi-Zero）扩为三个角度的同向证据；Open Problem 6 更新并新增 24/25；Benchmarks 表 +WorldExam。未刷新配图（本 survey 无配图，本轮为新增小节而非分类框架重构）。
+  - **证据边界**：接口范式与模型档次共线是这篇最主要的问题——dynamic track 上 action-driven 仅 2 个本地模型对 language-driven 7 个 API 系统，"action 接口 → 世界不反应"与"这两个特定模型 → 世界不反应"在其数据里分不开，论文未将此列为 limitation。范式内方差大于范式间（Kling 2.5 的 Task 39.85 低于 LingBot-World 39.91，范式内跨度 25 分），"language-driven 更会反应"实由三个最强系统撑起。四个 checklist 任务的 ground truth 由未具名 LLM 起草、refiner 改写后定稿，人工只筛初始图；human alignment 验证的是 judge 而非 checklist。judge 只看 10 帧且无敏感性分析。六个动态任务初始图全为合成、生成模型与候选数未披露，与 static track 输入不同源；每 case 只跑一次生成。"20 个模型"仅指 static track，reactivity 层实际 9 个。数据与 toolkit 尚未发布。以上均为库内单篇证据，无独立复现；与 [[2607-GigaWorld1]] 在 contact 失效点上的收敛属跨论文 pattern，非复现。
 - **2026-08-04 survey-refresh**：并入 5 篇（[[2607-QQWorld]] / [[2607-STWAM]] / [[2607-WCM]] / [[2607-MentalWorldModeling]] / [[2607-N0TWAM]]，均 full-text；ST-WAM 为 partial 核查，其余 source-checked）。结构性变化：路线 4 新增"被预测的未来该是什么表示"分支（ST-WAM 双空间未来 + N0-TWAM 触觉未来），路线 5 新增 critic 侧分支 WM-as-Critic 并在路线对比表 +1 行、Unified VLA+WM 行补 2 篇代表工作；路线 2 补 QQ-World，路线 9 补 MWM（Levels × Laws 中 Social 约束域的首篇）。Overview 趋势 +14/15/16；Key Takeaways +26–30，Takeaway 12 由六种耦合改为七种（新增 critic 侧，[[2607-WCM]]）；Open Problems 更新 7、新增 21–23；Benchmarks 表 +LIBERO-Plus / UniVTAC / Menti-Bench 三行。未刷新配图（本轮为分支新增，分类框架未重构）。
   - **证据边界**：ST-WAM 的核心机制断言（pixel-generative 未来监督造成 entanglement）在笔记 Evidence Ledger 中状态为 `unsupported`，全文无任何 entanglement 度量，本轮只引用其消融数字与负结果；其 LIBERO / RoboTwin 表未交代 baseline 来源、全文无参数量，唯一同示教同流程的干净对照是真机组。N0-TWAM 的 NeoData / NeoSim / NeoReal / NeoForce 均出自同一份公司网页报告，规模数字一手出处不可独立核查；真机每任务 20 trials，二项标准误约 ±11%，逐任务存在方向反转。WCM 全文无 value-accuracy 指标，"预测目标 → 值估计更准 → 策略更好"只有两端被测；SIGReg 在 on-policy 下关闭，仿真结果实际只有 $\mathcal{L}_{\text{pred}}$ 生效。MWM 只报 final-action F1，其自定义的过程级指标全部无数值，benchmark 与被测 pipeline schema 同源。QQ-World 只在单一 LeWM backbone 上验证，Reacher / OGBench 增益落在标准差内，三条 proposition 未给证明。以上均为库内单篇证据，无独立复现。
 - **2026-08-02 survey-refresh**：并入 2 篇（[[2607-PhiZero]] / [[2607-WorldActionPlanner]]，均 full-text + source-checked）。结构性变化：路线 1 新增 reason-then-render 分支（离散"物理语言"中间表示 + 扩散渲染），路线 5 新增推理期 WM-as-Planner 分支并在路线对比表 +1 行；Overview 趋势 +12/13；Key Takeaways +24（生成保真不蕴含物理判别，把 Takeaway 16 从 evaluator 场景推广为一般性质）、+25（推理期规划）；Takeaway 12 由五种耦合改为六种；Open Problems 2/4/6/7 更新；Benchmarks 表 +Physics-IQ / IntPhys2 / LikePhys-WorldModelBench 三行。未刷新配图。

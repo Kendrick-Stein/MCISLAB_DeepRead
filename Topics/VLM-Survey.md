@@ -1,9 +1,9 @@
 ---
 title: VLM Survey
 tags: [survey, VLM, multimodal, vision-language-model, visual-reasoning]
-date_updated: "2026-08-04"
+date_updated: "2026-08-05"
 year_range: 2023-2026
-papers_analyzed: 43
+papers_analyzed: 46
 keywords: [vlm, vision language model, multimodal llm, visual reasoning]
 domain_map: VLM
 ---
@@ -41,7 +41,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - **SeeClick**：Grounding pre-training + screen-only 输入，实现跨平台 GUI grounding
 
 **优势**：解决传统 VLM 在文本密集场景的分辨率瓶颈；跨平台通用性强（不依赖 DOM/HTML）
-**局限**：高分辨率输入导致计算开销显著增加；训练和推理资源消耗大
+**局限**：高分辨率输入导致计算开销显著增加；训练和推理资源消耗大。同一瓶颈还有一条不改训练的解法——推理期让模型自己决定放大哪一块，而非把整幅截图整体升到更高分辨率（[[2608-GUILens]]，详见 §2.7）
 
 ### 2.2 Zero-shot / Agent-based Grounding 路线
 
@@ -126,9 +126,9 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 ### 2.7 VLM as CUA 基座：数据 Scaling、动作表示与外挂验证
 
-**代表论文**：[[2509-ScaleCUA]]、[[2602-ToolTok]]、[[2511-GuiAima]]、[[2606-HiViG]]、[[2603-SecAgent]]、[[2607-MHLC]]
+**代表论文**：[[2509-ScaleCUA]]、[[2602-ToolTok]]、[[2511-GuiAima]]、[[2606-HiViG]]、[[2603-SecAgent]]、[[2607-MHLC]]、[[2608-GUILens]]、[[2608-MissClick]]
 
-**核心结论**：GUI/computer-use 场景对 VLM 的要求已从"看得清"（2.1 的高分辨率路线）推进到数据配比、动作表示、历史压缩与验证机制四个层面，且 grounding 能力与端到端 agent 能力被证明显著解耦。
+**核心结论**：GUI/computer-use 场景对 VLM 的要求已从"看得清"（2.1 的高分辨率路线）推进到数据配比、动作表示、历史压缩与验证机制四个层面，且 grounding 能力与端到端 agent 能力被证明显著解耦。动作表示这一层在 2026H2 被从两端同时敲打：推理期的主动观察脚手架可以在完全不训练的前提下把通用 VLM 的定位精度抬到专用模型之上（[[2608-GUILens]]），而"坐标以 digit token 逐位发出"这个输出接口被证明是一个可被定向利用的非均匀误差面（[[2608-MissClick]]）——一个说明接口选择决定能力上限，另一个说明它同时决定攻击面。
 
 **关键设计**：
 - **ScaleCUA**：6 平台开源 CUA 语料（471K understanding / 17.1M grounding / 19K trajectories）+ Qwen2.5-VL 3B/7B/32B 三推理模式基座；GUI understanding/grounding 开源 SOTA（MMBench-GUI L1-Hard 94.4、ScreenSpot-v2 94.7、ScreenSpot-Pro 59.2），但端到端 OSWorld 仅 17.7%、落后 RL 训练的 agent 近一倍（[[2509-ScaleCUA]]）
@@ -137,15 +137,19 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - **HiViG**：8B 多模态 critic 双任务——递归压缩 macro-action history + 在截图上渲染红 "X" 标记核对 policy 的实际坐标；对 frozen policy 平均 +7.3/+9.0（Qwen3-VL-32B / Gemini-3-Flash），而全部五种已有 critic baseline 对强 policy 增益近零或为负（[[2606-HiViG]]）
 - **SecAgent**：自然语言 semantic context 递归压缩历史，1 帧历史 + context 接近 5 帧性能（SA 94.8 vs 95.5）而 tokens/TTFT 显著更低；附中文 CMGUI 数据集（121K 已标注 steps / 44 apps）补非英语语料缺口（[[2603-SecAgent]]）
 - **MHLC**：把 generated-token hidden-state trajectory 读成两个 execution control signal——Capability Head 决定是否 handoff，Resolution Head 在 Clarification / Tool Use / Abstention / Direct Answering 间选择；AndroidWorld 的 Qwen3-VL-4B→32B routing 从 0.47 提至 0.60、按其“本地模型免费”口径 paid API cost 减 90.7%。它把 latent self-assessment 变成可执行接口，但监督来自外部 LLM judge、每个 backbone 需单独训练，且 hidden-state access 使其不能直接包装 closed API（[[2607-MHLC]]）
+- **GUI-Lens**：training-free 的推理期定位脚手架，把一次性坐标预测改写成序贯观察。OCR 与 UI detector 的输出只作**非排他**坐标参考而不构成候选集，裁剪区域与放大倍率由 VLM 自选（与围绕临时点击点缩放的做法相对，后者一旦早期定位偏了后续观察就被锁死），每个 crop/click 提议先标注回图上做一次 accept/reject 校验，拒绝即回退全屏重启。同 backbone 对照下 ScreenSpot-Pro：GPT-5.5 74.8→87.9、Claude Opus 4.7 57.4→82.3、MiniMax-M3 26.4→47.4；另有 ScreenSpot-v2 96.8、MMBench-GUI-L2 91.52、UI-Vision 68.64。**引用须带限定**：对照的是单次调用而非等推理预算（高精度配置每样本要发起十余次模型调用），跨行 backbone 不统一（GPT-5.5 单次调用的 74.8 本身已高于同表全部专用 GUI 模型的最好值 70.6），OSWorld 的 86.8 只覆盖 Chrome/Multi-Apps/OS 三域且步数上限 15，全部数字为单次运行、未做重复采样（[[2608-GUILens]]）
+- **MissClick**：把坐标输出接口本身当作攻击面。digit 带十进制位权，百位翻一次即 100 个坐标单位的位移，而 token 级 loss 对所有位一视同仁；untargeted 分支最大化可微 soft coordinate 与真值点击的距离，targeted 分支改用按位权加权的 target-digit 交叉熵——作者用"期望等于目标值但 argmax 不是"的反例说明 targeted 为何不能沿用 soft-coordinate 目标，这条带机制解释的负结果比主表更硬（soft-coordinate 目标在 targeted 下只有 15.73/27.59，反低于朴素 digit CE 的 35.24/50.69）。ScreenSpot-v2 上白盒 PGD（ε=16/255）攻击 OS-Atlas-Base-7B / UGround-V1-7B：untargeted ASR 75.07%/72.93%（representation attack 58.45%/42.21%），targeted 44.86%/62.67%（token CE 13.13%/15.61%），位权加权本身贡献 +9.62/+11.98 pp。**边界很窄**：全白盒、无迁移与黑盒实验、零防御评测、扰动注入通道未讨论；untargeted 口径把解析失败计为成功且只要求点击离开真值框，故 75% 这个数并不检验它自己的位权机制，真正相关的是 targeted 的 44.86%（[[2608-MissClick]]）
 
 **跨论文 pattern**：
 
 | Pattern | 证据 |
 |:--|:--|
 | grounding SOTA ≠ 端到端能力 | ScaleCUA OSWorld 17.7 vs COMPUTERRL 47.3；训练分辨率 2K 升 grounding 却降 online agent |
-| 像素锚定优于文字中介 | HiViG intent masking ablation 证明 verbal critic 在读文字而非看图；ToolTok/HiViG 均靠截图上渲染显式标记（crosshair / 红 X）把 VLM 拉回视觉状态；GUI-AIMA 直接监督内生 anchor→patch 注意力分布替代文本坐标生成，ablation 较 vanilla attention 聚合 +5.88（43.39 vs 37.51） |
+| 像素锚定优于文字中介 | HiViG intent masking ablation 证明 verbal critic 在读文字而非看图；ToolTok/HiViG 均靠截图上渲染显式标记（crosshair / 红 X）把 VLM 拉回视觉状态；GUI-AIMA 直接监督内生 anchor→patch 注意力分布替代文本坐标生成，ablation 较 vanilla attention 聚合 +5.88（43.39 vs 37.51）；GUI-Lens 的 visual verification 同样把提议的框/点画回观察图上再判 accept/reject（去掉该组件 −1.7~−4.8） |
 | GUI 专有能力与通用能力冲突 | ScaleCUA：通用多模态数据比例上升则 GUI benchmark 单调下降，需显式 data-balancing |
 | 语义历史压缩缺 factuality 校验 | SecAgent/HiViG 的压缩状态由模型自述生成，silent corruption 会污染后续决策，两篇均未评测 context 本身准确率 |
+| 坐标的 digit 序列化是一个非均匀误差面 | [[2608-MissClick]]：单纯给交叉熵乘上 $10^{m-j}$ 的位权，targeted ASR 即从 35.24→44.86 / 50.69→62.67。同一杠杆在训练侧已被位权重加权类工作（NTL、DIST2Loss、Phi-Ground）独立利用，说明这是接口性质而非某个模型的实现偶然；其推论是任何噪声源（量化、采样温度、解码扰动）在高位上的一次失误都会造成大位移 |
+| 推理期脚手架的边际价值取决于它补的是能力缺口还是信息瓶颈 | [[2608-GUILens]] 三 backbone 消融：coordinate priming −1.0/−2.0/−7.3、visual verification −1.7/−1.7/−4.8，收益随 backbone 变弱而放大；而 cropping 对最强的 GPT-5.5 仍值 −10.4。前两者替补基座缺失的能力、会随基座进步贬值，裁剪解的是高分辨率输入的信息瓶颈、不随能力增强而消失。单篇证据，尚无独立复现 |
 
 ### 2.8 机制分析：视觉信息"在"但"读不出"
 
@@ -205,7 +209,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 | Tool-Harm 未被控制 | Beacon 平均 Tool-Harm 6.15 为全表最高（Metis 仅 1.10），ΔTE 优势全来自 Tool-Gain；MathVista 上 ΔTE −0.38，按其自身口径工具净有害 |
 | 评测轴与训练目标同源 | FaithEyes 的评测 faithfulness rubric 是训练 subagent rubric 的加严版（同一概念"所问目标是否出现在处理图中"，差别在信息集与严格度），只有 FaithEyes 被直接优化到该轴上，baseline 从未见过 |
 | 只证到 action level | 两篇诊断问题时用的是"移除 process image 后预测几乎不变"这类反事实证据，验证自身修复时却换成 judge 打分的比例指标；FaithEyes 自认 answer-level reliance gap 未关闭 |
-| 无预算匹配对照 | FaithEyes 每次工具调用多一次 subagent forward，全文不报 latency 或 token 开销；其 Table 1 显示仅在推理期给 Thyme 插一个外部 32B 判词、不做任何训练，V\* 即从 82.7 升到 85.8（距 FaithEyes 87.4 仅 1.6 分），暗示相当部分增益来自"多一次带视觉的复核"这一通用机制。Beacon 调用频率远高于 baseline，等推理预算下的对比同样缺失 |
+| 无预算匹配对照 | FaithEyes 每次工具调用多一次 subagent forward，全文不报 latency 或 token 开销；其 Table 1 显示仅在推理期给 Thyme 插一个外部 32B 判词、不做任何训练，V\* 即从 82.7 升到 85.8（距 FaithEyes 87.4 仅 1.6 分），暗示相当部分增益来自"多一次带视觉的复核"这一通用机制。Beacon 调用频率远高于 baseline，等推理预算下的对比同样缺失。同一缺口在 GUI 定位脚手架上原样重现——[[2608-GUILens]] 的 +13.1~+24.9 全部对照单次调用 baseline，而其高精度配置每样本要发起十余次模型调用 |
 | 强 teacher 依赖未被剥离 | Beacon 的 SFT 轨迹合成、RL hint 生成与答案判分兜底同为 Gemini 3.1 Pro；FaithEyes 的判定 rationale 由 Qwen3-VL-32B 生成、accuracy/consistency 兜底由 Qwen2.5-VL-72B、faithfulness 评测由 Qwen3-VL-235B-A22B。两篇均无 teacher 消融，"机制有效"与"强 teacher 蒸馏有效"无法分开 |
 | baseline 数字跨论文不一致 | 同一 DeepEyes-7B 在 [[2606-CodeDance]] 记 V\* 90.4 / MathVerse 47.3，在 [[Papers/2607-FaithEyes]] 记 84.3 / 44.3——这批 benchmark 的评测协议（分辨率上限、温度、答案抽取）远未统一，1.6~2.6 分的领先须在同一 harness 下复现才成立 |
 
@@ -230,8 +234,8 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 | **Nr3D** | 3D Grounding | ~41K descriptions | Acc | VLM-Grounder: 48.0% | 3D referring expression |
 | **Mind2Web** | Web Navigation | ~2K tasks | Success Rate | CogAgent SOTA | Web agent benchmark |
 | **AITW** | Android Navigation | ~560K episodes | Action Accuracy | CogAgent SOTA | 移动端操作 benchmark |
-| **ScreenSpot** | GUI Grounding | Multi-platform | Accuracy | ScaleCUA-32B 94.7 (v2) | GUI grounding 评测 |
-| **ScreenSpot-Pro** | 高分辨率 GUI Grounding | 专业软件截图 | Accuracy | GUI-AIMA-3B 61.5（含 zoom-in）/ ToolTok-4B 61.1 / ScaleCUA-32B 59.2 | 高分辨率/小目标 grounding |
+| **ScreenSpot** | GUI Grounding | Multi-platform | Accuracy | GUI-Lens (GPT-5.5) 96.8 (v2，推理期脚手架) / ScaleCUA-32B 94.7 (v2) | GUI grounding 评测 |
+| **ScreenSpot-Pro** | 高分辨率 GUI Grounding | 专业软件截图 | Accuracy | 脚手架档 GUI-Lens (GPT-5.5) 87.9（非等推理预算；同基座单次调用 74.8）/ 专用模型档 GUI-AIMA-3B 61.5（含 zoom-in）/ ToolTok-4B 61.1 / ScaleCUA-32B 59.2 | 高分辨率/小目标 grounding；两档不可直接比较 |
 | **RefCOCO** | 2D Grounding | ~50K expressions | Acc@0.5 | 多模型竞争 | 经典 referring expression |
 | **FactIP** | World-grounded Generation | 12 categories | Human preference | Unify-Agent 接近 closed-source | 长尾概念生成评测 |
 | **SynthDocBench** | Long-context Doc VQA | 200 docs / 1,788 题 | ACC（LLM judge） | Gemini-3.1-Pro 0.725 | 全合成受控诊断；因子可独立控制 |
@@ -256,7 +260,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 ## Key Takeaways
 
-1. **高分辨率视觉编码是 VLM 在文本密集场景的关键突破**：CogAgent、MobileFlow 等证明，支持 ≥1120x1120 输入的双分辨率编码器可显著提升 GUI、文档等场景的理解能力。这解决了传统 VLM 固定分辨率（224x224）的瓶颈。
+1. **高分辨率视觉编码是 VLM 在文本密集场景的关键突破，但训练不是唯一的解法**：CogAgent、MobileFlow 等证明，支持 ≥1120x1120 输入的双分辨率编码器可显著提升 GUI、文档等场景的理解能力，解决了传统 VLM 固定分辨率（224x224）的瓶颈。同一瓶颈在推理期还有一条 training-free 的对应路线——由模型自选放大区域的序贯观察（[[2608-GUILens]] 在同基座上把 ScreenSpot-Pro 提升 13.1~24.9 分），且三 backbone 消融显示裁剪对最强基座仍值 10.4 分，说明分辨率是架构层的信息瓶颈、不随基座能力增强而消失。但该对照没有等推理预算 baseline，增益里脚手架与算力各占多少无从分离。
 
 2. **Zero-shot grounding 利用 VLM agent 能力而非专门训练**：VLM-Grounder 展示了通过动态拼接 + feedback loop + multi-view ensemble，无需 3D 训练数据即可实现较强的 3D grounding。这条路线适合数据稀缺场景。
 
@@ -302,13 +306,13 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 7. **3D grounding benchmark 的规模局限**：ScanRefer、Nr3D 数据规模有限（~50K），且场景类型偏室内家居。开放世界 3D grounding、跨场景泛化评测仍缺乏。
 
-8. **MLLM-as-reward / as-judge 的可信度**：2.6 节三篇工作的 reward 或评测均依赖闭源强模型且缺独立人评交叉验证（[[2607-SpectraReward]] 零人类评估、[[2607-SearchGenBoundary]] 裁判与奖励同源）；[[2607-SynthDocBench]] 的 rendering-familiarity confound（D3.js 渲染分布可能偏向特定模型家族）提示合成评测同样有系统性偏差。Reward hacking、judge 亲和偏差的系统性度量方法缺失。§2.9 把该问题推到极端形态：[[Papers/2607-FaithEyes]] 的 tool reward 完全由与 policy **共享权重**的 subagent 给出，RL 全程只在训练结束后做过一次外部 judge 检查，而稳步上升的 tool reward 恰恰是被 hack 时同样会上升的量；该 subagent 的判定质量从未被独立测量（无人工标注一致率、无相对 235B judge 的混淆矩阵），其 SFT 判定标签还建立在"两次调用轨迹的第一次必然无用"这一未核验的结构性假设上。可行的最小检验是记录 RL 全程 subagent True-rate 与外部 judge 判定的偏离曲线，成本不高但尚无人做。
+8. **MLLM-as-reward / as-judge 的可信度**：2.6 节三篇工作的 reward 或评测均依赖闭源强模型且缺独立人评交叉验证（[[2607-SpectraReward]] 零人类评估、[[2607-SearchGenBoundary]] 裁判与奖励同源）；[[2607-SynthDocBench]] 的 rendering-familiarity confound（D3.js 渲染分布可能偏向特定模型家族）提示合成评测同样有系统性偏差。Reward hacking、judge 亲和偏差的系统性度量方法缺失。§2.9 把该问题推到极端形态：[[Papers/2607-FaithEyes]] 的 tool reward 完全由与 policy **共享权重**的 subagent 给出，RL 全程只在训练结束后做过一次外部 judge 检查，而稳步上升的 tool reward 恰恰是被 hack 时同样会上升的量；该 subagent 的判定质量从未被独立测量（无人工标注一致率、无相对 235B judge 的混淆矩阵），其 SFT 判定标签还建立在"两次调用轨迹的第一次必然无用"这一未核验的结构性假设上。可行的最小检验是记录 RL 全程 subagent True-rate 与外部 judge 判定的偏离曲线，成本不高但尚无人做。另一侧的进展是 judge 可靠性开始有可比的量纲：[[2608-WorldExam]] 用 800 个实例、5,793 条 checklist item、3 名标注者多数票测得 GPT-5.5 judge 与人的 Spearman 0.8614 / PLCC 0.8583，且报告了分任务弱项——最低的 Social Interaction 只有 0.7019，恰是需要判时序的一类，而 judge 只看均匀采样的 10 帧、帧数未做敏感性分析。它同时暴露了一处容易被忽视的协议风险：判定规则把"无法核实"一律记为不满足，画面越糊越难确认某条成立，视觉质量因此可能从后门渗进语义分（该论文未做相关分析）。judge 协议的默认值本身就是一个未被度量的偏差来源，这一点可直接搬到 VLM-as-judge 的任何场景。该基准的主场是 [[Topics/WorldModel-Survey]]，此处只取其可迁移的 judge 可靠性读数。
 
 ### 5.3 系统与应用挑战
 
 9. **VLM 作为 agent backbone 的决策可靠性**：当 VLM 用于 GUI agent、embodied agent 时，其 grounding 误差会直接影响动作执行。如何在多步任务中实现稳定的决策链，是走向实际部署的关键。[[2606-HiViG]] 给出一个反直觉证据：五种已有 critic（scalar PRM、zero-shot verbal critic、专训 critic）对强 policy 增益近零或为负——"拿通用 VLM 当 judge"在 CUA 上不成立，critic 必须专门训练且训练信号对准像素证据（visual marker + intent masking）。[[2607-MHLC]] 进一步说明 even when latent control works，judge-derived labels、fixed threshold、per-backbone head 与未计 hidden-state extraction 的成本会成为新依赖；[[2607-HyGAE]] 则把训练期稳定性问题推进到 token/turn 混合 credit，但 long-horizon 证据仍空白。
 
-10. **安全与隐私防护的系统化方案**：LaSM 针对 pop-up attack 的 layer-wise scaling 是有效局部方案，但对 instruction injection、adversarial OCR text 等其他攻击类型的系统性防御尚未成熟。隐私维度上 [[2601-GUIGuardBench]] 揭示层级断裂：binary detection 尚可（Android 89.0% / PC 63.3%）但 strict full match 仅 8.8%/0.6%，需要上下文推断的 Inferences & Profiling 类 recall 仅 2.4%——"知道有隐私"远不等于能最小化披露，selective disclosure policy 的学习尚属空白。
+10. **安全与隐私防护的系统化方案**：LaSM 针对 pop-up attack 的 layer-wise scaling 是有效局部方案，但对 instruction injection、adversarial OCR text 等其他攻击类型的系统性防御尚未成熟。隐私维度上 [[2601-GUIGuardBench]] 揭示层级断裂：binary detection 尚可（Android 89.0% / PC 63.3%）但 strict full match 仅 8.8%/0.6%，需要上下文推断的 Inferences & Profiling 类 recall 仅 2.4%——"知道有隐私"远不等于能最小化披露，selective disclosure policy 的学习尚属空白。感知侧还有一条与注入类攻击正交的通路：[[2608-MissClick]] 不改指令、不改模型参数，只在截图上加 ℓ∞ 有界扰动就能把点击挤出目标控件（untargeted ASR 75.07%/72.93%），甚至定向落进指定的另一个元素（targeted 44.86%/62.67%），杠杆正是坐标逐位序列化后高位 digit 的巨大位权。防御位置因此完全不同——意图审计与确认门控拦得住指令注入，拦不住这一类，因为 agent 报告的动作语义与它实际发出的坐标之间根本没有一致性检查；对最终落点反查一次元素身份、核对它是否与指令描述匹配，是一项廉价、与攻击类型无关且当前普遍缺失的环节。该威胁自身的证据边界很窄：全白盒、无迁移与黑盒实验、零防御评测（连 JPEG 重编码与模型自身 resize 这类最便宜的检查都未做）、ε=16/255 在大面积纯色的 GUI 截图上对人眼可感知，且扰动经由什么通道写进 agent 看到的截图始终未被讨论。
 
 11. **理解-生成统一模型的推理效率**：MoE + diffusion + LLM 的组合导致显存和推理速度挑战。如何在保持统一能力的前提下实现高效推理，需要架构层面的创新。[[2607-Gemma4]] 的 encoder-free 直投路线（raw patch/audio 直接进 LLM embedding 空间）是候选方向之一，但目前只有 12B 单点、缺同规模对照。
 
@@ -386,6 +390,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - [[2607-SynthDocBench]] - SynthDocBench: 长文档视觉理解的受控诊断 benchmark
 - [[2601-GUIGuardBench]] - GUIGuard-Bench: Trajectory-conditioned GUI privacy 评测
 - [[2607-MentalWorldModeling]] - Menti-Bench / Mentis: 心理状态世界建模的六级必要性阶梯与跨媒体通道干预
+- [[2608-WorldExam]] - WorldExam: world model 四层诊断基准，附 VLM-judge 与人一致性的规模化测量（primary home 为 [[Topics/WorldModel-Survey]]）
 
 **VLM for GUI Agent**：
 - [[2506-ShowuiOneVisionLanguage]] - ShowUI: Vision-Language-Action model for GUI
@@ -395,6 +400,8 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - [[2606-HiViG]] - HiViG: History-aware visually grounded critic
 - [[2603-SecAgent]] - SecAgent: Semantic context 历史压缩 + 中文 CMGUI 数据集
 - [[2607-MHLC]] - MHLC: Hidden-state trajectory 驱动 handoff / tool / clarification / abstention
+- [[2608-GUILens]] - GUI-Lens: Training-free 序贯裁剪 + 自校验的推理期 grounding 脚手架
+- [[2608-MissClick]] - MissClick: 位权加权的 digit 级对抗攻击，暴露坐标序列化接口的非均匀误差面
 
 ---
 
@@ -455,4 +462,12 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - 未推翻既有结论：§2.8 原有四篇的表述全部保留；本轮改的是该节的证据分层与适用边界，不是结论方向
 - 验证边界：TokenSwap 的 gap 数字未与"模型能否认出替换图"分离，弱模型上感知失败与读出失败无法拆开——正文与 Open Problem 14 均已写明，未把它表述为读出通路的独立验证；Mentis 全文只报 final-action F1，其过程级指标（mental fidelity / perspective-leakage / process-outcome divergence）在原文有定义无数值，未据其写任何过程层结论
 - domain_map: 更新 [[DomainMaps/VLM]] 近期格局变化（跨模态一致性成为与单模态分数正交的独立评测轴）
+- **status**: success
+
+### 2026-08-05 增量更新（survey-refresh）
+- 并入 3 篇：[[2608-GUILens]]（§2.7 + §2.1/§2.9 交叉引用 + benchmark 表，training-free 序贯裁剪脚手架，三 backbone 消融给出"脚手架补能力缺口 vs 补信息瓶颈"的分辨判据）、[[2608-MissClick]]（§2.7 + Open Problem 10，位权加权的 digit 级对抗攻击，坐标序列化接口的非均匀误差面）、[[2608-WorldExam]]（Open Problem 8，VLM-judge 与人一致性的规模化测量与 judge 协议默认值偏差；primary home 为 [[Topics/WorldModel-Survey]]，此处只取可迁移的 judge 可靠性读数）
+- 跳过：无
+- 结构变化：未新增小节。§2.7 代表论文 +2、关键设计 +2 bullet、跨论文 pattern 表 +2 行（digit 序列化的非均匀误差面；脚手架边际价值的分辨判据）；benchmark 表 ScreenSpot / ScreenSpot-Pro 的 SOTA 列改为"脚手架档 / 专用模型档"两档并注明不可直接比较；Takeaway 1 增量修订（分辨率瓶颈的推理期解法与其等预算缺口）；Open Problem 8/10 各扩一段
+- 未推翻既有结论：§2.7 原有六篇表述全部保留；Takeaway 1 的原论断（高分辨率编码是关键突破）未被削弱，新增的是同一瓶颈的第二条解法
+- 验证边界：GUI-Lens 的全部增益对照单次调用 baseline 而非等推理预算，跨行 backbone 亦不统一，正文与 §2.9 打折表均已写明，未把 87.9 与专用模型的 61.5 并列为同一榜；MissClick 为全白盒、无迁移无防御评测，其 untargeted 口径把解析失败计为成功，未据 75% 支持任何机制结论；WorldExam 的"视觉质量从后门渗进语义分"为该论文未做分析的推测，已按推测表述
 - **status**: success

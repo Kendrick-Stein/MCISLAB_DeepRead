@@ -2,9 +2,9 @@
 title: Vision-Language-Action Models
 description: 从 2022 RT-1 到 2026 π0.7 / GEN-1 的 VLA 全景——按 action 表示与 data recipe 双轴组织，覆盖 AR token / 连续 flow matching / hierarchical / latent / reasoning-augmented / hybrid / world-model-conditioned / RL-post-trained 八类技术路线，重点分析 scaling law、cross-embodiment 统一、real-world RL、reasoning-action 融合、data engine 工学术分化等前沿议题
 tags: [VLA, manipulation, embodied-reasoning]
-date_updated: "2026-08-04"
+date_updated: "2026-08-05"
 year_range: 2022-2026
-papers_analyzed: 90
+papers_analyzed: 91
 keywords: [vla, vision-language-action, robot policy]
 domain_map: EmbodiedAI
 ---
@@ -168,6 +168,29 @@ VLA 试图解决的核心问题可以用 [[2509-PureVLA]] 的一句 framing 概�
 
 证据独立性的硬边界必须同时记：两篇同团队，NeoData / NeoSim / NeoReal / NeoForce 均出自公司网页报告、一手出处不可独立核查，八个基准中仅 UniVTAC 为第三方，且 N0-VTLA 在 UniVTAC 的 8 个任务里输掉 3 个（Insert HDMI 25，对照 Xiaomi-Robotics-0 的 69）；真机每任务 20 trial（分辨率 ±11%），无 seed 与方差，也没有同一 checkpoint 关掉触觉的对照。
 
+### 横切议题三：proprioceptive state 的接口与历史深度（2026-08 新增）
+
+八条路线按 action 表示组织，而"机器人自身的 state 怎么进模型"横跨全部路线，且长期由惯例而非证据决定——[[2504-Pi05|π0.5]] 把 state 量化成文本 token 拼进 prompt，[[2502-OpenVLA-OFT|OpenVLA-OFT]] 连续投影进语言序列，[[2503-GR00TN1|GR00T N1]] 直接喂 action head，三者从未在同一 backbone 下被单独比较。[[2608-VLAProprioception]] 把这个接线选择拆成表示形式、历史长度、注入位置三条可测量的轴，固定 π0.5 基座、数据、action 表示与评测协议，用同一 scaffold 实现五种接口在 RoboCasa365 上闭环对比（45 个 atomic 任务按控制语义事前分三族、各训一个 category expert、每任务 50 次 rollout；20 个 composite 任务单策略联合训练、每任务 25 次 rollout）。
+
+| 接口 | 注入位置 | 新增可训练参数 | 训练 / 推理边际 GFLOPs | 单帧 45-atomic macro SR |
+|:--|:--|:--|:--|:--|
+| no-state | — | — | — | 54.6 |
+| State Prompt (sp) | VLM prompt（每维 256 bin，约 66 token；构造上只支持当前帧） | 0 | 1114 / 282 | **57.7**（+3.1，唯一区间排除 0：[0.2, 6.1]） |
+| VLM Prefix (vp) | VLM 双向 prefix | 4.26M | 16.9 / 4.3 | 56.8 |
+| Action Prefix (ap) | action expert 因果后缀 | 1.08M | 3.5 / 7.6 | 55.7 |
+| State Expert (se) | 独立 transformer 分支 | 199.30M | 2.6 / 0.7 | 55.7–57.7 带内 |
+| Feature Modulation (fm) | action expert 每层 scale / shift 调制 | 123.84M | 45.4 / 114 | 55.7–57.7 带内 |
+
+**当前帧 state 的平均收益很小，接口选择在平均意义上几乎无关紧要。** 五个接口的点估计全部挤在 55.7–57.7 这两个点的带子里，只有 sp 的配对 task-bootstrap 区间排除 0，其余四个只能读作一致的正向倾向。真正的信息在族内排名的翻转：rearrangement / pick-and-place 一族 sp 最优（68.7，+7.0），articulated-object 一族 vp 反超（68.8，+6.1），小工作空间高精度一族 se 领先（42.8，+3.3）且 vp 是唯一低于 baseline 的接口（38.3，−1.2）。一个 benchmark-wide 平均会把这套结构完全抹掉。算力代价则相差两个数量级——sp 的 66 个 prompt token 是最贵的设计，而 se / fm 用近乎可忽略的边际算力拿到同档点估计。
+
+**短历史有界有益、长 raw 历史有害，且收益不能用 conditioning 容量解释。** K 从 1 扫到 96 呈明显非单调，小工作空间高精度一族在长历史下退化最重、经 VLM prefix 注入时尤甚。关键排除项是 slot-matched 对照：固定图像、语言、slot 数、expert action 与初始 flow noise，只把有序历史换成当前帧的副本，composite 从 39.0 掉到 30.8，差 +8.2 且配对区间排除 0——多出来的 conditioning slot 本身不产生收益，起作用的是时序内容。
+
+**注入位置的偏好随时间预算翻转。** 单帧时 VLM 侧占优（composite vp1 34.4 对 ap1 28.2）；给到 8 帧历史后决定性地转向 action 侧——ap 在 composite 上 28.2→39.0（+10.8）、atomic 上 55.7→59.6（+3.9），同样的历史走 vp 只有 −0.6 与 +0.6，K=8 时 ap 在每个 panel 都是最佳入口，而它在单帧时接近最弱。定点 probe 与这个读法一致：ap1→ap8 使 flow 末端 correction 与 expert residual 的对齐从 0.079 升到 0.270、归一化幅度 0.174→0.382（45 任务配对差 +0.191 / +0.208，区间 [+0.143,+0.239] / [+0.171,+0.244]），PrepareToast 的增益集中在"回身关柜"这一后期阶段切换（该阶段达成率 30%→56%，配对区间 [+10,+42]；条件于进入前一阶段后 46.9%→82.4%），作者声明这是使用模式的关联证据而非 mediation。
+
+这条结果与「横切议题一」构成同一个模式：**conditioning 进入网络的位置本身是一等设计变量，而它的最优解依赖其余设计，没有可移植的默认值**。语言语义的注入点在三种架构之间不可移植，state 的注入点则在同一架构内随历史长度翻转；两者都说明"接在哪里"不能从别人的配置里抄。
+
+边界需一并记住。+10.8 是从 ap1 28.2 这个几乎无收益的起点量起的，跨设计的诚实比较是 ap8 的 39.0 对最好的单帧设计 vp1 的 34.4，即 +4.6，方向不变但幅度减半。换成 joint-angle state 后短历史的方向复现，但 K=8 时两条路线收敛（ap 36.2 对 vp 35.8，落在配对 bootstrap 噪声带内），路由规则的强度依赖 state 用的是哪套坐标。16 维 state 里有 7 维是 world frame 下的 mobile-base 位姿，作者自己点明这不能读作纯粹的内部本体感受，而 sp 增益最大的恰是大范围重定位一族——"把全局定位离散化塞进语言空间"是一条未被消融排除的替代解释。此外 se / fm 因硬件分配训练曝光偏低（作者据此声明不做 capacity-matched claim），多数对比依赖单一训练 seed，interface × depth 的 sweep 属探索性且未做多重比较校正，全部实验在仿真中完成、state 纯 kinematic 不含 force / tactile。以上数字经原文一致性核查，尚无独立复现。
+
 ### 8 条路线的实质 trade-off
 
 | 轴          | AR             | Flow/Diff      | Hierarchical   | Latent         | Reasoning       | Hybrid         | SoftPrompt   | WM/RL           |
@@ -194,7 +217,7 @@ VLA 试图解决的核心问题可以用 [[2509-PureVLA]] 的一句 framing 概�
 9. **执行期监控与恢复独立成层（2026-07 新 pattern）**：失败常源于"执行中途坏掉且回不来"而非"不会做"，恢复机制可与策略学习解耦。[[2606-RehearseVLA|RehearseVLA]] 的 instant reflector 暴露 VLA 评测对 oracle 终止信号的隐性依赖（禁用后 OpenVLA-OFT 掉 11.8pp）；[[2607-RobustExecAgenticRL]] 在冻结 VLA 上用 PPO 训 {Execute/Retry/Repair/Reset} 调度层、以回滚历史 nominal state 恢复执行（扰动设定 LIBERO-Long 平均 +39.2pp，但缺规则阈值 baseline、扰动类型为方法量身定做）；与 venue 回填的 [[2606-AffordanceFieldInterventio]] test-time rollback 同线。
 10. **下游适配配方成为受控研究对象**：[[2607-LoRAVLA]] 给出 π0 工业微调的实证 recipe——LoRA r=32 + SigLIP 全量微调持平 FFT（VRAM 36.2→10.8 GiB），embodiment adaptation 的瓶颈在视觉 domain shift 而非动作层；[[2607-DART]] 把适配数据的价值从"重学任务"改写为"测量 domain direction"——source/target one-shot update vector 相减 + SVD subspace 过滤，一条 target demo 把 domain shift 迁移到全部任务（LIBERO viewpoint shift 79.1% vs one-shot FT 31.5%，真机 UR10e 81.7%）。
 11. **UMI 从 pre-training 进入 target-task post-training，但 data equivalence 尚未成立**：[[Papers/2607-HiFiUMI|HiFi-UMI]] 在 StarVLA-QwenPI、OpenPI-π0.5、LingBot-VA 三种 backbone 上报告 UMI−teleoperation aggregate gap −2.5 / +3.1 / −0.6pp，证明整套高保真采集系统足以形成可部署 policy；然而每任务 3,200 条 UMI 对约 300 条 teleoperation，且 evaluation-scene exposure 不同，因此不能把 pipeline parity 解释为 equal-sample parity。
-12. **"多预测一路未来 / 多接一路感知"的收益归因开始被自家消融反噬（2026-08 新 pattern）**：三篇彼此独立的工作给出同向负信号——[[2607-STWAM]] 的 DINO-only 未来分支在 LIBERO-Plus 只有 39.7%，**低于**纯 VAE 的 Fast-WAM 51.5%；[[2607-N0TWAM]] 去掉反应式触觉通路比去掉预测式通路损失更大，且最大单因素是预训练数据量而非任一触觉通路；[[2607-WCM]] 用 $\lambda=0$ 的历史 ViT 对照证明了"预测目标有用"，却全文没有任何 value 估计精度指标，无法排除"预测 loss 只是防表征塌缩的正则化"这条同样兼容的解释。三者的缺口是同一个：缺同 backbone、同算力、逐目标移除的对照。在补上之前，"新增预测通道 → 表征更好 → 动作更好"这条因果链在库内只有相关性证据。
+12. **"多预测一路未来 / 多接一路感知"的收益归因开始被自家消融反噬（2026-08 新 pattern）**：三篇彼此独立的工作给出同向负信号——[[2607-STWAM]] 的 DINO-only 未来分支在 LIBERO-Plus 只有 39.7%，**低于**纯 VAE 的 Fast-WAM 51.5%；[[2607-N0TWAM]] 去掉反应式触觉通路比去掉预测式通路损失更大，且最大单因素是预训练数据量而非任一触觉通路；[[2607-WCM]] 用 $\lambda=0$ 的历史 ViT 对照证明了"预测目标有用"，却全文没有任何 value 估计精度指标，无法排除"预测 loss 只是防表征塌缩的正则化"这条同样兼容的解释。三者的缺口是同一个：缺同 backbone、同算力、逐目标移除的对照。在补上之前，"新增预测通道 → 表征更好 → 动作更好"这条因果链在库内只有相关性证据。[[2608-VLAProprioception]] 给出这类对照的一个可搬运样板，并且同时落在天平两侧：固定 backbone / 数据 / 协议只动 state 接口，当前帧这一路"多接一路感知"在 45 个任务上五个接口只有一个区间排除 0（54.6 → 55.7–57.7）；但换成 8 帧有序历史后，相对"用当前帧副本填满同样 slot 数"的对照仍有 +8.2 且区间排除 0。通道有没有用要按其承载的内容判，而不是按"多了一路"判。
 
 ## Datasets & Benchmarks
 
@@ -231,7 +254,7 @@ VLA 试图解决的核心问题可以用 [[2509-PureVLA]] 的一句 framing 概�
 | SimplerEnv Google Robot VA   | Real-to-sim             | avg SR             | 75.7% ([[2510-XVLA\|X-VLA]]) <br>74.7% ([[2602-XiaomiRobotics0\|Xiaomi-Robotics-0]])                                                                  |
 | SimplerEnv WidowX            | Real-to-sim             | avg SR             | **95.8%** ([[2510-XVLA\|X-VLA]], vs 前 SOTA MemoryVLA 71.9) <br>79.2% ([[2602-XiaomiRobotics0\|Xiaomi-Robotics-0]])                                    |
 | RoboCasa Kitchen Easy / Hard | 100 photorealistic 厨房任务 | SR                 | 70.0 / 39.0 ([[2510-XVLA\|X-VLA]])                                                                                                                    |
-| RoboCasa365                  | 365-task 移动操作 pretraining 设置 | avg SR      | **57.4%** ([[2607-XiaomiRobotics1\|Xiaomi-Robotics-1]], Composite-Unseen 32.1%) <br>46.6% ([[2607-ABotM05\|ABot-M0.5]] +Condensed Memory, Composite-Unseen 7.9%)                                |
+| RoboCasa365                  | 365-task 移动操作 pretraining 设置 | avg SR      | **57.4%** ([[2607-XiaomiRobotics1\|Xiaomi-Robotics-1]], Composite-Unseen 32.1%) <br>46.6% ([[2607-ABotM05\|ABot-M0.5]] +Condensed Memory, Composite-Unseen 7.9%) <br>*另一套口径*：[[2608-VLAProprioception]] 用 45 个 atomic（分三族各训 category expert）+ 20 个 composite 子集，macro 57.7% / 39.0%，与上两行的 365-task 联合训练设置不可横比 |
 | VLABench                     | VLA-centric 综合          | Avg.PS             | 51.1 ([[2510-XVLA\|X-VLA]])                                                                                                                           |
 | RoboTwin 2.0 Randomized      | 50-task bimanual Aloha  | avg SR             | **94.2%** ([[2607-ABotM05\|ABot-M0.5]]) <br>92.14% ([[2607-FlowWAM\|FlowWAM]]) <br>87.02% ([[2512-Motus\|Motus]]) <br>72.84% ([[2510-XVLA\|X-VLA]]) <br>43.84% ([[2504-Pi05\|π0.5]])                                                 |
 | BiCoord                      | 18 bimanual 长程紧耦合       | single-task avg SR | 46.4% ([[2410-Pi0\|π0]], 次 [[2502-OpenVLA-OFT\|OpenVLA-OFT]] 40.5 / RDT 39.5 / DP 33.1) <br>27.2% ([[2410-Pi0\|π0]] multi-task, 相比 single-task −19pp) |
@@ -348,6 +371,7 @@ MEM（video encoder + language memory 解耦，15min 任务）、EchoVLA（PHC+h
 - Explicit voxel 3D memory 在动态遮挡下失灵（EchoVLA OR 任务输给 baseline），explicit vs implicit memory trade-off 未系统化。
 - 长于 1 小时的 memory 几乎无工作；GEN-1 "连续 200+ 次无干预"demo 未开放评测协议。
 - Latent-native vs policy-side：[[2607-LaMemVLA]] 显示记忆织入 native embedding 空间优于外部条件化（+2pp），但纯仿真、top-K 检索不可微——真机稳健性与可微检索是下一步。
+- **原始帧堆叠不是可扩展的记忆（2026-08）**：[[2608-VLAProprioception]] 把 state 历史深度从 1 扫到 96，收益非单调——短历史优于单帧，更深的未压缩历史不再带来收益并最终损害控制，小工作空间高精度任务退化最重且经 VLM prefix 注入时尤甚（K=8 是该论文的经验操作点而非普适最优）。这把压缩式记忆的必要性从工程优化改写成避免退化的前提。但它只测了 raw frame stack，"长 raw 历史有害"不等于"长历史无用"——压缩式历史能否在更大 K 上保住收益，以及长历史退化究竟是 copycat shortcut 还是上下文稀释，都还没有失败模式归因。
 
 ### 8. Safety / alignment for embodied intelligence
 
@@ -362,11 +386,19 @@ MEM（video encoder + language memory 解耦，15min 任务）、EchoVLA（PHC+h
 
 要把这条链从相关性变成因果，缺的实验是共同的，也不昂贵：
 
-- **同 backbone、同算力、逐目标移除**——把新增通道的参数量与训练步数补齐到对照组，再逐个关掉预测目标，而不是整支砍掉（ST-WAM 的 "parameter-matched" 变体方向正确，但原文未给参数量）。
+- **同 backbone、同算力、逐目标移除**——把新增通道的参数量与训练步数补齐到对照组，再逐个关掉预测目标，而不是整支砍掉（ST-WAM 的 "parameter-matched" 变体方向正确，但原文未给参数量）。[[2608-VLAProprioception]] 的 slot-matched 对照是可直接搬运的样板：固定图像、语言、slot 数、expert action 与初始噪声，只抽掉时间变化，把"时序内容"与"多出来的 conditioning 容量"分开（30.8 对 39.0）。它自身仍留着 state expert / feature modulation 训练曝光不等、多数对比单 seed、sweep 未做多重比较校正的缺口。
 - **中间量必须被直接测量**：value 精度（explained variance / TD error）之于 predictive critic，预测未来的保真度之于 WAM，接触事件的预测误差之于触觉——只报下游成功率无法区分"预测更准"与"梯度更稳"。
 - **偏移类型要超出外观**：ST-WAM 的增益集中在 LIBERO-Plus 的 camera / sensor-noise 等外观级扰动，而它把机制归给 DINO 的表示不变性；在物理属性、动力学或物体几何偏移上重跑才能检验这条归因。
 
 ## 调研日志
+
+### 2026-08-05 survey-refresh 增量并入 1 篇
+
+- **来源**：[[Papers/2608-VLAProprioception|VLAProprioception]]（full-text，source-checked：18 条 evidence-ledger claim 全部 source-verified，正文只引其中的数字与负结果）。
+- **结构变化**：技术路线部分新增「横切议题三：proprioceptive state 的接口与历史深度」，与既有两个横切议题并列——state 接口横跨八条路线且在既有分类里无落点；该节同时与横切议题一合并出一条模式（conditioning 的注入位置是一等设计变量，最优解依赖其余设计、无可移植默认）。convergence 观察 12 增补一句：新增通道的收益归因现在有了一个可搬运的对照样板，且同一篇论文在"当前帧 state"上给出弱信号、在"有序历史"上给出经容量对照后仍成立的正信号。Open Problem 7 新增"原始帧堆叠不是可扩展的记忆"，Open Problem 9 的第一条实验缺口补上 slot-matched 对照样板；Benchmarks 的 RoboCasa365 行加注该论文的另一套评测口径不可横比。papers_analyzed 90→91。
+- **证据边界**：全部实验在仿真中完成，无真机验证，state 纯 kinematic 不含 force / tactile；五个接口在 45 atomic 上只有 State Prompt 的配对区间排除 0，其余四个只是一致的正向倾向；state expert / feature modulation 训练曝光偏低，作者据此声明不做 capacity-matched claim；多数对比单 seed，interface × depth sweep 未做多重比较校正。16 维 state 含 7 维 world-frame mobile-base 位姿，"把全局定位塞进语言空间"这条替代解释未被消融排除。composite 的 +10.8 起点接近无收益，跨设计的可比幅度是 +4.6。库内单篇证据，无独立复现。
+- **domain_map**：[[DomainMaps/EmbodiedAI]]（与同轮 EmbodiedAI-Survey 的格局变化合并写入）。
+- **status**：success
 
 ### 2026-08-04 survey-refresh 增量并入 5 篇
 

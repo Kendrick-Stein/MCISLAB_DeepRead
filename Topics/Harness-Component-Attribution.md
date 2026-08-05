@@ -63,7 +63,7 @@ scope: methodology-focused
 | 中 | 异族模型 | [[Papers/2607-HarnessBank]] evolver 用 Claude Opus 4.8、task agent 用 Qwen3.6-27B；未报告 false-accept/reject 率 |
 | 高 | 确定性检查 / 执行结果 / 统计判据 | [[Papers/2605-GRASP]] 留出探针集上的净修复计数；[[Papers/2606-SkillNb]] 执行式 gate；[[Papers/2607-HarnessBank]] 配对 t 统计量 z ≥ 1.96 |
 
-低剂量一栏最值得注意的是 [[Papers/2607-StateAct]]：它的 finish gate 与 LongHorizon-Harness 的 auditor 是同一设计原则——fresh context、看不到 trajectory 与 rationale、禁止 mutation、重新读取真实 deliverable——并且跑在同一个 benchmark（OSWorld 2.0）上。StateAct 直接测了这个验证者的判决准确率，结果是错误放过 68/76。它能抓 missing file、wrong path、format mismatch 这类结构缺陷，抓不到 value correctness。LongHorizon-Harness 从未报告其 auditor 的 verdict 准确率。
+低剂量一栏里，[[Papers/2607-StateAct]] 是唯一测了判决准确率的：它的 finish gate 与 LongHorizon-Harness 的 auditor 是同一设计原则——fresh context、看不到 trajectory 与 rationale、禁止 mutation、重新读取真实 deliverable——并且跑在同一个 benchmark（OSWorld 2.0）上。StateAct 直接测了这个验证者的判决准确率，结果是错误放过 68/76。它能抓 missing file、wrong path、format mismatch 这类结构缺陷，抓不到 value correctness。LongHorizon-Harness 从未报告其 auditor 的 verdict 准确率。
 
 TeamBench 还量化了一个被忽略的失效：其 Verifier 的假接受率随模型从 36.3%（GPT-5.4 Mini）到 77.0%（Gemini-3 Flash）跨越一倍以上，意味着"用独立 auditor"这一设计规则的有效性本身是模型相关的，不能作为无条件的 harness 设计结论。
 

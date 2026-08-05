@@ -125,4 +125,5 @@ daily-papers / news-digest / literature-survey 的关键词打分均从该文件
 - `docs/SPEC.md` — 系统完整规范
 - `references/skill-protocol.md` — Skill 格式定义
 - `references/tags.md` — 论文 tag 规范
+- `references/writing-style.md` — 机器味检测清单（正文定稿前自查）
 - `Templates/Paper.md` — 论文笔记模板

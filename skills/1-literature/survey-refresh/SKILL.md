@@ -141,6 +141,8 @@ python3 scripts/survey_updates.py clear --survey {survey-name} --papers "Papers/
 - [ ] 新增关键数字均对应 source-verified claim row；partial/unverified/legacy note 未被用于升级强结论
 - [ ] 若高层判断发生变化，Key Evidence Matrix 已同步；普通增量未制造冗余 claim rows
 - [ ] 若本轮有结构性变化：受影响章节的配图已新增/重画/撤下，无图文不一致
+- [ ] **并入的文字读不出"是后加的"**：按 `references/writing-style.md` §A4 检查——正文无"本轮/本次并入/新增了/相比上一版"这类增量锚定，新写的段落与原生章节在句式和密度上无差别；内部记账只留在调研日志与 Key Evidence Matrix
+- [ ] **无机器味残留**：按 `references/writing-style.md` §A3 检查新写段落——无格言体（"评测即共识"）、制造金句（三连短句）、导览铺垫、权威腔（"归根结底"）。注意 §B：hedge 不删，只删跟不上条件/数字/检验方式的空 hedge
 
 ## Examples
 

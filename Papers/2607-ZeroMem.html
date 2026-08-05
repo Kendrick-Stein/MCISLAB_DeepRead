@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr"><head><title>Zero-Mem: Zero-Token Memory Operations for LLM Agents</title><meta charset="utf-8"/><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com"/><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted Grotesk:wght@400;700&amp;family=Source Sans Pro:ital,wght@0,400;0,600;1,400;1,600&amp;family=IBM Plex Mono:wght@400;600&amp;display=swap"/><link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin="anonymous"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="og:site_name" content="DeepRead"/><meta property="og:title" content="Zero-Mem: Zero-Token Memory Operations for LLM Agents"/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="Zero-Mem: Zero-Token Memory Operations for LLM Agents"/><meta name="twitter:description" content="Summary Zero-Mem 把 LLM agent memory 的全部操作——构建、组织、路由、检索、证据闭包、以及 reader 前后的两次 calibration——都改成不调用 LLM、不消耗 LLM token 的确定性流程，只在最后一步 QA 调用一次 reader。它不用生成的 abstraction 替换原始 interaction trace，而是在 trace 之上建 entity–context 图与时间层级两个非生成式视图，按 query 决定二者权重后融合检索。在 LoCoMo 与 HotpotQA 上取得最高平均 F1，同时 memory-operation ..."/><meta property="og:description" content="Summary Zero-Mem 把 LLM agent memory 的全部操作——构建、组织、路由、检索、证据闭包、以及 reader 前后的两次 calibration——都改成不调用 LLM、不消耗 LLM token 的确定性流程，只在最后一步 QA 调用一次 reader。它不用生成的 abstraction 替换原始 interaction trace，而是在 trace 之上建 entity–context 图与时间层级两个非生成式视图，按 query 决定二者权重后融合检索。在 LoCoMo 与 HotpotQA 上取得最高平均 F1，同时 memory-operation ..."/><meta property="og:image:alt" content="Summary Zero-Mem 把 LLM agent memory 的全部操作——构建、组织、路由、检索、证据闭包、以及 reader 前后的两次 calibration——都改成不调用 LLM、不消耗 LLM token 的确定性流程，只在最后一步 QA 调用一次 reader。它不用生成的 abstraction 替换原始 interaction trace，而是在 trace 之上建 entity–context 图与时间层级两个非生成式视图，按 query 决定二者权重后融合检索。在 LoCoMo 与 HotpotQA 上取得最高平均 F1，同时 memory-operation ..."/><meta property="og:image" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/static/og-image.png"/><meta property="og:image:url" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/static/og-image.png"/><meta name="twitter:image" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/static/og-image.png"/><meta property="og:image:type" content="image/.png"/><meta property="twitter:domain" content="kendrick-stein.github.io/MCISLAB_DeepRead"/><meta property="og:url" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/Papers/2607-ZeroMem"/><meta property="twitter:url" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/Papers/2607-ZeroMem"/><link rel="icon" href="../static/icon.png"/><meta name="description" content="Summary Zero-Mem 把 LLM agent memory 的全部操作——构建、组织、路由、检索、证据闭包、以及 reader 前后的两次 calibration——都改成不调用 LLM、不消耗 LLM token 的确定性流程，只在最后一步 QA 调用一次 reader。它不用生成的 abstraction 替换原始 interaction trace，而是在 trace 之上建 entity–context 图与时间层级两个非生成式视图，按 query 决定二者权重后融合检索。在 LoCoMo 与 HotpotQA 上取得最高平均 F1，同时 memory-operation ..."/><meta name="generator" content="Quartz"/><link href="../index.css" rel="stylesheet" type="text/css" data-persist="true"/><style>.expand-button {
+  position: absolute;
+  display: flex;
+  float: right;
+  padding: 0.4rem;
+  margin: 0.3rem;
+  right: 0;
+  color: var(--gray);
+  border-color: var(--dark);
+  background-color: var(--light);
+  border: 1px solid;
+  border-radius: 5px;
+  opacity: 0;
+  transition: 0.2s;
+}
+.expand-button > svg {
+  fill: var(--light);
+  filter: contrast(0.3);
+}
+.expand-button:hover {
+  cursor: pointer;
+  border-color: var(--secondary);
+}
+.expand-button:focus {
+  outline: 0;
+}
+
+pre:hover > .expand-button {
+  opacity: 1;
+  transition: 0.2s;
+}
+
+#mermaid-container {
+  position: fixed;
+  contain: layout;
+  z-index: 999;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: none;
+  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.5);
+}
+#mermaid-container.active {
+  display: inline-block;
+}
+#mermaid-container > #mermaid-space {
+  border: 1px solid var(--lightgray);
+  background-color: var(--light);
+  border-radius: 5px;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  height: 80vh;
+  width: 80vw;
+  overflow: hidden;
+}
+#mermaid-container > #mermaid-space > .mermaid-content {
+  position: relative;
+  transform-origin: 0 0;
+  transition: transform 0.1s ease;
+  overflow: visible;
+  min-height: 200px;
+  min-width: 200px;
+}
+#mermaid-container > #mermaid-space > .mermaid-content pre {
+  margin: 0;
+  border: none;
+}
+#mermaid-container > #mermaid-space > .mermaid-content svg {
+  max-width: none;
+  height: auto;
+}
+#mermaid-container > #mermaid-space > .mermaid-controls {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: var(--light);
+  border: 1px solid var(--lightgray);
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+}
+#mermaid-container > #mermaid-space > .mermaid-controls .mermaid-control-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--lightgray);
+  background: var(--light);
+  color: var(--dark);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  font-family: var(--bodyFont);
+  transition: all 0.2s ease;
+}
+#mermaid-container > #mermaid-space > .mermaid-controls .mermaid-control-button:hover {
+  background: var(--lightgray);
+}
+#mermaid-container > #mermaid-space > .mermaid-controls .mermaid-control-button:active {
+  transform: translateY(1px);
+}
+#mermaid-container > #mermaid-space > .mermaid-controls .mermaid-control-button:nth-child(2) {
+  width: auto;
+  padding: 0 12px;
+  font-size: 14px;
+}
+/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VSb290IjoiL2hvbWUvcnVubmVyL3dvcmsvTUNJU0xBQl9EZWVwUmVhZC9NQ0lTTEFCX0RlZXBSZWFkL3dlYnNpdGUvcXVhcnR6L2NvbXBvbmVudHMvc3R5bGVzIiwic291cmNlcyI6WyJtZXJtYWlkLmlubGluZS5zY3NzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiJBQUFBO0VBQ0U7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7O0FBRUE7RUFDRTtFQUNBOztBQUdGO0VBQ0U7RUFDQTs7QUFHRjtFQUNFOzs7QUFLRjtFQUNFO0VBQ0E7OztBQUlKO0VBQ0U7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTs7QUFFQTtFQUNFOztBQUdGO0VBQ0U7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7O0FBRUE7RUFDRTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7O0FBRUE7RUFDRTtFQUNBOztBQUdGO0VBQ0U7RUFDQTs7QUFJSjtFQUNFO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7O0FBRUE7RUFDRTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBOztBQUVBO0VBQ0U7O0FBR0Y7RUFDRTs7QUFJRjtFQUNFO0VBQ0E7RUFDQSIsInNvdXJjZXNDb250ZW50IjpbIi5leHBhbmQtYnV0dG9uIHtcbiAgcG9zaXRpb246IGFic29sdXRlO1xuICBkaXNwbGF5OiBmbGV4O1xuICBmbG9hdDogcmlnaHQ7XG4gIHBhZGRpbmc6IDAuNHJlbTtcbiAgbWFyZ2luOiAwLjNyZW07XG4gIHJpZ2h0OiAwOyAvLyBOT1RFOiByaWdodCB3aWxsIGJlIHNldCBpbiBtZXJtYWlkLmlubGluZS50c1xuICBjb2xvcjogdmFyKC0tZ3JheSk7XG4gIGJvcmRlci1jb2xvcjogdmFyKC0tZGFyayk7XG4gIGJhY2tncm91bmQtY29sb3I6IHZhcigtLWxpZ2h0KTtcbiAgYm9yZGVyOiAxcHggc29saWQ7XG4gIGJvcmRlci1yYWRpdXM6IDVweDtcbiAgb3BhY2l0eTogMDtcbiAgdHJhbnNpdGlvbjogMC4ycztcblxuICAmID4gc3ZnIHtcbiAgICBmaWxsOiB2YXIoLS1saWdodCk7XG4gICAgZmlsdGVyOiBjb250cmFzdCgwLjMpO1xuICB9XG5cbiAgJjpob3ZlciB7XG4gICAgY3Vyc29yOiBwb2ludGVyO1xuICAgIGJvcmRlci1jb2xvcjogdmFyKC0tc2Vjb25kYXJ5KTtcbiAgfVxuXG4gICY6Zm9jdXMge1xuICAgIG91dGxpbmU6IDA7XG4gIH1cbn1cblxucHJlIHtcbiAgJjpob3ZlciA+IC5leHBhbmQtYnV0dG9uIHtcbiAgICBvcGFjaXR5OiAxO1xuICAgIHRyYW5zaXRpb246IDAuMnM7XG4gIH1cbn1cblxuI21lcm1haWQtY29udGFpbmVyIHtcbiAgcG9zaXRpb246IGZpeGVkO1xuICBjb250YWluOiBsYXlvdXQ7XG4gIHotaW5kZXg6IDk5OTtcbiAgbGVmdDogMDtcbiAgdG9wOiAwO1xuICB3aWR0aDogMTAwdnc7XG4gIGhlaWdodDogMTAwdmg7XG4gIG92ZXJmbG93OiBoaWRkZW47XG4gIGRpc3BsYXk6IG5vbmU7XG4gIGJhY2tkcm9wLWZpbHRlcjogYmx1cig0cHgpO1xuICBiYWNrZ3JvdW5kOiByZ2JhKDAsIDAsIDAsIDAuNSk7XG5cbiAgJi5hY3RpdmUge1xuICAgIGRpc3BsYXk6IGlubGluZS1ibG9jaztcbiAgfVxuXG4gICYgPiAjbWVybWFpZC1zcGFjZSB7XG4gICAgYm9yZGVyOiAxcHggc29saWQgdmFyKC0tbGlnaHRncmF5KTtcbiAgICBiYWNrZ3JvdW5kLWNvbG9yOiB2YXIoLS1saWdodCk7XG4gICAgYm9yZGVyLXJhZGl1czogNXB4O1xuICAgIHBvc2l0aW9uOiBmaXhlZDtcbiAgICB0b3A6IDUwJTtcbiAgICBsZWZ0OiA1MCU7XG4gICAgdHJhbnNmb3JtOiB0cmFuc2xhdGUoLTUwJSwgLTUwJSk7XG4gICAgaGVpZ2h0OiA4MHZoO1xuICAgIHdpZHRoOiA4MHZ3O1xuICAgIG92ZXJmbG93OiBoaWRkZW47XG5cbiAgICAmID4gLm1lcm1haWQtY29udGVudCB7XG4gICAgICBwb3NpdGlvbjogcmVsYXRpdmU7XG4gICAgICB0cmFuc2Zvcm0tb3JpZ2luOiAwIDA7XG4gICAgICB0cmFuc2l0aW9uOiB0cmFuc2Zvcm0gMC4xcyBlYXNlO1xuICAgICAgb3ZlcmZsb3c6IHZpc2libGU7XG4gICAgICBtaW4taGVpZ2h0OiAyMDBweDtcbiAgICAgIG1pbi13aWR0aDogMjAwcHg7XG5cbiAgICAgIHByZSB7XG4gICAgICAgIG1hcmdpbjogMDtcbiAgICAgICAgYm9yZGVyOiBub25lO1xuICAgICAgfVxuXG4gICAgICBzdmcge1xuICAgICAgICBtYXgtd2lkdGg6IG5vbmU7XG4gICAgICAgIGhlaWdodDogYXV0bztcbiAgICAgIH1cbiAgICB9XG5cbiAgICAmID4gLm1lcm1haWQtY29udHJvbHMge1xuICAgICAgcG9zaXRpb246IGFic29sdXRlO1xuICAgICAgYm90dG9tOiAyMHB4O1xuICAgICAgcmlnaHQ6IDIwcHg7XG4gICAgICBkaXNwbGF5OiBmbGV4O1xuICAgICAgZ2FwOiA4cHg7XG4gICAgICBwYWRkaW5nOiA4cHg7XG4gICAgICBiYWNrZ3JvdW5kOiB2YXIoLS1saWdodCk7XG4gICAgICBib3JkZXI6IDFweCBzb2xpZCB2YXIoLS1saWdodGdyYXkpO1xuICAgICAgYm9yZGVyLXJhZGl1czogNnB4O1xuICAgICAgYm94LXNoYWRvdzogMCAycHggNHB4IHJnYmEoMCwgMCwgMCwgMC4xKTtcbiAgICAgIHotaW5kZXg6IDI7XG5cbiAgICAgIC5tZXJtYWlkLWNvbnRyb2wtYnV0dG9uIHtcbiAgICAgICAgZGlzcGxheTogZmxleDtcbiAgICAgICAgYWxpZ24taXRlbXM6IGNlbnRlcjtcbiAgICAgICAganVzdGlmeS1jb250ZW50OiBjZW50ZXI7XG4gICAgICAgIHdpZHRoOiAzMnB4O1xuICAgICAgICBoZWlnaHQ6IDMycHg7XG4gICAgICAgIHBhZGRpbmc6IDA7XG4gICAgICAgIGJvcmRlcjogMXB4IHNvbGlkIHZhcigtLWxpZ2h0Z3JheSk7XG4gICAgICAgIGJhY2tncm91bmQ6IHZhcigtLWxpZ2h0KTtcbiAgICAgICAgY29sb3I6IHZhcigtLWRhcmspO1xuICAgICAgICBib3JkZXItcmFkaXVzOiA0cHg7XG4gICAgICAgIGN1cnNvcjogcG9pbnRlcjtcbiAgICAgICAgZm9udC1zaXplOiAxNnB4O1xuICAgICAgICBmb250LWZhbWlseTogdmFyKC0tYm9keUZvbnQpO1xuICAgICAgICB0cmFuc2l0aW9uOiBhbGwgMC4ycyBlYXNlO1xuXG4gICAgICAgICY6aG92ZXIge1xuICAgICAgICAgIGJhY2tncm91bmQ6IHZhcigtLWxpZ2h0Z3JheSk7XG4gICAgICAgIH1cblxuICAgICAgICAmOmFjdGl2ZSB7XG4gICAgICAgICAgdHJhbnNmb3JtOiB0cmFuc2xhdGVZKDFweCk7XG4gICAgICAgIH1cblxuICAgICAgICAvLyBTdHlsZSB0aGUgcmVzZXQgYnV0dG9uIGRpZmZlcmVudGx5XG4gICAgICAgICY6bnRoLWNoaWxkKDIpIHtcbiAgICAgICAgICB3aWR0aDogYXV0bztcbiAgICAgICAgICBwYWRkaW5nOiAwIDEycHg7XG4gICAgICAgICAgZm9udC1zaXplOiAxNHB4O1xuICAgICAgICB9XG4gICAgICB9XG4gICAgfVxuICB9XG59XG4iXX0= */</style><link href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" rel="stylesheet" type="text/css" data-persist="true"/><script src="../prescript.js" type="application/javascript" data-persist="true"></script><script type="application/javascript" data-persist="true">const fetchData = fetch("../static/contentIndex.json").then(data => data.json())</script><link rel="alternate" type="application/rss+xml" title="RSS Feed" href="https://kendrick-stein.github.io/MCISLAB_DeepRead/index.xml"/></head><body data-slug="Papers/2607-ZeroMem"><div id="quartz-root" class="page"><div id="quartz-body"><div class="left sidebar"><h2 class="page-title"><a href="..">DeepRead</a></h2><div class="spacer mobile-only"></div><div class="flex-component" style="flex-direction: row; flex-wrap: nowrap; gap: 1rem;"><div style="flex-grow: 1; flex-shrink: 1; flex-basis: auto; order: 0; align-self: center; justify-self: center;"><div class="search"><button class="search-button"><svg role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 19.9 19.7"><title>Search</title><g class="search-path" fill="none"><path stroke-linecap="square" d="M18.5 18.3l-5.4-5.4"></path><circle cx="8" cy="8" r="7"></circle></g></svg><p>Search</p></button><div class="search-container"><div class="search-space"><input autocomplete="off" class="search-bar" name="search" type="text" aria-label="Search for something" placeholder="Search for something"/><div class="search-layout" data-preview="true"></div></div></div></div></div><div style="flex-grow: 0; flex-shrink: 1; flex-basis: auto; order: 0; align-self: center; justify-self: center;"><button class="darkmode"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" class="dayIcon" x="0px" y="0px" viewBox="0 0 35 35" style="enable-background:new 0 0 35 35" xml:space="preserve" aria-label="Dark mode"><title>Dark mode</title><path d="M6,17.5C6,16.672,5.328,16,4.5,16h-3C0.672,16,0,16.672,0,17.5    S0.672,19,1.5,19h3C5.328,19,6,18.328,6,17.5z M7.5,26c-0.414,0-0.789,0.168-1.061,0.439l-2,2C4.168,28.711,4,29.086,4,29.5    C4,30.328,4.671,31,5.5,31c0.414,0,0.789-0.168,1.06-0.44l2-2C8.832,28.289,9,27.914,9,27.5C9,26.672,8.329,26,7.5,26z M17.5,6    C18.329,6,19,5.328,19,4.5v-3C19,0.672,18.329,0,17.5,0S16,0.672,16,1.5v3C16,5.328,16.671,6,17.5,6z M27.5,9    c0.414,0,0.789-0.168,1.06-0.439l2-2C30.832,6.289,31,5.914,31,5.5C31,4.672,30.329,4,29.5,4c-0.414,0-0.789,0.168-1.061,0.44    l-2,2C26.168,6.711,26,7.086,26,7.5C26,8.328,26.671,9,27.5,9z M6.439,8.561C6.711,8.832,7.086,9,7.5,9C8.328,9,9,8.328,9,7.5    c0-0.414-0.168-0.789-0.439-1.061l-2-2C6.289,4.168,5.914,4,5.5,4C4.672,4,4,4.672,4,5.5c0,0.414,0.168,0.789,0.439,1.06    L6.439,8.561z M33.5,16h-3c-0.828,0-1.5,0.672-1.5,1.5s0.672,1.5,1.5,1.5h3c0.828,0,1.5-0.672,1.5-1.5S34.328,16,33.5,16z     M28.561,26.439C28.289,26.168,27.914,26,27.5,26c-0.828,0-1.5,0.672-1.5,1.5c0,0.414,0.168,0.789,0.439,1.06l2,2    C28.711,30.832,29.086,31,29.5,31c0.828,0,1.5-0.672,1.5-1.5c0-0.414-0.168-0.789-0.439-1.061L28.561,26.439z M17.5,29    c-0.829,0-1.5,0.672-1.5,1.5v3c0,0.828,0.671,1.5,1.5,1.5s1.5-0.672,1.5-1.5v-3C19,29.672,18.329,29,17.5,29z M17.5,7    C11.71,7,7,11.71,7,17.5S11.71,28,17.5,28S28,23.29,28,17.5S23.29,7,17.5,7z M17.5,25c-4.136,0-7.5-3.364-7.5-7.5    c0-4.136,3.364-7.5,7.5-7.5c4.136,0,7.5,3.364,7.5,7.5C25,21.636,21.636,25,17.5,25z"></path></svg><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" class="nightIcon" x="0px" y="0px" viewBox="0 0 100 100" style="enable-background:new 0 0 100 100" xml:space="preserve" aria-label="Light mode"><title>Light mode</title><path d="M96.76,66.458c-0.853-0.852-2.15-1.064-3.23-0.534c-6.063,2.991-12.858,4.571-19.655,4.571  C62.022,70.495,50.88,65.88,42.5,57.5C29.043,44.043,25.658,23.536,34.076,6.47c0.532-1.08,0.318-2.379-0.534-3.23  c-0.851-0.852-2.15-1.064-3.23-0.534c-4.918,2.427-9.375,5.619-13.246,9.491c-9.447,9.447-14.65,22.008-14.65,35.369  c0,13.36,5.203,25.921,14.65,35.368s22.008,14.65,35.368,14.65c13.361,0,25.921-5.203,35.369-14.65  c3.872-3.871,7.064-8.328,9.491-13.246C97.826,68.608,97.611,67.309,96.76,66.458z"></path></svg></button></div></div><div class="explorer" data-behavior="link" data-collapsed="collapsed" data-savestate="false" data-data-fns="{&quot;order&quot;:[&quot;filter&quot;,&quot;map&quot;,&quot;sort&quot;],&quot;sortFn&quot;:&quot;(a,b)=>{let order=[\&quot;DomainMaps\&quot;,\&quot;Papers\&quot;,\&quot;Topics\&quot;,\&quot;Ideas\&quot;,\&quot;Projects\&quot;],aIdx=order.indexOf(a.displayName),bIdx=order.indexOf(b.displayName);return aIdx!==-1&amp;&amp;bIdx!==-1?aIdx-bIdx:aIdx!==-1?-1:bIdx!==-1?1:a.slug?.startsWith(\&quot;Papers/\&quot;)&amp;&amp;b.slug?.startsWith(\&quot;Papers/\&quot;)?b.displayName.localeCompare(a.displayName):a.displayName.localeCompare(b.displayName)}&quot;,&quot;filterFn&quot;:&quot;node=>node.slugSegment!==\&quot;tags\&quot;&quot;,&quot;mapFn&quot;:&quot;node=>{node.isFolder||(node.displayName=node.slugSegment)}&quot;}"><button type="button" class="explorer-toggle mobile-explorer hide-until-loaded" data-mobile="true" aria-controls="explorer-1237"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide-menu"><line x1="4" x2="20" y1="12" y2="12"></line><line x1="4" x2="20" y1="6" y2="6"></line><line x1="4" x2="20" y1="18" y2="18"></line></svg></button><button type="button" class="title-button explorer-toggle desktop-explorer" data-mobile="false" aria-expanded="true"><h2>Explorer</h2><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="5 8 14 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="fold"><polyline points="6 9 12 15 18 9"></polyline></svg></button><div id="explorer-1237" class="explorer-content" aria-expanded="false" role="group"><ul class="explorer-ul overflow" id="list-0"><li class="overflow-end"></li></ul></div><template id="template-file"><li><a href="#"></a></li></template><template id="template-folder"><li><div class="folder-container"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="5 8 14 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="folder-icon"><polyline points="6 9 12 15 18 9"></polyline></svg><div><button class="folder-button"><span class="folder-title"></span></button></div></div><div class="folder-outer"><ul class="content"></ul></div></li></template></div><div class="sidebar-tags"><span class="sidebar-tags-title">Popular Tags</span><div class="sidebar-tag-cloud"><a href="/MCISLAB_DeepRead/tags/VLM" class="sidebar-tag-pill">#VLM</a><a href="/MCISLAB_DeepRead/tags/gui-agent" class="sidebar-tag-pill">#gui-agent</a><a href="/MCISLAB_DeepRead/tags/agentic-RL" class="sidebar-tag-pill">#agentic-RL</a><a href="/MCISLAB_DeepRead/tags/web-agent" class="sidebar-tag-pill">#web-agent</a><a href="/MCISLAB_DeepRead/tags/VLA" class="sidebar-tag-pill">#VLA</a><a href="/MCISLAB_DeepRead/tags/computer-use" class="sidebar-tag-pill">#computer-use</a><a href="/MCISLAB_DeepRead/tags/LLM" class="sidebar-tag-pill">#LLM</a><a href="/MCISLAB_DeepRead/tags/task-planning" class="sidebar-tag-pill">#task-planning</a><a href="/MCISLAB_DeepRead/tags/manipulation" class="sidebar-tag-pill">#manipulation</a><a href="/MCISLAB_DeepRead/tags/imitation-learning" class="sidebar-tag-pill">#imitation-learning</a></div></div></div><div class="center"><div class="page-header"><div class="popover-hint"><nav class="breadcrumb-container" aria-label="breadcrumbs"><div class="breadcrumb-element"><a href="../">Home</a><p> ❯ </p></div><div class="breadcrumb-element"><a href="../Papers/">Papers</a><p> ❯ </p></div><div class="breadcrumb-element"><a href>Zero Mem: Zero Token Memory Operations for LLM Agents</a></div></nav><h1 class="article-title">Zero-Mem: Zero-Token Memory Operations for LLM Agents</h1><div class="paper-meta"><span class="paper-venue">arXiv</span><span class="paper-institute"><span class="meta-sep">·</span>The Hong Kong Polytechnic University, Southwestern University of Finance and Economics, Jilin University</span><span class="paper-authors"><span class="meta-sep">·</span>Yilin Xiao <button class="et-al-btn" aria-expanded="false">et al.</button><span class="authors-full" style="display:none"><span>, Zhehan Zhu</span><span>, Yujing Zhang</span><span>, Jin Chen</span><span>, Zijin Hong</span><span>, Luyao Zhuang</span><span>, Qinggang Zhang</span><span>, Shengyuan Chen</span><span>, Xiaocao Ouyang</span><span>, Lingfei Ren</span><span>, Xiao Huang</span></span></span></div><p show-comma="true" class="content-meta"><time datetime="2026-08-05T08:59:33.630Z">Aug 05, 2026</time><span>22 min read</span></p><ul class="tags"><li><a href="../tags/LLM" class="internal tag-link">LLM</a></li></ul></div></div><article class="popover-hint"><h2 id="summary">Summary<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#summary" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p>Zero-Mem 把 LLM agent memory 的全部操作——构建、组织、路由、检索、证据闭包、以及 reader 前后的两次 calibration——都改成不调用 LLM、不消耗 LLM token 的确定性流程，只在最后一步 QA 调用一次 reader。它不用生成的 abstraction 替换原始 interaction trace，而是在 trace 之上建 entity–context 图与时间层级两个非生成式视图，按 query 决定二者权重后融合检索。在 LoCoMo 与 HotpotQA 上取得最高平均 F1，同时 memory-operation token 降为 0、耗时相对最快 baseline 降低 57.6%。</p>
+<h2 id="problem--motivation">Problem &amp; Motivation<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#problem--motivation" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p>现有 agent memory 系统普遍用额外的 LLM 调用来”运营”记忆：summarize/reflect 经验、构造层级抽象与图索引、生成或演化 memory record。这把 memory management 变成一份随交互反复付费的 generative workload。作者指出成本只是表层问题，更关键的是可追溯性——当生成的 abstraction 成为后续检索的中介，被遗漏的细节、被合并的主体、被模糊的时间更新都会削弱证据到原始 interaction 的追溯链。</p>
+<p>反方向的策略是保留完整历史、直接从 raw trace 检索。这保住了 source evidence，但 flat lexical 或 dense 检索会混淆来自不同 user、session、时间状态的语义相似 trace，且当支持证据分散在多次交互中时会失效。</p>
+<p>近期工作只是削减而非消除这种依赖：SimpleMem 靠语义结构化压缩、在线语义合成与意图感知的检索规划提升 token 效率；LightMem 把若干 memory 操作从大模型移到专用小语言模型，并把在线检索与离线整合解耦。二者都没有把 final QA 变成唯一依赖 LLM 的阶段。于是论文提出问题：能否在保留超越 flat similarity 的结构化访问的前提下，把 final QA 之外的所有 LLM 调用全部删掉？作者把这个操作区间命名为 zero-token memory operations，并明确把 encoder 计算与 final-QA 推理单独计账。</p>
+<h2 id="method">Method<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#method" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p><strong>1）Provenance-preserving Token-Free Memory Substrate。</strong> 每个派生单元保留原文，外加 source identifier、session time、boundary identifier 等可得元数据，因此检索出的证据始终可回溯到观测到的交互而非模型生成的陈述。</p>
+<ul>
+<li><em>Relational trace graph</em>：用非生成式 NER 模型（论文举例 spaCy）对每个 context unit 抽实体，构 G = (V_d ∪ V_e, E_de ∪ E_dd)。E_de 是实体–context 共现边，权重 w(d_i, e) = c(e, d_i) / Σ_{e′∈ℰ(d_i)} c(e′, d_i)，即实体在该单元内出现频次的归一化；E_dd 是相邻 context unit 之间的邻接边，保留局部连续性。图只记录观测到的共现与 trace 邻接，不生成语义三元组或推断关系。</li>
+<li><em>Hierarchical trace units</em>：𝒯(ℋ) = U_turn ∪ U_window ∪ U_episode ∪ U_local。turn 保原子话语，window 保短程上下文，episode 按语义连续性与可得的时间/session 边界把相邻 window 聚成事件区域，local span 保候选 turn 的直接邻域。</li>
+<li><em>访问信号</em>：BM25 lexical 统计 + BGE-M3 dense embedding。二者只用于索引、seeding 与打分，不生成也不改写 memory 内容。</li>
+</ul>
+<p><strong>2）Query-Conditioned Evidence Routing。</strong> 对每个 query 构造轻量 profile φ(q) = {subject, keywords, answer-type, temporal-cues, boundary}，仅从 query 与可得元数据得到，不使用 gold answer。路由输出 Route(q) ∈ {relational, local}，前者图优先、后者层级优先，判据是确定性的 query 结构信号（问题形式、时间或聚合需求、subject anchor 是否可得）。完整模型中两个 view 都会执行，路由只控制融合时的相对权重：全局共享的 primary-view 权重 ρ 给主视图，1−ρ 给次视图。</p>
+<p><strong>3）Dual-View Evidence Retrieval and Closure。</strong></p>
+<ul>
+<li><em>图侧</em>：把 query 抽出的实体 ê 与图中最相似的观测实体 e 对齐，初始激活 η₀(e|q) = cos(<strong>e</strong>, <strong>ê</strong>)；沿相关共现句传播 η_{t+1}(e′) = Σ_{e∈ℰ_t} η_t(e) Σ_{z∈Z(e)∩Z(e′)} sim(q, z)，即某实体与已激活实体在与 query 相关的句子中共现越多得分越高。传播后的实体激活与 dense context prior 合成 query-specific reset 向量 <strong>r</strong>_q，做 Personalized PageRank <strong>π</strong>_q = (1−γ)<strong>r</strong>_q + γP^⊤<strong>π</strong>_q，context 节点的 PageRank 值构成图侧排序；最后用精确 lexical 与 phrase 匹配对姓名、日期、数值、标题、引语做 refine。</li>
+<li><em>层级侧</em>：episode → window → turn → local 的 coarse-to-fine 检索。每个单元同时按语义相关性和与 profile 的结构兼容性（subject consistency、temporal validity、boundary consistency、expected answer type、lexical/phrase support）打分，这些信号只用于修正语义排序，不当作独立生成的证据。</li>
+<li><em>Closure</em>：两侧分数先做 query-wise min-max 归一化（缺席某 view 记 0），再按 S_fuse(d) = ρ·Ŝ_primary(d) + (1−ρ)·Ŝ_secondary(d) 融合。融合后保留的主证据 M(q) 再补上图侧的关系/桥接支持 𝒩_g 与层级侧的邻近 turn 或 local span 𝒩_h，去重后得候选集 C(q)；任一支持集可以为空。</li>
+</ul>
+<p><strong>4）Deterministic Evidence Calibration。</strong> 证据级先 Filter 掉违反 provenance 或 query boundary 约束的候选，再按 subject、时间与 answer-type 兼容性 Rank，得到紧凑证据集 R(q)——Rank 只排序不改内容。答案级则在 reader 产出 a₀ 之后，对可做确定性检查的答案形式从 R(q) 抽 evidence-local 候选集 A(q) 再 Calibrate：a₀ 若被支持且格式良好就保留，否则做保持证据的规范化、抽取式缩短或逐项列表剪枝；标量答案只在 A(q) 中存在唯一类型兼容候选时才被替换，无确定性修正则保留 a₀。整个过程不调用第二个模型。</p>
+<h2 id="key-results">Key Results<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#key-results" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p><strong>设置。</strong> backbone 为 GPT-4o-mini 与 Qwen2.5-14B-Instruct，Zero-Mem 与全部 baseline 共用；每个设置内所有方法使用相同的 final-QA reader 与等价的 context budget，因此差异被隔离在 memory pipeline 上。检索条数上限统一设为 5，γ 与 ρ 均取 0.6，硬件为 NVIDIA RTX 4090。</p>
+<p><strong>LoCoMo（Table 1）。</strong> GPT-4o-mini 下 Zero-Mem 平均 F1 59.15 / BLEU-1 52.96，比最强 baseline GAM（53.75 / 47.51）高 5.40 / 5.45 点。按问题类型拆开更有信息量：single-hop 66.65 vs GAM 57.75、temporal 61.97 vs 59.45、open-domain 35.52 vs 33.30 均领先，但 <strong>multi-hop 41.61 低于 GAM 的 42.29</strong>（BLEU-1 32.92 vs 34.44 同样落后），是唯一不占优的类型。Qwen2.5-14B 下 Zero-Mem 平均 57.57 / 51.41，比 GAM（52.70 / 46.55）高 4.87 / 4.86，且在每个问题类型与每个指标上都排第一。</p>
+<p><strong>HotpotQA（Table 3，F1）。</strong> GPT-4o-mini 下 56K/224K/448K 分别为 72.07 / 66.43 / 65.04，Qwen2.5-14B 下为 68.58 / 65.47 / 61.02，在所有 reader × 所有上下文长度上都最高，相对最强 baseline 平均提升 5.52 点。这张表里还有一个论文没有展开的反差：A-Mem、Mem0、MemoryOS、LightMem 四个 memory-based baseline 在全部六个设置上都低于 memory-free 的 LONG-LLM 与 RAG（LightMem 最高 40.93，而 LONG-LLM / RAG 的列内最低值为 43.17 / 46.72）。也就是说在 Wikipedia 多跳 + distractor 场景下，“有结构化记忆”本身并不自动优于长上下文或朴素 chunk 检索。</p>
+<p><strong>效率（Table 2，GPT-4o-mini、4 并发线程、同硬件）。</strong> Zero-Mem memory-operation token 为 0，总耗时 334.77 s、每 query 0.22 s；对照组 LightMem 877,086 token / 788.76 s / 0.51 s，SimpleMem 14,096,246 / 8,365.38 s / 5.43 s，GAM 28,570,674 / 9,237.25 s / 6.00 s。相对最快的 LightMem 时间降低 57.6%，相对两项质量指标第二的 GAM，F1 提升 10.0%、BLEU-1 提升 11.5%。论文明确写出 “Zero-token operation does not imply zero computation”——encoder 推理、memory 组织、检索与确定性 calibration 仍有计算开销。</p>
+<p><strong>Ablation（Figure 3，HotpotQA 56K + GPT-4o-mini）。</strong> full model 72.07 F1 / 69.66 BLEU-1；仅保留图视图降到 62.50 / 59.90，仅保留层级视图降到 54.88 / 51.40；去掉 evidence closure 为 67.90 / 65.43，去掉 evidence calibration 为 70.13 / 66.45。图视图单独明显强于层级视图，与 HotpotQA 偏关系型跨文档推理的性质一致，但两个单视图都显著低于全模型。</p>
+<p><strong>检索预算（Figure 4，LoCoMo + GPT-4o-mini）。</strong> Top-K 从 1 增到 5，平均 F1 从 52.59 升到 59.15、BLEU-1 从 46.79 升到 52.96；Top-10 达到整体最佳，更大预算只有小幅波动。主实验用 Top-5 以对齐所有 baseline 的检索设置，代价是比 Top-10 只差 0.65 F1 / 0.83 BLEU-1。</p>
+<h2 id="evidence-ledger">Evidence Ledger<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#evidence-ledger" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="table-container"><table><thead><tr><th style="text-align:left;">Claim ID</th><th style="text-align:left;">Claim</th><th style="text-align:left;">Type</th><th style="text-align:left;">Source locator</th><th style="text-align:left;">Evidence excerpt</th><th style="text-align:left;">Status</th></tr></thead><tbody><tr><td style="text-align:left;">C1</td><td style="text-align:left;">LoCoMo + GPT-4o-mini：Zero-Mem 平均 F1 59.15 / BLEU-1 52.96，GAM 53.75 / 47.51，论文称提升 5.40 / 5.45 点</td><td style="text-align:left;">number</td><td style="text-align:left;">Table 1（PDF p.5）；Main Results / LoCoMo（p.6）</td><td style="text-align:left;">“Zero-Mem 66.65 60.53 41.61 32.92 61.97 57.45 35.52 30.47 59.15 52.96”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C2</td><td style="text-align:left;">LoCoMo + Qwen2.5-14B：Zero-Mem 平均 57.57 / 51.41，在每种问题类型与指标上均第一，较 GAM 提升 4.87 / 4.86 点</td><td style="text-align:left;">number</td><td style="text-align:left;">Table 1（p.5）；Main Results / LoCoMo（p.6）</td><td style="text-align:left;">“With Qwen2.5-14B, it ranks first across every question type and metric”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C3</td><td style="text-align:left;">GPT-4o-mini 下 multi-hop 是唯一不领先的类型：Zero-Mem 41.61 低于 GAM 42.29</td><td style="text-align:left;">comparison</td><td style="text-align:left;">Table 1，GPT-4o-mini 区块 Multi Hop 列（p.5）</td><td style="text-align:left;">正文措辞 “remaining competitive with GAM on multi-hop questions”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C4</td><td style="text-align:left;">Table 2：Zero-Mem memory-operation token = 0，总耗时 334.77 s / 每 query 0.22 s；相对 LightMem（论文称最快 baseline）降 57.6%</td><td style="text-align:left;">number</td><td style="text-align:left;">Table 2（p.6）；Efficiency Comparison（p.7）</td><td style="text-align:left;">“reducing memory-operation latency by 57.6% relative to LightMem, the fastest baseline”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C5</td><td style="text-align:left;">Table 2 token 总量：LightMem 877,086、SimpleMem 14,096,246、GAM 28,570,674</td><td style="text-align:left;">number</td><td style="text-align:left;">Table 2，Tokens 列（p.6）</td><td style="text-align:left;">“SimpleMem … 14,096,246”; “LightMem … 877,086”; “GAM … 28,570,674”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C6</td><td style="text-align:left;">HotpotQA：Zero-Mem 在所有 reader 与上下文长度上 F1 最高（72.07 / 66.43 / 65.04；68.58 / 65.47 / 61.02），论文称平均提升 5.52 点</td><td style="text-align:left;">number</td><td style="text-align:left;">Table 3（p.6）；Main Results / HotpotQA</td><td style="text-align:left;">”highest F1 across all readers and context lengths … average improvement of 5.52 points”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C7</td><td style="text-align:left;">Ablation：full 72.07 / 69.66；graph-only 62.50 / 59.90；hierarchy-only 54.88 / 51.40；无 closure 67.90 / 65.43；无 calibration 70.13 / 66.45</td><td style="text-align:left;">number</td><td style="text-align:left;">Figure 3（p.7）；Ablation Study</td><td style="text-align:left;">”full model achieves 72.07 F1 and 69.66 BLEU-1 … graph view reduces the scores to 62.50 and 59.90”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C8</td><td style="text-align:left;">检索预算：Top-1→Top-5 平均 F1 52.59→59.15、BLEU-1 46.79→52.96；Top-10 最佳；Top-5 仅差 0.65 F1 / 0.83 BLEU-1</td><td style="text-align:left;">number</td><td style="text-align:left;">Figure 4（p.7）；Effect of the Retrieval Budget</td><td style="text-align:left;">”from 52.59 and 46.79 to 59.15 and 52.96”; “trails Top-10 by only 0.65 F1 and 0.83 BLEU-1”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C9</td><td style="text-align:left;">方法栈：非生成式 NER（举例 spaCy）建 entity–context 图；BM25 + BGE-M3 做 lexical/dense 索引；图上用 Personalized PageRank</td><td style="text-align:left;">causal-mechanism</td><td style="text-align:left;">Method / Relational trace graph（p.3）、Lexical and dense access signals（p.3）、Graph evidence propagation（p.4）</td><td style="text-align:left;">“non-generative Named Entity Recognition (NER) model (e.g., spaCy)”; “lexical statistics (BM25) and dense embeddings (BGE-M3)“</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C10</td><td style="text-align:left;">超参与硬件：γ = ρ = 0.6；NVIDIA RTX 4090；所有方法检索条数上限统一为 5；Table 2 用 4 并发线程</td><td style="text-align:left;">benchmark-setting</td><td style="text-align:left;">Implementation Details（p.6）；Table 2 caption</td><td style="text-align:left;">”Damping factor γ and dual-view routing coefficient ρ are both set to 0.6”; “cap the number of retrieved items at five”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C11</td><td style="text-align:left;">backbone 为 GPT-4o-mini 与 Qwen2.5-14B-Instruct，Zero-Mem 与所有 baseline 共用；同设置内 final-QA reader 相同、context budget 等价</td><td style="text-align:left;">benchmark-setting</td><td style="text-align:left;">Implementation Details（p.6）</td><td style="text-align:left;">“identical final-QA reader and equivalent context budget, so the comparison isolates differences in their memory pipelines”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C12</td><td style="text-align:left;">zero-token 的定义：final QA 之外任何步骤都不调用 LLM、不消耗 LLM token；encoder 计算与 final-QA 推理单独计账</td><td style="text-align:left;">causal-mechanism</td><td style="text-align:left;">Introduction 定义段（p.2）</td><td style="text-align:left;">“Encoder computation and final-QA inference are accounted for separately”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C13</td><td style="text-align:left;">评测集为 LoCoMo（四类问题）与 HotpotQA（按 MemAgent 的 memory-evaluation 变体，靠 distractor 得到 56K/224K/448K 三档）</td><td style="text-align:left;">benchmark-setting</td><td style="text-align:left;">Datasets（p.5）</td><td style="text-align:left;">“Following MemAgent (Yu et al. 2026) … produces three context-length settings of 56K, 224K, and 448K tokens”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C14</td><td style="text-align:left;">Baseline 段落列出 LONG-LLM、RAG（2,048-token chunk、top-5）、A-Mem、Mem0、MemoryOS、LightMem、SimpleMem、CompassMem、GAM</td><td style="text-align:left;">benchmark-setting</td><td style="text-align:left;">Baselines（p.5）</td><td style="text-align:left;">“RAG divides the history into 2,048-token chunks and retrieves the top five chunks by semantic similarity”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C15</td><td style="text-align:left;">代码需等同行评审之后才公开，地址 <a href="https://github.com/TheMoon0815/Zero-mem%EF%BC%88%E5%BD%93%E5%89%8D%E6%9C%AA%E5%8F%91%E5%B8%83%EF%BC%89" class="external">https://github.com/TheMoon0815/Zero-mem（当前未发布）<svg aria-hidden="true" class="external-icon" style="max-width:0.8em;max-height:0.8em;" viewBox="0 0 512 512"><path d="M320 0H288V64h32 82.7L201.4 265.4 178.7 288 224 333.3l22.6-22.6L448 109.3V192v32h64V192 32 0H480 320zM32 32H0V64 480v32H32 456h32V480 352 320H424v32 96H64V96h96 32V32H160 32z"></path></svg></a></td><td style="text-align:left;">license-code</td><td style="text-align:left;">Abstract 末句（p.1）</td><td style="text-align:left;">“After peer review, the code and implementation details will be available at <a href="https://github.com/TheMoon0815/Zero-mem" class="external">https://github.com/TheMoon0815/Zero-mem<svg aria-hidden="true" class="external-icon" style="max-width:0.8em;max-height:0.8em;" viewBox="0 0 512 512"><path d="M320 0H288V64h32 82.7L201.4 265.4 178.7 288 224 333.3l22.6-22.6L448 109.3V192v32h64V192 32 0H480 320zM32 32H0V64 480v32H32 456h32V480 352 320H424v32 96H64V96h96 32V32H160 32z"></path></svg></a>.”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C16</td><td style="text-align:left;">Table 2 的 Relative Gain 行：F1 +10.0%、BLEU-1 +11.5%，对照对象是两项指标上第二的 GAM</td><td style="text-align:left;">number</td><td style="text-align:left;">Table 2 末行 + caption（p.6）；Efficiency Comparison</td><td style="text-align:left;">”Relative Gain/Reduction 10.0%↑ 11.5%↑ 100.0%↓ 100.0%↓ 57.6%↓ 57.6%↓“</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C17</td><td style="text-align:left;">机构：♠ The Hong Kong Polytechnic University；♣ School of Computing and AI, Southwestern University of Finance and Economics；♢ School of AI, Jilin University。2026-07-31 提交，cs.CL</td><td style="text-align:left;">benchmark-setting</td><td style="text-align:left;">PDF p.1 题头 + arXiv 侧栏戳</td><td style="text-align:left;">”arXiv:2607.29377v1 [cs.CL] 31 Jul 2026”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C18</td><td style="text-align:left;">HotpotQA 表中 A-Mem / Mem0 / MemoryOS / LightMem 在全部六个设置上都低于 memory-free 的 LONG-LLM 与 RAG</td><td style="text-align:left;">comparison</td><td style="text-align:left;">Table 3（p.6）</td><td style="text-align:left;">LightMem 最高 40.93；LONG-LLM / RAG 列内最低为 43.17 / 46.72</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C19</td><td style="text-align:left;">论文自陈 zero-token ≠ 零计算，encoder 推理、memory 组织、检索与确定性 calibration 仍有开销</td><td style="text-align:left;">causal-mechanism</td><td style="text-align:left;">Efficiency Comparison（p.7）</td><td style="text-align:left;">“Zero-token operation does not imply zero computation, since encoder inference, memory organization, retrieval, and deterministic calibration still incur processing costs.”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C20</td><td style="text-align:left;">Table 2 的 overhead 范围被界定为 “memory operations outside the shared final-QA stage”，但正文与表注均未说明一次性索引/建图耗时是否计入 334.77 s</td><td style="text-align:left;">benchmark-setting</td><td style="text-align:left;">Efficiency Comparison（p.7）；Table 2 caption（p.6）</td><td style="text-align:left;">“the total and per-query overhead incurred by memory operations outside the shared final-QA stage”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C21</td><td style="text-align:left;">Table 1 报了 HippoRAG，但 Baselines 段落从未介绍它，Table 3 也未包含它</td><td style="text-align:left;">benchmark-setting</td><td style="text-align:left;">Table 1（p.5）vs Baselines（p.5）vs Table 3（p.6）</td><td style="text-align:left;">Table 1 含 “HippoRAG 54.84 48.84 …” 行；Baselines 段落无对应描述</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C22</td><td style="text-align:left;">正文称 “Additional baseline descriptions are provided in the Appendix”，但 v1 全文 8 页在 References 结束，无 Appendix</td><td style="text-align:left;">benchmark-setting</td><td style="text-align:left;">Baselines（p.5）；PDF 全文 8 页</td><td style="text-align:left;">”Additional baseline descriptions are provided in the Appendix.”</td><td style="text-align:left;">source-verified</td></tr></tbody></table></div>
+<h2 id="strengths--weaknesses">Strengths &amp; Weaknesses<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#strengths--weaknesses" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p><strong>问题被提成了可判定的定义，而不是模糊的省钱叙事。</strong> 论文没有说”我们更省 token”，而是给出一个可证伪的 operating regime：final QA 之外零 LLM 调用、零 LLM token，并把 encoder 计算与 reader 推理明确排除在这个承诺之外。C19 这句自陈尤其难得——很多效率论文会让”zero”顺势读成”零成本”，这里作者主动把边界划清。定义写清楚之后，“生成式 memory 到底是不是必需”才第一次成为可以直接实验回答的问题。</p>
+<p><strong>最有信息量的结果是删掉生成环节后质量没掉。</strong> 领域里”必须先让 LLM 把经验总结成 memory 才能用”是一条被广泛默认的 convention，Zero-Mem 在两个 benchmark 上同时给出了反证：不仅没掉，还都拿到最高平均 F1。C18 是同方向的第二个信号——四个 memory-based baseline 在 HotpotQA 上全面输给长上下文和朴素 RAG。合起来的判断是：在 QA 型 memory 任务上，生成式 memory 目前提供的多半是负价值，成本之外还引入了信息损失。provenance 论证也比 token 成本更值得注意：生成式 memory 的真正代价是证据链断掉后无法归因，这在需要审计的部署里是硬约束而非优化项。效率对比的控制也比较严——同 reader、同 context budget、同并发、同硬件、检索条数统一上限 5。</p>
+<p><strong>但适用面比结论段的措辞窄。</strong> 评测只覆盖两个 QA benchmark，本质都是”给定问题、从历史中定位证据并作答”。Zero-Mem 的每一个非生成式组件——NER、BM25、PageRank、结构兼容性过滤——都天然适配这种以实体和显式指称为主的任务。当记忆的价值在于跨轮抽象（用户偏好随时间的漂移、某类任务的正确做法、失败模式的归纳）而非定位原句时，“不需要中间表示”是否还成立完全没有测。论文正文把 claim 限定在 structured memory access 上是恰当的，但结论段 “effective agent memory does not require generated intermediate representations” 的覆盖面明显宽于证据。C3 是这个边界的一个具体信号：GPT-4o-mini 下唯一不领先的正是 multi-hop——最需要跨 trace 组合而非定位的那一类。</p>
+<p><strong>query profile 是全文最薄的一环。</strong> φ(q) 的五个字段与”确定性 query-structure signals”的路由判据都只有名称，没有规则集、模板或抽取器细节，也没有跨 benchmark 的可迁移性测试。如果这些规则是按 LoCoMo 与 HotpotQA 的问题格式手工调出来的，那”零 token”的成本其实被转移到了人工规则设计上，换 domain 需要重做——而这部分成本不会出现在 Table 2 里。这是判断该方法能否推广的关键未知量。</p>
+<p><strong>其余边界。</strong> C20：Table 2 的 overhead 范围未明确一次性索引/建图是否计入 334.77 s，而 Zero-Mem 恰恰需要对全部 trace 跑 NER 与 BGE-M3 编码，这直接影响 57.6% 的可比性。只用了两个 backbone 且都不是强推理模型，生成式 memory 的相对优势理论上会随 reader 能力变化，单点验证不足以判断趋势。C21/C22 反映 v1 的实验报告尚不完整——Table 1 出现了 Baselines 段落从未介绍、Table 3 也不含的 HippoRAG，且被引用的 Appendix 在 v1 中并不存在。代码需等 peer review 之后发布，当前无法复现。</p>
+<h2 id="mind-map">Mind Map<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#mind-map" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<pre><button class="expand-button" aria-label="Expand mermaid diagram" data-view-component="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M3.72 3.72a.75.75 0 011.06 1.06L2.56 7h10.88l-2.22-2.22a.75.75 0 011.06-1.06l3.5 3.5a.75.75 0 010 1.06l-3.5 3.5a.75.75 0 11-1.06-1.06l2.22-2.22H2.56l2.22 2.22a.75.75 0 11-1.06 1.06l-3.5-3.5a.75.75 0 010-1.06l3.5-3.5z"></path></svg></button><code class="mermaid" data-clipboard="&quot;mindmap\n  root((Zero-Mem))\n    Problem\n      生成式 memory 是循环开销\n      抽象中介切断 provenance\n      raw 检索混淆 session 与时间状态\n      SimpleMem/LightMem 只减不消\n    Method\n      Provenance 保留的 trace substrate\n        非生成 NER 建 entity-context 图\n        turn/window/episode/local 层级\n        BM25 + BGE-M3 只做索引打分\n      Query-conditioned routing\n        profile 五字段\n        relational vs local 权重 rho\n      Dual-view 检索与闭包\n        实体激活传播 + Personalized PageRank\n        coarse-to-fine 层级检索\n        归一化融合 + 关系桥接 + 邻域补全\n      确定性 calibration\n        证据级 Filter 与 Rank\n        答案级抽取式校正\n    Results\n      LoCoMo 平均最优 但 multi-hop 输给 GAM\n      HotpotQA 全设置最高 448K 仍领先\n      memory token 归零 耗时降 57.6%\n      双视图与 closure/calibration 均有贡献\n      memory baseline 在 HotpotQA 输给长上下文&quot;">mindmap
+  root((Zero-Mem))
+    Problem
+      生成式 memory 是循环开销
+      抽象中介切断 provenance
+      raw 检索混淆 session 与时间状态
+      SimpleMem/LightMem 只减不消
+    Method
+      Provenance 保留的 trace substrate
+        非生成 NER 建 entity-context 图
+        turn/window/episode/local 层级
+        BM25 + BGE-M3 只做索引打分
+      Query-conditioned routing
+        profile 五字段
+        relational vs local 权重 rho
+      Dual-view 检索与闭包
+        实体激活传播 + Personalized PageRank
+        coarse-to-fine 层级检索
+        归一化融合 + 关系桥接 + 邻域补全
+      确定性 calibration
+        证据级 Filter 与 Rank
+        答案级抽取式校正
+    Results
+      LoCoMo 平均最优 但 multi-hop 输给 GAM
+      HotpotQA 全设置最高 448K 仍领先
+      memory token 归零 耗时降 57.6%
+      双视图与 closure/calibration 均有贡献
+      memory baseline 在 HotpotQA 输给长上下文
+</code><div id="mermaid-container" role="dialog"><div id="mermaid-space"><div class="mermaid-content"></div></div></div></pre>
+<h2 id="notes">Notes<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#notes" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p>这篇与 <a href="../Papers/2606-SkillMemoryBudget" class="internal" data-slug="Papers/2606-SkillMemoryBudget">2606-SkillMemoryBudget</a> 是同一类质疑的两个侧面：后者证明 online skill/memory 模块的收益很大程度是预算不对称的产物（给 vanilla actor 同等 token 就能追平），本文证明 memory 操作里的生成环节可以整个删掉而质量不降。合起来的 pattern 是——agent memory 领域大量”模块有效”的结论没有控制成本轴，一旦把 token 或预算拉平，增益就大幅缩水甚至反号。读这类论文的默认追问应该是”模块的开销记在谁头上”。</p>
+<p><a href="../Papers/2606-AgentMemorySystem" class="internal" data-slug="Papers/2606-AgentMemorySystem">2606-AgentMemorySystem</a> 的结论（没有架构通吃，有效性取决于 workload 与结构匹配度）恰好预测了 Zero-Mem 的适用边界：它的结构假设是实体密集、指称明确、证据可定位，这正是 LoCoMo 与 HotpotQA 的形态。要检验其一般性，应该找 workload 特性相反的场景——记忆的价值在于归纳而非检索的任务。<a href="../Papers/2608-AgentStream" class="internal" data-slug="Papers/2608-AgentStream">2608-AgentStream</a> 里 retrieval-based 方法在 Interleaved 流下反而优于 context-integrated 方法，与本文”保留原始 trace + 结构化检索优于把经验折进生成表示”的方向一致，是一个跨论文的弱共振信号，但两者的实验设置差异大，暂不宜当作互证。</p>
+<p>值得展开的问题：zero-token 的边界在写入侧。Zero-Mem 的策略是全存不筛，避开了”什么值得记”这个决策——而这恰是 <a href="../Papers/2510-MemAct" class="internal" data-slug="Papers/2510-MemAct">2510-MemAct</a> 把 memory 操作当 action 来学的那一类工作的核心。当 trace 规模持续增长时，图与索引的膨胀、PageRank 的延迟是否还能维持 0.22 s/query，论文没有测；若届时必须引入筛选，非生成式方法能否胜任仍是开放问题。</p></article><hr/><div class="page-footer"></div></div><div class="right sidebar"><div class="toc desktop-only"><button type="button" class="toc-header" aria-controls="toc-1039" aria-expanded="true"><h3>Table of Contents</h3><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="fold"><polyline points="6 9 12 15 18 9"></polyline></svg></button><ul id="list-1" class="toc-content overflow"><li class="depth-0"><a href="#summary" data-for="summary">Summary</a></li><li class="depth-0"><a href="#problem--motivation" data-for="problem--motivation">Problem &amp; Motivation</a></li><li class="depth-0"><a href="#method" data-for="method">Method</a></li><li class="depth-0"><a href="#key-results" data-for="key-results">Key Results</a></li><li class="depth-0"><a href="#evidence-ledger" data-for="evidence-ledger">Evidence Ledger</a></li><li class="depth-0"><a href="#strengths--weaknesses" data-for="strengths--weaknesses">Strengths &amp; Weaknesses</a></li><li class="depth-0"><a href="#mind-map" data-for="mind-map">Mind Map</a></li><li class="depth-0"><a href="#notes" data-for="notes">Notes</a></li><li class="overflow-end"></li></ul></div></div><footer class><p>Created with <a href="https://quartz.jzhao.xyz/">Quartz v4.5.2</a> © 2026</p><ul><li><a href="https://github.com/Kendrick-Stein/MCISLAB_DeepRead">GitHub</a></li></ul></footer></div></div></body><script type="application/javascript" data-persist="true">function n(){let t=this.parentElement;t.classList.toggle("is-collapsed");let e=t.getElementsByClassName("callout-content")[0];if(!e)return;let l=t.classList.contains("is-collapsed");e.style.gridTemplateRows=l?"0fr":"1fr"}function c(){let t=document.getElementsByClassName("callout is-collapsible");for(let e of t){let l=e.getElementsByClassName("callout-title")[0],s=e.getElementsByClassName("callout-content")[0];if(!l||!s)continue;l.addEventListener("click",n),window.addCleanup(()=>l.removeEventListener("click",n));let o=e.classList.contains("is-collapsed");s.style.gridTemplateRows=o?"0fr":"1fr"}}document.addEventListener("nav",c);
+</script><script type="module" data-persist="true">function E(a,e){if(!a)return;function t(o){o.target===this&&(o.preventDefault(),o.stopPropagation(),e())}function n(o){o.key.startsWith("Esc")&&(o.preventDefault(),e())}a?.addEventListener("click",t),window.addCleanup(()=>a?.removeEventListener("click",t)),document.addEventListener("keydown",n),window.addCleanup(()=>document.removeEventListener("keydown",n))}function f(a){for(;a.firstChild;)a.removeChild(a.firstChild)}var m=class{constructor(e,t){this.container=e;this.content=t;this.setupEventListeners(),this.setupNavigationControls(),this.resetTransform()}isDragging=!1;startPan={x:0,y:0};currentPan={x:0,y:0};scale=1;MIN_SCALE=.5;MAX_SCALE=3;cleanups=[];setupEventListeners(){let e=this.onMouseDown.bind(this),t=this.onMouseMove.bind(this),n=this.onMouseUp.bind(this),o=this.onTouchStart.bind(this),r=this.onTouchMove.bind(this),i=this.onTouchEnd.bind(this),s=this.resetTransform.bind(this);this.container.addEventListener("mousedown",e),document.addEventListener("mousemove",t),document.addEventListener("mouseup",n),this.container.addEventListener("touchstart",o,{passive:!1}),document.addEventListener("touchmove",r,{passive:!1}),document.addEventListener("touchend",i),window.addEventListener("resize",s),this.cleanups.push(()=>this.container.removeEventListener("mousedown",e),()=>document.removeEventListener("mousemove",t),()=>document.removeEventListener("mouseup",n),()=>this.container.removeEventListener("touchstart",o),()=>document.removeEventListener("touchmove",r),()=>document.removeEventListener("touchend",i),()=>window.removeEventListener("resize",s))}cleanup(){for(let e of this.cleanups)e()}setupNavigationControls(){let e=document.createElement("div");e.className="mermaid-controls";let t=this.createButton("+",()=>this.zoom(.1)),n=this.createButton("-",()=>this.zoom(-.1)),o=this.createButton("Reset",()=>this.resetTransform());e.appendChild(n),e.appendChild(o),e.appendChild(t),this.container.appendChild(e)}createButton(e,t){let n=document.createElement("button");return n.textContent=e,n.className="mermaid-control-button",n.addEventListener("click",t),window.addCleanup(()=>n.removeEventListener("click",t)),n}onMouseDown(e){e.button===0&&(this.isDragging=!0,this.startPan={x:e.clientX-this.currentPan.x,y:e.clientY-this.currentPan.y},this.container.style.cursor="grabbing")}onMouseMove(e){this.isDragging&&(e.preventDefault(),this.currentPan={x:e.clientX-this.startPan.x,y:e.clientY-this.startPan.y},this.updateTransform())}onMouseUp(){this.isDragging=!1,this.container.style.cursor="grab"}onTouchStart(e){if(e.touches.length!==1)return;this.isDragging=!0;let t=e.touches[0];this.startPan={x:t.clientX-this.currentPan.x,y:t.clientY-this.currentPan.y}}onTouchMove(e){if(!this.isDragging||e.touches.length!==1)return;e.preventDefault();let t=e.touches[0];this.currentPan={x:t.clientX-this.startPan.x,y:t.clientY-this.startPan.y},this.updateTransform()}onTouchEnd(){this.isDragging=!1}zoom(e){let t=Math.min(Math.max(this.scale+e,this.MIN_SCALE),this.MAX_SCALE),n=this.content.getBoundingClientRect(),o=n.width/2,r=n.height/2,i=t-this.scale;this.currentPan.x-=o*i,this.currentPan.y-=r*i,this.scale=t,this.updateTransform()}updateTransform(){this.content.style.transform=`translate(${this.currentPan.x}px, ${this.currentPan.y}px) scale(${this.scale})`}resetTransform(){let t=this.content.querySelector("svg").getBoundingClientRect(),n=t.width/this.scale,o=t.height/this.scale;this.scale=1,this.currentPan={x:(this.container.clientWidth-n)/2,y:(this.container.clientHeight-o)/2},this.updateTransform()}},T=["--secondary","--tertiary","--gray","--light","--lightgray","--highlight","--dark","--darkgray","--codeFont"],y;document.addEventListener("nav",async()=>{let e=document.querySelector(".center").querySelectorAll("code.mermaid");if(e.length===0)return;y||=await import("https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.esm.min.mjs");let t=y.default,n=new WeakMap;for(let r of e)n.set(r,r.innerText);async function o(){for(let s of e){s.removeAttribute("data-processed");let c=n.get(s);c&&(s.innerHTML=c)}let r=T.reduce((s,c)=>(s[c]=window.getComputedStyle(document.documentElement).getPropertyValue(c),s),{}),i=document.documentElement.getAttribute("saved-theme")==="dark";t.initialize({startOnLoad:!1,securityLevel:"loose",theme:i?"dark":"base",themeVariables:{fontFamily:r["--codeFont"],primaryColor:r["--light"],primaryTextColor:r["--darkgray"],primaryBorderColor:r["--tertiary"],lineColor:r["--darkgray"],secondaryColor:r["--secondary"],tertiaryColor:r["--tertiary"],clusterBkg:r["--light"],edgeLabelBackground:r["--highlight"]}}),await t.run({nodes:e})}await o(),document.addEventListener("themechange",o),window.addCleanup(()=>document.removeEventListener("themechange",o));for(let r=0;r<e.length;r++){let v=function(){let g=l.querySelector("#mermaid-space"),h=l.querySelector(".mermaid-content");if(!h)return;f(h);let w=i.querySelector("svg").cloneNode(!0);h.appendChild(w),l.classList.add("active"),g.style.cursor="grab",u=new m(g,h)},M=function(){l.classList.remove("active"),u?.cleanup(),u=null},i=e[r],s=i.parentElement,c=s.querySelector(".clipboard-button"),d=s.querySelector(".expand-button"),p=window.getComputedStyle(c),L=c.offsetWidth+parseFloat(p.marginLeft||"0")+parseFloat(p.marginRight||"0");d.style.right=`calc(${L}px + 0.3rem)`,s.prepend(d);let l=s.querySelector("#mermaid-container");if(!l)return;let u=null;d.addEventListener("click",v),E(l,M),window.addCleanup(()=>{u?.cleanup(),d.removeEventListener("click",v)})}});
+</script><script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/copy-tex.min.js" type="application/javascript" data-persist="true"></script><script src="../postscript.js" type="module" data-persist="true"></script></html>

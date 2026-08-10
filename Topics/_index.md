@@ -17,6 +17,13 @@ last_updated: "2026-07-24"
 
 所有 Web、Mobile、Desktop、OS 与 GUI+API/CLI 交互论文都先进入这一个主报告。每篇论文只设一个 primary section，其他章节使用 cross-link，避免为"算法/环境/可靠性"重复维护多份结论。digest→survey 路由以本文件 frontmatter keywords 为准。
 
+同方向另有两份**专题分析**，切面与主报告正交、文件名不带 `-Survey` 后缀因而不参与自动路由：
+
+| 专题分析 | 切面 |
+|:--|:--|
+| [[Topics/AgentHarness-Design]] | harness 三条设计轴（动作接口 / 执行循环 / 上下文预算）+ 预算口径审计，web agent 范围 |
+| [[Topics/Harness-Component-Attribution]] | harness 增益的组件级归因：bundle 报增益、缺角色消融的证据缺口 |
+
 ### AI Agent / 非 GUI 邻接方向
 
 | Survey | 范围 | Domain Map |

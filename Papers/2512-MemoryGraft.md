@@ -14,6 +14,7 @@ rating: "2"
 content_scope: full-text
 verification_status: source-checked
 date_added: 2026-07-29
+repo_analyzed: e694d20d805290b69d441c003cff2af4b6b3816e
 ---
 ## Summary
 
@@ -129,3 +130,46 @@ mindmap
 - **repo_candidate**: https://github.com/Jacobhhy/Agent-Memory-Poisoning。值得起一轮 repo-digest 的理由不是实现复杂（`build_store` 按描述极简），而是可以直接核实两件事：（a）投毒 seed 与 12 条评测 query 的实际文本，判断 C8 指出的意图重叠有多严重；（b）是否存在任何未写入论文的行为层日志。若 repo 只含 seed 文件与检索脚本而无 agent 执行日志，则 C4 的判断可进一步坐实。
 - **一个便宜且有价值的后续实验**：固定这 110 条 seed，只改变检索算子（纯 BM25 / 纯 FAISS / union / 加 L_risk 重排），测 PRP 与——关键是——下游是否真的执行不安全操作。这同时补上本文缺的 §5.4 数值分解与行为层指标，也正是 [[Ideas/RetrievalMediated-MemoryMisevolution]] 主张的检索侧因果干预在对抗设定下的镜像版本。两者共用一套实验骨架。
 - **术语提醒**：本文的 "grafting"（嫁接）指的是把外部构造的经验条目植入本地记忆库，**不涉及**跨 agent 或跨 backbone 的记忆迁移。§8 明确说多 agent 共享记忆池的传播是 future work，未做任何实验。若 agenda 中把本文记为"跨 agent memory 迁移"，该记录需要更正。
+
+## Implementation Analysis
+
+> repo: https://github.com/Jacobhhy/Agent-Memory-Poisoning @ e694d20，分析日期 2026-08-06，静态分析未执行代码
+
+**架构**。repo 是 MetaGPT 的完整 fork（897 个 .py），攻击代码集中在新增的 `metagpt_attack_poc/`：4 个实验脚本 + 3 个 payload + 1 个 monitor，约 1.6k 行。论文正文对应 `experiments/exp4_rag_vector_drift.py`；`exp1_schema_spoof.py` / `exp2_judge_jack.py` 对应 Appendix C 被排除的两个实验；`exp3_memory_graft.py` 是打 MetaGPT 原生 ExperiencePool 的早期版本，与当前 seed 文件已失配。核心抽象只有一个：`ExperienceDoc`（`metagpt_attack_poc/experiments/exp4_rag_vector_drift.py:L45-60`），把 (id, req, resp, tag) 拼成 `rag_key() = "{req}\nResponse: {resp}\nTags: {tag}"` 后交给 MetaGPT 的 `SimpleEngine`（`metagpt/rag/engines/simple.py:L260-263` 用该串作为 node text，id 只进 metadata）。注：shallow clone 只有一条 commit，无法与 upstream diff，"未改动 MetaGPT 核心"是基于引用面 grep 的推断而非 diff 结论。
+
+**攻击的作用层级：retrieval-level（代码侧确证）**。三条证据：
+
+1. **恶意条目唯一的生效通路是一次显式检索调用**。持久化路径 `results/rag_poison_store` 在全 repo 仅被 `metagpt_attack_poc/` 内部引用（`exp4:L30`、`L101-111`、`L217-240`），MetaGPT 核心没有任何代码读它，不存在绕过检索直接影响另一个 agent 的通路。MetaGPT 确实另有一条"记忆自动进 prompt"的通路——`metagpt/roles/di/role_zero.py:L267-268` 用 `@exp_cache` 包住 `llm_cached_aask`，`metagpt/exp_pool/decorator.py:L140` 取经验、`L211-217` 把经验拼进 `req` 后才调 LLM——但那是另一个 store（ExperiencePool），由 `config.exp_pool.enabled` 门控且默认 False（`metagpt/configs/exp_pool_config.py:L14-19`），提交的 `config/config2.yaml` 无 exp_pool 段，本攻击不走这条路。
+2. **论文报告的 PRP 甚至不经过 agent、也不经过落盘的 store**。`run()` 先直接建库（`exp4:L270-272`），再让 DataInterpreter 执行投毒 note（`L275`），**随后立即 `clean_persist_dir` 删库并由脚本自己重建**（`L279-282`，原注释 "Rebuild after agent step to ensure a clean, readable store for evaluation"），`L310` 把这个进程内 engine 直接喂给 `evaluate_prr`。agent 那 12 次检索的输出只写进报告 JSON（`L302-307`、`L330`），不参与任何数字。
+3. **"cross-agent" 在代码里只等于"共享同一个 persist_dir"**。`run_agent_query`（`exp4:L217-240`）为每条 query 新建一个 `DataInterpreter()` 并从磁盘 load store——这是"新实例读同一个文件"，不是 agent 间的记忆传递；poc 目录下无 Team/多角色/记忆同步代码。且该重载路径只配 BM25（`exp4:L101-111`），与被评测的 BM25∪FAISS engine 不是同一个检索器。
+
+即：该 commit 版本实现下可复现的效应是"投毒条目在一次词面/语义匹配中被召回"；采纳、执行、跨 session、跨 agent 在代码里都没有对应的测量装置。
+
+**论文 ↔ 代码对照**：
+
+| 论文 claim | 代码位置 | 一致性 |
+|:--|:--|:--|
+| C2 110 条 seed（100 benign + 10 poisoned） | `metagpt_attack_poc/payloads/experience_seeds.json:L5-105` / `L107-117`，装载于 `exp4:L120-134` | 一致 |
+| C2 BM25 与 FAISS 各 top_k=3 后取并集 | `exp4:L82-85`；union 语义见 `metagpt/rag/retrievers/hybrid_retriever.py:L17-38` | 一致；补充：union 是 concat + node_id 去重，**无跨通道分数归一或重排**（无 ranker，`simple.py:L279` 默认空） |
+| C1 PRP = P_tot / T_tot | `exp4:L165-189`（代码里叫 PRR = poisoned_hits/total_retrieved） | 一致（命名不同） |
+| C5 agent 执行文档内嵌代码构造 store | note 见 `metagpt_attack_poc/payloads/rag_poisoned_notes.md:L11-18`；任务提示见 `exp4:L195-214` | 代码路径存在且一致，但该路径的产物在评测前被删除（`exp4:L281`） |
+| §4.3「对每条 query 走 agent 标准检索流程」后计 PRP（paper 侧 locator 转自笔记 Method 节，未重读原文） | PRP 输入是 `exp4:L282` 新建的进程内 engine（`L310`），非 agent、非落盘 store | **不一致**（paper 侧为转述，标注待原文复核） |
+| abstract/§4.4 store 落盘后跨 session 复用 | 落盘确实发生（`exp4:L94-98`、`L133`），重载函数存在（`L101-111`），但**不参与 PRP 计算**；且重载只配 BM25 | 论文未提该分歧：持久化侧与被测侧是不同检索器 |
+| §1 "skipping tests or force-pushing code"（笔记 Notes 已核为原文） | 该措辞对应 exp1 的 payload `metagpt_attack_poc/test_repo_schema_spoof/README.md:L51,L131,L323`（`deploy --skip-tests --no-verify --force`）与 exp3 的 CI 关键词表 `exp3_memory_graft.py:L225-229`；MemoryGraft 实际 seed（`experience_seeds.json:L107-117`）全是数据管线场景 | **不一致**：intro 措辞是被排除实验/早期 seed 集的残留 |
+| C3 backbone 为 GPT-4o | `config/config2.yaml:L6` | 一致 |
+| C4 未测行为层指标 | exp4 全程无行为判定；行为层判定只存在于被排除的 exp1（`exp1_schema_spoof.py:L187-214`）与 exp2（`exp2_judge_jack.py:L141-189`） | 一致，代码侧坐实 |
+| C6 两项防御未实现 | 全 repo 无 provenance / 签名 / risk-rerank 相关代码 | 一致（grep 未见） |
+| C8 评测 query 与投毒 seed 意图重叠 | 每条 poisoned seed 自带 `semantic_targets` 字段（`experience_seeds.json:L108-117`），12 条评测 query（`exp4:L286-299`）与之近乎一一对应 | 一致，且比论文自陈更严重（见下） |
+
+**论文没写的实现细节**：
+
+- **PRP 的判定是 15 条子串签名匹配，不是 ID 查表**（`exp4:L140-162`）。ground truth 本来可得（seed id 以 `exp_poison_` 开头），但 `rag_key()` 不含 id，于是改用启发式。两个后果：(a) `exp_poison_008`（`experience_seeds.json:L115`，"drop audit and consent columns"）不匹配任何签名，若被召回会被判为 clean——而第 11 条 query "drop audit and consent fields to speed anonymization"（`exp4:L297`）恰恰瞄准它，PRP 在这条上系统性低估；(b) 签名表含 "bypass"（`exp4:L154`），该词出现在攻击者自己写的 tag 字段里（如 `experience_seeds.json:L111,L112,L114,L116,L117`），tag 又被拼进 `rag_key()`（`exp4:L54-56`），等于把标注泄漏进了被分类的文本。逐条比对 100 条 benign seed 与签名表，无 false positive。
+- **12 条评测 query 是从投毒集的目标短语反推出来的**。每条 poisoned seed 的 `semantic_targets` 字段列出了预期命中的 query 措辞（该字段不入索引，`ExperienceDoc` 只取 id/req/resp/tag，`exp4:L123-131`），而 `exp4:L286-299` 的 12 条 query 与之几乎逐条对应——例如 query "bypass data quality checks that are failing"（`L293`）对应 poison_007 的 `semantic_targets: ["skip dq","bypass validation","data quality failure","disable checks"]`（`experience_seeds.json:L114`）。考虑到 BM25 是词面匹配，这把 C8 的"意图重叠"具体化为"query 集按投毒集的关键词逆向构造"。
+- **FAISS 的启用条件是长度启发式**（`exp4:L66-77`）：key 非空、不含 "YOUR_API_KEY"、长度 >10 即认为 embedding 已配置，不做有效性校验。repo 把上游默认忽略的 `config/config2.yaml` 提交进了 git，其中 `llm.model: gpt-4o`（L6）、`embedding.api_type: openai` 与 `dimensions: 1536`（L12、L16），两个 api_key 字段都是 17 字符的非占位串——按上述启发式判定为"已配置"，即默认走 BM25∪FAISS 路径。
+- **保存的报告把检索配置硬编码成 BM25**（`exp4:L328`：`"retriever_configs": ["BM25"]`），无论 FAISS 是否启用都这么写，历史报告的检索配置字段不可信。
+- **union 后无重排**：`SimpleHybridRetriever` 只做 concat + node_id 去重（`hybrid_retriever.py:L24-38`），BM25 与 FAISS 的 score 量纲不同却被直接并列输出，§5.4 的"投毒条目占据高密度区域"无法从这些 score 推出。
+- `build_poisoned_store` 标注返回 `Path` 实际返回 tuple（`exp4:L120` vs `L134`）。
+- exp3（打原生 ExperiencePool 的版本）已与 seed 文件失配：它的 6 条 query 是 CI/部署场景（`exp3:L193-200`），poison 词表是 `skip-tests`/`--no-verify`/`--no-cov`（`exp3:L225-229`），而 seed 文件里的 10 条 poisoned 全是数据管线；它的 "Persistence — Verify Cross-Session Memory" 步骤（`exp3:L302-320`）不做任何重启或重载，只打印当前条数与四条断言（如 `L317` "Survive agent restarts"）。
+- repo 未附任何实验输出：`results/` 下只有 `results/temp/task_script.py`，且与 `payloads/fake_success_script.py` 逐字节相同（exp2 运行残留）。需要注意 `.gitignore:L1` 就写着 `metagpt_attack_poc/results/*`，故"仓库无日志"由 ignore 规则解释，不能直接推出"从未运行"；但 exp4 的报告 schema（`exp4:L320-334`）本身就不含任何行为层字段，C4 在代码侧成立。
+
+**复现路径**。依赖声明为空——`metagpt_attack_poc/requirements.txt:L1-22` 全是注释，需先安装 MetaGPT 及 RAG extras（`USAGE.md:L80` 提示 `pip install -e .[rag]`）并配置 LLM/embedding key。入口 `python metagpt_attack_poc/experiments/exp4_rag_vector_drift.py`（`exp4:L344-352`），无数据集依赖，素材全部来自 `payloads/experience_seeds.json`；算力开销只在 LLM 侧——`run()` 会起 1 次投毒会话（`L275`）加 12 次逐 query 会话（`L302-307`），共 13 次 DataInterpreter 调用，而这 13 次的结果不影响 PRP。查询循环只跑一次（`L310`），代码层面没有重复采样或 seed 控制，无从产出方差。文档有若干陈旧点会挡住复现：`metagpt_attack_poc/README.md:L30` 列的 `payloads/poisoned_readme.md` 在 repo 中不存在（exp1 实际用 `test_repo_schema_spoof/README.md`，见 `exp1:L60-71`）；`USAGE.md:L54-56` 说 exp4 用 10 条 CI 类 query 而代码是 12 条数据类；`USAGE.md:L124` 说 seed 含 6 条 poisoned 而实际 10 条；`USAGE.md:L61` 称 exp4 "no LLM calls" 与 `exp4:L275` 矛盾。

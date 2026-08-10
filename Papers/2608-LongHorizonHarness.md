@@ -14,6 +14,7 @@ rating: 4
 content_scope: full-text
 verification_status: source-checked
 date_added: "2026-08-05"
+repo_analyzed: 24ad75c067b7abded492f7e343123e403741c612
 ---
 ## Summary
 
@@ -150,3 +151,50 @@ mindmap
 - **与库内工作的关系**：benchmark 侧接 [[2606-WeaveBench]]（该文自身的分析指出 outcome-only grading 系统性高估 10–20pp、35.2% 的失败源于 reward hacking——本文用的正是它的 trajectory-aware judge，judge 为 Opus 4.7 而 auditor 为 Qwen 3.7-Plus，二者不同族，这降低了 judge–auditor 偏好相关的风险）与 [[2606-OSWorld2]]；harness 作为研究对象这条线接 [[2607-HarnessHandbook]]；纯 CLI 长任务评测接 [[2607-LongHorizonTerminalBench]]；最直接的同期对照是 [[2607-StateAct]]。
 - **一个可以提炼成 survey 论断的观察**：本文与 StateAct 都在 OSWorld 2.0 这个"median 1.6 小时"的量级上把提升做出来，且两者都不改模型。如果把 [[2606-OSWorld2]] 的"最强配置也只有 20.6% binary"作为起点，那么 2026 年下半年 CUA 的进展主线正在从"训更强的 GUI policy"转向"设计更可靠的执行契约"。这条主线值得在 CUA-Survey 里单独立节，并把 harness 层的 verification 结构（谁验、验什么、验证者能看到什么）作为分类轴，而不是按系统名罗列。
 - **repo_candidate**: https://github.com/AMAP-ML/LongHorizon-Harness —— 系统/基建类工作，贡献主要在实现（角色权限隔离、integrity 监控、AgentAdapter），值得另起一轮 repo-digest 核查 read-only 强制是怎么落地的（尤其"检出 mutation 即判 violation"的监控粒度）。
+
+## Implementation Analysis
+
+> repo: https://github.com/AMAP-ML/LongHorizon-Harness @ `24ad75c`，分析日期 2026-08-06，静态分析未执行代码。以下结论均为"该 commit 版本实现如此"，不外推为论文结果可由此复现。
+
+**架构**
+
+仓库里并行存在两套 harness，读代码时必须先分清。一套是发布的 pip 包 `src/lh_harness/`（角色名 manager / executor / auditor，MEA 控制流全在 `manager.py:L93-606`，环境只有 `LocalEnvironment`），另一套是 `eval/WeaveBench-harness/` 与 `eval/OSWorldv2-harness/` 里各自 vendored 的 `cua_harness`（角色名 orchestrator / task / verifier）。论文主实验走的是后者：预算、角色权限、完整性监控的真实执行点都在 `eval/WeaveBench-harness/WeaveBench/weavebench/agents/cua_harness_claudecode_agent.py`（997 行），而不是发布包。两套的控制协议也不同——发布包的审计报告有三条控制轴（`src/lh_harness/types.py:L49-62`：status / integrity / contract_audit），eval 版只有两条（`eval/WeaveBench-harness/cua-harness/src/cua_harness/role_prompts.py:L116-137`），contract-audit 轴是发布包相对论文实验版新增的。角色隔离在发布包里基本靠 prompt，在 eval 版里才有进程级强制。
+
+**论文 ↔ 代码对照**
+
+| 论文 claim | 代码位置 | 一致性 |
+|:--|:--|:--|
+| C10 预算：executor 1800s、manager/auditor 各 300s、最多 25 轮 | `eval/WeaveBench-harness/WeaveBench/scripts/run_qwen37plus_cua_harness_eval.sh:L80-85` 显式设 `MAX_ROUNDS=25 / TASK_TIMEOUT=1800 / ORCHESTRATOR=300 / VERIFIER=300` | 一致（但仅在这个启动脚本里；发布包默认是 4 轮 + manager/auditor 各 600s，见 `src/lh_harness/types.py:L82-90`；agent 类兜底默认是 30 轮 + `min(timeout,900)`，见 `cua_harness_claudecode_agent.py:L229-234`） |
+| §2.4 auditor read-only，"harness 全程监控 workspace 与 artifact" | `cua_harness_claudecode_agent.py:L155-171`（observe_only 角色禁 Write/Edit/NotebookEdit）+ `L173-189`（导出 `WEAVEBENCH_VERIFIER_READ_ONLY=1` 与 PATH/PYTHONPATH/NODE_OPTIONS 守卫）+ `L524-832`（三层运行时 guard）+ `L835-878`（SHA256 全量快照） | eval 路径一致；发布包不一致——`src/lh_harness/adapters/claude_code.py:L48-55` 对所有角色（含 auditor）都拼 `--dangerously-skip-permissions`，read-only 只由 prompt 声明（`src/lh_harness/prompt_texts.py:L179-214`） |
+| C11 "任何被检出的 mutation 记为 integrity violation，该报告即不能支撑 completed 记录"（§2.4） | `src/lh_harness/auditor_agent.py:L74-140` 有三条分支，只有 `restore_on_mutation` 为真的分支置 violation（`L119`）；`restore_on_mutation` 为假走归档分支，`L134` 明写"该归档不自动废弃本轮审计报告"，status / integrity 都不改。而 WeaveBench 的元数据生产者把它固定为假：`cua_harness_claudecode_agent.py:L891 "verifier_workspace_restore_on_mutation": False` | **不一致**（双边证据齐）：论文的"任何 mutation → violation"在论文所用的 WeaveBench 配置下不成立，检出的 mutation 只被追加成一段说明文字 |
+| §2.3 "harness 只暴露被选中角色的接口，角色外能力默认不可用" | `src/lh_harness/prompt_texts.py:L74`（EN）与 `L109`（ZH）写的是 "Tools are not the routing boundary." / "路由不是工具权限隔离。"；`cua_harness_claudecode_agent.py:L305` 与 `L311` 把 gui_task 与 cli_task **都**构造为 `gui=True`，即两个 executor 角色都能调 `mcp__weavebench_computer__computer` | **不一致**（双边证据齐）：GUI/CLI 是提示词层面的职责路由，不是工具权限隔离；真正被工具面裁剪的只有 orchestrator（`L299` `gui=False` + `L450-453` 额外禁 `Bash,Write,Edit,NotebookEdit`）与两个 verifier（`L317`/`L323` `computer_observe_only=True`） |
+| §2.3 manager 无法观察或修改环境，只读 task state 与历史 audit report | `src/lh_harness/role_prompts.py:L42-56` manager prompt 只拼 `format_verified_intermediate_context`；后者（`L495-522`）只放 auditor 报告原文与对应子任务，executor 输出不进入。含 executor 输出的 `format_management_history`（`L538-566`）只在 `manager.py:L596` 生成日志 transcript 时调用 | 一致 |
+| §2.4 auditor 从排除 executor 原始轨迹的 fresh context 起步，但可用 o_i 定位 | `src/lh_harness/role_prompts.py:L189-233` auditor prompt 确实包含 `executor_output`（`L225`，裁剪上限 `types.py:L94` = 24k），而该字段是 `manager.py:L942-956` `_visible_output` 解码出的"可见输出"，stream-json 原始轨迹另存不入 prompt（`manager.py:L993-996` 注释） | 一致（论文排除的是 raw trajectory，不是执行报告） |
+| §2.4 审计报告给两组状态（completion / integrity） | `src/lh_harness/types.py:L49-62` 是三组，多一条 `contract_audit_status`；manager 的完成闸门要求三者同时满足（`manager.py:L295` → `L872-884` complete + clean + aligned） | 代码严于论文；不算不一致，属论文未写的实现细节 |
+| C12 引入受限的 `save_screenshot` 证据保全工具 | `eval/WeaveBench-harness/WeaveBench/weavebench/assets/weavebench_computer_mcp/server.py:L662-716` 实现，并写 `.meta.json` sidecar（`L694` `capture_source: "real_screen"`，另含 sha256 / capture_time / resolution / active_window）；`L786` 的 OBSERVE_ONLY 白名单只允许 `screenshot`/`cursor_position`/`wait`，因此 `L794` 的 `save_screenshot` 分支对 verifier 不可达 | 一致，且比论文所述更强——截图证据只能由 executor 产生，verifier 只能读取和校验 |
+| §2.5 AgentAdapter 统一接口，保留后端原生 loop | `src/lh_harness/adapters/cli_agent.py:L44-113` `run_episode(prompt, env, budget) -> EpisodeResult`；环境侧 `src/lh_harness/environment/base.py:L8-21` `Environment` Protocol | 一致 |
+
+**论文没写的实现细节**
+
+- **read-only 是三层进程级强制，不是单一开关**（`cua_harness_claudecode_agent.py:L524-832`）：PATH 前置目录里放约 34 个写类命令的拦截 shim（`L616-673`，命中即报错退出）；`sitecustomize.py` 猴补 Python 侧写接口（`L675-783`）；Node 侧用 `--require` 注入 fs guard（`L785-822`）。这是论文完全没提、但决定 "auditor read-only" 是否真成立的部分。
+- **auditor 有一条特许写通道**：`cua_verifier_delete` 二进制（`L528-614`），要求 `--path --sha256 --reason` 三参数，禁删前缀含 `ROOT/.harness/_screenshots/.cua_harness_claudecode/gt`，每次删除追加到 `verifier_deletions.jsonl`（`L542`）。发布包侧对应 `src/lh_harness/auditor_agent.py:L617-645` `_allowed_auditor_delete_paths`，命中时走 `L82-97` 分支——只在报告尾部追加"删除记录"，**不置 violation**。即 read-only 的语义实际是"不得新增或修改，但可在留痕前提下删除被判伪造的产物"。
+- **完整性快照只覆盖 auditor，不覆盖 executor**：`L426-429` 与 `L469-470` 显示 before/after 快照只在 `computer_observe_only` 为真时采集。executor 对 workspace 的任何改动都不进入 hash 比对。
+- **ground truth 目录被排除在监控之外**：快照排除 `.harness` / `_screenshots` / `.cua_harness_claudecode` / `gt`（`L835-878`），发布包侧 `src/lh_harness/types.py:L101-115` 同样把 `{workspace}/gt` 列入 ignore 前缀。
+- **回滚未实现**：`verifier_workspace_restored` 在全库只有消费者（`src/lh_harness/auditor_agent.py:L77`、`L635`、`L771` 及两个 eval `verifier_agent.py`），没有任何生产者。`L98-124` 分支里"harness restored the workspace snapshot"这句提示文本因此在当前代码路径下永远走不到 restored 为真的分支。
+- **控制头是真正的机器接口**：auditor 输出的前三行非空行被当作 Status / Integrity / Contract audit 解析（`src/lh_harness/auditor_agent.py:L262-309`），解析失败直接降级为 blocked / suspect / unknown（`L312-322`），另有一次格式修复提示（`src/lh_harness/role_prompts.py:L264-302`）。论文把它描述为"报告给出两组状态"，没有说明这是一个会因格式错误而判负的协议。
+- **human-in-the-loop 通道**：`RoleNextStep` 含 `"ask"`（`src/lh_harness/types.py:L17`），落地为 `manager.py:L632-701` `_human_gate`，论文只在 q ∈ {execute, done, blocked, ask} 里一笔带过。
+- **完成权归属被写死**：`manager.py:L918` 最终报告固定标 `"completion_authority": "manager_with_role_auditors"`。
+- **发布包路径上完整性监控恒为空**：`_workspace_mutation_detected`（`manager.py:L988-990`）只读 metadata 里的 `verifier_workspace_mutation_detected`，而发布包的 adapter 产出的 metadata 不含任何 `verifier_workspace_*` 字段（`src/lh_harness/adapters/cli_agent.py:L99-112`）；全库唯一的生产者是 `cua_harness_claudecode_agent.py:L881-902`。用 `uv tool install lh-harness` 装到的版本没有完整性监控。
+
+**复现路径**
+
+发布包依赖极轻——`pyproject.toml` 声明 Python ≥3.10、运行时依赖只有 `packaging` 与 `tomli`、MIT 许可，入口 `lh-harness = lh_harness.cli:main`（`src/lh_harness/cli.py:L92`）；README `L146-180` 的流程是 `uv tool install lh-harness` → `doctor` → `init` → `run --task`。但可选后端只有 codex 与 claude_code 两种 CLI（`cli.py:L625-665`），环境只有 `local`（`cli.py:L617-623`），因此本地跑通只验证控制流，跑不出论文数字。论文的 WeaveBench 结果需要走 `eval/WeaveBench-harness/`：启动脚本 `WeaveBench/scripts/run_qwen37plus_cua_harness_eval.sh`（预算见 `L80-85`）、agent 类 `weavebench/agents/cua_harness_claudecode_agent.py`（`L221-222` 强制要求 `gui=True`），依赖带桌面的 VM、`weavebench_computer` MCP server、Claude Code CLI 与 API backbone。OSWorld 侧参数表在 `eval/OSWorldv2-harness/docs/EXPERIMENT_PARAMETERS.zh-CN.md:L138-143`，环境适配器为 `eval/OSWorldv2-harness/cua-harness/src/cua_harness/integrations/vm.py:L22-76`。**Terminal-Bench 的评测代码没有随仓库发布**：`eval/` 下只有 `OSWorldv2-harness/` 与 `WeaveBench-harness/` 两棵树，全库对 terminal-bench 的引用只出现在 `README.md` 与 `README.zh-CN.md` 的结果表里。因此笔记正文认定"信息量最高"的那条结果（C2，唯一 tool-matched 的纯 CLI 对照）恰恰是三个 benchmark 里唯一无法从本仓库复跑的。仓库不含模型权重，backbone 为闭源 API 模型，"可复现性依赖闭源栈"这一判断在代码层面成立。
+
+**Affordance 面**
+
+- **暴露给 agent 的接口**：只有各后端 CLI 自带的工具面（Bash / Read / Write / Edit / computer MCP 等），由 harness 通过 `--disallowedTools` 做减法（`cua_harness_claudecode_agent.py:L155-171`、`L450-459`）。harness 自身不向 agent 暴露任何"task state 读写""申请核验""重置环境"之类的一等接口——task state 全程以自然语言块的形式在 prompt 里流转（`src/lh_harness/role_prompts.py:L42-56`），agent 影响状态的唯一途径是输出被 `extract_role_task_state` / 控制头解析器接住的文本。
+- **只暴露给 harness（trainer/evaluator 侧）的接口**：`Environment` Protocol 的 `exec` / `screenshot` / `upload` / `download`（`src/lh_harness/environment/base.py:L8-21`）；快照与差分 `_workspace_snapshot` / `_workspace_snapshot_diff`（`cua_harness_claudecode_agent.py:L835-878`、`L881-902`）；guard 安装 `_install_verifier_guard`（`L524-832`）；完成闸门 `_latest_auditor_is_clean_complete`（`src/lh_harness/manager.py:L872-884`）。这些都在 agent 进程之外调用，agent 无法触发也无法读取其输出。
+- **verifier 的实现方式是 LLM judge + 后验哈希对账，没有 programmatic predicate**。判定主体是一个跑同样 CLI 后端的 LLM，被要求把结论压进前三行控制头（`src/lh_harness/prompt_texts.py:L179-214`）；harness 只做协议校验与哈希比对，不对任务语义做任何程序化断言。精度边界在代码里是可见的：解析失败 → blocked/suspect/unknown（`auditor_agent.py:L312-322`）；complete 但存在阻断约束 → 降级 incomplete（`L145-146`、`L170-171`）；mutation 的三条分支各自的后果（`L74-140`）。也就是说误判的兜底全是"降级"，没有任何"升级"或复核路径。
+- **不存在 reset / fork / snapshot 能力**——对任何一方都不存在。`Environment` Protocol 里没有（`environment/base.py:L8-21`），全库 `def snapshot` 只有 `src/lh_harness/dashboard/state.py:L382` 一处，那是 dashboard 的 JSON 状态导出，与环境状态无关。`_workspace_snapshot` 是只读的 SHA256 清点，用于事后对账，不能回放。所以 MEA 的"重来"只能靠下一轮 executor 自己修复。
+- **观察类接口带 provenance**：`save_screenshot` 会写同名 `.meta.json` sidecar，记录 `capture_source: "real_screen"`、`capture_time`、`sha256`、`resolution`、`active_window`、`producer`（`weavebench_computer_mcp/server.py:L662-716`），auditor 的提示词明确要求核对该 sidecar（`src/lh_harness/prompt_texts.py:L183`、`L191`）。这是全仓库唯一带来源与新鲜度标注的观察通道；`exec` 与 `screenshot` 的返回值都不带。
+- **角色权限隔离的具体机制**（按强度排序）：① CLI 层 `--disallowedTools` 黑名单（`L155-171`、`L450-459`）；② 环境变量开关 `WEAVEBENCH_VERIFIER_READ_ONLY` / `WEAVEBENCH_COMPUTER_OBSERVE_ONLY`（`L173-189`），被 MCP server 在 `L786` 读取用于收窄动作白名单；③ PATH shim + Python sitecustomize + Node fs guard 三层运行时拦截（`L616-673`、`L675-783`、`L785-822`）；④ 事后 SHA256 快照差分兜底（`L835-878`）。四层全部作用于 verifier 一个角色；executor 侧没有任何隔离，orchestrator 侧只有第 ① 层。

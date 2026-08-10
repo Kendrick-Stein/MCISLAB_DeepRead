@@ -9,7 +9,8 @@ url: "https://arxiv.org/abs/2605.07073"
 arxiv_id: "2605.07073"
 doi:
 cite_key: kim2026teambench
-code: "https://teambench.github.io/"
+code: "https://github.com/ybkim95/teambench"
+repo_analyzed: d185aef1916fd86a9ba554d581fd256319a973af
 rating: 4
 content_scope: full-text
 verification_status: source-checked
@@ -218,3 +219,67 @@ LongHorizon-Harness 的核心机制主张是「read-only auditor 从 fresh conte
 
 - **repo_candidate**: https://teambench.github.io/（代码与数据 MIT license，HuggingFace `ybkim95/teambench`）——系统/基建类工作，贡献主要在实现（Docker 权限边界、per-turn role-violation rubric、attestation 协议），值得另起一轮 repo-digest 核查两件事：(a) role-violation label 到底怎么从 trace 里判出来的（3.6× 完全依赖这套 rubric 的精度）；(b) No-Evaluate 条件下 attestation 是怎么处理的，用以解释 Table 12 里 Haiku/Sonnet 那两个塌陷值。
 - 一个本文没问但很关键的问题：**Verifier 的 false-accept 到底是能力问题还是激励问题？** 论文的 system prompt 写着 "Only set verdict='pass' when ALL requirements are satisfied"，但没有任何机制惩罚错误的 pass。在没有代价的情况下 pass-by-default 是理性的。一个便宜的对照是给 Verifier 一个"错误放行比错误拒绝代价更高"的显式 scoring rule，看 49.4% 掉到多少——如果掉很多，那这就不是模型能力的上限，而是 harness 的激励设计问题。
+
+## Implementation Analysis
+
+> repo: https://github.com/ybkim95/teambench @ `d185aef`，分析日期 2026-08-06，静态分析未执行代码。
+> 笔记原 `code:` 字段指向的 https://teambench.github.io/ 是项目主页，不含代码。仓库实测 417 MB（`.git` 135 MB，`generators/` 163 MB，`datasets/` 96 MB）。关键便利：仓库内附论文 LaTeX 源码 `paper/submitted_version/neurips_2026.tex`，下文"论文侧"证据一律直接引自该文件的行号，不依赖笔记转述。
+
+**架构**：三层。底层 `harness/agent_interface.py` 定义四个 tool（`run`/`read`/`write`/`send_message`，声明见 `:63-121`）与五套 `RoleConfig` 工厂——角色权限的实现就是"发哪些 tool 对象 + 每个 tool 的 `allowed_roots` 装哪些目录"；中层 `harness/agent_loop.py` 是 provider 无关的 tool-calling 循环，角色间靠 append-only 的 `messages/dialogue.jsonl` 通信（`:49-71` 轮询），逐轮落盘 `turn_%03d.json`（`:82-87`）；上层两个编排器，`harness/orchestrator.py` 跑 Full Team 三阶段 + 至多 2 轮 remediation，`harness/ablation.py`（1567 行）承载 16 个消融条件、指标聚合与 checkpoint 续跑，是论文全部数字的入口（README:51/64）。任务侧 `generators/gen_<task>.py` 按 seed 生成确定性 workspace 与答案键 `expected.json`，`tasks/<ID>/grade.sh` + `harness/grader_helpers.sh` 是确定性 shell grader。
+
+**论文 ↔ 代码对照**：
+
+| 论文 claim | 代码位置 | 一致性 |
+|:--|:--|:--|
+| 角色权限由 Docker bind mount 强制（tex:505 Table 2 caption；tex:1416） | `harness/run_task.py:86` 是全仓唯一 `docker compose up`，其输出提示人工 `docker exec -it teambench_planner bash`（`:97-99`）；`harness/ablation.py` 全文零 docker 引用；`harness/agent_interface.py:289` docstring 写明路径映射服务于 "non-Docker agent runs" | 不一致（就自动评测路径而言）：产出报告数字的 `ablation.py` 路径上，权限是 Python 绝对路径前缀检查，非容器挂载。论文 tex:1416 加了 "When running in Docker mode" 限定，但未说明报告结果不在该模式下取得 |
+| Verifier 不能执行命令，只能读 Executor 的测试日志（tex:1401 Table 23 `run(cmd)` 行 Verifier ✗；tex:1413；tex:1425 prompt box "You CANNOT execute commands"） | `harness/agent_interface.py:560` `RunCommandTool(cwd=workspace_dir, allowed=True)`；system prompt `:551-552` 写 "You **CAN** execute commands…You MUST run validation scripts (e.g. `python check_training.py` or `pytest`) and observe their output before writing the attestation" | 不一致，且方向相反：代码不仅给了 `run`，还强制要求 Verifier 自己跑测试 |
+| 越权 tool 调用返回 permission denied（C23） | `ReadFileTool.execute:204` / `WriteFileTool.execute:236` 做 `abs_path.startswith(root)` 前缀校验；但 `RunCommandTool.execute:149-178` 只有"整体禁用"（`:152-153`）与"首 token 白名单"（`:154-165`）两档，`subprocess.run(cmd, shell=True, cwd=workspace, timeout=60)` **无任何路径边界** | 部分一致：`read`/`write` 有鉴权，`run` 没有。持有 `run` 的角色（Executor `:519`、Verifier `:560`、Solo、Restricted）可越过 `allowed_roots` 读写宿主机任意路径 |
+| All API calls use temperature 0（tex:1083；C18） | `harness/ablation.py:1333` `create_adapter(model=model, temperature=0.2)`；role-mixing 分角色 adapter `:1071` 同为 `temperature=0.2` | 不一致 |
+| TNI = (S_team − S_restricted) / max(ε, S_solo − S_restricted)，ε=0.05，只在 gap > ε 的任务上汇总（tex:283-289） | 两套互不相同的实现：`harness/ablation.py:1222` `tni = (p_full - p_restricted) / max(epsilon, necessity_gap)` 但 `:1177` 默认 `epsilon = 0.01`；`harness/compute_tni.py:58-62` 改成 `abs(gap) < 0.05 → NaN`、除以**带符号** gap、再 `max(-2.0, min(2.0, raw))` 截断 | 不一致：ε 取值分歧（0.01 vs 0.05），且 `compute_tni.py` 的 [-2,2] 截断论文未提 |
+| 附录 F 案例：Restricted 0.10 / Solo 0.45 / Team 1.00 → "TNI = 2.00"（tex:1437） | 按论文式应为 (1.00−0.10)/(0.45−0.10) = **2.57**；`compute_tni.py:62` 的截断恰好给出 2.00 | 不一致：论文自报的这个数值由未披露的截断产生，与论文自己的公式对不上 |
+| 每任务一个确定性 shell grader，partial score ∈ [0,1]，binary pass 需全 check 通过（C18） | `harness/grader_helpers.sh:30-38`（`init_grader N`）、`:42-53`（`check` 累加）、`:194-215`（`partial_score = round(passed/N, 2)`，任一 check 失败即 `pass=false`） | 一致。附带口径：分母 N 是 `init_grader` 的字面量而非实际执行的 check 数 |
+| 缺 attestation 即判失败（promotion rule 的反面，C18） | `harness/grade_task.py:32-45` 硬规则；但批量路径 `harness/run_all.py:98-99` 注释"attestation check is handled within each grader (not pre-filtered here)" | 一致但双路径口径不同：单任务 grader 前置拒绝，批量 grader 交由各 `grade.sh` 自行处理 |
+| No-Evaluate 条件下如何处理 attestation（笔记待办 b） | `harness/ablation.py:199-206` `_write_passing_attestation()` 直接写 `{"verdict": "pass", "checklist": [], "condition": "team_no_verify_stub"}`，在 `:363` 被 TEAM_NO_VERIFY 调用 | 论文未提：No-Verify 条件下 attestation 由 harness 自动补一张空白通过票 |
+| 3.6× 依赖的 role-violation label 如何判定（C8，笔记待办 a） | `experiments/role_enforcement_ablation/scripts/04_score_compliance.py`：`_writes_workspace:106-127`（`write` 调用排除 `submission`/`attestation`/`reports` 前缀，`run` 调用匹配关键词 `" > " / " >> " / "tee " / "touch " / "cp " / "mv " / "sed -i"`，见 `:125`）、`_analyze_turn:130-162` 六条规则 | 论文未提细节：是**确定性关键词 rubric**，不是 LLM judge。三处已知精度上限——`verifier_modifies_code` 只认 shell 重定向关键词，`heredoc`/`python -c`/`>>>` 之外的写法漏判；`planner_emits_code` 阈值是 `code_lines >= 5`（`:147`）；`executor_plans` 判定为"无 tool call 且无代码且正文 < 40 词"（`:153`），把简短确认也算成越权 |
+| 发布物含 per-condition reference-ablation logs 与 2,025 条去重 role-mixing per-task 记录（tex:1080） | 全仓 `dialogue.jsonl` 0 个、`turn_*.json` 0 个、`attestation.json` 0 个；`shared/` 下无 role-mixing 逐条记录；Table 18 的 285/384/20/394 在任何发布 JSON 中检索不到 | 不一致：只发布了聚合 JSON（`shared/ablation_results/` 35 个文件 + `shared/paper/` 一批），trace 与逐条记录未发布，49.4% 无法从发布物复算 |
+| Solo baseline 的 prompt "intentionally concise"，仅"完成任务"（tex:1427-1429） | `harness/ablation.py:99-147` 的 Oracle system prompt 是长指令，含 `:128` "DO NOT read the same file more than twice. After reading, ACT on what you learned."；user prompt `:273` 另强制 "Before outputting code or commands, write a `<thinking>` block analyzing the codebase against the spec." | 不一致：Solo baseline 带显式 CoT 指令与检索节流启发式 |
+
+**论文没写的实现细节**：
+
+- **Full Team 的 Verifier 收到一条宽松化指令**。`harness/orchestrator.py:238-240`：`"5. IMPORTANT: Set verdict='pass' if the CORE requirements are met, even if minor stylistic issues remain. Only set verdict='fail' for clear, objective violations of explicit spec requirements."` 论文 tex:1425 的 Verifier prompt box 只有 "Only set verdict='pass' when ALL requirements are satisfied"，与之相反。这条指令与 49.4% false-accept 处在同一条因果路径上，却不在论文任何位置。
+- **Baseline 轮次预算不对称**。`ablation.py:301` 给 Restricted `max_turns=max(max_turns, 30)`，代码注释（`:286-287`）自陈"Restricted runs lack oracle context, so verbose models (Anthropic) need extra turns to converge — bump from default 20 to 30"；Solo/ORACLE 走 `:267` 的 `run_max_turns`，CLI `--max-turns` 默认 20（`:1525`）。即 TNI 分母两端的 Solo 与 Restricted 预算是 20 vs 30。
+- **被判分的 workspace 可能不是 agent 最后留下的那个**。`orchestrator.py:264-268` 每轮 remediation 前 `copytree` 快照；终局判 fail 时 `:299-303` 调用 `_select_best_workspace`（`:308-344`）按**文件字节总和**启发式挑最大的快照回滚，阈值 `best_size > current_size * 1.1`（`:342`）。仅 FULL 条件有此逻辑，其他条件无，构成条件间的不对称。
+- **attestation 用正则抢救**。`orchestrator.py:354-380`：JSON 解析失败后用 `re.search(r'"verdict"\s*:\s*"(pass|fail)"', raw)` 从原始文本里捞判决并重写成合法 attestation。
+- **终止判据是子串匹配**。`agent_loop.py:167` `if "DONE" in response.text or "TASK_COMPLETE" in response.text`，正文任意位置出现 "DONE" 即终止该角色。
+- **答案键落在 Executor 可读写的目录里**。`generators/base.py:81-84` 把 `expected.json` 写进 `reports_dir`，注释自称 "grader-only, never accessible to agents"；但同仓 `agent_interface.py:521` 给 Executor 的 `read` 根包含 `reports_dir`，`:524` 的 `write` 根同样包含，Docker 模式下 `docker-compose.yml:59-61` 也是 read-write 绑定。`expected.json` 的内容是解题答案（如 `generators/gen_cr3_perf_review.py:160-171` 的 `hotspot1_fn` / `hotspot1_strategy` / `budget_ms`），且 `run_all.py:104-106` 将其作为 `$5` 传给 grader（53 个 `grade.sh` 引用 `$5`/`EXPECTED`）——Executor 既能读答案也能改评分依据。未见任何路径隔离或校验。
+- **attestation 来源存在回退**。`scripts/compute_advanced_metrics.py:325-337` 依次在 `submission/`、`workspace/`、`./` 找 `attestation.json`。Executor 对 workspace 有写权限，因此当 submission 缺 attestation 时，Executor 写在 workspace 的同名文件会被当作"Verifier 判决"计入混淆矩阵。
+- **发布的唯一一份 verifier 混淆矩阵与论文 Table 18 不是同一个数**。`shared/paper/advanced_metrics.json` 的 `verification_accuracy` 为 TP=674 / FP=2510 / FN=27 / TN=440（`total_judgments`=3651，`meta.n_runs_loaded`=4841、`n_tasks_aggregated`=188），VA=0.3051，换算 false-accept = 2510/2950 = 85.1%。论文 Table 18 pooled 是 TP=285/FP=384/FN=20/TN=394（n=1083），false-accept 49.4%。两者池子不同（论文限定 role-mixing pool），不构成直接矛盾，但发布物给出的图景明显更差，而论文表中的数在发布物里找不到对应。另注：`compute_va:417-431` 只输出 VA/precision/recall/false_negative_rate，**不输出 false-accept rate**，49.4% 需自行由 FP/(FP+TN) 换算。
+- **仓库内存在 `model: "synthetic-baseline"` 的 1200 条模拟 run**（`shared/synthetic_ablation.json`，配套 `shared/synthetic_tni.json` 报 avg_tni=0.88 / 80 任务全部 team_helps）。全仓无任何 `.py`/`.sh`/`.md` 引用这两个文件。**待核**：是否为流水线自测遗留、是否与论文任一数字相关，静态分析无法判定。
+- **TNI 的有效样本远小于任务数**。`shared/paper/ablation_summary.json` 的 aggregate 为 `count=155, valid_tni_count=37`——155 个任务里只有 37 个（23.9%）满足 gap 门槛而产出有效 TNI。同文件 `findings.total_runs=1427`，与论文 tex:1083 的 "1,165 task runs" 不同口径。
+- **prompt-only vs enforced 的 prompt 并非逐字相同**。`agent_interface.py:586-601` 的 docstring 称与 enforced 条件"identical in content"，`:610-613` 的注释自陈"only the role label and the workspace-access language differs"；实际 prompt-only 的 Planner 说 "You have shared workspace tools, but your job is to plan, not to implement"（`:622-628`），enforced 的 Planner 说 "You CANNOT execute commands or modify the workspace"（`:320-327`）。`experiments/role_enforcement_ablation/HYPOTHESIS.md:119-121` 已在预注册里明确承认这一差异属于"legitimate, pre-registered difference"，因此不算隐瞒，但它意味着该对照并非纯 enforcement 单变量——措辞差异与权限差异共变。
+
+**复现路径**：Python ≥ 3.10，核心依赖仅 `click` + `pyyaml`，provider SDK 走 extras（`pyproject.toml` 的 `gemini`/`openai`/`anthropic`/`all`），入口 `teambench = "harness.cli:main"`。主命令是 `python -m harness.ablation --model <m> --conditions oracle restricted full team_no_plan team_no_verify`（README:51/64），CLI 默认 `--max-turns 20`、`--max-remediation 2`、`--seeds 0 1 2`（`ablation.py:1520-1545`）。`--model mock` 可无 API key 跑通判分与沙箱管线（README:90-94），适合验证 grader 而非复现结论。`.env.example` 只有 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` / `OPENROUTER_API` 四个空占位（全仓 `sk-ant-`/`sk-proj-`/`AIza` 正则扫描零命中，无凭证泄漏）。任务数据完整开放：90 个 leaderboard 任务（`leaderboard/data/leaderboard_90_tasks.json`）逐一核对均有 `tasks/<ID>/` 目录与 `grade.sh`；seed 0–2 公开、seed ≥5 保留（tex:1086）。算力成本按论文口径为 role-mixing 网格 2,025 run / $326.04；`ablation.py:1365-1389` 的 append-only checkpoint 支持中断续跑。**不可复现的部分**：per-run trace（`turn_*.json` / `dialogue.jsonl`）与 role-mixing 逐条记录未发布，Table 18 的混淆矩阵与 49.4% 无法由发布物重算；README:152 注明 leaderboard 任务 `GH120_redis-py_3863` 正在重整、当前返回 0。
+
+**Affordance 面**：
+
+*Agent-facing（rollout 中模型可调用，全部经 tool declaration `agent_interface.py:63-121` 暴露，共四个）*
+
+- `run(cmd)` — `RunCommandTool.execute:149-178`，宿主机 `subprocess.run(shell=True, cwd=workspace, timeout=60)`。权限只有"整体开关"（`:152-153`）与"首 token 白名单"（`:154-165`）两档，**无路径边界**。持有者：Executor（`:519`）、Verifier（`:560`，与论文相反）、Oracle/Solo、Restricted；Planner 无（`:309-332`，与论文一致）。
+- `read(path)` — `ReadFileTool.execute:204`，绝对路径前缀匹配 `allowed_roots`；配合 `_build_path_map:285-300` 把 `/shared/workspace` 之类的 Docker 风格路径映射到宿主机真实路径。
+- `write(path, content)` — `WriteFileTool.execute:236`，同样前缀匹配。Executor 写根 `[workspace, reports]`（`:524`），Verifier 写根仅 `[submission]`（`:568`）。
+- `send_message(to, content)` — `SendMessageTool.execute:255-269`，追加一行 JSON 到 `messages/dialogue.jsonl`；接收侧是 `agent_loop.py:49-71` 每轮轮询、按 `to == role or "all"` 过滤。这是**唯一的 agent 间通道**。
+- 观测面：任务描述在首轮 prompt 里一次性注入（如 `orchestrator.py:220-244`），此后 agent 的全部新信息只来自 tool 返回值与轮询到的消息。
+- **不存在的 agent-facing 能力**：无任务状态查询（拿不到当前得分、已用轮次、剩余预算、grader 反馈）、无 reset、无 fork、无 snapshot/rollback、无中间态检查点。角色对自己被回滚、被截断、被判违规一无所知。Planner 的输出若未调用 `send_message`，会被 `orchestrator.py:49-79` 的 `_relay_planner_text` 强行转成一条消息注入——这是编排器替 agent 补的动作，不是 agent 的接口。
+
+*Trainer/evaluator-facing（仅外部框架可用，agent 既不可调用也不可感知）*
+
+- workspace snapshot 与回滚：`orchestrator.py:264-268` 建快照，`:299-303` + `_select_best_workspace:308-344` 按字节数启发式回滚（阈值 `*1.1`，`:342`）。这是全仓最接近"环境控制"的能力，且只在 FULL 条件生效。
+- checkpoint / resume：`ablation.py:1365-1389`，append-only `.checkpoint.jsonl`，按 `condition:task:seed` 取最后一条覆盖。粒度是整个 run，**不能从 run 中途状态 fork**。
+- 确定性重建：`generators/base.py:61-101` 的 `write_to_disk(result, workspace_dir, reports_dir[, task_dir])` + seed。注意 `run_task.py:56-64`（Docker 人工路径）会额外把 seed 化的 `spec.md`/`brief.md` 回写进 `tasks/<ID>/`，而 `run_all.py:54` 不传 `task_dir`，两条路径的产物构成不同。
+- 判分：`tasks/<ID>/grade.sh` + `harness/grader_helpers.sh`；`run_all.py:104-106` 把 `reports/expected.json` 作为 `$5` 传入实现 seed-aware grading，60 秒超时（`:116`），超时或无 `score.json` 时回落到 `failure_modes: ["grader_no_score"]`（`:126-131`）。
+- 事后合规标注：`experiments/role_enforcement_ablation/scripts/04_score_compliance.py` 离线消费 `logs/<role>/turn_*.json`，`test_seen_global` 跨全部角色的 turn 计算（`:191-200`）后再门控 `verifier_skips_tests`。
+- 指标聚合：`ablation.py:1175-1285`、`compute_tni.py`、`scripts/compute_advanced_metrics.py`。
+
+*verifier / 判分的实现方式*：两条**互相独立**的链路，不要混为一谈。(1) **进入 pass rate 与 partial score 的判分完全是确定性 shell**，无 LLM 参与，`grader_helpers.sh:194-215` 是终点；顺带一提，`finalize_grader` 恒定输出 `"failure_modes": []`（`:211`），失败模式实际由上层填。(2) **Verifier agent 只产出 `attestation.json`，不进 pass rate**，它使用与被评者同一个 adapter（`ablation.py:1333` 单模型；role-mixing 时按角色分配 `:1069-1072`），prompt 见 `agent_interface.py:548-558` 与 `orchestrator.py:220-244`（含上文那条宽松化指令）。这一分工与论文一致，也正是论文能把 Verifier 判决与 grader 判决配对算混淆矩阵的前提。
+
+*对本 vault 研究方向的判断*：TeamBench 的 affordance 面是**极薄的 agent-facing + 中等的 evaluator-facing**。agent 侧只有四个 tool、单向观测、零环境控制，连"我现在得几分"都查不到；所有回滚、重放、续跑能力都握在编排器手里且对 agent 不可见。这解释了 Verifier 为何 pass-by-default：它既没有查询 grader 结果的接口，也没有任何机制让错判在后续轮次里产生代价——**pass-by-default 是这个 affordance 设计的均衡解，不必然是模型能力的上限**（对应笔记待办里那个激励 vs 能力的问题，代码侧支持"激励"一侧）。若要把它当作 agent 训练环境使用，缺的是三样：run 内可 fork 的状态快照、agent 可查询的任务进度/评分反馈、以及把 grader 信号回灌给 Verifier 的通路。

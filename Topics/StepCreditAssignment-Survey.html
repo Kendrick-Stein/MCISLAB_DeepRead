@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr"><head><title>Step-Level Credit Assignment：从 trajectory-level reward 反推步级监督</title><meta charset="utf-8"/><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com"/><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted Grotesk:wght@400;700&amp;family=Source Sans Pro:ital,wght@0,400;0,600;1,400;1,600&amp;family=IBM Plex Mono:wght@400;600&amp;display=swap"/><link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin="anonymous"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="og:site_name" content="DeepRead"/><meta property="og:title" content="Step-Level Credit Assignment：从 trajectory-level reward 反推步级监督"/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="Step-Level Credit Assignment：从 trajectory-level reward 反推步级监督"/><meta name="twitter:description" content="Overview 从 trajectory-level 的 0/1 reward 反推步级监督，实质上是在两个不同的问题之间做选择——哪一步重要，和哪一步对。 区分这一族方法的三条轴： 打分信号从哪来：语义判据 / prefix rollout 估值 / 终局回溯 / log-likelihood ratio / 外部 critic / 轨迹间结构对比。信号来源决定标注成本，也决定失效模式。 信号衡量的是什么：与目标的相关性、前缀的价值、该步的正确性、模型对该步的可学性。四者常被混用为同一个”step score”。 信号如何被消费：SFT 阶段的 loss mask 与 token 加权，还..."/><meta property="og:description" content="Overview 从 trajectory-level 的 0/1 reward 反推步级监督，实质上是在两个不同的问题之间做选择——哪一步重要，和哪一步对。 区分这一族方法的三条轴： 打分信号从哪来：语义判据 / prefix rollout 估值 / 终局回溯 / log-likelihood ratio / 外部 critic / 轨迹间结构对比。信号来源决定标注成本，也决定失效模式。 信号衡量的是什么：与目标的相关性、前缀的价值、该步的正确性、模型对该步的可学性。四者常被混用为同一个”step score”。 信号如何被消费：SFT 阶段的 loss mask 与 token 加权，还..."/><meta property="og:image:alt" content="Overview 从 trajectory-level 的 0/1 reward 反推步级监督，实质上是在两个不同的问题之间做选择——哪一步重要，和哪一步对。 区分这一族方法的三条轴： 打分信号从哪来：语义判据 / prefix rollout 估值 / 终局回溯 / log-likelihood ratio / 外部 critic / 轨迹间结构对比。信号来源决定标注成本，也决定失效模式。 信号衡量的是什么：与目标的相关性、前缀的价值、该步的正确性、模型对该步的可学性。四者常被混用为同一个”step score”。 信号如何被消费：SFT 阶段的 loss mask 与 token 加权，还..."/><meta property="og:image" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/static/og-image.png"/><meta property="og:image:url" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/static/og-image.png"/><meta name="twitter:image" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/static/og-image.png"/><meta property="og:image:type" content="image/.png"/><meta property="twitter:domain" content="kendrick-stein.github.io/MCISLAB_DeepRead"/><meta property="og:url" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/Topics/StepCreditAssignment-Survey"/><meta property="twitter:url" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/Topics/StepCreditAssignment-Survey"/><link rel="icon" href="../static/icon.png"/><meta name="description" content="Overview 从 trajectory-level 的 0/1 reward 反推步级监督，实质上是在两个不同的问题之间做选择——哪一步重要，和哪一步对。 区分这一族方法的三条轴： 打分信号从哪来：语义判据 / prefix rollout 估值 / 终局回溯 / log-likelihood ratio / 外部 critic / 轨迹间结构对比。信号来源决定标注成本，也决定失效模式。 信号衡量的是什么：与目标的相关性、前缀的价值、该步的正确性、模型对该步的可学性。四者常被混用为同一个”step score”。 信号如何被消费：SFT 阶段的 loss mask 与 token 加权，还..."/><meta name="generator" content="Quartz"/><link href="../index.css" rel="stylesheet" type="text/css" data-persist="true"/><style>.expand-button {
+  position: absolute;
+  display: flex;
+  float: right;
+  padding: 0.4rem;
+  margin: 0.3rem;
+  right: 0;
+  color: var(--gray);
+  border-color: var(--dark);
+  background-color: var(--light);
+  border: 1px solid;
+  border-radius: 5px;
+  opacity: 0;
+  transition: 0.2s;
+}
+.expand-button > svg {
+  fill: var(--light);
+  filter: contrast(0.3);
+}
+.expand-button:hover {
+  cursor: pointer;
+  border-color: var(--secondary);
+}
+.expand-button:focus {
+  outline: 0;
+}
+
+pre:hover > .expand-button {
+  opacity: 1;
+  transition: 0.2s;
+}
+
+#mermaid-container {
+  position: fixed;
+  contain: layout;
+  z-index: 999;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: none;
+  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.5);
+}
+#mermaid-container.active {
+  display: inline-block;
+}
+#mermaid-container > #mermaid-space {
+  border: 1px solid var(--lightgray);
+  background-color: var(--light);
+  border-radius: 5px;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  height: 80vh;
+  width: 80vw;
+  overflow: hidden;
+}
+#mermaid-container > #mermaid-space > .mermaid-content {
+  position: relative;
+  transform-origin: 0 0;
+  transition: transform 0.1s ease;
+  overflow: visible;
+  min-height: 200px;
+  min-width: 200px;
+}
+#mermaid-container > #mermaid-space > .mermaid-content pre {
+  margin: 0;
+  border: none;
+}
+#mermaid-container > #mermaid-space > .mermaid-content svg {
+  max-width: none;
+  height: auto;
+}
+#mermaid-container > #mermaid-space > .mermaid-controls {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: var(--light);
+  border: 1px solid var(--lightgray);
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+}
+#mermaid-container > #mermaid-space > .mermaid-controls .mermaid-control-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--lightgray);
+  background: var(--light);
+  color: var(--dark);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  font-family: var(--bodyFont);
+  transition: all 0.2s ease;
+}
+#mermaid-container > #mermaid-space > .mermaid-controls .mermaid-control-button:hover {
+  background: var(--lightgray);
+}
+#mermaid-container > #mermaid-space > .mermaid-controls .mermaid-control-button:active {
+  transform: translateY(1px);
+}
+#mermaid-container > #mermaid-space > .mermaid-controls .mermaid-control-button:nth-child(2) {
+  width: auto;
+  padding: 0 12px;
+  font-size: 14px;
+}
+/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VSb290IjoiL2hvbWUvcnVubmVyL3dvcmsvTUNJU0xBQl9EZWVwUmVhZC9NQ0lTTEFCX0RlZXBSZWFkL3dlYnNpdGUvcXVhcnR6L2NvbXBvbmVudHMvc3R5bGVzIiwic291cmNlcyI6WyJtZXJtYWlkLmlubGluZS5zY3NzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiJBQUFBO0VBQ0U7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7O0FBRUE7RUFDRTtFQUNBOztBQUdGO0VBQ0U7RUFDQTs7QUFHRjtFQUNFOzs7QUFLRjtFQUNFO0VBQ0E7OztBQUlKO0VBQ0U7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTs7QUFFQTtFQUNFOztBQUdGO0VBQ0U7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7O0FBRUE7RUFDRTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7O0FBRUE7RUFDRTtFQUNBOztBQUdGO0VBQ0U7RUFDQTs7QUFJSjtFQUNFO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7O0FBRUE7RUFDRTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBOztBQUVBO0VBQ0U7O0FBR0Y7RUFDRTs7QUFJRjtFQUNFO0VBQ0E7RUFDQSIsInNvdXJjZXNDb250ZW50IjpbIi5leHBhbmQtYnV0dG9uIHtcbiAgcG9zaXRpb246IGFic29sdXRlO1xuICBkaXNwbGF5OiBmbGV4O1xuICBmbG9hdDogcmlnaHQ7XG4gIHBhZGRpbmc6IDAuNHJlbTtcbiAgbWFyZ2luOiAwLjNyZW07XG4gIHJpZ2h0OiAwOyAvLyBOT1RFOiByaWdodCB3aWxsIGJlIHNldCBpbiBtZXJtYWlkLmlubGluZS50c1xuICBjb2xvcjogdmFyKC0tZ3JheSk7XG4gIGJvcmRlci1jb2xvcjogdmFyKC0tZGFyayk7XG4gIGJhY2tncm91bmQtY29sb3I6IHZhcigtLWxpZ2h0KTtcbiAgYm9yZGVyOiAxcHggc29saWQ7XG4gIGJvcmRlci1yYWRpdXM6IDVweDtcbiAgb3BhY2l0eTogMDtcbiAgdHJhbnNpdGlvbjogMC4ycztcblxuICAmID4gc3ZnIHtcbiAgICBmaWxsOiB2YXIoLS1saWdodCk7XG4gICAgZmlsdGVyOiBjb250cmFzdCgwLjMpO1xuICB9XG5cbiAgJjpob3ZlciB7XG4gICAgY3Vyc29yOiBwb2ludGVyO1xuICAgIGJvcmRlci1jb2xvcjogdmFyKC0tc2Vjb25kYXJ5KTtcbiAgfVxuXG4gICY6Zm9jdXMge1xuICAgIG91dGxpbmU6IDA7XG4gIH1cbn1cblxucHJlIHtcbiAgJjpob3ZlciA+IC5leHBhbmQtYnV0dG9uIHtcbiAgICBvcGFjaXR5OiAxO1xuICAgIHRyYW5zaXRpb246IDAuMnM7XG4gIH1cbn1cblxuI21lcm1haWQtY29udGFpbmVyIHtcbiAgcG9zaXRpb246IGZpeGVkO1xuICBjb250YWluOiBsYXlvdXQ7XG4gIHotaW5kZXg6IDk5OTtcbiAgbGVmdDogMDtcbiAgdG9wOiAwO1xuICB3aWR0aDogMTAwdnc7XG4gIGhlaWdodDogMTAwdmg7XG4gIG92ZXJmbG93OiBoaWRkZW47XG4gIGRpc3BsYXk6IG5vbmU7XG4gIGJhY2tkcm9wLWZpbHRlcjogYmx1cig0cHgpO1xuICBiYWNrZ3JvdW5kOiByZ2JhKDAsIDAsIDAsIDAuNSk7XG5cbiAgJi5hY3RpdmUge1xuICAgIGRpc3BsYXk6IGlubGluZS1ibG9jaztcbiAgfVxuXG4gICYgPiAjbWVybWFpZC1zcGFjZSB7XG4gICAgYm9yZGVyOiAxcHggc29saWQgdmFyKC0tbGlnaHRncmF5KTtcbiAgICBiYWNrZ3JvdW5kLWNvbG9yOiB2YXIoLS1saWdodCk7XG4gICAgYm9yZGVyLXJhZGl1czogNXB4O1xuICAgIHBvc2l0aW9uOiBmaXhlZDtcbiAgICB0b3A6IDUwJTtcbiAgICBsZWZ0OiA1MCU7XG4gICAgdHJhbnNmb3JtOiB0cmFuc2xhdGUoLTUwJSwgLTUwJSk7XG4gICAgaGVpZ2h0OiA4MHZoO1xuICAgIHdpZHRoOiA4MHZ3O1xuICAgIG92ZXJmbG93OiBoaWRkZW47XG5cbiAgICAmID4gLm1lcm1haWQtY29udGVudCB7XG4gICAgICBwb3NpdGlvbjogcmVsYXRpdmU7XG4gICAgICB0cmFuc2Zvcm0tb3JpZ2luOiAwIDA7XG4gICAgICB0cmFuc2l0aW9uOiB0cmFuc2Zvcm0gMC4xcyBlYXNlO1xuICAgICAgb3ZlcmZsb3c6IHZpc2libGU7XG4gICAgICBtaW4taGVpZ2h0OiAyMDBweDtcbiAgICAgIG1pbi13aWR0aDogMjAwcHg7XG5cbiAgICAgIHByZSB7XG4gICAgICAgIG1hcmdpbjogMDtcbiAgICAgICAgYm9yZGVyOiBub25lO1xuICAgICAgfVxuXG4gICAgICBzdmcge1xuICAgICAgICBtYXgtd2lkdGg6IG5vbmU7XG4gICAgICAgIGhlaWdodDogYXV0bztcbiAgICAgIH1cbiAgICB9XG5cbiAgICAmID4gLm1lcm1haWQtY29udHJvbHMge1xuICAgICAgcG9zaXRpb246IGFic29sdXRlO1xuICAgICAgYm90dG9tOiAyMHB4O1xuICAgICAgcmlnaHQ6IDIwcHg7XG4gICAgICBkaXNwbGF5OiBmbGV4O1xuICAgICAgZ2FwOiA4cHg7XG4gICAgICBwYWRkaW5nOiA4cHg7XG4gICAgICBiYWNrZ3JvdW5kOiB2YXIoLS1saWdodCk7XG4gICAgICBib3JkZXI6IDFweCBzb2xpZCB2YXIoLS1saWdodGdyYXkpO1xuICAgICAgYm9yZGVyLXJhZGl1czogNnB4O1xuICAgICAgYm94LXNoYWRvdzogMCAycHggNHB4IHJnYmEoMCwgMCwgMCwgMC4xKTtcbiAgICAgIHotaW5kZXg6IDI7XG5cbiAgICAgIC5tZXJtYWlkLWNvbnRyb2wtYnV0dG9uIHtcbiAgICAgICAgZGlzcGxheTogZmxleDtcbiAgICAgICAgYWxpZ24taXRlbXM6IGNlbnRlcjtcbiAgICAgICAganVzdGlmeS1jb250ZW50OiBjZW50ZXI7XG4gICAgICAgIHdpZHRoOiAzMnB4O1xuICAgICAgICBoZWlnaHQ6IDMycHg7XG4gICAgICAgIHBhZGRpbmc6IDA7XG4gICAgICAgIGJvcmRlcjogMXB4IHNvbGlkIHZhcigtLWxpZ2h0Z3JheSk7XG4gICAgICAgIGJhY2tncm91bmQ6IHZhcigtLWxpZ2h0KTtcbiAgICAgICAgY29sb3I6IHZhcigtLWRhcmspO1xuICAgICAgICBib3JkZXItcmFkaXVzOiA0cHg7XG4gICAgICAgIGN1cnNvcjogcG9pbnRlcjtcbiAgICAgICAgZm9udC1zaXplOiAxNnB4O1xuICAgICAgICBmb250LWZhbWlseTogdmFyKC0tYm9keUZvbnQpO1xuICAgICAgICB0cmFuc2l0aW9uOiBhbGwgMC4ycyBlYXNlO1xuXG4gICAgICAgICY6aG92ZXIge1xuICAgICAgICAgIGJhY2tncm91bmQ6IHZhcigtLWxpZ2h0Z3JheSk7XG4gICAgICAgIH1cblxuICAgICAgICAmOmFjdGl2ZSB7XG4gICAgICAgICAgdHJhbnNmb3JtOiB0cmFuc2xhdGVZKDFweCk7XG4gICAgICAgIH1cblxuICAgICAgICAvLyBTdHlsZSB0aGUgcmVzZXQgYnV0dG9uIGRpZmZlcmVudGx5XG4gICAgICAgICY6bnRoLWNoaWxkKDIpIHtcbiAgICAgICAgICB3aWR0aDogYXV0bztcbiAgICAgICAgICBwYWRkaW5nOiAwIDEycHg7XG4gICAgICAgICAgZm9udC1zaXplOiAxNHB4O1xuICAgICAgICB9XG4gICAgICB9XG4gICAgfVxuICB9XG59XG4iXX0= */</style><link href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" rel="stylesheet" type="text/css" data-persist="true"/><script src="../prescript.js" type="application/javascript" data-persist="true"></script><script type="application/javascript" data-persist="true">const fetchData = fetch("../static/contentIndex.json").then(data => data.json())</script><link rel="alternate" type="application/rss+xml" title="RSS Feed" href="https://kendrick-stein.github.io/MCISLAB_DeepRead/index.xml"/></head><body data-slug="Topics/StepCreditAssignment-Survey"><div id="quartz-root" class="page"><div id="quartz-body"><div class="left sidebar"><h2 class="page-title"><a href="..">DeepRead</a></h2><div class="spacer mobile-only"></div><div class="flex-component" style="flex-direction: row; flex-wrap: nowrap; gap: 1rem;"><div style="flex-grow: 1; flex-shrink: 1; flex-basis: auto; order: 0; align-self: center; justify-self: center;"><div class="search"><button class="search-button"><svg role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 19.9 19.7"><title>Search</title><g class="search-path" fill="none"><path stroke-linecap="square" d="M18.5 18.3l-5.4-5.4"></path><circle cx="8" cy="8" r="7"></circle></g></svg><p>Search</p></button><div class="search-container"><div class="search-space"><input autocomplete="off" class="search-bar" name="search" type="text" aria-label="Search for something" placeholder="Search for something"/><div class="search-layout" data-preview="true"></div></div></div></div></div><div style="flex-grow: 0; flex-shrink: 1; flex-basis: auto; order: 0; align-self: center; justify-self: center;"><button class="darkmode"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" class="dayIcon" x="0px" y="0px" viewBox="0 0 35 35" style="enable-background:new 0 0 35 35" xml:space="preserve" aria-label="Dark mode"><title>Dark mode</title><path d="M6,17.5C6,16.672,5.328,16,4.5,16h-3C0.672,16,0,16.672,0,17.5    S0.672,19,1.5,19h3C5.328,19,6,18.328,6,17.5z M7.5,26c-0.414,0-0.789,0.168-1.061,0.439l-2,2C4.168,28.711,4,29.086,4,29.5    C4,30.328,4.671,31,5.5,31c0.414,0,0.789-0.168,1.06-0.44l2-2C8.832,28.289,9,27.914,9,27.5C9,26.672,8.329,26,7.5,26z M17.5,6    C18.329,6,19,5.328,19,4.5v-3C19,0.672,18.329,0,17.5,0S16,0.672,16,1.5v3C16,5.328,16.671,6,17.5,6z M27.5,9    c0.414,0,0.789-0.168,1.06-0.439l2-2C30.832,6.289,31,5.914,31,5.5C31,4.672,30.329,4,29.5,4c-0.414,0-0.789,0.168-1.061,0.44    l-2,2C26.168,6.711,26,7.086,26,7.5C26,8.328,26.671,9,27.5,9z M6.439,8.561C6.711,8.832,7.086,9,7.5,9C8.328,9,9,8.328,9,7.5    c0-0.414-0.168-0.789-0.439-1.061l-2-2C6.289,4.168,5.914,4,5.5,4C4.672,4,4,4.672,4,5.5c0,0.414,0.168,0.789,0.439,1.06    L6.439,8.561z M33.5,16h-3c-0.828,0-1.5,0.672-1.5,1.5s0.672,1.5,1.5,1.5h3c0.828,0,1.5-0.672,1.5-1.5S34.328,16,33.5,16z     M28.561,26.439C28.289,26.168,27.914,26,27.5,26c-0.828,0-1.5,0.672-1.5,1.5c0,0.414,0.168,0.789,0.439,1.06l2,2    C28.711,30.832,29.086,31,29.5,31c0.828,0,1.5-0.672,1.5-1.5c0-0.414-0.168-0.789-0.439-1.061L28.561,26.439z M17.5,29    c-0.829,0-1.5,0.672-1.5,1.5v3c0,0.828,0.671,1.5,1.5,1.5s1.5-0.672,1.5-1.5v-3C19,29.672,18.329,29,17.5,29z M17.5,7    C11.71,7,7,11.71,7,17.5S11.71,28,17.5,28S28,23.29,28,17.5S23.29,7,17.5,7z M17.5,25c-4.136,0-7.5-3.364-7.5-7.5    c0-4.136,3.364-7.5,7.5-7.5c4.136,0,7.5,3.364,7.5,7.5C25,21.636,21.636,25,17.5,25z"></path></svg><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" class="nightIcon" x="0px" y="0px" viewBox="0 0 100 100" style="enable-background:new 0 0 100 100" xml:space="preserve" aria-label="Light mode"><title>Light mode</title><path d="M96.76,66.458c-0.853-0.852-2.15-1.064-3.23-0.534c-6.063,2.991-12.858,4.571-19.655,4.571  C62.022,70.495,50.88,65.88,42.5,57.5C29.043,44.043,25.658,23.536,34.076,6.47c0.532-1.08,0.318-2.379-0.534-3.23  c-0.851-0.852-2.15-1.064-3.23-0.534c-4.918,2.427-9.375,5.619-13.246,9.491c-9.447,9.447-14.65,22.008-14.65,35.369  c0,13.36,5.203,25.921,14.65,35.368s22.008,14.65,35.368,14.65c13.361,0,25.921-5.203,35.369-14.65  c3.872-3.871,7.064-8.328,9.491-13.246C97.826,68.608,97.611,67.309,96.76,66.458z"></path></svg></button></div></div><div class="explorer" data-behavior="link" data-collapsed="collapsed" data-savestate="false" data-data-fns="{&quot;order&quot;:[&quot;filter&quot;,&quot;map&quot;,&quot;sort&quot;],&quot;sortFn&quot;:&quot;(a,b)=>{let order=[\&quot;DomainMaps\&quot;,\&quot;Papers\&quot;,\&quot;Topics\&quot;,\&quot;Ideas\&quot;,\&quot;Projects\&quot;],aIdx=order.indexOf(a.displayName),bIdx=order.indexOf(b.displayName);return aIdx!==-1&amp;&amp;bIdx!==-1?aIdx-bIdx:aIdx!==-1?-1:bIdx!==-1?1:a.slug?.startsWith(\&quot;Papers/\&quot;)&amp;&amp;b.slug?.startsWith(\&quot;Papers/\&quot;)?b.displayName.localeCompare(a.displayName):a.displayName.localeCompare(b.displayName)}&quot;,&quot;filterFn&quot;:&quot;node=>node.slugSegment!==\&quot;tags\&quot;&quot;,&quot;mapFn&quot;:&quot;node=>{node.isFolder||(node.displayName=node.slugSegment)}&quot;}"><button type="button" class="explorer-toggle mobile-explorer hide-until-loaded" data-mobile="true" aria-controls="explorer-1314"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide-menu"><line x1="4" x2="20" y1="12" y2="12"></line><line x1="4" x2="20" y1="6" y2="6"></line><line x1="4" x2="20" y1="18" y2="18"></line></svg></button><button type="button" class="title-button explorer-toggle desktop-explorer" data-mobile="false" aria-expanded="true"><h2>Explorer</h2><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="5 8 14 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="fold"><polyline points="6 9 12 15 18 9"></polyline></svg></button><div id="explorer-1314" class="explorer-content" aria-expanded="false" role="group"><ul class="explorer-ul overflow" id="list-0"><li class="overflow-end"></li></ul></div><template id="template-file"><li><a href="#"></a></li></template><template id="template-folder"><li><div class="folder-container"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="5 8 14 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="folder-icon"><polyline points="6 9 12 15 18 9"></polyline></svg><div><button class="folder-button"><span class="folder-title"></span></button></div></div><div class="folder-outer"><ul class="content"></ul></div></li></template></div><div class="sidebar-tags"><span class="sidebar-tags-title">Popular Tags</span><div class="sidebar-tag-cloud"><a href="/MCISLAB_DeepRead/tags/VLM" class="sidebar-tag-pill">#VLM</a><a href="/MCISLAB_DeepRead/tags/agentic-RL" class="sidebar-tag-pill">#agentic-RL</a><a href="/MCISLAB_DeepRead/tags/gui-agent" class="sidebar-tag-pill">#gui-agent</a><a href="/MCISLAB_DeepRead/tags/web-agent" class="sidebar-tag-pill">#web-agent</a><a href="/MCISLAB_DeepRead/tags/LLM" class="sidebar-tag-pill">#LLM</a><a href="/MCISLAB_DeepRead/tags/VLA" class="sidebar-tag-pill">#VLA</a><a href="/MCISLAB_DeepRead/tags/computer-use" class="sidebar-tag-pill">#computer-use</a><a href="/MCISLAB_DeepRead/tags/task-planning" class="sidebar-tag-pill">#task-planning</a><a href="/MCISLAB_DeepRead/tags/manipulation" class="sidebar-tag-pill">#manipulation</a><a href="/MCISLAB_DeepRead/tags/imitation-learning" class="sidebar-tag-pill">#imitation-learning</a></div></div></div><div class="center"><div class="page-header"><div class="popover-hint"><nav class="breadcrumb-container" aria-label="breadcrumbs"><div class="breadcrumb-element"><a href="../">Home</a><p> ❯ </p></div><div class="breadcrumb-element"><a href="../Topics/">Topics</a><p> ❯ </p></div><div class="breadcrumb-element"><a href>Step Level Credit Assignment：从 trajectory level reward 反推步级监督</a></div></nav><h1 class="article-title">Step-Level Credit Assignment：从 trajectory-level reward 反推步级监督</h1><p show-comma="true" class="content-meta"><time datetime="2026-08-20T07:02:16.823Z">Aug 20, 2026</time><span>47 min read</span></p><ul class="tags"><li><a href="../tags/survey" class="internal tag-link">survey</a></li><li><a href="../tags/agentic-RL" class="internal tag-link">agentic-RL</a></li><li><a href="../tags/gui-agent" class="internal tag-link">gui-agent</a></li></ul></div></div><article class="popover-hint"><h2 id="overview">Overview<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#overview" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p>从 trajectory-level 的 0/1 reward 反推步级监督，实质上是在两个不同的问题之间做选择——哪一步重要，和哪一步对。</p>
+<p>区分这一族方法的三条轴：</p>
+<ul>
+<li><strong>打分信号从哪来</strong>：语义判据 / prefix rollout 估值 / 终局回溯 / log-likelihood ratio / 外部 critic / 轨迹间结构对比。信号来源决定标注成本，也决定失效模式。</li>
+<li><strong>信号衡量的是什么</strong>：与目标的相关性、前缀的价值、该步的正确性、模型对该步的可学性。四者常被混用为同一个”step score”。</li>
+<li><strong>信号如何被消费</strong>：SFT 阶段的 loss mask 与 token 加权，还是 RL 阶段的 reward shaping 与 advantage 重分配。</li>
+</ul>
+<p>这三条轴不是正交的分类练习，而是决定一个方法能否回答”轨迹整体 reward=1、但其中若干步是错的，怎么办”这个具体问题。<strong>SFT 侧的两条代表性选步工作并不回答它</strong>：<a href="../Papers/2503-ATLaS" class="internal" data-slug="Papers/2503-ATLaS">2503-ATLaS</a> 用 GPT-4o 按 Plan Creation / Critical Observation / Critical Action / Self Correction 四类语义标准挑步，<a href="../Papers/2605-Weasel" class="internal" data-slug="Papers/2605-Weasel">2605-Weasel</a> 用 goal-state 语义相关度加两两差异度做固定预算的子集选择——两者的判据里都没有”这一步对不对”这一维，且都明确假设输入是专家轨迹。一个错误但与目标相关、且与其他步骤不重复的步骤，会被这两类选择器选中并加权。</p>
+<p>真正把正确性纳入判据的信号来自另外几族：prefix rollout 估的是价值而非正确性，只在”错步会显著降低成功概率”时与正确性重合；终局回溯与外部 critic 直接判对错，代价是引入一个本身会错的判官；log-likelihood ratio 提供免费的分解，但它的推导前提在 GUI 轨迹上并不成立。</p>
+<p>评测层面存在一个结构性偏斜：数学推理域因为答案可自动校验，成了这条线的发源地与主要实验场，而 GUI / Web agent 恰恰是缺少可自动校验终局信号的场景。把数学域的结论平移到长轨迹 GUI 训练，中间隔着至少三个未被检验的假设（step 边界的定义、outcome label 的噪声、observation token 是否计入分解）。</p>
+<h2 id="技术路线">技术路线<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#技术路线" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p>这条线的起点是 process reward model 的标注成本。PRM 相比 outcome reward model 能定位错误位置，但训练它需要逐步人工标注；<a href="../Papers/2312-MathShepherd" class="internal" data-slug="Papers/2312-MathShepherd">2312-MathShepherd</a> 在 2023 年底把这一步自动化——从中间步的前缀出发采样 N 条后续路径，按是否命中 golden answer 给该步打分，从此不再需要人标。一年后 <a href="../Papers/2412-ImplicitPRM" class="internal" data-slug="Papers/2412-ImplicitPRM">2412-ImplicitPRM</a> 把成本进一步压到零：只要把 outcome reward 参数化成 policy 与 reference model 的 log-likelihood ratio，逐 token 的 log-ratio 累加就恰好是该前缀的 Q value，process reward 成为 ORM 前向计算的副产品。两篇工作合起来定义了”outcome-only 反推 step-level”这个问题的上下界——一端是每步 N 次完整 rollout，另一端是零额外开销。</p>
+<p>但两篇都在单轮数学解题上验证，而把它们搬到 agent 轨迹上时，最先断裂的不是算法而是前提。数学题有唯一可自动校验的答案，agent 任务的成败判定往往来自一个学出来的 verifier；数学解题的 step 是自然的文本片段，agent 的一个 step 是一次 action 且与前后强耦合；数学解答整条由 policy 生成，agent 轨迹里穿插着截图和工具返回这类非 policy 生成的 token。2025 年之后 GUI / Web 侧涌现的方法，多数是在绕开这三处断裂中长出来的，而不是在改进 Math-Shepherd 的估值精度。</p>
+<h3 id="语义与可学性打分不做估值的直接选择">语义与可学性打分：不做估值的直接选择<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#语义与可学性打分不做估值的直接选择" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h3>
+<p>这一族不估任何价值，直接用一个外部判据给步骤打分，因而成本最低、也最不触及正确性。</p>
+<p>ATLaS 的判据是四类语义角色，硬约束是每条轨迹最多选 30% 的步骤，SFT 时保留完整轨迹作为输入、只在选中步骤的 token 上算 loss。在 AgentGym 上 held-in 均分从 60.52 提到 65.91。它最有力的证据是同预算对照：同样只训 30% 的步骤，改选 selector 排除掉的那批，held-in 掉到 56.17、held-out 掉到 29.88，都低于全轨迹训练——被排除的步骤确实带进了负向偏置，而不只是”训得少所以少过拟合”。</p>
+<p>Weasel 把同一件事写成显式的优化问题：目标函数是每步与 goal 的 BERTScore 加上步骤之间两两差异度（状态侧与动作侧取 max），用贪心求解，并在 1,877 条轨迹上穷举验证贪心在 96% 以上的轨迹里等于精确最优。在 AgentTrek 上只留 10K/52K 的步骤就在 WebArena / MiniWob / WorkArena 上全面超过全量 SFT，训练时间从 136 小时降到 12 小时。它的 diversity 消融给出一个可直接复用的结论：只看状态差异是 9.7、只看 reasoning/action 差异是 13.9、取 max 是 14.5——在 web 轨迹里”做了不同的事”比”看到了不同的页面”更能刻画有效覆盖。</p>
+<p><a href="../Papers/2404-Rho1" class="internal" data-slug="Papers/2404-Rho1">2404-Rho1</a> 是同一逻辑在 token 粒度上的版本，也是这一族里唯一给出打分函数动态化设计的工作。它先在高质量语料上训一个 reference model，再用 excess loss——当前训练模型的 token loss 减去 reference loss——排序，每个 batch 内只对 top-k% 的 token 算 loss。分数依赖训练模型的当前状态，因此是一个 curriculum 而非静态过滤器。但它度量的是”相对参考分布还有多少可学空间”，全程不使用任何结果信号；把它搬到轨迹上等价于假设 likelihood 差可以代理对成败的贡献，这个假设该工作既未提出也未检验。</p>
+<p>三者共同的边界是同一条：判据里没有正确性。ATLaS 的四类语义角色、Weasel 的目标相关度与非冗余、Rho-1 的可学性，都不区分一个步骤是”关键且正确”还是”关键且错误”。</p>
+<h3 id="monte-carlo-prefix-rollout把-outcome-信号摊到前缀">Monte-Carlo prefix rollout：把 outcome 信号摊到前缀<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#monte-carlo-prefix-rollout把-outcome-信号摊到前缀" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h3>
+<p>Math-Shepherd 把 step quality 定义为”该步推出正确答案的潜力”，用 hard estimation（任一 completion 命中即标 1）或 soft estimation（命中频率）给标签，实际发布的模型用的是 HE，因为它可以用两个 special token 走标准 language modeling pipeline。在 best-of-256 重排上，DeepSeek-67B 达 GSM8K 93.3 / MATH500 47.0，配 self-consistency 后 48.1。</p>
+<p>这个定义是价值定义而非正确性定义，作者本人在正文里就承认它引入噪声。一个错误但可被后续步骤纠正的步骤，只要有一条 completion 命中就被标为 good；一个正确但 completer 能力不足的步骤会被标为 bad。唯一连接标签与正确性的证据是 160 个人工标注 step 上的 86%——而这个数字用的是 LLaMA2-70B completer + N=4，实际建数据集用的是 LLemma-7B + N=8，后者的标注准确率正文没有给出。更麻烦的是 N 增大后准确率反而下降（作者归因于 false positive），意味着”多花 rollout 买更准的标签”这条直觉不成立。</p>
+<p>成本方面，该方法需要每步 N 次完整 completion，作者把它列为第一条 limitation，却没有给出任何 wall-clock、GPU-hours、FLOPs 或总 rollout 数。这给后续以”降低标注成本”为动机的工作留下一个结构性麻烦：基线成本必须由引用方自行重建。ATLaS 给出了长轨迹侧唯一可引用的量级——2000 条平均 25 步的轨迹按 IPR 的做法估值至少需要 6.5×10⁵ 次推理，它据此判定这条路线在 agent 轨迹上不可行。</p>
+<p><a href="../Papers/2605-BetaPRM" class="internal" data-slug="Papers/2605-BetaPRM">2605-BetaPRM</a> 针对的是这一族的统计缺陷：k/N 只是有限样本估计，把它当点目标回归会过拟合采样噪声，因此改用 Beta 分布同时建模 process reward 的均值与可靠性，并据此做自适应终止。这条改进方向与 Math-Shepherd 自己的观察吻合——SE 随 N 增大越来越贴近人工分布，但用 SE 或 HE 训出的 verifier 性能没有实质差别，说明点估计的精度不是瓶颈。</p>
+<h3 id="终局回溯从答案反查哪一步提供了证据">终局回溯：从答案反查哪一步提供了证据<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#终局回溯从答案反查哪一步提供了证据" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h3>
+<p><a href="../Papers/2608-ABSeeker" class="internal" data-slug="Papers/2608-ABSeeker">2608-ABSeeker</a> 走的是另一条路：先从最终答案回溯出解题所需的线索，再按线索是否被某一步提供来给该步打分。评分是一套显式 rubric（+0.8 / +0.4 / −0.8 / +1.0 / −1.0，基准 1.0，裁剪到 [0, 2.0]），因而是这批工作里少数直接给出”这一步是错的”这一判定的。</p>
+<p>它的 Figure 4 是全域最直接的问题量化：<strong>成功轨迹里约 4% 的步骤得分低于 1.0，失败轨迹里约 10% 的步骤得分高于 1.0</strong>。这两个数字同时说明了 outcome-only 监督为什么是错配的——成功不蕴含每步都对，失败也不蕴含每步都错——以及错配的规模并不巨大。需要注意的是这两个比例本身由同一套自动 rubric 产生，没有人工验证。</p>
+<h3 id="隐式-creditlog-likelihood-ratio-自带的分解">隐式 credit：log-likelihood ratio 自带的分解<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#隐式-creditlog-likelihood-ratio-自带的分解" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h3>
+<p>ImplicitPRM 的结论是 credit 的分解可以是免费的：只要 reward 的参数化本身逐 token 可分解，前缀 log-ratio 累加就是该前缀的 Q value，无需第二次训练也无需 step 标注。在 MATH-500 的 best-of-N 上 DPO 变体均分 50.4，超过作者自己复现的 Math-Shepherd（47.8），而开发 FLOPs 约为后者的 1/38.8。它最有信息量的是负结果——把复现的 Math-Shepherd step label 喂回去做第二阶段训练，九个 cell 无一致提升——这反过来支撑了”outcome-only 训练已经把步级信息学到了”这一主张。</p>
+<p>同一个量在 agent 侧被赋予了完全不同的含义。<a href="../Papers/2607-SEED" class="internal" data-slug="Papers/2607-SEED">2607-SEED</a> 用 skill 模型与 policy 的 token loss 差经 sigmoid 门控出置信度，Qwen2.5-3B 在 ALFWorld 达 91.8%（GRPO 75.0），且用 60% 数据就超过 GRPO 用满数据的结果。<a href="../Papers/2608-PCSD" class="internal" data-slug="Papers/2608-PCSD">2608-PCSD</a> 把单点的 log-prob 差换成该差值在前向窗口上的<strong>持续性</strong>，与 SEED 共享全部超参、只差这一处，构成这一族里最干净的对照：ALFWorld 90.6 对 84.4。PCSD 还给出了一个诊断量——教师质量与权重的对齐相关性，PCSD 是 +0.174 / +0.052，而单点版本是 <strong>−0.489 / −0.208</strong>，即教师越差、单点方法给的权重反而越高。</p>
+<p><a href="../Papers/2608-GatedHindsight" class="internal" data-slug="Papers/2608-GatedHindsight">2608-GatedHindsight</a> 属于同族但换了信息源：把训练时可见、推理时不可见的下一帧截图交给一个参数共享的 teacher，让它对 student 的 rollout 重新打分，只有当 student 失败且 teacher 的 top-1 恢复了示范动作时才放行该步的监督。AndroidLab 从 31.93 提到 43.10（7B）、37.43 提到 54.11（8B）。</p>
+<p>三者与 ImplicitPRM 的关系值得单独指出：同一个”policy 对参考模型的 log-prob 差”，在 ImplicitPRM 里被当作 Q value 读，在 Rho-1 里被当作可学性读，在 SEED / PCSD 里被当作 token 权重读。三种读法各自都有实验支撑，但没有工作比较过它们在同一批数据上给出的步骤排序是否一致。</p>
+<h3 id="外部-critic-与角色化归因">外部 critic 与角色化归因<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#外部-critic-与角色化归因" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h3>
+<p>这一族训练或调用一个独立判官给步骤打分，是 GUI 侧数量最多的一支。</p>
+<p><a href="../Papers/2606-TRIAGE" class="internal" data-slug="Papers/2606-TRIAGE">2606-TRIAGE</a> 的设计最锋利：让一个 thinking 模型把轨迹片段归到 decisive / exploration / no-progress / regression 四类角色，再按固定常数（1, 0.5, −0.1, −0.5）乘系数加到 outcome advantage 上，判官只看前后各 5 组 action-observation、看不到最终结果。ALFWorld 7B 从 79.6 提到 87.5、WebShop 从 70.1 提到 77.2。它的消融把贡献定位得很清楚：去掉 regression 系数代价是 ALFWorld −6.1 / WebShop −4.1，去掉 exploration credit 只有 −1.7——主要贡献是<strong>压制成功轨迹里的回退步骤</strong>，而不是奖励探索。</p>
+<p><a href="../Papers/2602-ADMIRE" class="internal" data-slug="Papers/2602-ADMIRE">2602-ADMIRE</a> 用 GPT-4o 从环境验证过的成功 rollout 里蒸馏有序 milestone，再按命中情况做非对称 credit：成功轨迹只奖励命中 milestone 的步骤（去噪），失败轨迹给进度分加 milestone 分（脚手架）。AndroidWorld 7B 从 base 32.8 → outcome-only 39.7 → ADMIRE 44.0；在 MobileMiniWob++ 上 outcome-only 反而把 57.6 打到 51.1，而 ADMIRE 是 61.1。但它判定 milestone 命中的方式是把 <strong>agent 自己写的动作描述</strong>与 milestone 文本做 SBERT 余弦并卡 0.75 阈值——这是一个自报进度的通道，论文没有测试它是否可被 hack。</p>
+<p><a href="../Papers/2608-StepReflect" class="internal" data-slug="Papers/2608-StepReflect">2608-StepReflect</a> 把 per-step reflection 重构成条件于显式 transition specification 的结构化预测，8B 模型在 AndroidWorld 的 1,082 条人工核验 transition 上达 82.16%，超 zero-shot 前沿模型 11.83 个百分点。它测的正是其他方法默认成立的东西——判官在自己的设置下有多准。<a href="../Papers/2607-OSReward" class="internal" data-slug="Papers/2607-OSReward">2607-OSReward</a> 把这件事做成横向测量：27 个 judge 在整体上最好 89.7%，但在 Hard 子集上最好只有 69.7%、均值约 52%，并且存在共同的宽松偏置——判官更愿意采信 agent 的自述而不是去核对截图。</p>
+<p><a href="../Papers/2500-GuiPraProcessReward" class="internal" data-slug="Papers/2500-GuiPraProcessReward">2500-GuiPraProcessReward</a>、<a href="../Papers/2509-TGPO" class="internal" data-slug="Papers/2509-TGPO">2509-TGPO</a>、<a href="../Papers/2505-MobileIPL" class="internal" data-slug="Papers/2505-MobileIPL">2505-MobileIPL</a> 属于同族的 GUI 实例：分别在 process reward 里加入动态记忆与自适应 UI 感知、把语义等价的状态在树上合并以消除偏好标签冲突、以及把叶节点规则奖励沿 CoaT 树回传后做 T-DPO。这三条的定位可靠，但其报告数字尚未见独立验证。</p>
+<h3 id="结构对比fork-point树与失败定位">结构对比：fork point、树与失败定位<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#结构对比fork-point树与失败定位" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h3>
+<p>最后一族不给单步打绝对分，而是通过轨迹之间的结构差异推出相对信号。</p>
+<p><a href="../Papers/2604-SOLAR-RL" class="internal" data-slug="Papers/2604-SOLAR-RL">2604-SOLAR-RL</a> 在离线设定下对每步采 N 个候选、与 ground-truth 动作标签逐一比对，在首个失败点做回溯截断，再经三段式归一化给出奖励；代价是需要 ground-truth 动作标签，这在有标注数据集（AndroidControl、GUI-Odyssey）上成立、在自采轨迹上不成立。<a href="../Papers/2601-EvoCUA" class="internal" data-slug="Papers/2601-EvoCUA">2601-EvoCUA</a> 在 SFT→RFT 之后于首个分歧点做 step-level DPO，OSWorld-Verified 达 56.7%；其后续 <a href="../Papers/2607-EvoCUA15" class="internal" data-slug="Papers/2607-EvoCUA15">2607-EvoCUA15</a> 用 STEPO 把轨迹级 advantage 按步数均分回每一步以恢复 group 内零和，达 63.2%。<a href="../Papers/2509-TreeGRPO" class="internal" data-slug="Papers/2509-TreeGRPO">2509-TreeGRPO</a> 用先初始化再扩展的树采样，在同预算下拿到约 1.5× 的样本，用兄弟子树的回报差当步级信号，1/4 预算即超过 chain GRPO。<a href="../Papers/2602-ProxMO" class="internal" data-slug="Papers/2602-ProxMO">2602-ProxMO</a> 用极化信号控制器加基于邻近度的软聚合，在 +1.09% 开销下相对 GRPO 有明显提升。</p>
+<p><a href="../Papers/2606-ECPO" class="internal" data-slug="Papers/2606-ECPO">2606-ECPO</a> 是这一族的统计学批评：在有限 rollout 下”更密不等于更好”——同一 anchor 处罕见的幸运动作会按观测 return 拿到过大 advantage，这类 divergent anchor 在训练过程中从 9% 涨到 28%，造成后期振荡。它的修正是把低计数的动作分组向 anchor 均值收缩，并压低 within-action 噪声占优的 anchor 的权重，Qwen2.5-1.5B 上相对 GiGPO 拿到 ALFWorld +5.2pp / WebShop +7.3pp，advantage 计算开销只增加 0.10%。</p>
+<h3 id="消费端sft-loss-加权与-rl-advantage-塑形">消费端：SFT loss 加权与 RL advantage 塑形<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#消费端sft-loss-加权与-rl-advantage-塑形" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h3>
+<p>同一个步级分数可以被两种方式消费，而它们的收益并不对称。</p>
+<p><a href="../Papers/2608-ABSeeker" class="internal" data-slug="Papers/2608-ABSeeker">2608-ABSeeker</a> 是唯一在同一套 rubric 下跑完两端的工作：ABC-SFT 把分数映射成 [0.24, 1.76] 的 token 权重，均分从 28.5 提到 30.8，但在 xbench-2505 上从 73.0 掉到 72.0；ABC-GRPO 把分数以 γ=0.25 折进 advantage，均分从 33.5 提到 37.3。同样的信号在 RL 侧净增益更大。一个合理但未经检验的解释是：SFT 侧的权重只能重新分配对已有示范的模仿强度，样本分布不变；RL 侧的 advantage 改变的是采样分布本身。这个对照只有单一来源，尚未见独立验证，且两个 GRPO 行都从同一个 ABC-SFT checkpoint 出发，缺 Standard-SFT × ABC-GRPO 这一格。</p>
+<p>数学域给出的是相反方向的读数。Math-Shepherd 的 step-by-step PPO 把 Mistral-7B 的 GSM8K 从 77.9 提到 84.1，但 ORM-PPO 已经拿到 81.8——步级粒度的净增量只有 +2.3（GSM8K）与 +1.7（MATH）。ImplicitPRM 补上了另一半：额外的 step label 对已经用 outcome-only 训好的模型没有增益。两条合起来说明在短链条推理上 outcome reward 已经接近够用，作者自己也把 GSM8K 上 PRM 与 ORM 的小差距归因于步数少。</p>
+<h3 id="方法对照">方法对照<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#方法对照" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="table-container"><table><thead><tr><th style="text-align:left;">方法</th><th style="text-align:left;">打分信号来源</th><th style="text-align:left;">是否判断对错</th><th style="text-align:left;">标注/算力成本</th><th style="text-align:left;">消费方式</th><th style="text-align:left;">验证域</th><th style="text-align:left;">关键证据</th></tr></thead><tbody><tr><td style="text-align:left;"><a href="../Papers/2503-ATLaS" class="internal" data-slug="Papers/2503-ATLaS">2503-ATLaS</a></td><td style="text-align:left;">LLM selector 四类语义角色</td><td style="text-align:left;">否（假设专家轨迹已正确）</td><td style="text-align:left;">1 次 GPT-4o 调用/轨迹</td><td style="text-align:left;">SFT loss mask（30% 步骤）</td><td style="text-align:left;">AgentGym 文本环境</td><td style="text-align:left;">held-in 60.52→65.91；held-out 与 Random 30% 仅差 0.32</td></tr><tr><td style="text-align:left;"><a href="../Papers/2605-Weasel" class="internal" data-slug="Papers/2605-Weasel">2605-Weasel</a></td><td style="text-align:left;">goal-state BERTScore + 两两 diversity</td><td style="text-align:left;">否</td><td style="text-align:left;">embedding 前向，无 LLM 调用</td><td style="text-align:left;">SFT 子集选择（19% 数据）</td><td style="text-align:left;">WebArena / MiniWob / WorkArena</td><td style="text-align:left;">10K/52K 全面超全量；单独 pruning 把 MiniWob 59.4→40.3</td></tr><tr><td style="text-align:left;"><a href="../Papers/2404-Rho1" class="internal" data-slug="Papers/2404-Rho1">2404-Rho1</a></td><td style="text-align:left;">excess loss（训练模型 − reference model）</td><td style="text-align:left;">否（衡量可学性）</td><td style="text-align:left;">一个 reference model 的训练</td><td style="text-align:left;">pretraining token loss mask</td><td style="text-align:left;">数学语料</td><td style="text-align:left;">1.1B 均分 21.6→38.1；去掉外部语料只剩 +2.4~+3.3</td></tr><tr><td style="text-align:left;"><a href="../Papers/2312-MathShepherd" class="internal" data-slug="Papers/2312-MathShepherd">2312-MathShepherd</a></td><td style="text-align:left;">MC prefix rollout（HE / SE）</td><td style="text-align:left;">部分（价值而非正确性）</td><td style="text-align:left;">每步 N=8 次完整 completion</td><td style="text-align:left;">PRM → best-of-N + step PPO</td><td style="text-align:left;">GSM8K / MATH500</td><td style="text-align:left;">93.3 / 48.1；step 粒度相对 ORM-PPO 净增 +2.3 / +1.7</td></tr><tr><td style="text-align:left;"><a href="../Papers/2605-BetaPRM" class="internal" data-slug="Papers/2605-BetaPRM">2605-BetaPRM</a></td><td style="text-align:left;">MC 估计 + Beta 分布可靠性</td><td style="text-align:left;">部分</td><td style="text-align:left;">同上 + 分布拟合</td><td style="text-align:left;">PRM 打分 + 自适应终止</td><td style="text-align:left;">数学</td><td style="text-align:left;">自适应终止省 33.57% token（尚未见独立验证）</td></tr><tr><td style="text-align:left;"><a href="../Papers/2608-ABSeeker" class="internal" data-slug="Papers/2608-ABSeeker">2608-ABSeeker</a></td><td style="text-align:left;">终局线索回溯 + 显式 rubric</td><td style="text-align:left;">是</td><td style="text-align:left;">1 次 LLM judge/步</td><td style="text-align:left;">ABC-SFT 权重 + ABC-GRPO advantage</td><td style="text-align:left;">deep research / xbench</td><td style="text-align:left;">成功轨迹 ~4% 步骤 &lt;1.0，失败轨迹 ~10% 步骤 >1.0</td></tr><tr><td style="text-align:left;"><a href="../Papers/2412-ImplicitPRM" class="internal" data-slug="Papers/2412-ImplicitPRM">2412-ImplicitPRM</a></td><td style="text-align:left;">policy/reference log-likelihood ratio</td><td style="text-align:left;">部分（Q value）</td><td style="text-align:left;">零额外开销（ORM 前向副产品）</td><td style="text-align:left;">best-of-N 重排</td><td style="text-align:left;">MATH-500</td><td style="text-align:left;">50.4 vs 复现 Math-Shepherd 47.8；额外 step label 无增益</td></tr><tr><td style="text-align:left;"><a href="../Papers/2607-SEED" class="internal" data-slug="Papers/2607-SEED">2607-SEED</a></td><td style="text-align:left;">skill 与 policy 的 token loss 差 + 门控</td><td style="text-align:left;">否（衡量策略差距）</td><td style="text-align:left;">需先建 skill library</td><td style="text-align:left;">蒸馏权重</td><td style="text-align:left;">ALFWorld / WebShop / search-QA</td><td style="text-align:left;">91.8 vs GRPO 75.0；60% 数据即超 GRPO 全量</td></tr><tr><td style="text-align:left;"><a href="../Papers/2608-PCSD" class="internal" data-slug="Papers/2608-PCSD">2608-PCSD</a></td><td style="text-align:left;">log-prob 差在前向窗口上的持续性</td><td style="text-align:left;">否</td><td style="text-align:left;">同 SEED</td><td style="text-align:left;">token 权重</td><td style="text-align:left;">ALFWorld</td><td style="text-align:left;">90.6 vs 单点版 84.4；教师质量对齐 ρ +0.174 对 −0.489</td></tr><tr><td style="text-align:left;"><a href="../Papers/2608-GatedHindsight" class="internal" data-slug="Papers/2608-GatedHindsight">2608-GatedHindsight</a></td><td style="text-align:left;">teacher 见下一帧截图后重打分</td><td style="text-align:left;">是（要求 teacher top-1 复现示范动作）</td><td style="text-align:left;">一次 teacher forcing</td><td style="text-align:left;">SFT 门控</td><td style="text-align:left;">AndroidWorld / AndroidLab</td><td style="text-align:left;">AL 31.93→43.10；只给动作 −0.43，只给截图 +7.42</td></tr><tr><td style="text-align:left;"><a href="../Papers/2606-TRIAGE" class="internal" data-slug="Papers/2606-TRIAGE">2606-TRIAGE</a></td><td style="text-align:left;">LLM judge 给片段分四类角色</td><td style="text-align:left;">是（含 regression 判定）</td><td style="text-align:left;">1 次 judge/片段</td><td style="text-align:left;">GRPO advantage 加常数</td><td style="text-align:left;">ALFWorld / WebShop / Search-QA</td><td style="text-align:left;">去掉 regression 项 −6.1 / −4.1；no-thinking judge 跌破 GRPO</td></tr><tr><td style="text-align:left;"><a href="../Papers/2602-ADMIRE" class="internal" data-slug="Papers/2602-ADMIRE">2602-ADMIRE</a></td><td style="text-align:left;">GPT-4o 蒸馏 milestone + SBERT 命中</td><td style="text-align:left;">部分（agent 自报进度）</td><td style="text-align:left;">milestone 蒸馏 + 每步 SBERT</td><td style="text-align:left;">成功/失败非对称 credit</td><td style="text-align:left;">AndroidWorld / MobileMiniWob++</td><td style="text-align:left;">44.0 vs outcome-only 39.7；MMW 上 outcome-only 反降 57.6→51.1</td></tr><tr><td style="text-align:left;"><a href="../Papers/2608-StepReflect" class="internal" data-slug="Papers/2608-StepReflect">2608-StepReflect</a></td><td style="text-align:left;">结构化 transition consistency 预测</td><td style="text-align:left;">是</td><td style="text-align:left;">四阶段训练一个 8B 判官</td><td style="text-align:left;">在线 reflection</td><td style="text-align:left;">AndroidWorld</td><td style="text-align:left;">1,082 条人工核验 transition 上 82.16%</td></tr><tr><td style="text-align:left;"><a href="../Papers/2604-SOLAR-RL" class="internal" data-slug="Papers/2604-SOLAR-RL">2604-SOLAR-RL</a></td><td style="text-align:left;">与 ground-truth 动作标签逐步比对 + 首失败点截断</td><td style="text-align:left;">是（依赖标签）</td><td style="text-align:left;">离线，每步 N 个候选</td><td style="text-align:left;">三段式 reward</td><td style="text-align:left;">AndroidControl / GUI-Odyssey</td><td style="text-align:left;">零在线交互；需要 ground-truth 动作标签</td></tr><tr><td style="text-align:left;"><a href="../Papers/2601-EvoCUA" class="internal" data-slug="Papers/2601-EvoCUA">2601-EvoCUA</a> / <a href="../Papers/2607-EvoCUA15" class="internal" data-slug="Papers/2607-EvoCUA15">2607-EvoCUA15</a></td><td style="text-align:left;">首个分歧点 / STEPO 均分回传</td><td style="text-align:left;">部分</td><td style="text-align:left;">需成对轨迹</td><td style="text-align:left;">step-level DPO / GRPO</td><td style="text-align:left;">OSWorld-Verified</td><td style="text-align:left;">56.7% → 63.2%</td></tr><tr><td style="text-align:left;"><a href="../Papers/2509-TreeGRPO" class="internal" data-slug="Papers/2509-TreeGRPO">2509-TreeGRPO</a></td><td style="text-align:left;">树采样中兄弟子树的回报差</td><td style="text-align:left;">部分</td><td style="text-align:left;">同预算下约 1.5× 样本</td><td style="text-align:left;">GRPO advantage</td><td style="text-align:left;">多跳 QA</td><td style="text-align:left;">1/4 预算即超过 chain GRPO</td></tr><tr><td style="text-align:left;"><a href="../Papers/2606-ECPO" class="internal" data-slug="Papers/2606-ECPO">2606-ECPO</a></td><td style="text-align:left;">对 anchor 内 advantage 做收缩与方差门控</td><td style="text-align:left;">不适用（校准既有信号）</td><td style="text-align:left;">+0.10% advantage 计算开销</td><td style="text-align:left;">GRPO advantage 校准</td><td style="text-align:left;">ALFWorld / WebShop</td><td style="text-align:left;">divergent anchor 占比 9%→28%；相对 GiGPO +5.2 / +7.3pp</td></tr></tbody></table></div>
+<pre><button class="expand-button" aria-label="Expand mermaid diagram" data-view-component="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M3.72 3.72a.75.75 0 011.06 1.06L2.56 7h10.88l-2.22-2.22a.75.75 0 011.06-1.06l3.5 3.5a.75.75 0 010 1.06l-3.5 3.5a.75.75 0 11-1.06-1.06l2.22-2.22H2.56l2.22 2.22a.75.75 0 11-1.06 1.06l-3.5-3.5a.75.75 0 010-1.06l3.5-3.5z"></path></svg></button><code class="mermaid" data-clipboard="&quot;flowchart LR\n  R[\&quot;trajectory-level reward = 1&lt;br/>需要步级监督\&quot;]\n\n  R --> A[\&quot;1 语义与可学性打分&lt;br/>不估值\&quot;]\n  R --> B[\&quot;2 prefix rollout 估值\&quot;]\n  R --> C[\&quot;3 终局回溯\&quot;]\n  R --> D[\&quot;4 log-likelihood ratio\&quot;]\n  R --> E[\&quot;5 外部 critic 与角色归因\&quot;]\n  R --> F[\&quot;6 轨迹间结构对比\&quot;]\n\n  A --> A1[\&quot;ATLaS / Weasel / Rho-1\&quot;]\n  B --> B1[\&quot;Math-Shepherd / BetaPRM\&quot;]\n  C --> C1[\&quot;ABSeeker\&quot;]\n  D --> D1[\&quot;ImplicitPRM / SEED / PCSD / GatedHindsight\&quot;]\n  E --> E1[\&quot;TRIAGE / ADMIRE / StepReflect / GUI-PRA / TGPO / MobileIPL\&quot;]\n  F --> F1[\&quot;SOLAR-RL / EvoCUA / TreeGRPO / ECPO / ProxMO\&quot;]\n\n  A1 --> S1[\&quot;判据不含正确性\&quot;]\n  B1 --> S2[\&quot;每步 N 次 rollout\&quot;]\n  C1 --> S3[\&quot;判官本身未经人工验证\&quot;]\n  D1 --> S4[\&quot;前提在 GUI 轨迹上不成立\&quot;]\n  E1 --> S5[\&quot;判官可靠性即上限\&quot;]\n  F1 --> S6[\&quot;需成对或可比轨迹\&quot;]&quot;">flowchart LR
+  R[&quot;trajectory-level reward = 1&lt;br/>需要步级监督&quot;]
+
+  R --> A[&quot;1 语义与可学性打分&lt;br/>不估值&quot;]
+  R --> B[&quot;2 prefix rollout 估值&quot;]
+  R --> C[&quot;3 终局回溯&quot;]
+  R --> D[&quot;4 log-likelihood ratio&quot;]
+  R --> E[&quot;5 外部 critic 与角色归因&quot;]
+  R --> F[&quot;6 轨迹间结构对比&quot;]
+
+  A --> A1[&quot;ATLaS / Weasel / Rho-1&quot;]
+  B --> B1[&quot;Math-Shepherd / BetaPRM&quot;]
+  C --> C1[&quot;ABSeeker&quot;]
+  D --> D1[&quot;ImplicitPRM / SEED / PCSD / GatedHindsight&quot;]
+  E --> E1[&quot;TRIAGE / ADMIRE / StepReflect / GUI-PRA / TGPO / MobileIPL&quot;]
+  F --> F1[&quot;SOLAR-RL / EvoCUA / TreeGRPO / ECPO / ProxMO&quot;]
+
+  A1 --> S1[&quot;判据不含正确性&quot;]
+  B1 --> S2[&quot;每步 N 次 rollout&quot;]
+  C1 --> S3[&quot;判官本身未经人工验证&quot;]
+  D1 --> S4[&quot;前提在 GUI 轨迹上不成立&quot;]
+  E1 --> S5[&quot;判官可靠性即上限&quot;]
+  F1 --> S6[&quot;需成对或可比轨迹&quot;]
+</code><div id="mermaid-container" role="dialog"><div id="mermaid-space"><div class="mermaid-content"></div></div></div></pre>
+<h2 id="datasets--benchmarks">Datasets &amp; Benchmarks<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#datasets--benchmarks" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p>数学域与 agent 域的分工不是偶然：前者提供可自动校验的终局信号，使 prefix rollout 与 log-ratio 分解得以定义；后者提供真正的长轨迹，但终局判定本身需要一个 verifier。跨这两类环境比较方法时，“步级信号的净增益”这个量的含义并不相同。</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="table-container"><table><thead><tr><th style="text-align:left;">Dataset</th><th style="text-align:left;">规模</th><th style="text-align:left;">评估指标</th><th style="text-align:left;">本表内最高</th><th style="text-align:left;">特点</th></tr></thead><tbody><tr><td style="text-align:left;">MATH-500</td><td style="text-align:left;">500 题</td><td style="text-align:left;">best-of-N 准确率</td><td style="text-align:left;">Math-Shepherd + SC 48.1（DeepSeek-67B, N=256）</td><td style="text-align:left;">答案可自动校验，PRM 方法的发源地；短链条使 ORM 已接近够用</td></tr><tr><td style="text-align:left;">GSM8K</td><td style="text-align:left;">—</td><td style="text-align:left;">best-of-N / greedy 准确率</td><td style="text-align:left;">Math-Shepherd 93.3（N=256）</td><td style="text-align:left;">步数少，PRM 相对 ORM 的差距最小</td></tr><tr><td style="text-align:left;">AgentGym / AgentTraj-L</td><td style="text-align:left;">10 held-in + 4 held-out 任务</td><td style="text-align:left;">任务成功率均分</td><td style="text-align:left;">ATLaS 65.91 / 38.36（Llama-3.1-8B）</td><td style="text-align:left;">多为短程文本环境；held-out 是唯一能测选步泛化的一列</td></tr><tr><td style="text-align:left;">ALFWorld</td><td style="text-align:left;">128 episode 评测集</td><td style="text-align:left;">成功率</td><td style="text-align:left;">PCSD 90.6（Qwen2.5-3B）</td><td style="text-align:left;">步级方法的主力测试床；1 分 ≈ 1.3 episode，小差距需谨慎解读</td></tr><tr><td style="text-align:left;">WebShop</td><td style="text-align:left;">—</td><td style="text-align:left;">成功率</td><td style="text-align:left;">SEED 88.5（Qwen2.5-3B）</td><td style="text-align:left;">文本 web，与 ALFWorld 常成对报告</td></tr><tr><td style="text-align:left;">WebArena-Lite / WebArena</td><td style="text-align:left;">—</td><td style="text-align:left;">成功率</td><td style="text-align:left;">Weasel 21.2 / 19.2（Qwen3-8B）</td><td style="text-align:left;">强 backbone 上离线 SFT 本身几乎无净增益</td></tr><tr><td style="text-align:left;">MiniWob</td><td style="text-align:left;">—</td><td style="text-align:left;">成功率</td><td style="text-align:left;">Weasel 48.0（Qwen2.5-7B, AgentTrek）</td><td style="text-align:left;">短程，对数据预处理极敏感</td></tr><tr><td style="text-align:left;">WorkArena L1 / L2</td><td style="text-align:left;">—</td><td style="text-align:left;">成功率</td><td style="text-align:left;">Weasel 12.4 / 4.7（Qwen2.5-7B, AgentTrek）</td><td style="text-align:left;">L2 长程，绝对分极低，差异难以归因</td></tr><tr><td style="text-align:left;">AndroidWorld</td><td style="text-align:left;">—</td><td style="text-align:left;">成功率</td><td style="text-align:left;">GatedHindsight 52.73（7B）</td><td style="text-align:left;">移动端长程；ADMIRE 与 GatedHindsight 均在此报告主结果</td></tr><tr><td style="text-align:left;">AndroidLab</td><td style="text-align:left;">—</td><td style="text-align:left;">成功率</td><td style="text-align:left;">GatedHindsight 54.11（8B）</td><td style="text-align:left;">GRPO 在此可低于 SFT（37.43 对 39.13）</td></tr><tr><td style="text-align:left;">OSWorld-Verified</td><td style="text-align:left;">—</td><td style="text-align:left;">成功率</td><td style="text-align:left;">EvoCUA1.5 63.2%</td><td style="text-align:left;">桌面长程，步数最长的一类</td></tr><tr><td style="text-align:left;">xbench-2505</td><td style="text-align:left;">—</td><td style="text-align:left;">成功率</td><td style="text-align:left;">ABSeeker（ABC-GRPO）</td><td style="text-align:left;">ABC-SFT 在此掉点 73.0→72.0，是选步方法少见的反向读数</td></tr><tr><td style="text-align:left;">OSReward-Hard</td><td style="text-align:left;">—</td><td style="text-align:left;">judge 准确率</td><td style="text-align:left;">最好 69.7%，均值约 52%</td><td style="text-align:left;">直接测量步级判官本身，而非用它的下游收益倒推</td></tr></tbody></table></div>
+<h2 id="失败模式与负证据">失败模式与负证据<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#失败模式与负证据" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p>这一节比正面结果更有信息量：把”选择”这个动作单独隔离出来的对照，多数指向增益并不主要来自选对了哪些步。</p>
+<p><strong>选择器的增益常常不来自”选对了”。</strong> ATLaS 自己的 Random 对照最能说明问题：held-out 上 Random 30% 是 38.04、Critical 30% 是 38.36，只差 0.32；而 held-in 上是 59.90 对 65.91，差 6.01。selector 的语义判断主要在训练分布内兑现，分布外那点增益里绝大部分来自”只训 30% 步骤”这件事本身。Rho-1 给出同向的读数：去掉外部高质量语料、改用语料自身训 reference model 之后，增益从 +16.5 掉到 +2.4~+3.3，暗示大部分收益来自 reference model 携带的目标分布信息而非选择动作——但该消融同时换了打分函数，这一归因不能定量拆分。Weasel 的表里则藏着两处未被作者讨论的现象：单独做 pruning 在 Qwen3-8B 上把 MiniWob 从 59.4 打到 40.3、WorkArena L1 从 33.3 打到 15.5，是全表最差的一行，而加上 selection 之后又恢复到 61.9 / 38.8，一个破坏性的预处理为何在与选择组合后不再破坏，没有机制解释；同一 backbone 上 Pruning+LLM-Judge 的 WebArena-Lite 是 19.4、Weasel 是 21.2，而 Weasel 去掉 reasoning synthesis 后只有 17.0——把这个正交组件扣掉，“选择算法优于 LLM-judge 选择”这个结论在 Qwen3-8B 上不成立。</p>
+<p><strong>判官本身会失效，而多数方法没有测过自己的判官。</strong> TRIAGE 的消融是这条最硬的证据：把判官的 thinking 去掉，regression-in-success 的 F1 从 86.1% 塌到 29.2%，整体表现随之跌到 GRPO 之下（76.8 对 79.6）——依赖 judge 的步级方法，其上限就是 judge 的上限。OSReward 把这件事横向测出来：27 个 judge 在 Hard 子集上最好只有 69.7%、均值约 52%，且共享一个宽松偏置，倾向采信 agent 的自述而非核对截图。ADMIRE 恰好落在这个偏置的射程内——它判定 milestone 命中的依据正是 agent 自己写的动作描述与 milestone 文本的 SBERT 余弦，构成一个未被测试的 reward hacking 通道。StepReflect 是少数正面报告判官准确率的工作（1,082 条人工核验 transition 上 82.16%）；ATLaS、TRIAGE、ADMIRE、ABSeeker 都没有在各自设置下报告这个数。</p>
+<p><strong>更密的 credit 未必更稳。</strong> ECPO 指出在有限 rollout 下，同一 anchor 处罕见的幸运动作会按观测 return 拿到过大 advantage，这类 divergent anchor 在训练中从 9% 涨到 28%，是后期振荡的来源——“denser 即 better”在统计上不成立。PCSD 的表里则出现了 backbone 翻转：GRPO+OPSD 在 3B 上是 +6.2、在 1.7B 上是 −14.1；同时它的主结果是单次运行、128 episode 评测，PCSD 相对单点版本的差距折合 8 个 episode（3B）与 7 个（1.7B），约 1.5σ 与 0.9σ。Math-Shepherd 给出的是另一种不稳：PPO 之后单用它的 PRM 做 verifier，MATH500 上 41.1 反而不如纯 self-consistency 的 42.3 与 SC+ORM 的 43.1——为更弱模型训的 reward model 监督不了被它训强之后的模型。</p>
+<p><strong>增益高度依赖 headroom，而非方法本身。</strong> <a href="../Papers/2607-GRPONullWebAgent" class="internal" data-slug="Papers/2607-GRPONullWebAgent">2607-GRPONullWebAgent</a> 用 18 组受控实验给出条件命题：当 SFT 已经掌握任务时 RL 没有增益，存在 headroom 时增益可达 22 分；中等学习率造成局部损伤，高学习率造成全局崩塌。Weasel 的最强 backbone 一列印证了同一件事——Qwen3-8B 未训练时 WebArena 18.0 / MiniWob 61.1 / WorkArena L1 35.2，全量 SFT 后是 18.2 / 59.4 / 33.3，训练把两项拉低了；Weasel 在这一列的主要成就是让 SFT 不再有害，而不是让 SFT 带来大幅提升。ABSeeker 的 ABC-SFT 在 xbench-2505 上从 73.0 掉到 72.0，属于同一类读数：高分基线上，重加权 SFT 的收益可能是负的。</p>
+<p><strong>训练信号质量的直接测量给出偏冷的结论。</strong> <a href="../Papers/2606-QVal" class="internal" data-slug="Papers/2606-QVal">2606-QVal</a> 跨 4 个环境、7 个方法族、21 个方法、6 个 backbone 做了 1200 组以上实验，用 Q-alignment 相关性衡量各类步级信号的质量，结论是简单基线（直接 prompting、ranking）在多数格子里已具竞争力。但这一结论是环境条件的而非普遍的：FrozenLake 的 Q-value 文本设定下 codegen-avg 达 ρ=+0.939（直接 batched 只有 +0.430），OpenApps 的 Q-value 上 ΔBelief 在全部 6 个 backbone 上优于 ranking，而 TerminalBench 上 code 族强烈为负（codegen-avg −0.328）。它同时把 self-distillation 族测为中游、且发现特权信息对该族没有帮助——这与 SEED / PCSD / GatedHindsight 报告的大幅下游增益直接抵触，而 QVal 自陈没有做闭环实验。</p>
+<h2 id="key-evidence-matrix">Key Evidence Matrix<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#key-evidence-matrix" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="table-container"><table><thead><tr><th style="text-align:left;">Survey claim</th><th style="text-align:left;">State</th><th style="text-align:left;">Evidence objects</th><th style="text-align:left;">Claim IDs / locators</th><th style="text-align:left;">Contradictions / boundary</th></tr></thead><tbody><tr><td style="text-align:left;">SFT 侧主流选步方法的判据不含正确性，假设输入为专家轨迹</td><td style="text-align:left;">consensus</td><td style="text-align:left;"><a href="../Papers/2503-ATLaS" class="internal" data-slug="Papers/2503-ATLaS">2503-ATLaS</a>、<a href="../Papers/2605-Weasel" class="internal" data-slug="Papers/2605-Weasel">2605-Weasel</a></td><td style="text-align:left;">ATLaS C1（Sec 3.1–3.2 四类判据）；Weasel C1（§2.2 Eq.1–4）</td><td style="text-align:left;">两者均在专家/自动采集轨迹上验证；对 policy 自采的含错轨迹未测</td></tr><tr><td style="text-align:left;">成功轨迹含错步、失败轨迹含对步，规模约 4% 与 10%</td><td style="text-align:left;">single-source</td><td style="text-align:left;"><a href="../Papers/2608-ABSeeker" class="internal" data-slug="Papers/2608-ABSeeker">2608-ABSeeker</a></td><td style="text-align:left;">ABSeeker Fig. 4</td><td style="text-align:left;">比例由同一套自动 rubric 产出，无人工验证；仅 deep-research 域</td></tr><tr><td style="text-align:left;">outcome-only 数据可零成本得到步级 Q value</td><td style="text-align:left;">source-verified，域受限</td><td style="text-align:left;"><a href="../Papers/2412-ImplicitPRM" class="internal" data-slug="Papers/2412-ImplicitPRM">2412-ImplicitPRM</a></td><td style="text-align:left;">ImplicitPRM C1、C2（Prop 3.1）、C24</td><td style="text-align:left;">仅 MATH-500 单轮、inference-time BoN，无 RL 实验；推导假设整条序列由 policy 生成，且 outcome label 无噪</td></tr><tr><td style="text-align:left;">MC prefix rollout 标签衡量价值而非正确性</td><td style="text-align:left;">source-verified</td><td style="text-align:left;"><a href="../Papers/2312-MathShepherd" class="internal" data-slug="Papers/2312-MathShepherd">2312-MathShepherd</a></td><td style="text-align:left;">MathShepherd C24（§3.3.1）、C13（§5.2 86%@N=4）、C25</td><td style="text-align:left;">唯一人工对照用 N=4 + LLaMA2-70B，与实际建库配置（N=8 + LLemma-7B）不同，后者标注质量未测</td></tr><tr><td style="text-align:left;">步级粒度在短链条数学上的净增益很小</td><td style="text-align:left;">consensus</td><td style="text-align:left;"><a href="../Papers/2312-MathShepherd" class="internal" data-slug="Papers/2312-MathShepherd">2312-MathShepherd</a>、<a href="../Papers/2412-ImplicitPRM" class="internal" data-slug="Papers/2412-ImplicitPRM">2412-ImplicitPRM</a></td><td style="text-align:left;">MathShepherd C9/C10（Table 2 step-PPO 对 ORM-PPO）；ImplicitPRM C13（Table 2 加 step label 无增益）</td><td style="text-align:left;">仅数学域；未在长轨迹上做同一对照</td></tr><tr><td style="text-align:left;">选步方法的分布外增益主要不来自 selector</td><td style="text-align:left;">disputed（作者读法与数据不一致）</td><td style="text-align:left;"><a href="../Papers/2503-ATLaS" class="internal" data-slug="Papers/2503-ATLaS">2503-ATLaS</a></td><td style="text-align:left;">ATLaS C4（Table 3：held-out 38.04 对 38.36）</td><td style="text-align:left;">作者正文称 random 在所有比例上均不如 critical，held-out 列不支持该强度；held-in 差距 6.01 成立</td></tr><tr><td style="text-align:left;">依赖 LLM judge 的步级方法上限即 judge 上限</td><td style="text-align:left;">consensus</td><td style="text-align:left;"><a href="../Papers/2606-TRIAGE" class="internal" data-slug="Papers/2606-TRIAGE">2606-TRIAGE</a>、<a href="../Papers/2607-OSReward" class="internal" data-slug="Papers/2607-OSReward">2607-OSReward</a></td><td style="text-align:left;">TRIAGE no-thinking 消融（F1 86.1%→29.2%，76.8 &lt; GRPO 79.6）；OSReward C（Hard 最好 69.7% / 均值约 52%）</td><td style="text-align:left;">TRIAGE 笔记无 Evidence Ledger，按 legacy-unverified 处理，此处只用其方向性结论；OSReward 为 source-checked</td></tr><tr><td style="text-align:left;">特权信息的价值在证据而非答案</td><td style="text-align:left;">single-source</td><td style="text-align:left;"><a href="../Papers/2608-GatedHindsight" class="internal" data-slug="Papers/2608-GatedHindsight">2608-GatedHindsight</a></td><td style="text-align:left;">GatedHindsight Table 4（+Action −0.43；screenshot-only +7.42；Full +5.62）</td><td style="text-align:left;">单篇、Android 两个 benchmark；尚未见独立验证</td></tr><tr><td style="text-align:left;">同一 rubric 在 RL 侧比在 SFT 侧净增益更大</td><td style="text-align:left;">single-source</td><td style="text-align:left;"><a href="../Papers/2608-ABSeeker" class="internal" data-slug="Papers/2608-ABSeeker">2608-ABSeeker</a></td><td style="text-align:left;">ABSeeker Table 3（SFT 28.5→30.8，xbench 73.0→72.0；GRPO 33.5→37.3）</td><td style="text-align:left;">两个 GRPO 行同起于 ABC-SFT checkpoint，缺 Standard-SFT × ABC-GRPO 格；机制解释为推测</td></tr><tr><td style="text-align:left;">更密的 step credit 在有限 rollout 下会引入系统性偏置</td><td style="text-align:left;">source-verified</td><td style="text-align:left;"><a href="../Papers/2606-ECPO" class="internal" data-slug="Papers/2606-ECPO">2606-ECPO</a></td><td style="text-align:left;">ECPO（divergent anchor 占比 9%→28%；相对 GiGPO +5.2 / +7.3pp）</td><td style="text-align:left;">1.5B backbone、两个文本环境；未在 GUI 上复测</td></tr><tr><td style="text-align:left;">简单基线的步级信号质量已具竞争力</td><td style="text-align:left;">disputed（环境条件成立）</td><td style="text-align:left;"><a href="../Papers/2606-QVal" class="internal" data-slug="Papers/2606-QVal">2606-QVal</a></td><td style="text-align:left;">QVal Appendix E（FrozenLake codegen-avg ρ=+0.939 对 direct-batched +0.430；OpenApps ΔBelief 6/6 优于 ranking；TerminalBench codegen-avg −0.328）</td><td style="text-align:left;">笔记为 legacy-unverified；论文未做显著性检验，“简单基线获胜”不可读作跨环境普遍结论</td></tr><tr><td style="text-align:left;">self-distillation 族的信号质量与其下游增益不一致</td><td style="text-align:left;">disputed</td><td style="text-align:left;"><a href="../Papers/2606-QVal" class="internal" data-slug="Papers/2606-QVal">2606-QVal</a> 对 <a href="../Papers/2607-SEED" class="internal" data-slug="Papers/2607-SEED">2607-SEED</a> / <a href="../Papers/2608-PCSD" class="internal" data-slug="Papers/2608-PCSD">2608-PCSD</a> / <a href="../Papers/2608-GatedHindsight" class="internal" data-slug="Papers/2608-GatedHindsight">2608-GatedHindsight</a></td><td style="text-align:left;">QVal 将该族测为中游且特权信息无助；SEED 91.8 对 GRPO 75.0；PCSD 90.6 对 84.4</td><td style="text-align:left;">QVal 自陈未做闭环实验；PCSD 为 partial 验证、单次运行、128 episode 评测</td></tr><tr><td style="text-align:left;">RL 增益条件于 SFT 未饱和</td><td style="text-align:left;">source-verified</td><td style="text-align:left;"><a href="../Papers/2607-GRPONullWebAgent" class="internal" data-slug="Papers/2607-GRPONullWebAgent">2607-GRPONullWebAgent</a>、<a href="../Papers/2605-Weasel" class="internal" data-slug="Papers/2605-Weasel">2605-Weasel</a></td><td style="text-align:left;">GRPONullWebAgent（18 组受控实验；饱和时无增益，有 headroom 时 +22）；Weasel Table 1 Qwen3-8B 列</td><td style="text-align:left;">前者为 MiniWob + Qwen3-VL 4B/8B；跨环境外推未验证</td></tr></tbody></table></div>
+<h2 id="key-takeaways">Key Takeaways<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#key-takeaways" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<ol>
+<li>
+<p><strong>“挑关键步”和”判对错”是两个不同的问题，SFT 侧的代表性选择器只解决前者。</strong> ATLaS 的四类语义角色与 Weasel 的目标相关度加非冗余，都不区分一个关键步骤是对是错，两者也都显式假设输入轨迹已经正确。数据若来自自采 rollout、只有整条轨迹的 0/1 信号，直接套用这两类选择器不解决原问题——一个”错但相关且不重复”的步骤会被选中并加权。要判对错，信号必须来自终局回溯、外部 critic、或轨迹间结构对比。</p>
+</li>
+<li>
+<p><strong>零成本的步级分解存在，但它的前提在 GUI 轨迹上不成立。</strong> ImplicitPRM 证明只要 reward 参数化成 log-likelihood ratio，前缀 log-ratio 累加就是 Q value，不需要额外 rollout。它的两个隐含前提是 outcome label 近乎无噪、整条序列由 policy 自回归生成。GUI 轨迹两条都不满足：成败判定来自一个本身会错的 verifier，轨迹里穿插着截图与工具返回这类非 policy 生成的 token，而 log-ratio 在这些 token 上是否应计入 Q，原推导没有覆盖。</p>
+</li>
+<li>
+<p><strong>把”选择”这个动作单独隔离出来的对照，三处都显示大部分增益来自选择之外。</strong> ATLaS 的 Random 30% 在 held-out 上只落后 0.32，Rho-1 去掉外部参考语料后增益从 +16.5 塌到 +2.4~+3.3，Weasel 的 pruning 单独用会把 MiniWob 从 59.4 打到 40.3、加上 selection 又恢复。三者机制不同，但共同的含义是：报告”选步带来 X 分提升”时，同预算随机对照和拆解消融应当是标配而不是附录。</p>
+</li>
+<li>
+<p><strong>特权信息的价值在于提供证据，而不是提供答案。</strong> GatedHindsight 的消融把这一点分离得很干净：把正确动作直接给 teacher 是 −0.43，只把下一帧截图给 teacher 是 +7.42，两者兼给是 +5.62。这意味着”用后见之明修正步级监督”的收益来源不是让教师知道该做什么，而是让教师能看到该步的后果——对任何试图注入 privileged information 的设计，可观测的后果比正确的标签更值得优先接。这条只有单一来源，尚未见独立验证。</p>
+</li>
+<li>
+<p><strong>依赖 LLM judge 的方法应当先报告 judge 的准确率，因为它就是方法的上限。</strong> TRIAGE 把判官的 thinking 去掉后，判定 F1 从 86.1% 塌到 29.2%，整体表现随之跌破普通 GRPO；OSReward 测出 27 个判官在困难子集上均值约 52%，且共享”更信 agent 自述、不核对截图”的宽松偏置。目前 ATLaS、TRIAGE、ADMIRE、ABSeeker 都没有在自己的设置下给出这个数，而 ADMIRE 的 milestone 命中判据恰好建立在 agent 的自述之上。</p>
+</li>
+</ol>
+<h2 id="open-problems">Open Problems<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#open-problems" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<ol>
+<li>
+<p><strong>步级信号与步骤正确性的一致性从未被直接测量。</strong>（Validated Gap）Math-Shepherd 的 86% 是唯一的人工对照，但它用的是 N=4 + LLaMA2-70B completer，而真正用来建数据集的是 N=8 + LLemma-7B，后者的标注质量正文没有给出；ABSeeker 的 4% / 10% 量化了问题规模，但这两个比例本身由同一套自动 rubric 产出、无人工验证。一个直接的实验是在同一批 agent 轨迹上人工标注若干步的正确性，再看各族信号（rollout 估值、log-ratio、judge 分数、语义相关度）与它的排序相关性——这将同时回答”哪一族真的在判对错”和”几族之间是否只是同一个量的不同读法”。</p>
+</li>
+<li>
+<p><strong>self-distillation 族的信号质量与下游增益互相矛盾。</strong>（Observed Tension）QVal 把该族的 Q-alignment 测为中游，并发现给它特权信息没有帮助；而 SEED（ALFWorld 91.8 对 GRPO 75.0）、PCSD（90.6 对单点版 84.4）、GatedHindsight（AndroidLab 31.93→43.10）都报告大幅下游增益。QVal 自陈没有做闭环实验，两侧至今没有对账。可能的解释包括：Q-alignment 不是下游收益的正确代理；或者这几篇的增益来自权重分布的形状而非排序的准确性。两种解释指向完全不同的改进方向。</p>
+</li>
+<li>
+<p><strong>步级粒度的净增益在数学域很小、在 agent 域被报告为大，但没有工作在同一环境内改变 horizon 来验证。</strong>（Observed Tension）Math-Shepherd 的 step-PPO 相对 ORM-PPO 只有 +2.3 / +1.7，ImplicitPRM 加 step label 完全无增益；而 TRIAGE 相对 GRPO 是 +7.9 / +7.1、ADMIRE 相对 outcome-only 约 +4.3。Math-Shepherd 自己把 GSM8K 上 PRM 与 ORM 的小差距归因于步数少，这提示 horizon 长度决定 outcome 信号被稀释的程度。但这两组数字来自不同环境、不同 backbone、不同算法，把差异归给 horizon 目前只是一个未经检验的猜测。</p>
+</li>
+<li>
+<p><strong>判官的可靠性没有被纳入方法设计。</strong>（Validated Gap）现有做法是把 judge 当作固定的信号源，用下游收益倒推它够不够好。OSReward 显示困难子集上判官均值约 52%，TRIAGE 显示判官退化会让整个方法跌破基线，BetaPRM 是少数显式给 process reward 建可靠性模型的工作，但它建的是采样噪声的可靠性、不是判官本身的可靠性。缺的是把 judge 置信度作为一等公民接入 credit 分配的设计——例如按判官在该类步骤上的历史准确率对其分数做收缩。</p>
+</li>
+<li>
+<p><strong>backbone 规模与 SFT 饱和度会翻转结论，而多数工作只报告单一规模。</strong>（Observed Tension）PCSD 的 GRPO+OPSD 在 3B 上是 +6.2、在 1.7B 上是 −14.1；GRPONullWebAgent 的 18 组受控实验显示 SFT 已掌握的任务上 RL 没有增益、有 headroom 时可达 +22；Weasel 在最强 backbone 上的成就实际是”让 SFT 不再有害”。这意味着任何”方法 A 优于方法 B”的表述都需要附带 backbone 与饱和度条件，而目前这类条件极少被报告。</p>
+</li>
+<li>
+<p><strong>长轨迹上的步级监督缺少可比的成本口径。</strong>（Validated Gap）Math-Shepherd 把 completion 算力列为第一条 limitation，却没有给出任何 wall-clock、GPU-hours、FLOPs 或总 rollout 数；ImplicitPRM 摘要中的 “1/38 训练数据” 实为含数据采集的 FLOPs 比、且随规模在 21.3×–146.5× 间摆动；ATLaS 的 6.5×10⁵ 次推理是长轨迹侧唯一可引用的估算，且是它为否定该路线而算的。结果是每篇声称”降低 X 倍标注成本”的工作都在用自建口径，横向不可比。</p>
+</li>
+</ol>
+<h2 id="调研日志">调研日志<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#调研日志" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p><strong>调研日期</strong>：2026-08-20</p>
+<p><strong>论文统计</strong>：纳入分析 24 篇，覆盖 2023-12 至 2026-08。其中 2026-08 新增 digest 3 篇（<a href="../Papers/2312-MathShepherd" class="internal" data-slug="Papers/2312-MathShepherd">2312-MathShepherd</a>、<a href="../Papers/2412-ImplicitPRM" class="internal" data-slug="Papers/2412-ImplicitPRM">2412-ImplicitPRM</a>、<a href="../Papers/2404-Rho1" class="internal" data-slug="Papers/2404-Rho1">2404-Rho1</a>，均为并行 prepare-only + 独立 verifier 核查后串行落库），另 3 篇（<a href="../Papers/2608-ABSeeker" class="internal" data-slug="Papers/2608-ABSeeker">2608-ABSeeker</a>、<a href="../Papers/2503-ATLaS" class="internal" data-slug="Papers/2503-ATLaS">2503-ATLaS</a>、<a href="../Papers/2605-Weasel" class="internal" data-slug="Papers/2605-Weasel">2605-Weasel</a>）在同一轮先行完成。</p>
+<p><strong>验证状态分布</strong>：source-checked 11 篇（ATLaS、Weasel、ABSeeker、GatedHindsight、ECPO、OSReward、StepReflect、SEED、MathShepherd、ImplicitPRM、Rho1）；partial 1 篇（PCSD）；legacy-unverified 12 篇（QVal、TRIAGE、ADMIRE、SOLAR-RL、BetaPRM、GUI-PRA、TGPO、MobileIPL、TreeGRPO、EvoCUA、EvoCUA15、ProxMO），其结论仅用于分类与方向性判断，未用于升级关键数字或宣告共识。</p>
+<p><strong>核查中被修正的结论</strong>：</p>
+<ul>
+<li>QVal 的”text observation 显著优于 visual”未通过独立核查——按 Appendix E 的 Tables 7/8、10/11、13/14 逐格配对统计，88 个匹配的 (method, model) 格子里 image 更优的有 29 个（ALFWorld 文本 31/31 全胜，但 OpenApps image 胜 15/33、FrozenLake image 胜 12/24），论文既未使用 “significantly”/“consistently” 也未做显著性检验。该结论未进入本文。<code>Papers/2606-QVal.md</code> 正文仍含此表述，需另起一轮修正。</li>
+<li>QVal 的”简单基线获胜”经核查为环境条件成立而非普遍成立，已在正文与 Key Evidence Matrix 中按条件命题表述。</li>
+<li>Math-Shepherd 关于 RL 规格缺失的判断经嵌套核查后收窄：KL 系数 0.04 确有报告，缺的是它如何进入目标（reward penalty 还是独立损失项）。</li>
+</ul>
+<p><strong>未能获取</strong>：无。所有纳入论文均取得全文或已有全文笔记。</p>
+<p><strong>建议加入 DomainMaps</strong>：<a href="../DomainMaps/AgenticRL" class="internal" data-slug="DomainMaps/AgenticRL">AgenticRL</a> 第 136 行”监督资产是 policy 相对的”可扩展为一条更强的表述——同一个 policy-reference log-prob 差在 ImplicitPRM / Rho-1 / SEED / PCSD 四篇里分别被读作 Q value、可学性、策略差距与 token 权重，四种读法各有实验支撑但从未在同一批数据上比较过排序一致性。另建议记录”判官可靠性即方法上限”这一条（TRIAGE + OSReward）。</p>
+<p><strong>待办</strong>：<code>Papers/2606-QVal.md</code> 第 33 行的模态比较结论需按核查结果修正；<code>Papers/2600-Adaptive Milestone Reward for GUI Agents.md</code> 与 <a href="../Papers/2602-ADMIRE" class="internal" data-slug="Papers/2602-ADMIRE">2602-ADMIRE</a> 疑为同一篇的重复笔记，需去重。</p></article><hr/><div class="page-footer"></div></div><div class="right sidebar"><div class="toc desktop-only"><button type="button" class="toc-header" aria-controls="toc-1116" aria-expanded="true"><h3>Table of Contents</h3><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="fold"><polyline points="6 9 12 15 18 9"></polyline></svg></button><ul id="list-1" class="toc-content overflow"><li class="depth-0"><a href="#overview" data-for="overview">Overview</a></li><li class="depth-0"><a href="#技术路线" data-for="技术路线">技术路线</a></li><li class="depth-1"><a href="#语义与可学性打分不做估值的直接选择" data-for="语义与可学性打分不做估值的直接选择">语义与可学性打分：不做估值的直接选择</a></li><li class="depth-1"><a href="#monte-carlo-prefix-rollout把-outcome-信号摊到前缀" data-for="monte-carlo-prefix-rollout把-outcome-信号摊到前缀">Monte-Carlo prefix rollout：把 outcome 信号摊到前缀</a></li><li class="depth-1"><a href="#终局回溯从答案反查哪一步提供了证据" data-for="终局回溯从答案反查哪一步提供了证据">终局回溯：从答案反查哪一步提供了证据</a></li><li class="depth-1"><a href="#隐式-creditlog-likelihood-ratio-自带的分解" data-for="隐式-creditlog-likelihood-ratio-自带的分解">隐式 credit：log-likelihood ratio 自带的分解</a></li><li class="depth-1"><a href="#外部-critic-与角色化归因" data-for="外部-critic-与角色化归因">外部 critic 与角色化归因</a></li><li class="depth-1"><a href="#结构对比fork-point树与失败定位" data-for="结构对比fork-point树与失败定位">结构对比：fork point、树与失败定位</a></li><li class="depth-1"><a href="#消费端sft-loss-加权与-rl-advantage-塑形" data-for="消费端sft-loss-加权与-rl-advantage-塑形">消费端：SFT loss 加权与 RL advantage 塑形</a></li><li class="depth-1"><a href="#方法对照" data-for="方法对照">方法对照</a></li><li class="depth-0"><a href="#datasets--benchmarks" data-for="datasets--benchmarks">Datasets &amp; Benchmarks</a></li><li class="depth-0"><a href="#失败模式与负证据" data-for="失败模式与负证据">失败模式与负证据</a></li><li class="depth-0"><a href="#key-evidence-matrix" data-for="key-evidence-matrix">Key Evidence Matrix</a></li><li class="depth-0"><a href="#key-takeaways" data-for="key-takeaways">Key Takeaways</a></li><li class="depth-0"><a href="#open-problems" data-for="open-problems">Open Problems</a></li><li class="depth-0"><a href="#调研日志" data-for="调研日志">调研日志</a></li><li class="overflow-end"></li></ul></div></div><footer class><p>Created with <a href="https://quartz.jzhao.xyz/">Quartz v4.5.2</a> © 2026</p><ul><li><a href="https://github.com/Kendrick-Stein/MCISLAB_DeepRead">GitHub</a></li></ul></footer></div></div></body><script type="application/javascript" data-persist="true">function n(){let t=this.parentElement;t.classList.toggle("is-collapsed");let e=t.getElementsByClassName("callout-content")[0];if(!e)return;let l=t.classList.contains("is-collapsed");e.style.gridTemplateRows=l?"0fr":"1fr"}function c(){let t=document.getElementsByClassName("callout is-collapsible");for(let e of t){let l=e.getElementsByClassName("callout-title")[0],s=e.getElementsByClassName("callout-content")[0];if(!l||!s)continue;l.addEventListener("click",n),window.addCleanup(()=>l.removeEventListener("click",n));let o=e.classList.contains("is-collapsed");s.style.gridTemplateRows=o?"0fr":"1fr"}}document.addEventListener("nav",c);
+</script><script type="module" data-persist="true">function E(a,e){if(!a)return;function t(o){o.target===this&&(o.preventDefault(),o.stopPropagation(),e())}function n(o){o.key.startsWith("Esc")&&(o.preventDefault(),e())}a?.addEventListener("click",t),window.addCleanup(()=>a?.removeEventListener("click",t)),document.addEventListener("keydown",n),window.addCleanup(()=>document.removeEventListener("keydown",n))}function f(a){for(;a.firstChild;)a.removeChild(a.firstChild)}var m=class{constructor(e,t){this.container=e;this.content=t;this.setupEventListeners(),this.setupNavigationControls(),this.resetTransform()}isDragging=!1;startPan={x:0,y:0};currentPan={x:0,y:0};scale=1;MIN_SCALE=.5;MAX_SCALE=3;cleanups=[];setupEventListeners(){let e=this.onMouseDown.bind(this),t=this.onMouseMove.bind(this),n=this.onMouseUp.bind(this),o=this.onTouchStart.bind(this),r=this.onTouchMove.bind(this),i=this.onTouchEnd.bind(this),s=this.resetTransform.bind(this);this.container.addEventListener("mousedown",e),document.addEventListener("mousemove",t),document.addEventListener("mouseup",n),this.container.addEventListener("touchstart",o,{passive:!1}),document.addEventListener("touchmove",r,{passive:!1}),document.addEventListener("touchend",i),window.addEventListener("resize",s),this.cleanups.push(()=>this.container.removeEventListener("mousedown",e),()=>document.removeEventListener("mousemove",t),()=>document.removeEventListener("mouseup",n),()=>this.container.removeEventListener("touchstart",o),()=>document.removeEventListener("touchmove",r),()=>document.removeEventListener("touchend",i),()=>window.removeEventListener("resize",s))}cleanup(){for(let e of this.cleanups)e()}setupNavigationControls(){let e=document.createElement("div");e.className="mermaid-controls";let t=this.createButton("+",()=>this.zoom(.1)),n=this.createButton("-",()=>this.zoom(-.1)),o=this.createButton("Reset",()=>this.resetTransform());e.appendChild(n),e.appendChild(o),e.appendChild(t),this.container.appendChild(e)}createButton(e,t){let n=document.createElement("button");return n.textContent=e,n.className="mermaid-control-button",n.addEventListener("click",t),window.addCleanup(()=>n.removeEventListener("click",t)),n}onMouseDown(e){e.button===0&&(this.isDragging=!0,this.startPan={x:e.clientX-this.currentPan.x,y:e.clientY-this.currentPan.y},this.container.style.cursor="grabbing")}onMouseMove(e){this.isDragging&&(e.preventDefault(),this.currentPan={x:e.clientX-this.startPan.x,y:e.clientY-this.startPan.y},this.updateTransform())}onMouseUp(){this.isDragging=!1,this.container.style.cursor="grab"}onTouchStart(e){if(e.touches.length!==1)return;this.isDragging=!0;let t=e.touches[0];this.startPan={x:t.clientX-this.currentPan.x,y:t.clientY-this.currentPan.y}}onTouchMove(e){if(!this.isDragging||e.touches.length!==1)return;e.preventDefault();let t=e.touches[0];this.currentPan={x:t.clientX-this.startPan.x,y:t.clientY-this.startPan.y},this.updateTransform()}onTouchEnd(){this.isDragging=!1}zoom(e){let t=Math.min(Math.max(this.scale+e,this.MIN_SCALE),this.MAX_SCALE),n=this.content.getBoundingClientRect(),o=n.width/2,r=n.height/2,i=t-this.scale;this.currentPan.x-=o*i,this.currentPan.y-=r*i,this.scale=t,this.updateTransform()}updateTransform(){this.content.style.transform=`translate(${this.currentPan.x}px, ${this.currentPan.y}px) scale(${this.scale})`}resetTransform(){let t=this.content.querySelector("svg").getBoundingClientRect(),n=t.width/this.scale,o=t.height/this.scale;this.scale=1,this.currentPan={x:(this.container.clientWidth-n)/2,y:(this.container.clientHeight-o)/2},this.updateTransform()}},T=["--secondary","--tertiary","--gray","--light","--lightgray","--highlight","--dark","--darkgray","--codeFont"],y;document.addEventListener("nav",async()=>{let e=document.querySelector(".center").querySelectorAll("code.mermaid");if(e.length===0)return;y||=await import("https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.esm.min.mjs");let t=y.default,n=new WeakMap;for(let r of e)n.set(r,r.innerText);async function o(){for(let s of e){s.removeAttribute("data-processed");let c=n.get(s);c&&(s.innerHTML=c)}let r=T.reduce((s,c)=>(s[c]=window.getComputedStyle(document.documentElement).getPropertyValue(c),s),{}),i=document.documentElement.getAttribute("saved-theme")==="dark";t.initialize({startOnLoad:!1,securityLevel:"loose",theme:i?"dark":"base",themeVariables:{fontFamily:r["--codeFont"],primaryColor:r["--light"],primaryTextColor:r["--darkgray"],primaryBorderColor:r["--tertiary"],lineColor:r["--darkgray"],secondaryColor:r["--secondary"],tertiaryColor:r["--tertiary"],clusterBkg:r["--light"],edgeLabelBackground:r["--highlight"]}}),await t.run({nodes:e})}await o(),document.addEventListener("themechange",o),window.addCleanup(()=>document.removeEventListener("themechange",o));for(let r=0;r<e.length;r++){let v=function(){let g=l.querySelector("#mermaid-space"),h=l.querySelector(".mermaid-content");if(!h)return;f(h);let w=i.querySelector("svg").cloneNode(!0);h.appendChild(w),l.classList.add("active"),g.style.cursor="grab",u=new m(g,h)},M=function(){l.classList.remove("active"),u?.cleanup(),u=null},i=e[r],s=i.parentElement,c=s.querySelector(".clipboard-button"),d=s.querySelector(".expand-button"),p=window.getComputedStyle(c),L=c.offsetWidth+parseFloat(p.marginLeft||"0")+parseFloat(p.marginRight||"0");d.style.right=`calc(${L}px + 0.3rem)`,s.prepend(d);let l=s.querySelector("#mermaid-container");if(!l)return;let u=null;d.addEventListener("click",v),E(l,M),window.addCleanup(()=>{u?.cleanup(),d.removeEventListener("click",v)})}});
+</script><script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/copy-tex.min.js" type="application/javascript" data-persist="true"></script><script src="../postscript.js" type="module" data-persist="true"></script></html>

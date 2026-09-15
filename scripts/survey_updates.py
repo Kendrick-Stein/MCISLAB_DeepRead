@@ -4,7 +4,11 @@
 用法:
     python3 scripts/survey_updates.py record <paper-note.md>
     python3 scripts/survey_updates.py pending [--survey NAME]
+    python3 scripts/survey_updates.py unrouted
     python3 scripts/survey_updates.py clear --survey NAME --papers a.md b.md
+
+匹配面只有笔记的 tags + title，因此漏路由通常是 survey keywords 词表缺项。record 匹配为空
+时写入 ledger 的 unrouted 表并告警，避免论文静默掉出综述维护闭环。
 """
 import argparse
 import datetime
@@ -29,7 +33,7 @@ def _frontmatter(path: Path) -> dict:
     for key in (
         "title", "tags", "keywords", "exclude_tags", "exclude_keywords",
         "hard_exclude_keywords", "exclude_override_tags",
-        "exclude_override_keywords", "status",
+        "exclude_override_keywords", "status", "no_survey",
     ):
         km = re.search(rf"^{key}:[ \t]*(.*)$", fm, re.MULTILINE)
         if not km:
@@ -68,13 +72,16 @@ def _load(root: Path) -> dict:
             data = json.loads(p.read_text(encoding="utf-8"))
             if not isinstance(data, dict) or not isinstance(data.get("pending"), list):
                 raise ValueError("wrong shape")
+            # unrouted 为后加字段，旧 ledger 缺失时补空表而非判为损坏
+            if not isinstance(data.get("unrouted"), list):
+                data["unrouted"] = []
             return data
         except (json.JSONDecodeError, ValueError):
             # 损坏/结构错误：备份后重建，不静默丢弃（spec §9）
             bak = p.with_suffix(p.suffix + ".bak")
             os.replace(p, bak)
             print(f"[survey_updates] warning: corrupt ledger backed up to {bak}", file=sys.stderr)
-    return {"version": 1, "pending": []}
+    return {"version": 1, "pending": [], "unrouted": []}
 
 
 def _save(root: Path, data: dict) -> None:
@@ -94,15 +101,26 @@ def load_pending(root: Path = ROOT) -> list:
     return _load(root)["pending"]
 
 
+def load_unrouted(root: Path = ROOT) -> list:
+    return _load(root)["unrouted"]
+
+
+def _haystack(fm: dict) -> str:
+    """匹配面：只有 tags + title。正文与摘要不参与，故 tag 词表缺项会直接导致漏路由。"""
+    tags = [str(t) for t in fm.get("tags", [])]
+    # tags 用 ", " 连接：_norm 后逗号保留，阻止多词 keyword 跨 tag 边界拼接命中
+    return _norm(", ".join(tags) + ", " + str(fm.get("title", "")))
+
+
 def match_surveys(paper: Path, root: Path = ROOT) -> list:
     fm = _frontmatter(paper)
     tags = [str(t) for t in fm.get("tags", [])]
     normalized_tags = {_norm(tag) for tag in tags}
-    title = str(fm.get("title", ""))
-    # tags 用 ", " 连接：_norm 后逗号保留，阻止多词 keyword 跨 tag 边界拼接命中
-    haystack = _norm(", ".join(tags) + ", " + title)
+    haystack = _haystack(fm)
     matched = []
-    for survey in sorted(root.glob("Topics/*-Survey.md")):
+    # 认领资格看的是"有没有 keywords"，不是文件名后缀。AgentHarness-Design 这类不带
+    # -Survey 后缀的专题同样写了 keywords，按文件名过滤会让它们永远拿不到论文。
+    for survey in sorted(root.glob("Topics/*.md")):
         survey_fm = _frontmatter(survey)
         if _norm(str(survey_fm.get("status", ""))) == "merged":
             continue
@@ -152,6 +170,19 @@ def record(paper: Path, root: Path = ROOT) -> list:
     for s in matched:
         if (s, rel) not in existing:
             data["pending"].append({"survey": s, "paper": rel, "added_at": today})
+    # 无 survey 认领时显式记账。匹配面只有 tags+title，漏路由多是词表缺项而非"确实不属于
+    # 任何综述"——不留痕迹的话论文会静默掉出综述维护闭环。
+    data["unrouted"] = [e for e in data["unrouted"] if e["paper"] != rel]
+    # no_survey: true 是人工判定"本就不该有归属"（回填噪声、领域外论文）的豁免标记，
+    # 避免它们长期占满 unrouted 表把真正的漏路由淹掉。
+    exempt = _norm(str(_frontmatter(paper).get("no_survey", ""))) == "true"
+    if not matched and not exempt:
+        data["unrouted"].append({
+            "paper": rel,
+            "added_at": today,
+            "haystack": _haystack(_frontmatter(paper)),
+        })
+        print(f"[survey_updates] unrouted: {rel} 未被任何 survey 认领", file=sys.stderr)
     _save(root, data)
     return matched
 
@@ -168,6 +199,7 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     p_rec = sub.add_parser("record"); p_rec.add_argument("paper")
     p_pen = sub.add_parser("pending"); p_pen.add_argument("--survey")
+    sub.add_parser("unrouted")
     p_clr = sub.add_parser("clear"); p_clr.add_argument("--survey", required=True); p_clr.add_argument("--papers", required=True, nargs="+")
     args = ap.parse_args()
     if args.cmd == "record":
@@ -178,6 +210,8 @@ def main() -> int:
         if args.survey:
             rows = [r for r in rows if r["survey"] == args.survey]
         print(json.dumps(rows, ensure_ascii=False, indent=2))
+    elif args.cmd == "unrouted":
+        print(json.dumps(load_unrouted(), ensure_ascii=False, indent=2))
     else:
         clear(args.survey, args.papers)
     return 0

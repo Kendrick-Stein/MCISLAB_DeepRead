@@ -3,7 +3,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-from survey_updates import match_surveys, record, load_pending, clear
+from survey_updates import (
+    match_surveys, record, load_pending, load_unrouted, clear,
+)
 
 
 def make_vault(tmp_path):
@@ -119,6 +121,76 @@ def test_record_appends_and_dedups(tmp_path):
     assert len(pending) == 1
     assert pending[0]["survey"] == "GUIAgent-Survey"
     assert pending[0]["paper"] == "Papers/2607-FooAgent.md"
+
+
+def test_topic_without_survey_suffix_can_claim(tmp_path):
+    """认领资格看 keywords 而非文件名：不带 -Survey 后缀的专题同样参与匹配。"""
+    make_vault(tmp_path)
+    (tmp_path / "Topics" / "AgentHarness-Design.md").write_text(
+        "---\ntitle: Agent Harness 设计\nkeywords: [harness design, agent loop]\n---\n"
+    )
+    paper = tmp_path / "Papers" / "2609-Harness.md"
+    paper.write_text("---\ntitle: Rethinking harness design for coding agents\ntags: [task-planning]\n---\n")
+    assert match_surveys(paper, tmp_path) == ["AgentHarness-Design"]
+
+
+def test_index_without_keywords_never_claims(tmp_path):
+    """Topics/_index.md 这类无 keywords 的文件放宽 glob 后也不得认领任何论文。"""
+    paper = make_vault(tmp_path)
+    (tmp_path / "Topics" / "_index.md").write_text("---\ntitle: Topics 索引\n---\n")
+    assert match_surveys(paper, tmp_path) == ["GUIAgent-Survey"]
+
+
+def test_unmatched_paper_recorded_as_unrouted(tmp_path):
+    """无 survey 认领时必须留痕：匹配面只有 tags+title，漏路由多是词表缺项而非真不相关。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2609-Orphan.md"
+    paper.write_text("---\ntitle: Diversity-aware skill routing\ntags: [task-planning]\n---\n")
+    assert record(paper, tmp_path) == []
+    unrouted = load_unrouted(tmp_path)
+    assert len(unrouted) == 1
+    assert unrouted[0]["paper"] == "Papers/2609-Orphan.md"
+    assert "skill routing" in unrouted[0]["haystack"]
+    record(paper, tmp_path)  # 幂等，不重复堆积
+    assert len(load_unrouted(tmp_path)) == 1
+
+
+def test_no_survey_flag_exempts_from_unrouted(tmp_path):
+    """人工判定领域外的论文标 no_survey: true 后不再占用 unrouted 表。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2400-Navier.md"
+    paper.write_text(
+        "---\ntitle: Global refined Fujita-Kato solution\ntags: []\nno_survey: true\n---\n"
+    )
+    assert record(paper, tmp_path) == []
+    assert load_unrouted(tmp_path) == []
+
+
+def test_unrouted_cleared_once_paper_matches(tmp_path):
+    """补上 survey keywords 后重跑 record，旧的 unrouted 记录必须消失。"""
+    make_vault(tmp_path)
+    paper = tmp_path / "Papers" / "2609-Orphan.md"
+    paper.write_text("---\ntitle: Diversity-aware skill routing\ntags: [task-planning]\n---\n")
+    record(paper, tmp_path)
+    assert len(load_unrouted(tmp_path)) == 1
+    survey = tmp_path / "Topics" / "GUIAgent-Survey.md"
+    survey.write_text(survey.read_text().replace(
+        "keywords: [gui-agent, web agent]", "keywords: [gui-agent, web agent, skill routing]"))
+    assert record(paper, tmp_path) == ["GUIAgent-Survey"]
+    assert load_unrouted(tmp_path) == []
+
+
+def test_legacy_ledger_without_unrouted_not_corrupt(tmp_path):
+    """unrouted 为后加字段：旧账本缺该键应补空表，而不是被当成损坏备份掉。"""
+    paper = make_vault(tmp_path)
+    ledger = tmp_path / "Workbench" / "survey-updates.json"
+    ledger.write_text(json.dumps({"version": 1, "pending": [
+        {"survey": "VLM-Survey", "paper": "Papers/2608-Old.md", "added_at": "2026-08-01"},
+    ]}), encoding="utf-8")
+    assert load_unrouted(tmp_path) == []
+    assert not (tmp_path / "Workbench" / "survey-updates.json.bak").exists()
+    record(paper, tmp_path)
+    assert len(load_pending(tmp_path)) == 2
 
 
 def test_clear_removes_processed(tmp_path):

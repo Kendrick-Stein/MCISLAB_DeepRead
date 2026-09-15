@@ -10,6 +10,7 @@ cite_key: wang2012intelligent
 code: ""
 rating: "3"
 date_added: "2026-04-21"
+no_survey: true
 ---
 ## Summary
 本文提出了一种智能多智能体控制系统，以解决智能和可持续建筑中的能源与舒适管理问题，通过优化控制策略实现了显著的能效提升和用户舒适度改善。

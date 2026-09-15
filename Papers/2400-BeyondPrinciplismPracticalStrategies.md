@@ -11,6 +11,7 @@ arxiv_id: "2401.15284"
 code: ""
 rating: "3"
 date_added: "2026-04-08"
+no_survey: true
 ---
 ## Summary
 这篇论文关注生成式 AI，尤其是 LLM，在科研实践中的伦理使用问题，指出现有 principlism、formalism 和 technological solutionism 过于抽象或僵化，难以指导日常研究操作；作者提出一种以用户为中心、受 realism 启发的实践框架，围绕五个可操作目标给出策略、误用案例与纠正建议，并补充透明性与可复现性的文档规范。其主要贡献不是提出可量化的新模型或 benchmark SOTA，而是把抽象 AI ethics 原则转化为更贴近科研工作流的实践指导框架。

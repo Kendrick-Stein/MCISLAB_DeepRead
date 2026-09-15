@@ -15,6 +15,7 @@ arxiv_id: "1349.35569"
 code: ""
 rating: "3"
 date_added: "2026-04-08"
+no_survey: true
 ---
 ## Summary
 该论文针对 GUI 测试自动化中基于 OCR 的 widget 文本定位速度过慢问题，提出了一种无需 GPU 的 Label Text Screening (LTS) 加速方法，通过在 OCR 前对 GUI 屏幕中的候选 label text 进行筛选，减少不必要的文本分析。根据摘要，在 4k 分辨率界面上，LTS 可使约 60% 以上案例的定位时间控制在 0.5 秒以内，而基于 Tesseract、PaddleOCR、EasyOCR 的 CPU 方案通常需要 2 秒以上，即使使用 GPU 也往往难以稳定低于 1 秒。

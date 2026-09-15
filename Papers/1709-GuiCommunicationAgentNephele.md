@@ -10,6 +10,7 @@ cite_key: kyriakos2017gui
 code: ""
 rating: "3"
 date_added: "2026-04-21"
+no_survey: true
 ---
 ## Summary
 该论文提出了一种用于“Nephele”数据中心通信代理的图形用户界面（GUI），旨在提高数据中心的管理效率和用户交互体验。

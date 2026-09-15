@@ -16,6 +16,7 @@ arxiv_id: "2411.06811"
 code: ""
 rating: "3"
 date_added: "2026-04-08"
+no_survey: true
 ---
 ## Summary
 该论文提出并公开了一个用于客观评估健康人群空间导航能力的 Electrooculography (EOG) 数据集，采集了27名受试者在 Leiden Navigation Test 视频观看阶段的水平与垂直眼动信号，并配套提供 Mini-Mental State Examination 与 Wayfinding Questionnaire 等认知量表信息；其主要贡献不是新算法，而是构建了一个将眼动生理信号与空间认知测评关联起来的多模态研究资源，为后续基于 EOG 的 spatial navigation 分析提供数据基础。

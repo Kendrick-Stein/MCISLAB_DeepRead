@@ -11,6 +11,7 @@ arxiv_id: "2410.09386"
 code: ""
 rating: "3"
 date_added: "2026-04-21"
+no_survey: true
 ---
 ## Summary
 本文提出了一种新的方法来解决三维不均匀不可压Navier-Stokes方程的全球唯一Fujita-Kato解，利用了临界Sobolev空间和Besov空间的理论，取得了对解的控制效果。

@@ -10,6 +10,7 @@ cite_key: han2002alife
 code: ""
 rating: "3"
 date_added: "2026-04-21"
+no_survey: true
 ---
 ## Summary
 本文提出了一种基于分布式自主体的人工生命（ALife）模型来解决N-皇后问题，通过在棋盘环境中模拟自主体的行为与互动，展示了该方法在解决大规模N-皇后问题上的有效性。

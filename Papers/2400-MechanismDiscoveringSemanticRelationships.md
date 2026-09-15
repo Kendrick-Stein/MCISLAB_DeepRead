@@ -15,6 +15,7 @@ arxiv_id: "2401.16216"
 code: ""
 rating: "3"
 date_added: "2026-04-08"
+no_survey: true
 ---
 ## Summary
 这篇论文关注多智能体系统中“不同 agent communication protocols 之间如何在语义层面发现关系”的问题，提出了一种基于 ontology + Event Calculus + fluent 集合比较的机制，把 communication acts 与 social commitment semantics 统一表示，并通过分支级比较自动识别 equivalence、specialization、restriction、prefix、suffix、infix 和 complement_to_infix 等协议关系。论文的主要贡献不在于提出新的学习模型或 benchmark SOTA，而在于给出一种可形式化、可推理、可证明若干关系性质的协议语义比较框架，用于支持异构协议之间的互操作分析。

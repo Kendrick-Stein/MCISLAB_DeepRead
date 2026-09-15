@@ -165,7 +165,7 @@ mindmap
 **与 vault 的连接。**
 
 - [[2606-AlwaysOnAgents]] 明确点出 STALE 一类基准的 coupling gap——"只问 agent 是否知道值过期，不问它是否因此拒绝了被该 stale 值授权的工具调用"。本文正是在闭这个环，而且第一作者 Y. Sun 与该 survey 引用的 STALE（Chao et al. 2026, arXiv:2605.06527）作者列表重叠，可以看作同一条线上的下一步。同一份 survey 转述的 RECLAIM 结论"保留 stale 结论却丢掉来源的记忆会变得 confidently uncorrectable，且严格劣于空记忆"，与本文的 74.4% vs 28.0% 在文本与空间两个模态上给出了同形状的证据。这是跨论文 pattern，不是单点。
-- [[2606-NaiveVisualMemory]] 在 GUI agent 上得到同向结论：朴素堆积的视觉记忆是净负资产。两者放在一起，"记忆默认有益"这个假设在 GUI 与空间两个场景下都被证伪了。
+- [[2606-NaiveVisualMemory]] 在 GUI agent 上给出同向但更弱的结论：朴素堆积的视觉记忆改变的是失败构成而非总量——state-level 失败下降（cognitive 82.6%→75.0%、visual state 73.1%→69.6%），action-level 失败上升（hidden operation 67.1%→78.8%、grounding 27.5%→36.1%），而 OSWorld 端到端 accuracy 仍由 18.3% 微升到 20.4%。因此它支持的是"记忆收益不均匀且含一个可测的有害分量"，而非"净负资产"（2026-09-15 对照 arXiv:2606.14106 Table 2 更正原表述）。两者放在一起，被证伪的是"记忆默认有益且无副作用"，不是"记忆有益"本身。
 - [[2512-MemoryGraft]] 是对抗版本的同一失败面：投毒经验检索让 agent 持续采信被污染的记忆。自然老化与主动投毒共享同一个下游脆弱点——**agent 在冲突时倾向于相信记忆而非当下观测**。防御侧应当共用同一个 read-time gate 抽象。
 - [[2606-SkillMemoryBudget]] 问"记忆模块值不值它花的 token"，本文问"记忆模块值不值它带来的死亡率"。合起来是同一个成本函数的两个分量。
 

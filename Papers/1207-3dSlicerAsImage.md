@@ -25,6 +25,7 @@ cite_key: fedorov20123d
 code: ""
 rating: "3"
 date_added: "2026-04-21"
+no_survey: true
 ---
 ## Summary
 本文提出了3D Slicer作为定量成像网络的图像计算平台，旨在解决医学图像分析中的数据处理和可视化问题，提供了一种集成的解决方案以支持多种成像技术。

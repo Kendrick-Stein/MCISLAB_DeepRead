@@ -15,6 +15,7 @@ arxiv_id: "2401.11841"
 code: ""
 rating: "3"
 date_added: "2026-04-08"
+no_survey: true
 ---
 ## Summary
 该论文试图解决异构 agent 系统之间因 Agent Communication Language 与 protocol 表达不统一而无法语义互通的问题，提出用 Semantic Web 技术对标准通信协议进行形式化描述：以 OWL-DL/SWRL 表示协议结构，以自建通信行为本体 CommOnt 表示 communication acts，并用基于 social commitments 的 Event Calculus 语义来支持协议比较与推理；论文的主要产出不是传统 benchmark 上的性能提升，而是给出一个可用于判断 protocol equivalence 与 specialization 的统一知识表示与推理框架。

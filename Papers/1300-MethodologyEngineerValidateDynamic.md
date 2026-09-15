@@ -15,6 +15,7 @@ arxiv_id: "1311.5108"
 code: ""
 rating: "3"
 date_added: "2026-04-21"
+no_survey: true
 ---
 ## Summary
 提出了一种基于IRM4MLS的动态多层次多智能体建模与仿真方法，以应对复杂系统的建模问题，并实现了在多个尺度和领域内的有效仿真。

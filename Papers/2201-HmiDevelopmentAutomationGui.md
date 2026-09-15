@@ -16,6 +16,7 @@ cite_key: mustafa2022hmi
 code: ""
 rating: "3"
 date_added: "2026-04-08"
+no_survey: true
 ---
 ## Summary
 论文题目表明其关注 HMI（Human-Machine Interface）开发自动化问题，尝试借助 GUI elements 与面向对象编程语言实现机制来提升界面开发效率与规范化程度；但由于当前未获取论文摘要与全文，无法确认其具体方法结构、实验设置及最终效果。基于题目可推断，这是一项面向工业软件工程与界面生成自动化的应用型研究，但具体贡献边界论文未提及。

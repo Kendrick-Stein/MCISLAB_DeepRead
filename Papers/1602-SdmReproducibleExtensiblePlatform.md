@@ -10,6 +10,7 @@ cite_key: naimi2016sdm
 code: ""
 rating: "3"
 date_added: "2026-04-21"
+no_survey: true
 ---
 ## Summary
 本文提出了一个名为 sdm 的 R 平台，用于物种分布建模，旨在提高模型的可重复性和可扩展性。

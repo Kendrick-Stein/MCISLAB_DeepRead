@@ -10,6 +10,7 @@ cite_key: patrick2002building
 code: ""
 rating: "3"
 date_added: "2026-04-21"
+no_survey: true
 ---
 ## Summary
 本文探讨了构建可信软件代理的问题，提出了一种综合考虑信任度的设计方法，旨在提高软件代理在实际应用中的可靠性和用户接受度。

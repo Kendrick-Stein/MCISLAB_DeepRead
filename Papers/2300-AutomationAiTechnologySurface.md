@@ -11,6 +11,7 @@ arxiv_id: "2301.09771"
 code: ""
 rating: "3"
 date_added: "2026-04-08"
+no_survey: true
 ---
 ## Summary
 这是一篇面向露天矿尤其是澳大利亚 Pilbara 铁矿区的综述论文，系统梳理了从地质勘探、采矿作业到铁路与港口运输全链条中的 automation、robotics 与 AI 技术。论文并未提出单一新算法，而是通过工程流程分解与案例式综述来说明 mining automation 的技术版图、关键挑战与潜在机会。其主要价值在于为工程与研究读者建立 open-pit mining 的整体认知框架，并指出 AI 在高技术矿山中的落地场景与限制。

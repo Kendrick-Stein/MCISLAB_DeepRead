@@ -15,6 +15,7 @@ arxiv_id: "2604.03350"
 code: ""
 rating: "3"
 date_added: "2026-04-08"
+no_survey: true
 ---
 ## Summary
 该论文针对 stochastic Agent-Based Models 在高维参数空间下难以系统探索的问题，提出了一个从 model-based screening 到 data-driven surrogate 的多阶段分析流程：先用实验设计与线性/树模型筛查主导变量和不稳定区域，再用机器学习 surrogate 拟合复杂非线性交互。论文在一个 predator-prey ABM 案例上表明，这一流程能够自动识别高随机性、强交互的参数区域，为 sensitivity analysis 与 policy testing 提供更系统的工作流，但从给定文本中无法确认其是否在标准 benchmark 上取得显著数值型 SOTA 结果。

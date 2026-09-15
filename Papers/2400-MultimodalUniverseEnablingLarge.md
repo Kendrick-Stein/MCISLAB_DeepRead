@@ -40,6 +40,7 @@ arxiv_id: "2412.02527"
 code: ""
 rating: "3"
 date_added: "2026-04-21"
+no_survey: true
 ---
 ## Summary
 本文提出了MULTIMODAL UNIVERSE，一个大规模的多模态天文学数据集，旨在促进机器学习研究，包含100TB的多通道和超光谱图像、光谱和多变量时间序列等数据，提供了针对天体物理学的基准任务。

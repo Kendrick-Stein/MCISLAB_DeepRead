@@ -11,6 +11,7 @@ arxiv_id: "2601.16513"
 code: ""
 rating: "3"
 date_added: "2026-04-08"
+no_survey: true
 ---
 ## Summary
 本文以 OpenAI 为案例，研究其公开话语中“ethics”“safety”“alignment”等概念如何随时间被使用与重构；方法上结合定性内容分析与基于 NLP 的计算传播分析，对面向大众与面向学术受众的公开文档进行结构化语料比较；结论指出 OpenAI 的公开沟通中以 safety/risk 话语为主导，而较少采用学术界或倡议界更完整的 AI ethics 框架，并据此讨论治理含义与 ethics-washing 风险。

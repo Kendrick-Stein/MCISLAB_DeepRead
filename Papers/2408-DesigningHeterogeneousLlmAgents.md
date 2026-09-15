@@ -10,6 +10,7 @@ cite_key: xing2024designing
 code: ""
 rating: "3"
 date_added: "2026-04-21"
+no_survey: true
 ---
 ## Summary
 本文提出了一种异构大语言模型（Heterogeneous LLM）代理的方法来解决金融情感分析问题，旨在提高情感分析的准确性和效率。

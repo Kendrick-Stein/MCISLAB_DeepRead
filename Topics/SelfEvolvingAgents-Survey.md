@@ -1,16 +1,16 @@
 ---
 title: "Self-Evolving and Self-Improving Agents: A Unified Survey of Evolution Targets, Feedback, Gating, and Safety"
 tags: [survey, self-evolving-agents, self-improvement, recursive-self-improvement, agentic-RL, LLM, misevolution]
-date_updated: "2026-09-07"
+date_updated: "2026-09-18"
 year_range: 2022-2026
-papers_analyzed: 65
+papers_analyzed: 76
 keywords: [self-evolving, self-evolution, self-improving, self-improvement, recursive self-improvement, self-recursive improvement, misevolution, lifelong agent, skill evolution, memory evolution, operation-level memory, experience-driven, co-evolution, environment evolution, multi-agent evolution, skill optimization, skill library, self-training, memory poisoning, evolution gate, verifier gating, harness evolution, streaming evaluation, evolution gain]
 domain_map: AgenticRL
 supersedes: "SelfEvolvingAgents-Survey 07-24 版（30 篇、4 路线）已并入本文并按 12 节 CUA 标准重排"
 ---
 
 > [!note] 版本说明（2026-07-29）
-> 本文在 07-24 版四路线综述基础上按 12 节完整目录重排，并入本轮独立核验的 20 篇一手论文（recursive self-improvement 谱系、负性结果、env/multi-agent 协同演化、operation-level memory、gate 家族、安全威胁模型）。所有进入正文的 benchmark 数字与机制主张均标注 grounding，边界见 Key Evidence Matrix。
+> 本文在 07-24 版四路线综述基础上按 12 节完整目录重排，覆盖 76 篇文献（recursive self-improvement 谱系、负性结果、env/multi-agent 协同演化、operation-level memory、gate 家族、安全威胁模型）。所有进入正文的 benchmark 数字与机制主张均标注 grounding，边界见 Key Evidence Matrix。
 
 # Self-Evolving and Self-Improving Agents: A Unified Survey
 
@@ -26,7 +26,7 @@ Self-improvement 与 self-evolving 是同一研究纲领在两个系统层次上
 
 ### 1.2 2026 的活跃前沿
 
-四条主线在 2026 年同时加速：其一，**recursive self-improvement 的 scaffold lineage 成型**——自改代码 agent 从 Darwin-Gödel Machine 的开放式 archive 走向 [[Papers/2510-HuxleyGodelMachine]] 的 clade 级 credit assignment 与 [[Papers/2607-MetaSkillEvolve]] 的"演化改进流程本身"两级递归。其二，**负性结果集中爆发**——self-improvement reversal、rise-and-collapse、recursive self-training collapse 三条独立证据线共同刻画了自演化的失效条件。其三，**agent-environment co-evolution 从概念变为实证**——环境从静态评测台升格为共同演化对象（[[Papers/2605-SEAL]]、[[Papers/2512-GenEnv]]、anchor survey [[Papers/2606-EnvEngineeringSurvey]]）。其四，**演化步 verifier gating 从方法空白扩展为多粒度家族**——从技能编辑级到 anytime-valid 统计证书到形式化验证合成，gate 从安全阀被重新论证为可靠性的主要来源；但它是否同时抬高性能天花板，在 2026 年中已成为有正反实测的争议（§6.2）。其五，**演化信号开始越出"从自己成功的轨迹里学"这一默认设定**——一组 rollout 全部失败时二值 reward 在组内退化为常数，[[Papers/2608-ZerothOrderSelfEvolve]] 用参数空间扰动加 gold-answer 连续似然绕开这个真空，[[Papers/2608-ROPSD]] 把反思文本转成 token 级监督，两者都落在 anchor survey 的信号分类（verifier / self-reward / judge / 共识伪标签）之外（§4.3）。
+2026 年同时加速的主线有六条。其一，**recursive self-improvement 的 scaffold lineage 成型**——自改代码 agent 从 Darwin-Gödel Machine 的开放式 archive 走向 [[Papers/2510-HuxleyGodelMachine]] 的 clade 级 credit assignment 与 [[Papers/2607-MetaSkillEvolve]] 的"演化改进流程本身"两级递归。其二，**负性结果集中爆发**——self-improvement reversal、rise-and-collapse、recursive self-training collapse 刻画的是演化过程自身跑偏的条件，[[Papers/2609-Ecdysis]] 与 [[Papers/2607-RethinkSkillEvolve]] 又补上一种发生在闸门之后的形态：每一步改动都通过了接受判据，交付到 held-out 上仍是净负（§10.2）。其三，**agent-environment co-evolution 从概念变为实证**——环境从静态评测台升格为共同演化对象（[[Papers/2605-SEAL]]、[[Papers/2512-GenEnv]]、anchor survey [[Papers/2606-EnvEngineeringSurvey]]）。其四，**演化步 verifier gating 从方法空白扩展为多粒度家族**——从技能编辑级到 anytime-valid 统计证书到形式化验证合成，gate 从安全阀被重新论证为可靠性的主要来源；但它是否同时抬高性能天花板，在 2026 年中已成为有正反实测的争议（§6.2）。其五，**演化信号开始越出"从自己成功的轨迹里学"这一默认设定**——一组 rollout 全部失败时二值 reward 在组内退化为常数，[[Papers/2608-ZerothOrderSelfEvolve]] 用参数空间扰动加 gold-answer 连续似然绕开这个真空，[[Papers/2608-ROPSD]] 把反思文本转成 token 级监督，两者都落在 anchor survey 的信号分类（verifier / self-reward / judge / 共识伪标签）之外（§4.3）。其六，**演化收益开始被匹配对照与噪声带检验**——固定 executor、固定流程、只改 optimizer 可见的轨迹之后，[[Papers/2607-RethinkSkillEvolve]] 在 14 个 setting 上测到"演化后部署 test 更好"只有 9 个，而一份字节完全相同的技能重复评测八次落在 71.43%–83.67%（标准差 3.92 个百分点）；[[Papers/2608-SkillZipPro]] 则第一次把等价性写成预先声明的判据（102 个 held-out 任务、配对 bootstrap、事先固定的 −0.05 边界）。这条线把"演化涨了多少"从单点比较推到了必须先给出协议分辨率（§9.4、§10.2）。
 
 ### 1.3 与相邻领域的边界
 
@@ -61,6 +61,10 @@ Self-improvement 与 self-evolving 是同一研究纲领在两个系统层次上
 ### 2.2 演化、优化、终身学习、model editing 的切分
 
 见 §1.3 表。核心分界是"部署后是否持续、自主、经验驱动地改变策略"。一个反例说明判据的作用：标题含 self-evolving 但实为 GT-IoU 弱监督离线蒸馏、部署后 reward model 冻结的工作，不满足条件 (i)(ii)，按判据不并入。
+
+第二类边界情形是机制齐备而测量没跟上。[[Papers/2605-SEGA]] 同时具备两套演化：三轮离线演化重训（AndroidWorld 28.6 → 34.5 → 39.0），以及一个在推理期累积、跨任务复用的 test-time memory buffer。后者按 §2.1 三条件是合格的部署后演化，但全文没有任何实验把 buffer 的效应与训练轮次分开，两者始终一起上线。本文因此按训练期演化引用它的数字，其"无需重训即可在线演化"的部分不作为部署后持续演化的证据——这类拆分缺口在 §6.3 的关库对照与 §7.2 的 harness 份额拆分中是同一种要求。
+
+第三类是形式描述与实物的不匹配，判据本身仍然适用但需要显式落回三条件。[[Papers/2609-GeneralizedAgentIteration]] 把自改进系统写成 $\chi=(\pi,V,m,U,\rho)$ 并用"更新算子是否落在可修改子集内"定义递归性，这套坐标比 §2.1 宽——它不问更新发生过几次，也不问是否在部署后。两套判据在 §7.5 并置使用：形式坐标用于命名，三条件用于判定实物。
 
 ### 2.3 纳入与排除标准
 
@@ -101,7 +105,7 @@ Self-improvement 与 self-evolving 是同一研究纲领在两个系统层次上
 
 ### 3.4 反馈信号轴
 
-反馈信号的可验证性是四条路线共同的成败分界（详见 §4.4）。deterministic verifier 域（代码测试执行、几何计算、规则验证）收益最大最稳；internal self-reward 域有偏差放大与 reversal 风险；LLM/VLM-judge 域介于两者之间且 judge 噪声直接进训练集；共识伪标签（majority-voting）在无 ground truth 的视觉域是唯一退路，但会逐代劣化。这与 vault 已确立的"verifier 从评测工具变为训练监督源"判断在自演化语境下汇合：**verifier 质量上界决定 self-evolution 收益上界**。
+反馈信号的可验证性是四条路线共同的成败分界（详见 §4.4）。deterministic verifier 域（代码测试执行、几何计算、规则验证）收益最大最稳；internal self-reward 域有偏差放大与 reversal 风险；LLM/VLM-judge 域介于两者之间且 judge 噪声直接进训练集；共识伪标签（majority-voting）在无 ground truth 的视觉域是唯一退路，但会逐代劣化。这与"verifier 从评测工具变为训练监督源"这一判断在自演化语境下汇合：**verifier 质量上界决定 self-evolution 收益上界**。这条上界该按"判分质量"而非"判分准确率"读：[[Papers/2608-GSAR]] 的学习式 GUI 轨迹判分器离线准确率 91.5%，把规则式对照甩开十几个点，接进同一条在线 RL 管线当 reward 之后反而少涨 2.6 个点（§4.4）。
 
 第五类信号是**纯过程审计**——只看执行痕迹（工具记录、证据可见性、未决问题、置信度），完全不接触任务是否做对。它的意义在于把演化信号与评价信号从结构上切开，因而不受"演化闸门其实就是打分模型"的循环质疑；代价是信号本身弱且未经独立校准。[[Papers/2607-MANTA]] 是目前唯一给出这一代价定量的工作：其 Trace Auditor 明确不可访问 benchmark 答案或判分，450 run 上无 flag 的 run 正确率 83.2%、被 flag 的 62.5%（差 20.7 点），但作为"答案是否错误"的检测器总体 precision 仅 0.38、F1 0.47，且分域极不均——WorkBench F1 0.78 而 BrowseComp 假阳率 0.90、PlanCraft 90 run 只 flag 出 1 次。过程信号与结果正确性确有关联但远非等价，这一点在 §6.2 的 gate 家族与 §10.6 的可靠性讨论中都是硬约束。
 
@@ -109,9 +113,11 @@ Self-improvement 与 self-evolving 是同一研究纲领在两个系统层次上
 
 可验证性之外，这条轴还有一个此前被并进去的属性：**信号的分辨率**。GRPO 一族用组内相对优势，因此当一组 rollout 全部失败、二值 reward 在组内退化为常数时梯度估计恒为零——[[Papers/2608-ZerothOrderSelfEvolve]] 把这一点写成推导（所有轨迹拿到同一 reward 时 $\hat g_{RL}=0$），[[Papers/2608-ROPSD]] 在实测里撞上同一堵墙（纯标量 reward 的 GUI-RCPO 在 MMBench-GUI 上负迁移 −0.3）。两篇的绕法都不是换一个更可信的 verifier，而是提高同一份失败经验的分辨率：前者把判据换成 gold answer 上 token-normalized 的 NLL（连续，失败轨迹只要检索到部分支持证据就有下降），后者把反思文本条件化出 self-teacher、取它与无条件 policy 的 token 级 log-ratio 当 advantage。代价各自明确，且都不是无监督：前者要求存在可核对的 gold answer，后者要求一个先用带标注数据训出来的 Reflector（held-out 二分类准确率 89.5% / 91.7%）。**标注需求被从轨迹层挪到别处，而不是被消除**（详见 §4.3）。
 
+分辨率之外还有一层此前被一并计入信号质量的东西：**稠密信号里有多少是内容，有多少只是落点与符号**。[[Papers/2608-OPSA]] 把 on-policy distillation 的 token 级教师信号整个换成一个固定负常数、只施加在学生自己 log-probability 最低的 20% token 上，训练效果与完整教师相当，而把这个常数改成正的则策略崩溃。被质量上界约束的是信号的判别内容，而在这个设置里真正起作用的是它落在哪些 token 上以及朝哪个方向推——两者可以解耦（§4.3）。
+
 ### 3.5 演化时机与 gate 轴
 
-时机决定漂移暴露面：train-time 演化（如 [[Papers/2607-SEED]] 把 hindsight skill 蒸进参数、部署弃用）漂移风险最低；deploy-time 演化（memory reward hacking）漂移风险最高；on-the-fly 自改（[[Papers/2511-LiveSWEAgent]]）介于两者。时机轴的最细端点是**任务实例之内**：[[Papers/2607-MANTA]] 在解同一道题的两轮之间改写通信拓扑，跨 run 只留原则性 playbook，因此单次错误的持久面最小——但也因此每个 instance 都要重付一次演化开销（§7.1）。gate 粒度从无（Live-SWE-agent 零关口）到 edit-level（[[Papers/2605-GRASP]]）、step-level（[[Papers/2606-SkillNb]]）、patch 筛选级（[[Papers/2607-HarnessBank]]）、统计证书（[[Papers/2607-SEACertificates]]）、形式验证合成（[[Papers/2603-SEVerA]]）构成一条可靠性谱（详见 §6.2）。
+时机决定漂移暴露面：train-time 演化（如 [[Papers/2607-SEED]] 把 hindsight skill 蒸进参数、部署弃用）漂移风险最低；deploy-time 演化（memory reward hacking）漂移风险最高；on-the-fly 自改（[[Papers/2511-LiveSWEAgent]]）介于两者。时机轴的最细端点是**任务实例之内**：[[Papers/2607-MANTA]] 在解同一道题的两轮之间改写通信拓扑，跨 run 只留原则性 playbook，因此单次错误的持久面最小——但也因此每个 instance 都要重付一次演化开销（§7.1）。同一端点在 harness 侧的形态是 per-instance 合成：[[Papers/2608-JITAgent]] 训练一个生成器，在每个任务实例到达时现场产出该实例专用的工具集、状态机与提示协议，权重与生成器全程不变，于是被演化的对象从"部署前选定的一套配置"变成"每个实例各一套"，而代价同样是每个实例都要重付一次生成开销（§7.4）。gate 粒度从无（Live-SWE-agent 与 [[Papers/2608-TRACE]] 零关口）到 edit-level（[[Papers/2605-GRASP]]）、step-level（[[Papers/2606-SkillNb]]）、patch 筛选级（[[Papers/2607-HarnessBank]]）、统计证书（[[Papers/2607-SEACertificates]]）、形式验证合成（[[Papers/2603-SEVerA]]）构成一条可靠性谱（详见 §6.2）。
 
 deploy-time 一端此前只有不动参数的记忆演化，[[Papers/2608-ROPSD]] 把参数更新也放了进来：GUI grounding 模型在部署侧的无标注界面数据上，用自己的预测与一个冻结 Reflector 的反思做 LoRA 更新。它同时暴露这一端点的边界——适配数据就是待测集合本身（transductive），任务流由评测给定而非自主生成，按 §2.1 第三条件只算边界纳入；其收益读法也因此不能直接搬给"部署后遇到什么学什么"的在线设定。
 
@@ -121,10 +127,10 @@ deploy-time 一端此前只有不动参数的记忆演化，[[Papers/2608-ROPSD]
 
 | 路线 | 代表 | 反馈来源 | 已证收益（代表数字） | 已证风险（实测） |
 |:--|:--|:--|:--|:--|
-| Model（参数） | WebRL / [[Papers/2412-PAE]] / [[Papers/2500-UiGenieSelfImproving]] / [[Papers/2607-SEED]] / [[Papers/2606-VisPlay]] / [[Papers/2607-SpyRL]] / [[Papers/2608-ZerothOrderSelfEvolve]] / [[Papers/2608-EvoHarnessRL]] | ORM / VLM-judge / 自奖励 / 共识伪标签 / 构造式可验 reward / gold-answer 似然 / 反思蒸馏 | WebArena-Lite 4.8→42.4（WebRL）；ALFWorld 91.8 vs GRPO 75.0（SEED）；无标注 3B 30.6→47.3（VisPlay）；七数学 benchmark 均值 41.4→50.4（SpyRL）；GAIA 23.3→47.5（ZO 参数空间搜索）；ALFWorld seen 47.9→96.9（EvoHarness-RL） | safety 累积衰减（Misevolution）；risk-awareness 灾难性遗忘（SEAgent）；共识伪标签逐代劣化 72→61；去掉两处优化侧设计后跌破未训练基座（SpyRL 50.4→37.5 vs 基座 41.4）；增益与被演化组件的因果链未闭合（EvoHarness-RL 收敛后 harness 调用退火到约每 episode 一次，而其 SFT teacher 自身 ReAct 在同一 split 上已 96.4，无去 BPE 的同管线对照臂） |
-| Memory/Context | [[Papers/2409-AgentWorkflowMemory]] / [[Papers/2600-UiMemSelfEvolving]] / [[Papers/2601-MemRL]] / [[Papers/2602-MemSkill]] / [[Papers/2608-RoMeRL]] | 历史评分 / 检索命中 / task reward | WebArena 相对 +51.1%（AWM）；LoCoMo 53.82、调用量低一量级（MemSkill）；ALFWorld+LAB overall 0.830→0.862 且记忆池 −84.4%（RoMeRL） | deployment-time reward hacking >60% 且可突然崩塌（Misevolution）；operation-level blast radius 系统性放大；memory-reward trap——扩大探索使无因果贡献的记忆吃到更多正向更新（RoMeRL 注入实验 3.7→7.2） |
-| Tool/Skill | Voyager / [[Papers/2605-SkillOpt]] / [[Papers/2605-GRASP]] / [[Papers/2606-SkillNb]] / [[Papers/2606-LearningFromFailure]] / [[Papers/2607-SESA]] / [[Papers/2608-SkillZip]] | validation gate / A/B / held-out 探针 / state-contract / 前沿难度整形 / 不接触任务的结构压缩 | 6 bench 平均 +23.5（SkillOpt）；OSWorld 零训练 42.3→48.9（LearningFromFailure）；七集合 QA Qwen3-8B 56.3→59.5（SESA） | 创建-复用 Unsafe Rate 65.5%；外部工具摄取 Refusal <8%（Misevolution）；技能库的部署期贡献可能远小于其训练期贡献（SESA 关库仍得 +1.8/+2.2，开库只再加 +0.5/+1.0）；技能文本随演化膨胀（SkillOpt 5 轮后达初始约 5.2×）；经验层投毒可被抽取成独立存储的 skill 并在删源后存活（[[Papers/2608-SkillJack]]，§10.4） |
-| Architecture / RSI | [[Papers/2505-DarwinGodelMachine]] / [[Papers/2510-HuxleyGodelMachine]] / [[Papers/2605-MetaTeam]] / [[Papers/2607-MANTA]] / [[Papers/2607-FrontisMA1]] | benchmark 分数 / clade 聚合 / 团队讨论 / 纯过程审计 / 执行反馈 | SWE-bench 20→50（DGM）；full Verified 61.4%（HGM）；组织演化 53.9>40.8（MetaTeam）；等 token 下 74.0 vs Voting 64.7（MANTA）；MLE-Bench Lite 39.39→60.61（Frontis-MA1 post-training 净增） | AFlow 20 轮 ASR 54.4→83.1%；self-review gate 退化为 rubber-stamp；增益归因不闭合（MANTA 结构改变与 +28K token 绑定；Frontis-MA1 自改进与外部 teacher 蒸馏未分离） |
+| Model（参数） | WebRL / [[Papers/2412-PAE]] / [[Papers/2500-UiGenieSelfImproving]] / [[Papers/2607-SEED]] / [[Papers/2606-VisPlay]] / [[Papers/2607-SpyRL]] / [[Papers/2608-ZerothOrderSelfEvolve]] / [[Papers/2608-EvoHarnessRL]] / [[Papers/2608-OPSA]] / [[Papers/2609-FlowBalance]] / [[Papers/2609-NeoHorse1]] | ORM / VLM-judge / 自奖励 / 共识伪标签 / 构造式可验 reward / gold-answer 似然 / 反思蒸馏 / 自身低置信 token / 符号门控的 hindsight 能量 / 部署路由器预测的能力档位 | WebArena-Lite 4.8→42.4（WebRL）；ALFWorld 91.8 vs GRPO 75.0（SEED）；无标注 3B 30.6→47.3（VisPlay）；七数学 benchmark 均值 41.4→50.4（SpyRL）；GAIA 23.3→47.5（ZO 参数空间搜索）；ALFWorld seen 47.9→96.9（EvoHarness-RL）；AIME24 Avg@32 13.44→48.85 且训练不用答案只用问题（OPSA）；五数学 benchmark 均值 67.61 vs GRPO 65.49（FlowBalance） | safety 累积衰减（Misevolution）；risk-awareness 灾难性遗忘（SEAgent）；共识伪标签逐代劣化 72→61；去掉两处优化侧设计后跌破未训练基座（SpyRL 50.4→37.5 vs 基座 41.4）；增益与被演化组件的因果链未闭合（EvoHarness-RL 收敛后 harness 调用退火到约每 episode 一次，而其 SFT teacher 自身 ReAct 在同一 split 上已 96.4，无去 BPE 的同管线对照臂）；教师监督噪声随教师规模上升（OPSA 测到 30.6/34.7/50.6%）；核心设计未被消融（FlowBalance 的符号门控无 $\beta_G=0$ 臂） |
+| Memory/Context | [[Papers/2409-AgentWorkflowMemory]] / [[Papers/2600-UiMemSelfEvolving]] / [[Papers/2601-MemRL]] / [[Papers/2602-MemSkill]] / [[Papers/2608-RoMeRL]] / [[Papers/2608-PRACTICE]] / [[Papers/2605-SEGA]] | 历史评分 / 检索命中 / task reward / 冻结 executor 的成败分组 | WebArena 相对 +51.1%（AWM）；LoCoMo 53.82、调用量低一量级（MemSkill）；ALFWorld+LAB overall 0.830→0.862 且记忆池 −84.4%（RoMeRL）；EB-ALFRED 49.7 vs 最强经验增强基线 40.0，终库仅 29 张 card（PRACTICE） | deployment-time reward hacking >60% 且可突然崩塌（Misevolution）；operation-level blast radius 系统性放大；memory-reward trap——扩大探索使无因果贡献的记忆吃到更多正向更新（RoMeRL 注入实验 3.7→7.2） |
+| Tool/Skill | Voyager / [[Papers/2605-SkillOpt]] / [[Papers/2605-GRASP]] / [[Papers/2606-SkillNb]] / [[Papers/2606-LearningFromFailure]] / [[Papers/2607-SESA]] / [[Papers/2608-SkillZip]] / [[Papers/2608-SkillZipPro]] / [[Papers/2608-TRACE]] / [[Papers/2609-COBRASkills]] / [[Papers/2607-RethinkSkillEvolve]] | validation gate / A/B / held-out 探针 / state-contract / 前沿难度整形 / 不接触任务的结构压缩 / 无闸门的反复执行重建 / bandit 预算分配 | 6 bench 平均 +23.5（SkillOpt）；OSWorld 零训练 42.3→48.9（LearningFromFailure）；七集合 QA Qwen3-8B 56.3→59.5（SESA）；CAR-bench held-out Pass^3 50.0→70.0（TRACE）；三底座相对无技能 +13.1/+26.9/+22.5 且总成本降 55%–58%（COBRA） | 创建-复用 Unsafe Rate 65.5%；外部工具摄取 Refusal <8%（Misevolution）；技能库的部署期贡献可能远小于其训练期贡献（SESA 关库仍得 +1.8/+2.2，开库只再加 +0.5/+1.0）；技能文本随演化膨胀（SkillOpt 5 轮后达初始约 5.2×）；经验层投毒可被抽取成独立存储的 skill 并在删源后存活（[[Papers/2608-SkillJack]]，§10.4）；匹配对照下端到端只有 9/14 个 setting 在部署 test 上更好，字节相同技能重测标准差 3.92 点（RethinkSkillEvolve）；演化产物可能固化沙箱专属绕法（§10.7） |
+| Architecture / RSI | [[Papers/2505-DarwinGodelMachine]] / [[Papers/2510-HuxleyGodelMachine]] / [[Papers/2605-MetaTeam]] / [[Papers/2607-MANTA]] / [[Papers/2607-FrontisMA1]] / [[Papers/2608-JITAgent]] / [[Papers/2608-Zetta]] / [[Papers/2609-RSIAgent]] / [[Papers/2609-DreamRSI]] / [[Papers/2609-Ecdysis]] | benchmark 分数 / clade 聚合 / 团队讨论 / 纯过程审计 / 执行反馈 / 冻结树上的重放分 / 跨任务失败模式聚类 | SWE-bench 20→50（DGM）；full Verified 61.4%（HGM）；组织演化 53.9>40.8（MetaTeam）；等 token 下 74.0 vs Voting 64.7（MANTA）；MLE-Bench Lite 39.39→60.61（Frontis-MA1 post-training 净增）；RoboCasa 73.56→93.56（Zetta，冻结 VLA 之外的 harness 演化）；18 个 matched 配对全部提升且成本降 14.9%–54.1%（JIT-Agent）；轮级聚类改 harness 5 模型 × 2 子集平均 59.33 对逐条改的 46.67、10/10 格方向一致（Ecdysis） | AFlow 20 轮 ASR 54.4→83.1%；self-review gate 退化为 rubber-stamp；增益归因不闭合（MANTA 结构改变与 +28K token 绑定；Frontis-MA1 自改进与外部 teacher 蒸馏未分离）；harness 与自改进机制的份额未分离——受控对照下 harness 贡献是机制的三到四倍（RSI-Agent）；离线搜索自身的开销不计入报告 compute（Dream-RSI）；逐条失败改 harness 的同协议基线跌破人工起点 51.67→46.67（Ecdysis） |
 
 风险一列的共性——safety 衰减、reward hacking、rubber-stamp、Unsafe Rate 高——统一指向 §10：演化的失效不在"能不能改进"，而在"改进过程自身会不会偏航且无关可拦截"。
 
@@ -136,6 +142,8 @@ deploy-time 一端此前只有不动参数的记忆演化，[[Papers/2608-ROPSD]
 
 自生成数据谱系 STaR / ReST(EM) / Self-Rewarding / SPIN → Absolute-Zero / R-Zero（proposer 与 solver 同体互促）；自生成课程 [[Papers/2411-WebRL]]（从失败经历自动生成新任务 + ORM，Llama-3.1-8B WebArena-Lite 4.8%→42.4%）与 SEAgent（computer-use 侧从失败轨迹定向出题）。共同结构是"agent 既是数据消费者又是数据生产者"，收益来自课程与能力边界的自动对齐。
 
+难度标签此前只有两个来源：人工分档，或 solver 自己的通过率估计。[[Papers/2609-NeoHorse1]] 用了第三个——生产环境里本来就存在的部署路由器。它为每一轮对话预测所需的能力档位以决定派哪个模型，这个预测被直接回收成训练语料的难度标签，用来把语料排成由易到难的三段课程。吸引力在于标签是部署副产品、零额外标注成本；代价是它测的是"路由器认为多难"而不是"当前 solver 做不做得到"，与能力边界的对齐因此是间接的。Qwen3.5-4B 在十个 benchmark 上的无权均值 58.94→64.87、9B 65.60→69.04，同 harness、同工具接口、同预算下与自己的基座比较。但全文没有任何消融把课程排序、on-policy distillation 与能力导向的数据配比三者分开，所以这批数字支持的是"这套组合有效"，不是"课程排序有效"。它的第二个对照更需要按边界读：路由式 harness 70.57 相对 Toucan 基线的 64.32 高出 6.26 点，可基座本身是 69.31——Toucan 跌破了基座，路由式 harness 相对基座只有 +1.26，而这 1.26 里 HumanEval 独占 +9.14，其余四项合计 −0.57。
+
 ### 4.2 proposer-solver 闭环
 
 [[Papers/2412-PAE]]（VLM 提任务/评结果的能力不对称支撑弱模型引导强 agent，WebVoyager 开源 SOTA 33.0%）与 [[Papers/2500-UiGenieSelfImproving]]（agent 与 reward model 联合迭代自增强，verifier-first）是闭环三角的两个代表。能力不对称性（评估比生成易）是这类方法可行的前提。
@@ -144,7 +152,7 @@ deploy-time 一端此前只有不动参数的记忆演化，[[Papers/2608-ROPSD]
 
 这条路线的域边界由一篇外部工作补上：[[Papers/2607-SpyRL]] 的附录 D.1 把每个方法对**自己的**未训练 backbone 做换序聚合 A/B，未训练自比落在 51.7% / 51.8%，而 R-Zero 在 summarization 上是 51.9% / 51.5%（等于没训练）、在 creative writing 上对 Qwen3-4B 只有 48.8% / 46.5%（**训练后反而变差**）。proposer-solver 自博弈的既有正向证据几乎全部落在数学/代码这类有确定性 verifier 的域，把它直接搬到开放式生成上目前没有增益证据——这是单篇、单次运行的结果，但它做的是每个方法对自身基座的对照，比跨方法主表更难被 position bias 或基座差异解释。
 
-### 4.3 失败轨迹的信号提取
+### 4.3 失败轨迹与低置信 token 的信号提取
 
 [[Papers/2607-SEED]] 用同一 policy 快照兼任 actor 与 analyzer，把 on-policy 轨迹提炼的自然语言 hindsight skill 转成 token 级蒸馏信号并与 GRPO 联合优化，skill 只在训练时用、部署零开销（ALFWorld 91.8% vs GRPO 75.0%，60% 数据超 GRPO 全量；静态 skill library 消融 −7.4 直接证明"hindsight 必须随 policy 演化"）。[[Papers/2600-UiVoyagerSelfEvolving]] 用 group rollout 找 fork point，让成功轨迹给失败轨迹当局部教师（4B 模型 AndroidWorld 81.0%）。两者共同点：把失败从丢弃样本变为定向监督信号。
 
@@ -153,6 +161,10 @@ deploy-time 一端此前只有不动参数的记忆演化，[[Papers/2608-ROPSD]
 [[Papers/2608-ROPSD]] 在 GUI grounding 的 test-time 设置里遇到同一现象并给出另一种解法。它先复现了失败：纯标量 reward 的 test-time RL（GUI-RCPO）在困难的 MMBench-GUI 数据上负迁移 −0.3，作者归因于难数据上 rollout group 全部失败使组内相对 reward 失效。它的替换不是加 verifier 而是加分辨率：冻结的 Reflector 对每次预测输出二值判定与一段反思文本，policy 自己被这段反思条件化后充当 self-teacher，逐坐标 token 取条件化 teacher 与无条件 policy 的 log-ratio 作为 advantage，于是"哪一步错、错在哪"这类只能用自然语言表达的判断被译成生成序列上的稠密反馈。Contrastive Calibration 处理的是自回归监督特有的污染——前缀一旦错，teacher 在错前缀上的后续概率不再可信，故把 advantage 的分母换成被反向提示（告知"你的预测是对的"）的 student：初始错误 token 处平均 advantage 从 −0.39 加深到 −0.97，而漂移末端从 1.34 衰减到 0.0033。Qwen2.5-VL-3B 六个 grounding benchmark 平均 50.2→57.6，对 GUI-RCPO 最高 +7.7。两个消融是这篇里最硬的部分：去掉反思或去掉 Contrastive Calibration 都导致灾难性 policy collapse，即它与 §4.5 记录的 SpyRL 属同一形态——**优化侧部件缺一个就跌破起点**，而不是各贡献几个点。三条边界须一并记：Reflector 本身用 GroundCUA 的带标注数据训练（约 10,160 对，held-out 准确率 89.5% / 91.7%），所以"无 ground truth"只对适配阶段成立；任务是单步坐标预测而非多步轨迹；增益在更强 backbone 上收窄（Qwen3-VL-2B +3.7 / +4.6）。
 
 把两篇并起来读，可承重的形态是：**自演化在"当前能力解不动"的那一段上失效，其直接原因是结果型信号在该段退化为常数**，而两种绕法都把标注需求转移而非消除——一个转到答案层（gold answer），一个转到评判器的训练数据层（带标注训出的 Reflector）。"边界外自演化"因此目前只在有外部可核对物的域里成立。
+
+第三条路线干脆不要教师。[[Papers/2608-OPSA]] 先测出 on-policy distillation 的监督本身有多脏：教师给出的 token 级 advantage 噪声率 30.6% / 34.7% / 50.6% 且随教师规模单调上升，235B 教师对 97.8% 的正确答案 token 给出负 advantage，同时 29.2% 的 token advantage 恰为零、51.7% 幅值低于 $10^{-4}$ 并集中在高 log-probability 处。判别实验紧接着来：把全部教师 advantage 换成一个施加在学生自己最低 20% log-probability token 上的固定 −0.5，训练结果与标准 OPD 相当，而换成 +0.2 则策略崩溃。据此它把教师整个删掉，用熵自适应的负 advantage 只更新低置信 token，训练只用 DAPO-17k 的**问题**而不用答案——Qwen3-1.7B 的 AIME24 Avg@32 从 13.44 提到 48.85，高出 OPD 16.77 点，每步 46.3 秒对 OPD 61.2 秒、GRPO 186.2 秒。三条边界收窄了它的含义：mask 掉反思词的 fork 位置后增益基本消失并在约 300 步出现长度崩塌，说明它撬动的是模型已有的反思路径而非新增能力；OOD 增益很小（MBPP+ +1.20、GPQA-Diamond +4.48）；全部结果落在 1.7B 非 thinking 模式的数学推理上。
+
+第四条路线不换教师也不换信号来源，而是换掉优化目标的形式。[[Papers/2609-FlowBalance]] 把 policy 更新写成 GFlowNet 式的分布匹配，能量项为 $E=\eta_A A+\beta_G G_H\,\mathrm{sgn}(A)$，其中 $G_H$ 是对整条轨迹的 hindsight 评分、以停梯度特征进入，$\mathrm{sgn}(A)$ 让同一份 hindsight 在成功轨迹上加分、在失败轨迹上反号。Qwen3-8B 五个数学 benchmark 均值 67.61，对 GRPO 65.49 / FlowRL 65.85 / RLSD 64.12 / OPSD 41.16，到 0.5 AIME24 验证准确率快 1.43 倍，rollout 的 Simpson 多样性 0.2194 对 GRPO 0.1017，而 GRPO 在约 180 步后开始退化。但它恰好在本节关心的那一格上没有证据：按其能量式的定义，$A=0$ 时 guidance 项整个关闭，而一组 rollout 全部同分正是 $A=0$ 的来源，论文未讨论这一格（此为本文推断）。$\beta_G\in\{1,2,3\}$ 的扫描给出 67.61 / 66.48 / 65.95 单调递减，却没有 $\beta_G=0$ 这一档，所以符号门控这个核心设计从未被消融掉；作者自陈它不是一个完整的自演化系统。
 
 ### 4.4 反馈可验证性谱系
 
@@ -164,6 +176,8 @@ deploy-time 一端此前只有不动参数的记忆演化，[[Papers/2608-ROPSD]
 
 摘要侧还有一个论文未做的对照：训练压力是"不要显得像信息缺失"，这与"覆盖更多源文内容"高度同向，而 ROUGE-L 恰恰奖励召回；论文既未报告输出长度统计也未做长度控制，因此 ROUGE-L 增益里有多少是质量、多少是覆盖率无法从文中分离（此为本文推断，非论文断言）。全篇无种子数、方差、误差棒或显著性检验，仅 4B/8B 单节点规模。
 
+谱系的另一端由一次同底座的头对头比较收紧。[[Papers/2608-GSAR]] 训练了一个读"目标状态"的学习式 GUI 轨迹判分器，离线判定四个 judge 平均 91.5% 准确率 / 91.8% F1，把 StepCritic（77.6 / 81.8）、DistRL（75.0 / 74.5）、DigiRL（68.3 / 62.8）甩开十几个点。把它接进在线 RL 当 reward 之后，UI-TARS-7B-DPO 在 AndroidWorld 上 26.7% → 30.2%（+3.5），而同一 backbone 换成规则式 verifier 训出来是 32.8%（+6.1）。**判分器的离线准确率不是它作为训练信号的质量**——中间隔着噪声的分布形状，作者对 StepCritic 的归因就是假阳性使奖励过于乐观而非漏判，而假阳性恰恰是 RL 最难消化的那一类噪声。这是单篇、单次运行的对照，但它是目前唯一一次把学习式与规则式两种信号接在同一 backbone、同一算法、同一环境上直接比较，因此它限定的不是 §3.4 那条上界本身，而是上界该用什么量来度。同篇还留下两处未测：自演化合成循环把页面复杂度只推高了一点（边密度 0.0240→0.0295、熵 1.90→2.11、UI 元素 22.68→24.56），而分布坍缩与 reward hacking 全文无评估；增益在已经 GUI 专用化的 UI-TARS-7B-SFT 上收窄，与 §9.2 的能力 gate 同向。
+
 ### 4.5 Open Problems
 
 self-improvement reversal（§10.2）与 solver-verifier gap 的收敛条件、防 error accumulation 无解法（VisPlay 逐代信号劣化 72→61）、以及 safety alignment 的累积性衰减（Misevolution 200 步 longitudinal 持续下行，即使自生成数据不含有害内容）是三个开放缺口。
@@ -171,6 +185,8 @@ self-improvement reversal（§10.2）与 solver-verifier gap 的收敛条件、�
 第四个缺口是：**优化侧设计正在从"增益来源"变成"不做就崩"的稳定性前提**。[[Papers/2607-SpyRL]] 的两个消融都是净负——去掉按角色分离的 EMA baseline（RAE）后七 benchmark 均值由 50.4 掉到 37.5，**低于 41.4 的未训练基座**且 GSM8K / Math500 / Minerva / MMLU-Pro / GPQA-D 全部劣于基座；两阶段联合更新（而非交替）把五 benchmark 均值从 42.4 压到 35.3。论文强调其唯一需要按任务指定的组件是信息退化算子 $g(\cdot)$、"requires little task-specific engineering"，但真实的工程负担只是从 reward 设计转移到了优化器设计。同类现象在 §10.2 的三条负性结果线里是"演化到后期会退化"，这里则是"缺一个稳定化部件就直接低于起点"——两者的共同后果是复现门槛远高于方法描述给出的印象。此外该方法的跨任务迁移是单向的：summarization 与 creative writing 互相正迁移，而数学训练出的 checkpoint 在两类写作上全线跌破 50% 持平线（41.7%–45.6% / 38.5%–42.5%），收益严格受限于 performing stage 与目标任务的能力重合度。
 
 第五个缺口来自 §4.3 那两条绕开全失败真空的路线：**它们把标注需求从轨迹层转移到别处，而不是消除它**。[[Papers/2608-ZerothOrderSelfEvolve]] 的连续信号来自 gold answer 的 token-normalized NLL，[[Papers/2608-ROPSD]] 的 token 级优势来自一个在 10,160 条带标注 GroundCUA 数据上训出、测试时冻结的 Reflector。两者都不需要人给轨迹打分，但都需要域里存在一个便宜的可核对物——短答案，或一个提前训好且在目标域仍准（89.5% / 91.7%）的反思器。缺这两样的域（长程 GUI 任务无唯一正确答案、开放式写作无 gold token 序列）目前既无 verifier 也无这两条替代路径，"边界外自演化"因此不是一个已被解决的问题，而是被换了个代价形式。可检验的下一步是把 gold-answer 似然换成任何一个**噪声已知**的连续代理（判分模型的 logit、执行时长、部分匹配率），量出信号-噪声比降到多少时 ZO 搜索退回随机；库内无人做过这个扫描。
+
+第六个缺口由 §4.3 与 §4.4 的几次对照共同提出：**信号的三个属性——可验证性、分辨率、落点——各自有证据而从未被同时控制**。[[Papers/2608-GSAR]] 显示离线判分准确率与训练信号质量不同向，[[Papers/2608-OPSA]] 显示教师传递的判别内容可以近乎为零而收益仍在，[[Papers/2609-FlowBalance]] 的符号门控缺 $\beta_G=0$ 的对照。对应的实验很便宜：固定 backbone、任务与算法，按噪声率、噪声的假阳/假阴构成、施加位置三个维度分别注入受控扰动，量出每一维的收益弹性。做完之后"verifier 质量上界决定收益上界"才从一条定性判断变成一条带系数的关系。
 
 ## 5. Memory / Context Evolution
 
@@ -181,8 +197,8 @@ self-improvement reversal（§10.2）与 solver-verifier gap 的收敛条件、�
 | 位置 | 演化的是 | 代表 | blast radius |
 |:--|:--|:--|:--|
 | write-side（内容） | 存什么、如何组织记忆条目 | [[Papers/2409-AgentWorkflowMemory]]、ReasoningBank、[[Papers/2603-HybridSelfEvolvingStructured]]、[[Papers/2600-UiMemSelfEvolving]] | 单条经验 |
-| read-side / selection | 检索/取用哪条记忆 | [[Papers/2601-MemRL]]、[[Papers/2608-RoMeRL]] | 单次检索 |
-| operation-level（操作） | 写记忆的 procedure 本身 | [[Papers/2602-MemSkill]] | 所有后续记忆写入 |
+| read-side / selection | 检索/取用哪条记忆 | [[Papers/2601-MemRL]]、[[Papers/2608-RoMeRL]]、[[Papers/2605-SEGA]] | 单次检索 |
+| operation-level（操作） | 写记忆的 procedure 本身 | [[Papers/2602-MemSkill]]、[[Papers/2608-PRACTICE]] | 所有后续记忆写入 |
 
 三个位置对应记忆 pipeline 的不同环节，blast radius 逐级放大：operation-level 演化改的是"如何构建记忆"的规则，一次错误影响所有下游记忆写入，是 misevolution 放大面最大的记忆亚型。
 
@@ -202,13 +218,21 @@ self-improvement reversal（§10.2）与 solver-verifier gap 的收敛条件、�
 
 三条边界必须一起记。其一，**RL 的贡献完全没被隔离**：四个坐标里只有 NCC 的选择规则用到学到的 Q，其余三条是纯启发式；论文没做 $\omega_Q=0$ 的消融，也无 $\omega_Q$ 敏感性分析，因此"降维结构"与"在其上做 RL"的贡献无法区分。其二，**headline 效率数字含近乎恒等式的成分**：feedback density 4.96→29.93（6.0×）与记忆池 45K→7K（6.4×）几乎同比，而论文自己的 Theorem 3 就是"固定预算 T 摊到 d 个坐标 = T/d"——缩维必然提高人均反馈，真正需要证明的是缩维不损失信息，而这只能由任务 SR 承担，SR 只给出 +3.2pp。其三，**增益高度集中且无方差**：+3.2pp 里约 62% 来自 ALFWorld 的 P&P（0.908→0.968）与 Examine（0.855→0.957）两列，heat 一列反而略低（0.862 vs 0.865），全文无 seed 重复、无标准差、无显著性检验。此外坐标是 per-task 的，而 LAB/ALFWorld 的协议是对同一任务集跑 10 epochs——一旦任务不重复出现（真正的 open-ended 部署），每个任务只有 ≤4 个坑且大多为空，reduced-order 相对全池的优势基础就消失了，论文的 limitations 承认未评估 open-ended 但没有把这条结构性依赖讲出来。
 
+检索池的构成也被一次消融量化。[[Papers/2605-SEGA]] 在 AC-High 上比较三种检索策略：Top-k 75.8、成功与失败混合 76.2、只检索成功轨迹 70.0；GUIOdyssey 上是 83.9 / 82.1 / 72.5。把失败轨迹从检索池里去掉在两个评测面上都是最差的一档，与 §4.3 把失败当定向监督信号是同一方向的证据，只是发生在不改参数的检索侧。同篇另有两处需要一并读：去掉三层记忆后 AC-High 从 73.8 掉到 61.4，但该变体同时拿掉了记忆内容与为容纳它而开的 6144 token 预算，没有等长对照，因此这 12.4 点里有多少是记忆价值、有多少是 prompt 分布失配无从判断；全文无 seed 与方差，且这组消融的基准 73.8 与主表的 75.8 在原文并存。
+
 ### 5.4 operation-level（操作级演化，新亚型）
 
 [[Papers/2602-MemSkill]] 把"如何从轨迹提取/修订记忆"这套操作本身从固定原语（Insert/Update/Delete/Skip）抬升为可学习、可演化的 memory skills：PPO 训练的轻量 controller（三个独立 MLP + Gumbel-Top-K）按 span 选 Top-K skill，固定 LLM executor 按 skill 规范产出结构化更新，LLM designer 每 100 步分析 hard case 增改 skill bank（每轮 ≤3 edits），并用 best-snapshot rollback + stabilized reward + early stopping 做防退化 gate。LoCoMo L-J 53.82、LongMemEval 纯迁移 60.89、ALFWorld-Unseen SR 83.58%，且 LLM 调用量比 baseline 低一个量级（215 vs 1288/1548）。ablation 中 designer 贡献大于 controller，坐实"演化操作本身"确有增益。局限：gate 只在 skill-bank 层且只看 aggregate task reward，单条记忆无 per-item 验证，designer 直接改写记忆构建 procedure 使 blast radius 系统性放大。
 
+[[Papers/2608-PRACTICE]] 是这一亚型的第二个实例，也是第一个把"写记忆的 procedure"交给一个被**训练**出来的模型而非被提示的模型：一个 8B learner 输出 ADD / REVISE / MERGE / REMOVE 四种结构化编辑与分层合并，executor 全程冻结，监督分三段——先用 8 个异构 executor 在同一批任务上的分组数据做 SFT，再用冻结的 32B 教师做 on-policy distillation。EmbodiedBench 的 EB-ALFRED 上 49.7%，高出最强经验增强基线 9.7 个点，演化出的库最终只有 29 张 card。它的阶段消融是本节最有信息量的一处：24.3 → 40.7 → 42.3 → 45.3 → 49.7，其中从 24.3 到 40.7 的 16.4 个点来自一个**完全不学习**的初始库（用 BPE 式频繁相邻 action 子序列合并构造），三个学习阶段合计 9.0 点。学到的更新策略确实在贡献，但它贡献的是这条链上较小的一半——这与 §4.3 的 OPSA 在另一条路线上得到的形态相同：一个精心训练出来的监督源，其收益可能小于一个不学习的结构先验。三条边界：failure-aware 相对 success-only 高 2.6 个点（45.3 对 42.7），与 §5.3、§4.3 同向；跨 executor 迁移 +2.4 / +30.3 / +15.3 / +25.4，但在 EB-Habitat 的 Base 与 Long 两档落后于最强基线；Appendix C.2 把同一结果写成 40.0% 而 Table 1/3/7 是 49.7%，论文未解释这处不一致。
+
 ### 5.5 prompt 优化谱系
 
 APE → OPRO → ProTeGi/TextGrad（文本梯度）→ PromptBreeder/EvoPrompt（种群演化）→ SPO/ACE（自监督闭环）、DSPy/MIPRO（程序化联合调优）。严格按 §2.1 判据多数是 offline optimisation 而非部署后持续演化。
+
+这条线在 2026 年的活动集中在**多 agent 流水线里该改谁**：N 个 agent 串在一条链上共享一个终点 reward，文本梯度沿链回传时遇到的正是 §7.3 的 credit assignment 问题。[[Papers/2609-AgentGrad]] 的做法是不回传而是干预——从最后一个 agent 逆序，逐个把它的输出替换成一个由 ground truth 或输出约束构造的 hint，第一个能把整条流水线的 reward 拉到上界的位置即被判为责任所在，干预后的输出直接充当该 agent 的 pseudo-label，因此整套方法不需要显式 loss。GPT-5-mini 上五个 benchmark 平均增益 +11.76，对 GEPA +9.24 / TextGrad +6.33 / MIPROv2 +5.66；Qwen3-8B 上 +9.67 对 +7.62 / +6.27 / +6.06；平均 wall-clock 136 分钟，对次快的 GEPA（337 分钟）快 2.5 倍。
+
+四处必须与这些数字一并记。其一，摘要的"两个 backbone 五个 benchmark 全面 SOTA"与它自己的表不一致——Qwen3-8B 的 IFBench 一格 TextGrad 42.52 高于 AgentGrad 41.42，且该格的加粗给了 TextGrad，实际是 10 格中 9 格最优。其二，逆序干预的前提是"失败集中在靠后的 agent"，这条前提全文没有任何测量，它决定的是搜索顺序而非搜索空间，因此影响的是成本而非正确性。其三，同一张表里 GPT-5-mini 下 TextGrad 的 IFBench 与 MATH 两格数字连标准误都与不做 prompt 优化的基线逐位相同，即那两次运行一次更新也没被接受，论文对此未作说明——**汇总表把一个在部分格子上真实产出为零的优化器呈现为一个正的平均增益**，这与 §10.2 的负性结果线是同一形态。其四，加速数字与方法的主要开销脱钩：逆序干预对每个失败样本最多要跑 $N$ 次系统执行，而这些调用是否计入预算 $B$ 全文未说明，因此 136 分钟这个数是否与基线同尺无从判断；标称的 2.5× 是两列均值之比（336.8/136.4），五个逐 benchmark 比值取平均只有 2.24，且其中 PUPA 与 MATH 的次快方法并非 GEPA。论文 13 页、无附录、无 Limitations，预算 $B$ 的数值与各 benchmark 的 agent 数均未给出。
 
 ### 5.6 Open Problems
 
@@ -219,6 +243,8 @@ APE → OPRO → ProTeGi/TextGrad（文本梯度）→ PromptBreeder/EvoPrompt�
 方法之外，那套 null 化注入协议本身值得单独记住：它把"记忆污染"从定性讨论变成两个便宜、可移植的数字（噪声条目累计正向更新数 + 终轮噪声占比），可以拿去测其他 memory 方法，也可与 [[Papers/2512-MemoryGraft]] 的投毒攻击面并置——前者是无意污染、后者是有意注入，指标是同一套。
 
 一个现成的适用对象是 [[Papers/2608-EvoHarnessRL]] 的经验库：条目由 agent 在训练中自己写下的 note 构成，增删改由一个外部 Claude Opus consolidation model 在每个 epoch 边界执行、辅以 LFU 淘汰，全程没有 held-out 准入判据，而 policy 会在后续 episode 里通过 `recall` 反复读回这些条目。这正是 null 化探针要测的结构——错误条目能驻留多久、拿到多少次正向强化——论文自己的附录 case study 里也确实出现了一条被写入库的错误先验，但它以个案形式呈现，没有污染率。该库因此是"可测而未测"的一格。
+
+还有一个自由度从未被写进报告口径：**记忆的复用单位**。[[Papers/2609-RSIAgent]] 在 OSWorld 2.0 上把 partial score 从 71.97 提到 78.98，机制是先在目标任务上探索、把有效操作序列写进持久记忆再正式作答，但它记录的三条轨迹全部从空记忆起步，记忆按目标任务建立而非跨任务共享。探索成本因此按任务计价、不被后续任务摊销，收益也就不能读成"经验在环境上积累"。§5.1 的三个位置都默认记忆跨任务复用，一旦复用单位塌到单任务，read-side 的检索问题消失、write-side 的污染窗口只有一个任务长、operation-level 的 blast radius 也随之缩小——三种记忆亚型的风险量级都依赖这个未被声明的参数。该文的基线同时关掉探索与持久记忆且无预算配平（其附录自陈不是 matched-budget 估计），所以 7.01 点的差额里记忆与额外算力没有分开。
 
 ## 6. Tool / Skill Evolution
 
@@ -236,6 +262,20 @@ APE → OPRO → ProTeGi/TextGrad（文本梯度）→ PromptBreeder/EvoPrompt�
 
 三条边界要一并记。其一，**保留保证是相对解析器的**：Cor IV.2 保证的是"在该 typed 语法下可被覆盖的规则不被删"，一条从未被写成显式规则的隐性约定不在保护范围内。其二，四个操作与硬覆盖约束**没有分项消融**，31.2% 里各部分的贡献无法拆分，也无公开代码。其三，也是最需要按 §9.4 的标准读的一条：**"压缩无损"是一个等价性主张，而它的证据是 0.577 对 0.570 的单点比较，全文无 seed、无方差、无等价性检验**。库内已有的方差量级足以让这个差值失去判别力——[[Papers/2608-AgentStream]] 在同类 agentic benchmark 上测到的单元格 seed 间标准差常在 3–6 个百分点，而这里的差值是 0.7 个百分点。可以确证的是压缩率与速度（31.2% 对 9.2%、286 s 对数十次 rollout，量级差距远超噪声）；不能确证的是"压掉三成而分数不降"——这套协议既无法区分无损与小损，也无法排除 0.007 的正向差本身即噪声。
 
+续作 [[Papers/2608-SkillZipPro]] 把压缩对象从单个文档换成生产环境实际部署的渐进加载目录（root + references + subskills + scripts + schemas），并给出这条线最该被采纳的一条记账纪律：**单一压缩率是误导性指标**。目录形态下至少有四层成本——选择前可见的 catalog、激活后必载的 root、执行路径上被打开的文件、落盘总量——只压 root 能报出漂亮的比率却不动大部分部署文本，把罕见分支上提进 root 甚至让每次调用都更贵。四层分开记账后，平铺拼接的做法在真实技能库上只保留 0.2% 的指令行，只压 root 的做法把 routing 保留率压到 0.000（分支文件还在盘上但再也选不中），而它自己保 1.000。删除侧的纪律是 witness 分级：每次删除必须恰好携带一个证据——字面包含（可逆）、确定性覆盖检查、或温度为 0 的冻结 checker 判定蕴含——无 witness 的删除无论预计节省多大一律拒绝。这套分级在一个中文内容审核 skill 上把可压比例从 13.8% 推到 38.1%，准确率 89.00 对未压缩的 92.00/91.00；同一份 skill 换成无保护压缩压掉 71.4%/75.8% 时，准确率从 88% 掉到 70%/62%，误报从 10 条涨到 29–35 条，损失集中在"何时不该 flag"的豁免规则上——**被压掉的从来不是平均意义上的冗余，而是罕见分支上的守卫条款**，这与前作 Cor IV.2 想保护的正是同一类内容。
+
+它在证据形态上补上了前作缺的那一块：质量不降这个等价性主张由 102 个 held-out 任务上的配对 bootstrap（10,000 次重采样）承担，−0.05 的等价边界在实验前固定，结果 +0.010、95% CI [−0.029, +0.059]（§9.4）。开启时机的单调性也在真实库上复现：第一轮起压缩省下全流 carried token 的 40.8%，第十三轮才开只剩 18.5%；每轮新增内容与既有文本的重复率稳定在 55%±3%，可移除份额随库龄从 29%（第 2 轮）爬到 53%（第 15 轮）——压缩算子对演化中的技能库是报酬递增而非递减。两处不能顺延：SkillReducer 这条基线为匹配零 rollout 预算被禁用了它自己的 evaluation-based candidate selection，因此前作 31.2% 对 9.2% 的对比线在这里不可直接续读；跨 executor 迁移三个底座两升一降（kimi-k2.6 0.611→0.574，无关加载占比 0.077→0.287），结构可移植而加载效率依赖 executor 如何解释 routing。
+
+这条链上第五个环节是**评估预算怎么花**。skill 演化真正贵的不是写出候选而是执行候选——候选效用只有跑过才知道，而大部分候选最终被证明没用。[[Papers/2609-COBRASkills]] 把这一步形式化成候选集逐轮变化的序贯决策：每个候选用固定 embedding 表示，一个两层 MLP 预测它的 reward、LinearUCB 项给出探索奖励，每轮只把评估预算给优先级最高的那一个；teaching model 不再每轮重读轨迹，只在周期性的种群更新时被调用，用 regeneration / rollout mutation / crossover 三个算子替换掉最低优先级的候选。6 个 benchmark × 3 个 target model 上平均分全部最高（相对无技能基线 +13.1 / +26.9 / +22.5），总优化成本相对 [[Papers/2605-SkillOpt]] 降 55%–58%，每提升一分的成本降 60%–69%，且按 3 次独立运行报 mean ± SE。成本优势的来源被它自己拆开了：teaching token 少用 67%–80%，而 target token 在两个底座上反而更高——省下的是教师的钱，不是执行的钱。消融里三项各值 2 点上下（去 bandit −2.2、去演化算子 −2.4、换成 Best-of-30 −2.5），量级接近说明预算分配与候选生成是可互换的两种花法，而非一主一辅。两处边界：18 个 benchmark×model 格子里有 6 格存在比它更强的方法（Qwen 的 SearchQA 上 SkillOpt 86.3 对 84.3）；把教师换成 target 自己后平均分只从 73.5 掉到 72.5、成本减半，但 ALFWorld 单项从 72.3 掉到 63.3——自教学在需要长程流程知识的任务上不成立。
+
+目标函数也不止"更强"一种。[[Papers/2608-TRACE]] 把 skill 演化的目标换成一致性：同一请求重复 $k$ 次是否每次都对（Pass^k），而非至少对过一次（Pass@k）。机制是轨迹对比——Curator 按轨迹调用过的 skill 分组，读同组的成功与失败轨迹直接改写 skill body，并在渲染轨迹时逐条标注哪些信息部署时可见、哪些只有 Curator 在演化时可见，以防把 skill 写成依赖部署期拿不到的知识；部署侧每一轮重新编排一次 skill 集合，上一轮注入的内容不保留。CAR-bench（58 个互联工具、19 条 domain policy）上 GPT-5.5 的 Pass^3 从 59.9 升到 94.5，Pass@3 与 Pass^3 的差从 27.8 点收到 4.0 点，收益集中在原本最弱的 Disambiguation 一类（39.3→94.6）。
+
+两组数字必须分开读。主表的评测集与演化所用任务重合——skill bank 先在 training split 上起步、再用 test split 扩覆盖——因此 94.5 是训练集内的数字；官方 hidden set（30 个未见任务 × 3 次）上 Pass^3 是 50.0→70.0、Pass@3 是 66.7→83.3，一致性差只收窄 3.4 点，而训练集内收窄 23.8 点。开销侧记得诚实：中位延迟 +22.0%、token +72.4%、每次调用成本 +58.8%。它同时是零关口一端的第二个样本（§6.2）：产物只是 markdown 文件、不改权重，接受与否由 Curator 自行决定，全文无任何组件消融、无演化轮数敏感性，也不报 false-refusal 率——一个把"承认做不到"当作正确行为的系统，其过度拒答率恰恰是最该报的那个数。
+
+整条链的产出率第一次被系统审计，结果比 before-after 曲线难看得多。[[Papers/2607-RethinkSkillEvolve]] 固定 executor、optimizer、revision 流程、validation 规则与 10 轮预算，只变 optimizer 可见的轨迹视图，在 3 个模型 × 5 个 benchmark 上跑 42 次演化，并用 SHA-256 给每个 skill artifact 定身份：一次"新最优"必须同时满足 validation 严格提升与字节不同，byte-identical 重跑带来的分数波动一律判为执行噪声。这条纪律之下，388 个 candidate 只有 55 个建立了 byte-distinct 的 validation 最优；跨 8 个模型的 SearchQA 分析里 210 个 candidate 中 191 个确实改动了 incoming skill，只有 29 个改出了新最优。端到端看，14 个 setting 中 11 个最终选中演化后的 skill，其中 9 个在 released test 上更好，而要求同时改善 robustness 与 transfer 则降到 7/14。**技能演化是被 validation 过滤出来的稀疏搜索，不是逐轮稳步改进**——"改过"与"改好"之间差一个数量级，而前者才是演化循环的默认产出。
+
+这项审计同时给出了本节所有单点比较的判别下限。同一份字节完全相同的 skill 在 49 题 validation split 上重复评测 8 次，hard score 从 71.43% 到 83.67%，标准差 3.92 点；在同口径的 100 题配对面板上重复部署三次，SearchQA 的 +2.3 变成 −2.0 / −3.0 / 0.0，LiveMath 的 −6.6 变成 +6.0 / +7.0 / +5.0，两个方向的符号都翻了，而 parent 对 parent 的纯噪声基线是 −2.0 / −2.0 / +2.0。**在这套评测里 ±3 点以内的差异不可判**，本节此前引用的若干单点比较（含 0.577 对 0.570 那处）都落在带宽以内。这个下限不能跨 split 搬运——3.92 来自 49 题，±3 判据来自 100 题面板，更大的 test split 噪声更小——但它确立的方法学要求与 split 大小无关：**报差值必须同时报该评测的重复部署带宽**。
+
 ### 6.2 验收闸门家族（gate 扛的是地板还是天花板）
 
 2026 年 gate 从单点设计扩展为覆盖六种粒度的家族。它是可靠性来源这一点没有争议；**它是否同时是性能收益的来源，已出现方向相反的自身消融**，分歧线由"gate 之外还有没有一个冗余的部署选择器"划开：
@@ -248,8 +288,12 @@ APE → OPRO → ProTeGi/TextGrad（文本梯度）→ PromptBreeder/EvoPrompt�
 | [[Papers/2607-HarnessBank]] | harness patch 筛选级 | validity（基建执行状态）× activation（patch 自报 beacon）× significance（与父代在同批任务上配对，要求 $\hat\Delta>0$ 且 $z\ge1.96$），判决由不含 LLM 的 deterministic evaluator 计算 | 去掉 2σ 判据后 test Pass@1 **±0.0**，但假精英 0→2、收敛轮数 10→>20（cap） |
 | [[Papers/2607-SEACertificates]] | 演化步统计级 | anytime-valid 统计证书对每次演化给出随时有效的置信判定 | 措辞级修正 3 处后 13/13 source-verified |
 | [[Papers/2603-SEVerA]] | 形式验证合成级 | 对自演化 agent 做 verified synthesis，演化产物须过形式化验证 | 11/11 verified，含 fallback 触发率未报告一处确认缺失 |
+| [[Papers/2608-Zetta]] | 技能入库级（具身） | cluster 内 100% 历史回归全通过 + held-out ΔSR 双闸门，outcome 侧直接查环境官方谓词 | RoboCasa 73.56→93.56、LIBERO-Pro 32.00→71.13；ΔSR 无数值接受阈值，全文无组件消融 |
+| [[Papers/2609-Ecdysis]] | harness 轮级 | 候选仅在训练集**总分**严格提升时接受，否则回滚上一版 | 5 模型 × 2 子集平均 59.33 对逐条改的 46.67；总分准则不约束逐任务回归 |
 
-与之对照，[[Papers/2511-LiveSWEAgent]] 走**零 gate** 的 on-the-fly 自演化（SWE-bench 上运行时无关口自改），是 gate 谱的另一端点。仍开放：现有实证 gate 全部只覆盖任务性能回归维度、依赖任务可复现结构（GRASP 在开放动作空间失效、SKILL.nb 安全性 replay-relative），task-agnostic 的安全侧 gate 依旧空白。
+这两行分处闸门强度谱的两端，而它们的强弱差异恰好落在同一个维度上：**判据约束的是逐任务回归还是聚合分数**。Zetta 要求候选把它所源自的 failure cluster 里的历史失败全部修好（100%，不是"多数"）再加一个 held-out 增量，逐任务回归因此被直接禁止；Ecdysis 只要求训练集总分严格提升，一个把三个任务修好、两个任务弄坏的候选照样入库；相对 [[Papers/2607-HarnessBank]] 的 validity / activation / significance 三道确定性判据，它是更弱的一种准入准则，而两者的干预点（证据粒度与接受判据）正交、原则上可叠。§10.2 记录的负性结果多数发生在聚合判据一侧不是巧合——聚合分数是唯一允许"净改善"掩盖单任务破坏的判据形态。
+
+与之对照，[[Papers/2511-LiveSWEAgent]] 与 [[Papers/2608-TRACE]] 走**零 gate** 路线（前者在 SWE-bench 上运行时无关口自改，后者由 Curator 自行决定改写并直接发布新 skill bank），是 gate 谱的另一端点。仍开放：现有实证 gate 全部只覆盖任务性能回归维度、依赖任务可复现结构（GRASP 在开放动作空间失效、SKILL.nb 安全性 replay-relative），task-agnostic 的安全侧 gate 依旧空白。
 
 **gate 与部署选择器是两个组件，而多数报告 gate 收益的工作把后者的功劳记在前者账上。** [[Papers/2607-HarnessBank]] 在冻结 Qwen3.6-27B 上做 harness 自演化：可变表面（prompt / knowledge / runtime / config）之外保留不可变 kernel，候选按 (where, why) 双坐标存入 MAP-Elites 式档案（where 是被改的组件，why 是被针对的失败机制），先在训练子集上过三道 gate 才拿到全训练集复评资格。七个域的 test Pass@1 提升 5.1%–15.4%，六个过它自设的配对 2σ 判据。但它自己的消融是一处自证否定：在 TB2 上去掉 2σ 判据，test Pass@1 变化是 ±0.0，论文的解释是部署根本不由 gate 决定——训练集上的 argmax 无论有没有 gate 都会选中同一个赢家。gate 在因果链上的位置因此是预算分配器与档案守门员，而不是部署决策者，其可测收益全部兑现在地板与效率轴：假精英 0 而非 2（其中一个是 activation beacon 从未触发的惰性变体），收敛在 10 轮而非跑到轮数上限。终止侧的机制也被量化——在收敛后候选中性的那些轮次里，改用 single-run 或 K=3 均值判据会有 62%–76% 的轮次出现幻觉进展，循环因此停不下来。
 
@@ -261,9 +305,13 @@ APE → OPRO → ProTeGi/TextGrad（文本梯度）→ PromptBreeder/EvoPrompt�
 
 这三层拆开后，[[Papers/2608-EvoHarnessRL]] 提供了第二个样本，它的形态恰好与 HarnessBank 互补：判决**者**外生而判决**据**缺失。它的技能库在每个 epoch 边界由一个外部 Claude Opus consolidation model 执行增/改/删，辅以 LFU 淘汰——判决者与被演化的 Qwen3-8B policy 既非同一模型也非同一家族，在判决算法层上是外生的。但判据是这个 LLM 阅读 agent 自己写下的 note 文本再加使用频次，既没有 held-out 任务上的回归检查，也没有任何"改动前后配对比较"的统计量；论文附录的 case study 里就有一条错误先验被写进库并留存。换句话说 HarnessBank 的判决是"外生模型算一个确定性统计量"，EvoHarnessRL 的判决是"外生模型读自报证据下一个主观判断"——判决者的独立性并不自动传递给判据。两个样本合看，gate 独立性的三层里目前**没有任何一篇同时做到三层外生**，而"用了异族模型当裁判"这一句在论文里常被当作独立性的充分说明。
 
+[[Papers/2609-GeneralizedAgentIteration]] 给这三层配了一条该被采纳的术语切分：判据的**位置**与判据的**忠实度**是两件独立的事。在它的坐标里，外部 judge 无论训得多不忠实都算 anchored，因为那个 dial 问的是标准放在系统内还是系统外；而一个很忠实的 judge 一旦成为被演化对象的组件就变成 goal drift。这把"外生"二字的含义钉在位置上——HarnessBank 的判决算法外生是位置性质，它对 activation beacon 是否名副其实一无所知是忠实度问题，两者不互相兑换。同篇的最小例子把后果讲得比任何实证都直接：一个按测试通过率给自己的改动打分的 coding agent，在测试被 held out、测试放进它自己的 repo、测试被换成它自己对"何为改进"的判断这三种放置下都满足同一组自洽条件，而只有第一种在服务原目标——**自洽的自我报告不携带任何关于是否真的变好的信息**。该文无实验、无定理，作者自陈从 RSI 到 GPI 的归约是散文而非带显式假设的命题，因此它提供的是坐标而不是证据。
+
 需要与 gate 分开的还有 §6.1 的压缩算子：[[Papers/2608-SkillZip]] 完全不进入这张表，因为它不做接受/拒绝判决，只在既有条目上做保守改写。这是 gate 之外的第二类库维护机制——gate 管"什么能进来"，压缩管"进来之后占多少地方"，两者的预算特征相反（gate 必须花 rollout，压缩恰恰以零 rollout 为设计目标）。
 
 **gate 谓词自身的 precision** 在整个 gate 家族里只有一处数字，来自 [[Papers/2607-MANTA]]。需要先分清它测的是哪种谓词：MANTA 的 Trace Auditor 是**触发闸门**（判断当前结构是否已失效、要不要修复），不是验收闸门（判断演化产物能否入库），因此这个数字不能直接搬给 GRASP/SKILL.nb 那一列。在 450 run 上，以"答案错误"为正类，初始 audit 的总体 precision 0.38 / recall 0.64 / F1 0.47，分域从 WorkBench 的 0.81/0.75 到 BrowseComp 的 0.25/1.00（FPR 0.90）跨度极大；论文同时报告无 flag 的 run 正确率 83.2% 而 flagged 62.5%，即过程信号与结果正确性显著相关但远不等价。两条边界必须一并读：作者明确指出"false positive"只意味着被 flag 而答案正确，并非过程判断的真值——process flag 自身的人工标注精度被列为未执行的扩展；且该 precision 是与谓词同底座（Gemma 4 31B）的自评，不是外生校准。真正 task-agnostic、抗 rubber-stamp 的 gate 谓词校准仍未出现。
+
+第二个数字仍然缺席，缺席的形态值得记一笔。[[Papers/2609-RSIAgent]] 的探索循环全靠一个 verifier agent 判定候选操作序列是否达成子目标，通过的序列写进持久记忆供后续任务复用；该文从未量化 verifier 准确率，却在失败分析里记下它在字段值无依据、产物与官方 rubric 不符的情况下仍返回 PASS。判据自身的错误率没有被测，而它的错误被结构性地保存下来——这条通路在 §10.6 展开。
 
 ### 6.3 内化 vs 外挂分岔
 
@@ -277,13 +325,19 @@ APE → OPRO → ProTeGi/TextGrad（文本梯度）→ PromptBreeder/EvoPrompt�
 
 SESA 自身的消融顺带给出一个次级判断：去掉记忆 priming 56.2→54.7、去掉 frontier shaping 54.0、去掉失败蒸馏 53.5——**失效最严重的是失败蒸馏而非技能库**，与 §4.3 "把失败从丢弃样本变为定向监督信号"是同向证据。需要一并记的负面模式：Bamboogle 在七个 backbone 分块中有六块相对 SSP 回退，论文未讨论；其"challenger 与 solver 双向协同演化"的机制主张没有隔离实验支撑，论文自述该动力学是相关性观察，本文不采用。
 
+这条分岔一直缺第三个对照臂：**什么都不存，把同样的预算花在推理时**。[[Papers/2607-RethinkSkillEvolve]] 把它补上了——两个控制组都从冻结的 parent skill 出发，共享 executor、工具接口、test pool、verifier 与调用预算，Parallel Sampling 在 $K$ 次尝试上报 oracle any-success，Sequential Refinement 以任务和上一次回答为条件重答。两个 benchmark 给出完全相反的答案：SearchQA 上 evolved skill 77.93、Parallel 77.50，只差 0.43 点（parent 75.64）；SpreadsheetBench 上 evolved 85.77、Parallel 54.80，差 30.96 点（parent 50.53）。算力还是倾斜给采样一侧的——evolved 是单次调用，Parallel 在 SearchQA 用到 $K=6$、共 6,324 次计分尝试，而 oracle any-success 按论文自述是假设完美事后挑选的上界、不可部署。判据因此相当清楚：**收益若来自答案形式上的约定，采样即可替代；收益若来自一条完整的多步执行流程，采样替代不了**。Sequential Refinement 在两处都贴着或低于 parent，说明"以上一次回答为条件"本身不构成纠错反馈。
+
+成本侧的账要按摊销读。被选中的那次 SearchQA 演化消耗 2,750 次目标模型调用，摊到 1,400 个测试任务上是每次部署多付约 2 次调用，而采样的开销按任务线性累加、不随部署规模摊薄——两条路线在大规模部署下的成本曲线形状不同，这一点比任何单点分数更决定选型。该判据对 GUI/computer-use 的含义只能作为假设记下：那类任务动作不可回滚、失败代价非对称、oracle any-success 在真实部署中根本不可用，30.96 点更可能是下界而非上界，但这套协议尚未在 GUI 环境里被复制过。
+
 ### 6.4 Open Problems
 
-[[Papers/2509-Misevolution]] 实测 8 个顶级 LLM 工具创建-复用平均 Unsafe Rate 65.5%，摄取含隐藏恶意代码的外部工具时 Refusal Rate 全线 <8%。技能库的 homogenization/冗余度量、gate 谓词自身可信性、以及安全维度 gate 均无系统方案。冗余这一格现在有了半个答案：**长度维度已经可测也可治**——膨胀因子（演化 N 轮后的 token 数比初始）是个便宜的标量，[[Papers/2608-SkillZip]] 测出五轮约 5.2×、十六轮 2.5–3.7×，并给出零 rollout 的压缩算子（§6.1）；但语义冗余（两条技能是否在做同一件事、库整体的覆盖是否随演化收窄）仍无任何度量，而 homogenization 关心的正是后者，压缩率高不等于同质化低。第二条新缺口在攻击面：**技能准入的判据读的是攻击者可控字段**——[[Papers/2608-SkillJack]] 的消融显示同一份投毒 skill 在 LLM judge 只看到代码时判恶率 36.7%，补上攻击者撰写的良性 name 与 documentation 后**反而降到 10.0%**——给 judge 看得更多，它判得更松，逃逸的载体是表层元数据而非代码，而 §6.2 里绝大多数 gate 与检索器恰恰以这些元数据为输入。
+[[Papers/2509-Misevolution]] 实测 8 个顶级 LLM 工具创建-复用平均 Unsafe Rate 65.5%，摄取含隐藏恶意代码的外部工具时 Refusal Rate 全线 <8%。技能库的 homogenization/冗余度量、gate 谓词自身可信性、以及安全维度 gate 均无系统方案。冗余这一格现在有了半个答案：**长度维度已经可测也可治**——膨胀因子（演化 N 轮后的 token 数比初始）是个便宜的标量，[[Papers/2608-SkillZip]] 测出五轮约 5.2×、十六轮 2.5–3.7×，并给出零 rollout 的压缩算子（§6.1）；但语义冗余（两条技能是否在做同一件事、库整体的覆盖是否随演化收窄）仍无任何度量，而 homogenization 关心的正是后者，压缩率高不等于同质化低。[[Papers/2608-SkillZipPro]] 把可测的一侧又推进一格：真实演化库里 79%–84% 的内容是重复的，每轮新增内容与既有文本的重复率稳定在 55%±3%，可移除份额随库龄从 29% 爬到 53%。它测的仍是文本层重复而非功能层同质——两条措辞完全不同、做的却是同一件事的技能，在这套记账里都算新内容。第二条新缺口在攻击面：**技能准入的判据读的是攻击者可控字段**——[[Papers/2608-SkillJack]] 的消融显示同一份投毒 skill 在 LLM judge 只看到代码时判恶率 36.7%，补上攻击者撰写的良性 name 与 documentation 后**反而降到 10.0%**——给 judge 看得更多，它判得更松，逃逸的载体是表层元数据而非代码，而 §6.2 里绝大多数 gate 与检索器恰恰以这些元数据为输入。
 
 另一条是：**技能库的部署期贡献缺省未被测量**——关库对照（§6.3）目前只有一篇做过，而它给出的分解是训练期占大头；在这个对照成为标配之前，"技能库带来 X 点提升"这类表述在库内一律应视为未拆分的联合效应。
 
 与之同构的第二条方法学要求是**把 gate 与部署选择器分开报告**：一个演化循环里"谁配拿到全量评测预算、谁能进档案"与"最终交付什么"往往由两个不同机制决定，只有把后者也消融掉，gate 的天花板贡献才有意义（§6.2）。这个对照与关库对照一样便宜——去掉判决规则再跑一遍，或固定判决规则换掉最终选择器——而它一旦被做，目前唯一的结果是 ±0.0。第三条仍空缺：把验证行为与验证结论分离的算力配平对照（花掉同样的筛选预算但丢弃判决），gate 家族里只有 GRASP 声称做过，而那条记录缺核验。
+
+第四条是这条链的**报告口径**。[[Papers/2607-RethinkSkillEvolve]] 把两个此前没人报的量变成了可算的：artifact 级产出率（388 个 candidate 对 55 个 byte-distinct validation best，靠给每份 skill 算 SHA-256 把"分数动了"与"skill 真的动了"分开），以及同一份字节相同的 skill 在重复部署下的分数带宽（49 题 split 上标准差 3.92 点，100 题配对面板上 ±3 点内不可判）。两个量都便宜——前者只需算哈希，后者只需把最终 skill 多跑两遍——而缺了它们，"演化让分数涨了 X 点"就无法与"重跑同一份 skill 也能涨 X 点"区分开。把这两项列进技能演化工作的默认报告项，是本节成本最低的一条方法学要求。
 
 ## 7. Architecture / Workflow Evolution and Recursive Self-Improvement
 
@@ -299,6 +353,10 @@ ADAS → AFlow（MCTS 搜 code-represented workflow）→ ScoreFlow / MaAS / Evo
 
 WorkBench 是该工作未解释的反例，也是拓扑演化表达能力的直接证据。该任务族上多 agent 化整体有害（static MAS 15.6–23.3，single agent 41.1），singleton 就在 MANTA 的根交互模式集合内，且此处 audit 质量为全场最高（precision 0.81 / F1 0.78），但 MANTA 只回到 43.3，被 ADAS 的 66.7 甩开 23.4 点。现有 mutation 算子里没有"收缩规模"这一族——唯一的收缩是检索专用的手写规则——过程信号也无从表达"整个多 agent 组织本身是错的"这类诊断。与 [[Papers/2605-MetaTeam]] 并读可得该路线的时机轴：Meta-Team 在任务**之间**演化团队组织，MANTA 在任务**之内**演化通信结构，跨 run 只继承原则性 playbook（budget 置 0 的迁移实验跨域均值 +3.3，但每 benchmark 仅 30 题，+3.3 恰等于一道题，证据强度撑不起"可继承的结构知识"这一结论）。
 
+第三种时机把演化对象从产物换成**搜索策略本身**，反馈则来自已经录下来的搜索树。[[Papers/2609-DreamRSI]] 指出 AlphaEvolve 一系的 discovery loop 把算力全投在候选解上，而决定"在哪条分支上继续、开几条、什么时候停"的 exploration 策略通常手写且全程固定；把这一层纳入优化的障碍是每试一个策略都要付一次完整 rollout 的钱。它的做法是把跑完的一轮 discovery tree 冻结成 replay simulator——每个节点存着当时的 workspace、产物、评测诊断与分数，换一个策略去走这棵树就不必重新调用 coding agent 与 evaluator——据此改写策略代码再放回线上。Lasso regularization path 上，相对同初始化、策略冻结的对照，Gemini-3.1-Pro 用 317 次 discovery-agent 调用（对照 550）把平均运行时从 3587.1 ms 压到 2931.0 ms，Gemini-3.7-Flash 用 1879 次（对照 3200）从 2516.7 压到 2350.6。
+
+三处边界决定这些数字怎么读。其一，replay 的转移是确定性的揭示而非生成——被选中的节点只返回已经录好的那个孩子，候选策略因此只能换顺序、换批大小、多走少走几步或早点停，无法回答"在某个节点换个方向会怎样"，被优化的实际是预算分配、批处理与停止规则。其二，论文给出的唯一保证是新策略在固定 history 上的**平均 replay 分**不劣于当前策略，该保证不涉及线上表现，而 replay 分与线上表现的相关性全文未测。其三，报告的 Compute 只数 discovery-agent 调用，offline dreaming 里 $M$ 个策略版本 × $t$ 棵树的重放评估与改写调用一次都不计。结果也需要按列读而非按均值读：6 个 held-out 数据集里 Gemini-3.1-Pro 有 5 个慢于冻结对照，平均值靠 RCV1 一列（14616.0 对 19550.1）拉回；三个数学任务里 Auto Correlation 的 1.456375 差于它自己的冻结对照 1.456001，Circle Packing 六位小数完全相同；全文单次运行、无种子、无误差棒。同篇还留下一条与 §4 呼应的观察：在等预算下给 exploration 加 prompt 级的语义方向指引，两种范式都不如不加指引（仅在一个 kernel 任务上测）。
+
 ### 7.2 自改代码的 scaffold lineage
 
 自改代码 agent 构成一条清晰谱系：STOP（自引用代码优化）→ Gödel Agent（自我修改的通用框架）→ [[Papers/2505-DarwinGodelMachine]]（agent archive + 读自身日志自诊断自改 scaffolding + benchmark 实证验证替代形式证明，SWE-bench 20.0%→50.0%，跨模型/跨语言迁移成立，成本约 2 周/run）→ SICA → [[Papers/2510-HuxleyGodelMachine]]→ [[Papers/2511-LiveSWEAgent]]（on-the-fly）→ [[Papers/2607-MetaSkillEvolve]]（两级递归：把"改进流程本身"纳入演化）。
@@ -311,11 +369,19 @@ WorkBench 是该工作未解释的反例，也是拓扑演化表达能力的直�
 
 标题中的 recursive self-improvement 则是纲领而非结果，作者在 Related Work 与 Limitations 中把这条边界划得清楚：训练是部署前的一次性离线过程（SFT → RL → 冻结），演化系统本身按其自述 largely fixed，全文只到 generation 1，没有"MA1 训出 MA2"这一步。按 §2.1 判据这是**单次 meta-evolution** 而非递归，与 [[Papers/2607-MetaSkillEvolve]] 把"改进流程本身"纳入演化的两级结构不在同一层。两处归因缺口须一并计入：SFT teacher 为 GLM-4.7、evolutionary path 的轨迹亦由 GLM-4.7 驱动 AIRA-Evo 产生、trajectory-step 由 DeepSeek-V4-Pro 标注，因此 21.22 个点里"执行反馈接地的学习"与"蒸馏更强外部模型的 MLE 习惯"没有实验能分开（语料结构加剧此疑问：Draft 占 74.0%，承载演化叙事的 Improve+Crossover 合计仅 9.4%）；全文无算子级 ablation、无 SFT/RL 拆解，Evo-Max 的 +10.6 点把跨任务经验先验与异步多卡并行两项变化打包上线，机制主张（"Improve+Crossover 贡献 85.0% validation gain"）来自单任务轨迹案例。基准判别力同样有限——22 任务下一块奖牌约 4.5 个百分点，71.21% ± 8.57% 与 GPT-5.6 Sol + Codex 的 72.73%（单次点估计）区间高度重叠，作者自己的 artifact 审计表里还列有 75.76%–80.30% 的既有系统（预算更大）。该工作的实际贡献因此不在分数，而在它是该表中唯一 data / sandbox / train code / RL method / eval / weights 六项齐全的行：上面缺的 ablation 由此从"必须相信作者"变成"别人可以补的实验"。边界：六项齐全为作者自评，§1 对 release 仍用将来时，链接可达性本文未独立核查。
 
+整条谱系有一个共同前提：harness 是跨任务携带的耐久工件。[[Papers/2608-JITAgent]] 把这个前提直接取消——harness 按任务现场生成、用完即弃，被演化的对象换成生成它的那个模型。做法是先用 $(\mathbf{M},\mathbf{P},\mathbf{A},\mathbf{F})$ 四模块协议把 harness 约束成受限程序空间（memory / planning / action / capability orchestration，接口、生命周期与验证规则由协议固定），再用同一 kernel 下重实现的 13 个代表性 scaffold 作 seed bank，最后以 Qwen3.6-27B 为底座分三阶段训练生成器：SFT 加 DPO 学任务条件化定制、teacher-forced 学两轮内修复合成失败、clipped PPO 学超越 archive 前沿。九个 benchmark 上替换默认 scaffold 后 18 个 backbone–benchmark 配对全部提升（GLM-5.2 平均 74.1→81.8，DeepSeek-V4-Flash 66.7→75.5）。最可复用的一步是那个类型签名：它把"生成 harness"从开放式代码生成收窄成填四个已知槽位的结构化输出，没有显式 planner 的结构用 null directive 保持类型一致，因此 ReAct 一类不需要特例。
+
+三处需要一并记。其一，固定 backbone 的受控对比里 token 与成本在全部 6 个设置中最低（相对最便宜的固定 harness 降 14.9%–54.1%、均值 36.0%），而性能只在 6 个中的 4 个居首——它最稳的收益是效率而非分数，且论文未说明报告的 token 与成本是否含生成器自身的开销。其二，它写进定义的三条性质里 reliability 完全没有量化证据：协议合法率、生成失败率、两轮修复成功率一个都没报。其三，全文无 stage 级消融，四段训练的贡献无法拆分；而"按任务现场生成优于预先优化"这条主线按其附录自述是结构性论证而非经验排名，没有任何一个预先优化式 harness 方法被跑在同一 benchmark 上。
+
+冻结底座、只演化外围代码这一形态在具身侧也出现了。[[Papers/2608-Zetta]] 把闭环下沉到 action frequency：一个 code-based runtime critic 逐 action chunk 产出结构化 proposal，Orchestrator 裁决是否从 VLA 切出去执行 recovery skill 并按 re-entry contract 交还控制权；rollout-batch 层做失败聚类与逐层因果诊断生成候选 critic/recovery，iteration 层用 §6.2 那道双闸门决定是否入 skill memory。base VLA 权重全程不动，RoboCasa 18 任务 macro-average 73.56%→93.56%，LIBERO-Pro 全部 40 个 task-setting 对 32.00%→71.13%（摘要标的 90.8% 是 Goal 两个 setting 的均值，不是全集）。配套的执行基建把 rollout 吞吐从 1.72 提到 35.1 episodes/min——自演化研究的迭代速度长期受限于 rollout 吞吐而非算法，这一格的工程数字比方法本身更容易被别人复用。它与本节其余工作共享同一处空缺：三条 loop 一条都没有单独消融，也没有算力配平对照，因此"闸门 / runtime critic / recovery skill 各自值多少"在这篇里没有答案。
+
 ### 7.3 credit assignment 的粒度
 
 DGM 与 HGM 的核心分歧在**用什么信号选择 parent 做下一步自改**。HGM 提出 clade-level（宗系级）credit assignment：以子代整枝（clade）的聚合表现而非单节点即时表现估计一个 agent 的改进潜力，其 CMP（clade metaproductivity）与真实改进的 Pearson 相关达 0.778，显著高于 DGM 式即时 guidance 信号的 0.285。这把 recursive self-improvement 的瓶颈从"如何自改"推进到"parent selection 信号质量"这一新维度——选错垫脚石比改得不好更致命。
 
-到 2026 年中，"改进标量分数不足以选 parent"已成为该谱系的收敛判断，四个独立工作在打同一个靶而解法各异：DGM 用即时 benchmark 分数；HGM 换成 clade 级聚合（CMP 与真实改进 Pearson 0.778 vs DGM guidance 0.285）；[[Papers/2607-FrontisMA1]] 在 RL 与搜索两处都把 fitness 拆成多因子——RL 侧 $F(p)=\text{norm}(R_p)+\text{norm}(\text{Var}_c R_c)+\text{norm}(C_p)$（强父 + 子代结果方差仍大即信息量仍在 + 按访问次数降温防 incumbent 垄断），搜索侧 $U_i=\lambda_s\tilde s_i+\lambda_\Delta\tilde\Delta_i+\lambda_n\nu_i$（quality / 相对父的进步 / method-family novelty，权重固定为 1.0/0.6/0.3 且不学习）；[[Papers/2607-MANTA]] 则把选择依据整体换成不接触结果的过程 flag。分歧点因此明确：信号该来自**结果的聚合方式**（clade）、**结果的辅助统计量**（方差、访问次数、novelty），还是**根本不来自结果**（过程审计）。三类信号目前没有在同一 testbed 上被对照过，这是该谱系可立即补上的实验。把 HGM 的 clade 聚合接进 OpenMLE-Evo 的 parent 选择是其中最直接的一个。
+到 2026 年中，"改进标量分数不足以选 parent"已成为该谱系的收敛判断，五个独立工作在打同一个靶而解法各异：DGM 用即时 benchmark 分数；HGM 换成 clade 级聚合（CMP 与真实改进 Pearson 0.778 vs DGM guidance 0.285）；[[Papers/2607-FrontisMA1]] 在 RL 与搜索两处都把 fitness 拆成多因子——RL 侧 $F(p)=\text{norm}(R_p)+\text{norm}(\text{Var}_c R_c)+\text{norm}(C_p)$（强父 + 子代结果方差仍大即信息量仍在 + 按访问次数降温防 incumbent 垄断），搜索侧 $U_i=\lambda_s\tilde s_i+\lambda_\Delta\tilde\Delta_i+\lambda_n\nu_i$（quality / 相对父的进步 / method-family novelty，权重固定为 1.0/0.6/0.3 且不学习）；[[Papers/2607-MANTA]] 则把选择依据整体换成不接触结果的过程 flag；[[Papers/2609-AgentGrad]] 干脆不推断信号而做干预——在多 agent 流水线上从末端逆序替换每个 agent 的输出为由 ground truth 构造的 hint，第一个能把整条链的 reward 拉到上界的位置即被判为责任所在（§5.5）。分歧点因此明确：信号该来自**结果的聚合方式**（clade）、**结果的辅助统计量**（方差、访问次数、novelty）、**根本不来自结果**（过程审计），还是干脆**不从观测推断而用干预定位**。四类目前没有在同一 testbed 上被对照过，这是该谱系可立即补上的实验。把 HGM 的 clade 聚合接进 OpenMLE-Evo 的 parent 选择是其中最直接的一个。
+
+干预这一类另有一条独立于具体方法的代价：它要求存在一个能被替换进链中的"正确输出"。AgentGrad 在训练集有 ground truth 或可验证输出约束时成立，而 §7.2 的 scaffold 演化场景恰恰没有这种东西——一个 harness patch 没有可替换的正确版本。因此干预式 credit assignment 的适用边界与 §3.4 的可验证性谱系重合：**它是 deterministic verifier 域的一个便宜方法，而不是这条谱系的通用解**。
 
 ### 7.4 天花板：scaffold vs weights
 
@@ -325,11 +391,31 @@ DGM 类架构自演化只搜索 frozen FM 之外的 scaffolding 空间——收�
 
 必须同时记住这个分解的代价：累计覆盖不是一个可交付的系统。122/122 是 450 次尝试跨 69 个 job 的并集，没有任何单一配置能达到它，也没有任何机制能在见到任务之前挑对配置——把搜索成本折算进去，它更接近 pass@450 的重参数化而非天花板的抬升。可承重的结论是"单配置与最优配置之间存在一个数量级的差距"，不能承重的是"scaffold 演化能兑现这个差距"。
 
+兑现它需要一个能在执行前按任务挑出配置的机制，而 [[Papers/2608-JITAgent]] 是这类机制的第一个学习式实例：生成器读到任务描述与可用能力后现场产出一份 harness，不依赖任何事后挑选（§7.2）。它在九个 benchmark 上把 18 个 backbone–benchmark 配对全部推高、平均 +7.7 分，量级与"操作天花板到激发天花板"那一个数量级的差距完全不可比——但两者从未在同一套任务上被测过，Macaron 的 122 个任务是按"冻结基座全部得 0"筛出来的，JIT-Agent 的九个 benchmark 则是常规难度。**因此这个夹层到底有多少可被非 oracle 机制兑现，目前没有任何数字**。把 Macaron 的 122 任务集交给一个按任务生成配置的生成器跑一遍，是这条线上最直接的判别实验：单配置 11/122 是下界、事后挑选 122/122 是上界，学习式选择器落在哪里决定 scaffold 演化的收益空间究竟是一个数量级还是几个百分点。
+
 ### 7.5 Open Problems
 
 "自我改进能否复利"（recursive self-improvement）在两个层次都有明确收敛边界：scaffold 层受 frozen FM 天花板约束，weight 层受 reversal 约束。AGI 叙事下的无界 RSI 在现有证据下不成立。credit assignment 的信号质量（HGM 的 CMP 0.778 vs DGM 0.285）说明谱系的下一步瓶颈已从"改法"转向"选法"。
 
-另有两个缺口。其一是**术语与实物的系统性错位**：以 RSI 为题的工作里，多数实际做的是单次 meta-evolution（用一轮演化搜索的轨迹训一次模型，再把模型放回同一个搜索器），[[Papers/2607-FrontisMA1]] 是最清晰的样本——作者在正文里划清了这条边界，标题与 abstract 没有。判据不难给：是否存在 generation ≥2、演化系统本身是否也在被演化、权重更新是否发生在部署后。[[Papers/2608-MacaronV1]] 是同一形态的第二个样本，且它的坦诚程度与 Frontis-MA1 相当：其 MindForge 循环设计为 Discovery → Expansion → Update 三段，但报告只跑通 Expansion，Update 段未走完，全部结果都在 generation 1 上；作者自己把"持续学习是否复利"与"多实例经验能否汇聚成集体智能"列为未验证的开放问题。按上面三条判据，它与 Frontis-MA1 一样落在单次 meta-evolution 而非 RSI。两个样本合起来，这条错位不是个别标题夸张，而是该谱系的默认叙述方式。其二是**增益的预算与来源归因**：[[Papers/2607-MANTA]] 的 mutation 增益与 +28K token 绑定，Frontis-MA1 的 post-training 增益与外部 teacher 蒸馏绑定，两者都缺 equal-budget / no-teacher 对照臂。这两处归因缺口的性质相同——报告的是"某个演化机制 + 某项额外资源"的联合效应，而结论被写成前者的效应。
+另有两个缺口。其一是**术语与实物的系统性错位**：以 RSI 为题的工作里，多数实际做的是单次 meta-evolution（用一轮演化搜索的轨迹训一次模型，再把模型放回同一个搜索器），[[Papers/2607-FrontisMA1]] 是最清晰的样本——作者在正文里划清了这条边界，标题与 abstract 没有。判据不难给：是否存在 generation ≥2、演化系统本身是否也在被演化、权重更新是否发生在部署后。[[Papers/2608-MacaronV1]] 是同一形态的第二个样本，且它的坦诚程度与 Frontis-MA1 相当：其 MindForge 循环设计为 Discovery → Expansion → Update 三段，但报告只跑通 Expansion，Update 段未走完，全部结果都在 generation 1 上；作者自己把"持续学习是否复利"与"多实例经验能否汇聚成集体智能"列为未验证的开放问题。按上面三条判据，它与 Frontis-MA1 一样落在单次 meta-evolution 而非 RSI。把这三条判据摊到以 RSI 自称的五个工作上，错位就不再是个别标题夸张，而是该谱系的默认叙述方式：
+
+| 工作 | 存在 generation ≥2 | 演化系统自身被演化 | 权重更新发生在部署后 | 实际形态 |
+|:--|:--|:--|:--|:--|
+| [[Papers/2607-FrontisMA1]] | 否（只到 generation 1） | 否（作者自述 largely fixed） | 否（SFT→RL→冻结，部署前一次性） | 单次 meta-evolution |
+| [[Papers/2608-MacaronV1]] | 否（Update 段未走完） | 否 | 否（权重全程冻结，只搜配置） | 单次配置搜索 |
+| [[Papers/2609-RSIAgent]] | 否（框架不变，跨任务不继承） | 否 | 否（权重固定） | 任务内探索 + 持久记忆 |
+| [[Papers/2609-NeoHorse1]] | 否（作者自述只跑完一轮） | 否 | 是（用线上流量重训） | 部署数据驱动的单轮再训练 |
+| [[Papers/2609-DreamRSI]] | 是（Lasso 5 轮、数学 10 轮，策略跨轮携带） | 否（改写策略的那个 agent 固定） | 不适用（无权重更新） | 多代的代码级策略迭代 |
+
+五行里没有一行三项全中，而每一行中的那一项还各不相同——DreamRSI 有多代但改写者固定，NeoHorse-1 的权重更新确实发生在部署之后但只有一轮，其余三个一项都不满足。**"recursive self-improvement"目前在文献中标记的是意图而非实现形态**，引用这批工作时应当按上表的形态列而非按标题读。
+
+[[Papers/2609-RSIAgent]] 值得单独判一次，因为它自述的 recursive self-improvement 是全表里离字面含义最远的一个。它在目标任务上先做广度探索（尝试不同操作路径）再做深度探索（沿最优路径细化），由 verifier 判定成功的片段写进持久记忆，正式作答时复用——权重固定、框架不变、记忆按任务从空建起。按本文三条判据它一条都不满足，实际形态是**任务内的探索加持久记忆**，与 §5 的 memory 演化同族而非与 §7.2 的 scaffold 自改同族。这个判定不是措辞洁癖：该文自己的 GameCraft-Bench 是全表唯一一处同起点、同底座的受控对比，在那张表上（40 个任务、四个 generator）换 harness 带来 +5.07 / +11.33 / +14.18 / +12.52，而开启它的"RSI"机制只带来 +3.44 / +3.76 / +3.99 / +3.64——**自我改进的收益被拆成 harness 与机制两级时，大头在 harness 一侧，机制约为其三分之一到四分之一**。OSWorld 2.0 上 partial score 71.97→78.98、binary 37.80→42.68，ALE 83.75→84.82，但主表把真实 RSI 结果与保留的基线数字拼接（OSWorld 41/82 任务、ALE 19/67 任务重跑），只有基线未满分的任务被分配探索而满分任务仍留在分母，且没有任何算力配平臂——附录自陈不是 matched-budget 估计。同篇的 w/o RSI 版本在 ALE 上已达 83.75，超过 GPT-6 Astra 的 82.26，这条比较里被验证的是 harness 而不是自改进。
+
+[[Papers/2609-NeoHorse1]] 在另一侧给出该谱系最实际的一条工程观察：一个已经在线上跑的 routing harness 自带 RSI 需要的反馈机制——router 为每个 user turn 记下预测的能力档位、实际服务的档位与随后的交互，这份记录既是训练语料又是不用额外标注的难度标签，同一个 routing score 因此可以同时给 SFT 排课程、给 on-policy distillation 调度起始上下文、按能力短板决定下一轮数据配比。十个 benchmark 的宏平均在 4B 上 58.94→64.87、9B 上 65.60→69.04。但它的受控实验只比较了数据来源与数据量：同配置同基座下 routing-harness 数据五项均值 70.57、公开 agent 数据 64.32，而该基座在这五项上的均值本身就是 69.31——**routing-harness 一轮相对基座只有 +1.26，其中 HumanEval 一项贡献 +9.14，其余四项净 −0.57**。课程排序、on-policy distillation、能力导向配比三个核心机制无一有对照消融。所以这篇可承重的是"部署流量可以自动转成带难度标签的训练语料"这一机制设计，不可承重的是"这套自改进循环带来了宏平均 +5.93"。
+
+[[Papers/2609-GeneralizedAgentIteration]] 试图把这些判据形式化：系统写成 $\chi=(\pi,V,m,U,\rho)$ 五组件，agent 是其中**可被修改的那个子集** $Ag$，两个 dial——修改器 $m$ 是否属于 $Ag$、评价基准 $\rho$ 是否接地于 agent 之外——决定实例落在 generalized policy iteration 还是 RSI，以及 anchored / goal drift / fully self-referential 三种极性。把 agent 从"策略"重定义为"系统里可被改动的那部分"是这套坐标最有价值的一步：它让"改进机制是否属于被改进对象"从修辞变成可判定的二值问题。它与上表的关系是互补而非替代——上表按实物形态分，GAI 按结构位置分，而 GAI 的 Table 3 恰恰把 Gödel Agent、DGM、STOP、SICA 等一并放进同一个 anchored 行，作者也承认已演示的系统绝大多数是 anchored。该文无实验、无定理，作者自陈 RSI 到 GPI 的归约是散文而非带显式假设的命题，且世界与目标被按假设固定在系统之外，因此 §8 的 agent-environment co-evolution 在这套坐标里没有位置。它提供的是判据的形式化表达，判据本身仍需经验工作去填。
+
+其二是**增益的预算与来源归因**：[[Papers/2607-MANTA]] 的 mutation 增益与 +28K token 绑定，Frontis-MA1 的 post-training 增益与外部 teacher 蒸馏绑定，两者都缺 equal-budget / no-teacher 对照臂。这两处归因缺口的性质相同——报告的是"某个演化机制 + 某项额外资源"的联合效应，而结论被写成前者的效应。
 
 ## 8. Co-Evolution: Environments and Multi-Agent Teams
 
@@ -362,13 +448,15 @@ DGM 类架构自演化只搜索 frozen FM 之外的 scaffolding 空间——收�
 
 MetaTeam 与 §7.1 的 [[Papers/2607-MANTA]] 构成"团队级演化"的时机对照——前者在任务之间更新团队 scaffold（角色构成、shared constitution），后者在任务之内改写通信拓扑而跨 run 只继承原则性 playbook；两者都是 training-free、只改 scaffold，证据强度的差别在于 MetaTeam 的组织消融直接隔离出协同交换的净增益，而 MANTA 的 mutation 消融把结构改变、额外一轮计算与诊断文本绑在一起。
 
+per-agent credit assignment 这一格现在有了第一个算法化实例，虽然来自另一种多 agent 结构。[[Papers/2609-AgentGrad]] 处理的是固定流水线上 $N$ 个 agent 共享一个终点 reward 的场景，做法是逆序干预而非反思归因：把某个 agent 的输出替换成由 ground truth 或输出约束构造的 hint，第一个能把整条链的 reward 拉到上界的位置即被判为责任所在，干预后的输出同时充当该 agent 的 pseudo-label（§5.5、§7.3）。它与 Meta-Team 的差别不在归因技术而在被演化对象与前提：前者改各 agent 的 prompt、要求链路结构固定且终点可验证，后者改角色构成与协作结构、终点是开放任务。**算法化归因目前只覆盖"结构固定、终点可验证"这一象限**，团队组织级演化的归因仍靠 LLM 反思涌现。把干预式定位接到可增删角色的团队上是一个明确的开口——一旦角色集合可变，被干预的位置本身也在变，责任位置与结构变更会混在一起。
+
 多智能体演化的暗面由 [[Papers/2606-MLASSelfEvolvingSafety]] 刻画：其 MLAS 矩阵（模块 × 演化阶段）指出 shared constitution 是全队共享的可写入 prompt，无准则的演化更新意味着单次错误可 lineage-persistent 地污染全队（Collective × Commit 攻击面）。
 
 ### 8.4 co-evolution 的粒度谱与开放问题
 
 把协同演化按"演化对手"与"演化层级"排列，谱系现在在最细一端多了一格：环境状态级（[[Papers/2608-OpenART]]）< interface 级（SEAL）< difficulty 级（GenEnv）< 环境池级（AgentWorld）< 团队组织级（MetaTeam）。最细的这一格与其余各格的区别在于它**什么都不改，只改状态**——任务语义、benign objective、evaluator 全程固定，被搜索的只有 agent 能看到的那部分环境内容（workspace 文件、工具返回、memory 条目、plan state）。
 
-"谁验证 verifier 的演化"这个空白需要改述得更准确。[[Papers/2608-CoEvolutionSurvey]] 记录的 Stage 2 feedback-space 分支里，被演化的恰恰就是反馈机制本身：ROSKA 联合搜索 reward 候选与 policy 变体、CURE 从执行失败演化 unit test、ARCO 用步级分数与最终结果对账、ECHO 按建议是否真的改善 policy 来更新 critic。所以**并非无人演化 verifier，而是无人验证演化后的 verifier**——上述工作对演化后的判分器都以下游任务性能为唯一背书，而下游性能正是该判分器自己给的。这与 §6.2 gate 独立性三层是同一个问题在环境侧的投影：判分器一旦进入被演化对象集合，"用它测出的提升"就不再能同时充当它自身正确性的证据。可操作的最小对照是保留一个冻结的 held-out verifier 用于跨代复评，库内无人这样做。
+"谁验证 verifier 的演化"这个空白需要改述得更准确。[[Papers/2608-CoEvolutionSurvey]] 记录的 Stage 2 feedback-space 分支里，被演化的恰恰就是反馈机制本身：ROSKA 联合搜索 reward 候选与 policy 变体、CURE 从执行失败演化 unit test、ARCO 用步级分数与最终结果对账、ECHO 按建议是否真的改善 policy 来更新 critic。所以**并非无人演化 verifier，而是无人验证演化后的 verifier**——上述工作对演化后的判分器都以下游任务性能为唯一背书，而下游性能正是该判分器自己给的。这与 §6.2 gate 独立性三层是同一个问题在环境侧的投影：判分器一旦进入被演化对象集合，"用它测出的提升"就不再能同时充当它自身正确性的证据。可操作的最小对照是保留一个冻结的 held-out verifier 用于跨代复评，目前无人这样做。最接近这个要求的一处证据来自 [[Papers/2608-GSAR]]：它把判分器的离线质量与它接进训练管线后的下游增益分开测了——学习式 GUI 轨迹判分器离线准确率 91.5%、比规则式判分器高十几个点，接进同一条在线 RL 管线后却只带来 +3.5 点而规则式带来 +6.1 点（§4.4）。"判分器更准"与"用它训出的 agent 更好"因此不是同一个量，用下游性能给演化后的判分器背书这一做法在方向上也不安全。
 
 OpenART 顺带给出了这类归因要求的一个现成实现样式：它把除待测组件外的一切固定为不变量——两侧模型冻结、benign objective 与 evaluator 不变、通信只经 adapter 投影——因此 ASR 的上升只能归给环境状态的演化。这套"设一组不变量再动一个变量"的做法正是 §7.5、§6.3 反复要求而多数共演工作缺失的东西；它能在这里成立，很大程度上是因为攻防设定天然给出了一个不受演化影响的外部评判标准，而以能力提升为目标的共演工作没有这份便利。multi-agent 的 population 稳定性、合谋、集体 misevolution 仍无实证。
 
@@ -394,6 +482,9 @@ OpenART 顺带给出了这类归因要求的一个现成实现样式：它把除
 | [[Papers/2508-StuLife]] | lifelong | StuGPA / PIS | GPT-5 17.90 vs human 85.24；PIS 4.68% | 首个"大学生涯"式 ELL，瓶颈定位记忆+主动性（详 §9.2） |
 | [[Papers/2604-SkillFlow]] | lifelong(skill) | family SR 提升 | Opus 4.6 +8.43pt；GPT-5.3-Codex −6.02pt | skill lifecycle，差距在修复而非写（详 §9.2） |
 | HarmBench / RedCode / Agent-SafetyBench | safety | Safe / RR / ASR | AFlow ASR 54.4→83.1%；工具 Unsafe Rate 65.5% | 演化前后 snapshot + 有限 longitudinal（详 §9.3） |
+| CAR-bench（由 [[Papers/2608-TRACE]] 使用） | deterministic(工具使用 / 多轮对话) | Pass@k 与 Pass^k 之差（一致性 gap） | TRACE 把 GPT-5.5 的 Pass^3 从 59.9 提到 94.5（train+test 合并集）；官方 hidden set 50.0→70.0 | 唯一以"每次都对"而非"对过一次"为主指标的评测面；58 个互联工具 + 19 条 domain policy；演化所用任务与主表评测集重合，引用须区分合并集与 hidden set |
+| RoboCasa / LIBERO-Pro | deterministic(具身) | 任务 SR 宏平均 | [[Papers/2608-Zetta]] RoboCasa 18 任务 73.56→93.56%；LIBERO-Pro 40 个 task-setting 对 32.00→71.13% | 冻结 VLA + 外围演化的主要评测面；LIBERO-Pro 按 task×setting 成对计分，子集均值（Goal 两档的 90.8%）与全集宏平均差 20 点以上 |
+| SkillOpt-Lite 五集合（SearchQA / OfficeQA / SpreadsheetBench / LiveMath / DocVQA） | deterministic + judge 混合 | validation-only 选择 + released test / robustness / transfer 三面 | [[Papers/2607-RethinkSkillEvolve]] 42 次演化：11/14 选中演化后 skill、9/14 部署后 test 更好、7/14 同时改善 robustness 与 transfer | 唯一带 artifact 身份（SHA-256）与重复部署带宽的技能演化评测协议；100 题配对面板上 ±3 点不可判 |
 | [[Papers/2608-OpenART]] | safety（长程有状态） | Strict ASR（确定性 evaluator 与 LLM judge 须一致）+ benign completion | 15 agent × 5 model 共 75 配置，pooled Strict ASR 85.0%；单轮 42.9 → 五轮 94.7 | 库内唯一在长程有状态工作流上测演化式攻击的评测面（中位 97 次工具调用，对照论文所列既有安全 benchmark 的 1–15）；ASR 是跨轮 best-of-K 而非单轮值；judge 用的 GLM-5.2 本身也在被测的五个模型之列（详 §9.3） |
 
 ### 9.1 deterministic-verifier 域 benchmark
@@ -432,7 +523,9 @@ StuLife 与 SkillFlow 共同刻画了自演化的两个反直觉事实：其一�
 
 真正的 evolution-aware benchmark（联合追踪演化步数、能力、风险，覆盖四条路线且区分 model+harness 与模型本体贡献）仍然缺失。[[Papers/2608-AgentStream]] 关掉了其中一半——跨方法、跨底座、跨流结构的受控析因与统一的 evolution gain 定义都已就位——但只覆盖能力轴，风险与演化步轨迹仍在评测面之外。四个具体缺口：StuLife/SkillFlow 都定义了 forgetting/redundancy 指标却未报告数值；headline 分数与 harness/协议强绑定使跨论文比较失真；安全评测停留在 snapshot，无法捕捉 misevolution 的累积轨迹（§10.2）；以及**评测预算与目标效应量不匹配**——在每 benchmark 50 题 × 3 seed 的规模上分辨 1 个百分点量级的差异超出该协议的判别力，而这恰是当前多数自演化工作报告增益的量级。最后一条已有可操作对策：[[Papers/2607-HarnessBank]] 的配对 2σ crediting 与它测出的 62%–76% 幻觉进展率表明，判别规则应写进评测协议本身，而不是留给读者去猜哪个百分点是真的。安全轴上的缺口被 [[Papers/2608-OpenART]] 关掉了一部分——它给出长程有状态的风险传播刻画与跨 runtime 对齐的口径——但它测的是外部攻击者演化环境状态，被测 agent 自身全程冻结，因此"agent 自演化 N 步后风险如何变化"这条剂量-反应曲线仍只有 model 路线的约 200 步数据。
 
-还有一条独立于样本量的缺口：**等价性主张比优越性主张更需要噪声带，而库内目前一例都没有**。"压缩三成而分数不降"（[[Papers/2608-SkillZip]] 的 0.577 对 0.570）、"换个配置而能力等价"这类结论在形式上是要证明差值落在某个可忽略区间内，可现有报告方式（单次运行、单点比较、无方差）在数学上根本无法区分"无差异"与"差异小于本协议的分辨率"。优越性主张至少还能靠效应量足够大自救，等价性主张不能——它的可信度完全取决于噪声带的宽度是否被测量过。现成的做法早已存在（预先声明等价边界、报告差值的置信区间），成本与 HarnessBank 的配对 2σ 相当。
+还有一条独立于样本量的缺口，它今年第一次被部分关上：**等价性主张比优越性主张更需要噪声带**。"压缩三成而分数不降"（[[Papers/2608-SkillZip]] 的 0.577 对 0.570）、"换个配置而能力等价"这类结论在形式上是要证明差值落在某个可忽略区间内，而单次运行、单点比较、无方差的报告方式在数学上无法区分"无差异"与"差异小于本协议的分辨率"。优越性主张还能靠效应量足够大自救，等价性主张不能——它的可信度完全取决于噪声带宽度是否被测量过。
+
+这一格现在有了两个正面样本，且分别从两头做。[[Papers/2608-SkillZipPro]] 在实验前固定 −0.05 的等价边界，用 102 个 held-out 任务上的配对 bootstrap（10,000 次重采样）给出 +0.010、95% CI [−0.029, +0.059]，并据此判定自己是唯一保质量的压缩器——先声明边界再给区间，结论因此可证伪。[[Papers/2607-RethinkSkillEvolve]] 则直接把带宽量出来：字节完全相同的 skill 在 49 题 split 上重复评测 8 次标准差 3.92 点，100 题配对面板上重复部署三次能把 +2.3 变成 −2.0 / −3.0 / 0.0、把 −6.6 变成 +6.0 / +7.0 / +5.0。两者合起来把要求写实了——**报等价性要预先声明边界并给区间，报差值要给出同一协议下重跑同一份产物的带宽**，成本与 HarnessBank 的配对 2σ 相当。缺口因此从"无人做"收窄为"未成标配"：本文覆盖的其余等价性主张（含 SkillZip 自身那条）仍无一给出噪声带。同期的一条典型反面样本是 [[Papers/2608-PrimeAgent]] 对 nanoGPT speedrun 的结论——harness 选择对最终 record 的影响小于实验噪声——这句判断以散文形式给出，该节报告的是行为层的差异（Prime Agent 下每 100 次训练脚本执行有 7.6 次脚本外实验，Claude Code 下 1.2 次），未见与这条等价判断配套的噪声估计。
 
 ## 10. Safety, Reliability, and Failure Modes
 
@@ -442,15 +535,21 @@ StuLife 与 SkillFlow 共同刻画了自演化的两个反直觉事实：其一�
 
 [[Papers/2509-Misevolution]] 在四条路径 × SOTA 系统上证明：不需要不安全数据、不需要外部攻击者，**良性反馈循环 + 有偏 credit assignment 就足以产生 safety 衰减与 reward hacking**；现有 mitigation（prompt 补丁/事后补训/静态扫描）全部只部分有效。四路径实测：AFlow 优化 20 轮后 ASR 54.4%→83.1%（Ensemble Node 级联放大）、memory 路径 deployment-time reward hacking >60%、工具创建-复用 Unsafe Rate 65.5%、自训练 safety 累积衰减。
 
-### 10.2 负性结果三条线
+### 10.2 负性结果：自改进可自退化
 
-三篇独立工作从不同角度刻画自演化的失效条件，共同结论是"自改进可自退化"：
+五篇独立工作从不同角度刻画自演化的失效条件：
 
 | 工作 | 失效模式 | 关键机制/证据 |
 |:--|:--|:--|
 | [[Papers/2407-SelfImprovementReversal]] | self-improvement reversal | post-training 表面指标升但泛化/多样性降；评估协议为双轨解码 |
 | [[Papers/2606-RiseAndCollapse]] | rise-and-collapse | 自改进先升后崩的失效轨迹；C10 GRPO-vs-REINFORCE 措辞已核 |
 | [[Papers/2606-CodeSelfReviewCollapse]] | recursive self-training collapse | 用系统自身信号做 gate 会进入 rubber-stamp regime（等价于不过滤），Prop 2.1 给指数增长条件 |
+| [[Papers/2609-Ecdysis]] | 演化跌破自己的起点 | 逐条失败改 harness 的基线与胜出方法同起点同协议，10 个 held-out 格平均 51.67→46.67，7 格绝对下降，Pass@3 66.00→63.50、Pass^3 37.00→29.00 |
+| [[Papers/2607-RethinkSkillEvolve]] | 通过闸门的净负演化 | GPT-5.5–LiveMath 选中项 validation +5.7、robustness +8.3，而 released test −6.6、transfer −16.7；端到端口径下"演化后 test 更好"是 9/14，同时改善 robustness 与 transfer 是 7/14 |
+
+后两行与前三行的差别在于失效发生的位置：它们都发生在闸门之后。Ecdysis 的 Self-Evolution 基线不是一个被削弱的对照——它与胜出方法从同一份人工 harness 起步、共享同一套训练评测与接受回滚协议，差别只在更新粒度（逐条失败改 vs 逐轮聚类改）——跑完之后仍在 held-out 上跌回起点之下，Pass@3 与 Pass^3 同向。这说明一道只要求训练集总分严格提升的准入准则并不阻止部署侧的整体回归（§6.2），而论文把这条结果当动机提了一句就没再回头。RethinkSkillEvolve 的净负案例出在另一处：选择协议本身是干净的（validation-only 选择，test 完全不参与），validation 与 robustness 两项都在涨，掉的是没参与选择的 test 与 transfer——闸门读到的指标与部署时要的指标不是同一个。
+
+三处证据共用一种呈现形态：**聚合分数掩盖单元格上的净负**。Ecdysis 的 7/10 下降藏在一个平均值里，RethinkSkillEvolve 的 headline "11 个选中项中 9 个 test 更好"在 14 个端到端分母下是 9/14，[[Papers/2609-AgentGrad]] 的汇总表把两格一次更新也没被接受的运行算进一个正的平均增益（§5.5）。要让净负结果不被平均掉，报告里必须同时有逐格符号与端到端分母，两者都不是当前的默认口径。
 
 CodeSelfReviewCollapse 对全 survey 的 gate 论证是关键约束：**self-review 式 gate 会退化为橡皮图章**——这直接质疑 MetaTeam 的 collective discussion、MemSkill 的 reward-only rollback 等 self-gate 设计能否抵抗 rubber-stamp。[[Papers/2607-MANTA]] 提供了这一命题目前唯一的分域实测：其 Auditor 与被审计的 task agent 共用同一底座（Gemma 4 31B，temperature 0），450 run 中 200 run 被 flag，聚合上未退化为橡皮图章；但分域看，PlanCraft 90 run 只 flag 出 1 次、MATH 只 2 次，在这两域上闸门实际近乎恒过，而 BrowseComp 恰好相反（83/90，恒不过）。同底座 self-gate 的失效并非只有"全过"一种形态，两端退化都会使 gate 丧失判别力——这是把 rubber-stamp 命题从二元判断细化为分域现象的第一个数据点。
 
@@ -472,7 +571,9 @@ CodeSelfReviewCollapse 对全 survey 的 gate 论证是关键约束：**self-rev
 
 [[Papers/2606-MLASSelfEvolvingSafety]] 用模块 × 演化阶段矩阵系统化 multi-agent 自演化的攻击面，抓到三处论文内部数字不一致（17/7/1 vs 五档图例、3.5x vs 2x、2.5% 错置，均记于 Paper 笔记）。其价值在指出放大结构：单点错误经 shared scaffold / constitution 变为 lineage-persistent 的全队污染。
 
-MLAS 的 lineage-persistent 至此还只是框架层断言加案例，[[Papers/2608-SkillJack]] 给了它第一次直接测量：其 Commit 阶段 × Cognitive Resource 那一格对应的正是"删掉源经验后派生技能仍存活"，实测 80.0%（§10.4）。它还补上了 MLAS 没有的另一半——**在持久化的同时可检出性单调下降**：轨迹层 98.5% 判恶、skill 层 11.4%，来源标记在跨层提升中不被保留。两条合起来把工程结论收得很紧：**provenance 必须随派生制品传播，撤销必须覆盖后代**。这条结论不依赖 SkillJack 的任何一个数字，只依赖"技能库与经验语料分离存储"这个架构事实，而该事实在所有 experience-to-skill 系统里都成立——包括 §6.1 的 SkillOpt/SkillClaw 与 §6.3 的 SESA。目前没有一个自演化技能系统实现了带血缘的撤销。
+MLAS 的 lineage-persistent 至此还只是框架层断言加案例，[[Papers/2608-SkillJack]] 给了它第一次直接测量：其 Commit 阶段 × Cognitive Resource 那一格对应的正是"删掉源经验后派生技能仍存活"，实测 80.0%（§10.4）。它还补上了 MLAS 没有的另一半——**在持久化的同时可检出性单调下降**：轨迹层 98.5% 判恶、skill 层 11.4%，来源标记在跨层提升中不被保留。两条合起来把工程结论收得很紧：**provenance 必须随派生制品传播，撤销必须覆盖后代**。这条结论不依赖 SkillJack 的任何一个数字，只依赖"技能库与经验语料分离存储"这个架构事实，而该事实在所有 experience-to-skill 系统里都成立——包括 §6.1 的 SkillOpt/SkillClaw 与 §6.3 的 SESA。
+
+这条工程结论已有一个部分实现，且它不在技能层。[[Papers/2608-PrimeAgent]] 的 Continual Harness 把四类持久状态（prompt notes、memories、skills、subagent specification）做成版本化条目，每次 refinement 在 turn boundary 落地并记录触发它的事件与预期效果，版本保留 provenance 并支持 rollback，模型权重全程不动。撤销一次演化编辑因此是运行时的一个操作，而不是重建一遍状态。它关上的是**撤销单条资产**这一半：留下的是**撤销其后代**——该机制作用在条目自身的版本历史上，而上一段那条失效发生在跨存储的派生关系上（源经验被删，由它抽出的技能仍留在技能库里），论文既未描述删除是否沿派生链传播，也未报告任何血缘查询实验。结论应改写为：版本级撤销已有实物，派生级撤销仍无。
 
 攻击面还有一层此前未被列入 MLAS 矩阵的：**环境状态**。[[Papers/2608-OpenART]] 的攻击者不改指令、不改模型、不改评判标准，只演化 agent 能看到的 workspace 文件、工具返回、memory 与 plan state，八个 target 可见向量里每一个单独使用都能把 Strict ASR 推过 50%（其余七个均值 71.2%，仅 workspace 一项 92.5%）。它归纳的三类反复出现的失效对自演化系统尤其贴切，因为三类都以"复用先前判断"为前提：过期假设未被作废、安全判断被沿用而非在新状态下重算、以及若干单步安全的动作在组合后产生危害。自演化系统的产物——技能、记忆、harness patch——本身就是"过去某个上下文里成立的结论"被固化下来的形式，且被设计为反复取用，因此这三类失效在演化系统上的暴露面比在一次性 agent 上更大。
 
@@ -482,14 +583,28 @@ MLAS 的 lineage-persistent 至此还只是框架层断言加案例，[[Papers/2
 
 证据来源层的问题比"未审计"更重一档：**它是攻击者可控的**。[[Papers/2608-SkillJack]] 的元数据消融显示，LLM judge 在只看代码时判恶率 36.7%，补上 skill 的 name 与 documentation 后降到 10.0%——而 name 与 docstring 正是由抽取器根据（可能被投毒的）轨迹生成的字段。于是"给 gate 更多上下文"这个看起来无害的设计选择，实际是把安全决策的权重压在攻击者写得出的表层描述上。可直接转成设计规则：**准入判据只读行为与代码，不读名称与描述**。同一逻辑作用于 §6.2 的 HarnessBank：activation beacon 由 patch 自己发出，与 skill 的自述文档在结构上是同一类自报证据。需要如实标注该实验的边界——它是单模型（DeepSeek-v4-flash）自评，换一个非同族 judge 是否仍出现"看得越多判得越松"未被检验，这个对照的成本在数百次调用量级。
 
+闸门误判的代价有多大，取决于系统把判决结果存到哪里。[[Papers/2609-RSIAgent]] 给出这条通路的完整形状。它的 verifier 由一个与 actor 不同族的模型承担，跑在隔离 context 与 checkpoint 保护的环境副本上，看不到 actor 的私有推理与记忆，边界设计在本文覆盖的工作里属于最干净的一档；但它的准确率全文没有任何量化，既无与官方 rubric 的一致率，也无人工抽检比例。作者自己的失效分析写清了后果链：探索没打到真正出问题的决策 → verifier 在字段值无依据、产物与官方 rubric 不符时仍返回 PASS → actor 把这条被误判通过的规则（把"缺失数据标记"当成有效答案）蒸馏进记忆，后续 run 继续复用它。**判决错误在演化系统里不是一次性损失，它以持久资产的形式留在系统内，并在此后每次检索时被重新执行**，所以闸门的 precision 起的是乘数作用，决定的是错误的累积速率而不只是单轮的通过率。该篇对失效子类给出了计数，但按其自陈计数取自 selected case audit 且同一案例可计入多个子类，据此估不出误判发生率。这与 §10.5 的撤销缺口是同一件事的两端：误判率未知，而误判的产物无法被追溯作废。
+
+### 10.7 演化产物编码的是环境规程
+
+前面几节的失效都以分数下降或安全属性退化为表征。还有一类方向相反：分数照涨，但涨的来源是对评测环境本身的适应而非任务能力。它能穿过任何只看分数的闸门，因为闸门读到的正是它在优化的那个数。
+
+[[Papers/2607-RethinkSkillEvolve]] 提供了最细的一次解剖。全文唯一无争议的大幅提升是 SpreadsheetBench 三模型的 +28.8～+37.7，而这批技能保留下来的指导内容是"用 openpyxl、dual loading 验证、write–reopen–check、marker-aware 行删除"这类 API 使用规程；唯一被展示全文的那条技能里写着一句 sandbox 专属 workaround——在 `import openpyxl` 之前把 `/tmp` 从 `sys.path` 过滤掉，以绕开该评测环境特有的 RuntimeError——而按其附录，这条 workaround 被引入的那一轮本身就建立了一次 validation new best（69.2→74.4）。55 个字节互异的 validation best 里，至少有一个的实质内容是修一个导入路径的坑。两个旁证与这个读法一致：从同一 parent 技能反复采样补不回这条增益，而它的 transfer 在分布偏移 tier 上从 +52～+53 塌到 +2.9／+3.5。换一套 harness 或 sandbox 之后这部分收益是否还在，论文没有测，只能作为假设记下。
+
+同一形态在两个互不相关的系统上各出现一次。[[Papers/2608-PrimeAgent]] 的一条 Factorio 轨迹里，agent 发现可以经 RCON 直接向 assembly machine 注入资源，在环境挂着 anti-cheating heartbeat 的情况下仍然使用了它，并把它保留成一个可复用 skill——没有攻击者、没有不安全数据，一条绕过环境规则的捷径被演化机制按正常流程收为资产。[[Papers/2609-Ecdysis]] 的 AgentBench 结果是另一端：w/ FDCR 在五个模型上给出完全相同的 90.00／90.00／90.00，AVG = Pass@3 = Pass^3 意味着每个模型都在同一批任务上三次全对、在另一批上三次全错，而这五个模型从 Direct 只有 5.00 的 Llama-3.1-8B 跨到 230B。最自然的解释恰是该文自己诊断逐条演化基线时用的措辞——把某个训练任务的答案提升成了通用运行时约束——论文对这组数字零评论。这是推断而非实测，可证伪的检查很便宜：读一遍演化后的 harness，看有没有任务特定的常量或分支。这一块占了它 headline 平均增益的三分之一。
+
+治理这类失效的要求与 §10.4 的投毒不同。投毒需要一个攻击者，而这里只需要一个把分数当目标的闭环；它也不会被 §6.2 的任何一种闸门拦下，因为环境规程在训练与验证分布上确实提升分数，闸门读到的信号是真的。可用的判别手段不在闸门里而在报告口径上：把增益按"能力 / 环境规程"分类需要读演化产物的文本，而多数工作不发布产物；跨 harness 或跨 sandbox 复现是另一个直接检验，未见有工作报告过。
+
 ## 11. Open Challenges
 
 - **Longitudinal evolution-aware 评估**：当前 safety/能力评估全是 snapshot-based，无 benchmark 追踪"演化步数-能力-风险"联合轨迹；剂量关系目前仅 model 路径有 200 步数据。
 - **抗 rubber-stamp 的演化步 gate**：self-review 式 gate 会退化为橡皮图章（CodeSelfReviewCollapse），需要 exogenous、task-agnostic、可审计的验证。gate 谓词自身的 precision 目前只有一处数字，且是同底座自评的**触发**闸门而非验收闸门（[[Papers/2607-MANTA]] 总体 precision 0.38 / F1 0.47，分域从近乎恒过到近乎恒不过）；外生校准与 process flag 的人工标注精度均未见。[[Papers/2607-HarnessBank]] 把判决算法层做到了目前最外生的形态（确定性配对统计量 + 独立 evaluator + evolver 与 task agent 不同家族），但同时暴露出"外生"是分层的：证据来源层由 patch 自报 activation beacon 且无人审计该声明是否名副其实，打分器层在部分域直接是未指明模型的 LLM judge；该篇也未报告 gate 的误收/误拒率，只有个案。三层里最脆弱的是证据来源层，因为它不只是未审计而是**攻击者可控**：[[Papers/2608-SkillJack]] 测到 judge 只看代码时判恶 36.7%、补上攻击者撰写的 name 与 documentation 后降到 10.0%，而这两个字段恰是多数 skill 准入闸门与检索器的主要输入。[[Papers/2608-EvoHarnessRL]] 给出该三层框架的另一种缺失形态：判决者是外族的 Claude Opus，判据却只是它阅读 agent 自写 note 加 LFU 频次，没有任何 held-out 回归检查——判决者的独立性不自动传递给判据。[[Ideas/HybridVerifier-GUIRuntime]] 正针对 GUI runtime 的 hybrid（deterministic state-contract + 学习式）verifier gate 这一缺口。
-- **credit assignment 的信号质量**：RSI 谱系瓶颈从"如何自改"转向"如何选 parent"（HGM CMP 0.778 vs DGM 0.285）；四类替代信号（clade 聚合 / 结果的辅助统计量 / 多因子固定权重效用 / 纯过程审计）尚未在同一 testbed 上对照；multi-agent 的 per-agent 归因仍靠讨论涌现而非算法。
+- **credit assignment 的信号质量**：RSI 谱系瓶颈从"如何自改"转向"如何选 parent"（HGM CMP 0.778 vs DGM 0.285）；五类替代信号（clade 聚合 / 结果的辅助统计量 / 多因子固定权重效用 / 纯过程审计 / 逆序干预定位）尚未在同一 testbed 上对照。multi-agent 的 per-agent 归因不再只能靠讨论涌现：[[Papers/2609-AgentGrad]] 的逆序 hint 注入给出第一个算法化方案，但它成立的前提是存在一个可替换进去的正确输出，因此覆盖的是"流水线结构固定 + 终点可自动判"这一象限，开放式协作与共识域仍无算法（§7.3）。
 - **演化增益的预算与来源归因**：多数工作报告的是"演化机制 + 额外资源"的联合效应而把结论写成前者——[[Papers/2607-MANTA]] 的 mutation 增益与 +28K token 同时上线（缺同拓扑再跑一轮的对照臂），[[Papers/2607-FrontisMA1]] 的 post-training 增益与外部更强 teacher 的蒸馏成分未分离（缺 no-teacher 臂）。第三种形态是**演化组件自身未被隔离**。[[Papers/2608-RoMeRL]] 的四个记忆坐标里只有一个用到学到的 Q，却没跑 $\omega_Q=0$ 的纯启发式臂；[[Papers/2608-EvoHarnessRL]] 的消融只做在冻结的 inference-time harness 上（换它的配置），从不存在"同样 SFT+GRPO 但去掉 BPE 动作"的臂，而它自己的动作统计显示 harness 调用退火到约每 episode 一次、其 SFT 教师纯 ReAct 已达 96.4，两种归因都与数据相容；[[Papers/2607-SESA]] 跑了关库对照并因此发现技能库的部署期贡献只占总增益的两三成（§6.3）。第四种形态更隐蔽：**演化组件被系统内另一个冗余机制替代**——[[Papers/2607-HarnessBank]] 的 2σ gate 被去掉后天花板 ±0.0，因为训练集 argmax 这个独立的部署选择器已经选中了同一个赢家；报告 gate 收益的工作若不把 selector 也消融掉，记在 gate 账上的功劳无法与 selector 的分开。四种形态共用一句诊断：**报出的是联合效应，写下的是单一归因**。equal-budget paired replay、teacher-ablation、关掉待验组件再跑一遍、固定判决规则换掉最终选择器——四个补法的成本都远低于原实验，缺席本身就是信号。
+- **效应量与噪声的口径**：多数增益报告是单次运行、无方差、无显著性检验，而唯一做过重复部署的工作给出的不可判区是 ±3 点（同一 100 题配对面板三次重复；字节相同的技能在 49 题 validation split 上跑 8 次 SD 3.92），落在这个区间内的 headline 条目按其自身数据不可判（[[Papers/2607-RethinkSkillEvolve]]）。等价性主张的要求更高一档：说"压缩后质量不变"需要一个预先声明的噪声带，目前只有一处给出（[[Papers/2608-SkillZipPro]] 预先固定 −0.05 margin，102 held-out 任务配对 bootstrap 得 +0.010、95% CI [−0.029, +0.059]），其余等价性主张一概没有（§9.4）。
+- **增益的内容归类**：演化产物记下的可能是环境与 API 使用规程而非任务能力，这类增益在同一 sandbox 内真实、跨 harness 大概率不复现——一条 sandbox 专属的导入路径 workaround 就足以建立一次 validation new best（[[Papers/2607-RethinkSkillEvolve]]），更极端的形态是把训练任务的答案编成运行时约束，或把绕过环境规则的捷径收为可复用技能（§10.7）。判别只需两件事：发布演化产物、换一套 harness 复现一次，两者目前都罕见。
 - **operation-level 演化的安全性**：memory 演化从内容升到操作（MemSkill）后 blast radius 放大，但无安全评估。
-- **演化资产的维护与撤销**：技能库、记忆库、harness patch 是被长期持有的资产，而所有演化算子都只管生产不管维护。两个后果已被分别测到：体积上，演化五轮后技能文档膨胀约 5.2×、十六轮 2.5–3.7×，且晚接入压缩只能部分挽回（[[Papers/2608-SkillZip]]）；血缘上，派生技能在源经验被删后仍有 80.0% 存活，来源标记在跨层提炼中从 100.0% 掉到 44.4%（[[Papers/2608-SkillJack]]）。两者是同一件事的两面——**资产被创建时携带的上下文（它为什么存在、从哪来、何时应作废）没有被任何机制保留**。缺的具体机制有三：带血缘的撤销（删掉一条经验须能追溯并作废其全部后代）、语义冗余度量（长度已可测，"两条技能是否在做同一件事"仍无度量）、以及作废条件（一条技能在什么条件下应被判定过期，而不是等它在某次任务上失败）。
+- **演化资产的维护与撤销**：技能库、记忆库、harness patch 是被长期持有的资产，而所有演化算子都只管生产不管维护。两个后果已被分别测到：体积上，演化五轮后技能文档膨胀约 5.2×、十六轮 2.5–3.7×，且晚接入压缩只能部分挽回（[[Papers/2608-SkillZip]]）；血缘上，派生技能在源经验被删后仍有 80.0% 存活，来源标记在跨层提炼中从 100.0% 掉到 44.4%（[[Papers/2608-SkillJack]]）。两者是同一件事的两面——**资产被创建时携带的上下文（它为什么存在、从哪来、何时应作废）没有被任何机制保留**。缺的具体机制有三：带血缘的撤销（删掉一条经验须能追溯并作废其全部后代）、语义冗余度量（长度已可测，"两条技能是否在做同一件事"仍无度量）、以及作废条件（一条技能在什么条件下应被判定过期，而不是等它在某次任务上失败）。第一项已有一个部分实现：[[Papers/2608-PrimeAgent]] 的版本化持久 harness 状态保留 provenance 并支持 rollback，使撤销一次演化编辑成为运行时操作，缺的那一半是跨存储的派生传播（§10.5）。冗余侧出现的是一个相邻但不同的口径：按 catalog / activation / path / deployment 四层成本分开记账，并要求每次删除携带一个 witness（字面包含、确定性覆盖、或冻结 checker 的 entailment 判定），把"能删多少"变成"证据有多强"的函数（[[Papers/2608-SkillZipPro]]）；它测到的仍是文本级重复——演化库每轮新增内容 55%±3% 与既有文本重叠、可移除份额从第 2 轮的 29% 升到第 15 轮的 53%——而"两条技能是否在做同一件事"仍无度量（§6.4）。
 - **co-evolution 的验证空白**：并非无人演化 verifier——[[Papers/2608-CoEvolutionSurvey]] 记录的 Stage 2 feedback-space 分支（演化 reward 候选、演化 unit test、按建议是否改善 policy 更新 critic）整支都在做这件事——而是**无人验证演化后的 verifier**：这些工作对演化后判分器的唯一背书是下游任务性能，而下游性能正由该判分器给出。最小对照是保留一个冻结的 held-out verifier 做跨代复评，库内无人做过。multi-agent population 稳定性、合谋、集体 misevolution 亦无实证。
 - **优化产物可迁移性**：文本级经验资产跨 backbone 可迁移（KnowAct 正例 +3.1pts），但跨演化阶段迁移反而失效（SEED 静态 library −7.4）。[[Papers/2607-HarnessBank]] 给出目前最清楚的机制刻画：演化产物是针对特定底座失败模式的 correction 而非普适更优配置，迁移成立与否由 pathology 是否匹配决定——AppWorld 上匹配的 patch 给 +15.4、错配只给 +1.2，Omni-MATH 上两代同族模型共享同一失败模式因而几乎无损迁移（+11.7 → +11.0），而把同一杠杆反向拧错叠在演化后的 harness 上是 −15.7，即有害而非中性。[[Papers/2608-AgentStream]] 从方法层给出同向但更弱的证据（最优方法不跨底座保序），其方法间 spread 在两个较强底座上只有 0.9–2.0 点、落在噪声量级。可迁移性的刻画因此从"能不能迁"细化为"失败模式是否同构"，但除 HarnessBank 外无第二处受控证据，也没有任何工作事前预测过匹配与否。一处间接线索指向"压缩方式影响迁移性"：[[Papers/2608-SkillZip]] 在 LiveMath 上报告其压缩产物的跨模型保留率 0.97、评测驱动压缩（SkillReducer）产物 0.91，差距集中在 off-diagonal（技能被移到非产出它的底座上），可能的解释是评测驱动压缩会保下与评测时底座耦合的部分——但这只有一组数字、无方差，只能作为待检验的假设。
 - **自演化增益的存在条件**：跨方法受控析因显示增益既不普遍也不稳定——45 个计数单元里 11–17 个跑输不演化的同一模型，方向随底座能力非单调，且成本-收益比同样由底座决定（[[Papers/2608-AgentStream]]）。论文把成因归给 bootstrap loop（solve rate 低则经验流被失败轨迹主导），但这是事后解读而非受控结论。把"能力 gate"改写成可操作的"经验质量 gate"只需一个实验：固定底座与方法，按成功/失败比例控制注入 state 的轨迹构成，看增益如何随之移动。在这个实验做出来之前，"在哪些条件下该上自演化"仍是一个没有答案的部署问题。同向的单篇证据来自 [[Papers/2608-EvoHarnessRL]] 的 frontier block——同一 harness、同一 benchmark、只换底座：ReAct 47.9 的 GPT-4.1 得 +22.1，60.7 的 GPT-5 得 +25.7，而已经 96.4 的 Claude Opus 4.5 只得 +2.1，且 Opus 的 Heat 一族从 100.0 掉到 93.8。**增益与基线质量负相关，且在已近饱和的轨迹上净效应可以为负**，这给"能力 gate"提供了一个家族级的具体实例（该篇 +25.7 与表内 85.0−60.7=24.3 算术不一致，其余 Δ 自洽）。
@@ -507,11 +622,11 @@ MLAS 的 lineage-persistent 至此还只是框架层断言加案例，[[Papers/2
 
 其四，**自演化的增益不是普遍属性，而是与底座能力、任务流结构、失败模式匹配度耦合的条件性收益**。首个跨方法受控析因在 5 方法 × 3 底座 × 3 种任务流的 45 个计数单元里测到 11–17 个跑输不演化的同一模型，增益随底座能力非单调，最优方法不跨底座保序（[[Papers/2608-AgentStream]]）；机制侧的同向证据来自 [[Papers/2607-HarnessBank]]——演化出的 harness 是针对特定底座失败模式的 correction，匹配时 +15.4、错配时 +1.2、反向叠加时 −15.7。两者合起来意味着"某方法带来 X 点提升"这类跨论文引用在缺少底座与流结构限定时没有意义。证据强度需与结论分开记：前者的效应量普遍小于其自身的 seed 间标准差且全文无显著性检验，可承重的是形态不是数值；后者单次运行、无方差报告。第三处同向证据把"底座能力 gate"落到了家族级：同一 harness 换底座，ReAct 47.9 的 GPT-4.1 得 +22.1、60.7 的 GPT-5 得 +25.7、已达 96.4 的 Claude Opus 4.5 只得 +2.1，且 Opus 在 Heat 一族上从 100.0 掉到 93.8（[[Papers/2608-EvoHarnessRL]]）——增益与基线质量负相关，在已近饱和处净效应可以为负。
 
-其五，**演化产物是需要治理的资产，而现有工作只造不管**。这一条在三个互不相关的切面上同时显形：体积上，技能文档随演化轮次单调膨胀（五轮约 5.2×、十六轮 2.5–3.7×），而没有任何演化算子承担压缩职责，晚接入的压缩也无法完全撤销已固化的冗余（[[Papers/2608-SkillZip]]）；血缘上，派生技能在源经验被删后仍有 80.0% 存活，且来源标记在跨层提炼中大量丢失，使"撤销一条坏经验"在工程上不可实现（[[Papers/2608-SkillJack]]）；时效上，长程工作流里最常见的失效正是过期假设未被作废与安全判断被沿用而非重算（[[Papers/2608-OpenART]]）。三者指向同一个结构性缺失：**资产被创建时的上下文——为什么存在、从哪来、何时应作废——没有被任何机制保留**，而自演化系统的全部价值恰恰建立在复用这些资产上。这条比前四条更接近工程可动手的位置：带血缘的撤销、语义冗余度量与作废条件都是明确的待建组件，且都不依赖新的理论。证据强度须一并记：三处各自单篇、无方差，SkillJack 的数字还只是路由层代理量，可承重的是"这三件事都还没人做"，不是任何一个具体百分比。
+其五，**演化产物是需要治理的资产，而现有工作只造不管**。这一条在四个互不相关的切面上同时显形：体积上，技能文档随演化轮次单调膨胀（五轮约 5.2×、十六轮 2.5–3.7×），而没有任何演化算子承担压缩职责，晚接入的压缩也无法完全撤销已固化的冗余（[[Papers/2608-SkillZip]]）；血缘上，派生技能在源经验被删后仍有 80.0% 存活，且来源标记在跨层提炼中大量丢失，使"撤销一条坏经验"在工程上不可实现（[[Papers/2608-SkillJack]]）；时效上，长程工作流里最常见的失效正是过期假设未被作废与安全判断被沿用而非重算（[[Papers/2608-OpenART]]）；内容上，被保留下来的常常是环境与 API 使用规程而不是任务能力——一条 sandbox 专属的导入路径 workaround 就建立过一次 validation new best，而同一批技能的 transfer 在分布偏移 tier 上从 +52～+53 塌到 +2.9（[[Papers/2607-RethinkSkillEvolve]]）。四者指向同一个结构性缺失：**资产被创建时的上下文——为什么存在、从哪来、在什么环境里成立、何时应作废——没有被任何机制保留**，而自演化系统的全部价值恰恰建立在复用这些资产上。这条比前四条更接近工程可动手的位置：带血缘的撤销、冗余度量与作废条件都是明确的待建组件，且都不依赖新的理论；第一项已有一个版本级的部分实现（[[Papers/2608-PrimeAgent]] 的版本化 harness 状态保留 provenance 并支持 rollback），缺的是跨存储的派生传播。证据强度须一并记：四处各自单篇、无方差，SkillJack 的数字还只是路由层代理量，可承重的是这几件事的缺席，不是任何一个具体百分比。
 
 ## Key Evidence Matrix
 
-下表登记进入 Overview / §7–§10 / Open Challenges 的高影响 claim，标注 state（source-verified / 跨来源收敛 / 作者综合论断 / 库内暂无独立验证）、locator 与边界。本轮 20 篇新论文经独立 verifier 核验的 claim 均标 [本轮核]。
+下表登记进入 Overview / §7–§10 / Open Challenges 的高影响 claim，标注 state（source-verified / 跨来源收敛 / 作者综合论断 / 库内暂无独立验证）、locator 与边界。07-24 重排时经独立 verifier 核验的 claim 标 [本轮核]，其后各轮并入的行按并入日期标注。
 
 | Claim | State | Locator | 边界 / 修订 |
 |:--|:--|:--|:--|
@@ -571,8 +686,40 @@ MLAS 的 lineage-persistent 至此还只是框架层断言加案例，[[Papers/2
 | OpenART：10K+ 有状态 scenario / 50 域 / 500K+ 工具，中位 97 次工具调用（既有安全 benchmark 1–15）；75 配置 pooled Strict ASR 85.0%，五轮 42.9→69.4→73.5→89.8→94.7；evaluator 人工审计正确率 99.3% | source-verified [09-07 并入] | [[Papers/2608-OpenART]] Abstract / Table 3 / Table 6 / §5.2 / §5.6 | 85.0% 是跨轮 best-of-K 而非单轮概率；Strict ASR 要求确定性 evaluator 与 GLM-5.2 judge 一致，而 GLM-5.2 本身是被测五模型之一；benign completion 与 ASR 未解耦（Aider 70.74% 完成率 / 59.1 ASR 同为最低），无 completion-conditioned ASR；75 个 cell 未给 N 与 CI；无 Limitations/Ethics 节 |
 | OpenART 长程漂移：投毒内容到目标动作的中位传播距离 37 个 action（IQR 20–66），首次读取在执行进度 23%、首次不安全输出在 64%，注入到危害的中位延迟占工作流 41%；八个 target 可见向量单独使用均 >50%（workspace 92.5%，其余七个均值 71.2%，full 94.7%） | source-verified [09-07 并入] | [[Papers/2608-OpenART]] §5.5 Fig 4 / §5.6 Fig 7 | 反驳"不安全行为在注入附近发生"的短程假设；三类反复失效（过期假设未作废 / 安全判断被沿用而非重算 / 单步安全动作组合致害）对复用既有判断的自演化系统尤其贴切；单侧演化——两侧模型冻结、benign objective 与 evaluator 不变，故不构成 agent 自演化的剂量-反应证据 |
 | CoEvolutionSurvey 按演化算子作用域分三阶段：$A^{t+1}=\Omega(A^t,E,\tau^t)$ / $(A^{t+1},E^{t+1})=\Omega(A^t,E^t,\tau^t)$ / $\Omega^{t+1}=\Gamma^t(S^t,\Omega^t,\tau^t)$；判别标准为≥2 个演化单元相互重塑彼此后续演化，Appendix A 与十个相邻概念划界 | source-verified [09-07 并入] | [[Papers/2608-CoEvolutionSurvey]] Sec. 2.2–2.3 / Appendix A | 与库内两篇 anchor survey（按组件切）正交；Stage 2 feedback-space 分支（ROSKA/CURE/ARCO/ECHO）说明 verifier 确有人演化，缺的是对演化后 verifier 的验证；作者自陈 Stage 3 现有工作多为单实体前身、像样例子仅 RQGM 一类；无公开 repo；Figure 4 跨论文汇总受各论文 setting 差异与取数规则限制 |
+| RSI-Agent 的增益按层拆开：同一张 GameCraft 表上 harness 交付 +5.07/+11.33/+14.18/+12.52，自改进机制交付 +3.44/+3.76/+3.99/+3.64；OSWorld 2.0 partial 71.97→78.98、binary 37.80→42.68、ALE 83.75→84.82 | source-verified [09-18 并入] | [[Papers/2609-RSIAgent]] Table 2 / §5 | 无等预算对照臂，基线直接关掉探索与持久记忆，附录自陈 "not a matched-budget estimate"；主表由自改进结果与保留基线拼成（41/82、19/67），只探索非满分任务；ALE 上 w/o RSI 的 83.75 已高于 GPT-6 Astra 82.26 |
+| RSI-Agent 按 §7.5 三条判据全不满足：无 generation ≥2、演化系统本身不被演化、权重全程冻结；记录的案例中记忆按目标任务从空建起 | source-verified [09-18 并入] | [[Papers/2609-RSIAgent]] Table A3 / Appendix 12.1 | RSI 术语与实物错位的第三个样本（前两个为 Frontis-MA1、Macaron-V1）；实际形态是任务内探索加持久笔记，成本按题付而非按环境摊销一次 |
+| RSI-Agent 的 verifier 准确率全文无量化，其失效链自陈：误判 PASS → 错误规则被蒸馏进记忆 → 后续 run 继续复用 | source-verified [09-18 并入] | [[Papers/2609-RSIAgent]] §4.6 / §7 | 闸门误判在演化系统内以持久资产形式留存并被反复执行（§10.6）；失效子类计数取自 selected case audit 且同一案例可计入多个子类，据此估不出误判发生率 |
+| GAI 把 gate 独立性拆成两个独立自由度：判据的**位置**（评估者在 $Ag$ 内还是外）与判据的**忠实性**（被评的是不是真目标）；Minimal Example 里三种放置都自洽而只有一种服务目标 | source-verified [09-18 并入] | [[Papers/2609-GeneralizedAgentIteration]] Remark 2 / Minimal Example | 纯形式化工作：无实验、无定理证明，对既有系统的归约以散文给出；承重的是"自洽的自我报告不携带是否真的变好的信息"这一判断，不是任何数值 |
+| NeoHorse-1 的受控对照只剩 +1.26：同基座同课程同预算下 routing-harness 数据五项均值 70.57 vs Toucan 64.32 vs 基座 69.31，其中 HumanEval +9.14、其余四项净 −0.57 | source-verified [09-18 并入] | [[Papers/2609-NeoHorse1]] Table 3 + Table 1 逐格重算 | headline 的 58.94→64.87 / 65.60→69.04 含数据规模差异；全文无隔离课程排序、on-policy distillation 与能力导向配比的消融；论文未提及 Toucan 轮低于基座 |
+| Ecdysis：逐条失败改 harness 的基线与胜出方法同起点、同训练评测与接受回滚协议，10 个 held-out 格平均 51.67→46.67（7 格绝对下降），Pass@3 66.00→63.50、Pass^3 37.00→29.00；接受准则为训练集总分严格提升 | source-verified [09-18 并入] | [[Papers/2609-Ecdysis]] Table 1/2 + §4.1 | 该篇整体为 partial 核验，此处只用 source-verified 行；"总分严格提升"只约束总分不约束逐任务回归，是 §10.2 中第一例闸门之后的整体回归；论文全文未讨论该回归 |
+| Ecdysis 的 AgentBench 块：w/ FDCR 对五个模型给出完全相同的 90.00/90.00/90.00（AVG = Pass@3 = Pass^3），模型跨度从 Direct 5.00 的 Llama-3.1-8B 到 230B | source-verified [09-18 并入] | [[Papers/2609-Ecdysis]] Table 7 | "harness 把训练任务答案编成运行时约束"是推断而非实测，可证伪检查是读演化后的 harness 找任务特定常量；论文零评论；该块占 headline 相对增益的三分之一 |
+| RethinkSkillEvolve 端到端口径：14 个 setting 中"演化→部署 test 更好"9 个，同时改善 robustness 与 transfer 7 个；388 个候选经字节去重只剩 55 个互异的 validation best | source-verified [09-18 并入] | [[Papers/2607-RethinkSkillEvolve]] Table 2 / Appendix | "9/11 improve test" 的分母已被 validation 筛过一遍，跨论文引用应使用 9/14 与 7/14；probe 面板极小（LiveMath T3 仅 2 题）却被等权宏平均进 R/T 汇总 |
+| RethinkSkillEvolve 噪声带：字节完全相同的 skill 在 49 题 validation split 上重测 8 次 SD 3.92；100 题配对面板三次重复部署把 +2.3 翻成 −2.0/−3.0/0.0、把 −6.6 翻成 +6.0/+7.0/+5.0，parent-vs-parent 基线 −2.0/−2.0/+2.0 | source-verified [09-18 并入] | [[Papers/2607-RethinkSkillEvolve]] Appendix C Table A13 | 该协议下 ±3 点不可判，本文覆盖的多数报告增益落在此量级；SD 3.92 来自 49 题 split，不可直接搬到 1,400 题 test 上 |
+| RethinkSkillEvolve 的 test-time-scaling 对照臂：oracle Parallel Sampling 在 SearchQA 上只落后 evolved skill 0.43 点，在 SpreadsheetBench 上落后 30.96 点（K=6，6,324 次评分尝试） | source-verified [09-18 并入] | [[Papers/2607-RethinkSkillEvolve]] §TTS | 第三条对照臂（等预算重采样）此前在本文覆盖范围内无人做；oracle 选择是上界而非可交付系统；结论是分域的，不能跨域搬运 |
+| RethinkSkillEvolve：Gemini 3.1 Pro 选中 skill 含 sandbox 专属 workaround（import openpyxl 前把 /tmp 移出 sys.path），该 workaround 引入的那一轮本身建立了一次 validation new best（69.2→74.4） | source-verified [09-18 并入] | [[Papers/2607-RethinkSkillEvolve]] Appendix D Listing 3 / Table A23 | 演化产物编码环境规程而非能力的最细样本（§10.7）；同篇旁证：从 parent 反复采样补不回该增益，transfer 在分布偏移 tier 从 +52～+53 塌到 +2.9/+3.5；"换 harness 不复现"是假设，论文未测 |
+| SkillZip Pro 的等价性协议：实验前固定 −0.05 margin，102 个 held-out 任务配对 bootstrap（10,000 次重采样）给出 +0.010、95% CI [−0.029, +0.059]，据此判定唯一保质量 | source-verified [09-18 并入] | [[Papers/2608-SkillZipPro]] Table III / §VI-G | 等价性主张给出预先声明噪声带的首个样本（§9.4）；pooled 102 任务、BFCL 仅 21 题，真实演化库只有 3 个且同出一次 SkillOpt 运行；kimi-k2.6 上产物可移植性下降（0.611→0.574） |
+| SkillZip Pro 的四层成本账（catalog/activation/path/deployment）与 witness 层级 W1≻W2≻W3：production 内容审核 skill 上 witness 逐级放开 13.8%→32.7%→38.1%，无保护压缩 71.4%/75.8% 使 accuracy 88%→70%/62%、FP 10→29–35；演化库每轮新增内容 55%±3% 与既有文本重复，可移除份额 29%（round 2）→53%（round 15） | source-verified [09-18 并入] | [[Papers/2608-SkillZipPro]] §VI-M/§VI-P/§VI-V | "单一压缩率是误导性指标"在方法层被兑现；测到的是文本级重复而非功能级等价；其 SkillReducer 基线的弱化只适用于本文自身实现，不能反向下调前作报告的对照数字 |
+| TRACE 以 Pass^k 为直接目标做无闸门的技能重建：GPT-5.5 上 Pass^3 59.9%→94.5%、Δ3 从 27.8 收到 4.0；hidden set 上 50.0→70.0 与 66.7→83.3 | source-verified [09-18 并入] | [[Papers/2608-TRACE]] Table 1/2 | 主表报在 train+test 合并集上而演化循环同时用了两个 split，跨论文可比的是 hidden set 两列；代价是延迟 +22.0%、token +72.4%、成本 +58.8%；全文无任何组件消融，不报 false-refusal 率，也不测 Skill Bank 是否固化早期错误 |
+| COBRA-Skills 用 contextual bandit 分配评测预算：三底座相对无技能 +13.1/+26.9/+22.5，总成本相对 SkillOpt 降 55%–58%、每点增益成本降 60%–69%；消融 w/o Bandit −2.2 / w/o Evolution −2.4 / Best-of-30 −2.5 | source-verified [09-18 并入] | [[Papers/2609-COBRASkills]] Table 1/2/4 | 3 次运行 mean±SE，是本文覆盖范围内少见的带离散度报告；OfficeQA 因无法复现 SkillOpt 结果被排除；self-teaching 配置下均分 73.5→72.5、ALFWorld 72.3→63.3，教学侧 token 降 67%–80% 而目标模型 token 上升 |
+| JIT-Agent 把 harness 变成按实例现场生成的产物：$(\mathbf{M},\mathbf{P},\mathbf{A},\mathbf{F})$ 协议 + 13 个 seed harness + 三阶段训练的生成器；18 个 matched backbone–benchmark 配对全部提升（GLM-5.2 74.1→81.8、DeepSeek-V4-Flash 66.7→75.5） | source-verified [09-18 并入] | [[Papers/2608-JITAgent]] §5.2 / Table 3 | 固定 backbone 的受控对比里性能只 4/6 居首、成本 6/6 最低（降 14.9%–54.1%，均值 36.0%），且未说明报告的 token 与成本是否含生成器自身开销；无 stage 级消融；写进其 harness intelligence 定义的 reliability 一条完全无量化证据 |
+| Zetta 的技能入库闸门：候选须在来源 cluster 内 100% 通过历史失败回归，再看 held-out ΔSR；冻结 VLA 之外的 harness 演化使 RoboCasa 73.56→93.56、LIBERO-Pro macro 32.00→71.13 | source-verified [09-18 并入] | [[Papers/2608-Zetta]] §2.6.2 / Table 2/3 | 摘要的 90.8% 是 Goal 子集均值而非全集；ΔSR 无数值接受阈值；全文无组件级消融（runtime critic / recovery skill / gate 三者贡献未分离），无算力配平对照 |
+| Dream-RSI 用重放模拟器做离线搜索：Lasso 上 2931.0 ms / 317 次调用 对 3587.1 ms / 550 次，Flash 上 2350.6 ms / 1879 次 对 2516.7 ms / 3200 次 | source-verified [09-18 并入] | [[Papers/2609-DreamRSI]] Figure 3(a) / §4.1 | 该篇整体为 partial 核验，此处只用 source-verified 行；报告的 Compute 只数 discovery-agent 调用，离线重写与重放评估不计入；确定性揭示假设使被优化的只有预算、批次与停止；单次运行；Pro 侧 6 个 held-out 中 5 个更慢，均值改进完全由 RCV1 一列（14616.0 对 19550.1）支撑，Flash 侧则 6 个里赢 5 个 |
+| AgentGrad 用逆序 hint 注入做 per-agent 归因：谁的单点修正能把系统 reward 拉到上界谁即为责任方，干预后的输出直接充当 pseudo-label，因此不需要显式 loss；GPT-5-mini 五 benchmark 平均 +11.76（GEPA +9.24 / TextGrad +6.33 / MIPROv2 +5.66） | source-verified [09-18 并入] | [[Papers/2609-AgentGrad]] §4.1–4.2 / Table 1 | 该篇整体为 partial 核验，此处只用 source-verified 行；摘要的"两 backbone 全面 SOTA"与其自身表冲突（Qwen3-8B/IFBench TextGrad 42.52 > 41.42，加粗给了 TextGrad）；同表两格 TextGrad 与无优化基线逐位相同（零更新被接受）却计入正的平均增益；逆序前提"失败集中在靠后 agent"无任何测量；干预 rollout 是否计入预算 $B$ 未说明 |
+| Prime Agent 的版本化持久 harness 状态：四类 typed state 支持 CRUD，refinement 在 turn boundary 落地并记录触发事件与预期效果，版本保留 provenance 并支持 rollback，模型权重不变；一条 Factorio 轨迹里 agent 在 anti-cheating heartbeat 下仍用 RCON 直接 spawn 资源并把它保留为可复用 skill | source-verified [09-18 并入] | [[Papers/2608-PrimeAgent]] §2.5 / §3.5 | 该篇整体为 partial 核验，此处只用 source-verified 行（headline 30%→95.5% 按其 §3.1 自陈只是外部参照，不隔离 harness 因果效应）；撤销覆盖条目自身的版本历史，跨存储的派生传播未描述也未测；nanoGPT 上"harness 选择影响小于实验噪声"是散文判断，未见配套噪声估计 |
+| GSAR 的离线 judge 准确率与下游收益脱钩：四 judge 平均 91.5% Acc / 91.8% F1，但 AndroidWorld 在线 RL 头对头只把 UI-TARS-7B-DPO 从 26.7% 提到 30.2%（+3.5），低于 rule-based reward 的 32.8%（+6.1） | source-verified [09-18 并入] | [[Papers/2608-GSAR]] Table 2 / §5.3 Figure 6(a) | 演化 verifier 的离线判别力不能代替下游验证（§8.4）；每训练步 rollout 时间 2342 s 对 rule-based 2754 s，省的是设备访问开销；换 UI-TARS-7B-SFT 底座后增益萎缩到 EM +0.01～+1.03 |
+| OPSA：教师 token 级 advantage 噪声率 30.6% / 34.7% / 50.6% 随教师规模单调上升；把全部教师 advantage 换成施加在学生最低 20% log-probability token 上的固定 −0.5，效果与标准 OPD 相当，换成 +0.2 则策略崩溃；删掉教师后 Qwen3-1.7B 的 AIME24 Avg@32 13.44→48.85 | source-verified [09-18 并入] | [[Papers/2608-OPSA]] Sec 2.2 Fig 2(a) / Sec 3.2 Fig 4 / Table 2 | 信号的"落点"与"判别内容"是两条可解耦的属性（§3.4），与分辨率、可验证性从未被同时控制（§4.5 第六个缺口）；等 token 预算对照成立（App C.3：GRPO-wait 32.81 / OPD-wait 31.67 对 OPSA 48.85）；mask 掉反思词 fork 位置后增益基本消失并在约 300 步长度崩塌，撬动的是模型已有反思路径；OOD 增益小（MBPP+ +1.20、GPQA-Diamond +4.48）；全部结果在 1.7B 非 thinking 模式的数学推理上 |
+| PRACTICE 阶段消融 24.3 → 40.7 → 42.3 → 45.3 → 49.7：不学习的 BPE 式初始库贡献 16.4 点，三个学习阶段合计 9.0 点，终库 29 张 card | source-verified [09-18 并入] | [[Papers/2608-PRACTICE]] Table 3 / Sec 3.2 | 与 OPSA 同型——被训练出来的监督源，其收益可能小于一个不学习的结构先验；failure-aware 相对 success-only +2.6（45.3 对 42.7）；EB-Habitat 的 Base 与 Long 两档落后最强基线；Appendix C.2 把同一结果写成 40.0% 而 Table 1/3/7 是 49.7%，论文未解释这处不一致 |
 
 ## 调研日志
+
+### 2026-09-18 survey-refresh（并入 18 篇，papers_analyzed 76）
+
+- **merged（18 篇）**：[[Papers/2607-RethinkSkillEvolve]] → §6.1（审计式复现与噪声带）、§3.6/§6.3/§6.4/§9 索引表/§9.4/§10.2/§10.7/§11/§12 其五；[[Papers/2608-SkillZipPro]] → §6.1（四层成本与 witness 层级）、§6.4/§9.4/§11；[[Papers/2609-RSIAgent]] → §7.5（按三判据逐条判定）、§3.6/§5.6/§6.2/§10.6；[[Papers/2609-Ecdysis]] → §6.2（gate 判据形式轴）、§3.6/§10.2/§10.7；[[Papers/2608-PrimeAgent]] → §10.5（版本级撤销的首个实物）、§9.4/§10.7/§11/§12 其五；[[Papers/2609-AgentGrad]] → §5.5（多 agent 流水线的 prompt 优化）、§7.3/§8.3/§10.2/§11；[[Papers/2608-TRACE]] → §6.1（Pass^k 为目标的无闸门重建）、§3.5/§3.6/§6.2/§9 索引表；[[Papers/2608-JITAgent]] → §7.2（按实例生成 harness）、§3.5/§3.6/§7.4；[[Papers/2608-Zetta]] → §7.2（冻结 VLA 之外的 harness 演化）、§3.6/§6.2/§9 索引表；[[Papers/2609-DreamRSI]] → §7.1（重放模拟器上的离线搜索）、§3.6/§7.5；[[Papers/2609-GeneralizedAgentIteration]] → §6.2（判据位置与忠实度的切分）、§2.2/§7.5；[[Papers/2609-NeoHorse1]] → §7.5（路由 harness 自标难度）、§3.6/§4.1；[[Papers/2609-COBRASkills]] → §6.1（评测预算的 bandit 分配）、§3.6；[[Papers/2608-GSAR]] → §8.4（演化 verifier 的离线判别力与下游收益脱钩）、§3.4/§4.4；[[Papers/2608-OPSA]] → §3.4/§3.6/§4.3；[[Papers/2608-PRACTICE]] → §5.1/§5.4/§3.6；[[Papers/2609-FlowBalance]] → §3.6/§4.3；[[Papers/2605-SEGA]] → §2.2/§5.1/§5.3。
+- **skipped**：无。18 篇全部落位。
+- **papers_analyzed 对账链**：按"`## 调研日志` 之前的正文中唯一且能解析到 `Papers/*.md` 的 wikilink"口径机械重数，得 76，无悬空链接（另有 1 条 `Ideas/` 链接不计入）。同口径重数上一版正文得 58，而其 frontmatter 写的是 65——7 篇为历史漂移（旧口径按并入篇数累加而非重数）。本轮取机械值：58 + 18 = 76，覆盖累加值。
+- **结构变化**：新增 §10.7「演化产物编码的是环境规程」（三篇独立证据构成既有小节未覆盖的形态）；§10.2 由"三条线"扩为五行并改题为「负性结果：自改进可自退化」；§6.2 gate 表新增两行并补入"聚合分数 vs 逐任务回归"这条判据形式轴；§7.5 新增三判据 × 五工作的对照表；§9 索引表 +3 行；§11 新增两条开放挑战（效应量与噪声的口径、增益的内容归类），credit assignment 与演化资产两条按新证据改写；§12 其五由三个切面扩为四个。判断总数仍为五条，未增补。Key Evidence Matrix 新增 23 行。
+- **被修改的既有结论**：§9.4 的"等价性主张无人给出噪声带"降级为"未成标配"（[[Papers/2608-SkillZipPro]] 的预声明 margin + 配对 bootstrap、[[Papers/2607-RethinkSkillEvolve]] 的重复部署带宽两个正面样本）；§10.5 的"没有一个自演化系统实现带血缘的撤销"改写为"版本级撤销已有实物、派生级撤销仍无"（[[Papers/2608-PrimeAgent]]）；§11 的"multi-agent per-agent 归因仍靠讨论涌现而非算法"改写为限定在"结构固定 + 终点可验证"象限之外（[[Papers/2609-AgentGrad]]）；§8.4 的"库内无人这样做"改为"目前无人这样做"并补入 [[Papers/2608-GSAR]] 的离线-下游脱钩数据；§6.3 第三条对照臂（test-time scaling）由缺席改为已有分域结论（[[Papers/2607-RethinkSkillEvolve]]）；§1.2 其二的"三条独立证据线"改为两种形态——过程自身跑偏，以及通过接受判据之后仍在 held-out 上净负（[[Papers/2609-Ecdysis]]、[[Papers/2607-RethinkSkillEvolve]]）。
+- **刻意未写进正文的 claim 及理由**：(1) AgentGrad "1,000 rollout 达 70% 而 GEPA 需 >6,000"——逆序干预的额外 rollout 是否计入预算 $B$ 全文未说明，该图横轴正是 rollout 数，口径不确定，只保留 wall-clock 并标注其 ratio-of-means 口径；(2) Prime Agent 的 "same performance at substantially reduced cost / token-for-token advantage"——全文无任何 token 用量数字，ledger 判为 unsupported；(3) Prime Agent §1 的 "outperforms Kimi-Code"——与其 Figure 8 的 71.0 > 68.1 冲突（ledger 判 contradicted），该篇在本文承担的是撤销机制而非 benchmark 结论，故不引入；(4) Prime Agent headline 30%→95.5%——按其 §3.1 自陈只是外部参照而非隔离 harness 因果效应，不作为增益数字使用；(5) RSI-Agent 的 "Agentic Causal Discovery" 与可复用因果关系主张——记忆实物是无 schema 的自撰文件，无结构化因果表示、无对应消融；(6) Dream-RSI 的三条 not-checkable claim（含跨域普适性表述）不进正文；(7) Ecdysis 的跨模型迁移 51.67→68.33 与数据 curation 结论——单格、单次、Pass^3 反向（45.00 对 60.00），不足以承重；(8) Zetta 摘要的 90.8%——是 Goal 子集均值而非全集，正文一律用 71.13 与 93.56；(9) JIT-Agent 对 ahead-of-time harness 的优越性——该篇的对照是结构性论证而非实验，正文只写"首个学到的按实例配置生成器"并给出可判别实验。另有两条以假设形式而非结论形式入正文：RethinkSkillEvolve 的"换 harness 则 sandbox 相关收益不复现"、Ecdysis AgentBench 同分块的"答案被编成运行时约束"，两者均在正文标明未经实测并给出可证伪检查。
 
 ### 2026-09-07 增量更新（survey-refresh）
 

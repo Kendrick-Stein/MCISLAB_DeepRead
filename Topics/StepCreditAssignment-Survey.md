@@ -1,9 +1,9 @@
 ---
 title: "Step-Level Credit Assignment：从 trajectory-level reward 反推步级监督"
 tags: [survey, agentic-RL, gui-agent]
-date_updated: "2026-08-20"
+date_updated: "2026-09-18"
 year_range: 2023-2026
-papers_analyzed: 24
+papers_analyzed: 26
 keywords: [credit assignment, step-level reward, process reward, process reward model, critical step, step selection, dense reward, outcome reward, trajectory-level reward, loss masking, token weighting, self-distillation, hindsight distillation, advantage shaping]
 domain_map: AgenticRL
 ---
@@ -14,13 +14,13 @@ domain_map: AgenticRL
 
 区分这一族方法的三条轴：
 
-- **打分信号从哪来**：语义判据 / prefix rollout 估值 / 终局回溯 / log-likelihood ratio / 外部 critic / 轨迹间结构对比。信号来源决定标注成本，也决定失效模式。
-- **信号衡量的是什么**：与目标的相关性、前缀的价值、该步的正确性、模型对该步的可学性。四者常被混用为同一个"step score"。
-- **信号如何被消费**：SFT 阶段的 loss mask 与 token 加权，还是 RL 阶段的 reward shaping 与 advantage 重分配。
+- **打分信号从哪来**：语义判据 / prefix rollout 估值 / 终局回溯 / log-likelihood ratio / 外部 critic / 单点反事实干预 / 轨迹间结构对比。信号来源决定标注成本，也决定失效模式。
+- **信号衡量的是什么**：与目标的相关性、前缀的价值、该步的正确性、模型对该步的可学性、该步是否为失败的充分修复点。五者常被混用为同一个"step score"。
+- **信号如何被消费**：SFT 阶段的 loss mask 与 token 加权，RL 阶段的 reward shaping 与 advantage 重分配，或者不动参数、把分数变成对该步所用 prompt 的文本编辑。
 
 这三条轴不是正交的分类练习，而是决定一个方法能否回答"轨迹整体 reward=1、但其中若干步是错的，怎么办"这个具体问题。**SFT 侧的两条代表性选步工作并不回答它**：[[Papers/2503-ATLaS]] 用 GPT-4o 按 Plan Creation / Critical Observation / Critical Action / Self Correction 四类语义标准挑步，[[Papers/2605-Weasel]] 用 goal-state 语义相关度加两两差异度做固定预算的子集选择——两者的判据里都没有"这一步对不对"这一维，且都明确假设输入是专家轨迹。一个错误但与目标相关、且与其他步骤不重复的步骤，会被这两类选择器选中并加权。
 
-真正把正确性纳入判据的信号来自另外几族：prefix rollout 估的是价值而非正确性，只在"错步会显著降低成功概率"时与正确性重合；终局回溯与外部 critic 直接判对错，代价是引入一个本身会错的判官；log-likelihood ratio 提供免费的分解，但它的推导前提在 GUI 轨迹上并不成立。
+真正把正确性纳入判据的信号来自另外几族：prefix rollout 估的是价值而非正确性，只在"错步会显著降低成功概率"时与正确性重合；终局回溯与外部 critic 直接判对错，代价是引入一个本身会错的判官；log-likelihood ratio 提供免费的分解，但它的推导前提在 GUI 轨迹上并不成立；单点反事实干预把判定交还给环境 reward、因而不需要判官，但它得到的判定是"改这一步够不够"而非"这一步对不对"，且需要 ground-truth 才能把干预构造出来。
 
 评测层面存在一个结构性偏斜：数学推理域因为答案可自动校验，成了这条线的发源地与主要实验场，而 GUI / Web agent 恰恰是缺少可自动校验终局信号的场景。把数学域的结论平移到长轨迹 GUI 训练，中间隔着至少三个未被检验的假设（step 边界的定义、outcome label 的噪声、observation token 是否计入分解）。
 
@@ -80,6 +80,16 @@ ImplicitPRM 的结论是 credit 的分解可以是免费的：只要 reward 的�
 
 [[Papers/2500-GuiPraProcessReward]]、[[Papers/2509-TGPO]]、[[Papers/2505-MobileIPL]] 属于同族的 GUI 实例：分别在 process reward 里加入动态记忆与自适应 UI 感知、把语义等价的状态在树上合并以消除偏好标签冲突、以及把叶节点规则奖励沿 CoaT 树回传后做 T-DPO。这三条的定位可靠，但其报告数字尚未见独立验证。
 
+### 单点反事实干预：用环境 reward 判定责任单元
+
+这一族既不训练也不调用判官，而是直接改掉一个单元再把系统重跑一遍，用 reward 是否回到满分判定该单元是否要为这次失败负责。
+
+[[Papers/2609-AgentGrad]] 目前是这一族唯一的实例，作用对象是固定顺序流水线形式的 multi-agent system：π¹…π^N 依次执行、后一个 agent 的输入由前序输出构造、每个 agent 一条轨迹内只被调用一次，因而一次 agent 调用就对应轨迹上的一步。对每个失败样本，它按逆执行序逐个把含 ground-truth 的 hint 追加到某个 agent 的 prompt 后重跑，reward 被拉到 r_max 即认定该 agent 是责任单元；更关键的是同一输入下干预前后的中间输出之差直接充当该单元的 pseudo-label，于是梯度不再需要一个由系统级输出与 ground-truth 比较得到的显式 loss。五个 benchmark 上 GPT-5-mini 相对不做优化的基线平均 +11.76 点（GEPA +9.24），Qwen3-8B 上 +9.67（GEPA +7.62），五个 benchmark 的优化 wall-clock 都是最短，平均 136 分钟。
+
+它在这条线上的特殊之处有两点。其一是仲裁者从模型换成了环境：TRIAGE 与 OSReward 划出的"判官准确率即方法上限"这条天花板，在这里不适用，因为根本没有判官在给步骤打分。其二是成本结构与 prefix rollout 族正好相反——Math-Shepherd 每步要 N 次完整 completion，是因为它估的是一个概率；反事实干预每个单元只需一次重跑，是因为它问的是一个是非题。省下的算力换成了更强的前置条件：hint 由 ground-truth 或最终输出须满足的约束拼成，只在训练期注入，这意味着这条路要求终局答案已知，比"存在一个可自动判定的 verifier"苛刻一档。
+
+覆盖面是它真正的边界，缺口有两处。干预只施加在失败集上，成功轨迹里的错步完全不在射程内，而 ABSeeker 量化的问题恰有一半在那边（成功轨迹里约 4% 的步骤低于基准）。"改一个单元就够"这个 target 定义在失败由多个单元耦合造成时直接失效，逆序走完 n=1 仍未被任何单点干预解决的样本被整轮丢弃，该文既没有报告这类样本占失败集的比例，也没有给出各 benchmark 的 agent 数 N，因而方法的有效覆盖率无法从论文内部估出。逆序遍历所依据的"失败集中在靠后的 agent"在全文是一句没有任何测量支撑的断言。
+
 ### 结构对比：fork point、树与失败定位
 
 最后一族不给单步打绝对分，而是通过轨迹之间的结构差异推出相对信号。
@@ -113,6 +123,7 @@ ImplicitPRM 的结论是 credit 的分解可以是免费的：只要 reward 的�
 | [[Papers/2606-TRIAGE]] | LLM judge 给片段分四类角色 | 是（含 regression 判定） | 1 次 judge/片段 | GRPO advantage 加常数 | ALFWorld / WebShop / Search-QA | 去掉 regression 项 −6.1 / −4.1；no-thinking judge 跌破 GRPO |
 | [[Papers/2602-ADMIRE]] | GPT-4o 蒸馏 milestone + SBERT 命中 | 部分（agent 自报进度） | milestone 蒸馏 + 每步 SBERT | 成功/失败非对称 credit | AndroidWorld / MobileMiniWob++ | 44.0 vs outcome-only 39.7；MMW 上 outcome-only 反降 57.6→51.1 |
 | [[Papers/2608-StepReflect]] | 结构化 transition consistency 预测 | 是 | 四阶段训练一个 8B 判官 | 在线 reflection | AndroidWorld | 1,082 条人工核验 transition 上 82.16% |
+| [[Papers/2609-AgentGrad]] | 单点注入 ground-truth hint 后系统 reward 是否回到 r_max | 判"该单元是否为充分修复点"，不判该步对错 | 每个失败样本最多 N 次系统重跑，无判官 | 生成 prompt 文本编辑梯度，不动参数 | HotpotQA / HoVer / PUPA / IFBench / MATH | GPT-5-mini 均值 +11.76 对 GEPA +9.24；Qwen3-8B 的 IFBench 一格低于 TextGrad |
 | [[Papers/2604-SOLAR-RL]] | 与 ground-truth 动作标签逐步比对 + 首失败点截断 | 是（依赖标签） | 离线，每步 N 个候选 | 三段式 reward | AndroidControl / GUI-Odyssey | 零在线交互；需要 ground-truth 动作标签 |
 | [[Papers/2601-EvoCUA]] / [[Papers/2607-EvoCUA15]] | 首个分歧点 / STEPO 均分回传 | 部分 | 需成对轨迹 | step-level DPO / GRPO | OSWorld-Verified | 56.7% → 63.2% |
 | [[Papers/2509-TreeGRPO]] | 树采样中兄弟子树的回报差 | 部分 | 同预算下约 1.5× 样本 | GRPO advantage | 多跳 QA | 1/4 预算即超过 chain GRPO |
@@ -127,13 +138,15 @@ flowchart LR
   R --> C["3 终局回溯"]
   R --> D["4 log-likelihood ratio"]
   R --> E["5 外部 critic 与角色归因"]
-  R --> F["6 轨迹间结构对比"]
+  R --> G["6 单点反事实干预"]
+  R --> F["7 轨迹间结构对比"]
 
   A --> A1["ATLaS / Weasel / Rho-1"]
   B --> B1["Math-Shepherd / BetaPRM"]
   C --> C1["ABSeeker"]
   D --> D1["ImplicitPRM / SEED / PCSD / GatedHindsight"]
   E --> E1["TRIAGE / ADMIRE / StepReflect / GUI-PRA / TGPO / MobileIPL"]
+  G --> G1["AgentGrad"]
   F --> F1["SOLAR-RL / EvoCUA / TreeGRPO / ECPO / ProxMO"]
 
   A1 --> S1["判据不含正确性"]
@@ -141,6 +154,7 @@ flowchart LR
   C1 --> S3["判官本身未经人工验证"]
   D1 --> S4["前提在 GUI 轨迹上不成立"]
   E1 --> S5["判官可靠性即上限"]
+  G1 --> S7["需 ground-truth 造干预<br/>只覆盖失败轨迹"]
   F1 --> S6["需成对或可比轨迹"]
 ```
 
@@ -161,6 +175,7 @@ flowchart LR
 | AndroidWorld | — | 成功率 | GatedHindsight 52.73（7B） | 移动端长程；ADMIRE 与 GatedHindsight 均在此报告主结果 |
 | AndroidLab | — | 成功率 | GatedHindsight 54.11（8B） | GRPO 在此可低于 SFT（37.43 对 39.13） |
 | OSWorld-Verified | — | 成功率 | EvoCUA1.5 63.2% | 桌面长程，步数最长的一类 |
+| IFBench | — | instruction-following 得分 | AgentGrad 76.08（GPT-5-mini） | MAS 流水线上的指令跟随；Qwen3-8B 上 AgentGrad 41.42 低于 TextGrad 42.52，与该文自身的全面 SOTA 论断不一致 |
 | xbench-2505 | — | 成功率 | ABSeeker（ABC-GRPO） | ABC-SFT 在此掉点 73.0→72.0，是选步方法少见的反向读数 |
 | OSReward-Hard | — | judge 准确率 | 最好 69.7%，均值约 52% | 直接测量步级判官本身，而非用它的下游收益倒推 |
 
@@ -176,6 +191,8 @@ flowchart LR
 
 **增益高度依赖 headroom，而非方法本身。** [[Papers/2607-GRPONullWebAgent]] 用 18 组受控实验给出条件命题：当 SFT 已经掌握任务时 RL 没有增益，存在 headroom 时增益可达 22 分；中等学习率造成局部损伤，高学习率造成全局崩塌。Weasel 的最强 backbone 一列印证了同一件事——Qwen3-8B 未训练时 WebArena 18.0 / MiniWob 61.1 / WorkArena L1 35.2，全量 SFT 后是 18.2 / 59.4 / 33.3，训练把两项拉低了；Weasel 在这一列的主要成就是让 SFT 不再有害，而不是让 SFT 带来大幅提升。ABSeeker 的 ABC-SFT 在 xbench-2505 上从 73.0 掉到 72.0，属于同一类读数：高分基线上，重加权 SFT 的收益可能是负的。
 
+**报告增益的分母取决于基线有没有真正跑起来。** [[Papers/2609-AgentGrad]] 的 GPT-5-mini 主表里，TextGrad 在 IFBench 与 MATH 两格的数字连 standard error 都与不做优化的基线逐位相同（73.07±0.60 与 76.48±0.91），意味着这两格一次 prompt 更新都没被接受；迁移表的 IFEval 与 OlympiadBench 重复了同一现象，该文对这四处退化运行未作任何说明。这不动摇它的平均增益排序，但"相对 TextGrad 的平均差距"里有一部分来自基线没跑起来，而不是方法更强。这类检查在本节其他工作里几乎无法做：多数论文只报告基线的最终分数，不报告基线接受了多少次更新，于是"基线是否被合理调优"无法从论文内部证伪。该观察目前只有单一来源，尚未在其他工作上复核。
+
 **训练信号质量的直接测量给出偏冷的结论。** [[Papers/2606-QVal]] 跨 4 个环境、7 个方法族、21 个方法、6 个 backbone 做了 1200 组以上实验，用 Q-alignment 相关性衡量各类步级信号的质量，结论是简单基线（直接 prompting、ranking）在多数格子里已具竞争力。但这一结论是环境条件的而非普遍的：FrozenLake 的 Q-value 文本设定下 codegen-avg 达 ρ=+0.939（直接 batched 只有 +0.430），OpenApps 的 Q-value 上 ΔBelief 在全部 6 个 backbone 上优于 ranking，而 TerminalBench 上 code 族强烈为负（codegen-avg −0.328）。它同时把 self-distillation 族测为中游、且发现特权信息对该族没有帮助——这与 SEED / PCSD / GatedHindsight 报告的大幅下游增益直接抵触，而 QVal 自陈没有做闭环实验。
 
 ## Key Evidence Matrix
@@ -188,8 +205,10 @@ flowchart LR
 | MC prefix rollout 标签衡量价值而非正确性 | source-verified | [[Papers/2312-MathShepherd]] | MathShepherd C24（§3.3.1）、C13（§5.2 86%@N=4）、C25 | 唯一人工对照用 N=4 + LLaMA2-70B，与实际建库配置（N=8 + LLemma-7B）不同，后者标注质量未测 |
 | 步级粒度在短链条数学上的净增益很小 | consensus | [[Papers/2312-MathShepherd]]、[[Papers/2412-ImplicitPRM]] | MathShepherd C9/C10（Table 2 step-PPO 对 ORM-PPO）；ImplicitPRM C13（Table 2 加 step label 无增益） | 仅数学域；未在长轨迹上做同一对照 |
 | 选步方法的分布外增益主要不来自 selector | disputed（作者读法与数据不一致） | [[Papers/2503-ATLaS]] | ATLaS C4（Table 3：held-out 38.04 对 38.36） | 作者正文称 random 在所有比例上均不如 critical，held-out 列不支持该强度；held-in 差距 6.01 成立 |
-| 依赖 LLM judge 的步级方法上限即 judge 上限 | consensus | [[Papers/2606-TRIAGE]]、[[Papers/2607-OSReward]] | TRIAGE no-thinking 消融（F1 86.1%→29.2%，76.8 < GRPO 79.6）；OSReward C（Hard 最好 69.7% / 均值约 52%） | TRIAGE 笔记无 Evidence Ledger，按 legacy-unverified 处理，此处只用其方向性结论；OSReward 为 source-checked |
-| 特权信息的价值在证据而非答案 | single-source | [[Papers/2608-GatedHindsight]] | GatedHindsight Table 4（+Action −0.43；screenshot-only +7.42；Full +5.62） | 单篇、Android 两个 benchmark；尚未见独立验证 |
+| 依赖 LLM judge 的步级方法上限即 judge 上限 | consensus | [[Papers/2606-TRIAGE]]、[[Papers/2607-OSReward]] | TRIAGE no-thinking 消融（F1 86.1%→29.2%，76.8 < GRPO 79.6）；OSReward C（Hard 最好 69.7% / 均值约 52%） | TRIAGE 笔记无 Evidence Ledger，按 legacy-unverified 处理，此处只用其方向性结论；OSReward 为 source-checked；[[Papers/2609-AgentGrad]] 给出判官之外的仲裁者（环境 reward），代价是要求 ground-truth 且只处理失败样本 |
+| 特权信息的价值在证据而非答案 | single-source | [[Papers/2608-GatedHindsight]] | GatedHindsight Table 4（+Action −0.43；screenshot-only +7.42；Full +5.62） | 单篇、Android 两个 benchmark；尚未见独立验证；[[Papers/2609-AgentGrad]] 把 ground-truth 注入被归因单元作探针、从行为差读标签，说明该结论只覆盖 teacher 直接产出标签的设计 |
+| 单点反事实干预可用环境 reward 而非模型判官定位责任单元 | single-source | [[Papers/2609-AgentGrad]] | AgentGrad C10（§4.1–4.2、Algorithm 1 行 9–14、Eq. 3）、C11（§4.1 Hint Construction） | 仅固定顺序流水线 MAS；需 ground-truth 构造 hint；只作用于失败集；逆序遍历依据无测量支撑；笔记为 partial 验证，仅引用 source-verified 行 |
+| prompt-optimizer 类比较的报告增益须逐格核对并检查基线是否退化 | single-source | [[Papers/2609-AgentGrad]] | AgentGrad C3（§5.2 正文对 Table 2 IFBench：TextGrad 42.52 > AgentGrad 41.42）、C13（Table 1 TextGrad 两格与 no-PO 基线逐位相同） | 单篇内部观察；未在其他 prompt optimizer 论文上复核 |
 | 同一 rubric 在 RL 侧比在 SFT 侧净增益更大 | single-source | [[Papers/2608-ABSeeker]] | ABSeeker Table 3（SFT 28.5→30.8，xbench 73.0→72.0；GRPO 33.5→37.3） | 两个 GRPO 行同起于 ABC-SFT checkpoint，缺 Standard-SFT × ABC-GRPO 格；机制解释为推测 |
 | 更密的 step credit 在有限 rollout 下会引入系统性偏置 | source-verified | [[Papers/2606-ECPO]] | ECPO（divergent anchor 占比 9%→28%；相对 GiGPO +5.2 / +7.3pp） | 1.5B backbone、两个文本环境；未在 GUI 上复测 |
 | 简单基线的步级信号质量已具竞争力 | disputed（环境条件成立） | [[Papers/2606-QVal]] | QVal Appendix E（FrozenLake codegen-avg ρ=+0.939 对 direct-batched +0.430；OpenApps ΔBelief 6/6 优于 ranking；TerminalBench codegen-avg −0.328） | 笔记为 legacy-unverified；论文未做显著性检验，"简单基线获胜"不可读作跨环境普遍结论 |
@@ -204,13 +223,13 @@ flowchart LR
 
 3. **把"选择"这个动作单独隔离出来的对照，三处都显示大部分增益来自选择之外。** ATLaS 的 Random 30% 在 held-out 上只落后 0.32，Rho-1 去掉外部参考语料后增益从 +16.5 塌到 +2.4~+3.3，Weasel 的 pruning 单独用会把 MiniWob 从 59.4 打到 40.3、加上 selection 又恢复。三者机制不同，但共同的含义是：报告"选步带来 X 分提升"时，同预算随机对照和拆解消融应当是标配而不是附录。
 
-4. **特权信息的价值在于提供证据，而不是提供答案。** GatedHindsight 的消融把这一点分离得很干净：把正确动作直接给 teacher 是 −0.43，只把下一帧截图给 teacher 是 +7.42，两者兼给是 +5.62。这意味着"用后见之明修正步级监督"的收益来源不是让教师知道该做什么，而是让教师能看到该步的后果——对任何试图注入 privileged information 的设计，可观测的后果比正确的标签更值得优先接。这条只有单一来源，尚未见独立验证。
+4. **当 teacher 的职责是产出标签时，特权信息的价值在于提供证据而不是提供答案。** GatedHindsight 的消融把这一点分离得很干净：把正确动作直接给 teacher 是 −0.43，只把下一帧截图给 teacher 是 +7.42，两者兼给是 +5.62——收益来源不是让教师知道该做什么，而是让教师能看到该步的后果。这条结论的适用面必须限定在这一种角色分工上：[[Papers/2609-AgentGrad]] 同样注入 ground-truth，但注入对象是被归因的单元本身，读出来的不是标签而是注入前后行为的差，答案在那里是探针而非监督目标。两种用法的失效方式不同，原结论只在前一种上成立。GatedHindsight 一侧仍只有单一来源，尚未见独立验证。
 
-5. **依赖 LLM judge 的方法应当先报告 judge 的准确率，因为它就是方法的上限。** TRIAGE 把判官的 thinking 去掉后，判定 F1 从 86.1% 塌到 29.2%，整体表现随之跌破普通 GRPO；OSReward 测出 27 个判官在困难子集上均值约 52%，且共享"更信 agent 自述、不核对截图"的宽松偏置。目前 ATLaS、TRIAGE、ADMIRE、ABSeeker 都没有在自己的设置下给出这个数，而 ADMIRE 的 milestone 命中判据恰好建立在 agent 的自述之上。
+5. **依赖 LLM judge 的方法应当先报告 judge 的准确率，因为它就是方法的上限。** TRIAGE 把判官的 thinking 去掉后，判定 F1 从 86.1% 塌到 29.2%，整体表现随之跌破普通 GRPO；OSReward 测出 27 个判官在困难子集上均值约 52%，且共享"更信 agent 自述、不核对截图"的宽松偏置。目前 ATLaS、TRIAGE、ADMIRE、ABSeeker 都没有在自己的设置下给出这个数，而 ADMIRE 的 milestone 命中判据恰好建立在 agent 的自述之上。跳出这条天花板目前只有一条已被实现的路——把仲裁权交给环境而不是模型：[[Papers/2609-AgentGrad]] 用单点干预后 reward 是否回到满分认定责任单元，代价是必须有 ground-truth 才能构造干预，且只能作用于失败轨迹。
 
 ## Open Problems
 
-1. **步级信号与步骤正确性的一致性从未被直接测量。**（Validated Gap）Math-Shepherd 的 86% 是唯一的人工对照，但它用的是 N=4 + LLaMA2-70B completer，而真正用来建数据集的是 N=8 + LLemma-7B，后者的标注质量正文没有给出；ABSeeker 的 4% / 10% 量化了问题规模，但这两个比例本身由同一套自动 rubric 产出、无人工验证。一个直接的实验是在同一批 agent 轨迹上人工标注若干步的正确性，再看各族信号（rollout 估值、log-ratio、judge 分数、语义相关度）与它的排序相关性——这将同时回答"哪一族真的在判对错"和"几族之间是否只是同一个量的不同读法"。
+1. **步级信号与步骤正确性的一致性从未被直接测量。**（Validated Gap）Math-Shepherd 的 86% 是唯一的人工对照，但它用的是 N=4 + LLaMA2-70B completer，而真正用来建数据集的是 N=8 + LLemma-7B，后者的标注质量正文没有给出；ABSeeker 的 4% / 10% 量化了问题规模，但这两个比例本身由同一套自动 rubric 产出、无人工验证。一个直接的实验是在同一批 agent 轨迹上人工标注若干步的正确性，再看各族信号（rollout 估值、log-ratio、judge 分数、语义相关度）与它的排序相关性——这将同时回答"哪一族真的在判对错"和"几族之间是否只是同一个量的不同读法"。[[Papers/2609-AgentGrad]] 的单点干预提供了一个比人工标注便宜得多的参照轴：在某一步注入 ground-truth 后重跑，看结局是否翻转。它测的是"修这一步够不够"而非"这一步对不对"，两者在错误可被后续步骤纠正时会分叉，但它是环境仲裁的、每步只需一次重跑，比继续等人工标注可执行。
 
 2. **self-distillation 族的信号质量与下游增益互相矛盾。**（Observed Tension）QVal 把该族的 Q-alignment 测为中游，并发现给它特权信息没有帮助；而 SEED（ALFWorld 91.8 对 GRPO 75.0）、PCSD（90.6 对单点版 84.4）、GatedHindsight（AndroidLab 31.93→43.10）都报告大幅下游增益。QVal 自陈没有做闭环实验，两侧至今没有对账。可能的解释包括：Q-alignment 不是下游收益的正确代理；或者这几篇的增益来自权重分布的形状而非排序的准确性。两种解释指向完全不同的改进方向。
 
@@ -220,7 +239,7 @@ flowchart LR
 
 5. **backbone 规模与 SFT 饱和度会翻转结论，而多数工作只报告单一规模。**（Observed Tension）PCSD 的 GRPO+OPSD 在 3B 上是 +6.2、在 1.7B 上是 −14.1；GRPONullWebAgent 的 18 组受控实验显示 SFT 已掌握的任务上 RL 没有增益、有 headroom 时可达 +22；Weasel 在最强 backbone 上的成就实际是"让 SFT 不再有害"。这意味着任何"方法 A 优于方法 B"的表述都需要附带 backbone 与饱和度条件，而目前这类条件极少被报告。
 
-6. **长轨迹上的步级监督缺少可比的成本口径。**（Validated Gap）Math-Shepherd 把 completion 算力列为第一条 limitation，却没有给出任何 wall-clock、GPU-hours、FLOPs 或总 rollout 数；ImplicitPRM 摘要中的 "1/38 训练数据" 实为含数据采集的 FLOPs 比、且随规模在 21.3×–146.5× 间摆动；ATLaS 的 6.5×10⁵ 次推理是长轨迹侧唯一可引用的估算，且是它为否定该路线而算的。结果是每篇声称"降低 X 倍标注成本"的工作都在用自建口径，横向不可比。
+6. **长轨迹上的步级监督缺少可比的成本口径。**（Validated Gap）Math-Shepherd 把 completion 算力列为第一条 limitation，却没有给出任何 wall-clock、GPU-hours、FLOPs 或总 rollout 数；ImplicitPRM 摘要中的 "1/38 训练数据" 实为含数据采集的 FLOPs 比、且随规模在 21.3×–146.5× 间摆动；ATLaS 的 6.5×10⁵ 次推理是长轨迹侧唯一可引用的估算，且是它为否定该路线而算的。结果是每篇声称"降低 X 倍标注成本"的工作都在用自建口径，横向不可比。[[Papers/2609-AgentGrad]] 说明报全数字也不等于可比：它是少数逐 benchmark 给出 wall-clock 的工作（平均 136 分钟，五个 benchmark 上均最快），但摘要里的 2.5× 是两列均值之比，按五个逐 benchmark 加速比取平均只有 2.24，而"vs. next-best"那一行的均值格填的仍是与 GEPA 的比值，尽管其中两个 benchmark 的 next-best 并非 GEPA；更要紧的是干预带来的额外系统重跑是否计入 rollout 预算全文未说明，而它展示 rollout 效率的那张图横轴正是 rollout 数。口径问题的核心不是没人报数，而是同一个"倍数"可以由均值之比或比值之均值得出、论文无须声明用的是哪一种，这里两者相差 0.23。
 
 ## 调研日志
 
@@ -240,3 +259,17 @@ flowchart LR
 **建议加入 DomainMaps**：[[DomainMaps/AgenticRL]] 第 136 行"监督资产是 policy 相对的"可扩展为一条更强的表述——同一个 policy-reference log-prob 差在 ImplicitPRM / Rho-1 / SEED / PCSD 四篇里分别被读作 Q value、可学性、策略差距与 token 权重，四种读法各有实验支撑但从未在同一批数据上比较过排序一致性。另建议记录"判官可靠性即方法上限"这一条（TRIAGE + OSReward）。
 
 **待办**：`Papers/2606-QVal.md` 第 33 行的模态比较结论需按核查结果修正；`Papers/2600-Adaptive Milestone Reward for GUI Agents.md` 与 [[Papers/2602-ADMIRE]] 疑为同一篇的重复笔记，需去重。
+
+---
+
+**调研日期**：2026-09-18（增量）
+
+**并入 1 篇，跳过 0 篇**：[[Papers/2609-AgentGrad]]。它在固定顺序流水线 MAS 上用逆序单点干预 + 环境 reward 定位责任单元，属于"从 trajectory-level reward 反推单元级监督"的直系问题，落点为技术路线新增的"单点反事实干预"一族。
+
+**papers_analyzed 对账**：旧值 24 → 并入前机械重数 `## 调研日志` 之前正文中唯一且能解析到真实 `Papers/*.md` 的 wikilink，得 25（旧值少记 1 篇，属历史漂移，采用机械值）→ 并入 AgentGrad 后为 26，全部 26 个链接均可解析、无失效链接。
+
+**结构性变化**：技术路线新增一族并同步分类图（原 6 支变 7 支，原"轨迹间结构对比"由 6 号顺延为 7 号）；Overview 三条轴各扩一项（信号来源加单点反事实干预、衡量对象加"是否为充分修复点"、消费方式加 prompt 文本编辑）；方法对照表与 Datasets 表各增一行；失败模式一节新增"基线退化会抬高报告增益"一条。
+
+**被修正的既有结论**：Key Takeaway 4 由"对任何试图注入 privileged information 的设计"收窄为"当 teacher 的职责是产出标签时"，依据是 AgentGrad 把 ground-truth 注入被归因单元本身、从行为差而非答案读标签；Key Takeaway 5 保留原判断并补上唯一已实现的例外路径及其前置条件。两处均在正文标注 [[Papers/2609-AgentGrad]]。Open Problem 1 增加"以单点干预替代人工标注作参照轴"的可执行路线，Open Problem 6 增加"报全 wall-clock 仍不可比"的证据。
+
+**证据权限**：AgentGrad 笔记 `verification_status: partial`，本轮只引用其 Evidence Ledger 中 source-verified 的行；C3 作为"论文正文论断与自身表格不一致"的内部矛盾写入，未写成对该方法的否定结论。其 Qwen3-8B/IFBench 一格上"三个 prompt optimizer 有两个跌破不做优化的基线"这一读数，所依赖的单元格数值不在 source-verified 行内，未写入正文。

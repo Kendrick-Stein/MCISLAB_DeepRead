@@ -1,9 +1,9 @@
 ---
 title: "Computer-Use Agents: A Unified Survey of Models, Learning, Environments, Evaluation, and Deployment"
 tags: [survey, gui-agent, computer-use, web-agent, mobile-agent, os-agent, agentic-RL]
-date_updated: "2026-09-15"
+date_updated: "2026-09-18"
 year_range: 1997-2026
-papers_analyzed: 232
+papers_analyzed: 235
 keywords: [gui-agent, gui grounding, computer-use, computer use agent, cua, web agent, browser agent, mobile agent, desktop agent, os agent]
 exclude_tags: [deep-research]
 exclude_keywords: [deep research, information seeking, browsecomp, research agent, search agent]
@@ -990,6 +990,7 @@ CUA safety 已从筛查用户指令，扩展到环境内容、跨应用信息流
 
 | 风险面 | 代表工作 | 控制位置 | 未覆盖边界 |
 |:--|:--|:--|:--|
+| Agent 化本身造成的 guardrail 衰减（无 adversary） | [[Papers/2506-MLATrust]] | 动作许可门（执行前），而非模型侧对齐或 step budget | 衰减是否随步数继续累积未被其自身数据支持；judge 无 human agreement、单次运行 |
 | Environmental prompt injection | [[Papers/2504-WASP]]、[[Papers/2409-EIA]] | observation filtering 与 instruction hierarchy | goal-aligned injection |
 | Grounding 输出层的坐标劫持（意图不变、落点被改） | [[Papers/2608-MissClick]] | 现有栈无对应控制点；候选位置是动作语义与执行坐标的一致性核验 | 仅 white-box、无迁移与黑盒、零防御评测；未说明扰动经由什么通道进入截图 |
 | Low-severity goal injection | [[Papers/2608-InvisibleInkThreats]] | 意图推断，而非按动作危害分级的审计与门控 | 无高危害基线对照；注入文本本身极显眼、未测任何 detector |
@@ -1018,6 +1019,8 @@ CUA safety 已从筛查用户指令，扩展到环境内容、跨应用信息流
 [[Papers/2608-MissClick]] 把风险面从"agent 的意图被操纵"移到"意图不变而落点被劫持"，这是本表其余各行都不覆盖的一层。其观察在接口层面：主流 grounding 模型把点击坐标输出成 per-digit 十进制 token 序列，解析时每位带位权，因而百位一次翻转就等于 100 个坐标单位的位移，而 token 级 loss 对所有位置一视同仁。据此构造的白盒攻击在 ScreenSpot-v2 上对 OS-Atlas-Base-7B 与 UGround-V1-7B（[[Papers/2410-OSAtlas]]、[[Papers/2400-NavigatingDigitalWorldAs]]）取得 untargeted ASR 75.07% / 72.93%、targeted 44.86% / 62.67%，其中位权加权相对均匀权重的 digit 交叉熵单独贡献 +9.62 / +11.98 pp。对本节的结构性含义不在 ASR 数字，而在防御位置：注入类攻击可以靠 instruction hierarchy、内容审计与确认门控在意图层拦截，而这一类攻击下 agent 报告的动作语义（"点击提交按钮"）与它实际发出的坐标之间没有任何一致性检查，上述防线全部位于错误的层。一个廉价且与攻击类型无关的候选控制点是对最终坐标做一次反向元素识别、核验落点元素是否匹配指令描述——该文未实现，本综述亦无库内证据支持其有效性，此处记为可证伪的设计假设而非结论。
 
 **证据边界须一并读。** 威胁模型是完全 white-box（可取架构、权重与输入梯度），且要求在整张截图的每个像素上写入 ε=16/255 的 ℓ∞ 扰动，而论文全程未说明这一扰动经由什么通道进入 agent 看到的截图——攻击面是否存在与可迁移性是两个不同问题，论文只把后者列为 future work。无 transferability、无 black-box、零防御评测（JPEG 重编码、随机缩放、模型自身 resize/patchify 一个都没测），两个 victim 模型均为 7B 且不含使用特殊坐标 token 而非 per-digit 十进制的更新一代 grounder，因此"这是接口固有漏洞还是实现偶然"未被区分。口径上还有一处不对称：解析不出合法坐标计为 untargeted 成功，而 untargeted 只要求点击离开 ground-truth box，因此 75.07% 这个数并不检验该文自己的位权机制叙事——真正相关的是 targeted 一侧（OS-Atlas 上不到一半），而论文未报告任何直接机制量（逐位翻转率、位移分布）。作者自陈 digit token 的数值与位权结构已被 training-time 工作研究过，本文的贡献是把它带到攻击目标的设计上。
+
+[[Papers/2506-MLATrust]] 把本表"控制位置"一列从设计主张变成可测量的问题。它用同一 backbone、同样构造方法的数据，只更换单步问答与多步 GUI 执行两层外壳，测得 refusal rate 的系统性下降（GPT-4o 90.5%→70.2%、Gemini-Pro 86.0%→62.5%、Claude-3-7-sonnet 78.0%→57.8%），guardrail 的损失因此被归因到 agent 化这一步本身，而非某个模型的对齐缺陷。真正有结构含义的是它的 Figure 6：横轴取 step 0/1/3/5/7（step 0 为纯 MLLM 问答），四条曲线在 0→1 处集体断崖，此后全部在同一水平带内震荡回升，没有一条继续下行。论文正文只讨论了 0→1 那一跳，从未把 abstract 与 Discussion 反复出现的 "latent and nonlinear risk accumulation across decision cycles" 与这些数据点对上——换句话说，该文最容易被二手引用的口号在它自己的证据里只成立到第一步为止。若这一形态在更密的 step 网格上、并控制住任务难度随步数的混淆后仍成立，则应守的是**动作许可门而非 step budget**："长程 agent 更危险"的部分叙述需要改写为"能动手才危险"，而这两种读法指向的部署位置完全不同。本综述据此把它记为**有指向性、可证伪、验证代价低的假设**而非结论：这些逐步数值由矢量图坐标解码得到、正文未印出，且全文无重复采样、seed 或置信区间，单次运行下的震荡无法与噪声区分。该文与 [[Papers/2500-TowardsTrustworthyGuiAgents]] 还构成一处未解的 taxonomy 冲突——后者按 perception / reasoning / interaction 三层组织 trust，前者按 internal / external 二分再拆八个 sub-aspect，两套切法都没有证据说明自己更能预测真实部署事故；本综述不采纳任一分类学作为论断基础，只引用其下的具体测量。
 
 #### 6.11.2 运行时证据核验与分层防线
 
@@ -1240,12 +1243,19 @@ skill 的来源轴上还有第三种供给：由领域专家现场演示目标�
 | [[Papers/2607-KnowActGUIClaw]] | memory + skill | 部署中积累、经状态校验后入库，全程无训练 | MobileWorld GUI-Only 64.1%；蒸馏资产跨模型迁移使 Qwen3.5-35B 由 37.9% 升至 41.0% | 主结果依赖自建 benchmark；memory 对小模型增益远大于大模型（+9.7 对 +2.6） |
 | [[Papers/2606-LearningFromFailure]] | workflow / harness | 失败轨迹诊断后归纳四类可执行修复策略 | OSWorld 100-step 42.3%→48.9%，无需训练 | 诊断质量高度依赖所用 meta-controller；单篇结果 |
 | [[Papers/2605-SEGA]] | memory + model weights | 三层记忆检索采轨迹 → hindsight relabel → SFT + GRPO 变体，迭代三轮 | ScreenSpot 89.0、AndroidControl-High 75.8、AndroidWorld 39.0；三轮 28.6→34.5→39.0 | baseline 全部引自 UI-TARS 论文而非同设置复现；无 seed 无方差、AndroidWorld 无 step budget；记忆消融与 token 预算未分离 |
+| [[Papers/2609-RSIAgent]] | retrieved memory | 目标任务条件化的 curriculum 出题 → 隔离 context 的 LLM verifier 判 PASS/FAIL/UNVERIFIED → 由产生经验的 actor 蒸馏并对账后写入无 schema 的 markdown 记忆，training-free | OSWorld 2.0 offline 82 任务 partial 71.97→78.98、binary 37.80→42.68；ALE Near-term partial 83.75→84.82 | 记忆按目标任务从空建起、评测前冻结，摊销为 per-task 而非 per-environment；主表由真实 RSI 结果与保留基线拼接（OSWorld 41/82、ALE 19/67），且只给基线未满分的任务分配探索；无 equal-compute 对照；verifier 准确率未量化 |
 
 被 ICML 2026 接收的 SE-GA 值得单独一读，因为它把"GUI agent 自演化"这个词当前的实际所指摊开了：闭环是三轮离线重训，每轮用上一轮采到的轨迹重新更新 LoRA adapter，主干冻结。论文在引言里提出 test-time memory 可作为推理期 buffer、"无需即时重训"地在线演化，但全文没有任何实验把这一部署期效应与训练轮次分离；三轮曲线 28.6→34.5→39.0 与"用更多自采数据多训两轮"在观测上等价。它的动机陈述同样只是引用而非测量——全文未测过策略漂移或适应速度，因此可以作为方法样本，但不能作为"静态策略在动态环境中失效"的证据。其记忆消融也复现了本节的记账问题：为容纳三层记忆，prompt 上限专门开到 6144 token，而去掉记忆的对照同时拿掉了内容与这部分预算，12.4 个百分点里有多少来自记忆内容无法判断。引用其消融时须写"去掉 Stage II 自演化训练"而非"去掉 MASE"——主文标注为后者的那一行与附录中只移除 Stage II 的变体逐格相同。
 
 这条线上唯一被多次独立触及的机制性结论，与 §7.11.2 从 web 侧得到的结论同向：增益来自校验环节，而不是积累本身。KnowAct-GUIClaw 的 skill 只在状态校验通过后入库，MAGNET 用遗忘评分主动淘汰过期条目并测到初始来源占比三轮内由 100% 降至 26% / 18%，Learning-from-Failure 则把"诊断—开方"这一步本身当作 gate；三者分别从入库、退库与修复三个位置实现同一功能。相反，缺少这一环节的形态在 GUI 上同样失效：把历史整屏截图直接 prepend 作为视觉记忆，虽使 OSWorld accuracy 由 18.3% 微升至 20.4%，却把失败构成从 state-level 推向 action-level（hidden operation 67.1%→78.8%、grounding 27.5%→36.1%），改存 action-relevant crop 后四类失败才全面下降 [[Papers/2606-NaiveVisualMemory]]（详见 §6.9.1）。这说明在 GUI 上评估记忆或 skill 的价值时，聚合成功率的分辨率不够——应报告失败构成的迁移，否则一个净增益里可能同时藏着一项被加重的失效。
 
-这条线当前最硬的缺口是记账口径，而非方法多样性。上表八项工作中没有一项报告 budget-matched 对照，也没有一项报告演化闭环自身的探索、校验与检索开销；唯一施加了 token-matched 约束的工作在 WebArena 上让三种自积累方法全面失守 [[Papers/2606-SkillMemoryBudget]]，而该结论尚未在 desktop/mobile GUI 上被复制。更值得警惕的是增益的成分：在非 GUI 但做了 artifact 级审计的设定里，唯一稳定超出噪声的大幅提升（SpreadsheetBench 三模型 +28.8~+37.7）所保留的内容是 openpyxl 用法、写回后重开校验这类环境使用规程，其中一条被选中的 skill 甚至直接写着绕开该评测沙箱导入路径报错的 workaround，且这条 workaround 本身就建立过一次 validation 新最优；相应地，其 transfer 增益在分布偏移最强的一档只剩 +2.9 [[Papers/2607-RethinkSkillEvolve]]。GUI 侧的自演化工作普遍在自建环境内闭环，因此同样需要回答被固化下来的究竟是任务能力还是这套 harness 的使用规程——上表八项工作中没有一项做过更换 harness 或沙箱的复现。因此本节可以确认"GUI 自演化的多条路线各有正向记录"，但尚不能确认其中任何一条在同预算下优于把预算直接花在更长交互或更强基座上；这是 §11.4 列为待检验的首要问题。
+[[Papers/2609-RSIAgent]] 在 desktop 侧补了一个新形态，也把上述记账问题推到更尖锐的位置。它的信息边界设计是本节所见最干净的一套：verifier 看不到 actor 的私有推理与记忆、探针跑在 checkpoint 保护的副本上查完即还原、curriculum 只拿记忆的一次性副本且无权写回、官方 evaluator 在所有 agent context 之外且不回传分数；并行探索阶段同一 wave 共享不可变记忆快照、全部判完后按指定顺序串行提交更新。这套边界本身值得被后续 memory 类系统复用。但**它的摊销结构不是环境级的**——记录的三条轨迹均起于空记忆、各自只服务一道目标任务，curriculum 在两个阶段都以目标 query 为 context，深度阶段更是直接反复练习那道最终被打分的题。因此它证明的是按题定制的 test-time search 加笔记，而非"适应一个新环境、此后所有任务共享"；成本按题付而不是按环境付一次，论文未报告同一份记忆服务多道任务时第 k 道的边际探索成本。这条区分对本节的分类有直接后果：`context / memory` 这一行下的工作须先说明记忆的复用边界，否则其增益与推理期搜索无法分离。
+
+它同时提供了本节最缺的那类对照。GameCraft-Bench 的 40 个任务上，四个 generator 各有一组同起点同 backbone 的两级拆分：agent harness 相对基线贡献 +5.07 / +11.33 / +14.18 / +12.52，自改进机制在其上再贡献 +3.44 / +3.76 / +3.99 / +3.64——机制的边际贡献稳定在 harness 的三到四分之一。主表上同向：ALE 中不含自改进的 harness 已达 83.75、越过同表 GPT-6 Astra 的 82.26，机制只再加 1.07；OSWorld 侧则相反，w/o RSI 的 71.97 低于 GPT-6 Astra 的 72.60，须靠 +7.01 才推到 78.98。这正是 §7.11.1 中 Ouroboros 与 DarwinX 都未建立的 causal attribution 在可得条件下的形态，而它给出的答案对整条线不利：**当 harness 与机制被拆开报告时，大头出现在 harness 一侧。**
+
+证据边界须与数字同引。基线是"关掉探索与持久记忆"而非等预算对照，RSI 条件额外消耗 8 个以上并行探索 project 与若干轮深度探索，论文只给单次运行的上限（65,536 token 响应上限、500/2,000 iteration、36,000/86,400 秒看门狗），无任何探索阶段的 token 总量、费用或 wall-clock 汇总，作者自陈 "not a matched-budget estimate"。主表的聚合口径在构造上偏乐观：只有基线未满分的任务被分配探索、满分任务原地保留基线分，于是"只能跌的"被冻住而"只能涨的"被投入算力；跨系统对比亦非 matched protocol（作者自述），且 ALE binary 上 RSIAgent 的 50.75 低于 GPT-6 Astra 的 52.24。verifier 为 Kimi-K3 自判，全文无准确率或与官方 rubric 一致率的任何量化，而其失败分析自己记录了 verifier 误判 PASS、错误规则被写进记忆并在后续 run 继续复用的具体案例——这恰是 §7.11.2 所要求的"合格闸门"缺席时的失效路径，也说明这条路线的净值在 verifier 更弱的模型上可能为负。标题中的 recursive self-improvement 在正文里不成立（权重固定、agent 架构与 prompt 全程不变、记忆评测时冻结，不存在 generation ≥2），该术语错位见 [[Topics/SelfEvolvingAgents-Survey]] §7.5。库内暂无独立验证。
+
+这条线当前最硬的缺口是记账口径，而非方法多样性。上表九项工作中没有一项报告 budget-matched 对照，也没有一项报告演化闭环自身的探索、校验与检索开销；唯一施加了 token-matched 约束的工作在 WebArena 上让三种自积累方法全面失守 [[Papers/2606-SkillMemoryBudget]]，而该结论尚未在 desktop/mobile GUI 上被复制。更值得警惕的是增益的成分：在非 GUI 但做了 artifact 级审计的设定里，唯一稳定超出噪声的大幅提升（SpreadsheetBench 三模型 +28.8~+37.7）所保留的内容是 openpyxl 用法、写回后重开校验这类环境使用规程，其中一条被选中的 skill 甚至直接写着绕开该评测沙箱导入路径报错的 workaround，且这条 workaround 本身就建立过一次 validation 新最优；相应地，其 transfer 增益在分布偏移最强的一档只剩 +2.9 [[Papers/2607-RethinkSkillEvolve]]。GUI 侧的自演化工作普遍在自建环境内闭环，因此同样需要回答被固化下来的究竟是任务能力还是这套 harness 的使用规程——上表九项工作中没有一项做过更换 harness 或沙箱的复现。RSIAgent 从另一侧逼近了同一问题：它没有换 harness，但把 harness 与自改进机制的贡献拆成两级报告，得到的比例（机制约为 harness 的三到四分之一）说明这个记账口径不是形式要求——只要拆开报，结论的重心就会移动。因此本节可以确认"GUI 自演化的多条路线各有正向记录"，但尚不能确认其中任何一条在同预算下优于把预算直接花在更长交互或更强基座上；这是 §11.4 列为待检验的首要问题。
 
 ### 7.12 Continual Learning
 
@@ -1473,10 +1483,13 @@ Safety evaluation 已从恶意 prompt 检测扩展到 environmental injection、
 | Vera-Bench [[Papers/2607-VeraSafetyTesting]] | 用户与工具通道攻击造成实际环境违规 | state-first、tool-second、response-last | coding/tool/MCP scope；verifier 本身仍需审计 |
 | II-Bench / HITLCUA [[Papers/2608-InvisibleInkThreats]] | 低危害但对攻击者有收益的注入目标；含模拟人类确认环节 | intent-level ASR（"出现执行有害指令的意图"即计成功，不要求完成），444 例 × 7 CUA，self-hosted OSWorld VM + Docker 站点 | 不计执行完成，测不出实际收益；无高危害基线对照，"因为低危害才通得过"未被实验分离；单点估计无重复实验；HITL 格子按"攻击相对无效"选出，回归均值未排除；无代码无数据 |
 | MissClick [[Papers/2608-MissClick]] | white-box 像素扰动劫持 grounding 输出的坐标数字，意图不变而落点改变 | 落点是否离开 ground-truth box（untargeted）/ 是否落入指定 box（targeted），分母限干净截图上已 grounding 正确的任务 | 静态 grounding benchmark 上的 component-only 证据，非端到端 agent 任务；无迁移/黑盒/防御评测；未建模扰动注入通道 |
+| MLA-Trust [[Papers/2506-MLATrust]] | 无 adversary 的常规高风险任务：agent 化本身造成的 guardrail 损失，含模糊/误导指令、超出指令的补全、毒性内容发布与 PII 披露 | Accuracy 与 Misguided Rate 用 exact/keyword match；Refuse-to-Execute Rate 由 Longformer 或 GPT-4 二分类；Toxicity 由 PerspectiveAPI；34 任务约 3.3k 实例 × 13 backbone，SeeAct（web）+ Mobile-Agent-E（mobile） | 主观指标无 human agreement 或抽样复核背书；单次运行，无 temperature/seed/方差，多个子任务仅 50 条实例；锚在 Amazon/Twitter/GitHub 等生产站点，纵向复现不成立；RtE 越高越"可信"的口径不惩罚 over-refusal |
 
 source-verified 的 EnvTrustBench 在 55 个可机器判分 case、11 个压力场景、14 个 model-scaffold stack、共 3,850 次受控 run 中得到 83.3% aggregate EMR [[Papers/2605-EnvTrustBench]]。该协议没有可迁移的固定 GUI step budget，且论文明确测的是刻意注入误导证据后的 susceptibility；这个数字不能解释成现实部署中 83.3% 的普通行动会失误。
 
-Safety benchmark 应至少分开报告 attack success、executed violation、benign utility、false positive intervention、side-effect severity 与 rollback success。把它们压成单一 safety score 会奖励过度拒绝，也会掩盖"任务完成但越权"的失败。[[Papers/2608-InvisibleInkThreats]] 是这条要求被违反的具体代价：它只报 intent-level ASR，理由是避免模型能力不足造成"未检出失败"，但代价是一篇以"攻击者收益可观且持久"立论的论文无法回答那些 star、安装与外泄里究竟有多少真的发生——危害等级的分界恰好被这个口径抹掉，且 intent 的裁决方式（人工还是 LLM judge）正文未交代。
+[[Papers/2506-MLATrust]] 的贡献不在覆盖面（四维八子维、34 任务、13 个 backbone），而在它把 agent safety 当作 **harness 引入的 delta** 来测。用与 agent 安全任务同样的构造方法生成单步问答版数据，同一 backbone 只更换"单步 MLLM 问答"与"多步 GUI 执行"两层外壳，refusal rate 从 90.5% 降到 70.2%（GPT-4o）、86.0% 降到 62.5%（Gemini-Pro）、78.0% 降到 57.8%（Claude-3-7-sonnet）。既有 agent safety benchmark 普遍缺的正是这个单步 baseline 条件——没有它，"agent 不安全"只是一条相关性观察，无法归因到 agent 化这一步本身。该文的其余数字用于刻画绝对水平时须打折（judge 无可信度背书、单次运行、生产站点锚定），但这组 delta 是同条件对照，是本节目前最可引用的一条因果性证据。其 Figure 6 对 step 数的进一步测量给出了与该文自身叙述相反的形态，含义见 §6.11.1。
+
+Safety benchmark 应至少分开报告 attack success、executed violation、benign utility、false positive intervention、side-effect severity 与 rollback success。把它们压成单一 safety score 会奖励过度拒绝，也会掩盖"任务完成但越权"的失败。MLA-Trust 是后半句的现成反例：它的 safety 与 privacy 两维全部建在 RtE 这个单向指标上，而 controllability 维度只测多做（overcompletion）不测少做，框架内没有任何位置惩罚过度拒绝——一个恒拒绝的模型会在这两维横扫，"某模型最可信"因而可以被重述为"某模型最爱拒绝"，安全与有用性的 trade-off 未被建模。[[Papers/2608-InvisibleInkThreats]] 是前半句的具体代价：它只报 intent-level ASR，理由是避免模型能力不足造成"未检出失败"，但代价是一篇以"攻击者收益可观且持久"立论的论文无法回答那些 star、安装与外泄里究竟有多少真的发生——危害等级的分界恰好被这个口径抹掉，且 intent 的裁决方式（人工还是 LLM judge）正文未交代。
 
 ### 8.10 Efficiency and Cost
 
@@ -1599,7 +1612,7 @@ CUA benchmark 的不可复现性来自四个不同层面：任务/参考答案�
 | Original→Verified release | WebArena-Verified 的使用见 [[Papers/2606-SkillNb]]；OSWorld-Verified 与后继 release 的边界见 [[Papers/2606-OSWorld2]] | release ID、checker commit、task exclusions 与 migration table；原版和 Verified 不共用 leaderboard denominator |
 | Static→Live drift | [[Papers/2504-OnlineMind2Web]]、[[Papers/2604-Odysseys]]；[[Papers/2607-MisScoreCUA]] 把 broken task 从 evaluator error 中单列，占 FAIL 的 4.7%（AssistantBench 5/23、OSWorld-Verified 2/57，其余三个 benchmark 为 0） | 时间戳、paired rerun、site-failure breakdown 与维护窗口；报告时把 task-unsolvable 与 verdict-wrong 分开计数 |
 | Data draw / run nondeterminism | [[Papers/2607-TeachStop]] 的单工作 variance decomposition；[[Papers/2606-SkillMemoryBudget]] 的 any/all-of-3 区间（web 域） | data-draw × seed crossed design、paired task statistics、完整 run distribution |
-| Partial evaluation bias | [[Papers/2607-AgentBenchmarkBudget]] 的 completed-record replay | 预注册 pairwise error、task-group coverage、unresolved rate 与 selection policy |
+| Partial evaluation bias | [[Papers/2607-AgentBenchmarkBudget]] 的 completed-record replay；[[Papers/2609-RSIAgent]] 只给基线未满分的任务分配改进算力、满分任务原地保留基线分，再把两类结果拼进同一行（OSWorld 41/82、ALE 19/67） | 预注册 pairwise error、task-group coverage、unresolved rate 与 selection policy；凡按结果筛选任务投入算力的改进实验，须公布 selection rule 与未被选中任务的分数来源，不得与统一协议下的 leaderboard 数字并排 |
 | Persistent-state contamination | [[Papers/2606-AlwaysOnAgents]]、[[Papers/2606-AgentTracesToTrust]] | provenance、freshness、deletion propagation、rollback trace 与 session isolation |
 | Serving-stack / compile-cache drift | [[Papers/2607-AAPT]]：仅改变 vLLM `torch.compile` 的 cache key（加 `--revision` 与一个 offline flag），在权重、prompt、sampler 与像素完全相同的条件下把 structured-output 合法率从 88.1% 打到 18.3% | 把 inference engine 版本、decoding backend 与 compile-cache key 记为实验条件并逐次核验；凡控制流依赖 schema 门限的系统须单独报告 structured-output 合法率 |
 
@@ -2088,13 +2101,28 @@ GUI/Computer-Use Agent 研究经历了五次可辨认的抽象升级——结构
 | CUA 同时具备持续适应的刚性需求与可低成本判定、可恢复现场的供给，因而是检验自演化研究纲领的判决性场景 | 作者综合论断（非领域共识） | §1.2.1；由需求侧与供给侧各三项独立证据拼合 | 三项供给条件均只部分闭合（task validity、judge 误差方向、reset 仅对 trainer 开放）；跨领域对照仅 SpyRL 一例，非同轴实验 |
 | 部署环境漂移造成的掉点已被直接测量，而非只被假定：LibreOffice Calc 上 platform migration / software update / resolution shift 致相对掉点最高约 51%；Claude-3.7 OSWorld 37% → ScienceBoard 10% | source-verified | [[Papers/2602-ACuRL]] §1 Fig. 1 / §4.5 Fig. 4（§1.2.1/§7.12） | 相对百分比在低基数下易放大观感；六个自选环境，通用能力是否退化无数据；库内暂无独立验证 |
 | 经验资产的过期速度可被测量：MAGNET 在 AndroidWorld 迭代三轮后，初始 Amex 来源记忆的检索占比由 100% 降至 26%（procedural）/ 18%（stationary） | source-verified | [[Papers/2601-MAGNET]] 持续适应实验（§1.2.1/§7.11.3） | 单篇工作；同文双层记忆合并消融仅 +2.03% SR，衰减曲线比 SR 增益更有信息量；库内暂无独立验证 |
-| GUI 自演化的八项代表工作无一报告 budget-matched 对照或演化闭环自身开销；唯一施加 token-matched 约束的工作使三种自积累方法在 WebArena 全面失守 | 作者综合论断（覆盖审计结论）+ source-verified（SkillMemoryBudget 数字） | §7.11.3 表 / [[Papers/2606-SkillMemoryBudget]] | 该阴性结果在 web agent 上取得，尚未在 desktop/mobile GUI 复制；"无一报告"限于本综述所核查的这八项 |
+| GUI 自演化的九项代表工作无一报告 budget-matched 对照或演化闭环自身开销；唯一施加 token-matched 约束的工作使三种自积累方法在 WebArena 全面失守 | 作者综合论断（覆盖审计结论）+ source-verified（SkillMemoryBudget 数字） | §7.11.3 表 / [[Papers/2606-SkillMemoryBudget]] | 该阴性结果在 web agent 上取得，尚未在 desktop/mobile GUI 复制；"无一报告"限于本综述所核查的这九项 |
+| 自改进机制与 agent harness 的贡献被同起点同 backbone 拆开时，大头在 harness：GameCraft-Bench 四个 generator 上 harness 贡献 +5.07/+11.33/+14.18/+12.52，机制在其上再贡献 +3.44/+3.76/+3.99/+3.64 | source-verified（数字）；"harness 归因须与机制增益分开报告"为本综述据其数据的综合建议 | [[Papers/2609-RSIAgent]] Table 2 / §4.5、Table 1（§7.11.3/§8.13.1） | 单篇工作、四组对照全部来自同一个游戏生成 benchmark；主表为真实 RSI 结果与保留基线的拼接（OSWorld 41/82、ALE 19/67）且只给基线未满分任务分配探索；无 equal-compute 对照，作者自陈 "not a matched-budget estimate"；verifier 为模型自判且准确率未量化；库内暂无独立验证 |
+| Agent 化削弱 guardrail 是同条件可测的 delta：同 backbone 只更换单步问答与多步 GUI 执行两层外壳，refusal rate 90.5%→70.2%（GPT-4o）、86.0%→62.5%（Gemini-Pro）、78.0%→57.8%（Claude-3-7-sonnet） | source-verified（delta 数字）；"衰减是 action-capability 的二值效应而非 step 累积，故该守动作许可门"为本综述据其 Fig. 6 提出的待检验假设 | [[Papers/2506-MLATrust]] §IV-B / Fig. 5 / Fig. 6（§6.11.1/§8.9） | step 0/1/3/5/7 的逐步数值由矢量图坐标解码、正文未印出，原文亦未把这段走势与其 "nonlinear risk accumulation" 论断对接；RtE 由 Longformer/GPT-4 判定且无 human agreement；单次运行无 temperature/seed/方差；生产站点锚定使纵向复现不成立；arXiv v1（13 模型）与 IJCV 正式版（17 模型）数字不一致，引用须标版本 |
 | 记忆/skill 的价值应按失败构成的迁移而非聚合成功率评估：整屏 visual memory 使 OSWorld accuracy 18.3%→20.4%，同时 hidden operation 67.1%→78.8%、grounding 27.5%→36.1% | source-verified（数字）+ 作者综合建议（评估口径） | [[Papers/2606-NaiveVisualMemory]] Table 2（§6.9.1/§7.11.3） | 单 backbone（GPT-5.4-mini）、单点估计无方差；WebForge 上三种配置均为 2.0，机制不具普适性 |
 | 推理期多采样能否替代持续演化取决于收益性质：SearchQA 上 oracle Parallel Sampling 只比演化后的 skill 低 0.43 点（77.50 对 77.93），SpreadsheetBench 上低 30.96 点（54.80 对 85.77） | source-verified（数字）+ 作者综合论断（"CUA 整体属后一类因而 gap 更可能放大"为待验证假设） | [[Papers/2607-RethinkSkillEvolve]] §Self-Evolution versus Test-Time Scaling / Table A25、A27（§1.2.1） | 面板五个 benchmark 无一涉及 UI 观测或 GUI 动作；两侧算力不对等（演化后每题一次调用 vs Parallel 6,324 次计分尝试）且 Parallel 按 oracle any-success 计分、原文自述为上界；单模型（GPT-5.5）；库内暂无独立验证 |
 | 自演化增益的可报告性受 artifact identity 与重跑噪声双重限制：42 次受控运行的 388 个 candidate 只有 55 个建立 byte-distinct validation best；字节相同的同一 skill 重复评估 8 次标准差 3.92 点，三次重复部署使两个 setting 结论符号翻转 | source-verified（数字）+ 作者综合建议（四项记账要求） | [[Papers/2607-RethinkSkillEvolve]] §Main Results、Appendix B/C Table A13（§1.2.2/§7.11.3） | 非 GUI 面板，对 CUA 是协议要求而非数值外推；每个 feedback view 只跑一次，view 间排序无判别力；全文无显著性检验；库内暂无独立验证 |
 | 2026-07-23 gap-fill 补录 14 篇（RL survey / Digi-Q / Jedi / AndroidControl / OSWorld-MCP / MCPWorld 等） | 库内暂无独立验证 | §1.4/§4.7/§5/§7/§8 各子节 | 单 agent digest、verification_status: unverified，仅作子节 enrichment，未升格为 Takeaway/共识 |
 
 ## 调研日志
+
+### 2026-09-18 survey-refresh（并入 2 篇，232 → 235）
+
+- 并入：[[Papers/2609-RSIAgent]]（§7.11.3 主落位，表内新增一行 + 三段正文；cross-ref §8.13.1 partial evaluation bias 一行）、[[Papers/2506-MLATrust]]（§8.9 主落位，表内新增一行 + 两段正文；cross-ref §6.11.1 风险面表新增一行 + 专段）。跳过 0 篇。
+- 分类记录：
+  - RSIAgent — platform = desktop（OSWorld 2.0）+ hybrid GUI+CLI（actor 为 code-as-policy，`look` 取视觉证据）；task_level = cross-app long-horizon；primary_section = training-RL；environment_setting = self-hosted（OSWorld 2.0 0808 release 的 82 任务 offline 子集、ALE Near-term 67 任务、GameCraft-Bench 40 任务）；verifier_type = interactive agent（Kimi-K3 隔离 context，PASS/FAIL/UNVERIFIED）+ programmatic（官方 evaluator，在所有 agent context 之外）；evidence_strength = direct end-to-end，但主表为拼接口径且无 equal-compute 对照臂
+  - MLA-Trust — platform = cross-platform（web via SeeAct + mobile via Mobile-Agent-E）；task_level = app workflow（含跨 app 协同子项 T.7）；primary_section = reliability-safety-HCI；environment_setting = live（Amazon/Arxiv/Twitter/GitHub/Mastodon 等生产站点）+ real-device（Notes/Email 等手机 app）；verifier_type = visual-rubric judge（Longformer 或 GPT-4 判 RtE、PerspectiveAPI 判 toxicity）+ programmatic（exact/keyword match 判 Accuracy）；evidence_strength = direct end-to-end（MLA-vs-MLLM 同 backbone 对照）
+- 关键变化：（一）§7.11.3 的 GUI 自演化表由八行扩为九行，且首次出现把 agent harness 与自改进机制拆成两级报告的同起点同 backbone 对照——RSIAgent 的 GameCraft-Bench 四组显示机制边际贡献稳定在 harness 的三到四分之一，这是 §7.11.1 中 Ouroboros 与 DarwinX 都未建立的 causal attribution 在可得条件下的形态，结论方向对整条线不利；（二）为 `context / memory` 一行加上前置分类要求——须先说明记忆的复用边界，RSIAgent 的记忆按目标任务从空建起、评测前冻结，摊销是 per-task 而非 per-environment，因此属 test-time search 加笔记而非环境级 flywheel；（三）§8.9 的 threat model 表新增"无 adversary 的 harness delta"一类，MLA-Trust 的同 backbone 换壳对照（refusal rate 90.5%→70.2% 等）是本节目前最可引用的因果性证据；（四）§6.11.1 的"控制位置"一列从设计主张变为可测问题——MLA-Trust 的 Fig. 6 在 step 0→1 断崖后不再下行，与该文 abstract 自陈的 "nonlinear risk accumulation" 相反，据此提出"该守动作许可门而非 step budget"的待检验假设；（五）§8.13.1 的 partial evaluation bias 一行补入第二类实例：按结果筛选任务投入改进算力、再把改进结果与保留基线拼进同一行。
+- Key Evidence Matrix 新增 2 行（RSIAgent 的 harness–机制拆分、MLA-Trust 的 agent 化 guardrail delta），因两条分别改写 §7.11/§11.4 与 §6.11/§10.8 的高层判断的证据基础；既有"八项工作无 budget-matched 对照"一行同步改为"九项"。
+- 无新增小节、无平行 taxonomy、无配图变化。
+- verification 纪律：两篇均 `verification_status: source-checked` / `content_scope: full-text`，正文只使用 source-verified 行。明确未写入正文的：RSIAgent 标题与 abstract 的 recursive self-improvement（三条判据全不满足，仅在 §7.11.3 内以术语错位记录并指向 [[Topics/SelfEvolvingAgents-Survey]] §7.5）、其 "Agentic Causal Discovery" 关键词（记忆实物为无 schema 的 actor 自撰文件，全文无隔离因果结构贡献的消融）、其 78.98/84.82 未与任何统一协议下的 leaderboard 数字并排；MLA-Trust 的 §IV-C "for all models" 普遍性断言（Evidence Ledger 记为 contradicted，Table VII 至少五个模型有反例，其中一个正是论文自选的示例模型）、其 Table III 的模型排名（judge 无 human agreement，排名可能含 judge artifact）、其 13/17 模型计数在 v1 内部四处互不相符。Fig. 6 的逐步数值由矢量图解码、正文未印出，已在正文与矩阵内同时标明并降格为假设。两篇均单篇工作，库内暂无独立验证。
+- 计数：papers_analyzed 按唯一 Papers wikilink 机械复核为 235（本轮新增 2 篇，另 1 篇系此前轮次引入正文但未同步计数，本轮一并更正）。
+- DomainMap 已刷新：[[DomainMaps/GUI-Agent]] 新增两条格局变化。RSIAgent 一条是因为它给 Pattern 4（预算匹配对照是方法可信度的首要筛选条件）补上一条新轴——不只是预算口径，还有 harness 与机制的归因拆分，且拆开后重心移到 harness；MLA-Trust 一条是因为它把"agent 化削弱 guardrail"从假定变成同条件测量，并同时给出反对"风险随步数累积"的自家证据，直接影响防御的部署位置。
 
 ### 2026-09-15 literature-survey（§1.2 研究意义扩写 + 自演化证据线补齐，224 → 232）
 

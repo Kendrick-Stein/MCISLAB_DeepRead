@@ -1,9 +1,9 @@
 ---
 title: VLM Survey
 tags: [survey, VLM, multimodal, vision-language-model, visual-reasoning]
-date_updated: "2026-09-07"
+date_updated: "2026-09-18"
 year_range: 2023-2026
-papers_analyzed: 52
+papers_analyzed: 64
 keywords: [vlm, vision language model, multimodal llm, visual reasoning]
 domain_map: VLM
 ---
@@ -23,7 +23,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - **能力扩展期（2024）**：高分辨率 VLM（CogAgent 1120x1120）、专业领域 VLM（MobileFlow）、VLM for grounding 成为热点
 - **统一模型期（2025）**：理解+生成统一模型涌现（LLaDA2.0-Uni、Unify-Agent）；VLM 作为 agent backbone 广泛应用
 - **效率与对齐优化期（2026）**：KV cache 优化（GUI-KV）、codec-native pre-encoder sparsification（Mage-VL）、human preference alignment、安全防御（LaSM）
-- **后训练与机制分析期（2026H2）**：统一模型的 RL 后训练兴起（BRAID、SpectraReward）；因果干预式机制分析与受控诊断 benchmark（Visual Access Sweep、SynthDocBench）取代观察性分析；开源基座持续演进（Gemma 4 encoder-free、ScaleCUA 跨平台 CUA 语料）
+- **后训练与机制分析期（2026H2）**：统一模型的 RL 后训练兴起（BRAID、SpectraReward）；因果干预式机制分析与受控诊断 benchmark（Visual Access Sweep、SynthDocBench）取代观察性分析；开源基座持续演进（Gemma 4 encoder-free、ScaleCUA 跨平台 CUA 语料）；机制分析开始给出可用的修法与明确的失效侧（VisLens 的 0.05% 参数读出头 vs QwenDrive 的度量级 3D 几何），reward 的来源从裁判模型移向可程序化求值的环境（PanoEnv、Code-as-World）
 
 ---
 
@@ -41,7 +41,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - **SeeClick**：Grounding pre-training + screen-only 输入，实现跨平台 GUI grounding
 
 **优势**：解决传统 VLM 在文本密集场景的分辨率瓶颈；跨平台通用性强（不依赖 DOM/HTML）
-**局限**：高分辨率输入导致计算开销显著增加；训练和推理资源消耗大。同一瓶颈还有一条不改训练的解法——推理期让模型自己决定放大哪一块，而非把整幅截图整体升到更高分辨率（[[2608-GUILens]]，详见 §2.7）
+**局限**：高分辨率输入导致计算开销显著增加；训练和推理资源消耗大。同一瓶颈还有一条不改训练的解法——推理期让模型自己决定放大哪一块，而非把整幅截图整体升到更高分辨率（[[2608-GUILens]]，详见 §2.7）。更省的一档不调外部工具也不做多轮交互：在冻结基座上训一个约 0.05% 参数的读出头，一次前向就从早期视觉 token 的 hidden state 里解出该放大哪一块（[[2608-VisLens]]，详见 §2.8）
 
 ### 2.2 Zero-shot / Agent-based Grounding 路线
 
@@ -55,11 +55,11 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - **OVOD-Agent**：把"迭代细化定位"的 agent loop 做成 LLM-free——针对 OVOD 推理时退化为静态类别名匹配的问题，用 7 个原语视觉操作（颜色/纹理/几何/空间关系等）逐步改写类别描述，训练期 UCB Bandit 采样轨迹 + GT-IoU 弱奖励，蒸馏成 20MB 双头 Reward-Policy MLP 在推理期引导 prompt 细化；LVIS val rare-category AP_r 对 4 个 OVOD backbone 一致提升 +1.2~+2.7、common/frequent 不受损（[[2511-OVODAgent]]）。注意其"self-evolving"实为离线弱监督蒸馏（部署后 RM 冻结），且论文存在多处内部数字不一致（引言 <100ms vs 实测 ΔLatency +90~155ms），精确数字引用需谨慎
 
 **优势**：无需 3D 标注数据；充分利用现有 VLM 的 2D 理解能力；适合数据稀缺场景
-**局限**：多阶段 pipeline 存在误差传播；计算开销不低（多视角处理 + 多轮 VLM 调用）
+**局限**：多阶段 pipeline 存在误差传播；计算开销不低（多视角处理 + 多轮 VLM 调用）。这条路线默认"VLM 的 zero-shot 定位能力在开源模型上同样成立"，而一处四路同题对照给出了反例：同一时间步向四架无人机各要一个像素目标、四张观测图各不相同时，Qwen3.5-9B 有 70% 的步骤对四张图给出完全相同的像素（27B 为 58%），三个前沿模型为 0%、Gemini 3.7 Flash 为 1%（[[2609-DroneCATS]]）。输出与输入无关这一类失败不会被单图定位准确率暴露，而 agent 式的多轮外壳恰好把它放大成整条轨迹的系统性偏移
 
 ### 2.3 理解-生成统一路线
 
-**代表论文**：[[2604-LLaDA2Uni]]、[[2600-UnifyAgentUnifiedMultimodal]]、[[2606-Orca]]
+**代表论文**：[[2604-LLaDA2Uni]]、[[2600-UnifyAgentUnifiedMultimodal]]、[[2606-Orca]]、[[2609-PhysBrain15]]
 
 **核心思路**：将多模态理解和生成统一在单一框架内，避免传统系统中理解模块与生成模块的表征不对齐问题。
 
@@ -68,13 +68,16 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - **Unify-Agent**：认知缺口检测 + 多模态证据检索 + grounded recaptioning + 图像生成，将 world-grounded synthesis 重构为 agent 流程
 - **VLV Auto-Encoder**：视觉编码器 + T2I diffusion decoder + LLM，通过知识蒸馏实现低成本高质量图像描述
 - **Orca**：把 modeling target 从 next-token/next-frame 上移到 world state transition——unconscious（视频相邻帧 latent 预测）+ conscious（event 条件预测 + VQA）联合预训练统一 world latent，冻结 backbone 后经 language/image/action 三种 decoder 读出；4B 在 OOD readout 上超同量级专用 baseline（[[2606-Orca]]），是"统一"从理解-生成扩展到 world modeling 的信号
+- **PhysBrain 1.5**：把统一词表从"语言 + 图像"再扩一格到"语言 + 动作 + 未来视觉状态"——$V_{\text{lang}} \cup V_{\text{act}} \cup V_{\text{vis}}$ 共享同一套 embedding 与 LM head，单一 masked next-token 目标，无 modality-specific head、无 pixel 重建损失；未来状态被编成 RGB / depth / robot-mask 三路 VQ token 按空间位置交错的 770-token 序列，与动作、语言排在同一条序列上。8B 在 28 个 embodied understanding benchmark 上均值 72.5（次优开源基座 66.0，均在 base 之上），但动作与未来帧这两路只有离线轨迹可视化与 action-token perplexity，全篇没有一个闭环成功率，也没有任何 ablation 把三路联合训练与只用 understanding 数据训练分开（[[2609-PhysBrain15]]）。通用多模态一侧同时出现代价：12 项里 7 降 5 升（MVBench −2.46、MME −62.6）。"统一"的外延在扩大，支撑它的对照实验没有跟上——这一条与 §2.6 的 reward 设计不同，属于目标函数层面的 claim，目前只有总分支持
+
+把新能力压进同一个 backbone、通用多模态理解随之掉分，是两条互不相关的扩展路线上同时出现的读数。[[2609-PhysBrain15]] 扩的是动作与未来视觉状态，12 项通用多模态里 7 降 5 升（MVBench −2.46、MME −62.6）；[[2609-Gander]] 扩的是 full-duplex 实时交互，相对自身基座 MiniCPM-o 4.5 在 WorldSense 上回退 6.08、Daily-Omni 回退 1.67。后者排除掉了最常见的那个解释——它的 vision tower 全程冻结且 bit-for-bit 未变，回退不能归因于视觉编码退化。两处回退的形状也不一样：考跨模态时序对齐的 Daily-Omni 掉得少，考计数与定位这类细粒度感知属性的 WorldSense 掉得多，作者把它归给交互语料里大量视频本就是无关上下文干扰项、训练目标是忽略而非细看。两篇都没有"同等算力只训通用数据"的对照，因此能确立的是代价存在、且不必然落在视觉塔上，不是代价的成因。
 
 **优势**：理解与生成能力可互相增强；支持 interleaved multimodal reasoning；更接近 AGI 范式
 **局限**：MoE + diffusion 组合的显存和推理速度挑战；训练复杂度高。推理速度这一项在 discrete diffusion VLM 上已有具体读数：把 LLaDA-V 8B 适配成单步 GUI grounding 模型后，输出只有十几个 token，恰是并行解码理论上最占便宜、AR 顺序开销最不重要的区间，延迟仍是 Qwen2.5-VL-7B 的 3-6 倍（1.10s vs 3.02-6.50s），四个数据集里三个精度落后（[[2606-TowardsGUIAgents]]，详见 §2.7）。该对照只对齐了训练语料（同一份 120K），参数量、预训练配方与解码预算均未控制，因此它证伪的是"并行解码在短输出上自动换来速度"这一预期，而非 diffusion 目标本身
 
 ### 2.4 Human Preference Alignment 路线
 
-**代表论文**：[[2500-AligningMultimodalLlmHuman]]
+**代表论文**：[[2500-AligningMultimodalLlmHuman]]、[[2506-MLATrust]]
 
 **核心思路**：将 LLM alignment 技术（如 RLHF、DPO）迁移到多模态场景，优化 VLM 在真实性、安全性、推理能力上的表现。
 
@@ -82,9 +85,10 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - 对齐数据集构建：数据来源、模型响应、偏好标注
 - 应用场景：一般图像理解、多图像、视频、音频等
 - 评估基准：多模态场景下的对齐效果评测
+- **MLA-Trust 的壳对照**：把同一个 backbone 分别放进 single-step 图文问答与 multi-step GUI 执行两种外壳，两侧的诱导数据用同一方法构造、只有壳不同，测拒绝率——GPT-4o 90.5%→70.2%、Gemini-Pro 86.0%→62.5%、Claude-3-7-sonnet 78.0%→57.8%（[[2506-MLATrust]]）。真实性一侧的落差更大：跨应用信息传递任务上最好的模型只有 26%，同一批模型在静态图像理解上通常报 80–90%。推论是对齐强度不是 backbone 的一个固定读数，而是随承载它的执行壳变化的量，静态输入输出对上测出的安全裕度不能直接搬到 agent 部署
 
 **优势**：提升 VLM 与人类意图的一致性；改善安全性和可控性
-**局限**：多模态偏好标注成本高；跨模态对齐信号难以精确定义
+**局限**：多模态偏好标注成本高；跨模态对齐信号难以精确定义；对齐效果的度量本身依赖执行壳——同一模型换成多步执行后拒绝率掉 20 个百分点以上（[[2506-MLATrust]]），而现有对齐评测几乎都在静态输入输出对上完成，因此"某模型已对齐到什么程度"这句话在没有指明壳的前提下不成立。引用该 benchmark 的数字须带三条限定：其主指标 Refuse-to-Execute Rate 只奖励拒绝、框架内没有惩罚过度拒绝的维度，一个恒拒绝的模型会在 safety 与 privacy 两维横扫，"谁更可信"的排序必须与"谁更爱拒绝"分开读；自动 judge（Longformer / GPT-4）没有人工一致性背书，且全部结果为单次运行、无种子与温度报告；数字取自 arXiv v1 的 13 个模型（GPT-4o / Claude-3.7 / Gemini-2.0 一代），期刊版扩到 17 个但未回填 arXiv
 
 ### 2.5 效率优化路线
 
@@ -107,13 +111,13 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 **跨论文 pattern（GUI KV 压缩支线）**：[[2606-StarKV]] 与 [[2603-STLiteKV]] 从不同诊断出发（subspace 级空间 MI 异质性 vs 全层均匀高稀疏）独立得到两个收敛结论——(1) 通用 LLM/VLM KV 压缩的结构先验（共享 saliency、分层预算）在 GUI attention 结构下失效；(2) 中等预算压缩可精度不降甚至略超 full cache，指向 GUI 历史 visual token 存在系统性冗余、stale 视觉历史会污染 context。但两者"反超"的幅度都很小（+0.19 / ~2 分）且均无方差报告，两者的 stale 判据也都是注意力/相似度启发式而非"证据是否仍反映当前界面状态"；该结论目前仅在 7B 开源模型（UI-TARS-1.5 / OpenCUA）上成立。
 
 **优势**：GUI-KV/STaR-KV/ST-Lite/LaSM 无需重新训练、plug-and-play；Gemma 4 的效率 recipe 可复用于端侧部署
-**局限**：缩放系数和关键层范围具有 model-specific 特性；对闭源模型难以应用；Gemma 4 未拆分 thinking mode 与架构本身的贡献占比；GUI KV 压缩支线均只报 analytic FLOPs 或受限样本上的加速比。Mage-VL 虽补了端到端 wall-clock，但 3.5× 只是 8×B200 上的峰值案例、跨 benchmark 非单调，效率结论必须同时报告 token budget、source-frame horizon、latency breakdown 与 matched hardware
+**局限**：缩放系数和关键层范围具有 model-specific 特性；对闭源模型难以应用；Gemma 4 未拆分 thinking mode 与架构本身的贡献占比；GUI KV 压缩支线均只报 analytic FLOPs 或受限样本上的加速比。Mage-VL 虽补了端到端 wall-clock，但 3.5× 只是 8×B200 上的峰值案例、跨 benchmark 非单调，效率结论必须同时报告 token budget、source-frame horizon、latency breakdown 与 matched hardware。以延迟为立论前提却不报延迟是这类设计里反复出现的缺口：[[2609-Gander]] 把 16× 视觉 token 压缩与 5× 音频下采样都归因于实时约束，全文没有一处 ms 级测量
 
 ### 2.6 多模态 RL 后训练与 Reward 设计
 
-**代表论文**：[[2607-BRAID]]、[[2607-SpectraReward]]、[[2607-SearchGenBoundary]]、[[2606-VisPlay]]、[[2607-HyGAE]]、[[2608-CoRLCohort]]
+**代表论文**：[[2607-BRAID]]、[[2607-SpectraReward]]、[[2607-SearchGenBoundary]]、[[2606-VisPlay]]、[[2607-HyGAE]]、[[2608-CoRLCohort]]、[[2606-PanoEnv]]、[[2608-CodeAsWorld]]、[[2609-FailBench]]
 
-**核心结论**：统一模型（UMM）的竞争焦点已从架构转向后训练——RL 信用分配如何贯穿异构模态、reward 如何免标注获得，且三篇 UMM 工作全部收敛到 BAGEL 系 hybrid AR-diffusion 基座。免标注 reward 的探索同时延伸到理解侧：[[2606-VisPlay]] 用完全自含的 self-play（自身 majority-voting 伪标签 + 不确定性课程）替代人工标注与外部裁判。再往下一步是把"自含"放宽为"不含自己"——[[2608-CoRLCohort]] 让 reward 来自一个独立预训练的 peer 而非模型自身，这条路线的门槛因此从"模型自己的多数票够不够准"变成"两个模型会不会错到一块去"。
+**核心结论**：统一模型（UMM）的竞争焦点已从架构转向后训练——RL 信用分配如何贯穿异构模态、reward 如何免标注获得，且三篇 UMM 工作全部收敛到 BAGEL 系 hybrid AR-diffusion 基座。免标注 reward 的探索同时延伸到理解侧：[[2606-VisPlay]] 用完全自含的 self-play（自身 majority-voting 伪标签 + 不确定性课程）替代人工标注与外部裁判。再往下一步是把"自含"放宽为"不含自己"——[[2608-CoRLCohort]] 让 reward 来自一个独立预训练的 peer 而非模型自身，这条路线的门槛因此从"模型自己的多数票够不够准"变成"两个模型会不会错到一块去"。reward 的来源还可以再往模型之外挪一格：[[2606-PanoEnv]] 与 [[2608-CodeAsWorld]] 都改从可程序化求值的环境里取 ground truth，前者用仿真器的 depth/segmentation/3D box，后者用可执行场景配置的运行结果，判据因此既不来自被训模型也不来自任何裁判模型。这条阶梯上还有一档一直被默认可行、最近才被系统测过一次：为某个判定任务专门训练一个 verifier。在 14 个独立来源、2,197 条真实与仿真机器人轨迹上，5 个专训失败检测器全部低于各自的基座模型，差值 −0.002 ~ −0.088，而 harness、prompt 与输入配方在两侧完全一致（[[2609-FailBench]]）。
 
 **关键设计**：
 - **BRAID**：两层 MDP 把交错"文-图-文"轨迹统一为单一决策过程，trajectory-level advantage 同时驱动文本 GRPO 与图像 DiffusionNFT，policy gradient 第一次真正贯穿异构模态；BAGEL-7B 上 7 benchmark 平均 +5.73，ablation 显示图像分支 RL 的贡献大于 VLM judge 的 process reward（[[2607-BRAID]]）
@@ -121,13 +125,15 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - **SearchGen**：生成模型的 knowledge boundary（internalizable vs contextual）是 (prompt, generator) 的联合属性且随训练漂移——盲目接搜索会在模型本会做的 prompt 上倒退；teach-then-search co-training（DPO 内化可学知识 + RFT 校准 8B search reasoner）使 4B generator 达 Gemini-3-Flash oracle reasoner 水平（[[2607-SearchGenBoundary]]）
 - **VisPlay**：理解侧的 label-free RL——单一 base VLM 演化 Questioner/Reasoner 双角色交替 GRPO：Questioner 以 frozen Reasoner 的答案不确定性（confidence→0.5）为 reward 生成贴着能力边界的问题，Reasoner 以自身 majority-voting 伪标签作 verifiable reward；47K 无标注 web 图像、3 个 backbone 平均分随迭代上升（Qwen2.5-VL-3B 30.61→47.27），与人工标注数据 + standard GRPO 平均相当。但拆分显示优势几乎全在 HallusionBench 单项，MMMU/MM-Vet 反而更低；且同批图像的伪标签估计准确率逐代 72.0→61.0 下滑——自我共识监督随迭代自噬，是该范式（而非实现）的根本约束，论文自认缺 definitive verification（[[2606-VisPlay]]）
 - **Co-RL**：把 VisPlay 那条 label-free 路线的 reward 换了个来源——N 个不共享参数的 policy 沿有向环互评，agent n 的 reward 是"自己的答案是否等于 agent n−1 的多数票"，每个 agent 都不参与构造自己的监督目标，各自 GRPO 独立更新。它同时给出了自我共识为何会自噬的形式化：对奇数 K，self-rewarding 的期望 GRPO 更新方向恒为 $\mathrm{sign}(p-1/2)$，因此在模型本来就做对不到一半的题上，训练必然把正确答案继续压下去。多模态侧 5 个 VLM（含 Qwen2.5-VL-3B/7B、InternVL3.5-2B/4B）在 4 个 benchmark 上平均 +2.3~+7.2。但同一篇论文的等预算对照把这个故事拆开了一半：较弱的 Qwen2.5-VL-3B 得 +3.19/+4.86，较强的 InternVL3.5-2B 只有 +0.53/+1.43，文本侧是同一形状（弱 agent +10.1、强 agent +0.3）——被测出来的主效应更接近"强模型隔着多数票教弱模型"，而把 peer 换成冻结强模型的对照没有做。作者自己的 Theorem 1 还标出了失败区：两 agent 正确率之和低于 1 时，cohort 收敛到错误共识是一个被证明存在的吸引盆，论文没有跑一次弱 cohort 把它演示出来（[[2608-CoRLCohort]]）
+- **PanoEnv / Code-as-World（reward 从引擎里取，不经裁判）**：PanoEnv 用 TartanAir 的 depth、segmentation 与 3D box 程序化生成 14,827 条全景 ERP 空间 QA，同一套几何 ground truth 直接充当 GRPO 的 rule-based reward——距离题按相对误差分档给分，方位题按正确轴占比给部分分，格式与答案两部分加权。Qwen2.5-VL-7B 的 open-ended 准确率 6.39→14.83、总分 49.34→52.93（[[2606-PanoEnv]]）。Code-as-World 把场景写成可执行的仿真器配置与 SDK 调用，propose–instantiate–execute–render–verify 的 K=5 闭环自动产出带答案的物理题，再做 image-space SFT（73,335 条）与 world-space GRPO（2,573 条）（[[2608-CodeAsWorld]]）。两者都绕开了本节其余工作对闭源裁判的依赖，也都留下同类欠账：PanoEnv 的训练 reward 与评测指标共用同一套 parser，换成独立 LLM judge 后增幅只剩 +0.64 / +0.49 分，与 open-ended 准确率翻倍不成比例，且全表没有一个在同分布数据上 SFT 过的对照，"+3.59 分属于 GRPO"因此无法与"见过同分布数据"分开；Code-as-World 的立论是 code 优于 pixel/3D/语言三种表示，全文却没有做过任何表示对照，发现闭环对下游分数的贡献也未被单独测量，主结果是 159 道自建验证题上的 55.4 对 54.8
+- **FailBench（专训 verifier 在分布外低于自己的基座）**：把"为判定任务单训一个 verifier"这一档拿到独立收集的数据上测——14 个来源（12 真机 / 2 仿真）、2,197 条轨迹（1,176 失败 / 1,021 成功），75% 的失败是自然发生而非人为构造，标签不由作者看视频判定。13 个检测器里最好的是 Gemini 3 Flash 的 0.77 macro balanced accuracy（随机 0.50）。真正有内部效度的是同基座对照，因为两侧只差微调、harness 与输入配方一致：Guardian −0.002、RoboReward-8B −0.057、ViFailback-8B −0.088、RoboFAC-7B −0.040、FailSense-Calvin-3B −0.003，五个专训检测器全部低于各自基座，且除最小的 Qwen3-VL-2B（0.53）外低于每一个通用模型（[[2609-FailBench]]）。它顺带给出一条比排名更有用的诊断：RoboFAC-7B 在平衡子集上抓到 30/30 的失败却只放行 2/30 的成功（BA 0.533），按其发布测试集 960:244 的类别先验重加权得 0.811、与它发布的 0.806 几乎相同——而在那个先验下"恒答失败"本身就值 0.797；ViFailback 的 445:55 划分里恒答失败值 0.890，其报告的基座分是 0.900。**打折**：五个 delta 都没有方差、置信区间或显著性检验；去掉 Guardian 两个 in-domain 子集后它仍落后 InternVL3-8B（0.596 vs 0.639），但那是作者的单点核查而非重跑；全篇没有人类 balanced accuracy、标注者一致率与标签噪声估计，0.77 这个上限由什么构成未知
 - **HyGAE**：把 multi-turn VLM agent 的 turn-wise 与 token-wise GAE 线性混合，并在特定 discount relation 下用单一 critic 同时提供两级 value；Qwen2.5-VL-3B 在五类受控 benchmark 的平均成功率 0.91（Token-PPO 0.81），但环境最多 3–7 turns、VIRL 只执行与 ground-truth trajectory 对齐的动作，支持的是短 horizon credit-assignment 稳定性，不是开放式 long-horizon 泛化（[[2607-HyGAE]]）
 
-**共同弱点**：UMM 三篇的 reward/裁判高度依赖闭源强模型（BRAID 用 GPT-5.2 打 process reward、SearchGen 裁判与奖励同源、SpectraReward 零人类评估），增益中 judge preference fitting 的占比未被剥离；likelihood reward 的经典退化解（把 prompt 文字渲染进图像）未被验证；均只在 4B-7B 单 backbone 验证。[[2606-VisPlay]] 换掉了外部裁判依赖，代价是 majority-voting 伪标签继承模型自身系统性偏差、无外部纠错通路。[[2608-CoRLCohort]] 把纠错通路换成一个预训练不同的 peer，代价是引入一个可被形式化的新失败模式（$p_A+p_B<1$ 时的错误共识吸引盆）与未被剥离的强→弱单向传递；它的可用性判据也随之明确——两个模型同时错、且错成同一个答案的比例（该文在 MATH L3–5 上量到 1.8%–5.2%）必须足够低，而这个量随答案空间收缩而上升，在小离散动作空间上不再成立。[[2607-HyGAE]] 换成显式 actor-critic，却只在 3B、3–7 turn 受控环境验证；这几类路线共同缺少 long-horizon、distribution shift 与 failure-type 分解。
+**共同弱点**：UMM 三篇的 reward/裁判高度依赖闭源强模型（BRAID 用 GPT-5.2 打 process reward、SearchGen 裁判与奖励同源、SpectraReward 零人类评估），增益中 judge preference fitting 的占比未被剥离；likelihood reward 的经典退化解（把 prompt 文字渲染进图像）未被验证；均只在 4B-7B 单 backbone 验证。[[2606-VisPlay]] 换掉了外部裁判依赖，代价是 majority-voting 伪标签继承模型自身系统性偏差、无外部纠错通路。[[2608-CoRLCohort]] 把纠错通路换成一个预训练不同的 peer，代价是引入一个可被形式化的新失败模式（$p_A+p_B<1$ 时的错误共识吸引盆）与未被剥离的强→弱单向传递；它的可用性判据也随之明确——两个模型同时错、且错成同一个答案的比例（该文在 MATH L3–5 上量到 1.8%–5.2%）必须足够低，而这个量随答案空间收缩而上升，在小离散动作空间上不再成立。[[2607-HyGAE]] 换成显式 actor-critic，却只在 3B、3–7 turn 受控环境验证。引擎侧取 reward 则把裁判依赖换成了口径依赖——[[2606-PanoEnv]] 的训练 reward 与评测指标同源，两者共涨不能算作独立验证。剩下那条"干脆专训一个 verifier"的退路，[[2609-FailBench]] 表明在分布外未必成立：五个专训检测器无一超过自己的基座，而其中至少一个的发布分数与"恒答失败"这条平凡基线只差 0.009。把它与本节其余工作并读，结论不是"专训无用"，而是免标注 reward 的几条路线目前都缺同一件东西——在训练分布之外的一次判定质量测量，以及一条类别先验对照。这几类路线共同缺少 long-horizon、distribution shift 与 failure-type 分解。
 
 ### 2.7 VLM as CUA 基座：数据 Scaling、动作表示与外挂验证
 
-**代表论文**：[[2509-ScaleCUA]]、[[2602-ToolTok]]、[[2511-GuiAima]]、[[2606-HiViG]]、[[2603-SecAgent]]、[[2607-MHLC]]、[[2608-GUILens]]、[[2608-MissClick]]、[[2606-TowardsGUIAgents]]
+**代表论文**：[[2509-ScaleCUA]]、[[2602-ToolTok]]、[[2511-GuiAima]]、[[2606-HiViG]]、[[2603-SecAgent]]、[[2607-MHLC]]、[[2608-GUILens]]、[[2608-MissClick]]、[[2606-TowardsGUIAgents]]、[[2609-ShowHarness]]
 
 **核心结论**：GUI/computer-use 场景对 VLM 的要求已从"看得清"（2.1 的高分辨率路线）推进到数据配比、动作表示、历史压缩与验证机制四个层面，且 grounding 能力与端到端 agent 能力被证明显著解耦。动作表示这一层在 2026H2 被从两端同时敲打：推理期的主动观察脚手架可以在完全不训练的前提下把通用 VLM 的定位精度抬到专用模型之上（[[2608-GUILens]]），而"坐标以 digit token 逐位发出"这个输出接口被证明是一个可被定向利用的非均匀误差面（[[2608-MissClick]]）——一个说明接口选择决定能力上限，另一个说明它同时决定攻击面。同一处接口在训练目标侧也留有余量：坐标文本里 `(x1,y1)` 锚定位置、`(x2,y2)` 定义范围，把这层层级显式排进 masking 调度后，同基座同语料下四个数据集一致涨点（[[2606-TowardsGUIAgents]]）。
 
@@ -143,6 +149,8 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 - **Towards GUI Agents**：唯一一个把坐标留在文本里、只改解码范式的对照点。LLaDA-V 8B（discrete diffusion）架构不动，只把 bbox 的生成顺序拆成两段——先在线性 masking 下学 action type 与锚点 `(x1,y1)`，再在 `(a_type, x1, y1, I, N)` 全部给定的条件下把余下 token 全部 mask，强制学 $p(x_2,y_2\mid\cdot)$。同基座、同 120K 语料、同推理配置下四个数据集 SSR 一致提升 +1.30~+6.10，且增益在缺 OCR 文字锚点的 icon 类最大（ScreenSpot-Web-Icon +5.30、VisualWebArena +6.10）、文本类最小（ScreenSpot-Web-Text +1.30）。代价是 conditional sequentiality：第二段依赖第一段的输出，延迟从 linear 的 3.02–3.36s 涨到 4.20–6.50s，而同任务的 Qwen2.5-VL-7B 只要 1.10s；把收敛步数压到 11–15 步以逼近 linear 的延迟后，四个数据集精度全面回落（VisualWebArena 67.50→59.20，反低于 linear 的 61.40），即该增益在等延迟预算下保不住。数据侧另有一条可迁移读数：语料从 7K 扩到 120K，精度上升的同时收敛步数从 25 降到 16–18，说明"需要多少去噪步"更多是训练充分度的函数而非架构常数；步数预算过 64 之后收益即平。**引用须避开一处**：论文正文称把与 AR 的差距"从约 25 分收窄到 15 分以内"，该表述无法由其自身主表得出（按各 benchmark 最强 AR 逐项计，linear 的均值差为 16.0、hybrid 为 12.5），零样本 LLaDA-V 的 SSR 本身是 0.00（[[2606-TowardsGUIAgents]]，primary home 为 [[Topics/CUA-Survey]]）
 
+- **Show-Harness**：证据来自真机 manipulation，但问的是本节同一个问题——VLM 面对一个离散动作词表时，它对每个 token 的效果的把握从哪里来。每步只选一个语义单元（`MV_FWD` / `ROTATE_CW` / `GRASP` / `DONE`），由 embodiment-specific 解释器确定性地落成一段有界的 6-DoF 位姿更新。2×2 的动作空间消融比主表硬得多：语义名 + 文字写明的方向约定 20/20，只给语义名 18/20，把语义名整体换成任意符号但保留约定 19/20，只给任意符号不给约定掉到 1/20，且模型自行探测推断出的映射只有 23.3% 正确（[[2609-ShowHarness]]）。这个结果反过来削弱了论文自己的 framing：起作用的不是"VLM 天然理解的动作语义"，而是上下文里那份 token→效果的确定性说明书，语义命名只提供一个弱先验。对 GUI 侧的推论是动作名称是否自然并非杠杆，把每个可用操作的效果显式写明才是——而这恰好是当前 CUA 系统普遍留在隐含约定里的部分。**打折**：每格 20 trials、无重复 run 与 error bar，19/20 与 20/20 的差不可解读；论文的主表另有一处更重的隐患——被对比的 VLA baseline 训练在"由同一批 2 cm 量化语义动作转换回去的连续轨迹"上，形态恰是它们的分布外，因此 89.0 对 39.0 里范式与数据格式的占比无法拆开，本节不引用该对照
+
 **跨论文 pattern**：
 
 | Pattern | 证据 |
@@ -153,15 +161,22 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 | 语义历史压缩缺 factuality 校验 | SecAgent/HiViG 的压缩状态由模型自述生成，silent corruption 会污染后续决策，两篇均未评测 context 本身准确率 |
 | 坐标的 digit 序列化是一个非均匀误差面 | [[2608-MissClick]]：单纯给交叉熵乘上 $10^{m-j}$ 的位权，targeted ASR 即从 35.24→44.86 / 50.69→62.67。同一杠杆在训练侧已被位权重加权类工作（NTL、DIST2Loss、Phi-Ground）独立利用，说明这是接口性质而非某个模型的实现偶然；其推论是任何噪声源（量化、采样温度、解码扰动）在高位上的一次失误都会造成大位移 |
 | 坐标文本序列的内部结构不被均匀的 token 目标覆盖 | [[2606-TowardsGUIAgents]]：随机 linear masking 很少稳定制造"anchor 可见、extent 被 mask"的训练情形，模型因而学不到 $p(x_2,y_2\mid a_{\text{type}},x_1,y_1,I,N)$；把这类情形显式排进调度，四个数据集一致 +1.30~+6.10，且缺文字锚点的 icon 类受益最大。与上一行的位权观察同形——一侧表现为学不到的条件分布，另一侧表现为可被定向利用的误差面，两者指向同一件事：坐标即文本这个接口带有结构信息，而均匀的 token 级损失看不见它 |
-| 推理期脚手架的边际价值取决于它补的是能力缺口还是信息瓶颈 | [[2608-GUILens]] 三 backbone 消融：coordinate priming −1.0/−2.0/−7.3、visual verification −1.7/−1.7/−4.8，收益随 backbone 变弱而放大；而 cropping 对最强的 GPT-5.5 仍值 −10.4。前两者替补基座缺失的能力、会随基座进步贬值，裁剪解的是高分辨率输入的信息瓶颈、不随能力增强而消失。单篇证据，尚无独立复现 |
+| 推理期脚手架的边际价值取决于它补的是能力缺口还是信息瓶颈 | [[2608-GUILens]] 三 backbone 消融：coordinate priming −1.0/−2.0/−7.3、visual verification −1.7/−1.7/−4.8，收益随 backbone 变弱而放大；而 cropping 对最强的 GPT-5.5 仍值 −10.4。前两者替补基座缺失的能力、会随基座进步贬值，裁剪解的是高分辨率输入的信息瓶颈、不随能力增强而消失。单篇证据，尚无独立复现。还有第三个变量：同一批裁剪框对不同 consumer 的价值可以相差整个效应量——[[2609-FailBench]] 用一个只看 4 帧与任务描述、看不到结果的独立定位器裁 ROI，同一批框给 Gemini 3 Flash 值 +10.7 分，给 Gemma-4-31B-it 为 0；整条流水线在 14 个子集上净收益 +2.4 分（修好 223 例、弄坏 160 例，exact McNemar $p=0.0015$），其中 4 个子集反而下降。裁剪的收益因此不是框的属性，而是框与消费者的联合属性（机器人视频域证据） |
+| 动作接口的 grounding 来自写明的映射，不来自名字的语义 | [[2609-ShowHarness]] 的 2×2：任意符号 + 文字约定 19/20 几乎追平语义名 + 约定 20/20，只给任意符号不给约定掉到 1/20、模型自行探测推断的映射仅 23.3% 正确。与上两行合看，坐标位权、bbox 层级、动作命名三处接口指向同一件事——决定能力上限的是接口把"这个 token 会造成什么"写明到什么程度，而不是它的抽象层级或命名是否自然。真机 manipulation 域的单点证据，每格 20 trials |
 
 ### 2.8 机制分析：视觉信息"在"但"读不出"
 
-**代表论文**：[[2607-VisualAccessBoundary]]、[[2606-Act2Answer]]、[[2607-GUIStateBelief]]、[[2607-EvoGUI]]、[[2605-TokenSwap]]、[[2607-MentalWorldModeling]]、[[2608-GroundingIsntKnowing]]、[[2608-MNISTPro]]、[[2608-MemoryLies]]
+**代表论文**：[[2607-VisualAccessBoundary]]、[[2606-Act2Answer]]、[[2607-GUIStateBelief]]、[[2607-EvoGUI]]、[[2605-TokenSwap]]、[[2607-MentalWorldModeling]]、[[2608-GroundingIsntKnowing]]、[[2608-MNISTPro]]、[[2608-MemoryLies]]、[[2608-VisLens]]、[[2608-QwenDrive]]、[[2601-VisualProjectionSpace]]、[[2609-DroneCATS]]
 
-**核心结论**：多篇在不同域用因果干预/行为级协议独立发现同一 pattern——信息在 hidden states 里（线性 probe 可恢复）但模型行为上读不出，VLM 的瓶颈从"表征缺失"转向"读出通路"。GUI 域进一步给出跨模态与时序两个变体：结构文本与像素冲突时模型偏信过期结构（[[2607-GUIStateBelief]]），以及状态转移/时序理解不随模型规模或 GUI 专门化提升（[[2607-EvoGUI]]）。2026H2 又补上黑箱侧的规模化读数：同一题目只改变信息的承载模态，42 个 MLLM 无一例外掉分（[[2605-TokenSwap]]）；而强制显式状态化的 pipeline 能把直接作答时的媒体惩罚抹平（[[2607-MentalWorldModeling]]）。这几类证据指向同一处，但强度递减——因果干预（VAS / Act2Answer）> 同题单变量配对（GUIStateBelief / TokenSwap）> 端到端阶梯对照（Mentis），后两类只测出了差距的存在与大小，没有把成因分解到读出通路。
+**核心结论**：多篇在不同域用因果干预/行为级协议独立发现同一 pattern——信息在 hidden states 里（线性 probe 可恢复）但模型行为上读不出，VLM 的瓶颈从"表征缺失"转向"读出通路"。GUI 域进一步给出跨模态与时序两个变体：结构文本与像素冲突时模型偏信过期结构（[[2607-GUIStateBelief]]），以及状态转移/时序理解不随模型规模或 GUI 专门化提升（[[2607-EvoGUI]]）。2026H2 又补上黑箱侧的规模化读数：同一题目只改变信息的承载模态，42 个 MLLM 无一例外掉分（[[2605-TokenSwap]]）；而强制显式状态化的 pipeline 能把直接作答时的媒体惩罚抹平（[[2607-MentalWorldModeling]]）。这几类证据指向同一处，但强度递减——因果干预（VAS / Act2Answer）> 同题单变量配对（GUIStateBelief / TokenSwap）> 端到端阶梯对照（Mentis），后两类只测出了差距的存在与大小，没有把成因分解到读出通路。阶梯最下面还有一层不计入证据链：只测 projector 输出的几何量、再与行为分数做组间 $t$ 检验的观察性 probe（[[2601-VisualProjectionSpace]]）。它的关键数字自身就对不上——用来划分"低秩 regime"的 BLIP-2 PC1 占比在正文写作 67.9% / 68.8%，同文 Figure 2 上读出的是约 0.24 / 0.445；扰动斜率 $\kappa_t$ 在 Table 2 是 1.1895，在 §4.5.2 的全模型均值却是零附近（LLaVA COCO $-0.0183 \pm 0.3290$），相差约 65 倍且符号相反，两处矛盾文中均未调和。
 
 这条链条的两端此后都被推动过一次。往下游看，[[2608-MNISTPro]] 与 [[2608-MemoryLies]] 各自在一个完全可观测的最小环境里做同一件事——把"证据有没有被取到"与"取到之后有没有改变决策"分开计量——两边都量到后一段独立断裂：glimpse 已覆盖目标、stale 条目已被正确检出并从提示中删除，动作与答案仍然不变。往上游看，[[2608-GroundingIsntKnowing]] 则收窄了输入端：被关系判断真正依赖的视觉证据比"先精确定位再判关系"这一默认假设要粗得多。前者把"读不出"从一个终点变成中间站，后者提示读出的对象可能一直被设错。
+
+再往后的两条证据改的不是链条长度而是它的适用范围。[[2608-VisLens]] 给出这条链上第一个建设性用法：在冻结基座上训一个约 0.05% 参数的 tuned-lens 读出头，一次前向就把早期视觉 token 的 hidden state 解成空间语义热图并据此裁剪重喂，V\* / HR-8K 提升 8.4–10.1 分——"信息在但读不出"因此不只是一个诊断，读出通路是可以外接的，而且很便宜。[[2608-QwenDrive]] 划出同一修法失效的一侧：在冻结的 VLM 上挂一个训练好的 BEV head 只到 35.60 mAP，解冻基座才补回 10.46 mAP 与 9.84 map mIoU。度量级 3D 几何上，问题不是"在但读不出"，而是冻结表征里就不够——读出通路能补回多少，取决于要读的是什么。
+
+链条的末端在闭环任务里还有一次断裂，位置是"行为已达成"与"模型报得出已达成"之间。[[2609-DroneCATS]] 把 MLLM 直接放进无人机控制回路（动作空间只在 prompt 里声明，`go` 给一个像素目标、`rotate` 给一个角度、另有 `think` 与 `finished`），成功的判据是模型自己宣告完成、再由外部 verifier 核对宣告时刻的真实距离。Qwen3.5-9B 有 90% 的 episode 真的进入了目标 5 m 半径，高于任何前沿模型，却只有 35% 转化为成功——它平均在起始距离的 0.63 倍处就宣告完成，而前沿模型的宣告距离比在 0.20–0.39；Qwen3.5-2B 在 1.28 倍处宣告、零成功，Cosmos3-Edge-2B 能飞（25% 进入半径）却从不宣告。飞到了与报得出是两件独立的事，被计分的是后一件。**这一条不能当作读出通路的证据**：论文没有做任何探针去区分"模型知道自己到了却不说"与"它并不知道自己到了"，而且它 prompt 里的停止判据是外观性的（目标充满视野）、计分却用 3D 距离，两套口径本身就不重合。可直接用的是它的判据审计——只按第一次宣告计分会翻掉 182 次成功里的 95 次，只按最后一次会翻掉 58 次，改按"轨迹曾进入半径"计分则 337 次从未宣告的失败里有 61 次转为成功；这类闭环 benchmark 的绝对数值主要由宣告协议决定，跨论文比较必须先对齐协议。
+
+同一批轨迹还给"加思考预算"添了一个负读数：1,797 次 `think` 调用没有改变任何可测量的量——739 组配对观测上每步前进距离只差 +0.03 m，卡住时的脱困率 1/230 对 103/8401，目标丢失后的重捕率 13.5% 对 13.4%。[[2609-ShowHarness]] 在真机 manipulation 上得到同形状的读数：加大 frontier 模型的 thinking effort 主要减少冗余交互步数，成功率增益很小而代价可观（GPT-5.6-sol 达 3.4× wall-clock）。两处都不是受控消融——前者由模型自己决定何时 `think`，是否思考与题目难度相混，作者自己也只把它标为观察；后者是跨模型比较——但它们与 [[2607-VisualAccessBoundary]] 在静态 VQA 上的因果结论同向：拉长推理链不扩张模型对环境证据的访问。
 
 **关键发现**：
 - **Visual Access Boundary**：硬屏蔽 generated token→image token attention 的 2D 扫描（layer × time）显示，CoT 生成长度拉长约 50 倍但所需视觉访问边界与 Direct answering 相差 ≤2 层——CoT 增益来自对已写入 hidden states 的视觉信息做更长语言计算，而非持续"回看"图像；CoT 增益上限受 perceptual readout 制约，难属性存在 probe-vs-decode gap（probe 高精度、decode 显著更差）（[[2607-VisualAccessBoundary]]）
@@ -173,6 +188,9 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - **GroundingIsntKnowing（被读出的对象比假设的粗）**：在 multimodal projection 之后、position encoding 之前，把 segmentation mask 命中的 visual token 整块换成一个在 ImageNet val 上算一次的全局平均 embedding。target 一侧的 localization 掉 5.37 / 27.90 / 64.93（LLaVA-1.5-7B / 13B / Qwen2.5-VL-7B），同一干预下 relation 最多只掉 1.32；把 mask 向外扩一格吃进周边像素，relation 才开始塌（13B −12.38、Qwen −6.37）。侵蚀与膨胀的响应方向相反，与"关系判断靠精确边界"的预期不符。全层 attention knockout 作为正对照把 relation 打到 chance，排除了"关系判断根本不看 object token"这一更强解释；而 Mediation Fraction 排序的 top-10 head 在两个任务间只重叠 2–3 个（top-50 为 3/7/3），指向两者复用同一个 object-grounded 中间表示、下游转换路径分开。position probe 的层曲线也与行为脱钩：解码精度在第 10–14 层见顶后回落，而 logit lens 上 Qwen 的答案信息要到第 19 层之后才急升到约 97%（[[2608-GroundingIsntKnowing]]）。**证据宽度须先看清**：LLaVA-1.5-7B 的 relation baseline 24.82 恰落在 four-way 的随机水平上、Qwen 的 96.11 逼近天花板，真正承载结论的接近 n=1，全文未报任何 delta 的显著性；更要紧的是被替换的 token 按 mask 选出，物体的轮廓与位置被完整保留下来——这正是论文自己说的 coarse anchor，而对照组是打散全图的随机 token、形状与位置都不匹配，因此"干预没有触及关系推理所依赖的东西"是一个同样融贯的读法。分开二者只需一个形状匹配的对照（把 mask 区域整体平移后再替换），论文没有做
 - **MNIST-PRO（证据取到了，解释没跟上）**：把 MNIST 改写成 glimpse 式 POMDP——224×224（单 digit）或 224×448（双 digit）画布上每步只看一个 64×64 窗口、步长 32、预算 36/78 步——在剥掉低层控制的最小视觉域里单测 perceptual state 的构建与解释。全图直接给出时是 94–99 的识别率，改成部分可观测后掉到 0–75（Gemini-3.7-Flash 98.0/97.0 → 75.0/47.0，Claude-5-Sonnet 94.0/90.0 → 23.0/0.0，多数模型 Level 2 直接归零）。关键在那个反事实：把**同一条轨迹**已采集的 glimpse 事后按坐标拼成一张 offline canvas 再让模型判读，Claude-5-Opus 从 41.0/13.0 回到 76.0/67.0——证据早已在手，掉的是组织与解释。覆盖率与准确率同样脱钩：最小 digit 覆盖率 ≤25% 时准确率 1.0%，>75% 时也只有 26.0%。失败模式可归到两处具体行为：323 次单数字预测中有 238 次从未探索过另一半画布（过早停止），39 例检查过的轨迹里 17 例形成错误信念、其中 15 例保持到最后（信念刚性）。四种记忆表示（全视觉历史 / 文本状态 / metric grid map / visual canvas）没有一个一致胜出（[[2608-MNISTPro]]）。**外推边界很硬**：二值化 MNIST 上 glimpse 可按坐标无损对齐，"拼起来就好了"这条恢复路径在视角变化、遮挡、光照变化的自然场景里不成立；每任务 100 个 episode，无 error bar
 - **MemoryLies（检测对了，动作没变）**：8×8 FrozenLake 变体上给每个格子写一条自然语言空间断言，翻转部分格子使记忆过期，同一份 ground truth 只换观测形式——文本坐标标注列表 vs 384×384 渲染图。文本侧三个闭源模型加 GLM-5.1 的 staleness 检测 F1 都在 0.88 以上，换成同一批网格的渲染图后 ΔF1 为 Qwen3-VL-235B −0.011（不显著）、Claude −0.134、GPT-4o −0.598、GLM-5.1 −0.830，最好与最差之间差 13 倍（0.887 vs 0.067）。它顺带给出一个便宜的知觉对照：GLM 把 memory-safe 条目标为 stale 的比例，在格子真安全与实为致命 hole 两种情况下几乎一样（5.0% vs 4.5%，每模型 6,400 条判断，差异不显著），而 Claude 分得很开（92.5% vs 1.4%）——一个随图像内容反转而纹丝不动的标记率指向"以记忆为准、对图像不敏感的规则"，不是识别能力缺失。下游侧：GPT-4o 在 L2 文本设定下原样信任过期记忆的成功率 14.4% / 死亡率 74.4%，完全不给记忆反而是 28.8% / 28.0%；逐条审计后删除（OMCD）把成功率增益从 L1 的 14.4 pp 提到 L3 的 24.4 pp，但把学得的 stale 标签换成 oracle 标签在任何 regime 都测不出进一步差异，逐 seed 的检测 F1 与 OMCD 成功率相关系数只有 +0.005~+0.060（p>0.67），且所有 OMCD 在 L2 踩 stale 格而死的案例都发生在检测 F1>0.9 的 run 里——条目已被正确检出并从提示中移除，agent 还是踩了上去（[[2608-MemoryLies]]）。**边界**：环境完全可观测，当前观测已含全部 ground truth，记忆在信息上严格冗余，"过期记忆比没有记忆更差"在这个设定里部分是构造的产物；vision 侧导航只有 10 seeds × 3 episodes 的探索性 preview（文本侧每格 250 episode），而机制分析（oracle 消融、F1–成功率相关）全部只在 GPT-4o 上做；GLM-5.1 的 0.067 由本地 vLLM 服务产生，未排除该服务与提示组合本身的视觉通路问题
+
+- **VisLens（读出头可以外接，成本约 0.05% 参数）**：$g_\ell(h) = h + \mathrm{MLP}_\ell(h)$ 的 residual translator 用自蒸馏 KL 对齐模型自身末层分布，基座全程冻结，8B 模型上附加参数约 0.05%。推理时一次前向读出早期视觉 token 的空间语义热图，据此裁剪再喂回：LLaVA-OV-7B 的 V\* 73.3→81.7、HR-8K 58.5→68.6，Qwen2.5-VL-7B 的 HR-8K 56.5→65.1，InternVL3-8B 的 V\* 71.7→81.7。两处 ablation 比主表更有信息量。其一是 source-layer 扫描：从 pre-layer 1 到深层，跨层结果差 ≤0.010——定位所需的语义在视觉 token 进入语言层之前就已经可读，与"表征缺失"相反。其二是把内部热图整体换成 SAM3 的外部分割、保持裁剪流程不变，增益从 +8.4 / +10.0 掉到 +1.0 / +5.3，说明起作用的是模型自己那张图而非裁剪这个动作。效率侧 V\* 上 74.30 @0.98s，高于多轮 RL 工具使用的 Thyme 的 72.25 @8.78s（[[2608-VisLens]]）。**边界很窄**：只覆盖名词式的物体查询，图表、OCR、全局版面类查询失败；单次裁剪没有纠错机会；只在 7–8B 开源模型上验证，未见独立复现
+- **QwenDrive（冻结表征里读不出度量级 3D 几何）**：Qwen3.5-4B 外挂 BEV head 与 flow-matching 规划专家（合计 5.0B）。冻结基座、只训 head 的探针得 35.60 mAP，解冻基座后 +10.46 mAP / +9.84 map mIoU——同一模型的内部对照，不受 baseline 训练量差异影响。另一条读数落在下游微调的代价上：加入 3D 感知监督后 Driving QA 从 70.07 掉到 69.43、General VQA 从 63.18 掉到 62.26（低于基座的 62.60），而规划指标 RFS 只涨 0.05，作者明确拒绝对这组变化下因果结论（[[2608-QwenDrive]]）。评测层级之间还出现整体反转：开环 WOD-E2E RFS 7.91 / NAVSIM PDMS 90.7 领先，同一模型在闭环 AlpaSim 上是 0.16 / 0.37，对照方法 Alpamayo-R1 为 0.36 / 0.58
 
 **必须打折的地方**：
 
@@ -186,14 +204,17 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 | 评测与被测系统同源 | Menti-Bench 的 gold 后继状态按 MWM taxonomy 标注、oracle 注入的正是 Mentis 自己的 schema、gold action 由同一批作者裁定；且 S6 约 20× S1 的调用量没有等预算对照（超过 SC@6） |
 | ablation 的对照没有匹配形状 | [[2608-GroundingIsntKnowing]] 的 token 替换保留了物体的连通轮廓与精确位置，随机对照却打散全图；因此"关系判断在定位塌掉后仍稳"与"该干预压根没破坏关系判断所依赖的粗粒度位置线索"无法分离。形状匹配的对照（把 mask 区域整体平移后替换）成本极低但未做 |
 | 承载结论的有效样本少于标称 | [[2608-GroundingIsntKnowing]] 三个模型中 LLaVA-1.5-7B 的 relation baseline 24.82 恰在 four-way 随机水平、Qwen2.5-VL-7B 的 96.11 逼近天花板，中间只剩 LLaVA-1.5-13B，且全部结论建在 What's Up 一个 614 图的双物体无遮挡桌面 benchmark 上；[[2608-MNISTPro]] 每任务 100 episode 且无 error bar；[[2608-MemoryLies]] 的 vision 导航每格仅 30 episode |
+| 观察性几何 probe 的数字不自洽 | [[2601-VisualProjectionSpace]] 的三条 regime 轴建在 projector 输出的有效维数、余弦对齐与扰动斜率上，但 BLIP-2 的 PC1 占比（正文 67.9% / 68.8% vs Figure 2 的约 0.24 / 0.445）与扰动斜率（Table 2 的 1.1895 vs §4.5.2 的 $-0.0183 \pm 0.3290$）两处自相矛盾，Kosmos-2 那条标为 0.9324 的斜率也拟合不出它自己的三个数据点（最小二乘为 3.506）；显著性一侧是对 0.0076 的差（SD 0.1579）报 $t = 10.213$，无效应量、无种子、无多重比较校正，SQA 上的分离只在 LLaVA 显著（$p = 0.0126$），BLIP-2 与 Kosmos-2 分别为 0.983 与 0.9801。观察性 probe 要进入机制证据链，至少需要一个干预对照 |
+| 跨模型对照的训练量差一个量级 | [[2608-QwenDrive]] 的 frozen / unfrozen 是同一模型的内部对照、可用，但它与 BEVFormerV2\* 相差 6.34 mAP 这一条不可用——该 baseline 只训了 28K 帧而本文用 607K 帧；其自建 PAI-AV-CoC 的裁判是同家族的 Qwen3.5-Plus，且主表把无法解析的回答计为 0 分计入平均 |
+| 闭环评测的排序落在它自己的方差带里 | [[2609-DroneCATS]] 把同一个 Gemini 3.7 Flash 重飞三轮得 43.7±7.8 / 80（54.6±9.7%），单格标准差 1.7–2.5 个 episode 约合 9–13 pp，作者明言同档内名次是噪声。它那条"embodiment 专门化的 Gemini Robotics-ER 2 四格均值 47.5% 低于通用的 Gemini 3.7 Flash 57.5%"的差正是这个量级，因此只能当作与 [[2609-FailBench]] 同向的提示，不能单独成立；主表里 90% 的 OSR 也从未被重飞过 |
 
-**含义**：对"拉长推理链提升 multimodal reasoning"和"扩数据防遗忘"两类流行方案都是警示——前者不扩张视觉访问、后者丢的不是知识而是读出。[[2605-TokenSwap]] 把第三类方案也送进警示名单：等模型再大一点（10× FLOPs 换 2.8%）与加 CoT（方向依基座而定）都不是这条通路上的解；同时它顺手给出一条便宜的仪器化路线——任意纯文本 benchmark 都能机械转成跨模态一致性诊断，且该指标与现有单模态分数近乎正交，值得作为独立报告轴。链条上多出的那一段则改变了最小修法的落点：证据一旦已被取到、甚至已被正确判定，继续加检测器或补数据都不再动它——[[2608-MemoryLies]] 的 oracle 标签换不来额外增益，[[2608-MNISTPro]] 只改变已有证据的呈现方式就回收 35–54 个百分点。两者一起把干预指向"把手里的证据重新组织成模型能一次读完的形式"，而不是继续提高获取或判定的精度；但这两个环境都完全可观测、证据可按坐标无损对齐，同一修法在证据须靠推断补全的场景里是否还成立没有数据。**适用边界**：VAS 的任务限于"一眼看完再算"型，visual search / 多步 grounding 上结论可能翻转；Act2Answer 的二选一格式分辨率有限；TokenSwap 的替换图来自检索与生成两条来源（376 个配对样本上生成图交错准确率高 4.6%，但模型排序不变），其绝对 gap 值随图源可动，跨论文引用时应比较排序而非绝对值。
+**含义**：对"拉长推理链提升 multimodal reasoning"和"扩数据防遗忘"两类流行方案都是警示——前者不扩张视觉访问、后者丢的不是知识而是读出。[[2605-TokenSwap]] 把第三类方案也送进警示名单：等模型再大一点（10× FLOPs 换 2.8%）与加 CoT（方向依基座而定）都不是这条通路上的解；同时它顺手给出一条便宜的仪器化路线——任意纯文本 benchmark 都能机械转成跨模态一致性诊断，且该指标与现有单模态分数近乎正交，值得作为独立报告轴。链条上多出的那一段则改变了最小修法的落点：证据一旦已被取到、甚至已被正确判定，继续加检测器或补数据都不再动它——[[2608-MemoryLies]] 的 oracle 标签换不来额外增益，[[2608-MNISTPro]] 只改变已有证据的呈现方式就回收 35–54 个百分点。两者一起把干预指向"把手里的证据重新组织成模型能一次读完的形式"，而不是继续提高获取或判定的精度；但这两个环境都完全可观测、证据可按坐标无损对齐，同一修法在证据须靠推断补全的场景里是否还成立没有数据。这条最小修法现在有了一个不依赖外部工具也不依赖多轮交互的实现：[[2608-VisLens]] 把重组这一步放回模型内部，读出头只占约 0.05% 参数、基座冻结，换成外部分割模型做同样的裁剪则增益从 +8.4 / +10.0 掉到 +1.0 / +5.3。它同时把修法的边界划出来了一段：物体级语义上外接读出通路近乎免费，而 [[2608-QwenDrive]] 表明度量级 3D 几何上冻结基座外挂训练好的 head 仍差一大截、只有解冻基座才补得回来。两条都是单点证据，合起来只构成一个待检验的分界——读出通路补得动语义、补不动几何——而不是已定的规律。**适用边界**：VAS 的任务限于"一眼看完再算"型，visual search / 多步 grounding 上结论可能翻转；Act2Answer 的二选一格式分辨率有限；TokenSwap 的替换图来自检索与生成两条来源（376 个配对样本上生成图交错准确率高 4.6%，但模型排序不变），其绝对 gap 值随图源可动，跨论文引用时应比较排序而非绝对值。
 
 ### 2.9 Agentic visual reasoning 的工具忠实性与自适应性
 
-**代表论文**：[[Papers/2607-Beacon]]、[[Papers/2607-FaithEyes]]、[[2606-CodeDance]]
+**代表论文**：[[Papers/2607-Beacon]]、[[Papers/2607-FaithEyes]]、[[2606-CodeDance]]、[[2606-SenseSearch]]
 
-**核心结论**：thinking-with-images 路线的 aggregate accuracy 掩盖了两类结构性退化——模型的调用模式基本锁死在"几乎必调"或"几乎不调"的一端而非按题自适应，且工具在难题上的收益被易题上新引入的错误大部分抵消。两篇 2026-07 的工作分别补上诊断口径与 reward 侧修复，把该路线的评价单位从"平均准确率"改写为"调用时机 × 工具净效应"的分解。
+**核心结论**：thinking-with-images 路线的 aggregate accuracy 掩盖了两类结构性退化——模型的调用模式基本锁死在"几乎必调"或"几乎不调"的一端而非按题自适应，且工具在难题上的收益被易题上新引入的错误大部分抵消。两篇 2026-07 的工作分别补上诊断口径与 reward 侧修复，把该路线的评价单位从"平均准确率"改写为"调用时机 × 工具净效应"的分解。检索类工具上还有一个更基本的对照长期缺席：不让模型自己决定何时检索的 training-free RAG，在同一批模型上反而更强（[[2606-SenseSearch]]）。
 
 **诊断口径**：
 
@@ -210,23 +231,26 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - **Beacon（reward 内化"何时该调"）**：Necessity-Aware Adaptive Reward——rollout group 内已存在正确的纯文本回答时，正确的 code 回答 reward 从 1 降到 0.25；"这题需不需要工具"的标签由当前 policy 的组内表现在线决定，而非外部 teacher 打标，规避了 teacher-policy 分布错配与 teacher 工具能力封顶。配套 Hint-Guided Capability Expansion 处理 RLVR 在全错组上无 group-relative 信号的结构缺陷：对全错组注入 expert 生成的 answer-free hint 重采样，策略更新时从输入抽掉 hint、只在 old policy 的 importance-sampling 分母保留，约 40% 的全错组被回收为有效信号。Qwen3-VL-8B 基座，13 benchmark 平均 58.98、MA_mean 58.83（全场最高）、ΔTE +3.14（[[Papers/2607-Beacon]]）
 - **FaithEyes（reward + observation 同时补"有没有用上"）**：同一 VLM 换 prompt 兼任 subagent，只看 `(Q, I_t)` 逐张判定 process image 是否呈现所问证据；判词一物两用——注入 observation（判为无用时直接丢图只留判词）并作为 tool reward 的缩放因子 `r_tool = 1 − (n_fail + n_unhelpful)/n_tool`。两处机制选择可脱离本文迁移：reward 用**比例而非计数**，数学上封死"多调工具刷 bonus"（λ_tool 消融全程平均调用次数稳定在约 1 次）；reward **不以答案正确为门**，因为挂钩答案会使难题上失去维持代码可执行性的梯度压力——对照实验中该变体的执行失败率峰值约 18%、调用次数一路掉向零且不再恢复。Qwen2.5-VL-7B 基座，V\*/HR-4K/HR-8K 达 87.4/77.8/72.9（[[Papers/2607-FaithEyes]]）
 
+**一条没有被讨论的负对照**：[[2606-SenseSearch]] 训了一个三工具（文本搜索、以图搜图、裁剪）的多轮检索 policy——约 3,000 条 cold-start SFT 轨迹 + BN-GSPO RL，Qwen2.5-VL-7B 基座，7 个检索 benchmark 平均 57.43，高于 MMSearch-R1 的 52.49。但它自己的 Table 1 里，training-free 的 RAG workflow（固定检索一次后直接作答）对每一个被测模型都高于让模型自主决定何时检索的 agentic workflow：GPT-4o 63.47 对 60.93、Gemini-2.5-Flash 62.29 对 58.05、GPT-4o-mini 58.36 对 45.65、Qwen2.5-VL-32B 58.09 对 53.45、Qwen2.5-VL-7B 50.04 对 35.50；训练后的 57.43 仍低于其中四个 training-free 结果。论文没有提及这组对照。这不否定 agentic 检索的价值——RAG workflow 每题固定一次检索、不处理需要改写查询或多跳的题，两侧的开销与覆盖面本就不同——但它把缺口指得很具体：该路线目前缺的是一条"什么题值得让模型自己决定"的判据，而不是更强的 RL。同一篇的三段增益拆解与本节既有读数同形：脚手架 27.70→35.50（+7.80）、cold-start SFT 35.50→53.06（+17.56）、RL 53.06→57.43（+4.37），RL 只占总增益的 15%。
+
 **必须打折的地方**：
 
 | 问题 | 证据 |
 |:--|:--|
-| 增益的主要来源不是新 RL 组件 | Beacon 相对 base 的 6.07 点中约 4.00 来自 SFT、整个 RL 阶段约 2.07，其中 vanilla GRPO 仅 +0.19；这恰好复现了它自己引用的"提升主要来自 SFT"的既有诊断 |
+| 增益的主要来源不是新 RL 组件 | Beacon 相对 base 的 6.07 点中约 4.00 来自 SFT、整个 RL 阶段约 2.07，其中 vanilla GRPO 仅 +0.19；这恰好复现了它自己引用的"提升主要来自 SFT"的既有诊断。[[2606-SenseSearch]] 在检索侧给出同一形状的三段拆解：脚手架 +7.80（占 26%）、cold-start SFT +17.56（占 59%）、BN-GSPO RL +4.37（占 15%） |
 | 基座代差混入主表 | Beacon 建在 Qwen3-VL-8B 上而四个 agentic baseline 为 Qwen2.5-VL-7B——未经任何 agentic 训练的 base 在其 Table 2 六项平均（43.97）已高于全部 7B agentic baseline（33.76~38.11）；同量级对照只有 Metis-8B，优势收窄到 +1.48 / +3.27 |
 | "省算力"的动机与实际行为相反 | Beacon 的 MA_text 仅 22.91，五个数据集实际调用率 70.65%~95.36%，高于被它批评为"缺自适应性"的 Metis（15.72%~54.32%）；其 MA_mean 优势几乎全部来自 MA_tool 一侧 |
 | Tool-Harm 未被控制 | Beacon 平均 Tool-Harm 6.15 为全表最高（Metis 仅 1.10），ΔTE 优势全来自 Tool-Gain；MathVista 上 ΔTE −0.38，按其自身口径工具净有害 |
-| 评测轴与训练目标同源 | FaithEyes 的评测 faithfulness rubric 是训练 subagent rubric 的加严版（同一概念"所问目标是否出现在处理图中"，差别在信息集与严格度），只有 FaithEyes 被直接优化到该轴上，baseline 从未见过 |
+| 评测轴与训练目标同源 | FaithEyes 的评测 faithfulness rubric 是训练 subagent rubric 的加严版（同一概念"所问目标是否出现在处理图中"，差别在信息集与严格度），只有 FaithEyes 被直接优化到该轴上，baseline 从未见过；[[2606-SenseSearch]] 的 RL reward judge 与最终评测 judge 同为 GPT-4o |
 | 只证到 action level | 两篇诊断问题时用的是"移除 process image 后预测几乎不变"这类反事实证据，验证自身修复时却换成 judge 打分的比例指标；FaithEyes 自认 answer-level reliance gap 未关闭 |
-| 无预算匹配对照 | FaithEyes 每次工具调用多一次 subagent forward，全文不报 latency 或 token 开销；其 Table 1 显示仅在推理期给 Thyme 插一个外部 32B 判词、不做任何训练，V\* 即从 82.7 升到 85.8（距 FaithEyes 87.4 仅 1.6 分），暗示相当部分增益来自"多一次带视觉的复核"这一通用机制。Beacon 调用频率远高于 baseline，等推理预算下的对比同样缺失。同一缺口在 GUI 定位脚手架上原样重现——[[2608-GUILens]] 的 +13.1~+24.9 全部对照单次调用 baseline，而其高精度配置每样本要发起十余次模型调用 |
+| 无预算匹配对照 | FaithEyes 每次工具调用多一次 subagent forward，全文不报 latency 或 token 开销；其 Table 1 显示仅在推理期给 Thyme 插一个外部 32B 判词、不做任何训练，V\* 即从 82.7 升到 85.8（距 FaithEyes 87.4 仅 1.6 分），暗示相当部分增益来自"多一次带视觉的复核"这一通用机制。Beacon 调用频率远高于 baseline，等推理预算下的对比同样缺失。同一缺口在 GUI 定位脚手架上原样重现——[[2608-GUILens]] 的 +13.1~+24.9 全部对照单次调用 baseline，而其高精度配置每样本要发起十余次模型调用。[[2606-SenseSearch]] 把开销量出来了却没有配对照：其评测期工具调用数为未训练基座的 1.6–49 倍（MMSearch 535 对 327、HR-MMSearch 910 对 562、V\* 341 对 7），而它引用的"约 4 次降到 2 次"是训练步曲线，不是与 baseline 的效率比较 |
+| SOTA 宣称的作用域在摘要里被放大 | [[2606-SenseSearch]] 正文把 SOTA 限定在"7B 以下开源 agentic 模型"，摘要与引言去掉了该限定；其视觉理解均值 72.8 只高于 DeepEyes 0.3 分，而单项上 V\* 83.8 低于 Pixel-Reasoner 84.3、HR-Bench 8k 69.8 低于 GPT-4o 70.4。摘要里那个 "19.18%" 也没有指明参照对象，它等于 38.52 减去未训练基座的 19.34，不是与 MMSearch-R1 的差 |
 | 强 teacher 依赖未被剥离 | Beacon 的 SFT 轨迹合成、RL hint 生成与答案判分兜底同为 Gemini 3.1 Pro；FaithEyes 的判定 rationale 由 Qwen3-VL-32B 生成、accuracy/consistency 兜底由 Qwen2.5-VL-72B、faithfulness 评测由 Qwen3-VL-235B-A22B。两篇均无 teacher 消融，"机制有效"与"强 teacher 蒸馏有效"无法分开 |
 | baseline 数字跨论文不一致 | 同一 DeepEyes-7B 在 [[2606-CodeDance]] 记 V\* 90.4 / MathVerse 47.3，在 [[Papers/2607-FaithEyes]] 记 84.3 / 44.3——这批 benchmark 的评测协议（分辨率上限、温度、答案抽取）远未统一，1.6~2.6 分的领先须在同一 harness 下复现才成立 |
 
 **与 §2.8 的关系**：这是 "decodable ≠ used" 在工具层的同构变体——process image 被生成（证据在）但答案并不依赖它（读不出）。差别在于 §2.8 的证据藏在 hidden states、只能靠 probe 与注意力屏蔽间接检验，而此处证据就在 observation 通道里，本可以直接做干预（移除或替换被判 helpful 的裁图，看答案是否改变），两篇却都停在 judge 打分的代理指标上。
 
-**适用边界**：全部结论建立在"工具 = 沙箱内确定性、无副作用、可回滚的 Python 代码"这一设定上。工具自身带噪声（检索、真实 GUI 操作、物理执行）时，NAAR 依赖的"组内是否存在正确纯文本回答"这一在线标签会被工具噪声污染，text-easy/text-hard 的划分也不再稳定——这是把该框架迁移到 GUI 或 embodied 场景时最先断裂的地方。
+**适用边界**：全部结论建立在"工具 = 沙箱内确定性、无副作用、可回滚的 Python 代码"这一设定上。工具自身带噪声（检索、真实 GUI 操作、物理执行）时，NAAR 依赖的"组内是否存在正确纯文本回答"这一在线标签会被工具噪声污染，text-easy/text-hard 的划分也不再稳定——这是把该框架迁移到 GUI 或 embodied 场景时最先断裂的地方。[[2606-SenseSearch]] 正落在这个预测的适用范围内（工具是真实检索，返回内容带噪、不可回滚、跨时间不稳定），但它没有报告任何 MA/TE 口径，该预测因此仍未被检验；把这套分解套到已有的检索 agent 上是一次成本很低、尚无人做的复算。
 
 ---
 
@@ -259,6 +283,9 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 | **Menti-Bench** | 心理状态世界建模（文本 / 图像 / 有声视频） | 448 records / 2,688 gold 后继状态 | final-action F1（6 选 1） | Mentis-S6 87.9（human 98.5） | 六级必要性阶梯 + oracle 级联；仅报终局 F1，过程级指标定义了但无数值 |
 | **MNIST-PRO** | glimpse 式主动感知诊断（部分可观测） | L1 224×224 / L2 224×448 画布，64×64 窗口，36/78 步预算 | exact-sequence accuracy | Gemini-3.7-Flash 75.0/47.0（MCP harness 下 88.0/63.0） | 全可观测对照 94–99 给出上界；同轨迹 offline canvas 反事实把"采集"与"解释"分开；每任务 100 episode，无 error bar |
 | **SpatialSTALE** | 空间记忆过期的检测–导航配对诊断 | 8×8 FrozenLake，64 条记忆/局，3 档 change regime | 检测 F1 + 下游成功率/死亡率 | text 检测 F1 >0.88；vision 侧 0.067–0.887 | 同一 ground truth 只换观测形式；自带 NoMemory 与 oracle-label 两组对照，且含知觉对照（真安全 vs 真致命下的误标率）|
+| **HR-MMSearch** | 高分辨率 + 时效性多模态检索 | 305 张 4K 图 / 8 域 / 2025 年后来源 | 检索问答准确率 | SenseSearch-RL 38.52（MMSearch-R1 20.33，未训练基座 19.34） | 目标小且需外部检索才可答；只报图片数，未报题量、标注者一致率与人类上限 |
+| **FailBench** | 机器人执行失败检测（VLM-as-judge 可信度） | 14 个独立来源（12 真机 / 2 仿真），2,197 条（1,176 失败 / 1,021 成功） | macro balanced accuracy | Gemini 3 Flash 0.77（随机 0.50） | 5 个专训检测器全部低于各自基座（−0.002~−0.088）；自带类别先验对照（"恒答失败"在两个已发布测试集划分上分别值 0.797 / 0.890）；无人类基线与标注者一致率 |
+| **DroneCATS** | MLLM 直接闭环控制的无人机导航 | AirSim，4 格 × 20 episodes / 模型 | 进入半径率 OSR + 宣告成功率 SR | 四格均值最高 Gemini 3.7 Flash 57.5% | 动作空间只在 prompt 里声明、模型自行宣告终止；自带三次重飞的方差审计（43.7±7.8 / 80）与三种成功判据的重算审计 |
 
 **Benchmark 演进趋势**：
 - 从自然图像问答（VQAv2）到文本密集场景（TextVQA、DocVQA）
@@ -269,6 +296,8 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - 从单帧安全评测到 trajectory-conditioned 评测：[[2601-GUIGuardBench]] 把 privacy 定义为任务上下文属性（task necessity），而非静态敏感类别识别
 - 从"新建 benchmark"到"机械改造既有 benchmark"：[[2605-TokenSwap]] 用概念级图文替换把任意纯文本考题转成跨模态一致性诊断，成本低于从头标注，且产出的指标与既有单模态排行榜近乎正交——但改造流水线本身依赖某个 MLLM 做过滤，家族偏差需另行对照
 - 从"报告端到端分数"到"在同一条轨迹上做配对反事实"：[[2608-MNISTPro]] 把已采集的 glimpse 事后拼成一张画布重判、[[2608-MemoryLies]] 把学得的 stale 标签换成 oracle 标签，两者都不改变 agent 实际拿到的证据，只改变证据的呈现或标注，因而能把失败归到链条的具体一环而非笼统的"能力不足"
+- 从"比谁分高"到"先跑一遍平凡基线"：[[2609-FailBench]] 在给失败检测器排名的同时，按各自发布测试集的类别先验重算了"恒答失败"能拿到多少分——RoboFAC-7B 的发布值 0.806 对应的平凡基线是 0.797，ViFailback 的划分下恒答失败值 0.890 而其报告基座分为 0.900。这道对照的成本接近零，却几乎没有 benchmark 默认报告，而它决定的是"该检测器是否真的在看视频"
+- 从"报一个数"到"同时报判据与方差审计"：[[2609-DroneCATS]] 把成功判据换三种口径重算（只按首次宣告计分翻掉 182 次成功里的 95 次，改按"轨迹曾进入半径"计分则 337 次失败里 61 次转为成功），并用三次重飞给出 43.7±7.8 / 80 的方差带、明言同档内排序是噪声。闭环 benchmark 的绝对分数主要由协议决定，不报协议敏感性就无法跨论文比较
 
 ---
 
@@ -278,7 +307,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 2. **Zero-shot grounding 利用 VLM agent 能力而非专门训练**：VLM-Grounder 展示了通过动态拼接 + feedback loop + multi-view ensemble，无需 3D 训练数据即可实现较强的 3D grounding。这条路线适合数据稀缺场景。
 
-3. **理解-生成统一是 VLM 发展的明确趋势，但架构尚未定型**：LLaDA2.0-Uni、Unify-Agent 等工作将多模态理解和生成放在同一框架，避免了两阶段系统的表征不对齐问题。原版认为 discrete diffusion + MoE 是主流架构选择，但 2026H2 的 RL 后训练工作（[[2607-BRAID]]、[[2607-SpectraReward]]、[[2607-SearchGenBoundary]]）全部收敛到 BAGEL 系 hybrid AR-diffusion 基座，主流架构之争未决；[[2606-Orca]] 进一步把"统一"从理解-生成扩展到 world state transition + 多 decoder 读出。
+3. **理解-生成统一是 VLM 发展的明确趋势，但架构尚未定型**：LLaDA2.0-Uni、Unify-Agent 等工作将多模态理解和生成放在同一框架，避免了两阶段系统的表征不对齐问题。原版认为 discrete diffusion + MoE 是主流架构选择，但 2026H2 的 RL 后训练工作（[[2607-BRAID]]、[[2607-SpectraReward]]、[[2607-SearchGenBoundary]]）全部收敛到 BAGEL 系 hybrid AR-diffusion 基座，主流架构之争未决；[[2606-Orca]] 进一步把"统一"从理解-生成扩展到 world state transition + 多 decoder 读出。外延每扩一格，通用多模态理解就出现一次可测的回退：[[2609-PhysBrain15]] 把动作与未来视觉状态并进同一词表后，12 项通用多模态里 7 降（MVBench −2.46、MME −62.6）；[[2609-Gander]] 并入 full-duplex 实时交互后，相对自身基座 WorldSense 回退 6.08、Daily-Omni 回退 1.67，而它的 vision tower 全程冻结且 bit-for-bit 未变——代价不必然落在视觉编码器上。两篇都缺"同等算力只训通用数据"的对照，因此这是一条代价确凿、成因未定位的扩展路线。
 
 4. **Human preference alignment 开始向多模态迁移**：将 RLHF/DPO 技术迁移到 VLM，优化真实性、安全性、推理能力，是当前 VLM 走向可靠部署的关键一步。
 
@@ -286,7 +315,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 6. **VLM 正从被动理解器走向主动 agent backbone**：GUI Agent、3D grounding agent、world-grounded synthesis agent 等工作表明，VLM 不只是"看图说话"，而是可以成为多模态 agent 的感知与决策核心。
 
-7. **多模态 RL 后训练成为新前沿，reward 转向复用 MLLM 自身能力**：[[2607-BRAID]] 让 policy gradient 第一次贯穿文本 token 与图像去噪路径；[[2607-SpectraReward]] 证明 frozen MLLM 的 prompt likelihood 一次 forward pass 即可做 T2I reward，且 reward-policy 分布对齐比 reward model 规模更重要（自打分超 235B 外部 reward）——该发现对整个 RLHF/RLAIF 都有参考价值。理解侧 [[2606-VisPlay]] 把 reward 推到零外部依赖（自身 majority-voting 伪标签 + 不确定性课程），但伪标签质量逐代下滑（72.0→61.0）表明纯自我共识的监督会自噬。[[2608-CoRLCohort]] 顺着这条裂缝往下：它把自我共识的退化写成定理（对奇数 K，self-rewarding 的期望更新方向恒为 $\mathrm{sign}(p-1/2)$，即在做对不到一半的题上必然强化错误），并用一个独立预训练 peer 的多数票替换自身多数票，5 个 VLM 上平均 +2.3~+7.2。但其等预算对照里增益极不对称（弱 agent +3.19/+4.86，强 agent +0.53/+1.43），主效应更像隔着多数票的单向传递而非共识本身生效；且该范式的前提"两个模型不会同时错成同一答案"（该文在 MATH L3–5 上量到 1.8%–5.2%）随答案空间收缩而失效，多模态里的多选题与小离散动作空间正落在失效侧。免标注 reward 因此仍无同时摆脱"闭源裁判"与"共识偏差"的方案，只是偏差的来源从模型自身挪到了 cohort。
+7. **多模态 RL 后训练成为新前沿，reward 转向复用 MLLM 自身能力**：[[2607-BRAID]] 让 policy gradient 第一次贯穿文本 token 与图像去噪路径；[[2607-SpectraReward]] 证明 frozen MLLM 的 prompt likelihood 一次 forward pass 即可做 T2I reward，且 reward-policy 分布对齐比 reward model 规模更重要（自打分超 235B 外部 reward）——该发现对整个 RLHF/RLAIF 都有参考价值。理解侧 [[2606-VisPlay]] 把 reward 推到零外部依赖（自身 majority-voting 伪标签 + 不确定性课程），但伪标签质量逐代下滑（72.0→61.0）表明纯自我共识的监督会自噬。[[2608-CoRLCohort]] 顺着这条裂缝往下：它把自我共识的退化写成定理（对奇数 K，self-rewarding 的期望更新方向恒为 $\mathrm{sign}(p-1/2)$，即在做对不到一半的题上必然强化错误），并用一个独立预训练 peer 的多数票替换自身多数票，5 个 VLM 上平均 +2.3~+7.2。但其等预算对照里增益极不对称（弱 agent +3.19/+4.86，强 agent +0.53/+1.43），主效应更像隔着多数票的单向传递而非共识本身生效；且该范式的前提"两个模型不会同时错成同一答案"（该文在 MATH L3–5 上量到 1.8%–5.2%）随答案空间收缩而失效，多模态里的多选题与小离散动作空间正落在失效侧。免标注 reward 因此仍无同时摆脱"闭源裁判"与"共识偏差"的方案，只是偏差的来源从模型自身挪到了 cohort。"那就为判定任务单训一个 verifier"这条退路也刚被测过一次并失手：14 个独立来源、2,197 条轨迹上，5 个专训失败检测器全部低于各自基座（−0.002~−0.088），其中一个的发布分数与"恒答失败"这条平凡基线只差 0.009（[[2609-FailBench]]）。五个 delta 均无方差报告，因此结论不是"专训无用"，而是判定质量必须在训练分布之外测、并配一条类别先验对照才算测过——这两项在当前的 reward model 与 judge 报告里几乎都缺席。
 
 8. **"Decodable ≠ used"是跨域收敛的机制发现**：[[2607-VisualAccessBoundary]] 的 probe-vs-decode gap 与 [[2606-Act2Answer]] 的"中层可解码、action head 近随机"互为印证——VLM 的瓶颈从表征缺失转向读出通路。CoT 增益来自更长的语言计算而非持续回看图像，上限受 perceptual readout 制约。黑箱侧的规模化读数与之同向：同一题目只改承载模态，42 个 MLLM 全部掉分、均值 19.6%，且该 gap 与模型的纯文本分、纯图像分几乎不相关（$r=-0.028$），因而是一条必须独立报告的轴而非现有指标的副产品（[[2605-TokenSwap]]）。但这层证据只测出差距，未分解成因——它没有排除"弱模型压根没认出替换图"，因此不能反过来当作读出通路假说的确证。同一条通路上还有一个方向相反的限定：把物体内部的 visual token 换成常量 embedding 后 localization 掉 5.37~64.93 点而 relation 最多掉 1.32，反倒是向外扩一格吃进周边像素才伤到 relation（[[2608-GroundingIsntKnowing]]）——被行为真正依赖的是粗粒度的 object-centered layout，而非精确边界。若该结论能出得了这篇的双物体无遮挡桌面场景，用坐标监督去撬动关系推理就是在优化一个不必要的中间量；但它的对照只匹配了 token 数量、没有匹配形状，而被替换区域的轮廓与位置恰好被保留，现有证据还不足以据此调整 grounding 训练的资源分配。
 
@@ -294,11 +323,13 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 10. **VLM agent 的新瓶颈是把内部信号变成可靠控制接口**：[[2607-MHLC]] 从 hidden-state trajectory 读出 handoff/tool/abstention 决策，[[2607-HyGAE]] 则把 token/turn credit 统一进同一 critic；两者分别处理 inference-time control 与 training-time credit assignment，但都只在可控、短 horizon setting 中成立。下一阶段不能只报 aggregate success，必须报告 false-retain/false-handoff、wrong intervention、trajectory 长度与 calibration drift。
 
-11. **"有没有调工具"必须与"调了有没有用"分开测量**：[[Papers/2607-Beacon]] 给出的 MA_mean = 50% 退化基线立刻暴露出现有 agentic VLM 基本锁死在"几乎必调"（DeepEyesV2 MA_tool 99.71）或"几乎不调"（Thyme MA_text 92.95）的一端，四个 baseline 的 Tool-Gain 减 Tool-Harm 净效应均在 +0.04~+1.74；[[Papers/2607-FaithEyes]] 从另一侧证明"答对但 process image 与问题无关"是常态，并给出两条可迁移的 reward 设计（按有用比例而非调用计数计分、不以答案正确为门）。这套分解可直接搬到 GUI agent 的"何时该截图放大"与 deep research agent 的"何时该检索"。但两篇都只证到 action level（裁得准），未证到 evidence-dependence level（答案真的靠它），且都缺等推理预算对照。
+11. **"有没有调工具"必须与"调了有没有用"分开测量**：[[Papers/2607-Beacon]] 给出的 MA_mean = 50% 退化基线立刻暴露出现有 agentic VLM 基本锁死在"几乎必调"（DeepEyesV2 MA_tool 99.71）或"几乎不调"（Thyme MA_text 92.95）的一端，四个 baseline 的 Tool-Gain 减 Tool-Harm 净效应均在 +0.04~+1.74；[[Papers/2607-FaithEyes]] 从另一侧证明"答对但 process image 与问题无关"是常态，并给出两条可迁移的 reward 设计（按有用比例而非调用计数计分、不以答案正确为门）。这套分解可直接搬到 GUI agent 的"何时该截图放大"与 deep research agent 的"何时该检索"。但两篇都只证到 action level（裁得准），未证到 evidence-dependence level（答案真的靠它），且都缺等推理预算对照。检索侧还缺一个更基本的对照：同一批模型上，固定检索一次的 training-free RAG 对五个模型全部高于让模型自主决定检索时机的 agentic workflow（GPT-4o 63.47 对 60.93、Qwen2.5-VL-7B 50.04 对 35.50），训练后的 SenseSearch-RL 57.43 仍低于其中四个（[[2606-SenseSearch]]）。两侧覆盖面本就不同（RAG 不处理需改写查询或多跳的题），但它说明"何时值得让模型自己决定"既没有判据，也还没被当作必报对照。
 
 12. **开源基座的视觉侧默认前提正在松动，但证据强度不足**：[[2607-Gemma4]] 取消视觉 encoder（encoder-free 直投）、[[Papers/2607-KimiK3]] 保留 ViT 但取消对比学习初始化（MoonViT-V2 从零 NTP 训练），两条路线同时质疑"必须从 CLIP/SigLIP 预训练 encoder 出发"。两者都只有单一规模点，且都未给同规模同数据的对照分数——Kimi K3 对该反转只提供了梯度范数曲线与一句"视觉评测持平"的定性表述，而它自己上一代 K2.5 的结论恰恰相反。
 
 13. **"判定正确"到"决策改变"之间还有一次独立断裂**：[[2608-MNISTPro]] 把同一条探索轨迹已采集的 glimpse 事后拼成一张画布重新呈现，Claude-5-Opus 从 41.0/13.0 回到 76.0/67.0；[[2608-MemoryLies]] 中所有踩中 stale 格而死的 OMCD run，检测 F1 都在 0.9 以上——那条记忆已被检出并从提示里删掉，动作还是没变，而把学得标签换成 oracle 标签测不出任何进一步增益（逐 seed 检测 F1 与成功率的相关系数 +0.005~+0.060）。两者一起说明，证据获取与证据判定都达标之后仍有一段独立损耗，最小修法落在"把已有证据重组成模型能一次读完的形式"，而不是继续提高前两段的精度。两个环境都完全可观测、证据可按坐标无损对齐，是否迁得到证据须靠推断补全的场景没有数据；MNIST-PRO 每任务 100 episode 无 error bar，MemoryLies 的机制分析只在 GPT-4o 上做。
+
+14. **离散动作空间的 grounding 来自写明的映射，不来自名字的语义**：把 VLM 的每步决策限制成一组语义动作单元时，2×2 消融把功劳定位到了上下文里那份 token→效果的确定性说明书——任意符号 + 文字约定 19/20 几乎追平语义名 + 约定 20/20，只给语义名 18/20，只给任意符号不给约定掉到 1/20，且模型自行探测推断出的映射只有 23.3% 正确（[[2609-ShowHarness]]）。与 [[2608-MissClick]] 的坐标位权、[[2606-TowardsGUIAgents]] 的 anchor→extent 层级合看，三处接口指向同一件事：决定能力上限的是接口把"这个 token 会造成什么"写明到什么程度，而不是它的抽象层级或命名是否自然。对 GUI agent 的推论可直接使用——纠结动作命名的自然度不如把每个可用操作的效果显式写进上下文。证据来自真机 manipulation 的单篇工作，每格 20 trials、无重复 run，量级判断可用、精确差值不可用。
 
 ---
 
@@ -310,7 +341,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 2. **理解-生成统一的表征最优设计**：LLaDA2.0-Uni 采用 discrete diffusion + MoE，Unify-Agent 采用 separate backbone + retrieval，两者架构差异显著。哪种设计在效率、质量、泛化上最优，尚无定论。RL 后训练侧 [[2607-BRAID]] 证明 advantage 可贯穿异构模态，但仅在 BAGEL-7B 单 backbone 验证，跨架构泛化未知。
 
-3. **VLM 的细粒度 grounding 稳定性**：在高噪声、遮挡、动态布局场景下，VLM 的 grounding 能力仍不够稳定。Continual GUI Agents 提出 anchoring reward，但更鲁棒的 scale-invariant grounding 机制需要进一步研究。[[2602-ToolTok]] 的离散相对 tool token 是绝对坐标之外的一条候选路线（跨分辨率/宽高比鲁棒性显著提升），但 FAR/MID/CLO 固定 pixel delta 并非完全 scale-invariant，且未经 online 长任务验证。
+3. **VLM 的细粒度 grounding 稳定性**：在高噪声、遮挡、动态布局场景下，VLM 的 grounding 能力仍不够稳定。Continual GUI Agents 提出 anchoring reward，但更鲁棒的 scale-invariant grounding 机制需要进一步研究。[[2602-ToolTok]] 的离散相对 tool token 是绝对坐标之外的一条候选路线（跨分辨率/宽高比鲁棒性显著提升），但 FAR/MID/CLO 固定 pixel delta 并非完全 scale-invariant，且未经 online 长任务验证。开源模型上还有一种更基础的失效尚未被任何 grounding benchmark 覆盖：输出与输入解耦——同一时间步对四张不同观测图给出完全相同的像素，Qwen3.5-9B 占 70% 的步骤、27B 占 58%，三个前沿模型为 0%（[[2609-DroneCATS]]）。单图定位准确率看不见这一类退化，要测它只需一道同批次多图同题的一致性对照，而目前没有 benchmark 报告它。
 
 4. **生成模型的 knowledge boundary 发现**：[[2607-SearchGenBoundary]] 证明"哪些知识内化、哪些外部检索"是 (prompt, generator) 的联合属性且随训练漂移——盲搜有害、边界不可先验预测、必须跑完整 co-training 才能发现。低成本的边界估计方法缺失，该问题与 agent 的"何时调工具"calibration 同构。
 
@@ -322,7 +353,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 7. **3D grounding benchmark 的规模局限**：ScanRefer、Nr3D 数据规模有限（~50K），且场景类型偏室内家居。开放世界 3D grounding、跨场景泛化评测仍缺乏。
 
-8. **MLLM-as-reward / as-judge 的可信度**：2.6 节三篇工作的 reward 或评测均依赖闭源强模型且缺独立人评交叉验证（[[2607-SpectraReward]] 零人类评估、[[2607-SearchGenBoundary]] 裁判与奖励同源）；[[2607-SynthDocBench]] 的 rendering-familiarity confound（D3.js 渲染分布可能偏向特定模型家族）提示合成评测同样有系统性偏差。Reward hacking、judge 亲和偏差的系统性度量方法缺失。§2.9 把该问题推到极端形态：[[Papers/2607-FaithEyes]] 的 tool reward 完全由与 policy **共享权重**的 subagent 给出，RL 全程只在训练结束后做过一次外部 judge 检查，而稳步上升的 tool reward 恰恰是被 hack 时同样会上升的量；该 subagent 的判定质量从未被独立测量（无人工标注一致率、无相对 235B judge 的混淆矩阵），其 SFT 判定标签还建立在"两次调用轨迹的第一次必然无用"这一未核验的结构性假设上。可行的最小检验是记录 RL 全程 subagent True-rate 与外部 judge 判定的偏离曲线，成本不高但尚无人做。另一侧的进展是 judge 可靠性开始有可比的量纲：[[2608-WorldExam]] 用 800 个实例、5,793 条 checklist item、3 名标注者多数票测得 GPT-5.5 judge 与人的 Spearman 0.8614 / PLCC 0.8583，且报告了分任务弱项——最低的 Social Interaction 只有 0.7019，恰是需要判时序的一类，而 judge 只看均匀采样的 10 帧、帧数未做敏感性分析。它同时暴露了一处容易被忽视的协议风险：判定规则把"无法核实"一律记为不满足，画面越糊越难确认某条成立，视觉质量因此可能从后门渗进语义分（该论文未做相关分析）。judge 协议的默认值本身就是一个未被度量的偏差来源，这一点可直接搬到 VLM-as-judge 的任何场景。该基准的主场是 [[Topics/WorldModel-Survey]]，此处只取其可迁移的 judge 可靠性读数。同期的 [[2608-HarnessEvalW]] 把 judge 从固定 rubric 换成分层 agentic harness（按 case 路由评测技能、拆成子问题交 sub-agent、父 agent 校验后聚合成 evidence tree），在同一批视频、同一 GPT-5.5 backend、同温度同抽帧下对上 WBench 的两个最接近协议：pairwise accuracy Physical 31.9%→71.7%、Intentional 60.2%→77.8%，模型级排序与人的 Spearman 达 0.93 / 0.87（n=9）。但同一组数里 draw rate 从 52.2% 降到 1.8%、从 36.1% 降到 11.1%，这两位数的提升有相当部分买的是"敢不敢分出胜负"——被替代的 Causal Fidelity 用一个 0–3 的整数分压缩整段 rollout，过半打平几乎是刻度粒度逼出来的。它也没有报告标注者人数与任何标注者间一致性统计量，因此 77.8% 究竟逼近人类上限还是差得远，从这篇里读不出来；其所称的"跨 VLM 稳健性"实际是同一 GPT-5.5 在温度 0 下跑三轮，路由与子问题分解的错误率、evidence tree 的忠实性也都没有单独测过。对 VLM-as-judge 可直接搬用的一条是：报告 pairwise accuracy 时必须同时给出 draw rate 与评分刻度粒度，否则分辨率的提升会被读成准确率的提升。该基准的主场同为 [[Topics/WorldModel-Survey]]。
+8. **MLLM-as-reward / as-judge 的可信度**：2.6 节三篇工作的 reward 或评测均依赖闭源强模型且缺独立人评交叉验证（[[2607-SpectraReward]] 零人类评估、[[2607-SearchGenBoundary]] 裁判与奖励同源）；[[2607-SynthDocBench]] 的 rendering-familiarity confound（D3.js 渲染分布可能偏向特定模型家族）提示合成评测同样有系统性偏差。Reward hacking、judge 亲和偏差的系统性度量方法缺失。§2.9 把该问题推到极端形态：[[Papers/2607-FaithEyes]] 的 tool reward 完全由与 policy **共享权重**的 subagent 给出，RL 全程只在训练结束后做过一次外部 judge 检查，而稳步上升的 tool reward 恰恰是被 hack 时同样会上升的量；该 subagent 的判定质量从未被独立测量（无人工标注一致率、无相对 235B judge 的混淆矩阵），其 SFT 判定标签还建立在"两次调用轨迹的第一次必然无用"这一未核验的结构性假设上。可行的最小检验是记录 RL 全程 subagent True-rate 与外部 judge 判定的偏离曲线，成本不高但尚无人做。另一侧的进展是 judge 可靠性开始有可比的量纲：[[2608-WorldExam]] 用 800 个实例、5,793 条 checklist item、3 名标注者多数票测得 GPT-5.5 judge 与人的 Spearman 0.8614 / PLCC 0.8583，且报告了分任务弱项——最低的 Social Interaction 只有 0.7019，恰是需要判时序的一类，而 judge 只看均匀采样的 10 帧、帧数未做敏感性分析。它同时暴露了一处容易被忽视的协议风险：判定规则把"无法核实"一律记为不满足，画面越糊越难确认某条成立，视觉质量因此可能从后门渗进语义分（该论文未做相关分析）。judge 协议的默认值本身就是一个未被度量的偏差来源，这一点可直接搬到 VLM-as-judge 的任何场景。该基准的主场是 [[Topics/WorldModel-Survey]]，此处只取其可迁移的 judge 可靠性读数。同期的 [[2608-HarnessEvalW]] 把 judge 从固定 rubric 换成分层 agentic harness（按 case 路由评测技能、拆成子问题交 sub-agent、父 agent 校验后聚合成 evidence tree），在同一批视频、同一 GPT-5.5 backend、同温度同抽帧下对上 WBench 的两个最接近协议：pairwise accuracy Physical 31.9%→71.7%、Intentional 60.2%→77.8%，模型级排序与人的 Spearman 达 0.93 / 0.87（n=9）。但同一组数里 draw rate 从 52.2% 降到 1.8%、从 36.1% 降到 11.1%，这两位数的提升有相当部分买的是"敢不敢分出胜负"——被替代的 Causal Fidelity 用一个 0–3 的整数分压缩整段 rollout，过半打平几乎是刻度粒度逼出来的。它也没有报告标注者人数与任何标注者间一致性统计量，因此 77.8% 究竟逼近人类上限还是差得远，从这篇里读不出来；其所称的"跨 VLM 稳健性"实际是同一 GPT-5.5 在温度 0 下跑三轮，路由与子问题分解的错误率、evidence tree 的忠实性也都没有单独测过。对 VLM-as-judge 可直接搬用的一条是：报告 pairwise accuracy 时必须同时给出 draw rate 与评分刻度粒度，否则分辨率的提升会被读成准确率的提升。该基准的主场同为 [[Topics/WorldModel-Survey]]。最直接的一条负结果来自 [[2609-FailBench]]：把"为判定任务专门训练一个 verifier"这条默认可行的退路拿到 14 个独立来源、2,197 条轨迹上测，5 个专训检测器全部低于各自的基座（−0.002~−0.088），而两侧只差微调、harness 与输入配方一致；其中 RoboFAC-7B 在平衡子集上抓到 30/30 的失败却只放行 2/30 的成功，按其发布测试集 960:244 的先验重加权得 0.811，而同一先验下"恒答失败"就值 0.797。这把该问题的最小要求写清楚了：judge 或 reward model 的可信度报告必须包含分布外的一次测量与一条类别先验基线，两者成本都接近零，目前却几乎没有工作默认提供。该文自身也有欠账——五个 delta 均无方差、置信区间或显著性，且全篇没有人类 balanced accuracy 与标注者一致率，0.77 这个上限由什么构成仍未知。
 
 ### 5.3 系统与应用挑战
 
@@ -332,7 +363,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 11. **理解-生成统一模型的推理效率**：MoE + diffusion + LLM 的组合导致显存和推理速度挑战。如何在保持统一能力的前提下实现高效推理，需要架构层面的创新。[[2607-Gemma4]] 的 encoder-free 直投路线（raw patch/audio 直接进 LLM embedding 空间）是候选方向之一，但目前只有 12B 单点、缺同规模对照。
 
-12. **下游微调的知识侵蚀**：[[2606-Act2Answer]] 显示 robotics 微调让 VLM 语义类知识掉 20-40 分且下游 SFT 继续恶化；VQA co-training 有保护作用但 Emotion/Attribute 类仍在 chance 水平——如何系统性防止微调侵蚀预训练能力（对 VLA、GUI agent 微调同样适用）未解决。
+12. **下游微调的知识侵蚀**：[[2606-Act2Answer]] 显示 robotics 微调让 VLM 语义类知识掉 20-40 分且下游 SFT 继续恶化；VQA co-training 有保护作用但 Emotion/Attribute 类仍在 chance 水平——如何系统性防止微调侵蚀预训练能力（对 VLA、GUI agent 微调同样适用）未解决。2026H2 的两条读数把问题收窄了一点但没有解决它：[[2609-PhysBrain15]] 扩动作与未来帧词表后通用多模态 12 项里 7 降（MVBench −2.46、MME −62.6），[[2609-Gander]] 扩 full-duplex 实时交互后相对自身基座 WorldSense 回退 6.08、Daily-Omni 回退 1.67，而后者的 vision tower 全程冻结且 bit-for-bit 未变——侵蚀不必然发生在视觉编码器上，"冻住视觉塔"因此不构成防护。两篇都没有跑"同等算力只训通用数据"的对照，成因仍未定位，[[2606-Act2Answer]] 的 VQA co-training 至今是唯一有正向读数的手段。
 
 13. **工具忠实性缺 answer-level 干预检验**：§2.9 两篇诊断问题时用的是干预式证据（移除 process image 后预测几乎不变），验证自身修复时却退回 judge 打分的比例指标，因此"faithful tool use"目前只被证到裁得准、未被证到答案真的依赖它。可直接借用的范式已在库内——[[2606-VisualFLIP]] 的 same-question paired perturbation 让 gold answer 确定性翻转，用 Pair Accuracy / Collapse Rate 度量证据依赖；把它套到被判 helpful 的裁图上（扰动该图看答案是否更新）就是缺失的决定性实验。同一层问题还有"等推理预算"这一侧：[[Papers/2607-FaithEyes]] 的 Table 1 显示纯推理期插一个外部判词就能让 Thyme 从 82.7 涨到 85.8，而多出的 subagent forward 从未被计入任何开销表。
 
@@ -340,13 +371,15 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 
 15. **证据判定正确之后的那段损耗只有代偿手段、没有机制解释**：[[2608-MemoryLies]] 已经排掉了"继续提高检测精度"这条路——oracle 标签相对学得标签在任何 regime 都测不出差异，逐 seed 检测 F1 与成功率的相关系数只有 +0.005~+0.060（p>0.67）；[[2608-MNISTPro]] 则给出一个有效但不解释成因的代偿：把已采集证据重新拼成一张图，L1/L2 各回收 35 与 54 个百分点。两个可分辨的机制假设都还没被检验——删掉一条记忆并不能删掉它在更早步骤已经写进规划的先验，还是过滤留下的空洞本身被默认当成安全？前者要求在规划层重新触发，后者只需把删除改成显式的 `UNKNOWN` 标记；用已有 traces 跑一次"删除 vs 替换为 UNKNOWN"的对照就能把两者分开，成本接近零。与之配套的另一个未知量是时机：证据该在采集过程中逐步整合，还是采完之后一次性重排，目前只有事后重排一侧的读数。
 
+16. **agentic 工具使用缺一条"何时值得让模型自己决定"的判据**：[[2606-SenseSearch]] 给出这个方向目前最直接的负对照——固定检索一次的 training-free RAG 对五个被测模型全部高于让模型自主决定检索时机的 agentic workflow，且经 cold-start SFT 与 BN-GSPO 训练后的 57.43 仍低于其中四个 training-free 结果，而评测期工具调用数是未训练基座的 1.6–49 倍。缺的不是更强的 RL，是一个能事前判断"这题交给模型自己决定是否划算"的量。§2.9 的 Mode Adaptiveness 口径是现成候选，但它建立在"工具确定性、无副作用、可回滚"的前提上，真实检索不满足：其难易标签由纯文本多次采样投票判定，而检索题的难易恰恰取决于模型不知道的外部内容。因此需要的是一套为带噪工具重新定义的自适应性口径，以及把"自主决定 vs 固定调用"列为必报对照的评测约定，两件目前都不存在。
+
 ### 5.4 研究方向建议
 
 - **Resolution-First 原则**：在追求复杂推理能力之前，优先确保高分辨率视觉编码的基础能力。
 - **Unified-First 原则**：在设计 VLM 时，优先考虑理解+生成的统一架构，而非分离模块拼接。
 - **Alignment-First 原则**：在追求性能提升之前，优先完成 human preference alignment，确保安全性和可控性。
 - **Efficiency-First 原则**：在部署场景中，优先考虑 inference-time efficiency optimization（KV cache、layer scaling），而非重新训练。
-- **Readout-First 原则**：诊断 VLM 能力失败时，先区分"表征缺失"与"读出失败"（linear probe vs 行为对照），再决定补数据还是修读出通路（[[2607-VisualAccessBoundary]]、[[2606-Act2Answer]]）。黑箱条件下的最低成本代用手段是同题换模态配对（[[2605-TokenSwap]]），但必须同时跑一道"能否认出这张图"的识别对照，否则感知失败与读出失败会被合并计入同一个数字。诊断到"读出失败"也还不是终点：在 agent 场景里要再分一次"读出对了但决策没跟着变"，判据是把同一条轨迹已获得的证据换一种形式重新呈现，看结果是否恢复（[[2608-MNISTPro]]、[[2608-MemoryLies]]）。
+- **Readout-First 原则**：诊断 VLM 能力失败时，先区分"表征缺失"与"读出失败"（linear probe vs 行为对照），再决定补数据还是修读出通路（[[2607-VisualAccessBoundary]]、[[2606-Act2Answer]]）。黑箱条件下的最低成本代用手段是同题换模态配对（[[2605-TokenSwap]]），但必须同时跑一道"能否认出这张图"的识别对照，否则感知失败与读出失败会被合并计入同一个数字。诊断到"读出失败"也还不是终点：在 agent 场景里要再分一次"读出对了但决策没跟着变"，判据是把同一条轨迹已获得的证据换一种形式重新呈现，看结果是否恢复（[[2608-MNISTPro]]、[[2608-MemoryLies]]）。闭环任务里还要再分一次"做到了"与"报得出做到了"——被计分的通常是后者，而两者的差可以大到 90% 对 35%（[[2609-DroneCATS]]）；换几种成功判据重算一遍再下能力结论，成本远低于重跑实验。
 
 ---
 
@@ -368,6 +401,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - [[2600-UnifyAgentUnifiedMultimodal]] - Unify-Agent: World-grounded image synthesis
 - [[2500-VisionLanguageVisionAuto]] - VLV Auto-Encoder: Knowledge distillation from diffusion
 - [[2606-Orca]] - Orca: Next-State-Prediction world foundation model, frozen latent + 多 decoder readout
+- [[2609-PhysBrain15]] - PhysBrain 1.5: 语言 + 动作 + 未来视觉状态共享单一词表与 LM head，无 modality-specific head
 
 **多模态 RL 后训练**：
 - [[2607-BRAID]] - BRAID: 两层 MDP 让 RL 贯穿文本 GRPO 与图像 DiffusionNFT
@@ -376,9 +410,12 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - [[2606-VisPlay]] - VisPlay: 双角色 self-play 免标注 RL，majority-voting 伪标签 + 不确定性课程
 - [[2607-HyGAE]] - HyGAE: Turn-wise + token-wise GAE 与 unified critic
 - [[2608-CoRLCohort]] - Co-RL: peer 多数票替代自我多数票的 label-free RL，附 self-rewarding 退化定理与错误共识吸引盆
+- [[2606-PanoEnv]] - PanoEnv: 仿真器 depth/segmentation/3D box 程序化生成全景空间 QA，几何 ground truth 直接充当 rule-based reward
+- [[2608-CodeAsWorld]] - Code-as-World: 可执行场景配置的 propose–instantiate–execute–render–verify 闭环自动产出带答案的物理题
 
 **Human Preference Alignment**：
 - [[2500-AligningMultimodalLlmHuman]] - Aligning Multimodal LLM with Human Preference: A Survey
+- [[2506-MLATrust]] - MLA-Trust: 同一 backbone 在单步问答壳与多步 GUI 执行壳下的拒绝率对照
 
 **效率优化与基座**：
 - [[2500-GuiKvEfficientGui]] - GUI-KV: KV cache with spatio-temporal awareness
@@ -392,6 +429,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 **Agentic visual reasoning 的工具使用**：
 - [[Papers/2607-Beacon]] - Beacon: Mode Adaptiveness / Tool Effect 诊断口径 + NAAR 在线自适应奖励 + HCE 全错组回收
 - [[Papers/2607-FaithEyes]] - FaithEyes: 自判 subagent 的 process-image 有用性判词双用（observation 反馈 + tool reward 缩放）
+- [[2606-SenseSearch]] - SenseSearch: 三工具多轮检索 policy（cold-start SFT + BN-GSPO）；其 Table 1 内含 training-free RAG 全面高于 agentic workflow 的负对照
 
 **机制分析**：
 - [[2607-VisualAccessBoundary]] - Visual Access Sweep: CoT 视觉访问边界的因果干预
@@ -400,6 +438,9 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - [[2608-GroundingIsntKnowing]] - Grounding Isn't Knowing: token 消融 + attention knockout + causal mediation，关系判断依赖粗粒度 object-centered layout 而非精确定位
 - [[2608-MNISTPro]] - MNIST-PRO: glimpse POMDP 下的主动感知诊断，同轨迹 offline canvas 反事实分离证据采集与证据解释
 - [[2608-MemoryLies]] - SpatialSTALE: 同一 ground truth 只换观测形式的 staleness 检测配对实验，附知觉对照与 oracle-label 消融
+- [[2608-VisLens]] - VisLens: 冻结基座上约 0.05% 参数的 residual translator 读出头，一次前向解出空间语义热图并据此裁剪
+- [[2608-QwenDrive]] - QwenDrive: 冻结 / 解冻基座的同模型内部对照，划出读出通路补不动度量级 3D 几何的一侧
+- [[2601-VisualProjectionSpace]] - Visual Projection Space: projector 输出几何量的观察性 probe；关键数字自相矛盾，仅作证据阶梯最下层的反面样本
 
 ### 6.2 应用与评测论文
 
@@ -414,6 +455,7 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - [[2607-MentalWorldModeling]] - Menti-Bench / Mentis: 心理状态世界建模的六级必要性阶梯与跨媒体通道干预
 - [[2608-WorldExam]] - WorldExam: world model 四层诊断基准，附 VLM-judge 与人一致性的规模化测量（primary home 为 [[Topics/WorldModel-Survey]]）
 - [[2608-HarnessEvalW]] - HarnessEval-W: 分层 agentic judge harness，同 backend 对照下 pairwise accuracy 与 draw rate 同时大幅移动（primary home 为 [[Topics/WorldModel-Survey]]）
+- [[2609-FailBench]] - FailBench: 14 来源 2,197 条轨迹的失败检测评测，5 个专训检测器全部低于各自基座 + 类别先验对照
 
 **VLM for GUI Agent**：
 - [[2506-ShowuiOneVisionLanguage]] - ShowUI: Vision-Language-Action model for GUI
@@ -426,6 +468,11 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - [[2608-GUILens]] - GUI-Lens: Training-free 序贯裁剪 + 自校验的推理期 grounding 脚手架
 - [[2608-MissClick]] - MissClick: 位权加权的 digit 级对抗攻击，暴露坐标序列化接口的非均匀误差面
 - [[2606-TowardsGUIAgents]] - Towards GUI Agents: discrete diffusion VLM 的 anchor→extent 混合 masking，同基座同语料下四数据集一致涨点但等延迟预算下不保（primary home 为 [[Topics/CUA-Survey]]）
+
+**VLM 直接承担控制与实时交互（域外对照）**：
+- [[2609-ShowHarness]] - Show-Harness: 语义动作单元 + embodiment 解释器；动作空间 2×2 消融把 grounding 归给写明的确定性映射而非语义命名
+- [[2609-DroneCATS]] - DroneCATS: MLLM 直接闭环控制无人机的评测，自带三次重飞方差审计与三种成功判据的重算审计
+- [[2609-Gander]] - Gander: full-duplex omni 交互前端 + training-free 后端；vision tower 冻结条件下的通用多模态回退读数
 
 ---
 
@@ -503,4 +550,13 @@ Vision Language Model (VLM) / Multimodal Large Language Model (MLLM) 是当前 A
 - 未推翻既有结论：§2.8 原有六篇的表述全部保留，"decodable ≠ used"未被削弱而是被接长一段（判定正确 → 决策改变）；Takeaway 7 的"免标注 reward 尚无同时摆脱闭源裁判与共识偏差的方案"仍成立，改动在于偏差来源从模型自身移到 cohort；§2.3 与 §2.5 的原有架构判断未动
 - 验证边界：[[2608-GroundingIsntKnowing]] 笔记为 `verification_status: partial`，只取 source-verified 行，未使用其 ±2 类容差表述；其三模型中两个分别贴随机水平与天花板，正文已按"有效样本接近 n=1"写明，形状匹配对照缺失亦已作为替代解释保留。[[2606-TowardsGUIAgents]] 正文自称"把与 AR 的差距从 25 收窄到 15 以内"无法由其主表复现，全篇未引用该表述及另两处被判 contradicted 的数值。[[2608-MemoryLies]] 的机制分析仅在 GPT-4o 上完成、vision 侧导航为 10 seeds × 3 episodes 的 preview，[[2608-MNISTPro]] 每任务 100 episode 无 error bar，两者的"完全可观测 + 证据可无损对齐"前提已随结论一并写出。[[2608-CoRLCohort]] 的错误共识吸引盆为定理而非实测，正文按"被证明存在但未被演示"表述
 - domain_map: 拟更新 [[DomainMaps/VLM]]，候选条目已写入 staging 待合并
+- **status**: success
+
+### 2026-09-18 增量更新（survey-refresh）
+- 并入 12 篇：[[2608-VisLens]]（§2.1 + §2.8，0.05% 参数的读出头把"在但读不出"从诊断推到可修）、[[2609-PhysBrain15]]（§2.3 + Takeaway 3 + Open Problem 12，统一/扩展带来的通用多模态回退代价）、[[2506-MLATrust]]（§2.4）、[[2609-Gander]]（§2.5 局限 + §2.3，视觉塔逐比特冻结仍出现 WorldSense −6.08）、[[2606-PanoEnv]] 与 [[2608-CodeAsWorld]]（§2.6，reward 从裁判模型移向可程序化求值的环境）、[[2609-FailBench]]（§2.6 + benchmark 表 + Takeaway 7 + Open Problem 8，5 个专训失败检测器全部低于各自 base）、[[2609-ShowHarness]]（§2.7 + 跨论文 pattern 表 + Takeaway 14，动作接口 2×2 消融分离"语义命名"与"写明映射"）、[[2608-QwenDrive]] 与 [[2601-VisualProjectionSpace]]（§2.8）、[[2609-DroneCATS]]（§2.8 + 打折表 + benchmark 表 + Open Problem 3 + §5.4，同像素退化、宣告缺口、判据与方差审计）、[[2606-SenseSearch]]（§2.9 + 打折表 4 行 + Takeaway 11 + Open Problem 16，被论文自己漏掉的 RAG 负对照）
+- 跳过 1 篇：[[2608-WeMMEmbedding]]（证据面为判别式多模态检索 embedding，本 survey 无对应路线；其 MMEB-v2 综合分 80.6 vs 80.2 领先 0.4 且三项子分均非第一，backbone 代次（Qwen3.5 vs Qwen3-VL）与方法增量未分离，baseline 取自榜单未重跑，唯一可迁移到 GUI 的读数依赖尚未消化的 MMEB-v3）
+- 结构变化：未新增小节。§2.2 局限 +1 段（与图像无关的同像素输出）；§2.3 新增 1 段"统一/扩展的代价"；§2.6 关键设计 +1 bullet、核心结论补第四级 reward 来源（专训 verifier）、共同弱点改写；§2.7 关键设计 +1 bullet、跨论文 pattern 表 +2 行；§2.8 +2 段、打折表 +1 行；§2.9 新增 1 段负对照、打折表 +1 行并扩写 3 行；benchmark 表 +3 行、演进趋势 +2 条；Key Takeaways 3/7/11 修订、新增 Takeaway 14；Open Problems 3/8/12 扩写、新增 Open Problem 16；§5.4 补"做到了 vs 报得出做到了"；参考文献补齐本轮 12 篇并新增"VLM 直接承担控制与实时交互（域外对照）"一组
+- 修改的既有结论：Takeaway 7「免标注 reward 尚无同时摆脱闭源裁判与共识偏差的方案」的适用范围扩大——原表述只覆盖共识类来源，[[2609-FailBench]] 显示专门训练的判别式 verifier 同样不成立（14 个来源 2,197 条轨迹上 5 个检测器相对各自 base 为 −0.002 ~ −0.088）；Takeaway 3 的"统一架构"论断补上代价侧（[[2609-PhysBrain15]] 12 项通用多模态 7 降、[[2609-Gander]] 冻结视觉塔仍回退），方向未推翻；Takeaway 11 补 [[2606-SenseSearch]] 的 RAG 对照。其余原有结论全部保留
+- 验证边界：[[2609-DroneCATS]] 未做区分"知道但不说"与"不知道"的探针，其宣告缺口在正文明确标注**不能当作读出通路的证据**；其 think 无效与 [[2609-ShowHarness]] 的 thinking-effort 均非受控对照，只按与 [[2607-VisualAccessBoundary]] 同向的观察表述。[[2609-ShowHarness]] 为 `verification_status: partial`，只取 source-verified 行；其主表 89.0 vs 39.0 因 VLA baseline 的动作格式混淆（由 2 cm 量化序列反解为连续轨迹）未被引用，仅采用 2×2 消融。[[2609-FailBench]] 无方差/置信区间/显著性检验，正文已写明其类别先验基线（always-failure 0.797 / 0.890）与报告分数的距离。[[2606-SenseSearch]] 的 RAG 负对照为本 survey 从其 Table 1 读出、原文未提及，已按"论文未讨论"表述
+- papers_analyzed 对账：按正文（`## 调研日志`之前）中能解析到 `Papers/*.md` 的唯一 wikilink 机械重数 = 64；HEAD 版本同口径重数 = 52，与旧值一致，差额 12 即本轮并入的 12 篇，无历史漂移。[[2604-LLaDA2Uni]] 为历轮遗留的悬空链接（`Papers/` 无对应文件，出现在 §2.3、Takeaway 3、Open Problem 2、参考文献），不计入 64，本轮未改动它支撑的结论
 - **status**: success

@@ -90,7 +90,7 @@ Iris-mini 从 Qwen3.6-35B-A3B 初始化、Iris-pro 从 Qwen3.5-397B-A17B 初始�
 | Iris-pro discard-all + retry | 90.3 (+17.7) | 85.1 (+8.3) | 93.4 (+7.0) | 56.6 (+5.8) |
 
 - **CM 的效应量远大于系统间差距**。Iris-mini 在 BrowseComp 上开关 CM 差 17.5 分（加 retry 21.2 分），而它对同段最强对手的领先只有 3.4 分。同一模型的两个 regime 分数（64.7 → 82.2）横跨了 Table 1 中 30–35B 整段的分布（67.9 → 82.2）。
-- **小模型从 CM 受益更多**：mini 的四项增益 17.5 / 12.5 / 5.9 / 9.1 全面高于 pro 的 16.0 / 8.3 / 6.5 / 5.6。作者的解释是预算大小相同、消耗速度不同——小模型解同一组约束需要更多步，更常触顶，CM 能捞回的也更多。
+- **小模型从 CM 受益更多——四项成立三项**：mini 的增益在 BrowseComp（17.5 vs 16.0）、BrowseComp-ZH（12.5 vs 8.3）、HLE（9.1 vs 5.6）上高于 pro，但 DeepSearchQA 反向（5.9 vs 6.5）。作者的解释是预算大小相同、消耗速度不同——小模型解同一组约束需要更多步，更常触顶，CM 能捞回的也更多。该解释与例外一致：DeepSearchQA 恰是三项测试中 no-CM 基线最高（mini 81.0 / pro 86.4）、即最不受 context 耗尽支配的一项。但这是四点数据上的事后拟合，作为可证伪假设记录，不作结论。
 - **增益排序由"多久耗尽 context"决定，不由 headroom 决定**：HLE 的 no-CM 基线最低（43.2）却增益小于 BrowseComp，因为 HLE 的缺口是领域知识而非 context，延长搜索视野收不回多少。这是一个可证伪的机制断言而非事后合理化。
 - **无 CM 对照**：Iris-mini 的 64.7 / 72.3 高于同样报告无 CM 结果的 FORT-Searcher（55.9 / 62.1）、OpenSeeker-v2（46.0 / 58.1）、REDSearcher（42.1 / 49.8）；Iris-pro 再高 7.9 / 4.5 分。
 - **BrowseComp-ZH 的天花板信号**：三个配置（mini discard-all+retry、pro discard-all、pro discard-all+retry）落在完全相同的 85.1，在 289 题上即 246 题正确，作者据此推断剩余性能受模型容量以外的因素约束。Appendix A 给出佐证：BrowseComp-ZH 第 85 题官方答案为 Lannister，而按剧情 Sansa Stark 的第二次正式婚姻对象是 Ramsay Bolton，系统答 Bolton 被判错。

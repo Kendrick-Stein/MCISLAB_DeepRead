@@ -85,7 +85,8 @@ ReadPaperMachine/
 ├── Workbench/           # Researcher 工作状态
 │   ├── agenda.md        #   研究议程
 │   ├── memory/          #   蒸馏后的记忆
-│   ├── queue.json       #   持久任务队列（summarize_paper / review_insight 等）
+│   ├── queue.json       #   活动任务队列，只持有 pending（summarize_paper / review_insight 等）
+│   ├── queue-archive.jsonl  # 已完成与被容量淘汰的任务（append-only；done 不占 max_queue_size 配额）
 │   ├── runs/            #   多阶段 research run manifest 与 checkpoint
 │   ├── logs/            #   每日操作日志
 │   ├── survey-updates.json  # digest→survey 记账（paper-digest 写，survey-refresh 消费）

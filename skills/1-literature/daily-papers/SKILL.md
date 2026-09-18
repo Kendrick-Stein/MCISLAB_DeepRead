@@ -106,7 +106,9 @@ python3 skills/1-literature/daily-papers/queue_ops.py enqueue \
   --ids <id1> <id2> ...
 ```
 
-脚本自动去重（已有笔记或已在队列的跳过）、自清理历史遗留的“已有笔记但仍 pending”任务，并按 `max_queue_size` 裁剪。正常路径由 Step 3 coordinator 在 artifact 安全 commit 后调用 `queue_ops.py complete` 标记 done。
+脚本自动去重（已有笔记、已在队列、或已在归档中完成的跳过）、自清理历史遗留的“已有笔记但仍 pending”任务，把 done 移入 `Workbench/queue-archive.jsonl`，再按 `max_queue_size` 裁剪。正常路径由 Step 3 coordinator 在 artifact 安全 commit 后调用 `queue_ops.py complete` 标记 done。
+
+`max_queue_size` 只丈量 pending——done 已归档，不占配额；淘汰对象只有 pending 的 `summarize_paper`，`review_insight` 是 Human gate 永不淘汰。若 stdout 出现 `DROPPED` 行，说明 backlog 仍然溢出、有未消化论文被挤出（已记入归档可重新入队），需在日志 gaps 中点名，不得当作正常裁剪略过。
 
 ### Step 3：每篇要精读论文 → Prepare、串行 Commit、独立点评
 

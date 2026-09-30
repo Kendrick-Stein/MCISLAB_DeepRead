@@ -1,9 +1,9 @@
 ---
 title: "Computer-Use Agents: A Unified Survey of Models, Learning, Environments, Evaluation, and Deployment"
 tags: [survey, gui-agent, computer-use, web-agent, mobile-agent, os-agent, agentic-RL]
-date_updated: "2026-09-18"
+date_updated: "2026-09-30"
 year_range: 1997-2026
-papers_analyzed: 235
+papers_analyzed: 236
 keywords: [gui-agent, gui grounding, computer-use, computer use agent, cua, web agent, browser agent, mobile agent, desktop agent, os agent]
 exclude_tags: [deep-research]
 exclude_keywords: [deep research, information seeking, browsecomp, research agent, search agent]
@@ -805,6 +805,7 @@ Native CUA 把 perception、grounding、reasoning、短期记忆与 action gener
 | Qwen-CUA | 397B-A17B MoE，screenshot-only：不提供 accessibility tree、DOM 与 shell，固定 20 张 active 视觉预算，超出后以 10 张为块把旧截图折成文本占位符 | 同一 fold operator 复用于训练期 trajectory slicing，长 episode 被切成多个继承终态 reward 的 context-bounded slice，训推折叠表示严格一致 [[Papers/2608-QwenCUA]] | 八个 benchmark 只在 OSWorld-Verified 与 MacAgentBench 居首；全文零组件级 ablation，五项设计打包交付，任一单项均无独立证据 |
 | UI-Mate | 27B / 9B 开权重桌面 policy，SFT 后接异步 GRPO；针对 GUI 改三处——decision-turn centering、IcePop/SeqClip staleness 过滤、token-level normalization | DemoCUA 把单条 in-context 示范当先验而非脚本：训练期只给 key action 迫使模型从截图补出中间动作，推理期给全序列 [[Papers/2608-UIMate]] | 数据侧与训练侧无任一组件级消融，基座到 27B 的增益为 bundle 级；9B 低于同尺寸 ScaleCUA |
 | UI-Venus-2 | 9B / 27B 开权重，单一 closed-loop reasoning–action policy 覆盖 mobile / web / desktop；三段训练——mid-training → 按域独立的 step-level offline RL → multi-teacher on-policy distillation 把域专家合回一个 policy | 动作空间统一到归一化坐标，另置 TakeNote（把截图信息写成跨步记忆）与 CallUser（多选项均满足时请求接管）两个非纯操作动作 [[Papers/2608-UIVenus2]] | 全文零 ablation，四项自述贡献均不可归因；训练数据量、算力与超参一概未报；OSWorld-Verified 80.5 与 OSWorld 2.0 Binary 2.8 并存于同一模型 |
+| MintAct | 单套参数覆盖 UI grounding、mobile/desktop/web navigation 与 visual tool use，由 domain-specific prompt 指定各域动作集 | 分阶段 SFT 后，把 per-domain RL specialist 的成功轨迹经 RFT 蒸馏回单模型，再做异步 joint RL [[Papers/2609-MintAct]]（C1–C3） | joint RL 实际仅覆盖 mobile 与 desktop；共享多域能力不等于已验证同任务内的 GUI/tool-use 自动切换 |
 
 UI-TARS 系列说明 native model 可以形成统一的 data flywheel；ScaleCUA 则提供反向边界：扩大 grounding 与跨平台训练数据仍可能留下明显的端到端执行缺口。现有证据因此不支持"native 化自动消除系统设计"，只支持把部分系统边界从显式模块接口迁移到训练数据、context policy 与 action schema。[[Papers/2607-QwenUIAgent]] 另外留下一条与规模相关的未解释反常：同一 pipeline 下 27B dense 在 MobileWorld 上比 35B-A3B MoE 高 17.1pp（82.1 vs 65.0），真机上为 92.2 vs 87.4，论文只把 MoE 变体当作"激活 3B、部署效率更高"的选项带过。由于端侧部署压力恰好落在 MoE/小模型一侧，这个 gap 值得独立复核；在此之前它只是单一系统内的现象，不能读作 dense 优于 MoE 的一般结论。
 
@@ -817,6 +818,8 @@ UI-TARS 系列说明 native model 可以形成统一的 data flywheel；ScaleCUA
 [[Papers/2608-UIVenus2]] 的 framing 比它的分数更值得记：它把 GUI agent 的瓶颈从模型侧移到 environment coverage、task construction 与 reward verification 三者的耦合上——扩环境必然要求可扩展的任务构造，而 RL 的能力上限由 verifier 质量决定。9B 与 27B 分别 init 自 Qwen3.5-9B 与 Qwen3.6-27B，训练分三段（multimodal mid-training → 按域独立的 step-level offline RL → MOPD 合并域专家），其中 mid-training 与 RL 组件按 §2.1 沿用 UI-Venus-1.5，真正的增量集中在 desktop computer-use 构建、数据生成与验证管线、MOPD 的 GUI 特化与安全评测四块，把整篇当作新训练范式读会显著高估它。20 个 benchmark 的成绩形态是分域不均而非全面领先：AndroidWorld 80.2 / 84.0（前最好 77.6，作者称该榜已接近饱和）、WebVoyager 90.8 / 93.4（refreshed 595 任务、GPT-4o judge）、Odysseys 领先最强 baseline 11.5 / 21.8（gemini-3.1-flash-lite-preview judge）、OSBlind ASR 48.8 / 47.9 而全部 baseline 落在 79.4–93.6；另一侧 MobileWorld 50 步 65.8 / 76.1 落后 Qwen-UI-Agent-27B 的 82.1，ScreenSpot-Pro 74.1 与 UI-Vision 66.9 同样次于后者（76.6 / 70.0），OSWorld-Verified 70.8 / 80.5 低于 Claude-Opus-4.8 的 83.4——该行 baseline 取自各自论文的 361-task 设定与各自 action scaffold，作者自陈应作 benchmark-level 参考而非受控对照。
 
 最尖锐的一对数字出现在同一模型内部：OSWorld-Verified 上 27B 得 80.5，而 OSWorld 2.0 的 Binary Accuracy 只有 2.8（9B 为 0.0）、Partial Score 13.2 / 7.5，对照 GPT-5.5 的 13.0 / 46.7，后者在官方 150 步预算下的 108 个任务上评测。[[Papers/2608-QwenCUA]] 在同一对 benchmark 上是 86.2 与 18.5，因此"短程桌面高分不自动外推到长程真实工作流"在两个系统上都成立，但落差幅度相差近一个量级，任一系统的 gap 都不能当作这对 benchmark 之间的固定换算。零 ablation 现象在本节则出现了第三个实例：§1 明写 "ablations are presented in the following sections"，全文却没有任何 ablation 表或节，四项自述贡献（MOPD 的两处 GUI 特化、双层验证框架、环境与任务扩展、CAPTCHA 数据）无一可归因，而同表里 Qwen3.6-27B 裸模型在 AndroidWorld 已有 70.3。训练侧同样不透明：任何阶段的数据量、轨迹数、算力与超参均未报，§4.1.1 的 implementation details 实际只写了推理配置，§3 的 4,000 域名 / 45,000 种子任务 / 70 类 CAPTCHA 是环境与任务池规模而非训练量。另有两处口径应随数字一并引用：DeskCraft 48.0 / 55.5 用的是作者自算的 538-task 并集而非官方分 split；Table 6 把 27B 的 general-VLM 对照记作 Qwen3.5-27B，与 §2.1 写明的 Qwen3.6-27B 初始化不一致，而 OSBlind 的 ASR 减半结论正建在这个对照上。安全侧还留下一个未被解释的规模反转——OSHarm 上 9B 的 ASR 11.3 低于 27B 的 15.3。全参数权重与评测基建已释出，库内暂无独立验证。
+
+[[Papers/2609-MintAct]] 将共享参数与联合在线优化的范围分开：UI 域以 screenshot 为观察、不读取 DOM 或 accessibility tree，visual tool use 采用结构化 function calling；web 与 tool-use 能力通过 joint RL 之前的训练阶段进入模型，最终联合更新仅含 mobile 与 desktop（C1–C3）。这与本节既有跨平台 native 路线相接，但不能据此把它归为已验证的 hybrid GUI/API routing policy。复现配方仍有未澄清处：正文按每次更新的 group quota 描述配比，附录 Table B 则列 mini-batch 与目标比例，未交代 mini-batch 的计量单位及两处配置对应的实验；不能把两处直接作同单位比较，或任选一处作为实际设置（C12）。原文一致性已核查，库内暂无独立复现。
 
 ### 6.4 Modular Agent Systems
 
@@ -1145,6 +1148,8 @@ EvoCUA 的离线路线依次使用 cold-start SFT、成功轨迹 RFT 与首分�
 ### 7.8 Online and Multi-Turn RL
 
 Online RL 把策略更新置于真实状态转移中，能够学习恢复、终止和长程决策，却同时放大环境吞吐、reset、reward coverage 与统计方差问题。算法名称不是首要选择依据；应先诊断 policy support、任务边界、rollout group 和环境可靠性。
+
+异步 rollout 还会改变实际进入优化器的跨域配比。[[Papers/2609-MintAct]] 在过滤全成功或全失败 group 之后，按域 quota 接收有效 group，并以消费进度向 producer 施加 backpressure；长时间等不到某域的有效 group 时，fallback 会放宽配额，因此该控制不是逐次更新的严格配比保证（C4）。其训练目标分别处理 policy staleness 与 rollout/trainer engine mismatch，并 mask 检测出的环境故障轨迹（C5）。这些机制尚无逐组件消融或 matched synchronous 吞吐对照，不能把系统设计分别记为已量化的加速来源；模型与 joint RL 的范围边界见 §6.3。
 
 #### 7.8.1 训练前诊断清单
 
@@ -2110,6 +2115,13 @@ GUI/Computer-Use Agent 研究经历了五次可辨认的抽象升级——结构
 | 2026-07-23 gap-fill 补录 14 篇（RL survey / Digi-Q / Jedi / AndroidControl / OSWorld-MCP / MCPWorld 等） | 库内暂无独立验证 | §1.4/§4.7/§5/§7/§8 各子节 | 单 agent digest、verification_status: unverified，仅作子节 enrichment，未升格为 Takeaway/共识 |
 
 ## 调研日志
+
+### 2026-09-30 survey-refresh（并入 1 篇，235 → 236）
+
+- 并入：[[Papers/2609-MintAct]]，§6.3 主落位（模型表一行与范围/复现边界一段），§7.8 一处 cross-link（有效 group 的消费配比控制）。跳过 0 篇。
+- 分类：platform = cross-platform；task_level = app workflow（兼有 grounding / step）；primary_section = model-architecture；environment_setting = self-hosted，另含 offline grounding 与 live Online-Mind2Web 评测；verifier_type = visual-rubric judge（在线训练），评测仅声明官方指标、未逐 benchmark 核定 evaluator；evidence_strength = direct end-to-end。
+- 变化：仅增量并入既有小节，不改高层结论、Key Evidence Matrix 或配图。正文只使用 source-verified C1–C5 与 C12，保留 joint RL 仅 mobile+desktop、同任务 GUI/tool-use 自动切换未验证、batch 单位及实验配置对应关系未明确等边界；未作跨论文分数排序。
+- DomainMap：skipped，单篇方法增量未形成格局级变化。唯一 Papers/ wikilink 机械复核为 236。
 
 ### 2026-09-18 survey-refresh（并入 2 篇，232 → 235）
 

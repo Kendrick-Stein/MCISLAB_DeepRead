@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr"><head><title>Questioning the Questions: Sustaining Self-Evolution in Reasoning Models</title><meta charset="utf-8"/><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com"/><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted Grotesk:wght@400;700&amp;family=Source Sans Pro:ital,wght@0,400;0,600;1,400;1,600&amp;family=IBM Plex Mono:wght@400;600&amp;display=swap"/><link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin="anonymous"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="og:site_name" content="DeepRead"/><meta property="og:title" content="Questioning the Questions: Sustaining Self-Evolution in Reasoning Models"/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="Questioning the Questions: Sustaining Self-Evolution in Reasoning Models"/><meta name="twitter:description" content="Summary R-Quest 诊断 R-Zero 式 questioner–solver 自进化在多轮后崩溃的两个数据侧原因：自生成题目中 invalid 题（矛盾、缺条件、歧义、无解）随轮次增多，且 answer-consistency 过滤反而抬高其占比；BLEU 词面去重识别不出”换皮同题”，题型集中度持续上升。方法是先用 GRPO 把 solver 训练成会输出 INVALID 拒题，再用它的多数投票做 validity gate，同时让 frozen base model 对 batch 内随机抽取的 K=8 道题做两两”是否同一题型”判断作为 novelty gate，只有通过两..."/><meta property="og:description" content="Summary R-Quest 诊断 R-Zero 式 questioner–solver 自进化在多轮后崩溃的两个数据侧原因：自生成题目中 invalid 题（矛盾、缺条件、歧义、无解）随轮次增多，且 answer-consistency 过滤反而抬高其占比；BLEU 词面去重识别不出”换皮同题”，题型集中度持续上升。方法是先用 GRPO 把 solver 训练成会输出 INVALID 拒题，再用它的多数投票做 validity gate，同时让 frozen base model 对 batch 内随机抽取的 K=8 道题做两两”是否同一题型”判断作为 novelty gate，只有通过两..."/><meta property="og:image:alt" content="Summary R-Quest 诊断 R-Zero 式 questioner–solver 自进化在多轮后崩溃的两个数据侧原因：自生成题目中 invalid 题（矛盾、缺条件、歧义、无解）随轮次增多，且 answer-consistency 过滤反而抬高其占比；BLEU 词面去重识别不出”换皮同题”，题型集中度持续上升。方法是先用 GRPO 把 solver 训练成会输出 INVALID 拒题，再用它的多数投票做 validity gate，同时让 frozen base model 对 batch 内随机抽取的 K=8 道题做两两”是否同一题型”判断作为 novelty gate，只有通过两..."/><meta property="og:image" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/static/og-image.png"/><meta property="og:image:url" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/static/og-image.png"/><meta name="twitter:image" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/static/og-image.png"/><meta property="og:image:type" content="image/.png"/><meta property="twitter:domain" content="kendrick-stein.github.io/MCISLAB_DeepRead"/><meta property="og:url" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/Papers/2610-RQuest"/><meta property="twitter:url" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/Papers/2610-RQuest"/><link rel="icon" href="../static/icon.png"/><meta name="description" content="Summary R-Quest 诊断 R-Zero 式 questioner–solver 自进化在多轮后崩溃的两个数据侧原因：自生成题目中 invalid 题（矛盾、缺条件、歧义、无解）随轮次增多，且 answer-consistency 过滤反而抬高其占比；BLEU 词面去重识别不出”换皮同题”，题型集中度持续上升。方法是先用 GRPO 把 solver 训练成会输出 INVALID 拒题，再用它的多数投票做 validity gate，同时让 frozen base model 对 batch 内随机抽取的 K=8 道题做两两”是否同一题型”判断作为 novelty gate，只有通过两..."/><meta name="generator" content="Quartz"/><link href="../index.css" rel="stylesheet" type="text/css" data-persist="true"/><style>.expand-button {
+  position: absolute;
+  display: flex;
+  float: right;
+  padding: 0.4rem;
+  margin: 0.3rem;
+  right: 0;
+  color: var(--gray);
+  border-color: var(--dark);
+  background-color: var(--light);
+  border: 1px solid;
+  border-radius: 5px;
+  opacity: 0;
+  transition: 0.2s;
+}
+.expand-button > svg {
+  fill: var(--light);
+  filter: contrast(0.3);
+}
+.expand-button:hover {
+  cursor: pointer;
+  border-color: var(--secondary);
+}
+.expand-button:focus {
+  outline: 0;
+}
+
+pre:hover > .expand-button {
+  opacity: 1;
+  transition: 0.2s;
+}
+
+#mermaid-container {
+  position: fixed;
+  contain: layout;
+  z-index: 999;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: none;
+  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.5);
+}
+#mermaid-container.active {
+  display: inline-block;
+}
+#mermaid-container > #mermaid-space {
+  border: 1px solid var(--lightgray);
+  background-color: var(--light);
+  border-radius: 5px;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  height: 80vh;
+  width: 80vw;
+  overflow: hidden;
+}
+#mermaid-container > #mermaid-space > .mermaid-content {
+  position: relative;
+  transform-origin: 0 0;
+  transition: transform 0.1s ease;
+  overflow: visible;
+  min-height: 200px;
+  min-width: 200px;
+}
+#mermaid-container > #mermaid-space > .mermaid-content pre {
+  margin: 0;
+  border: none;
+}
+#mermaid-container > #mermaid-space > .mermaid-content svg {
+  max-width: none;
+  height: auto;
+}
+#mermaid-container > #mermaid-space > .mermaid-controls {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: var(--light);
+  border: 1px solid var(--lightgray);
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+}
+#mermaid-container > #mermaid-space > .mermaid-controls .mermaid-control-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--lightgray);
+  background: var(--light);
+  color: var(--dark);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  font-family: var(--bodyFont);
+  transition: all 0.2s ease;
+}
+#mermaid-container > #mermaid-space > .mermaid-controls .mermaid-control-button:hover {
+  background: var(--lightgray);
+}
+#mermaid-container > #mermaid-space > .mermaid-controls .mermaid-control-button:active {
+  transform: translateY(1px);
+}
+#mermaid-container > #mermaid-space > .mermaid-controls .mermaid-control-button:nth-child(2) {
+  width: auto;
+  padding: 0 12px;
+  font-size: 14px;
+}
+/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VSb290IjoiL2hvbWUvcnVubmVyL3dvcmsvTUNJU0xBQl9EZWVwUmVhZC9NQ0lTTEFCX0RlZXBSZWFkL3dlYnNpdGUvcXVhcnR6L2NvbXBvbmVudHMvc3R5bGVzIiwic291cmNlcyI6WyJtZXJtYWlkLmlubGluZS5zY3NzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiJBQUFBO0VBQ0U7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7O0FBRUE7RUFDRTtFQUNBOztBQUdGO0VBQ0U7RUFDQTs7QUFHRjtFQUNFOzs7QUFLRjtFQUNFO0VBQ0E7OztBQUlKO0VBQ0U7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTs7QUFFQTtFQUNFOztBQUdGO0VBQ0U7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7O0FBRUE7RUFDRTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7O0FBRUE7RUFDRTtFQUNBOztBQUdGO0VBQ0U7RUFDQTs7QUFJSjtFQUNFO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7O0FBRUE7RUFDRTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBOztBQUVBO0VBQ0U7O0FBR0Y7RUFDRTs7QUFJRjtFQUNFO0VBQ0E7RUFDQSIsInNvdXJjZXNDb250ZW50IjpbIi5leHBhbmQtYnV0dG9uIHtcbiAgcG9zaXRpb246IGFic29sdXRlO1xuICBkaXNwbGF5OiBmbGV4O1xuICBmbG9hdDogcmlnaHQ7XG4gIHBhZGRpbmc6IDAuNHJlbTtcbiAgbWFyZ2luOiAwLjNyZW07XG4gIHJpZ2h0OiAwOyAvLyBOT1RFOiByaWdodCB3aWxsIGJlIHNldCBpbiBtZXJtYWlkLmlubGluZS50c1xuICBjb2xvcjogdmFyKC0tZ3JheSk7XG4gIGJvcmRlci1jb2xvcjogdmFyKC0tZGFyayk7XG4gIGJhY2tncm91bmQtY29sb3I6IHZhcigtLWxpZ2h0KTtcbiAgYm9yZGVyOiAxcHggc29saWQ7XG4gIGJvcmRlci1yYWRpdXM6IDVweDtcbiAgb3BhY2l0eTogMDtcbiAgdHJhbnNpdGlvbjogMC4ycztcblxuICAmID4gc3ZnIHtcbiAgICBmaWxsOiB2YXIoLS1saWdodCk7XG4gICAgZmlsdGVyOiBjb250cmFzdCgwLjMpO1xuICB9XG5cbiAgJjpob3ZlciB7XG4gICAgY3Vyc29yOiBwb2ludGVyO1xuICAgIGJvcmRlci1jb2xvcjogdmFyKC0tc2Vjb25kYXJ5KTtcbiAgfVxuXG4gICY6Zm9jdXMge1xuICAgIG91dGxpbmU6IDA7XG4gIH1cbn1cblxucHJlIHtcbiAgJjpob3ZlciA+IC5leHBhbmQtYnV0dG9uIHtcbiAgICBvcGFjaXR5OiAxO1xuICAgIHRyYW5zaXRpb246IDAuMnM7XG4gIH1cbn1cblxuI21lcm1haWQtY29udGFpbmVyIHtcbiAgcG9zaXRpb246IGZpeGVkO1xuICBjb250YWluOiBsYXlvdXQ7XG4gIHotaW5kZXg6IDk5OTtcbiAgbGVmdDogMDtcbiAgdG9wOiAwO1xuICB3aWR0aDogMTAwdnc7XG4gIGhlaWdodDogMTAwdmg7XG4gIG92ZXJmbG93OiBoaWRkZW47XG4gIGRpc3BsYXk6IG5vbmU7XG4gIGJhY2tkcm9wLWZpbHRlcjogYmx1cig0cHgpO1xuICBiYWNrZ3JvdW5kOiByZ2JhKDAsIDAsIDAsIDAuNSk7XG5cbiAgJi5hY3RpdmUge1xuICAgIGRpc3BsYXk6IGlubGluZS1ibG9jaztcbiAgfVxuXG4gICYgPiAjbWVybWFpZC1zcGFjZSB7XG4gICAgYm9yZGVyOiAxcHggc29saWQgdmFyKC0tbGlnaHRncmF5KTtcbiAgICBiYWNrZ3JvdW5kLWNvbG9yOiB2YXIoLS1saWdodCk7XG4gICAgYm9yZGVyLXJhZGl1czogNXB4O1xuICAgIHBvc2l0aW9uOiBmaXhlZDtcbiAgICB0b3A6IDUwJTtcbiAgICBsZWZ0OiA1MCU7XG4gICAgdHJhbnNmb3JtOiB0cmFuc2xhdGUoLTUwJSwgLTUwJSk7XG4gICAgaGVpZ2h0OiA4MHZoO1xuICAgIHdpZHRoOiA4MHZ3O1xuICAgIG92ZXJmbG93OiBoaWRkZW47XG5cbiAgICAmID4gLm1lcm1haWQtY29udGVudCB7XG4gICAgICBwb3NpdGlvbjogcmVsYXRpdmU7XG4gICAgICB0cmFuc2Zvcm0tb3JpZ2luOiAwIDA7XG4gICAgICB0cmFuc2l0aW9uOiB0cmFuc2Zvcm0gMC4xcyBlYXNlO1xuICAgICAgb3ZlcmZsb3c6IHZpc2libGU7XG4gICAgICBtaW4taGVpZ2h0OiAyMDBweDtcbiAgICAgIG1pbi13aWR0aDogMjAwcHg7XG5cbiAgICAgIHByZSB7XG4gICAgICAgIG1hcmdpbjogMDtcbiAgICAgICAgYm9yZGVyOiBub25lO1xuICAgICAgfVxuXG4gICAgICBzdmcge1xuICAgICAgICBtYXgtd2lkdGg6IG5vbmU7XG4gICAgICAgIGhlaWdodDogYXV0bztcbiAgICAgIH1cbiAgICB9XG5cbiAgICAmID4gLm1lcm1haWQtY29udHJvbHMge1xuICAgICAgcG9zaXRpb246IGFic29sdXRlO1xuICAgICAgYm90dG9tOiAyMHB4O1xuICAgICAgcmlnaHQ6IDIwcHg7XG4gICAgICBkaXNwbGF5OiBmbGV4O1xuICAgICAgZ2FwOiA4cHg7XG4gICAgICBwYWRkaW5nOiA4cHg7XG4gICAgICBiYWNrZ3JvdW5kOiB2YXIoLS1saWdodCk7XG4gICAgICBib3JkZXI6IDFweCBzb2xpZCB2YXIoLS1saWdodGdyYXkpO1xuICAgICAgYm9yZGVyLXJhZGl1czogNnB4O1xuICAgICAgYm94LXNoYWRvdzogMCAycHggNHB4IHJnYmEoMCwgMCwgMCwgMC4xKTtcbiAgICAgIHotaW5kZXg6IDI7XG5cbiAgICAgIC5tZXJtYWlkLWNvbnRyb2wtYnV0dG9uIHtcbiAgICAgICAgZGlzcGxheTogZmxleDtcbiAgICAgICAgYWxpZ24taXRlbXM6IGNlbnRlcjtcbiAgICAgICAganVzdGlmeS1jb250ZW50OiBjZW50ZXI7XG4gICAgICAgIHdpZHRoOiAzMnB4O1xuICAgICAgICBoZWlnaHQ6IDMycHg7XG4gICAgICAgIHBhZGRpbmc6IDA7XG4gICAgICAgIGJvcmRlcjogMXB4IHNvbGlkIHZhcigtLWxpZ2h0Z3JheSk7XG4gICAgICAgIGJhY2tncm91bmQ6IHZhcigtLWxpZ2h0KTtcbiAgICAgICAgY29sb3I6IHZhcigtLWRhcmspO1xuICAgICAgICBib3JkZXItcmFkaXVzOiA0cHg7XG4gICAgICAgIGN1cnNvcjogcG9pbnRlcjtcbiAgICAgICAgZm9udC1zaXplOiAxNnB4O1xuICAgICAgICBmb250LWZhbWlseTogdmFyKC0tYm9keUZvbnQpO1xuICAgICAgICB0cmFuc2l0aW9uOiBhbGwgMC4ycyBlYXNlO1xuXG4gICAgICAgICY6aG92ZXIge1xuICAgICAgICAgIGJhY2tncm91bmQ6IHZhcigtLWxpZ2h0Z3JheSk7XG4gICAgICAgIH1cblxuICAgICAgICAmOmFjdGl2ZSB7XG4gICAgICAgICAgdHJhbnNmb3JtOiB0cmFuc2xhdGVZKDFweCk7XG4gICAgICAgIH1cblxuICAgICAgICAvLyBTdHlsZSB0aGUgcmVzZXQgYnV0dG9uIGRpZmZlcmVudGx5XG4gICAgICAgICY6bnRoLWNoaWxkKDIpIHtcbiAgICAgICAgICB3aWR0aDogYXV0bztcbiAgICAgICAgICBwYWRkaW5nOiAwIDEycHg7XG4gICAgICAgICAgZm9udC1zaXplOiAxNHB4O1xuICAgICAgICB9XG4gICAgICB9XG4gICAgfVxuICB9XG59XG4iXX0= */</style><link href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" rel="stylesheet" type="text/css" data-persist="true"/><script src="../prescript.js" type="application/javascript" data-persist="true"></script><script type="application/javascript" data-persist="true">const fetchData = fetch("../static/contentIndex.json").then(data => data.json())</script><link rel="alternate" type="application/rss+xml" title="RSS Feed" href="https://kendrick-stein.github.io/MCISLAB_DeepRead/index.xml"/></head><body data-slug="Papers/2610-RQuest"><div id="quartz-root" class="page"><div id="quartz-body"><div class="left sidebar"><h2 class="page-title"><a href="..">DeepRead</a></h2><div class="spacer mobile-only"></div><div class="flex-component" style="flex-direction: row; flex-wrap: nowrap; gap: 1rem;"><div style="flex-grow: 1; flex-shrink: 1; flex-basis: auto; order: 0; align-self: center; justify-self: center;"><div class="search"><button class="search-button"><svg role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 19.9 19.7"><title>Search</title><g class="search-path" fill="none"><path stroke-linecap="square" d="M18.5 18.3l-5.4-5.4"></path><circle cx="8" cy="8" r="7"></circle></g></svg><p>Search</p></button><div class="search-container"><div class="search-space"><input autocomplete="off" class="search-bar" name="search" type="text" aria-label="Search for something" placeholder="Search for something"/><div class="search-layout" data-preview="true"></div></div></div></div></div><div style="flex-grow: 0; flex-shrink: 1; flex-basis: auto; order: 0; align-self: center; justify-self: center;"><button class="darkmode"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" class="dayIcon" x="0px" y="0px" viewBox="0 0 35 35" style="enable-background:new 0 0 35 35" xml:space="preserve" aria-label="Dark mode"><title>Dark mode</title><path d="M6,17.5C6,16.672,5.328,16,4.5,16h-3C0.672,16,0,16.672,0,17.5    S0.672,19,1.5,19h3C5.328,19,6,18.328,6,17.5z M7.5,26c-0.414,0-0.789,0.168-1.061,0.439l-2,2C4.168,28.711,4,29.086,4,29.5    C4,30.328,4.671,31,5.5,31c0.414,0,0.789-0.168,1.06-0.44l2-2C8.832,28.289,9,27.914,9,27.5C9,26.672,8.329,26,7.5,26z M17.5,6    C18.329,6,19,5.328,19,4.5v-3C19,0.672,18.329,0,17.5,0S16,0.672,16,1.5v3C16,5.328,16.671,6,17.5,6z M27.5,9    c0.414,0,0.789-0.168,1.06-0.439l2-2C30.832,6.289,31,5.914,31,5.5C31,4.672,30.329,4,29.5,4c-0.414,0-0.789,0.168-1.061,0.44    l-2,2C26.168,6.711,26,7.086,26,7.5C26,8.328,26.671,9,27.5,9z M6.439,8.561C6.711,8.832,7.086,9,7.5,9C8.328,9,9,8.328,9,7.5    c0-0.414-0.168-0.789-0.439-1.061l-2-2C6.289,4.168,5.914,4,5.5,4C4.672,4,4,4.672,4,5.5c0,0.414,0.168,0.789,0.439,1.06    L6.439,8.561z M33.5,16h-3c-0.828,0-1.5,0.672-1.5,1.5s0.672,1.5,1.5,1.5h3c0.828,0,1.5-0.672,1.5-1.5S34.328,16,33.5,16z     M28.561,26.439C28.289,26.168,27.914,26,27.5,26c-0.828,0-1.5,0.672-1.5,1.5c0,0.414,0.168,0.789,0.439,1.06l2,2    C28.711,30.832,29.086,31,29.5,31c0.828,0,1.5-0.672,1.5-1.5c0-0.414-0.168-0.789-0.439-1.061L28.561,26.439z M17.5,29    c-0.829,0-1.5,0.672-1.5,1.5v3c0,0.828,0.671,1.5,1.5,1.5s1.5-0.672,1.5-1.5v-3C19,29.672,18.329,29,17.5,29z M17.5,7    C11.71,7,7,11.71,7,17.5S11.71,28,17.5,28S28,23.29,28,17.5S23.29,7,17.5,7z M17.5,25c-4.136,0-7.5-3.364-7.5-7.5    c0-4.136,3.364-7.5,7.5-7.5c4.136,0,7.5,3.364,7.5,7.5C25,21.636,21.636,25,17.5,25z"></path></svg><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" class="nightIcon" x="0px" y="0px" viewBox="0 0 100 100" style="enable-background:new 0 0 100 100" xml:space="preserve" aria-label="Light mode"><title>Light mode</title><path d="M96.76,66.458c-0.853-0.852-2.15-1.064-3.23-0.534c-6.063,2.991-12.858,4.571-19.655,4.571  C62.022,70.495,50.88,65.88,42.5,57.5C29.043,44.043,25.658,23.536,34.076,6.47c0.532-1.08,0.318-2.379-0.534-3.23  c-0.851-0.852-2.15-1.064-3.23-0.534c-4.918,2.427-9.375,5.619-13.246,9.491c-9.447,9.447-14.65,22.008-14.65,35.369  c0,13.36,5.203,25.921,14.65,35.368s22.008,14.65,35.368,14.65c13.361,0,25.921-5.203,35.369-14.65  c3.872-3.871,7.064-8.328,9.491-13.246C97.826,68.608,97.611,67.309,96.76,66.458z"></path></svg></button></div></div><div class="explorer" data-behavior="link" data-collapsed="collapsed" data-savestate="false" data-data-fns="{&quot;order&quot;:[&quot;filter&quot;,&quot;map&quot;,&quot;sort&quot;],&quot;sortFn&quot;:&quot;(a,b)=>{let order=[\&quot;DomainMaps\&quot;,\&quot;Papers\&quot;,\&quot;Topics\&quot;,\&quot;Ideas\&quot;,\&quot;Projects\&quot;],aIdx=order.indexOf(a.displayName),bIdx=order.indexOf(b.displayName);return aIdx!==-1&amp;&amp;bIdx!==-1?aIdx-bIdx:aIdx!==-1?-1:bIdx!==-1?1:a.slug?.startsWith(\&quot;Papers/\&quot;)&amp;&amp;b.slug?.startsWith(\&quot;Papers/\&quot;)?b.displayName.localeCompare(a.displayName):a.displayName.localeCompare(b.displayName)}&quot;,&quot;filterFn&quot;:&quot;node=>node.slugSegment!==\&quot;tags\&quot;&quot;,&quot;mapFn&quot;:&quot;node=>{node.isFolder||(node.displayName=node.slugSegment)}&quot;}"><button type="button" class="explorer-toggle mobile-explorer hide-until-loaded" data-mobile="true" aria-controls="explorer-1410"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide-menu"><line x1="4" x2="20" y1="12" y2="12"></line><line x1="4" x2="20" y1="6" y2="6"></line><line x1="4" x2="20" y1="18" y2="18"></line></svg></button><button type="button" class="title-button explorer-toggle desktop-explorer" data-mobile="false" aria-expanded="true"><h2>Explorer</h2><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="5 8 14 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="fold"><polyline points="6 9 12 15 18 9"></polyline></svg></button><div id="explorer-1410" class="explorer-content" aria-expanded="false" role="group"><ul class="explorer-ul overflow" id="list-0"><li class="overflow-end"></li></ul></div><template id="template-file"><li><a href="#"></a></li></template><template id="template-folder"><li><div class="folder-container"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="5 8 14 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="folder-icon"><polyline points="6 9 12 15 18 9"></polyline></svg><div><button class="folder-button"><span class="folder-title"></span></button></div></div><div class="folder-outer"><ul class="content"></ul></div></li></template></div><div class="sidebar-tags"><span class="sidebar-tags-title">Popular Tags</span><div class="sidebar-tag-cloud"><a href="/MCISLAB_DeepRead/tags/VLM" class="sidebar-tag-pill">#VLM</a><a href="/MCISLAB_DeepRead/tags/agentic-RL" class="sidebar-tag-pill">#agentic-RL</a><a href="/MCISLAB_DeepRead/tags/gui-agent" class="sidebar-tag-pill">#gui-agent</a><a href="/MCISLAB_DeepRead/tags/LLM" class="sidebar-tag-pill">#LLM</a><a href="/MCISLAB_DeepRead/tags/task-planning" class="sidebar-tag-pill">#task-planning</a><a href="/MCISLAB_DeepRead/tags/VLA" class="sidebar-tag-pill">#VLA</a><a href="/MCISLAB_DeepRead/tags/web-agent" class="sidebar-tag-pill">#web-agent</a><a href="/MCISLAB_DeepRead/tags/manipulation" class="sidebar-tag-pill">#manipulation</a><a href="/MCISLAB_DeepRead/tags/computer-use" class="sidebar-tag-pill">#computer-use</a><a href="/MCISLAB_DeepRead/tags/world-model" class="sidebar-tag-pill">#world-model</a></div></div></div><div class="center"><div class="page-header"><div class="popover-hint"><nav class="breadcrumb-container" aria-label="breadcrumbs"><div class="breadcrumb-element"><a href="../">Home</a><p> ❯ </p></div><div class="breadcrumb-element"><a href="../Papers/">Papers</a><p> ❯ </p></div><div class="breadcrumb-element"><a href>Questioning the Questions: Sustaining Self Evolution in Reasoning Models</a></div></nav><h1 class="article-title">Questioning the Questions: Sustaining Self-Evolution in Reasoning Models</h1><div class="paper-meta"><span class="paper-venue">arXiv</span><span class="paper-institute"><span class="meta-sep">·</span>Washington University in St. Louis, University of Michigan, Ann Arbor</span><span class="paper-authors"><span class="meta-sep">·</span>Jinyuan Li <button class="et-al-btn" aria-expanded="false">et al.</button><span class="authors-full" style="display:none"><span>, Chengsong Huang</span><span>, Langlin Huang</span><span>, Donghong Cai</span><span>, Shiping Gao</span><span>, Yuyi Yang</span><span>, Jiaxin Huang</span></span></span></div><p show-comma="true" class="content-meta"><time datetime="2026-10-08T07:18:43.540Z">Oct 08, 2026</time><span>18 min read</span></p><ul class="tags"><li><a href="../tags/agentic-RL" class="internal tag-link">agentic-RL</a></li><li><a href="../tags/LLM" class="internal tag-link">LLM</a></li></ul></div></div><article class="popover-hint"><h2 id="summary">Summary<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#summary" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p>R-Quest 诊断 R-Zero 式 questioner–solver 自进化在多轮后崩溃的两个数据侧原因：自生成题目中 invalid 题（矛盾、缺条件、歧义、无解）随轮次增多，且 answer-consistency 过滤反而抬高其占比；BLEU 词面去重识别不出”换皮同题”，题型集中度持续上升。方法是先用 GRPO 把 solver 训练成会输出 <code>INVALID</code> 拒题，再用它的多数投票做 validity gate，同时让 frozen base model 对 batch 内随机抽取的 K=8 道题做两两”是否同一题型”判断作为 novelty gate，只有通过两道门的题才拿 uncertainty reward。Qwen3-4B-Base 上 10 轮自进化不崩，第 10 轮数学均分 51.92，比同轮已崩溃的 R-Zero（34.60）高 17.32 分（峰值对峰值只高 2.82 分）；5 轮主表中在两个 backbone、数学/代码/通用推理三个 domain 的均分上都高于 R-Zero、OCNR、R-Diverse。</p>
+<h2 id="problem--motivation">Problem &amp; Motivation<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#problem--motivation" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p>R-Zero 一类 self-evolving reasoning 框架让同一初始化的 questioner 和 solver 交替 GRPO：questioner 以 frozen solver 答案一致性接近 0.5 为 reward 出题，solver 用多数投票 pseudo-label 训练。已知问题是自进化几轮后性能回落甚至跌破 base model（本文复现：R-Zero 第 3 轮达峰 49.10，第 10 轮跌到 34.60，低于 base 的 46.17）。已有稳定化方法 OCNR、R-Diverse 都从”多样性”切入，靠 solver 表征距离或额外的 code generator + code encoder 衡量新颖性。本文的切入点是直接检查 R-Zero 产出的题目本身，问两件事：题是不是良定义的？是不是在反复出同一道题？</p>
+<h2 id="method">Method<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#method" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p><strong>诊断（§2.2）</strong>。用 GPT-5.6-Sol 当外部裁判分析 R-Zero（Qwen3-4B-Base）各轮题池：</p>
+<ul>
+<li><strong>Validity</strong>：每轮抽 200 题，valid 率从第 1 轮 76.5% 降到第 5 轮 39.5%；经 R-Zero 的 consistency ∈ [0.3, 0.8] 过滤后，第 5 轮训练集 valid 率只剩 27.64%。直觉解释：invalid 题的多数答案天然处于”中等一致”区间，恰好被 uncertainty 过滤器偏好保留。</li>
+<li><strong>因果检验</strong>：两份各 1,273 题的匹配数据集（共享 766 道 valid 题；其余 507 道一份为原 invalid 题，一份为 GPT-5.6-Sol 修复版），GRPO 训练后最终数学均分 49.91 vs 46.54，前期相近、后期分叉。</li>
+<li><strong>Repetition</strong>：第 5 轮过滤后题池抽 200 题按”数学构造 + 所问任务”分组，前三大题型占 59.5%；最大题型在 R-Zero 的 BLEU 聚类下被拆成 22 个簇。repetition penalty 按簇大小计，拆簇等于稀释惩罚。</li>
+</ul>
+<p><strong>R-Quest 三个组件</strong>：</p>
+<ol>
+<li><strong>Validity-aware solver initialization（§3.1）</strong>：从 R-Zero 前 5 轮 solver 训练集去重抽样，GPT-5.6-Sol 两阶段标注（判 valid/invalid → 只对 valid 题独立解出参考答案，再经答案复核、必要时人工复核），得到 2,240 题（valid 923 / invalid 1,317；train 1,943 / val 297）。GRPO 训练 base model：答对或正确拒题 +1，拒掉 valid 题 −0.5，其余 0；训练 15 步后的 checkpoint 作为 solver 初始化。</li>
+<li><strong>Sampled pairwise novelty（§3.2）</strong>：frozen base model 对候选题与 batch 内均匀抽取的 K=8 道其他题逐对判 SAME_TYPE / DIFFERENT，任一对判同类即拒。通过概率近似 (1−p)^K（p 为同类题占比）：p=5% 时约 66.3%，p=20% 时约 16.8%。成本从 O(B²) 降到 O(BK)。</li>
+<li><strong>Questioner reward（§3.3）</strong>：solver 先采 9 个 validity 回答，INVALID 比例 u>1/2 则 reward = 1/2 − u（负值）；否则再采 10 个常规解答算一致性 s，reward = g_novel · min(s, 1−s)，g_novel ∈ {0,1}。solver 训练数据同样先过 validity gate，再按 s ∈ [0.3, 0.8] 过滤、多数投票作 pseudo-label；每轮混入 10% 初始化数据 replay，维持拒题能力。</li>
+</ol>
+<p>self-evolution 期间不调用比 base model 更强的外部模型；但 validity 初始化数据的标注依赖 GPT-5.6-Sol（见 Strengths &amp; Weaknesses）。</p>
+<h2 id="key-results">Key Results<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#key-results" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p>设置：Qwen3-4B-Base 与 OctoThinker-3B-Hybrid-Base；baseline 为 base、R-Zero、OCNR、R-Diverse（后两者由作者在 R-Zero 框架内按论文描述复现，OCNR 每轮 20,000 候选题即 2 倍预算）；每轮 10,000 候选题。7 个数学 benchmark（AMC/AIME 用 mean@32，其余 greedy），代码 HumanEval+/MBPP+（pass@1），通用推理 SuperGPQA/MMLU-Pro/BBEH。主表跑 5 轮，<strong>每个方法每个 domain 报告测试集均分最高的那一轮 checkpoint</strong>。</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="table-container"><table><thead><tr><th style="text-align:left;">数学均分</th><th style="text-align:left;">Base</th><th style="text-align:left;">+validity init</th><th style="text-align:left;">R-Zero</th><th style="text-align:left;">OCNR</th><th style="text-align:left;">R-Diverse</th><th style="text-align:left;">R-Quest</th></tr></thead><tbody><tr><td style="text-align:left;">Qwen3-4B-Base</td><td style="text-align:left;">46.17</td><td style="text-align:left;">47.07</td><td style="text-align:left;">49.10</td><td style="text-align:left;">49.57</td><td style="text-align:left;">49.82</td><td style="text-align:left;"><strong>51.64</strong></td></tr><tr><td style="text-align:left;">OctoThinker-3B</td><td style="text-align:left;">24.90</td><td style="text-align:left;">25.22</td><td style="text-align:left;">28.25</td><td style="text-align:left;">28.12</td><td style="text-align:left;">28.61</td><td style="text-align:left;"><strong>30.69</strong></td></tr></tbody></table></div>
+<ul>
+<li><strong>代码 / 通用推理</strong>（Table 2）：Qwen 代码均分 62.69（base 58.79，R-Zero 59.27），通用 32.75（base 28.79）；OctoThinker 代码 18.90（base 13.67，R-Zero 14.14），通用 15.50（base 8.30，R-Zero 14.10）。只做 validity init 的增益很小，增益主要来自后续自进化。</li>
+<li><strong>10 轮长程</strong>（Fig. 5，Qwen）：R-Zero 第 3 轮 49.10 后跌到第 10 轮 34.60；R-Quest 第 1–10 轮每个 checkpoint 都高于 R-Zero 的峰值，第 10 轮达最高 51.92（比 base 高 5.75，比同轮 R-Zero 高 17.32）。注意 17.32 是 R-Quest 峰值对 R-Zero 崩溃后的值；峰值对峰值（51.92 vs 49.10）差 2.82 分。</li>
+<li><strong>Ablation</strong>（Table 3，Qwen 数学均分）：完整 51.64 / w/o novelty 51.02 / w/o validity 50.27 / 两者都去（=R-Zero）49.10 / frozen validity judge 49.93。10 轮曲线上去掉 validity 出现后期崩溃，去掉 novelty 只是温和下降且仍高于 base——validity 是长程稳定的主因。</li>
+<li><strong>过程指标</strong>（Fig. 6–7，GPT-5.6-Sol 裁判）：held-out 297 题上 R-Quest 的 invalid recall 第 10 轮 86.36%，R-Zero 各轮 10.23%–26.14%；未过滤题池 valid 率 R-Quest 第 4–10 轮 94.5%–97.5%，R-Zero 跌到 49.0%；valid 题上多数投票答案正确率第 10 轮 54.69% vs 2.06%；前五大题型占比 R-Zero 从 17.0% 升到 69.0%，R-Quest 第 5 轮 24.0%。</li>
+<li><strong>K 的反直觉结果</strong>：K=16 进一步压低题型集中度（第 4 轮 30.0% → 16.8%），但数学性能始终低于 K=8——过强的去重会连同”同题型中更难的变体”一起压掉。</li>
+</ul>
+<h2 id="evidence-ledger">Evidence Ledger<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#evidence-ledger" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="table-container"><table><thead><tr><th style="text-align:left;">Claim ID</th><th style="text-align:left;">Claim</th><th style="text-align:left;">Type</th><th style="text-align:left;">Source locator</th><th style="text-align:left;">Evidence excerpt</th><th style="text-align:left;">Status</th></tr></thead><tbody><tr><td style="text-align:left;">C1</td><td style="text-align:left;">R-Zero 题池 valid 率第 1 轮 76.5% → 第 5 轮 39.5%（每轮 200 题，GPT-5.6-Sol 判）</td><td style="text-align:left;">number</td><td style="text-align:left;">§2.2.1, Fig. 3(a)</td><td style="text-align:left;">“valid-question rate falls from 76.5% in round one to 39.5% in round five”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C2</td><td style="text-align:left;">consistency ∈ [0.3, 0.8] 过滤后第 5 轮 valid 率 27.64%</td><td style="text-align:left;">number</td><td style="text-align:left;">§2.2.1</td><td style="text-align:left;">”the valid question rate is further reduced, reaching 27.64% in round five”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C3</td><td style="text-align:left;">匹配实验（1,273 题，共享 766 valid，507 题原版 vs 修复版）：49.91 vs 46.54</td><td style="text-align:left;">number / causal-mechanism</td><td style="text-align:left;">§2.2.1, Fig. 3(b)</td><td style="text-align:left;">“final average score of 49.91 across seven mathematical benchmarks, compared with 46.54”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C4</td><td style="text-align:left;">第 5 轮前三大题型占 59.5%；最大题型被 BLEU 拆成 22 簇</td><td style="text-align:left;">number</td><td style="text-align:left;">§2.2.2, Fig. 4</td><td style="text-align:left;">”the largest type of question is split into 22 clusters”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C5</td><td style="text-align:left;">Questioner reward：g_valid=1/2−u&lt;0 时取 g_valid，否则 g_novel·min(s,1−s)；9 个 validity 回答 + 10 个解答</td><td style="text-align:left;">causal-mechanism</td><td style="text-align:left;">§3.3 公式; App. C.2, Table 7</td><td style="text-align:left;">”To evaluate each generated question, the frozen solver first produces nine validity responses.”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C6</td><td style="text-align:left;">frozen base model 与 K=8 道随机题两两比较，任一同类即拒；通过概率 ≈ (1−p)^K</td><td style="text-align:left;">causal-mechanism</td><td style="text-align:left;">§3.2; App. B.1–B.2</td><td style="text-align:left;">”reject the candidate if any reference is judged to be of the same type”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C7</td><td style="text-align:left;">初始化数据 2,240 题（train 1,943 / val 297），reward +1 / −0.5 / 0，15 步，10% replay</td><td style="text-align:left;">number</td><td style="text-align:left;">§3.1; App. A.1 Table 4; A.3 Table 6; C.2</td><td style="text-align:left;">”Annotation and answer review yield a final dataset of 2,240 questions”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C8</td><td style="text-align:left;">Table 1 数学均分：Qwen 46.17/49.10/49.57/49.82/51.64；Octo 24.90/28.25/28.12/28.61/30.69</td><td style="text-align:left;">comparison</td><td style="text-align:left;">Table 1</td><td style="text-align:left;">”R-Quest achieves the highest average performance across seven mathematical reasoning benchmarks on both backbones”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C9</td><td style="text-align:left;">主表 5 轮，每方法每 domain 取测试均分最高的 checkpoint</td><td style="text-align:left;">benchmark-setting</td><td style="text-align:left;">§4.1 Evaluation</td><td style="text-align:left;">”For each domain, we report the checkpoint with the highest average benchmark score across evaluated rounds.”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C10</td><td style="text-align:left;">10 轮：R-Zero 第 3 轮 49.10 → 第 10 轮 34.60；R-Quest 第 10 轮 51.92，同轮领先 17.32，各轮均高于 R-Zero 峰值</td><td style="text-align:left;">comparison</td><td style="text-align:left;">§4.2, Fig. 5</td><td style="text-align:left;">”every checkpoint from rounds one through ten exceeds R-Zero’s best score”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C11</td><td style="text-align:left;">Table 2 代码/通用均分（Qwen 62.69 vs 58.79/59.27；Octo 18.90 vs 13.67/14.14；通用 32.75 vs 28.79、15.50 vs 8.30）</td><td style="text-align:left;">number</td><td style="text-align:left;">Table 2</td><td style="text-align:left;">”improves average code generation scores over the base models by 3.90 points … and 5.23 points”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C12</td><td style="text-align:left;">Ablation 数学均分 51.64 / 51.02 / 50.27 / frozen judge 49.93</td><td style="text-align:left;">number</td><td style="text-align:left;">Table 3; App. F Table 9</td><td style="text-align:left;">”removing either validity or novelty feedback lowers performance across all three domains”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C13</td><td style="text-align:left;">去 validity 后期崩溃，去 novelty 温和下降且高于 base</td><td style="text-align:left;">causal-mechanism</td><td style="text-align:left;">§4.2, Fig. 5</td><td style="text-align:left;">”its removal leads to late-stage collapse, whereas the variant without novelty feedback shows a milder decline”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C14</td><td style="text-align:left;">balanced acc 64.80% → 72.93%；invalid recall 86.36% vs R-Zero 10.23%–26.14%</td><td style="text-align:left;">number</td><td style="text-align:left;">§4.3.2, Fig. 6(a)(b)</td><td style="text-align:left;">“R-Quest achieves an invalid recall of 86.36% in round ten”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C15</td><td style="text-align:left;">题池 valid 率 R-Quest 88.0% → 94.5%–97.5%（第 4–10 轮）；R-Zero 76.5% → 49.0%</td><td style="text-align:left;">number</td><td style="text-align:left;">§4.3.2, Fig. 6(c)</td><td style="text-align:left;">“the rate for R-Zero falls from 76.5% to 49.0%“</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C16</td><td style="text-align:left;">第 10 轮 valid 题多数答案正确率 54.69% vs 2.06%（严格口径）</td><td style="text-align:left;">number</td><td style="text-align:left;">§4.3.2, Fig. 6(d)</td><td style="text-align:left;">“R-Quest retains 54.69% accuracy, whereas R-Zero falls to just 2.06%“</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C17</td><td style="text-align:left;">top-5 share R-Zero 17.0% → 69.0%；R-Quest 24.0%；K=16 第 4 轮 30.0% → 16.8% 但性能低于 K=8</td><td style="text-align:left;">comparison</td><td style="text-align:left;">§4.3.3, Fig. 7</td><td style="text-align:left;">”This further lowers the top-five share, most notably from 30.0% to 16.8% in round four.”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C18</td><td style="text-align:left;">自进化中不调强模型，但初始化数据由 GPT-5.6-Sol 标注</td><td style="text-align:left;">benchmark-setting</td><td style="text-align:left;">§1; §3.1; App. A.2</td><td style="text-align:left;">”without further calls to stronger external models”; “We use GPT-5.6-Sol to annotate these questions”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C19</td><td style="text-align:left;">代码链接 github.com/JinYuanLi0012/R-Quest</td><td style="text-align:left;">license-code</td><td style="text-align:left;">HTML 标题区 Code 链接</td><td style="text-align:left;">href=“<a href="https://github.com/JinYuanLi0012/R-Quest" class="external">https://github.com/JinYuanLi0012/R-Quest<svg aria-hidden="true" class="external-icon" style="max-width:0.8em;max-height:0.8em;" viewBox="0 0 512 512"><path d="M320 0H288V64h32 82.7L201.4 265.4 178.7 288 224 333.3l22.6-22.6L448 109.3V192v32h64V192 32 0H480 320zM32 32H0V64 480v32H32 456h32V480 352 320H424v32 96H64V96h96 32V32H160 32z"></path></svg></a>”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C20</td><td style="text-align:left;">OCNR 每轮 20,000 候选（2 倍预算）；R-Diverse 用 Qwen2.5-Coder-7B + Jina-Code-Embeddings-1.5B</td><td style="text-align:left;">benchmark-setting</td><td style="text-align:left;">App. D</td><td style="text-align:left;">”we generate 20,000 candidate questions per round, twice our standard budget”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C21</td><td style="text-align:left;">7 位作者、WashU + UMich、v1 提交 2026-10-03</td><td style="text-align:left;">number</td><td style="text-align:left;">HTML 作者区; arXiv API</td><td style="text-align:left;">”Washington University in St. Louis, University of Michigan, Ann Arbor”</td><td style="text-align:left;">source-verified</td></tr></tbody></table></div>
+<blockquote>
+<p>21/21 条由独立 verifier 对照 arXiv v2 HTML 全文核查为 source-verified；仅表示原文一致性，不表示结果已被独立复现。所有过程指标（C1–C4、C14–C17）的裁判均为 GPT-5.6-Sol，单次运行、无方差。</p>
+</blockquote>
+<h2 id="strengths--weaknesses">Strengths &amp; Weaknesses<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#strengths--weaknesses" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p><strong>Strengths</strong></p>
+<ul>
+<li><strong>诊断先于方法</strong>。没有直接再加一个多样性正则，而是先量化 R-Zero 题池的病理，再用匹配数据集（同 766 题、只替换 507 道 invalid 题）做干预实验，把”invalid 题导致退化”从相关推进到局部因果（在该设置下）。这个 1,273 题对照实验是全文信息量最高的一处。</li>
+<li><strong>点破了 consistency 过滤的结构性缺陷</strong>：uncertainty reward 与 [0.3, 0.8] 过滤偏好”答案不一致”的题，而 ill-posed 题正是答案最不一致的一类，所以过滤器会系统性富集 invalid 题。这对所有用 self-consistency 当难度代理的方法都成立，不限于 R-Zero。</li>
+<li><strong>novelty 判定的简化很干净</strong>：把集合级多样性降为原子化的两两”同题型”判断 + 随机抽样，有闭式通过概率 (1−p)^K 可解释 K 的作用，不需要额外 encoder。</li>
+<li>过程指标（invalid recall、题池 valid 率、伪标签正确率）把”为什么不崩”和”性能”分开报告，R-Zero 第 10 轮 valid 题上多数答案正确率仅 2.06%，说明崩溃不只在题目侧，伪标签监督也同时失效。</li>
+</ul>
+<p><strong>Weaknesses / 边界</strong></p>
+<ul>
+<li><strong>“self-contained”打了折扣</strong>：自进化循环内确实不调强模型，但拒题能力来自 GPT-5.6-Sol 标注的 2,240 题外部监督（含人工复核），且这批题恰好采自 R-Zero 在同一 backbone 上的失败题池。这相当于把强模型的”良定义”判断蒸馏进 solver，与 R-Diverse 调用外部 code 模型的差别是”前置一次”vs”每轮调用”，而非有无外部知识。frozen validity judge 变体（49.93）低于完整方法，说明持续 replay + 自进化中的拒题训练有作用，但这仍不能区分外部标注与内生机制各自的贡献。</li>
+<li><strong>测量依赖同一个外部裁判</strong>：诊断（valid 率、题型分组）和效果分析（valid 率、伪标签正确率、top-5 share）都由 GPT-5.6-Sol 打分，题型分组还依赖 LLM 顺序聚类（3 种随机顺序取平均）。裁判与初始化标注是同一模型，R-Quest 的 solver 学的正是这个裁判的”invalid”口径，过程指标对 R-Quest 存在天然的口径对齐优势。</li>
+<li><strong>主表 checkpoint 选择用测试集</strong>：每个方法取测试 benchmark 均分最高的那一轮，对所有方法一致，但会抬高绝对数，且数学、代码、通用三个 domain 的数字可能来自不同轮次的 checkpoint，没有独立 validation set。5 轮内各方法差距约 1.8–2.5 分，未报告多 seed 方差；AIME 等小 benchmark 上的个别格子（如 OCNR AIME25 7.92）波动明显。</li>
+<li><strong>baseline 是复现</strong>：OCNR、R-Diverse 由作者在 R-Zero 框架里按论文描述重写，非官方代码。初始化是否统一用于所有 baseline，正文表述模糊（Training Settings 写”The solver uses the validity-aware initialization”，但 R-Zero 行与 ablation “w/o both (R-Zero)” 数值相同，提示 R-Zero 行未用该初始化）；R-Zero 各轮 invalid recall 仅 10%–26% 也与”从初始化模型出发”不符。w/o validity 变体只去掉 gate 还是连初始化和 replay 一起去掉，论文未定义——这影响对 “validity 是长程稳定主因” 的归因。</li>
+<li><strong>领域边界</strong>：只在数学题自进化上验证，validity 有相对清晰的定义（矛盾/缺条件/无解）。开放式任务、代码任务中”invalid”的边界更模糊；3–4B 规模之外是否成立也未测。</li>
+</ul>
+<p><strong>影响判断</strong>：这篇论文把”自进化崩溃”的讨论从”多样性不足”推到”题目是否良定义”，并给出 consistency 过滤反向富集 invalid 题这一机制性观察，对任何以 self-consistency 当 reward/难度代理的自生成数据流程都有警示意义。方法本身是 R-Zero 的增量修补（两道 gate），novelty 主要在诊断。</p>
+<h2 id="mind-map">Mind Map<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#mind-map" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<pre><button class="expand-button" aria-label="Expand mermaid diagram" data-view-component="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M3.72 3.72a.75.75 0 011.06 1.06L2.56 7h10.88l-2.22-2.22a.75.75 0 011.06-1.06l3.5 3.5a.75.75 0 010 1.06l-3.5 3.5a.75.75 0 11-1.06-1.06l2.22-2.22H2.56l2.22 2.22a.75.75 0 11-1.06 1.06l-3.5-3.5a.75.75 0 010-1.06l3.5-3.5z"></path></svg></button><code class="mermaid" data-clipboard="&quot;mindmap\n  root((R-Quest))\n    Problem\n      R-Zero 自进化多轮后崩溃\n      invalid 题随轮次增多\n      consistency 过滤富集 invalid 题\n      BLEU 去重漏掉换皮同题\n    Method\n      Validity-aware solver init\n        GPT-5.6-Sol 标注 2240 题\n        GRPO 学输出 INVALID\n      Validity gate 9 票多数\n      Pairwise novelty gate K=8\n      Reward g_novel x min s 1-s\n      10% replay 保持拒题能力\n    Results\n      Qwen 数学 51.64 vs R-Zero 49.10\n      10 轮不崩 51.92 vs 34.60\n      validity 是长程稳定主因\n      K=16 过强去重反而掉点&quot;">mindmap
+  root((R-Quest))
+    Problem
+      R-Zero 自进化多轮后崩溃
+      invalid 题随轮次增多
+      consistency 过滤富集 invalid 题
+      BLEU 去重漏掉换皮同题
+    Method
+      Validity-aware solver init
+        GPT-5.6-Sol 标注 2240 题
+        GRPO 学输出 INVALID
+      Validity gate 9 票多数
+      Pairwise novelty gate K=8
+      Reward g_novel x min s 1-s
+      10% replay 保持拒题能力
+    Results
+      Qwen 数学 51.64 vs R-Zero 49.10
+      10 轮不崩 51.92 vs 34.60
+      validity 是长程稳定主因
+      K=16 过强去重反而掉点
+</code><div id="mermaid-container" role="dialog"><div id="mermaid-space"><div class="mermaid-content"></div></div></div></pre>
+<h2 id="notes">Notes<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#notes" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<ul>
+<li><strong>与 R-Zero / Absolute Zero 的本质区别</strong>：vault 中暂无 R-Zero、Absolute Zero 的独立笔记。<a href="../Papers/2606-VisPlay" class="internal alias" data-slug="Papers/2606-VisPlay">VisPlay</a> 是 R-Zero 范式向 VLM 的迁移（同一作者群：Chengsong Huang、Jiaxin Huang），其 questioner 同样以 confidence→0.5 为 reward、多数投票作 pseudo-label——R-Quest 指出的”consistency 过滤富集 invalid 题”在 VisPlay 上应同样存在，值得回看 VisPlay 是否报告长程轮次。Absolute Zero 用代码执行做任务与答案验证，validity 由执行器外生保证，因而根本不存在本文的 invalid 题问题；R-Quest 的处境是没有执行器的纯数学文本自进化，只能靠学出来的 validity 判断来补上”外部 verifier”的缺位。<a href="../Papers/2604-SpatialEvo" class="internal alias" data-slug="Papers/2604-SpatialEvo">SpatialEvo</a> 走 Absolute Zero 那条路：用确定性几何环境替代模型共识，同样绕开了题目良定义问题。</li>
+<li><strong>与崩溃文献的关系</strong>：<a href="../Papers/2606-RiseAndCollapse" class="internal alias" data-slug="Papers/2606-RiseAndCollapse">RiseAndCollapse</a> 把 self-training 崩溃归因于固定分布上的 within-task over-optimization；<a href="../Papers/2606-CodeSelfReviewCollapse" class="internal alias" data-slug="Papers/2606-CodeSelfReviewCollapse">CodeSelfReviewCollapse</a> 认为模型 self-gate 会进入 rubber-stamp regime、必须有 exogenous verification。R-Quest 给出第三种机制（训练分布本身被 invalid 题和重复题污染），并且其 self-gate 恰好是用外部强模型标注数据”预校准”过的——这与 CodeSelfReviewCollapse 的结论并不矛盾，反而支持”self-gate 需要外部锚点”。R-Quest 的 frozen validity judge 弱于持续训练的 judge，与 rubber-stamp 担忧方向相反，是一个值得对照的矛盾点（推测：差别在于 R-Quest 有 10% 带真标签的 replay 作锚）。</li>
+<li><a href="../Papers/2607-SpyRL" class="internal alias" data-slug="Papers/2607-SpyRL">SpyRL</a>、<a href="../Papers/2512-GenEnv" class="internal alias" data-slug="Papers/2512-GenEnv">GenEnv</a> 同属”模型给自己造任务”一族：SpyRL 用任务变换造可验证 reward，GenEnv 用 α-curriculum 对齐难度。两者都没有显式处理”生成任务是否良定义”。</li>
+<li><strong>开放问题</strong>：(1) validity 能力是否必须靠外部标注启动？能否用 solver 自身多路径矛盾检测冷启动？(2) uncertainty reward 与 invalid 题的耦合是否可以从 reward 设计上直接解耦（例如用”解题路径一致但答案分歧”区分难题与坏题）？(3) 题型 novelty 只做 batch 内比较，跨轮重复（R-Diverse 有 memory penalty）未处理。</li>
+</ul></article><hr/><div class="page-footer"></div></div><div class="right sidebar"><div class="toc desktop-only"><button type="button" class="toc-header" aria-controls="toc-1211" aria-expanded="true"><h3>Table of Contents</h3><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="fold"><polyline points="6 9 12 15 18 9"></polyline></svg></button><ul id="list-1" class="toc-content overflow"><li class="depth-0"><a href="#summary" data-for="summary">Summary</a></li><li class="depth-0"><a href="#problem--motivation" data-for="problem--motivation">Problem &amp; Motivation</a></li><li class="depth-0"><a href="#method" data-for="method">Method</a></li><li class="depth-0"><a href="#key-results" data-for="key-results">Key Results</a></li><li class="depth-0"><a href="#evidence-ledger" data-for="evidence-ledger">Evidence Ledger</a></li><li class="depth-0"><a href="#strengths--weaknesses" data-for="strengths--weaknesses">Strengths &amp; Weaknesses</a></li><li class="depth-0"><a href="#mind-map" data-for="mind-map">Mind Map</a></li><li class="depth-0"><a href="#notes" data-for="notes">Notes</a></li><li class="overflow-end"></li></ul></div></div><footer class><p>Created with <a href="https://quartz.jzhao.xyz/">Quartz v4.5.2</a> © 2026</p><ul><li><a href="https://github.com/Kendrick-Stein/MCISLAB_DeepRead">GitHub</a></li></ul></footer></div></div></body><script type="application/javascript" data-persist="true">function n(){let t=this.parentElement;t.classList.toggle("is-collapsed");let e=t.getElementsByClassName("callout-content")[0];if(!e)return;let l=t.classList.contains("is-collapsed");e.style.gridTemplateRows=l?"0fr":"1fr"}function c(){let t=document.getElementsByClassName("callout is-collapsible");for(let e of t){let l=e.getElementsByClassName("callout-title")[0],s=e.getElementsByClassName("callout-content")[0];if(!l||!s)continue;l.addEventListener("click",n),window.addCleanup(()=>l.removeEventListener("click",n));let o=e.classList.contains("is-collapsed");s.style.gridTemplateRows=o?"0fr":"1fr"}}document.addEventListener("nav",c);
+</script><script type="module" data-persist="true">function E(a,e){if(!a)return;function t(o){o.target===this&&(o.preventDefault(),o.stopPropagation(),e())}function n(o){o.key.startsWith("Esc")&&(o.preventDefault(),e())}a?.addEventListener("click",t),window.addCleanup(()=>a?.removeEventListener("click",t)),document.addEventListener("keydown",n),window.addCleanup(()=>document.removeEventListener("keydown",n))}function f(a){for(;a.firstChild;)a.removeChild(a.firstChild)}var m=class{constructor(e,t){this.container=e;this.content=t;this.setupEventListeners(),this.setupNavigationControls(),this.resetTransform()}isDragging=!1;startPan={x:0,y:0};currentPan={x:0,y:0};scale=1;MIN_SCALE=.5;MAX_SCALE=3;cleanups=[];setupEventListeners(){let e=this.onMouseDown.bind(this),t=this.onMouseMove.bind(this),n=this.onMouseUp.bind(this),o=this.onTouchStart.bind(this),r=this.onTouchMove.bind(this),i=this.onTouchEnd.bind(this),s=this.resetTransform.bind(this);this.container.addEventListener("mousedown",e),document.addEventListener("mousemove",t),document.addEventListener("mouseup",n),this.container.addEventListener("touchstart",o,{passive:!1}),document.addEventListener("touchmove",r,{passive:!1}),document.addEventListener("touchend",i),window.addEventListener("resize",s),this.cleanups.push(()=>this.container.removeEventListener("mousedown",e),()=>document.removeEventListener("mousemove",t),()=>document.removeEventListener("mouseup",n),()=>this.container.removeEventListener("touchstart",o),()=>document.removeEventListener("touchmove",r),()=>document.removeEventListener("touchend",i),()=>window.removeEventListener("resize",s))}cleanup(){for(let e of this.cleanups)e()}setupNavigationControls(){let e=document.createElement("div");e.className="mermaid-controls";let t=this.createButton("+",()=>this.zoom(.1)),n=this.createButton("-",()=>this.zoom(-.1)),o=this.createButton("Reset",()=>this.resetTransform());e.appendChild(n),e.appendChild(o),e.appendChild(t),this.container.appendChild(e)}createButton(e,t){let n=document.createElement("button");return n.textContent=e,n.className="mermaid-control-button",n.addEventListener("click",t),window.addCleanup(()=>n.removeEventListener("click",t)),n}onMouseDown(e){e.button===0&&(this.isDragging=!0,this.startPan={x:e.clientX-this.currentPan.x,y:e.clientY-this.currentPan.y},this.container.style.cursor="grabbing")}onMouseMove(e){this.isDragging&&(e.preventDefault(),this.currentPan={x:e.clientX-this.startPan.x,y:e.clientY-this.startPan.y},this.updateTransform())}onMouseUp(){this.isDragging=!1,this.container.style.cursor="grab"}onTouchStart(e){if(e.touches.length!==1)return;this.isDragging=!0;let t=e.touches[0];this.startPan={x:t.clientX-this.currentPan.x,y:t.clientY-this.currentPan.y}}onTouchMove(e){if(!this.isDragging||e.touches.length!==1)return;e.preventDefault();let t=e.touches[0];this.currentPan={x:t.clientX-this.startPan.x,y:t.clientY-this.startPan.y},this.updateTransform()}onTouchEnd(){this.isDragging=!1}zoom(e){let t=Math.min(Math.max(this.scale+e,this.MIN_SCALE),this.MAX_SCALE),n=this.content.getBoundingClientRect(),o=n.width/2,r=n.height/2,i=t-this.scale;this.currentPan.x-=o*i,this.currentPan.y-=r*i,this.scale=t,this.updateTransform()}updateTransform(){this.content.style.transform=`translate(${this.currentPan.x}px, ${this.currentPan.y}px) scale(${this.scale})`}resetTransform(){let t=this.content.querySelector("svg").getBoundingClientRect(),n=t.width/this.scale,o=t.height/this.scale;this.scale=1,this.currentPan={x:(this.container.clientWidth-n)/2,y:(this.container.clientHeight-o)/2},this.updateTransform()}},T=["--secondary","--tertiary","--gray","--light","--lightgray","--highlight","--dark","--darkgray","--codeFont"],y;document.addEventListener("nav",async()=>{let e=document.querySelector(".center").querySelectorAll("code.mermaid");if(e.length===0)return;y||=await import("https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.esm.min.mjs");let t=y.default,n=new WeakMap;for(let r of e)n.set(r,r.innerText);async function o(){for(let s of e){s.removeAttribute("data-processed");let c=n.get(s);c&&(s.innerHTML=c)}let r=T.reduce((s,c)=>(s[c]=window.getComputedStyle(document.documentElement).getPropertyValue(c),s),{}),i=document.documentElement.getAttribute("saved-theme")==="dark";t.initialize({startOnLoad:!1,securityLevel:"loose",theme:i?"dark":"base",themeVariables:{fontFamily:r["--codeFont"],primaryColor:r["--light"],primaryTextColor:r["--darkgray"],primaryBorderColor:r["--tertiary"],lineColor:r["--darkgray"],secondaryColor:r["--secondary"],tertiaryColor:r["--tertiary"],clusterBkg:r["--light"],edgeLabelBackground:r["--highlight"]}}),await t.run({nodes:e})}await o(),document.addEventListener("themechange",o),window.addCleanup(()=>document.removeEventListener("themechange",o));for(let r=0;r<e.length;r++){let v=function(){let g=l.querySelector("#mermaid-space"),h=l.querySelector(".mermaid-content");if(!h)return;f(h);let w=i.querySelector("svg").cloneNode(!0);h.appendChild(w),l.classList.add("active"),g.style.cursor="grab",u=new m(g,h)},M=function(){l.classList.remove("active"),u?.cleanup(),u=null},i=e[r],s=i.parentElement,c=s.querySelector(".clipboard-button"),d=s.querySelector(".expand-button"),p=window.getComputedStyle(c),L=c.offsetWidth+parseFloat(p.marginLeft||"0")+parseFloat(p.marginRight||"0");d.style.right=`calc(${L}px + 0.3rem)`,s.prepend(d);let l=s.querySelector("#mermaid-container");if(!l)return;let u=null;d.addEventListener("click",v),E(l,M),window.addCleanup(()=>{u?.cleanup(),d.removeEventListener("click",v)})}});
+</script><script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/copy-tex.min.js" type="application/javascript" data-persist="true"></script><script src="../postscript.js" type="module" data-persist="true"></script></html>

@@ -1,9 +1,9 @@
 ---
 title: "Computer-Use Agents: A Unified Survey of Models, Learning, Environments, Evaluation, and Deployment"
 tags: [survey, gui-agent, computer-use, web-agent, mobile-agent, os-agent, agentic-RL]
-date_updated: "2026-10-08"
+date_updated: "2026-10-14"
 year_range: 1997-2026
-papers_analyzed: 241
+papers_analyzed: 247
 keywords: [gui-agent, gui grounding, computer-use, computer use agent, cua, web agent, browser agent, mobile agent, desktop agent, os agent]
 exclude_tags: [deep-research]
 exclude_keywords: [deep research, information seeking, browsecomp, research agent, search agent]
@@ -438,6 +438,7 @@ Desktop 供给最先在大规模 VM 并行与可验证状态上成熟，随后�
 | [[Papers/2508-ComputerRL]] | RL 训练基建 | 千级并行 Ubuntu VM（qemu-in-docker + gRPC）+ API-GUI 混合动作 | 环境改造针对特定 app 集合构建，跨 OS 未验证 |
 | [[Papers/2607-SCALECUA]] | desktop RL/task factory | 100+ task workers、600 并发 VM、capability-frontier rollout | 50-turn cap、Ubuntu-only；抽样 task validity 仍需人工 audit |
 | [[Papers/2605-OpenComputer]] | verifiable software world | app-specific 程序化 verifier，33 apps / 1,000 tasks，94.1% 人类对齐（LLM judge 仅 79.2%） | 高质量 verifier 依赖可观测内部状态 |
+| [[Papers/2610-SoftwareGym]] | synthetic app factory | coding agent 生成 182 个 Avalonia 桌面 app（12 类），GUI test 驱动最多 3 版修复，pass rate 54.9%→91.5% | app 类别按 OSWorld 应用类型对齐；SG-Bench 与训练数据同源 |
 | [[Papers/2604-Crab]] | sandbox runtime | agent-facing rollback；步数 −29%，branch token −40–64% | 仅 shell/FS/process，不是 GUI 全栈先例 |
 | [[Papers/2604-WindowsWorld]] | cross-app long-horizon | single-app 46% vs cross-app 14% | 181 tasks / 16 personas，样本偏小 |
 | [[Papers/2605-SaaSBench]] | professional SaaS workflow | 23 个可本地部署开源 SaaS 系统，106 tasks | resolved 3.8% vs checkpoint 43.9%，partial 打分掩盖端到端失败 |
@@ -445,6 +446,8 @@ Desktop 供给最先在大规模 VM 并行与可验证状态上成熟，随后�
 | [[Papers/2606-OSWorld2]] | checkpointed long-horizon | 108 tasks / 31 sites | binary 20.6% / partial 54.8%，分差反映"过程正确但终态未达成" |
 
 环境内部有 state、snapshot 和 verifier，不代表 agent 能利用它们。两者应明确区分：**Trainer-facing** 指 rollout scheduler、reset、parallel、ground-truth reward、hidden validator；**Agent-facing** 指 task-agnostic 的 `observe()`、`ground()`、`act()`、`feedback()`、`checkpoint()`、`rollback()` 等能力，它不能泄露 gold action 或直接给出 task success。Trainer-facing 一侧已相对成熟：[[Papers/2607-SCALECUA]] 已能调度 600 并发 VM，[[Papers/2605-OpenComputer]] 的 app-specific verifier 做到 94.1% 人类对齐。相比之下 agent-facing runtime 刚起步：[[Papers/2604-Crab]] 的 agent-facing rollback 仅覆盖 shell/FS/process。[[Papers/2607-Tactile]] 把 accessibility semantics、OCR text 与 visual fallback 编译成带 source label、geometry、affordance 和 verification cue 的 action object，使 runtime 从"鼠标驱动"变成 `observe–ground–act–verify` contract，在 macOSWorld-style tasks 上把 Codex Success@100 从 41.1% 提到 50.0%；但 AX-adapted 提升 10.04 个百分点，Limited-AX 只有 5.55 个百分点，canvas、remote desktop 与 stale metadata 仍会退回坐标歧义，说明 semantic action 的上限受环境结构质量约束，还不是 browser/mobile/desktop 全栈先例。
+
+Trainer-facing 供给的下一步是连 app 本身也由 agent 合成。[[Papers/2610-SoftwareGym]] 用 coding agent 生成 app 源码，再由 GUI agent 在运行中的界面上执行测试、把失败回传给 coding agent 修复。关键对照是修复信号的来源：在同一批 36 个 app 上，带 GUI 测试反馈的修复把 pass rate 从 50.4% 提到 83.1%，只看源码的修复反而降到 48.8%，说明可执行界面而非代码审查才是合成软件质量的有效 verifier。用这批 app 上的轨迹对 Qwen3.5-9B 做 1 epoch full SFT，在不含任何 OSWorld app、任务或轨迹的条件下，OSWorld（8 domains、244 tasks、Pass@3、100 步）从 41.39 提到 56.97；与等量（3,715 条轨迹）的 OSWorld 同源数据相比低 4.5 分（61.48），两者拼接为 58.61。合成 app 因此已能提供接近同源数据的训练信号，但类别对齐 OSWorld、轨迹由 GPT-5.5 judge 过滤、只有单一 backbone 与单次训练，尚缺独立复现。
 
 ### 4.5 Observation Spaces
 
@@ -542,6 +545,8 @@ GUI 之外，computer-use agent 可用的动作通道还包括应用内建/自�
 [[Papers/2508-ComputerRL]] 把 API 通道系统化为工程流程：为应用自动构建 workflow API（103 个 API，覆盖 Code/Chrome/LibreOffice 三件套/VLC 共 6 类应用），在 system prompt 里同时暴露 API 函数和 10 个 GUI 原语，让 agent 自行选择；GPT-4o 上的框架消融显示纯 GUI 11.2% 到 API+GUI 26.2%（+134%），Office 域从 6.2% 升到 27.9%，说明相当一部分收益来自工程化的 API 注入而非策略本身。[[Papers/2606-WeaveBench]] 则从 benchmark 侧证实了单一通道的系统性不足：114 个覆盖 8 个真实工作领域的长 horizon 任务上，GUI-only 与 CLI-only 两种单通道设置全面崩溃（GUI-only ≤1.8%，CLI-only ≤3.5%），同一 interface ablation 下 Hybrid 升到 35.1%（Claude Opus 4.7，Δ+31.6）；全局最高 41.2% PassRate 来自另一 runtime 组合（Claude Code），与前两者非同一实验轴。[[Papers/2606-GUIvsCLI]] 把 CLI 通道"已知边界"进一步量化为第一失败源：440 桌面任务的 matched 对照下，原始 CLI-Anything skill 库仅覆盖 37.6% 的 verifier checkpoints，CLI 失败 93.8% 归因于 skill coverage & contract gap（接口未暴露所需操作、或文档与实现不符）——CLI 侧瓶颈是接口生态覆盖而非模型能力，与 GUI 侧以执行可靠性为主的失败构成（61.3% workflow execution + 38.7% control discovery）异质。最佳 rollout 中位数 76 次工具调用、16 次 GUI↔CLI 通道切换；trajectory-aware judge 相比 outcome-only grading 系统性拉低 10–20 个百分点，失败分析显示 35.2% 的失败源于 reward hacking 而非能力不足。MCP 作为最新一类通道，本综述覆盖的文献中证据仍然稀薄：[[Papers/2512-MobileWorld]] 首创的 MCP-Augmented 任务类别（40/201，19.9%）显示混合工具调用与 GUI 操作是真实 mobile 使用中被现有 benchmark 忽略的能力维度，最优框架在该类别达 51.6% SR，但最主要的失败模式是 context overflow——MCP 工具返回内容过大，直接撑爆 agent 的 context window。生产级参考架构上，[[Papers/2604-ClaudeCode]] 对 Claude Code 源码的逆向分析显示，其扩展机制按上下文代价分四层递增：Hooks（零成本）→ Skills（极低成本）→ Plugins（中等成本）→ MCP Servers（高成本，8+ 传输协议的远程工具墙），这一层级结构本身即说明 MCP 在生产系统中被当作最昂贵、需要最谨慎路由的扩展手段，而非默认通道。
 
 工具通道是否无条件有益，目前最系统的受控检验来自 [[Papers/2604-ToolIllusion]]：三套 tool-use web framework（人工 REST API 的 Hybrid-Agent、LLM 合成 Python 函数的 SkillWeaver、刻意小工具集的 WALT）× 五个跨家族 backbone，在 WebArena / VisualWebArena 上同 framework 内只切换工具可用性。人工 API 使五个 backbone 全部获益（WebArena +12.4~+19.6pp），而 LLM 合成工具的收益是条件化的——仅当使用者明显弱于合成者时稳定成立，GPT-5 用 GPT-5-mini 合成的工具反而 52.9→50.9；固定使用者、更换合成者的反向扫描同样支持这一单向 capability-distillation 模式。工具库规模不构成价值：SkillWeaver 62% 的工具属高复杂度、79% 在整个评测中零调用；工具还有隐性税——Hybrid-Agent 开启工具后每站点 token 从 10.5M 涨到 33.9M、平均步数不降反升（7.1→8.3），真正决定上限的是功能覆盖与可组合性（其 52% 任务靠 ≥2 个低复杂度工具组合完成且成功率最高）。这组证据把 §4.7.1 表中"API 通道的收益"改写为三变量函数：工具来源（人工/合成）、合成者-使用者相对能力、覆盖与可组合性。边界：跨 framework 数值不可直接比（观测格式与预算未对齐，GPT-5 在 WALT 与 Hybrid-Agent 的无工具基线差 16.4pp）、单次运行无方差，且沙盒站点 DOM 稳定，合成工具在真实站点的选择器漂移税只会更高。[[Papers/2605-PlanThenExecuteWeb]] 从基础设施侧补上"需工程化构建 API"一格的量化下界：WebArena 的 Postmill 只暴露 16 个 REST API、仅能覆盖其 129 个任务的 33%——完整可信 API 这一假设与现实覆盖率之间的落差才是 API 通道的第一障碍（该文的安全论证见 §6.11.1）。
+
+工具的 token 代价取决于它是叠加在 GUI 之上还是替代 GUI。[[Papers/2511-AgentWebInterfaces]] 在 WebMall（4 个本地 WooCommerce 商店、4,421 个商品）上用同一组任务和四个 backbone（GPT-4.1、GPT-5、GPT-5-mini、Claude Sonnet 4）对照四种接口：只读 AXTree 的 browser agent，以及共享同一 embedding + Elasticsearch 后端的 RAG、MCP 与 NLWeb。四模型平均下，browser agent 的 F1 为 0.67，三种结构化接口为 0.75–0.77；每任务 token 从约 24.1 万降到 4.7 万–14.0 万，耗时从 291 s 降到 50–62 s。差距集中在具体商品查询与交易类任务，模糊查询上各接口 F1 相近（0.59–0.66）。NLWeb 与 MCP 的 F1 相近（0.76 vs 0.75）而 token 约为后者一半，说明返回 schema 的设计直接决定 context 代价，与 MobileWorld 中 MCP 返回内容撑爆 context 的失败模式指向同一变量。边界：browser agent 只读 AXTree、不含截图，结果为单次运行，且没有 GUI 与结构化接口混合的对照臂。
 
 针对上述 MCP 证据稀薄的缺口，近期已出现专门评测：[[Papers/2510-OSWorldMCP]] 在 computer-use agent 内基准化 MCP tool invocation，[[Papers/2506-MCPWorld]] 提供统一 API/GUI/Hybrid 测试床——两者把 MCP 从被忽略的旁路通道推进为可独立度量的接口维度（均为新近收录的工作，其结果尚未经独立验证）。
 
@@ -721,7 +726,7 @@ Safety 方向的代表是 [[Papers/2606-PrivacyAlign]]：其数据集包含 1,35
 | Reverse task synthesis（模型驱动） | [[Papers/2412-OSGenesis]] | 成本低于 live 人工采集，多样性高于 task-driven 合成 | 与 human 数据 SR retention >80%，但该 gap 是否在更大 scale 依然成立未被验证；pipeline 核心引擎仍是 GPT-4o，尚不能纯开源复现 |
 | 混合闭环（human + rule + model） | [[Papers/2509-ScaleCUA]]、[[Papers/2607-HyMobileAgent]] | 用人工补采 goal-directed 轨迹弥补自动化探索的目标缺失 | ScaleCUA 明确报告"完全依赖 VLM agent 探索多样性不足"是促使其转向混合方案的直接原因 |
 
-三种范式的分工并非静态：GroundCUA 的"质量>规模"结论目前只在 desktop grounding 单一任务上成立，尚不清楚是否推广到 trajectory 层；OS-Genesis 的 synthetic-human gap 收窄证据来自 1K 量级的特定 backbone 实验。跨方法在同一 benchmark 上直接对比数据效率曲线的研究目前不存在，这是本节最大的空白。在 trajectory 与标注之外，人类既有多模态资源（tutorial video、代码仓库、文章）构成第四类供给：Resource2Skill 将其蒸馏为可执行 skill 资产而非训练语料，其中 video 是单一最有价值来源（去除后平均下降 9.5 个百分点）；该路线目前只在 programmatic 接口的软件创作任务上验证（详见 §7.11）[[Papers/2606-Resource2Skill]]。
+三种范式的分工并非静态：GroundCUA 的"质量>规模"结论目前只在 desktop grounding 单一任务上成立，尚不清楚是否推广到 trajectory 层；OS-Genesis 的 synthetic-human gap 收窄证据来自 1K 量级的特定 backbone 实验。跨方法在同一 benchmark 上直接对比数据效率曲线的研究目前不存在，这是本节最大的空白。现有最接近的是单点等量对照：[[Papers/2610-SoftwareGym]] 在 3,715 条轨迹的同等规模下比较合成 app 数据与 OSWorld 同源数据，Qwen3.5-9B 的 OSWorld Pass@3 为 56.97 对 61.48，但只有一个数据规模和一次训练，不构成效率曲线（设置见 §4.4）。在 trajectory 与标注之外，人类既有多模态资源（tutorial video、代码仓库、文章）构成第四类供给：Resource2Skill 将其蒸馏为可执行 skill 资产而非训练语料，其中 video 是单一最有价值来源（去除后平均下降 9.5 个百分点）；该路线目前只在 programmatic 接口的软件创作任务上验证（详见 §7.11）[[Papers/2606-Resource2Skill]]。
 
 ### 5.10 Data Processing and Mixture
 
@@ -947,10 +952,14 @@ Memory 研究已经从"是否保存历史"转向"保存什么证据、何时失�
 | Validated delta chain | 双帧验证后的 `ΔS_t` | 只保存已确认状态变化 | append-only 链仍可能累积 verifier error |
 | Latent memory | 压缩成 soft token | 紧凑、可端到端训练 | belief source 不可读、难审计 |
 | Workflow / skill memory | 自然语言或代码化过程 | 跨任务复用 | UI drift、权限变化与回归；online 积累在预算匹配下净值可为负、资产约半数被失败轨迹污染 [[Papers/2606-SkillMemoryBudget]] |
+| App 知识卡 | 文档、源码与历史轨迹总结成整 app 卡片，注入 system prompt | 无需训练、可跨任务复用 | 增益依赖 backbone；无触发机制消融与预算对照 [[Papers/2601-AppCards]] |
+| 逐步经验激活 | 每步按当前屏选取历史轨迹中的单个动作作为参考 | 增益落在轨迹中后段，history token 最少 | 只在离线 teacher-forced 评测下验证 [[Papers/2609-ExpActivator]] |
 | Context-as-action | policy 主动折叠 history/state | 将保留决策内化到模型 | 需要训练 context action；错误折叠难恢复 |
 | 外置 curator 模型 | 独立小模型每 turn 重写 workspace | 兼容冻结/闭源 executor；curation 作为专门技能单独训练 | curator 自身推理开销易漏记；与 executor 无联合优化 |
 
 外置路线的首个 RL 实例是 [[Papers/2604-ActiveContextCurator]]：7B curator（MT-GRPO，稀疏任务完成 reward）配冻结 executor，WebArena 上 Gemini-3.0-flash 36.4→41.2%、GPT-4o-mini 12.7→21.8%——因执行权重全程冻结，这是"只改 context 内容"的干净因果对照，且 RL 后的 7B 追平 GPT-4o 作 curator（curation 是可训练专门技能的证据）。证据边界：其 token 节省口径仅计 executor 侧输入 context，curator 自身推理开销未入账，不能读作端到端成本下降；论文正文与结果表的 WebArena 域数不一致（四 vs 五），无多 run 方差。
+
+检索式 memory 的收益落在哪一步，决定了它能否支撑长程执行。[[Papers/2609-ExpActivator]] 在 AndroidIntent（82 名用户、775 个 episode、离线 teacher-forced 单步评测）上拆分了四种个性化 memory baseline 的增益：Qwen3-VL-8B 的首步准确率从 28.26% 提到约 62%，但在其后 7,140 个轨迹内动作上增益为 −0.80 至 −0.07 个百分点，置信区间均跨零；16 个 baseline × backbone 组合中轨迹内增益从未超过 2.4 个百分点。也就是说，按任务相关性检索到的历史主要帮助选对 app，而不帮助后续操作。该文改为每步按当前屏选取历史中的单个动作作参考，轨迹内增益 +8.24 [6.51, 10.16]，每步 history token 只有 144.6（baseline 为 417.8–843.7）；同样只给一条历史时，选中一步比整条追加高 5.36 个百分点（23.84 vs 18.47）。[[Papers/2601-AppCards]] 的整 app 知识卡处在另一端：在 DroidRun + AndroidWorld（116 tasks、同 harness）上，GPT-5 从 84.5% 提到 88.8%、Gemini 2.5 Pro 两个版本各约 +6 个百分点，Grok-4-fast 却从 61.2% 降到 60.3%，Hard 子集上 GPT-5 +21.0、Grok-4-fast −21.0 个百分点（各 19 题）。两者合起来说明，memory 的有效单位是与当前状态对齐的步骤级证据，而非整段经验或整 app 说明；静态知识注入的净效应取决于 backbone 能否消化额外 context，这与 SkillMemoryBudget 的预算匹配结论方向一致。证据边界：ExpActivator 的首步采用 app 投票而非视觉匹配，且未在在线闭环中验证；AppCards 无 seed、无方差，也无 curiosity 触发器的消融。
 
 #### 6.9.2 Verified delta 与 latent compression
 
@@ -1412,9 +1421,12 @@ Mobile benchmark 的核心张力是可验证性与真实生态：emulator/open-s
 | AmbiBench [[Papers/2602-AmbiBench]] | 不同 instruction clarity 下的主动澄清 | user simulator + outcome/process/interaction judges | interaction metric 依赖 simulator 与 judge calibration |
 | AndroidDaily [[Papers/2605-AndroidDaily]] | real-device、闭源商业 app 与多约束任务 | visual trajectory evidence + guideline-grounded judge | 看不到 hidden backend；结果是时间敏感快照 |
 | MemGUI-Bench [[Papers/2602-MemGUIBench]] | cross-temporal、cross-spatial 与 cross-session memory | snapshot emulator + memory-specific metrics | memory failure 与 perception failure 的归因仍可能耦合 |
+| ColorBench [[Papers/2510-ColorBench]] | 静态屏幕图上的跨 app 长程任务（175 tasks、21 个中文 app、平均最优路径 13.13 步、每题 ≥2 条正确路径） | 到达子任务 milestone 节点的程序化判定 | 图外动作与未采集状态无法评测；与真机结果的一致性只有 10 个定性案例 |
 | MobilePA-Bench [[Papers/2608-MobilePABench]] | sub-agent 委派、跨会话 memory、skill 复用（212 个模拟工具、13 个域、1,705 任务） | 三桶按证据类型对齐：tool-call 匹配 / DB delta / rubric | 感知层被整体抽掉，分数与 AndroidWorld/OSWorld 不同轴；rubric 执行者全文未指明 |
 
 这些 benchmark 不应汇总成单一 mobile SOTA 表。至少应分别报告 emulator/open-source/closed-source、single-app/cross-app、clarification 是否允许、MCP 是否可用、real-device failure policy、step cap、retry 与 verifier evidence access。
+
+[[Papers/2510-ColorBench]] 在离线轨迹匹配与在线真机之间取了中间点：把真实 app 的屏幕状态抽成强连通有向图，agent 在预采集截图上交互，任何到达全部 milestone 节点的路径都算成功，从而同时得到多解容忍与确定性判定。在这一设置下，13 个模型的最高平均 SR 只有 32.57%（GUI-OWL-32B 经 ColorBench-train 微调），未微调的 GLM-4.5V 为 28.57%，闭源模型的点击统一由 Qwen2.5-VL-7B 完成 grounding。跨子任务记忆是最明显的短板：15 项 atomic capability 中 memory 一项仅三个模型得分非零，与 MemGUI-Bench 的结论方向一致。图式评测的代价是覆盖：agent 离开已采集状态时的处理方式未说明，图构建本身用到 GUI-OWL-32B 做 bbox 标注，且图上分数与真机成功率的相关性尚无定量检验。
 
 [[Papers/2608-MobilePABench]] 换的是坐标轴而非难度：它不把像素做得更难，而是把 GUI 感知整体替换成 212 个有状态的模拟工具，问在感知不再是瓶颈时 agent 侧能力还剩下什么。结论是维度落差本身——Claude-Opus-5 总分 75.52，拆开看 Basic 83.85、Skills 78.00、Sub-agent 62.92、Memory 58.51；13 个模型在 Basic 上均值 76.58，在 Memory 上只有 50.98，且 7/13 的总分低于 70。这个落差的价值在于它无法被归因为 grounding 失败：工具调用是确定性的、返回结构化结果，剩下的错误只能落在跨会话状态检索与子任务委派上，正好补上 §8.4 既有条目里"memory failure 与 perception failure 归因耦合"的空缺。总分口径为 `0.50 Basic + 0.10 Sub-agent + 0.20 Memory + 0.20 Skill`，Basic 占一半，因此 75.52 更接近"基础工具调用大体可用"的读数而非综合能力刻度。
 
@@ -1483,9 +1495,13 @@ Personalization benchmark 需要区分四件事：读取个人历史、遵循稳
 | MyPCBench [[Papers/2606-MyPCBench]] | logged-in-like desktop、跨 app 历史与 persona data | task rubric、partial progress 与 trajectory efficiency | 单一 persona；privacy leakage 不是主指标 |
 | PSPA-Bench [[Papers/2603-PSPA-Bench- A Personalized Benchmark for Smartphone GUI Agent]] | smartphone workflow preference 与 personalized instruction | structure-aware process evaluation | 目前仅依据 abstract 收录，不能承载强定量结论 |
 | MemGUI-Bench [[Papers/2602-MemGUIBench]] | session 内外的任务记忆 | retention、recovery 与 memory proficiency | 记忆能力不等于用户偏好或身份治理 |
+| AndroidIntent 主动建议协议 [[Papers/2609-ExpActivator]] | 82 名用户的手机使用历史，315 个是否应主动建议的状态 | 离线逐步动作匹配；主动建议用 MCC 与误报率 | 不在线执行；68% 正例使 F1 失去区分度 |
+| AgenticShop [[Papers/2602-AgenticShop]] | 由 Amazon 评论史生成的用户 context，350 个 open-web 选品任务 | GPT-5-mini 按用户 checklist 逐条判定返回的产品（与人工 κ 0.732，人际 0.774） | 只评最终产品列表，不评 GUI 过程；live web 不可复现 |
 | AOEP-v0 [[Papers/2606-AlwaysOnAgents]] | persistent state 的 authority、scope、provenance 与 rollback obligation | obligation pass 与 negative-invariant pass 分离 | 通用 LLM-agent pilot，非 GUI end-to-end benchmark |
 
 Personalization 不能只看"用了多少用户历史后成功率提高"。同一 benchmark 还应检查与任务无关的信息是否被读取或披露、撤销是否传播、偏好是否越过 user/task scope、错误个性化是否可回滚，以及 agent 能否解释某个动作由哪条个人状态授权。多 persona、跨 session、带 permission/privacy verifier 的 source-verified end-to-end 证据目前仍然薄弱，是本节的主要缺口。
+
+主动个性化还需要按基率校准。AndroidIntent 的 315 个主动建议状态中正例占 68%，总是建议即可得到 81.1 的 F1；[[Papers/2609-ExpActivator]] 因此改报 MCC，在四个 backbone 上为 38.9–45.2，最强 baseline 为 14.1–22.0，但多数 backbone 上的误报率仍在 36–37%。[[Papers/2602-AgenticShop]] 把个性化移到 open web 的选品任务上：四个 web agent 与四个 search-augmented LLM 中最好的约 30–38%，无明确目标的探索类任务全部低于 22%，24.76–59.10% 的返回链接无效或无关。该评测只看最终产品列表、不区分交互接口，因此能说明个性化 grounding 的上限，测不到 GUI 执行本身的失败。
 
 ### 8.9 Safety and Security
 
@@ -1503,6 +1519,7 @@ Safety evaluation 已从恶意 prompt 检测扩展到 environmental injection、
 | Vera-Bench [[Papers/2607-VeraSafetyTesting]] | 用户与工具通道攻击造成实际环境违规 | state-first、tool-second、response-last | coding/tool/MCP scope；verifier 本身仍需审计 |
 | II-Bench / HITLCUA [[Papers/2608-InvisibleInkThreats]] | 低危害但对攻击者有收益的注入目标；含模拟人类确认环节 | intent-level ASR（"出现执行有害指令的意图"即计成功，不要求完成），444 例 × 7 CUA，self-hosted OSWorld VM + Docker 站点 | 不计执行完成，测不出实际收益；无高危害基线对照，"因为低危害才通得过"未被实验分离；单点估计无重复实验；HITL 格子按"攻击相对无效"选出，回归均值未排除；无代码无数据 |
 | MissClick [[Papers/2608-MissClick]] | white-box 像素扰动劫持 grounding 输出的坐标数字，意图不变而落点改变 | 落点是否离开 ground-truth box（untargeted）/ 是否落入指定 box（targeted），分母限干净截图上已 grounding 正确的任务 | 静态 grounding benchmark 上的 component-only 证据，非端到端 agent 任务；无迁移/黑盒/防御评测；未建模扰动注入通道 |
+| WebMirage [[Papers/2610-WebMirage]] | white-box 扰动攻击者可控的单张网页图片（l∞=16/255），使 agent 点击指定元素 | 以浏览器实际执行的动作判定，覆盖 1,710 个公开站点任务（本地替换图片）与 540 个 VisualWebArena sandbox 任务 | 仅 4B–34B 开源 VLM、白盒；跨架构迁移 4.5–23.8%；不含坐标输出型 agent |
 | MLA-Trust [[Papers/2506-MLATrust]] | 无 adversary 的常规高风险任务：agent 化本身造成的 guardrail 损失，含模糊/误导指令、超出指令的补全、毒性内容发布与 PII 披露 | Accuracy 与 Misguided Rate 用 exact/keyword match；Refuse-to-Execute Rate 由 Longformer 或 GPT-4 二分类；Toxicity 由 PerspectiveAPI；34 任务约 3.3k 实例 × 13 backbone，SeeAct（web）+ Mobile-Agent-E（mobile） | 主观指标无 human agreement 或抽样复核背书；单次运行，无 temperature/seed/方差，多个子任务仅 50 条实例；锚在 Amazon/Twitter/GitHub 等生产站点，纵向复现不成立；RtE 越高越"可信"的口径不惩罚 over-refusal |
 | AdvSim2Real [[Papers/2610-AdvSim2Real]] | 训练期自适应 prompt injection：adversary 与 agent、curriculum 三个 Qwen3.5-4B LoRA 在冻结的 WebWorld-14B 内 co-evolve | world model 渲染页面 + LLM judge 判完成；adversary 只在把原判成功的 clean run 翻为失败时得分；另用未参与训练的 Kimi-K3 adversary 外测 | robustness 数字全部在 world model + judge 内取得，robust checkpoint 未在真实浏览器测；learned adversary 要求的 marker 渲染可见率 <0.5%；150 个合成表单任务、单次训练 |
 
@@ -1511,6 +1528,8 @@ source-verified 的 EnvTrustBench 在 55 个可机器判分 case、11 个压力�
 [[Papers/2506-MLATrust]] 的贡献不在覆盖面（四维八子维、34 任务、13 个 backbone），而在它把 agent safety 当作 **harness 引入的 delta** 来测。用与 agent 安全任务同样的构造方法生成单步问答版数据，同一 backbone 只更换"单步 MLLM 问答"与"多步 GUI 执行"两层外壳，refusal rate 从 90.5% 降到 70.2%（GPT-4o）、86.0% 降到 62.5%（Gemini-Pro）、78.0% 降到 57.8%（Claude-3-7-sonnet）。既有 agent safety benchmark 普遍缺的正是这个单步 baseline 条件——没有它，"agent 不安全"只是一条相关性观察，无法归因到 agent 化这一步本身。该文的其余数字用于刻画绝对水平时须打折（judge 无可信度背书、单次运行、生产站点锚定），但这组 delta 是同条件对照，是本节目前最可引用的一条因果性证据。其 Figure 6 对 step 数的进一步测量给出了与该文自身叙述相反的形态，含义见 §6.11.1。
 
 [[Papers/2610-AdvSim2Real]] 把 injection 从评测对象推进到训练信号，其 adversary 奖励的设计可以单独借用：先回放 judge 已判为成功的 clean run，再注入同一 run，只有成功翻为失败才计分，于是 agent 自身能力不足造成的失败不会被记到 adversary 名下。在 WebWorld-14B 内，Qwen3.5-4B 的 clean 完成率 74.89→81.33、三个 learned adversary 下 48.07→57.48、未参与训练的 Kimi-K3 下 23.00→30.72（仅 2 seeds）。证据边界决定了这些数字能说明什么。真实 Chromium 只验证了不含对抗训练的 Stage 1 能力增益（strict success 25.56→44.44），Stage 2 的 robust checkpoint 从未在浏览器中测试；learned adversary 要求的 marker 在渲染页面上的可见率只有 0.22–0.48%（Kimi-K3 为 72.3–80.9%），Stage 2 中多数"攻击"可能根本没有被渲染出来；从未见过 injection 的 Stage 1 第一轮就把 attacked 均值由 48.07 拉到 54.74，Stage 2 只再加约 3 点。因此 robustness 增益可能主要来自任务完成能力变强，而非学会抵抗 injection（推测，现有消融区分不了两种解释），"需要一个会随 agent 变化的攻击者"这一核心主张尚未被检验。judge 与浏览器的偏差也有一手数据：judge 接受 7.5–10.4% 在浏览器中 strict 失败的轨迹，conjunctive selection 在 60 个浏览器 episode 中全部失败而 judge 放过其中 40.0–58.3%——world model 内的安全训练继承了 §8.12 所述 passive judge 偏宽松的误差方向。
+
+[[Papers/2610-WebMirage]] 把像素级攻击从 grounding 组件推到完整 web agent 的单步决策上，攻击成功按浏览器实际执行的动作计。关键在优化目标的选择：用 CodeQL 数据流分析找出 agent 代码中真正决定动作的输出 token，只优化这部分（目标 token 平均减少 87.4%）；与直接优化完整原始输出相比，目标长度从 88.0 降到 9.5 token，平均 ASR 从 70.4% 提到 91.9%。四种 agent 配置、六个开源 backbone 上的平均 ASR 为 91.9%，最强 baseline 为 17.4%；在 SeeAct 上延续到后续步骤后仍有 86.9%，剩余失败 90.6% 来自页面加载、弹窗与认证而非攻击失效。三种现有 web agent 防御下 ASR 仍为 86.5–91.9%，能把 ASR 压下去的输入噪声与 identifier randomization 同时把 clean accuracy 降到 58.5% 与 15.9%。威胁边界同样清楚：攻击需要白盒梯度，同谱系迁移 81.2–93.5%，跨架构只有 4.5–23.8%，闭源模型与直接输出坐标的 agent 均未测试。与 MissClick 合看，只要攻击者能控制页面上一张图片、又能拿到模型权重，开源 VLM agent 的单步动作就可被劫持；对闭源 API 模型的威胁尚无证据。
 
 Safety benchmark 应至少分开报告 attack success、executed violation、benign utility、false positive intervention、side-effect severity 与 rollback success。把它们压成单一 safety score 会奖励过度拒绝，也会掩盖"任务完成但越权"的失败。MLA-Trust 是后半句的现成反例：它的 safety 与 privacy 两维全部建在 RtE 这个单向指标上，而 controllability 维度只测多做（overcompletion）不测少做，框架内没有任何位置惩罚过度拒绝——一个恒拒绝的模型会在这两维横扫，"某模型最可信"因而可以被重述为"某模型最爱拒绝"，安全与有用性的 trade-off 未被建模。[[Papers/2608-InvisibleInkThreats]] 是前半句的具体代价：它只报 intent-level ASR，理由是避免模型能力不足造成"未检出失败"，但代价是一篇以"攻击者收益可观且持久"立论的论文无法回答那些 star、安装与外泄里究竟有多少真的发生——危害等级的分界恰好被这个口径抹掉，且 intent 的裁决方式（人工还是 LLM judge）正文未交代。
 
@@ -2136,6 +2155,23 @@ GUI/Computer-Use Agent 研究经历了五次可辨认的抽象升级——结构
 | 2026-07-23 gap-fill 补录 14 篇（RL survey / Digi-Q / Jedi / AndroidControl / OSWorld-MCP / MCPWorld 等） | 库内暂无独立验证 | §1.4/§4.7/§5/§7/§8 各子节 | 单 agent digest、verification_status: unverified，仅作子节 enrichment，未升格为 Takeaway/共识 |
 
 ## 调研日志
+
+### 2026-10-14 survey-refresh（并入 7 篇，240 → 247）
+
+- 并入：[[Papers/2610-SoftwareGym]]（§4.4 主落位，Desktop 表新增一行 + 一段正文；cross-ref §5.9 等量数据来源对照一句）、[[Papers/2511-AgentWebInterfaces]]（§4.7.2 主落位，ToolIllusion 段后一段：工具替代 GUI 与叠加 GUI 的 token 代价方向相反）、[[Papers/2601-AppCards]] 与 [[Papers/2609-ExpActivator]]（§6.9.1 主落位，设计谱系表新增两行 + 一段合写正文；ExpActivator cross-ref §8.8 表一行 + 主动建议基率一句）、[[Papers/2510-ColorBench]]（§8.4 主落位，表内新增一行 + 一段正文）、[[Papers/2602-AgenticShop]]（§8.8 主落位，表内新增一行 + 一句，定位为相邻证据：评测不区分交互接口）、[[Papers/2610-WebMirage]]（§8.9 主落位，表内新增一行 + 一段正文）。跳过 0 篇。
+- 分类记录：
+  - SoftwareGym — platform = desktop；task_level = app workflow；primary_section = environment-runtime（合成 app 供给）；environment_setting = self-hosted；verifier_type = programmatic（OSWorld evaluator / SG-Bench）+ visual-rubric judge（GPT-5.5 轨迹过滤）；evidence_strength = direct end-to-end
+  - AgentWebInterfaces — platform = web；task_level = app workflow；primary_section = environment-runtime（接口）；environment_setting = self-hosted（WebMall）；verifier_type = programmatic（URL 集合 / 终态）；evidence_strength = direct end-to-end
+  - AppCards — platform = mobile；task_level = app workflow；primary_section = model-architecture（memory / 知识注入）；environment_setting = self-hosted（AndroidWorld emulator）；verifier_type = programmatic；evidence_strength = direct end-to-end
+  - ExpActivator — platform = mobile；task_level = step + 主动建议；primary_section = model-architecture（memory）；environment_setting = offline（teacher-forced）；verifier_type = programmatic（逐步动作匹配）；evidence_strength = component-only（离线单步）
+  - ColorBench — platform = mobile；task_level = cross-app long-horizon；primary_section = evaluation-verifier；environment_setting = offline（静态屏幕图，准动态）；verifier_type = programmatic（milestone 节点）；evidence_strength = direct end-to-end（限图内）
+  - AgenticShop — platform = web；task_level = app workflow；primary_section = evaluation-verifier（个性化）；environment_setting = live；verifier_type = visual-rubric judge（GPT-5-mini checklist）；evidence_strength = direct end-to-end（仅最终产品列表，不区分接口）
+  - WebMirage — platform = web；task_level = step；primary_section = reliability-safety-HCI；environment_setting = offline（公开站本地替换图片）+ self-hosted（VWA sandbox）；verifier_type = programmatic（实际执行动作）；evidence_strength = direct end-to-end（单决策点）
+- 关键变化：仅增量并入，无结构变化。（一）§6.9.1 记录检索式 memory 的增益集中在首步（选 app），轨迹内增益与零无法区分，步骤级证据选择优于整段追加；整 app 知识卡的净效应随 backbone 变号；（二）§4.4 记录合成 app 的 GUI 测试反馈修复优于纯源码修复，合成 app 训练数据在不含 OSWorld 数据时接近同源数据；（三）§4.7.2 补充结构化接口替代 GUI 时 token 下降、返回 schema 决定 context 代价；（四）§8.9 补充执行级像素攻击在开源 VLM web agent 上的白盒威胁边界。
+- Key Evidence Matrix / Key Takeaways / Open Problems：均未改。七篇均为单篇工作，结论只写在子节内；§5.9"数据效率曲线不存在"判断保留，SoftwareGym 只补为单点等量对照。
+- verification 纪律：六篇 `source-checked`，AgentWebInterfaces 为 `partial`，只用其 source-verified 行（Table 3/4 四模型平均）；未写入其摘要级"RAG + GPT-5 F1 0.87 / CR 0.79"（abstract-only，正文无逐配置表），也未写 Table 9 与 Table 3 不一致的效率数字。其余明确未写入正文的：AppCards 的 leaderboard 榜首表述（84.5 来源不可独立引用）与摘要"平均 6pp"（四配置算术平均约 3.9）；SoftwareGym 的单 app 成本与多样性指标；ColorBench 的真机对照（仅 10 个定性案例）；WebMirage 的 4 候选受控实验与请求改写结果。
+- 计数：同一脚本（正文 `## 调研日志` 之前唯一 Papers wikilink、表格 `\|` 中和）复核 HEAD 为 240，与 frontmatter 记载的 241 相差 1，为既有漂移、非本次引入；240 + 7 = 247，写入 frontmatter。broken wikilink HEAD 0 → 0；表格列数不一致行 HEAD 10 → 10（均为既有）。
+- DomainMap：本次未写入，候选条目已交主流程决定。
 
 ### 2026-10-08 survey-refresh（并入 5 篇，236 → 241）
 

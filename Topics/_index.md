@@ -30,7 +30,7 @@ last_updated: "2026-08-20"
 | Survey | 范围 | Domain Map |
 |:--|:--|:--|
 | [[Topics/WebAgent-Survey]] | Deep Research / information seeking；不含 GUI navigation | [[DomainMaps/AgenticRL]] |
-| [[Topics/SelfEvolvingAgents-Survey]] | 通用 self-evolution：model / memory / skill / workflow | [[DomainMaps/AgenticRL]] |
+| [[Topics/SelfEvolvingAgents-Survey]] | 通用 self-evolution：model / memory / skill / workflow；含 2026 综述格局表与 L0–L4 / loop-closure 对齐、RSI 三口径界定 | [[DomainMaps/AgenticRL]] |
 | [[Topics/StepCreditAssignment-Survey]] | 从 trajectory-level reward 反推 step-level 监督：选步 / PRM / 隐式 credit / advantage 塑形 | [[DomainMaps/AgenticRL]] |
 
 通用 Agentic RL 的算法证据保留在 `Papers/`；只有形成独立于 GUI application 的稳定问题结构后，才重新建立跨域 survey。StepCreditAssignment 是目前唯一满足该条件的跨域切面——同一套问题（trajectory-level 0/1 信号如何分解到步）在数学推理、文本 agent 与 GUI 上共享方法族与失效模式。它是算法横切面，不改变 GUI 论文的落位：带直接 GUI 交互证据的论文仍以 [[Topics/CUA-Survey]] 为 primary section，只在步级监督机制上 cross-link 到这里。

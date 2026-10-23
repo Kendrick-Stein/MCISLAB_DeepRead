@@ -1,7 +1,7 @@
 ---
 title: "Self-Evolving and Self-Improving Agents: A Unified Survey of Evolution Targets, Feedback, Gating, and Safety"
 tags: [survey, self-evolving-agents, self-improvement, recursive-self-improvement, agentic-RL, LLM, misevolution]
-date_updated: "2026-09-18"
+date_updated: "2026-10-23"
 year_range: 2022-2026
 papers_analyzed: 76
 keywords: [self-evolving, self-evolution, self-improving, self-improvement, recursive self-improvement, self-recursive improvement, misevolution, lifelong agent, skill evolution, memory evolution, operation-level memory, experience-driven, co-evolution, environment evolution, multi-agent evolution, skill optimization, skill library, self-training, memory poisoning, evolution gate, verifier gating, harness evolution, streaming evaluation, evolution gain]
@@ -24,9 +24,26 @@ Self-improvement 与 self-evolving 是同一研究纲领在两个系统层次上
 - **Self-evolving agents（2025– ，system-centric）**：演化对象从模型参数扩展到 agent 系统的四组件——model / memory(context) / tool / workflow(architecture)。[[Papers/2507-SelfEvolvingAgentsSurvey]] 给出操作性定义（experience-dependent 更新 + persistent policy-changing 效果 + 自主探索），并与 lifelong learning、model editing、LLM self-improvement 显式切分；[[Papers/2508-SelfEvolvingAIAgentsSurvey]] 用统一优化框架（System Inputs / Agent System / Environment / Optimiser 闭环）+ Three Laws（Endure 安全 > Excel 保性能 > Evolve 自主演化）组织同一领域。
 - **Misevolution（2025-09– ，safety-centric）**：[[Papers/2509-Misevolution]] 命名并实证"演化过程自身偏航"的风险，标志领域从"能不能演化"进入"演化会不会坏"的阶段。
 
+2026 年下半年，通用综述层面出现一次换轴。三篇 anchor 都按"演化什么"（模型 / 记忆 / 工具 / 工作流）一维组织；2026 年 6–9 月的四篇通用综述把组织轴改成"改得多深"，其中 Diving into Reliable Self-Evolving Agents 与 arXiv 2607.07663 再加一问"证据是否在更新回路之外"；可读到全文的三篇彼此独立地把 RSI 从口号界定为一个结构位置——改到了"改进流程"或"评判标准"本身。下表登记这批综述的组织轴与对 RSI 的界定；它们与本文四轴框架的逐轴对齐见 §3.7，对本文结论的影响集中在 §7.6 与 §11。
+
+| 综述 | 组织轴 | 层级 / 深度概念 | 对 RSI 的界定 | 规模与版本 | 本文读取深度 |
+|:--|:--|:--|:--|:--|:--|
+| Diving into Reliable Self-Evolving Agents（Tencent Hunyuan / ZJU / PKU / THU；OpenReview 2026-08，preprints.org 202609.0913，无 arXiv 号） | 自演化深度（改到哪一层）× 可靠性（证据是否在 update boundary 之外） | L0 输出级 / L1 模型级 / L2 scaffold 级 / L3 improver 级 / L4 criterion 级；L0 任务内，L1–L4 须满足 retention condition | RSI = 最深活跃改动达到 L3 或 L4 的保留型转移；作者声明这是结构约定，"neither establishes improvement nor implies accelerating gains" | 参考文献 549 条 | 全文（PDF 转文本） |
+| Recursive Self-Improvement in AI: From Bounded Self-Refinement to Autonomous Research Loops（arXiv 2607.07663，v2 2026-09） | what improves（部署期自演化 / 训练期自迭代 / 自评估 / 自动科研）× loop closure（human-in / human-on / closed） | 无层级；以 bounded self-refinement（固定外部评估器、收敛、可评估）对 open-ended RSI（改评判标准与改进机器本身、无固定锚）二分 | open-ended RSI 位于 closed loop × self-evaluation 这一格；"almost everything surveyed in §§3–6 is human-on-the-loop" | 1,250 篇 2024–2026 年 arXiv 论文，74% 发布于 2026 | 全文（HTML） |
+| Self-Improvements in Modern Agentic Systems: A Survey（arXiv 2607.13104，2026-07） | 更新基底：indirect（改基础模型 θ）vs direct（改 scaffold Σ）；θ 侧按信号来源分（generative demonstrations / evaluative feedback / exploratory experience），Σ 侧按组件分（prompt / memory / tool governance / full scaffold） | 无层级；形式化 𝒜=(θ, Σ)，更新算子 𝒰 | 以 Gödel Machine 谱系为历史根；"once such a skill is in turn improved, we recover the self-referential loop"；§6.4 把 full scaffolding improvement 定为最接近 RSI 的类别，称 open-ended RSI 仍是 grand challenge、现有系统只实现为 bounded、verifiable loops；§9.2 outlook 未列 RSI | 伴随站点 312 条（scaffolding 176、evaluation 59） | 全文（HTML） |
+| Self-Improving Agents in the Era of Experience: A Survey of Self- to Meta-Evolution（Jiang et al.，OpenReview IUltZSgLMm，2026） | 经验的去向：external path（skills / memory / context / tools / environments）/ parameter path（agent RL、continual learning）/ meta-evolution（meta-agent、更新编排） | README 分四部分，parameter path 与 meta-evolution 合为一部分，但 Meta-Evolving Agents 独立成章（Ch. 7） | 未核实（PDF 受拦截；项目 README 未将 RSI 归入 meta-evolution，其唯一 RSI 条目 PluginRSI 列在 Harness 章） | 未核实 | 摘要与项目页（PDF 受访问验证拦截） |
+| Safety in Self-Evolving Agents: A Survey（arXiv 2610.00093，v1 2026-09-08） | SAVER：Substrate / Adaptation / Violation / Exposure / Response，以状态转移为分析单元 | 无层级；关注 persistence / authority / scope 三类扩张 | 不界定 | 80 页正文 | 摘要 |
+| Self-Evolving Coding Agents（arXiv 2608.03392，2026-08） | 演化对象（framework / memory / skills&tools / components / workflow&topology / environment&context）× 时机 × 代码特有信号 | assets / architecture / model parameters 三层按干预深度排序，作者明示深度不等于成熟度排序 | 不界定 | 未核实 | 摘要 + §1 / §3 节级 |
+| Self-Evolving Agents as Dynamic Graph Transformation（arXiv 2608.18104，v1 2026-06-10） | agent 状态建模为动态图，演化 = schema 约束下的图重写（node / edge / subgraph / cross-component） | 无 | 不界定 | 未核实 | 摘要 |
+| A Survey of Agentic Reasoning … Towards Recursively Self-Improving and Collective Agents（arXiv 2601.12538，v2 2026-09） | foundational / self-evolving / collective 三层；自演化层内分 feedback / memory / capability 三类机制，演化形态分 verbal / procedural / structural | 三层是推理范式的层，不是演化深度 | 标题含 RSI，正文无 RSI 定义或阶段 | 未核实 | §2.2 / §4 / §8 |
+
+八篇里对本文有实质影响的是前三篇。
+
 ### 1.2 2026 的活跃前沿
 
 2026 年同时加速的主线有六条。其一，**recursive self-improvement 的 scaffold lineage 成型**——自改代码 agent 从 Darwin-Gödel Machine 的开放式 archive 走向 [[Papers/2510-HuxleyGodelMachine]] 的 clade 级 credit assignment 与 [[Papers/2607-MetaSkillEvolve]] 的"演化改进流程本身"两级递归。其二，**负性结果集中爆发**——self-improvement reversal、rise-and-collapse、recursive self-training collapse 刻画的是演化过程自身跑偏的条件，[[Papers/2609-Ecdysis]] 与 [[Papers/2607-RethinkSkillEvolve]] 又补上一种发生在闸门之后的形态：每一步改动都通过了接受判据，交付到 held-out 上仍是净负（§10.2）。其三，**agent-environment co-evolution 从概念变为实证**——环境从静态评测台升格为共同演化对象（[[Papers/2605-SEAL]]、[[Papers/2512-GenEnv]]、anchor survey [[Papers/2606-EnvEngineeringSurvey]]）。其四，**演化步 verifier gating 从方法空白扩展为多粒度家族**——从技能编辑级到 anytime-valid 统计证书到形式化验证合成，gate 从安全阀被重新论证为可靠性的主要来源；但它是否同时抬高性能天花板，在 2026 年中已成为有正反实测的争议（§6.2）。其五，**演化信号开始越出"从自己成功的轨迹里学"这一默认设定**——一组 rollout 全部失败时二值 reward 在组内退化为常数，[[Papers/2608-ZerothOrderSelfEvolve]] 用参数空间扰动加 gold-answer 连续似然绕开这个真空，[[Papers/2608-ROPSD]] 把反思文本转成 token 级监督，两者都落在 anchor survey 的信号分类（verifier / self-reward / judge / 共识伪标签）之外（§4.3）。其六，**演化收益开始被匹配对照与噪声带检验**——固定 executor、固定流程、只改 optimizer 可见的轨迹之后，[[Papers/2607-RethinkSkillEvolve]] 在 14 个 setting 上测到"演化后部署 test 更好"只有 9 个，而一份字节完全相同的技能重复评测八次落在 71.43%–83.67%（标准差 3.92 个百分点）；[[Papers/2608-SkillZipPro]] 则第一次把等价性写成预先声明的判据（102 个 held-out 任务、配对 bootstrap、事先固定的 −0.05 边界）。这条线把"演化涨了多少"从单点比较推到了必须先给出协议分辨率（§9.4、§10.2）。
+
+综述层面与此同步换轴。2026 年 6–9 月的四篇通用综述在"演化什么"之外加问"改得多深"，其中两篇再问"证据是否在更新回路之外"（§1.1 表）。其中 Diving into Reliable Self-Evolving Agents 的 retention condition 与本文 §2.1 的持久性条件是同一刀，它与 arXiv 2607.07663 又彼此独立地把"证据来源在更新回路之外"立为可靠性的中心条件，与本文 §6.2 的 gate 独立性分析同向；逐轴对齐与由此暴露的框架缺口见 §3.7。
 
 ### 1.3 与相邻领域的边界
 
@@ -56,7 +73,7 @@ Self-improvement 与 self-evolving 是同一研究纲领在两个系统层次上
 
 ### 2.1 self-evolving 的操作性定义
 
-采纳 [[Papers/2507-SelfEvolvingAgentsSurvey]] 的三条件合取：(i) 更新由 agent 自身经验驱动（experience-dependent）；(ii) 更新产生持久的、改变策略的效果（persistent policy-changing）；(iii) 存在自主探索机制而非人给定的固定任务流。三者缺一即退化为 optimisation、editing 或 continual learning。本文在此基础上补一条工程判据：演化产物必须能被独立评估（否则"演化"不可证伪）——这条判据在 §9 的评估方法学与 §6 的 gate 家族中反复出现。
+采纳 [[Papers/2507-SelfEvolvingAgentsSurvey]] 的三条件合取：(i) 更新由 agent 自身经验驱动（experience-dependent）；(ii) 更新产生持久的、改变策略的效果（persistent policy-changing）；(iii) 存在自主探索机制而非人给定的固定任务流。三者缺一即退化为 optimisation、editing 或 continual learning。本文在此基础上补一条工程判据：演化产物必须能被独立评估（否则"演化"不可证伪）——这条判据在 §9 的评估方法学与 §6 的 gate 家族中反复出现。这组判据与同期综述的切法可以对照：Diving into Reliable Self-Evolving Agents 用 retention condition（保留下来的改动必须影响后续独立任务或未来更新）把任务内的 L0 排除在持久演化之外，与条件 (ii) 是同一刀；本文的"可独立评估"判据对应该综述的 external audit——外部目标、证据来源与验收策略三者都须版本化并留在 update boundary 之外。两者独立提出而口径一致，可视为该判据的跨来源收敛（§3.7）。
 
 ### 2.2 演化、优化、终身学习、model editing 的切分
 
@@ -99,7 +116,7 @@ Self-improvement 与 self-evolving 是同一研究纲领在两个系统层次上
 
 ### 3.3 演化对象轴
 
-四组件加团队组织构成对象空间。关键观察：**blast radius 随对象层级升高而放大**——改一条 memory 只影响一次检索，改一个 skill 影响所有复用该 skill 的任务，改 workflow/constitution 影响全队所有 agent。§10 的安全分析显示风险与 blast radius 正相关。
+四组件加团队组织构成对象空间。关键观察：**blast radius 随对象层级升高而放大**——改一条 memory 只影响一次检索，改一个 skill 影响所有复用该 skill 的任务，改 workflow/constitution 影响全队所有 agent。§10 的安全分析显示风险与 blast radius 正相关。但层级决定的是审计义务的形态与时间跨度，不是证据强度的排序——一个带新鲜可执行结果的参数更新可以比一个靠未校准自评的输出修订更有信息量（§3.7 其二）。
 
 一个正交于对象轴的划分由跨方法受控析因提出。[[Papers/2608-AgentStream]] 按**经验与执行上下文的耦合强度**把自演化方法重划为两族：context-integrated（经验直接折进 agent prompt，如 ACE 与整体 harness 演化）与 retrieval-based（经验存外部库、只注入当前任务检索到的条目，如 ReasoningBank、AutoSkill、A-Mem）。两族在任务流结构上的收益符号相反——同域内独立累积时 ACE 平均 +2.28、跨域混流时降到 −1.26，而三个检索式方法全部在混流下取到峰值（+2.22 / +1.79 / +0.72）。其含义是紧耦合的经验在跨分布流里无法被门控，松耦合天然只激活相关条目，因而"该演化哪个组件"可能是次要轴。本文暂不据此重排分类：该工作全文无显著性检验，单元格的 seed 间标准差常在 3–6 个百分点而效应量在 1–2 个百分点量级，符号翻转是目前最干净的形态证据，绝对幅度不足以承重。
 
@@ -133,6 +150,29 @@ deploy-time 一端此前只有不动参数的记忆演化，[[Papers/2608-ROPSD]
 | Architecture / RSI | [[Papers/2505-DarwinGodelMachine]] / [[Papers/2510-HuxleyGodelMachine]] / [[Papers/2605-MetaTeam]] / [[Papers/2607-MANTA]] / [[Papers/2607-FrontisMA1]] / [[Papers/2608-JITAgent]] / [[Papers/2608-Zetta]] / [[Papers/2609-RSIAgent]] / [[Papers/2609-DreamRSI]] / [[Papers/2609-Ecdysis]] | benchmark 分数 / clade 聚合 / 团队讨论 / 纯过程审计 / 执行反馈 / 冻结树上的重放分 / 跨任务失败模式聚类 | SWE-bench 20→50（DGM）；full Verified 61.4%（HGM）；组织演化 53.9>40.8（MetaTeam）；等 token 下 74.0 vs Voting 64.7（MANTA）；MLE-Bench Lite 39.39→60.61（Frontis-MA1 post-training 净增）；RoboCasa 73.56→93.56（Zetta，冻结 VLA 之外的 harness 演化）；18 个 matched 配对全部提升且成本降 14.9%–54.1%（JIT-Agent）；轮级聚类改 harness 5 模型 × 2 子集平均 59.33 对逐条改的 46.67、10/10 格方向一致（Ecdysis） | AFlow 20 轮 ASR 54.4→83.1%；self-review gate 退化为 rubber-stamp；增益归因不闭合（MANTA 结构改变与 +28K token 绑定；Frontis-MA1 自改进与外部 teacher 蒸馏未分离）；harness 与自改进机制的份额未分离——受控对照下 harness 贡献是机制的三到四倍（RSI-Agent）；离线搜索自身的开销不计入报告 compute（Dream-RSI）；逐条失败改 harness 的同协议基线跌破人工起点 51.67→46.67（Ecdysis） |
 
 风险一列的共性——safety 衰减、reward hacking、rubber-stamp、Unsafe Rate 高——统一指向 §10：演化的失效不在"能不能改进"，而在"改进过程自身会不会偏航且无关可拦截"。
+
+### 3.7 与 2026 年综述层级分类学的对齐
+
+本文的四轴（演化对象 / 反馈信号 / 演化时机 / gate 粒度）与 2026 年下半年三篇通用综述的组织轴可以逐轴对齐。对齐带来三处判断的独立印证，以及一处本文框架缺的轴。
+
+| 本文的轴 | Diving into Reliable Self-Evolving Agents（L0–L4） | RSI in AI（arXiv 2607.07663） | Self-Improvements in Modern Agentic Systems（arXiv 2607.13104） |
+|:--|:--|:--|:--|
+| 演化对象（model / memory / tool-skill / architecture-RSI） | L1 = model；L2 = scaffold（prompt、skill、memory、workflow、harness 合为一级）；L3 improver 与 L4 criterion 单列 | what improves：deployment-time（≈ scaffold）/ training-time（≈ model）/ self-evaluation / auto research | indirect（改 θ）/ direct（改 Σ：prompt / memory / tool governance / full scaffold） |
+| 反馈信号（可验证性、分辨率） | 作为每级"暴露给更新的证据"记入 Table 9，不单列为轴 | 单列为 verification hierarchy：formal > execution > learned judge > intrinsic | 只在 θ（基础模型）改进一侧作子轴：generative demonstrations / evaluative feedback / exploratory experience；Σ 一侧按组件分 |
+| 演化时机（offline / online / test-time） | 不作为轴；L0 即任务内，L1–L4 须跨任务保留 | 与 what-improves 轴部分重合（deployment-time vs training-time） | 不作为轴 |
+| gate 粒度（edit / step / audit / 统计证书 / 形式验证） | 换成另一问：证据来源与验收策略是否在 update boundary 之外（reliability ladder） | 换成 loop closure：human-in / human-on / closed | §8：须声明 judge 与 judging budget，防止对 judge 过优化 |
+| （本文缺）演化深度 | 核心轴 | bounded（固定外部评估器）vs open-ended（改评判标准） | 无 |
+| （本文缺）回路闭合度 | 以 external audit 的独立性间接表达 | 核心轴 | 无 |
+
+四点读法。
+
+其一，**本文"演化对象"轴与 L1–L2 的切分同形，与 L3–L4 不同形**。四条路线中的 model 对应 L1；memory、tool-skill 与 §7.1 的 workflow 拓扑在 Tencent 的分法里合为一级 L2——该综述按"改了什么对象"而非"用什么算法改"分级，所以 RL、反思、进化搜索都可以出现在多个层级，这与本文 §3.2 以对象为首轴、算法为次轴的处理一致。不同形的是本文把 §7 的 RSI 与 architecture 放在同一路线，而 L3（改"未来更新如何被提出、选择、提交、回滚"的程序）与 L4（改评估协议、reward、约束、价值本身）被切成两个独立层。本文此前在两处触到这条切分而未命名：§6.2 的 anchored vs goal-drift 二分（[[Papers/2609-GeneralizedAgentIteration]]，目标函数是否随演化移动）正是 L3 与 L4 的分界；§7.2 的两级递归（[[Papers/2607-MetaSkillEvolve]] 演化改进流程本身、[[Papers/2510-HuxleyGodelMachine]] 把当前表现与后代生产力分开计量）是 L3 的实物。采用 L3/L4 的词汇不改变本文任何结论，但让 §7.5 判据表里"演化系统自身被演化"这一列有了统一名字，§7.6 据此把该表的五个工作逐一归位。
+
+其二，**blast radius 随对象层级升高（§3.3）在三篇综述里都有对应物，但 Tencent 综述明确拒绝把深度读成可靠性排序**。其 Table 9 给每级列出"暴露给更新的证据"与一组特征性审计失效（各级首项为 L0 self-confirmation、L1 model collapse、L2 scaffold overfitting、L3 metric capture、L4 criterion drift），并强调 "self-evolution depth alone does not determine reliability"：一个带新鲜可执行结果的 L1 更新可以比一个靠未校准自评的 L0 修订更有信息量。本文 §3.3 的"收益与风险随层级同步放大"是对已有实测的归纳而非对可靠性的排序，两者不冲突，但本文应当明示同一限定：层级决定审计义务的形态与时间跨度，不决定证据强度。
+
+其三，**本文 gate 粒度轴与两篇综述的"证据在回路外"条件互补而非重复**。本文 §6.2 排的是闸门在什么粒度上介入（edit / step / audit / 统计证书 / 形式验证）以及 gate 独立性的三层（证据来源 / 判决算法 / 打分器）；arXiv 2607.07663 排的是证据来源的强度序（formal > execution > learned judge > intrinsic），并给出该序与已报告自改进强度同向的全集观察；Tencent 综述排的是每级应当有什么留在 update boundary 之外（外部目标、证据来源、验收策略三者都须版本化且不可被更新改写），并补一条本文此前没有写明的规则：一份证据一旦被用于候选生成或内部选择（作者称 development evidence），就不得再作为同一更新的唯一最终审计证据。三者合起来是三个正交维度：介入粒度、证据强度、证据独立性。本文 §6.2 对 [[Papers/2607-HarnessBank]] 的分析（判决算法外生、证据来源由 patch 自报）用的正是第三维，只是没有把它抽成规则。
+
+其四，**本文四轴缺"回路闭合度"**。arXiv 2607.07663 的 human-in / human-on / closed 三分问的是谁持有最终验收权，与 gate 粒度无关：一个 edit 级 gate 可以是人审，一个形式验证 gate 可以全自动。按该综述对 1,250 篇的归类，几乎全部工作是 human-on-the-loop，closed loop 与 self-evaluation 的交叉格正是 bounded self-refinement 过渡到 open-ended RSI 的位置。本文的样本与此一致：§7.5 表中无一工作在无人介入下跨代运行。这条轴值得补进 §9 的评估索引表，作为"演化步是否经人工验收"的一列；在补齐之前，本文把它登记为框架缺口而非结论。
 
 ## 4. Model Evolution（参数自演化）
 
@@ -177,6 +217,8 @@ deploy-time 一端此前只有不动参数的记忆演化，[[Papers/2608-ROPSD]
 摘要侧还有一个论文未做的对照：训练压力是"不要显得像信息缺失"，这与"覆盖更多源文内容"高度同向，而 ROUGE-L 恰恰奖励召回；论文既未报告输出长度统计也未做长度控制，因此 ROUGE-L 增益里有多少是质量、多少是覆盖率无法从文中分离（此为本文推断，非论文断言）。全篇无种子数、方差、误差棒或显著性检验，仅 4B/8B 单节点规模。
 
 谱系的另一端由一次同底座的头对头比较收紧。[[Papers/2608-GSAR]] 训练了一个读"目标状态"的学习式 GUI 轨迹判分器，离线判定四个 judge 平均 91.5% 准确率 / 91.8% F1，把 StepCritic（77.6 / 81.8）、DistRL（75.0 / 74.5）、DigiRL（68.3 / 62.8）甩开十几个点。把它接进在线 RL 当 reward 之后，UI-TARS-7B-DPO 在 AndroidWorld 上 26.7% → 30.2%（+3.5），而同一 backbone 换成规则式 verifier 训出来是 32.8%（+6.1）。**判分器的离线准确率不是它作为训练信号的质量**——中间隔着噪声的分布形状，作者对 StepCritic 的归因就是假阳性使奖励过于乐观而非漏判，而假阳性恰恰是 RL 最难消化的那一类噪声。这是单篇、单次运行的对照，但它是目前唯一一次把学习式与规则式两种信号接在同一 backbone、同一算法、同一环境上直接比较，因此它限定的不是 §3.4 那条上界本身，而是上界该用什么量来度。同篇还留下两处未测：自演化合成循环把页面复杂度只推高了一点（边密度 0.0240→0.0295、熵 1.90→2.11、UI 元素 22.68→24.56），而分布坍缩与 reward hacking 全文无评估；增益在已经 GUI 专用化的 UI-TARS-7B-SFT 上收窄，与 §9.2 的能力 gate 同向。
+
+把这条谱系放到全集尺度上看，结论不变，但多了一个量级的佐证。arXiv 2607.07663 对 1,250 篇 2024–2026 年论文的归类给出一个四级 verification hierarchy（formal verifiers > execution feedback > learned judges > intrinsic signals），并观察到已报告的自改进强度与该序同向；作者同时指出纯 intrinsic self-correction 的论文已变得罕见，其 §8 把"多少外部 grounding 才够"（exchange rate）列为首要开放问题。这是综述作者对全集的定性归纳，不是一次测得的相关系数，本文按作者综合论断登记。Diving into Reliable Self-Evolving Agents 在 L0 一级转引的两组负证据与之同向：无 oracle 标签或外部反馈时，intrinsic self-correction 让 GPT-4 在 GSM8K 上从 95.5% 降到 89.0%、在 HotpotQA 上从 49% 降到 43%；把 self-feedback 换成人工反馈，自修复成功率从 33.3% 升到 52.6%。这两组数字本文未回到原始论文核对，只到转引层。本节的判据（收益上界由真正塑造行为的那个信号有多可信决定）与两篇综述一致；差别在本文多出"分辨率"这一正交属性（§3.4），在两篇综述已读的分类中未见对应项。
 
 ### 4.5 Open Problems
 
@@ -417,6 +459,20 @@ DGM 类架构自演化只搜索 frozen FM 之外的 scaffolding 空间——收�
 
 其二是**增益的预算与来源归因**：[[Papers/2607-MANTA]] 的 mutation 增益与 +28K token 绑定，Frontis-MA1 的 post-training 增益与外部 teacher 蒸馏绑定，两者都缺 equal-budget / no-teacher 对照臂。这两处归因缺口的性质相同——报告的是"某个演化机制 + 某项额外资源"的联合效应，而结论被写成前者的效应。
 
+### 7.6 RSI 的综述级界定：三种口径与同一个证据状态
+
+三篇 2026 年综述给 recursive self-improvement 的界定口径不同，但对证据状态的判断收敛到与 §7.5 相同的位置。
+
+| 来源 | RSI 的界定 | 对证据状态的判断 |
+|:--|:--|:--|
+| Diving into Reliable Self-Evolving Agents | 结构性：最深活跃改动达到 L3（改"未来更新如何被提出、选择、提交、回滚"的程序）或 L4（改评判标准）的保留型转移；作者声明该约定 "neither establishes improvement nor implies accelerating gains" | §9.2：在其 Table 10 列举的代表性评测套件中，没有一个直接测量跨多代保留的 improver 级或 criterion 级改动；§9.1：两项早期预警任务（三小时重建 AlphaZero 式 Connect Four 流水线、Meta-Agent Challenge）都未显示系统能反复改进自己的 improver |
+| RSI in AI（arXiv 2607.07663） | 过程性：bounded self-refinement（固定外部评估器、收敛、可评估）对 open-ended RSI（修改评判标准与改进机器本身、无固定锚、发散）；open-ended 出现在 closed loop × self-evaluation 的交叉格 | 1,250 篇中几乎全部为 human-on-the-loop；四种失效（self-confirming loop、distributional collapse、diversity collapse、frame lock-in）里 frame lock-in 的检测需要回路外的视角（§5.3 第四种失效），§8 第 6 条开放问题 "Recognizing frame revision" 与之对应 |
+| Self-Improvements in Modern Agentic Systems（arXiv 2607.13104） | 谱系性：从 Schmidhuber 1987 年的自指学习与 Gödel Machine 到 Nivel 等人 2013 年的 bounded RSI；一个被改进出来的 skill 反过来被改进时即恢复自指回路 | §6.4 Takeaway："truly open-ended recursive self-improvement remains a grand challenge"，现有系统把它实现为 bounded、verifiable loops；§9.1 把"弱系统如何可靠推断更强后继"列为 RSI 的核心安全挑战；§9.2 的六条 outlook（test-time continual adaptation / active exploration / θ–Σ joint optimization / resource-constrained dynamics / multi-agent co-evolution / open-world drift）均不含 RSI 或形式验证 |
+
+三条口径里，Tencent 综述的结构性界定最可操作，因为它把"是否 RSI"从"作者如何命名"改成"改动的最深对象是什么"，判定不依赖效果。按这个口径回看 §7.5 表中以 RSI 自称的五个工作，没有一个达到 L3：[[Papers/2607-FrontisMA1]] 与 [[Papers/2609-NeoHorse1]] 改的是模型权重，落在 L1；[[Papers/2608-MacaronV1]] 搜配置、[[Papers/2609-DreamRSI]] 跨轮携带代码级策略而改写者固定，落在 L2；[[Papers/2609-RSIAgent]] 的记忆按任务从空建起、跨任务不继承，不满足 retention condition，落在 L0。库内达到 L3 的是 [[Papers/2505-DarwinGodelMachine]] 与 [[Papers/2510-HuxleyGodelMachine]]（Tencent 综述 Figure 3 明列为 L3 Self-Referential Agents）以及 [[Papers/2607-MetaSkillEvolve]]（本文按同一规则归位）；达到 L4 的实物库内没有，[[Papers/2609-GeneralizedAgentIteration]] 的 goal-drift 只是形式化坐标。这一归位是本文按该综述的分类规则推出的，除 DGM / HGM 外不是该综述的原文判定。两个外部样本池（549 条参考文献、1,250 篇论文）与本文的样本得到同一判断：改到 improver 的工作极少；报告了后代表现的只有 [[Papers/2510-HuxleyGodelMachine]] 的 lineage productivity 估计，而该综述把它判为非外部审计证据，因为它与候选选择共用固定的 coding benchmark 与搜索预算，超出已报告评估跨度的长期更新生产力仍未被观测。"RSI 叙事超前于实物"由此从库内观察升为跨来源收敛。
+
+arXiv 2607.07663 的 bounded / open-ended 二分补上了 §6.2 anchored vs goal-drift 缺的一层含义：anchored 除目标函数不动之外，还要求存在一个更新回路改不动的外部评估器，收敛性与可评估性都由它担保；一旦评估器进入回路（L4），§3.4 的 verifier 上界论证就失去前提，因为上界本身在被优化。Tencent 综述 §7.3 称之为 moving-ruler problem：内部分数的上升混合了"在旧标准下的行为变化"与"标准本身的移动"，仅在新标准下评估无法区分二者。本文此前只在 [[Papers/2609-GeneralizedAgentIteration]] 一处触到这个问题，现在它有了两个综述级的命名。
+
 ## 8. Co-Evolution: Environments and Multi-Agent Teams
 
 自演化的第三根轴是"演化对手是谁"：环境（任务分布、verifier、affordance）还是队友（多智能体团队）。
@@ -577,6 +633,8 @@ MLAS 的 lineage-persistent 至此还只是框架层断言加案例，[[Papers/2
 
 攻击面还有一层此前未被列入 MLAS 矩阵的：**环境状态**。[[Papers/2608-OpenART]] 的攻击者不改指令、不改模型、不改评判标准，只演化 agent 能看到的 workspace 文件、工具返回、memory 与 plan state，八个 target 可见向量里每一个单独使用都能把 Strict ASR 推过 50%（其余七个均值 71.2%，仅 workspace 一项 92.5%）。它归纳的三类反复出现的失效对自演化系统尤其贴切，因为三类都以"复用先前判断"为前提：过期假设未被作废、安全判断被沿用而非在新状态下重算、以及若干单步安全的动作在组合后产生危害。自演化系统的产物——技能、记忆、harness patch——本身就是"过去某个上下文里成立的结论"被固化下来的形式，且被设计为反复取用，因此这三类失效在演化系统上的暴露面比在一次性 agent 上更大。
 
+Safety in Self-Evolving Agents（arXiv 2610.00093）把本节的放大结构抽成一个以状态转移为单元的框架 SAVER（Substrate / Adaptation / Violation / Exposure / Response），其两条摘要级论断与本节已有实测同向：合法状态可以因为 adaptation 扩张了它的 persistence、authority 或 scope 而变得不安全，失效不必源自有害信息；现有工作对 admission、retrieval、activation、exposure 与局部 containment 的证据较强，对派生物的修复与演化恢复后的再评估证据很少。后一条正是本节"版本级撤销已有实物、派生级撤销仍无"的综述级陈述。该综述只读到摘要，其 80 页正文中的分类与证据未入库。
+
 ### 10.6 gate 作为可靠性来源
 
 综合 §6.2 与 §10.2：演化步 gate 在性能回归维度已有实证方案（GRASP 编辑级、SKILL.nb 步骤级、[[Papers/2607-HarnessBank]] 的 harness patch 筛选级），统计与形式化方向有 SEACertificates/SEVerA，但**安全维度 gate 与 self-gate 的 rubber-stamp 问题（CodeSelfReviewCollapse）仍是硬约束**。已被测量到的 gate 价值集中在防回归、拦假精英与收敛效率上，天花板贡献在存在冗余部署选择器时为零——把 gate 当作可靠性组件论证站得住，当作性能组件论证目前只有一处实测支持而那条记录缺核验（§6.2）。task-agnostic、抗橡皮图章、可第三方审计的 gate 仍是可靠性的核心未解问题：目前最外生的实例只在判决算法一层做到外生，证据来源（patch 自报 activation beacon）与打分器（judge 模型未指明）两层仍未审计。
@@ -597,8 +655,9 @@ MLAS 的 lineage-persistent 至此还只是框架层断言加案例，[[Papers/2
 
 ## 11. Open Challenges
 
-- **Longitudinal evolution-aware 评估**：当前 safety/能力评估全是 snapshot-based，无 benchmark 追踪"演化步数-能力-风险"联合轨迹；剂量关系目前仅 model 路径有 200 步数据。
-- **抗 rubber-stamp 的演化步 gate**：self-review 式 gate 会退化为橡皮图章（CodeSelfReviewCollapse），需要 exogenous、task-agnostic、可审计的验证。gate 谓词自身的 precision 目前只有一处数字，且是同底座自评的**触发**闸门而非验收闸门（[[Papers/2607-MANTA]] 总体 precision 0.38 / F1 0.47，分域从近乎恒过到近乎恒不过）；外生校准与 process flag 的人工标注精度均未见。[[Papers/2607-HarnessBank]] 把判决算法层做到了目前最外生的形态（确定性配对统计量 + 独立 evaluator + evolver 与 task agent 不同家族），但同时暴露出"外生"是分层的：证据来源层由 patch 自报 activation beacon 且无人审计该声明是否名副其实，打分器层在部分域直接是未指明模型的 LLM judge；该篇也未报告 gate 的误收/误拒率，只有个案。三层里最脆弱的是证据来源层，因为它不只是未审计而是**攻击者可控**：[[Papers/2608-SkillJack]] 测到 judge 只看代码时判恶 36.7%、补上攻击者撰写的 name 与 documentation 后降到 10.0%，而这两个字段恰是多数 skill 准入闸门与检索器的主要输入。[[Papers/2608-EvoHarnessRL]] 给出该三层框架的另一种缺失形态：判决者是外族的 Claude Opus，判据却只是它阅读 agent 自写 note 加 LFU 频次，没有任何 held-out 回归检查——判决者的独立性不自动传递给判据。[[Ideas/HybridVerifier-GUIRuntime]] 正针对 GUI runtime 的 hybrid（deterministic state-contract + 学习式）verifier gate 这一缺口。
+- **Longitudinal evolution-aware 评估**：库内 safety/能力评估全是 snapshot-based，无 benchmark 追踪"演化步数-能力-风险"联合轨迹；剂量关系目前仅 model 路径有 200 步数据。库外已有首批记录完整更新路径的评测（Diving into Reliable Self-Evolving Agents §9.2 转引：SEAGym 保存逐代 scaffold 快照并分开训练 / 冻结更新验证 / held-out 同分布与分布外 / 回放 / 成本；BenchTrace 区分失败检测、定位、诊断与后续规避；SEA-Eval 在成功率相近的框架间测到最高 31.2 倍的 token 差；PAST-Bench 做持久性消融），但按该综述自己的判断，没有一个直接测跨代保留的 L3/L4 改动。Are Self-Evolving Agents Continual Learners?（arXiv 2610.25858，摘要级）在四条漂移任务流上报告 ReasoningBank / GEPA / Meta-Harness 的 plasticity 以 stability 为代价、全局改写覆盖早期知识、检索式记忆出现 retrieval collision，是 stability–plasticity 问题在非参数自演化上的直接测量。以上均未入库核对；安全维度的纵向评估仍无实物，arXiv 2610.00093 为它列的三项要求是：追踪不安全影响到其源转移、验证修复是否覆盖派生物、测试其在继续演化下是否复现。
+- **抗 rubber-stamp 的演化步 gate**：self-review 式 gate 会退化为橡皮图章（CodeSelfReviewCollapse），需要 exogenous、task-agnostic、可审计的验证。gate 谓词自身的 precision 目前只有一处数字，且是同底座自评的**触发**闸门而非验收闸门（[[Papers/2607-MANTA]] 总体 precision 0.38 / F1 0.47，分域从近乎恒过到近乎恒不过）；外生校准与 process flag 的人工标注精度均未见。[[Papers/2607-HarnessBank]] 把判决算法层做到了目前最外生的形态（确定性配对统计量 + 独立 evaluator + evolver 与 task agent 不同家族），但同时暴露出"外生"是分层的：证据来源层由 patch 自报 activation beacon 且无人审计该声明是否名副其实，打分器层在部分域直接是未指明模型的 LLM judge；该篇也未报告 gate 的误收/误拒率，只有个案。三层里最脆弱的是证据来源层，因为它不只是未审计而是**攻击者可控**：[[Papers/2608-SkillJack]] 测到 judge 只看代码时判恶 36.7%、补上攻击者撰写的 name 与 documentation 后降到 10.0%，而这两个字段恰是多数 skill 准入闸门与检索器的主要输入。[[Papers/2608-EvoHarnessRL]] 给出该三层框架的另一种缺失形态：判决者是外族的 Claude Opus，判据却只是它阅读 agent 自写 note 加 LFU 频次，没有任何 held-out 回归检查——判决者的独立性不自动传递给判据。[[Ideas/HybridVerifier-GUIRuntime]] 正针对 GUI runtime 的 hybrid（deterministic state-contract + 学习式）verifier gate 这一缺口。两篇 2026 年综述彼此独立地把"证据来源与验收策略在 update boundary 之外"立为可靠性的中心条件（§3.7 其三），与本文的三层独立性同向；它们补的是规则层（development evidence 不得单独充当同一更新的最终审计证据、外部目标与验收策略须版本化），数字层仍空：已读章节中同样未见任何 gate 的误收/误拒率，本条缺口不变。
+- **L3/L4 改动的审计协议**：改到 improver 或 criterion 的工作（§7.6）目前只能逐篇手工判定，没有一套协议回答"后代是否比前代产生更好的更新"。Tencent 综述 §6.3 给出审计记录应含的五项（当前表现、后续轮次输出、搜索成本、失败恢复、向新任务的迁移），其 Table 9 与 §8.2 给出 L3 的证据形态（匹配资源下后代在新任务上的表现，而非当前分数），§7.3 给出 L4 的（新旧标准下的交叉评估与受保护的外部结果度量）；arXiv 2607.07663 补两条：frame lock-in 只能从回路外检测；direction-setting 是比验证更前置的瓶颈，因为验证已有 SoundnessBench 之类工具可查，而问题选择本身尚无评估。两者都是协议草案而非实物，库内也没有任何工作按此报告。
 - **credit assignment 的信号质量**：RSI 谱系瓶颈从"如何自改"转向"如何选 parent"（HGM CMP 0.778 vs DGM 0.285）；五类替代信号（clade 聚合 / 结果的辅助统计量 / 多因子固定权重效用 / 纯过程审计 / 逆序干预定位）尚未在同一 testbed 上对照。multi-agent 的 per-agent 归因不再只能靠讨论涌现：[[Papers/2609-AgentGrad]] 的逆序 hint 注入给出第一个算法化方案，但它成立的前提是存在一个可替换进去的正确输出，因此覆盖的是"流水线结构固定 + 终点可自动判"这一象限，开放式协作与共识域仍无算法（§7.3）。
 - **演化增益的预算与来源归因**：多数工作报告的是"演化机制 + 额外资源"的联合效应而把结论写成前者——[[Papers/2607-MANTA]] 的 mutation 增益与 +28K token 同时上线（缺同拓扑再跑一轮的对照臂），[[Papers/2607-FrontisMA1]] 的 post-training 增益与外部更强 teacher 的蒸馏成分未分离（缺 no-teacher 臂）。第三种形态是**演化组件自身未被隔离**。[[Papers/2608-RoMeRL]] 的四个记忆坐标里只有一个用到学到的 Q，却没跑 $\omega_Q=0$ 的纯启发式臂；[[Papers/2608-EvoHarnessRL]] 的消融只做在冻结的 inference-time harness 上（换它的配置），从不存在"同样 SFT+GRPO 但去掉 BPE 动作"的臂，而它自己的动作统计显示 harness 调用退火到约每 episode 一次、其 SFT 教师纯 ReAct 已达 96.4，两种归因都与数据相容；[[Papers/2607-SESA]] 跑了关库对照并因此发现技能库的部署期贡献只占总增益的两三成（§6.3）。第四种形态更隐蔽：**演化组件被系统内另一个冗余机制替代**——[[Papers/2607-HarnessBank]] 的 2σ gate 被去掉后天花板 ±0.0，因为训练集 argmax 这个独立的部署选择器已经选中了同一个赢家；报告 gate 收益的工作若不把 selector 也消融掉，记在 gate 账上的功劳无法与 selector 的分开。四种形态共用一句诊断：**报出的是联合效应，写下的是单一归因**。equal-budget paired replay、teacher-ablation、关掉待验组件再跑一遍、固定判决规则换掉最终选择器——四个补法的成本都远低于原实验，缺席本身就是信号。
 - **效应量与噪声的口径**：多数增益报告是单次运行、无方差、无显著性检验，而唯一做过重复部署的工作给出的不可判区是 ±3 点（同一 100 题配对面板三次重复；字节相同的技能在 49 题 validation split 上跑 8 次 SD 3.92），落在这个区间内的 headline 条目按其自身数据不可判（[[Papers/2607-RethinkSkillEvolve]]）。等价性主张的要求更高一档：说"压缩后质量不变"需要一个预先声明的噪声带，目前只有一处给出（[[Papers/2608-SkillZipPro]] 预先固定 −0.05 margin，102 held-out 任务配对 bootstrap 得 +0.010、95% CI [−0.029, +0.059]），其余等价性主张一概没有（§9.4）。
@@ -610,6 +669,8 @@ MLAS 的 lineage-persistent 至此还只是框架层断言加案例，[[Papers/2
 - **自演化增益的存在条件**：跨方法受控析因显示增益既不普遍也不稳定——45 个计数单元里 11–17 个跑输不演化的同一模型，方向随底座能力非单调，且成本-收益比同样由底座决定（[[Papers/2608-AgentStream]]）。论文把成因归给 bootstrap loop（solve rate 低则经验流被失败轨迹主导），但这是事后解读而非受控结论。把"能力 gate"改写成可操作的"经验质量 gate"只需一个实验：固定底座与方法，按成功/失败比例控制注入 state 的轨迹构成，看增益如何随之移动。在这个实验做出来之前，"在哪些条件下该上自演化"仍是一个没有答案的部署问题。同向的单篇证据来自 [[Papers/2608-EvoHarnessRL]] 的 frontier block——同一 harness、同一 benchmark、只换底座：ReAct 47.9 的 GPT-4.1 得 +22.1，60.7 的 GPT-5 得 +25.7，而已经 96.4 的 Claude Opus 4.5 只得 +2.1，且 Opus 的 Heat 一族从 100.0 掉到 93.8。**增益与基线质量负相关，且在已近饱和的轨迹上净效应可以为负**，这给"能力 gate"提供了一个家族级的具体实例（该篇 +25.7 与表内 85.0−60.7=24.3 算术不一致，其余 Δ 自洽）。
 - **Risk awareness 的灾难性遗忘**：SEAgent 演化后完全丧失拒绝/避险能力，安全能力遗忘动力学未知。
 
+与这批综述对照，本文另有三条挑战在其已读章节（§1–§2、各级 reliability 小节、§8、§9）中没有直接对应的条目：效应量与噪声带（Tencent 综述 Table 9 把 resource confounding 列为 L2/L3 的特征失效，其 §8.3 用 paired sequential test 与 anytime-valid gate 处理验收决策的多重比较与 optional stopping；arXiv 2607.13104 §8 要求声明 judging budget。三者管的是预算配平与决策规则的统计有效性，都未涉及重复部署的噪声带与效应量）；增益的内容归类（演化产物记下的是环境规程还是任务能力，§10.7）；底座条件性（增益随底座能力非单调、最优方法不跨底座保序，§12 其四）。这三条是本文相对综述层面的增量，也都对应最便宜的可做实验：重复部署给出噪声带、换一套 harness 复现一次、换一个底座再跑一遍。
+
 ## 12. Discussion and Conclusion
 
 自演化领域在 2026 年从"能不能演化"进入"演化会不会坏、如何 gate"的阶段。五个跨论文的判断浮现，其中第二个已由方向相反的两组实测从共识降级为条件性结论：
@@ -618,7 +679,7 @@ MLAS 的 lineage-persistent 至此还只是框架层断言加案例，[[Papers/2
 
 其二，**gate 是可靠性组件；它是否同时是性能组件，取决于 gate 之外有没有一个冗余的部署选择器**。两处证据台账齐备的自身消融把已测得的 gate 价值统一定位在地板与效率轴——[[Papers/2606-SkillNb]] 去 gate 只掉约 6 分成功率而修复后回归从 3.3% 爆到 18.6%，[[Papers/2607-HarnessBank]] 去掉 2σ 判据天花板 ±0.0 而假精英 0→2、收敛轮数 10→>20，其解释是训练集 argmax 这个独立选择器已经选中了同一赢家。方向相反的唯一实测来自 [[Papers/2605-GRASP]]（去闸门 88.8%→63.5%），其结构差别在于闸门本身即部署决策、没有下游 argmax 兜底，而该侧记录缺证据台账与核验状态。因此这条判断应按条件陈述而非作为共识引用，正反两侧一并记录（§6.2）。此外现有实证 gate 只覆盖性能回归、依赖任务可复现结构，且 self-review 式 gate 会退化为橡皮图章——抗 rubber-stamp 的 task-agnostic 安全 gate 是领域中枢缺口。一条新路径是把演化信号与评价信号从结构上切开（只用不接触结果的过程审计驱动演化），它免疫"闸门其实就是打分模型"的循环，代价是信号弱且分域极不稳定，且这条代价目前只被测量过一次。
 
-其三，**recursive self-improvement 在现有证据下有界**：scaffold 层受 frozen FM 天花板约束，weight 层受 reversal 约束，谱系的下一步瓶颈已从"改法"转向"选法"（credit assignment 信号质量）。misevolution 从假设变为跨系统实证事实，且威胁谱从无攻击者的良性偏航延伸到主动记忆投毒。领域叙事仍普遍超前于实物——满足严格自演化判据（经验依赖 + 持久策略改变 + 自主探索）且部署后持续演化的系统，目前极少；以 RSI 为题而实际做到 generation ≥2 的，库内一篇也没有。目前最完整的一套开放栈（[[Papers/2607-FrontisMA1]]，六件 artifact 齐全）只训练到 generation 1，其价值在于把"缺哪些 ablation"从必须相信作者变成别人可以补的实验，而不在于把递归做出来；[[Papers/2608-MacaronV1]] 是同一形态的第二个样本，其三段循环只跑通中间一段，作者自己把持续学习是否复利列为未验证的开放问题。同一篇也把"frozen FM 天花板"拆成两个不同的量：一个配置服务全部任务时是 11/122，允许每个任务用自己最合适的配置时累计覆盖 122/122，且后者不更新任何权重——此前归给"基座能力不足"的失败里，相当一部分是 elicitation failure。但累计覆盖来自 450 次尝试的并集，不是可交付的单一配置，能承重的只是"两者相差一个数量级"这一事实本身（§7.4）。
+其三，**recursive self-improvement 在现有证据下有界**：scaffold 层受 frozen FM 天花板约束，weight 层受 reversal 约束，谱系的下一步瓶颈已从"改法"转向"选法"（credit assignment 信号质量）。misevolution 从假设变为跨系统实证事实，且威胁谱从无攻击者的良性偏航延伸到主动记忆投毒。领域叙事仍普遍超前于实物——满足严格自演化判据（经验依赖 + 持久策略改变 + 自主探索）且部署后持续演化的系统，目前极少；以 RSI 为题而实际做到 generation ≥2 的，库内一篇也没有。目前最完整的一套开放栈（[[Papers/2607-FrontisMA1]]，六件 artifact 齐全）只训练到 generation 1，其价值在于把"缺哪些 ablation"从必须相信作者变成别人可以补的实验，而不在于把递归做出来；[[Papers/2608-MacaronV1]] 是同一形态的第二个样本，其三段循环只跑通中间一段，作者自己把持续学习是否复利列为未验证的开放问题。同一篇也把"frozen FM 天花板"拆成两个不同的量：一个配置服务全部任务时是 11/122，允许每个任务用自己最合适的配置时累计覆盖 122/122，且后者不更新任何权重——此前归给"基座能力不足"的失败里，相当一部分是 elicitation failure。但累计覆盖来自 450 次尝试的并集，不是可交付的单一配置，能承重的只是"两者相差一个数量级"这一事实本身（§7.4）。这一判断在综述层面得到两个外部样本池的印证：Diving into Reliable Self-Evolving Agents 指出，其 Table 10 列举的代表性评测套件没有一个直接测量跨多代保留的 improver 级或 criterion 级改动；arXiv 2607.07663 对 1,250 篇的归类中几乎全部为 human-on-the-loop。"RSI 叙事超前于实物"由此从库内观察升为跨来源收敛（§7.6）。
 
 其四，**自演化的增益不是普遍属性，而是与底座能力、任务流结构、失败模式匹配度耦合的条件性收益**。首个跨方法受控析因在 5 方法 × 3 底座 × 3 种任务流的 45 个计数单元里测到 11–17 个跑输不演化的同一模型，增益随底座能力非单调，最优方法不跨底座保序（[[Papers/2608-AgentStream]]）；机制侧的同向证据来自 [[Papers/2607-HarnessBank]]——演化出的 harness 是针对特定底座失败模式的 correction，匹配时 +15.4、错配时 +1.2、反向叠加时 −15.7。两者合起来意味着"某方法带来 X 点提升"这类跨论文引用在缺少底座与流结构限定时没有意义。证据强度需与结论分开记：前者的效应量普遍小于其自身的 seed 间标准差且全文无显著性检验，可承重的是形态不是数值；后者单次运行、无方差报告。第三处同向证据把"底座能力 gate"落到了家族级：同一 harness 换底座，ReAct 47.9 的 GPT-4.1 得 +22.1、60.7 的 GPT-5 得 +25.7、已达 96.4 的 Claude Opus 4.5 只得 +2.1，且 Opus 在 Heat 一族上从 100.0 掉到 93.8（[[Papers/2608-EvoHarnessRL]]）——增益与基线质量负相关，在已近饱和处净效应可以为负。
 
@@ -709,8 +770,27 @@ MLAS 的 lineage-persistent 至此还只是框架层断言加案例，[[Papers/2
 | GSAR 的离线 judge 准确率与下游收益脱钩：四 judge 平均 91.5% Acc / 91.8% F1，但 AndroidWorld 在线 RL 头对头只把 UI-TARS-7B-DPO 从 26.7% 提到 30.2%（+3.5），低于 rule-based reward 的 32.8%（+6.1） | source-verified [09-18 并入] | [[Papers/2608-GSAR]] Table 2 / §5.3 Figure 6(a) | 演化 verifier 的离线判别力不能代替下游验证（§8.4）；每训练步 rollout 时间 2342 s 对 rule-based 2754 s，省的是设备访问开销；换 UI-TARS-7B-SFT 底座后增益萎缩到 EM +0.01～+1.03 |
 | OPSA：教师 token 级 advantage 噪声率 30.6% / 34.7% / 50.6% 随教师规模单调上升；把全部教师 advantage 换成施加在学生最低 20% log-probability token 上的固定 −0.5，效果与标准 OPD 相当，换成 +0.2 则策略崩溃；删掉教师后 Qwen3-1.7B 的 AIME24 Avg@32 13.44→48.85 | source-verified [09-18 并入] | [[Papers/2608-OPSA]] Sec 2.2 Fig 2(a) / Sec 3.2 Fig 4 / Table 2 | 信号的"落点"与"判别内容"是两条可解耦的属性（§3.4），与分辨率、可验证性从未被同时控制（§4.5 第六个缺口）；等 token 预算对照成立（App C.3：GRPO-wait 32.81 / OPD-wait 31.67 对 OPSA 48.85）；mask 掉反思词 fork 位置后增益基本消失并在约 300 步长度崩塌，撬动的是模型已有反思路径；OOD 增益小（MBPP+ +1.20、GPQA-Diamond +4.48）；全部结果在 1.7B 非 thinking 模式的数学推理上 |
 | PRACTICE 阶段消融 24.3 → 40.7 → 42.3 → 45.3 → 49.7：不学习的 BPE 式初始库贡献 16.4 点，三个学习阶段合计 9.0 点，终库 29 张 card | source-verified [09-18 并入] | [[Papers/2608-PRACTICE]] Table 3 / Sec 3.2 | 与 OPSA 同型——被训练出来的监督源，其收益可能小于一个不学习的结构先验；failure-aware 相对 success-only +2.6（45.3 对 42.7）；EB-Habitat 的 Base 与 Long 两档落后最强基线；Appendix C.2 把同一结果写成 40.0% 而 Table 1/3/7 是 49.7%，论文未解释这处不一致 |
+| L0–L4 按"最深活跃改动的对象"而非算法分级；RSI = 达到 L3/L4 的保留型转移，且该约定 "neither establishes improvement nor implies accelerating gains" | source-verified [10-23 并入] | Diving into Reliable Self-Evolving Agents §2.1 / §2.3 / Table 2（无 arXiv 号；PDF 自项目页 wkqdzkd.github.io 取得） | 549 条参考文献；按级篇数（L0 42 / L1 137 / L2 257 / L3 21 / L4 30）取自项目 README 分节而非正文统计；preprints.org 页面不可访问 |
+| reliability ladder：外部目标、证据来源、验收策略须版本化并留在 update boundary 之外；development evidence 不得单独充当最终审计证据；"self-evolution depth alone does not determine reliability" | source-verified [10-23 并入] | 同上 §2.1 / §8.1 / Figure 8 / Table 9 | 作者自述为 "conditional design requirements rather than sufficient guarantees"；已读章节无任何 gate 误收/误拒率 |
+| 代表性评测套件中无一直接测跨多代保留的 L3/L4 改动；两项早期预警任务未显示系统能反复改进自身 improver | source-verified [10-23 并入] | 同上 §9.1 / §9.2 | "代表性"为该综述自选范围；SEAGym / BenchTrace / SEA-Eval（31.2× token 差）/ PAST-Bench 均为转引、未入库 |
+| 1,250 篇 2024–2026 年论文，74% 发布于 2026；verification hierarchy formal > execution > learned judge > intrinsic 与已报告自改进强度同向；几乎全部工作 human-on-the-loop | source-verified [10-23 并入] | arXiv 2607.07663 v2 §1 / §2.2 / §2.3 / §3.1 / §5.2 Fig. 5 / §5.3 / §5.4 / §8 | 篇数与归类为作者自建语料；"同向"是定性归纳非测得相关；bounded / open-ended 二分为概念框架无实证 |
+| 𝒜_t=(θ_t, Σ_t)、Σ=(p, m, 𝒯, g)、更新算子 𝒰；indirect（改 θ）/ direct（改 Σ）两模式；Table 1 自评相对 Gao / Fang / Tao 三综述的覆盖 | source-verified [10-23 并入] | arXiv 2607.13104 v1 §3 / Table 1 | 伴随站点 312 条（scaffolding 176 / evaluation 59）为站点计数；RSI 仅在 §6.4 Takeaway（full scaffolding 为最接近 RSI 的类别，bounded、verifiable loops）与 §9.1 安全段出现；§9.2 outlook 未列 RSI |
+| 非参数自演化 agent 在四条漂移任务流（BIRD / BFCL / ScienceWorld）上 plasticity 以 stability 为代价；自改写方法的全局编辑覆盖早期知识，检索式记忆出现 retrieval collision | 库内暂无独立验证 [10-23 并入] | arXiv 2610.25858 摘要 | 摘要级；无数字入正文；待 digest |
+| SAVER 框架；合法状态因 adaptation 扩张 persistence / authority / scope 而变得不安全；descendant repair 与 adaptation 恢复后的评估证据最少 | 库内暂无独立验证 [10-23 并入] | arXiv 2610.00093 摘要 | 摘要级（80 页正文未读）；与 [[Papers/2608-SkillJack]] 派生物存活 80.0% 同向 |
 
 ## 调研日志
+
+### 2026-10-23 增量更新（围绕 2026 年下半年的文献综述）
+
+- **触发**：Supervisor 要求围绕最新的文献综述更新本 survey。检索范围限定为 2026-06 以来以 self-evolving / self-improving / RSI 为题的综述与综述级实证，通道为 WebSearch（arXiv listing）、各综述项目页与 OpenReview；OpenAlex 未动用。
+- **纳入（9 项，均无 Papers/ 笔记，以外链登记）**：全文读取 3 项——Diving into Reliable Self-Evolving Agents（Tencent Hunyuan / ZJU / PKU / THU，无 arXiv 号，PDF 自项目页取得并 pdftotext 转文本，读 §1–§2、§3.3 / §4.4 / §5.6 / §6.3 / §7.3、§8、§9）、arXiv 2607.07663 v2（HTML 全文）、arXiv 2607.13104 v1（HTML 全文）；节级读取 2 项——arXiv 2601.12538 v2 §2.2 / §4 / §8、arXiv 2608.03392 §1 / §3（核验阶段补读）；摘要级 4 项——Jiang et al.（OpenReview IUltZSgLMm，PDF 被访问验证拦截，项目页论文索引显示为空，故其论文数与章节数未写入正文）、arXiv 2610.00093、2608.18104、2610.25858。
+- **跳过**：arXiv 2607.10113（Dynamic Agent Skills 生命周期综述，范围与 §6.1 重合但未读）、2608.08466（31 篇小综述）、2609.06396（MetaRSI）、2608.18066（自改进 agent 脆弱性）——均为检索命中但未读，留待下一轮；2602.23720 与 2511.13411 两个非综述的层级框架不纳入。
+- **结构变化**：§1.1 增综述格局表（8 行）与引言段；§1.2 增一段"综述层面换轴"；§2.1 增 retention condition / external audit 的跨来源对照句；§3.3 增"层级不是证据强度排序"限定句；§3.7 新设"与 2026 年综述层级分类学的对齐"（对齐表 + 四点读法，其四登记本文框架缺"回路闭合度"轴）；§4.4 末增全集尺度一段；§7.6 新设"RSI 的综述级界定"（三口径表 + §7.5 五工作的 L0–L4 归位 + moving-ruler）；§10.5 末增 SAVER 一段；§11 改写第一条（纵向评估）、第二条（gate）各补一句，新设"L3/L4 改动的审计协议"一条，末尾增"与综述对照后本文独有的角度"一段；§12 其三末补一句；Key Evidence Matrix +7 行。未做章节重编号。
+- **被修改的既有结论**：§11 第一条"无 benchmark 追踪演化轨迹"收窄为"库内无、库外已有首批但未测 L3/L4"；§12 其三的"RSI 叙事超前于实物"由库内观察升为跨来源收敛（两个外部样本池同一判断）；§3.3 的 blast radius 表述补上"层级不是可靠性排序"的限定（Tencent 综述明确拒绝该读法，本文原表述与之不冲突但未明示）。
+- **刻意未写进正文的 claim 及理由**：(1) Tencent 综述 README 的按级篇数（L0 42 / L1 137 / L2 257 / L3 21 / L4 30）只写进 Matrix 边界列，因为它是 README 分节计数而非正文统计；(2) Jiang et al. 的"111 篇、9 章"来自搜索摘要，项目页显示 0 indexed papers，不写；(3) arXiv 2607.07663 的分类计数（deployment-time 393 / training-time 340 / self-evaluation 318 / auto research 139）不写进正文，只保留总数与 2026 占比，因为分类边界由作者自定；(4) arXiv listing 本身给出 2610.00093 v1 = 2026-09-08、2608.18104 v1 = 2026-06-10，两次独立读取一致，但与 arXiv 号月份不符，原因未查明；正文按 listing 日期写并保留 arXiv 号。
+- **papers_analyzed 对账链**：同 09-18 口径机械重数（`## 调研日志` 之前正文中唯一且能解析到 `Papers/*.md` 的 wikilink），得 76；本轮未新增 Papers/ 笔记，§7.6 引用的均为既有笔记，机械值与 frontmatter 一致，papers_analyzed 不变。
+- **核验**：两个独立核验子代理，Finder ≠ Verifier。A（Tencent 综述，对照 pdftotext 全文）：53 条，46 confirmed / 7 contradicted / 0 unverifiable；实质性 1 条——初稿写"跨代报告后代表现的没有"，原文是 HGM 的 lineage productivity 估计被判为非外部审计证据（与候选选择共用 benchmark 与搜索预算），已按原文改写 §7.6；其余 6 条为措辞与定位（"任何一级"→"多个层级"、"不得兼任"→"不得单独充当最终审计证据"、Table 9 的"一种"→"一组特征性失效"、§12 的 549 条范围表述→"Table 10 列举"、L3 证据形态定位补 Table 9、§11 末补 §8.3 统计有效性限定）。B（arXiv 2607.07663 / 2607.13104 全文 HTML，其余五篇摘要页与 Jiang 项目页）：52 条，45 confirmed（7 条带定位或细节修正）/ 3 contradicted / 3 unverifiable；实质性 1 条——初稿称 2607.13104 把 RSI loop、open-ended 环境与形式验证列入 §9.2 outlook，原文 §9.2 六条均不含 RSI，RSI 只出现在 §6.4 Takeaway（full scaffolding 为最接近 RSI 的类别，现为 bounded、verifiable loops）与 §9.1 安全段，§1.1 表 / §7.6 表 / Matrix 三处同步改写；另两条为 2610.00093 与 2608.18104 的 listing 日期（见上条(4)）。unverifiable 三条的处理：Jiang et al."RSI 归入 meta-evolution"改为未核实并注明 README 反证；"7–9 月"按 Jiang 2026-06-28 发布改为"6–9 月"；"111 篇"本就未入正文。定位类修正另有：2607.07663 引文补"in §§3–6"、frame lock-in 对应其 §8 第 6 条 "Recognizing frame revision"、Matrix 来源列补 §2.2 / §3.1 / §5.4；2607.13104 的信号三分只是 θ 侧子轴，§1.1 与 §3.7 两表已改；2608.03392 的"按干预深度排序"只在正文，读取深度改为"摘要 + §1 / §3 节级"。全部修正已落稿。
+- **待办**：digest Diving into Reliable Self-Evolving Agents 与 arXiv 2607.07663 两篇（本 survey 引用最重、目前只有外链）；读 2610.25858 全文后决定是否补进 §9 索引表；§9 索引表补"演化步是否经人工验收"一列（§3.7 其四）。
 
 ### 2026-09-18 survey-refresh（并入 18 篇，papers_analyzed 76）
 

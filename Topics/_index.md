@@ -23,7 +23,7 @@ last_updated: "2026-08-20"
 |:--|:--|
 | [[Topics/AgentHarness-Design]] | harness 三条设计轴（动作接口 / 执行循环 / 上下文预算）+ 预算口径审计，web agent 范围 |
 | [[Topics/Harness-Component-Attribution]] | harness 增益的组件级归因：bundle 报增益、缺角色消融的证据缺口 |
-| [[Topics/WebAgentRL-Training]] | Web agent RL 训练：live rollout / 离线动作匹配 / 环境供给 / 奖励来源的取舍，含方法优缺点总表 |
+| [[Topics/WebAgentRL-Training]] | Web agent RL 训练：live rollout / 离线动作匹配 / 环境供给 / 奖励来源的取舍，含方法优缺点总表、分层 Open Problems 与挑战/可做的点 |
 
 ### AI Agent / 非 GUI 邻接方向
 

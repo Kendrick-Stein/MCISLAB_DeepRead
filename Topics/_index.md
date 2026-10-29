@@ -7,7 +7,7 @@ last_updated: "2026-08-20"
 
 `Topics/` 只维护跨论文、可持续增量更新的 canonical survey；一次性报告与项目提案放在 `Reports/`。
 
-> 2026-07-23 升级：GUI 主报告重构为 12 节完整 [[Topics/CUA-Survey]]（180 篇）。2026-07-24 清理：GUIAgent-Survey 及 4 份 merged redirect（AgentEnvironment / AgentRuntimePrimitives / RealWorldGUIAgent-Reliability / AgenticRL）删除，全库链接已改指 CUA-Survey。2026-08-20 新增跨域算法切面 [[Topics/StepCreditAssignment-Survey]]。当前 10 份均为 active survey。
+> 2026-07-23 升级：GUI 主报告重构为 12 节完整 [[Topics/CUA-Survey]]（180 篇）。2026-07-24 清理：GUIAgent-Survey 及 4 份 merged redirect（AgentEnvironment / AgentRuntimePrimitives / RealWorldGUIAgent-Reliability / AgenticRL）删除，全库链接已改指 CUA-Survey。2026-08-20 新增跨域算法切面 [[Topics/StepCreditAssignment-Survey]]。2026-10-28：CUA-Survey 增补 §10.11 Recent Landscape（2026-09/10 arXiv 扫描，20 篇全文核验 + 摘要级清单）与五个可开工实验方向 D1–D5。当前 10 份均为 active survey。
 
 ### GUI / Computer-Use Agent（当前研究重心）
 

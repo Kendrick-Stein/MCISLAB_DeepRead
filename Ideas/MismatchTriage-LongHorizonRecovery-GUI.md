@@ -3,7 +3,7 @@ title: "Recovery-Selection Gap：GUI Agent 的固定恢复策略留下多少可�
 tags: [gui-agent, computer-use, research-idea]
 status: developing
 linked_project: "[[Projects/MismatchTriage]]"
-date_updated: "2026-07-21"
+date_updated: "2026-10-29"
 ---
 
 ## Hypothesis
@@ -63,6 +63,10 @@ VeriGUI / OS-Oracle 主要研究第一层，WebRollback 研究是否 rollback �
 | [[Papers/2605-GUIRobustEval]] | 分支发现错误并合成恢复轨迹，建立 recovery benchmark | 不穷举同一点的异质 recovery operators，也不测 selection regret |
 | [[Papers/2606-SRC]] / [[Papers/2410-ExACT]] | 用 rollback/search 产生训练数据，再蒸馏为无搜索 policy | `train-with-fork, deploy-fork-free` 已有先例；本工作的差异是完整 recovery-intervention matrix 与 terminal value supervision |
 | [[Papers/2505-BacktrackAgent]] / [[Papers/2604-VeriGUI]] / [[Papers/2606-OSOracle]] | 检测失败后固定回退、self-correct 或 regenerate | 构成 shared-detector fixed baselines；不代表全部已有 recovery work |
+| AndroidFlux（[arXiv 2610.34384](https://arxiv.org/abs/2610.34384)） | 在 Android 上按错误深度评测两种固定干预：倒回到错误前相对于在错误步继续，前 3 步 +8.76、7 步后 +3.41；注入正确纠正动作相对于注入错误动作，−1.01→+5.86；两者差随深度移动 12.22 点 [4.1, 20.8]；并训练 recovery reward model | 只评测固定干预、不做条件化选择；两种干预各对各自基线，没有同 checkpoint 的全 operator outcome vector。它给出的深度交叉正是 selector 应该学到的东西，是 Phase 3 的外部先验 |
+| ReInBench / When to Intervene（[arXiv 2610.36471](https://arxiv.org/abs/2610.36471)） | 1,403 个自然发生的错误里 51.7% 被 agent 自行恢复（OSWorld 54.8%、web 32.8%）；全恢复轨迹完成率 60.0% 对零恢复 20.6%；ReCoF 预测"会不会自行恢复"宏 F1 73.53 对直接提示 68.75 | 只预测自恢复、不执行干预；`Continue` 臂的基率（约半数）由此有了外部数字，Phase 1 的 alert state bank 可据此预设 Continue 最优的比例区间 |
+| CUA-Recovery（[arXiv 2610.27645](https://arxiv.org/abs/2610.27645)） | policy 自发错误 2,250 个状态、接管深度 0–25：察觉到错误的运行通过率 15.6%，未察觉 12.2%；60.0% 的错误只在最后一步才出现证据，中位延迟 17 步；恢复轨迹微调使察觉率 19.9%→35.2% | 只有 Continue 一种干预；"察觉≠修复"说明 detector 不是 selector 的替代，但"证据中位延迟 17 步"把 detector-conditioned scope 风险量化了——first-alert 协议的触发点可能已经太深 |
+| Lost in Recovery（[arXiv 2610.27954](https://arxiv.org/abs/2610.27954)） | 注入 1–2 步错误后以回放 + SSIM 判定是否还原：EvoCUA-32B 隐式恢复 <1%，Sonnet 4.6 随允许步数 2→10 由 26.98% 降到 6.37%；推理时外挂同 backbone 显式恢复 agent 对 Qwen3.5-9B OSWorld 39.38→44.26，对 UI-TARS-1.5-7B / EvoCUA-32B 反而拖低 | 不训练、不选择；但"显式恢复 agent 对强 policy 为负"是 selection heterogeneity 的又一间接证据，也是 Phase 2 必须包含强 policy 的理由 |
 
 **Novelty**: 3/5 — closest works: [[Papers/2607-RobustExecAgenticRL]], [[Papers/2605-GUIRobustEval]], [[Papers/2504-WebRollback]]。广义的 learned recovery selection、branching-for-recovery-data、search-to-policy distillation 都已有先例；可守的新颖性是三者的组合：**GUI 同 checkpoint 全 recovery intervention matrix + oracle-vs-best-fixed headroom 的直接测量 + outcome-value selector 的 fork-free 部署**。
 
@@ -222,7 +226,7 @@ G_{\text{deploy}}=V(\rho_f;\pi,D)-V(\rho_{\text{best-fixed}};\pi,D),
 ## Main risks after refinement
 
 - **Novelty 已有强邻居**：RobustExec 已完成跨域 learned recovery selection；Human-Guided Harm Recovery、ScreenAgent、WebRollback 也否定宽 claim。论文必须以 matched-state gap measurement 为第一贡献，以 selector 为第二贡献。
-- **Detector-conditioned scope**：selection 上限可能被低 recall detector 压住。用 all-alert / confirmed-mismatch / injected-mismatch 三层结果分离，不把 detector 问题偷偷算给 selector。
+- **Detector-conditioned scope**：selection 上限可能被低 recall detector 压住。用 all-alert / confirmed-mismatch / injected-mismatch 三层结果分离，不把 detector 问题偷偷算给 selector。 10-29 补充：CUA-Recovery 测得 60.0% 的错误只在最后一步才出现证据、中位延迟 17 步，first-alert 触发时错误深度可能已超过 AndroidFlux 的交叉点（约 7 步），injected-mismatch 层须覆盖 0–3 与 ≥7 两个深度段。
 - **Fork 不完整**：remote backend、wall clock、network queue、auth/session、push 与外部副作用可能不在 emulator snapshot 内。fork fidelity 是前置 gate，不是事后 limitation。
 - **Outcome sparsity / winner's curse**：长 suffix 可能使七个 macro 全失败；用 expected outcomes、独立 selection/evaluation replicates、adaptive replication 与 recoverable coverage 控制。
 - **Macro 不同层级与成本**：额外 cognition 可能靠更多 token 获胜。预注册 macro budget，并报告 cost-aware 与 success-only 两套结果。
@@ -250,7 +254,8 @@ G_{\text{deploy}}=V(\rho_f;\pi,D)-V(\rho_{\text{best-fixed}};\pi,D),
 - **v2（同日下午）**：五分类 + 完备性三重验收。
 - **v3（同日）**：去除分类学依赖，改为分叉测量 recovery-selection gap；评估 21/25。
 - **v3.1（2026-07-20 上午）**：加入 EvoCUA-1.5 的 PRM failure、train-with-fork / deploy-fork-free 与第二轮 novelty search。
-- **v4（2026-07-20，本版）**：发现 RobustExec、WebRollback、GUI-RobustEval、ScreenAgent、Human-Guided Harm Recovery 等近邻后收窄 novelty；加入 `Continue`、形式化 estimand、first-alert / end-to-end 双协议、expected-outcome oracle、fork fidelity gate、强 fixed protocol、cost-aware value selector 与 CI kill criterion。评分从 21/25 调整为 18/25。
+- **v4（2026-07-20）**：发现 RobustExec、WebRollback、GUI-RobustEval、ScreenAgent、Human-Guided Harm Recovery 等近邻后收窄 novelty；加入 `Continue`、形式化 estimand、first-alert / end-to-end 双协议、expected-outcome oracle、fork fidelity gate、强 fixed protocol、cost-aware value selector 与 CI kill criterion。评分从 21/25 调整为 18/25。
+- **v4.1（2026-10-29，本版）**：按 [[Topics/CUA-Survey]] §10.11 的 2026-09/10 扫描并入四份外部基率（AndroidFlux、ReInBench / When to Intervene、CUA-Recovery、Lost in Recovery，均全文核验）。改动：Related Work 表加四行；Phase 0–1 的 `Continue` 基率预设为约半数（ReInBench 51.7%）；Phase 3 的 gap 判据加入"倒回与注入的增益随深度交叉 12.22 点"作为 selector 可收回幅度的外部参照（survey 的预测是条件化选择器相对最佳固定策略 ≥4–6 pp）；Main risks 的 detector-conditioned scope 由 CUA-Recovery 的"证据中位延迟 17 步"量化。novelty 位置未被占：ReCoF 只预测不干预，AndroidFlux 只评测不做策略；下一步跑 idea-evaluate 复核。评分未重估。
 
 ## Evidence boundary / 待核查
 

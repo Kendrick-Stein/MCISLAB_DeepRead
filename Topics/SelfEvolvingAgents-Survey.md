@@ -4,7 +4,7 @@ tags: [survey, self-evolving-agents, self-improvement, recursive-self-improvemen
 date_updated: "2026-10-23"
 year_range: 2022-2026
 papers_analyzed: 76
-keywords: [self-evolving, self-evolution, self-improving, self-improvement, recursive self-improvement, self-recursive improvement, misevolution, lifelong agent, skill evolution, memory evolution, operation-level memory, experience-driven, co-evolution, environment evolution, multi-agent evolution, skill optimization, skill library, self-training, memory poisoning, evolution gate, verifier gating, harness evolution, streaming evaluation, evolution gain]
+keywords: [self-evolving, self-evolution, self-improving, self-improvement, recursive self-improvement, self-recursive improvement, misevolution, lifelong agent, skill evolution, memory evolution, operation-level memory, experience-driven, co-evolution, environment evolution, multi-agent evolution, skill optimization, skill library, self-training, memory poisoning, evolution gate, verifier gating, harness evolution, agent harnessing, harness self-improvement, streaming evaluation, evolution gain]
 domain_map: AgenticRL
 supersedes: "SelfEvolvingAgents-Survey 07-24 版（30 篇、4 路线）已并入本文并按 12 节 CUA 标准重排"
 ---

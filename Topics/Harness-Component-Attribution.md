@@ -4,7 +4,7 @@ tags: [survey, task-planning, LLM, computer-use]
 date_updated: "2026-08-05"
 year_range: 2025-2026
 papers_analyzed: 17
-keywords: [agent harness, harness ablation, component attribution, role separation, independent verifier, verification gate, context reset, fresh context, progressive disclosure, compute-matched control]
+keywords: [agent harness, harness ablation, component attribution, role separation, independent verifier, verification gate, context reset, fresh context, progressive disclosure, compute-matched control, artifact creation]
 domain_map: GUI-Agent
 scope: methodology-focused
 ---
@@ -40,6 +40,7 @@ scope: methodology-focused
 | [[Papers/2608-ScreenshotsOrTools]] | MCP 工具注入 | 同 8B backbone，harness/retriever/prompt/toolset 固定 | Thinking +4.0pp / Instruct −5.9pp，均超 2 SE | 强 |
 | [[Papers/2606-SkillMemoryBudget]] | memory/skill 库 | token-matched vanilla（同预算换 15 步） | 3 模型 × 3 WebArena 域聚合 SR 被 vanilla 追平或反超 | 强 |
 | [[Papers/2510-ContextFolding]] | FoldGRPO 过程奖励 | 与 plain GRPO 对照 | plain GRPO 训出相反行为 | 中 |
+| [[Papers/2609-SoLPi]] | 四个 token 效率机制（Action Fusion / Online Context Compact / ObservationPack / Evidence-Preserving Reducer）逐个加到 Pi 上，对照全栈 | EdgeBench 51 个公开任务，GPT-5.6 Sol 与 Opus 5 两个 backend；harness 只在 GPT-5.6 Sol 轨迹上开发 | 全栈 token 降 49.0% / 44.7%、成本降 33.2% / 33.5%，分数为 Pi 的 93.7% / 94.3%；Opus 5 上单加 ObservationPack \$1,176 / 47.05，全栈 \$1,158 / 42.22 | 中：token 与成本侧削减幅度大；分数侧全为单次点估计、无方差，且 51 题中 11 题参与过候选验收 |
 
 ## 3. 四条轴上的发现
 
@@ -49,11 +50,13 @@ scope: methodology-focused
 
 决定符号的是两个变量：**被接受产物的持久性**，以及**判决的独立性**。GRASP 与 SkillNb 门控的是要写进技能库、会在所有后续任务上复用的产物，一次误收的代价被无限次摊放，因此闸门承重；TeamBench 门控的是单次提交，签或不签之后运行即结束，误拒的代价立刻兑现而误收的代价不复合，因此一个与生产者同能力层的验证者是净损失。HarnessBank 的 gate 产物同样持久，但它的部署选择由 train-argmax 独立完成，gate 的边际贡献因此被挤到零——它实际充当预算分配器与档案守门员，把收敛轮数从 20 以上压到 10、把假精英从 2 个压到 0。
 
+持久产物上的闸门承重，但它只守得住自己度量的那个分布。[[Papers/2609-SoLPi]] 门控的是要固化进 harness 的效率机制，判据在搜索前冻结、脱离被优化 agent 的控制：能力指标须落在预声明容差内，且至少一项效率指标改善。这道闸门约束的是聚合分数。全栈在 EdgeBench 上保住 Pi 平均分的 93.7%，换到 Terminal-Bench 4 的 63 个 CPU-only 任务时解 15 题，Codex 与 Pi 各解 18 题；论文报告的是单解题成本更低（\$14.07 对 \$15.91），而这个指标在解题数变少时也会变好。这些都是单次点估计，三题之差是否超出噪声，原文无从判断。
+
 这解释也预测了 [[Papers/2608-LongHorizonHarness]] 的位置：它的 auditor 门控的是跨轮持久 task state，持久性中等（误收可在后续 25 轮内被推翻），独立性低（auditor 与 executor 是同一个 Qwen 3.7-Plus，只是 context 不同）。
 
 ### 3.2 独立验证的"独立性"是有剂量的，低剂量已被证明失效
 
-[[Papers/2606-CodeSelfReviewCollapse]] 给出了理论边界：当门控信号来自模型自身时，被门控的分布退化为未门控分布（Theorem 2.3，"filtering becomes mathematically identical to no filtering"），通过率上升而正确率下降；Theorem 2.6 给出正向条件，要求校准误差有界。
+[[Papers/2606-CodeSelfReviewCollapse]] 给出了理论边界：当门控信号来自模型自身时，被门控的分布退化为未门控分布（Theorem 2.3，"filtering becomes mathematically identical to no filtering"），通过率上升而正确率下降；Theorem 2.6 给出正向条件，要求校准误差有界。[[Papers/2608-AgenticArtifactCreation]] 在 artifact creation 文献里综合出同向判断（learned judge 与生成器共享偏好与盲点时增益有限），但这一论断以被引的自偏好与 LLM-as-a-judge 偏差研究为依据，作者未在其 230 个系统上实测，不构成独立证据。
 
 实证侧的剂量阶梯已经成形：
 

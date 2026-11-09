@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr"><head><title>Self-Supervised Visual On-Policy Distillation</title><meta charset="utf-8"/><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com"/><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted Grotesk:wght@400;700&amp;family=Source Sans Pro:ital,wght@0,400;0,600;1,400;1,600&amp;family=IBM Plex Mono:wght@400;600&amp;display=swap"/><link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin="anonymous"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="og:site_name" content="DeepRead"/><meta property="og:title" content="Self-Supervised Visual On-Policy Distillation"/><meta property="og:type" content="website"/><meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="Self-Supervised Visual On-Policy Distillation"/><meta name="twitter:description" content="Summary S2VOPD 把 on-policy self-distillation 的 teacher–student 信息差反过来构造：不给 teacher 加 privileged 信息，而是让 student 在降质视图（默认下采样到 0.3–0.6× 再以 0.5 概率加 Gaussian noise）上 rollout，EMA teacher 在原图上对同一前缀打分，用 top-k generalized JSD 蒸馏，全程不需要标注、reward 或更强 teacher。Qwen3.5-4B 在 FineVision 12K 上训练后，6 个细粒度感知 benchmark 平..."/><meta property="og:description" content="Summary S2VOPD 把 on-policy self-distillation 的 teacher–student 信息差反过来构造：不给 teacher 加 privileged 信息，而是让 student 在降质视图（默认下采样到 0.3–0.6× 再以 0.5 概率加 Gaussian noise）上 rollout，EMA teacher 在原图上对同一前缀打分，用 top-k generalized JSD 蒸馏，全程不需要标注、reward 或更强 teacher。Qwen3.5-4B 在 FineVision 12K 上训练后，6 个细粒度感知 benchmark 平..."/><meta property="og:image:alt" content="Summary S2VOPD 把 on-policy self-distillation 的 teacher–student 信息差反过来构造：不给 teacher 加 privileged 信息，而是让 student 在降质视图（默认下采样到 0.3–0.6× 再以 0.5 概率加 Gaussian noise）上 rollout，EMA teacher 在原图上对同一前缀打分，用 top-k generalized JSD 蒸馏，全程不需要标注、reward 或更强 teacher。Qwen3.5-4B 在 FineVision 12K 上训练后，6 个细粒度感知 benchmark 平..."/><meta property="og:image" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/static/og-image.png"/><meta property="og:image:url" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/static/og-image.png"/><meta name="twitter:image" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/static/og-image.png"/><meta property="og:image:type" content="image/.png"/><meta property="twitter:domain" content="kendrick-stein.github.io/MCISLAB_DeepRead"/><meta property="og:url" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/Papers/2608-S2VOPD"/><meta property="twitter:url" content="https://kendrick-stein.github.io/MCISLAB_DeepRead/Papers/2608-S2VOPD"/><link rel="icon" href="../static/icon.png"/><meta name="description" content="Summary S2VOPD 把 on-policy self-distillation 的 teacher–student 信息差反过来构造：不给 teacher 加 privileged 信息，而是让 student 在降质视图（默认下采样到 0.3–0.6× 再以 0.5 概率加 Gaussian noise）上 rollout，EMA teacher 在原图上对同一前缀打分，用 top-k generalized JSD 蒸馏，全程不需要标注、reward 或更强 teacher。Qwen3.5-4B 在 FineVision 12K 上训练后，6 个细粒度感知 benchmark 平..."/><meta name="generator" content="Quartz"/><link href="../index.css" rel="stylesheet" type="text/css" data-persist="true"/><style>.expand-button {
+  position: absolute;
+  display: flex;
+  float: right;
+  padding: 0.4rem;
+  margin: 0.3rem;
+  right: 0;
+  color: var(--gray);
+  border-color: var(--dark);
+  background-color: var(--light);
+  border: 1px solid;
+  border-radius: 5px;
+  opacity: 0;
+  transition: 0.2s;
+}
+.expand-button > svg {
+  fill: var(--light);
+  filter: contrast(0.3);
+}
+.expand-button:hover {
+  cursor: pointer;
+  border-color: var(--secondary);
+}
+.expand-button:focus {
+  outline: 0;
+}
+
+pre:hover > .expand-button {
+  opacity: 1;
+  transition: 0.2s;
+}
+
+#mermaid-container {
+  position: fixed;
+  contain: layout;
+  z-index: 999;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: none;
+  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.5);
+}
+#mermaid-container.active {
+  display: inline-block;
+}
+#mermaid-container > #mermaid-space {
+  border: 1px solid var(--lightgray);
+  background-color: var(--light);
+  border-radius: 5px;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  height: 80vh;
+  width: 80vw;
+  overflow: hidden;
+}
+#mermaid-container > #mermaid-space > .mermaid-content {
+  position: relative;
+  transform-origin: 0 0;
+  transition: transform 0.1s ease;
+  overflow: visible;
+  min-height: 200px;
+  min-width: 200px;
+}
+#mermaid-container > #mermaid-space > .mermaid-content pre {
+  margin: 0;
+  border: none;
+}
+#mermaid-container > #mermaid-space > .mermaid-content svg {
+  max-width: none;
+  height: auto;
+}
+#mermaid-container > #mermaid-space > .mermaid-controls {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: var(--light);
+  border: 1px solid var(--lightgray);
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+}
+#mermaid-container > #mermaid-space > .mermaid-controls .mermaid-control-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--lightgray);
+  background: var(--light);
+  color: var(--dark);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  font-family: var(--bodyFont);
+  transition: all 0.2s ease;
+}
+#mermaid-container > #mermaid-space > .mermaid-controls .mermaid-control-button:hover {
+  background: var(--lightgray);
+}
+#mermaid-container > #mermaid-space > .mermaid-controls .mermaid-control-button:active {
+  transform: translateY(1px);
+}
+#mermaid-container > #mermaid-space > .mermaid-controls .mermaid-control-button:nth-child(2) {
+  width: auto;
+  padding: 0 12px;
+  font-size: 14px;
+}
+/*# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VSb290IjoiL2hvbWUvcnVubmVyL3dvcmsvTUNJU0xBQl9EZWVwUmVhZC9NQ0lTTEFCX0RlZXBSZWFkL3dlYnNpdGUvcXVhcnR6L2NvbXBvbmVudHMvc3R5bGVzIiwic291cmNlcyI6WyJtZXJtYWlkLmlubGluZS5zY3NzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiJBQUFBO0VBQ0U7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7O0FBRUE7RUFDRTtFQUNBOztBQUdGO0VBQ0U7RUFDQTs7QUFHRjtFQUNFOzs7QUFLRjtFQUNFO0VBQ0E7OztBQUlKO0VBQ0U7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTs7QUFFQTtFQUNFOztBQUdGO0VBQ0U7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7O0FBRUE7RUFDRTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7O0FBRUE7RUFDRTtFQUNBOztBQUdGO0VBQ0U7RUFDQTs7QUFJSjtFQUNFO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7O0FBRUE7RUFDRTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBO0VBQ0E7RUFDQTtFQUNBOztBQUVBO0VBQ0U7O0FBR0Y7RUFDRTs7QUFJRjtFQUNFO0VBQ0E7RUFDQSIsInNvdXJjZXNDb250ZW50IjpbIi5leHBhbmQtYnV0dG9uIHtcbiAgcG9zaXRpb246IGFic29sdXRlO1xuICBkaXNwbGF5OiBmbGV4O1xuICBmbG9hdDogcmlnaHQ7XG4gIHBhZGRpbmc6IDAuNHJlbTtcbiAgbWFyZ2luOiAwLjNyZW07XG4gIHJpZ2h0OiAwOyAvLyBOT1RFOiByaWdodCB3aWxsIGJlIHNldCBpbiBtZXJtYWlkLmlubGluZS50c1xuICBjb2xvcjogdmFyKC0tZ3JheSk7XG4gIGJvcmRlci1jb2xvcjogdmFyKC0tZGFyayk7XG4gIGJhY2tncm91bmQtY29sb3I6IHZhcigtLWxpZ2h0KTtcbiAgYm9yZGVyOiAxcHggc29saWQ7XG4gIGJvcmRlci1yYWRpdXM6IDVweDtcbiAgb3BhY2l0eTogMDtcbiAgdHJhbnNpdGlvbjogMC4ycztcblxuICAmID4gc3ZnIHtcbiAgICBmaWxsOiB2YXIoLS1saWdodCk7XG4gICAgZmlsdGVyOiBjb250cmFzdCgwLjMpO1xuICB9XG5cbiAgJjpob3ZlciB7XG4gICAgY3Vyc29yOiBwb2ludGVyO1xuICAgIGJvcmRlci1jb2xvcjogdmFyKC0tc2Vjb25kYXJ5KTtcbiAgfVxuXG4gICY6Zm9jdXMge1xuICAgIG91dGxpbmU6IDA7XG4gIH1cbn1cblxucHJlIHtcbiAgJjpob3ZlciA+IC5leHBhbmQtYnV0dG9uIHtcbiAgICBvcGFjaXR5OiAxO1xuICAgIHRyYW5zaXRpb246IDAuMnM7XG4gIH1cbn1cblxuI21lcm1haWQtY29udGFpbmVyIHtcbiAgcG9zaXRpb246IGZpeGVkO1xuICBjb250YWluOiBsYXlvdXQ7XG4gIHotaW5kZXg6IDk5OTtcbiAgbGVmdDogMDtcbiAgdG9wOiAwO1xuICB3aWR0aDogMTAwdnc7XG4gIGhlaWdodDogMTAwdmg7XG4gIG92ZXJmbG93OiBoaWRkZW47XG4gIGRpc3BsYXk6IG5vbmU7XG4gIGJhY2tkcm9wLWZpbHRlcjogYmx1cig0cHgpO1xuICBiYWNrZ3JvdW5kOiByZ2JhKDAsIDAsIDAsIDAuNSk7XG5cbiAgJi5hY3RpdmUge1xuICAgIGRpc3BsYXk6IGlubGluZS1ibG9jaztcbiAgfVxuXG4gICYgPiAjbWVybWFpZC1zcGFjZSB7XG4gICAgYm9yZGVyOiAxcHggc29saWQgdmFyKC0tbGlnaHRncmF5KTtcbiAgICBiYWNrZ3JvdW5kLWNvbG9yOiB2YXIoLS1saWdodCk7XG4gICAgYm9yZGVyLXJhZGl1czogNXB4O1xuICAgIHBvc2l0aW9uOiBmaXhlZDtcbiAgICB0b3A6IDUwJTtcbiAgICBsZWZ0OiA1MCU7XG4gICAgdHJhbnNmb3JtOiB0cmFuc2xhdGUoLTUwJSwgLTUwJSk7XG4gICAgaGVpZ2h0OiA4MHZoO1xuICAgIHdpZHRoOiA4MHZ3O1xuICAgIG92ZXJmbG93OiBoaWRkZW47XG5cbiAgICAmID4gLm1lcm1haWQtY29udGVudCB7XG4gICAgICBwb3NpdGlvbjogcmVsYXRpdmU7XG4gICAgICB0cmFuc2Zvcm0tb3JpZ2luOiAwIDA7XG4gICAgICB0cmFuc2l0aW9uOiB0cmFuc2Zvcm0gMC4xcyBlYXNlO1xuICAgICAgb3ZlcmZsb3c6IHZpc2libGU7XG4gICAgICBtaW4taGVpZ2h0OiAyMDBweDtcbiAgICAgIG1pbi13aWR0aDogMjAwcHg7XG5cbiAgICAgIHByZSB7XG4gICAgICAgIG1hcmdpbjogMDtcbiAgICAgICAgYm9yZGVyOiBub25lO1xuICAgICAgfVxuXG4gICAgICBzdmcge1xuICAgICAgICBtYXgtd2lkdGg6IG5vbmU7XG4gICAgICAgIGhlaWdodDogYXV0bztcbiAgICAgIH1cbiAgICB9XG5cbiAgICAmID4gLm1lcm1haWQtY29udHJvbHMge1xuICAgICAgcG9zaXRpb246IGFic29sdXRlO1xuICAgICAgYm90dG9tOiAyMHB4O1xuICAgICAgcmlnaHQ6IDIwcHg7XG4gICAgICBkaXNwbGF5OiBmbGV4O1xuICAgICAgZ2FwOiA4cHg7XG4gICAgICBwYWRkaW5nOiA4cHg7XG4gICAgICBiYWNrZ3JvdW5kOiB2YXIoLS1saWdodCk7XG4gICAgICBib3JkZXI6IDFweCBzb2xpZCB2YXIoLS1saWdodGdyYXkpO1xuICAgICAgYm9yZGVyLXJhZGl1czogNnB4O1xuICAgICAgYm94LXNoYWRvdzogMCAycHggNHB4IHJnYmEoMCwgMCwgMCwgMC4xKTtcbiAgICAgIHotaW5kZXg6IDI7XG5cbiAgICAgIC5tZXJtYWlkLWNvbnRyb2wtYnV0dG9uIHtcbiAgICAgICAgZGlzcGxheTogZmxleDtcbiAgICAgICAgYWxpZ24taXRlbXM6IGNlbnRlcjtcbiAgICAgICAganVzdGlmeS1jb250ZW50OiBjZW50ZXI7XG4gICAgICAgIHdpZHRoOiAzMnB4O1xuICAgICAgICBoZWlnaHQ6IDMycHg7XG4gICAgICAgIHBhZGRpbmc6IDA7XG4gICAgICAgIGJvcmRlcjogMXB4IHNvbGlkIHZhcigtLWxpZ2h0Z3JheSk7XG4gICAgICAgIGJhY2tncm91bmQ6IHZhcigtLWxpZ2h0KTtcbiAgICAgICAgY29sb3I6IHZhcigtLWRhcmspO1xuICAgICAgICBib3JkZXItcmFkaXVzOiA0cHg7XG4gICAgICAgIGN1cnNvcjogcG9pbnRlcjtcbiAgICAgICAgZm9udC1zaXplOiAxNnB4O1xuICAgICAgICBmb250LWZhbWlseTogdmFyKC0tYm9keUZvbnQpO1xuICAgICAgICB0cmFuc2l0aW9uOiBhbGwgMC4ycyBlYXNlO1xuXG4gICAgICAgICY6aG92ZXIge1xuICAgICAgICAgIGJhY2tncm91bmQ6IHZhcigtLWxpZ2h0Z3JheSk7XG4gICAgICAgIH1cblxuICAgICAgICAmOmFjdGl2ZSB7XG4gICAgICAgICAgdHJhbnNmb3JtOiB0cmFuc2xhdGVZKDFweCk7XG4gICAgICAgIH1cblxuICAgICAgICAvLyBTdHlsZSB0aGUgcmVzZXQgYnV0dG9uIGRpZmZlcmVudGx5XG4gICAgICAgICY6bnRoLWNoaWxkKDIpIHtcbiAgICAgICAgICB3aWR0aDogYXV0bztcbiAgICAgICAgICBwYWRkaW5nOiAwIDEycHg7XG4gICAgICAgICAgZm9udC1zaXplOiAxNHB4O1xuICAgICAgICB9XG4gICAgICB9XG4gICAgfVxuICB9XG59XG4iXX0= */</style><link href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" rel="stylesheet" type="text/css" data-persist="true"/><script src="../prescript.js" type="application/javascript" data-persist="true"></script><script type="application/javascript" data-persist="true">const fetchData = fetch("../static/contentIndex.json").then(data => data.json())</script><link rel="alternate" type="application/rss+xml" title="RSS Feed" href="https://kendrick-stein.github.io/MCISLAB_DeepRead/index.xml"/></head><body data-slug="Papers/2608-S2VOPD"><div id="quartz-root" class="page"><div id="quartz-body"><div class="left sidebar"><h2 class="page-title"><a href="..">DeepRead</a></h2><div class="spacer mobile-only"></div><div class="flex-component" style="flex-direction: row; flex-wrap: nowrap; gap: 1rem;"><div style="flex-grow: 1; flex-shrink: 1; flex-basis: auto; order: 0; align-self: center; justify-self: center;"><div class="search"><button class="search-button"><svg role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 19.9 19.7"><title>Search</title><g class="search-path" fill="none"><path stroke-linecap="square" d="M18.5 18.3l-5.4-5.4"></path><circle cx="8" cy="8" r="7"></circle></g></svg><p>Search</p></button><div class="search-container"><div class="search-space"><input autocomplete="off" class="search-bar" name="search" type="text" aria-label="Search for something" placeholder="Search for something"/><div class="search-layout" data-preview="true"></div></div></div></div></div><div style="flex-grow: 0; flex-shrink: 1; flex-basis: auto; order: 0; align-self: center; justify-self: center;"><button class="darkmode"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" class="dayIcon" x="0px" y="0px" viewBox="0 0 35 35" style="enable-background:new 0 0 35 35" xml:space="preserve" aria-label="Dark mode"><title>Dark mode</title><path d="M6,17.5C6,16.672,5.328,16,4.5,16h-3C0.672,16,0,16.672,0,17.5    S0.672,19,1.5,19h3C5.328,19,6,18.328,6,17.5z M7.5,26c-0.414,0-0.789,0.168-1.061,0.439l-2,2C4.168,28.711,4,29.086,4,29.5    C4,30.328,4.671,31,5.5,31c0.414,0,0.789-0.168,1.06-0.44l2-2C8.832,28.289,9,27.914,9,27.5C9,26.672,8.329,26,7.5,26z M17.5,6    C18.329,6,19,5.328,19,4.5v-3C19,0.672,18.329,0,17.5,0S16,0.672,16,1.5v3C16,5.328,16.671,6,17.5,6z M27.5,9    c0.414,0,0.789-0.168,1.06-0.439l2-2C30.832,6.289,31,5.914,31,5.5C31,4.672,30.329,4,29.5,4c-0.414,0-0.789,0.168-1.061,0.44    l-2,2C26.168,6.711,26,7.086,26,7.5C26,8.328,26.671,9,27.5,9z M6.439,8.561C6.711,8.832,7.086,9,7.5,9C8.328,9,9,8.328,9,7.5    c0-0.414-0.168-0.789-0.439-1.061l-2-2C6.289,4.168,5.914,4,5.5,4C4.672,4,4,4.672,4,5.5c0,0.414,0.168,0.789,0.439,1.06    L6.439,8.561z M33.5,16h-3c-0.828,0-1.5,0.672-1.5,1.5s0.672,1.5,1.5,1.5h3c0.828,0,1.5-0.672,1.5-1.5S34.328,16,33.5,16z     M28.561,26.439C28.289,26.168,27.914,26,27.5,26c-0.828,0-1.5,0.672-1.5,1.5c0,0.414,0.168,0.789,0.439,1.06l2,2    C28.711,30.832,29.086,31,29.5,31c0.828,0,1.5-0.672,1.5-1.5c0-0.414-0.168-0.789-0.439-1.061L28.561,26.439z M17.5,29    c-0.829,0-1.5,0.672-1.5,1.5v3c0,0.828,0.671,1.5,1.5,1.5s1.5-0.672,1.5-1.5v-3C19,29.672,18.329,29,17.5,29z M17.5,7    C11.71,7,7,11.71,7,17.5S11.71,28,17.5,28S28,23.29,28,17.5S23.29,7,17.5,7z M17.5,25c-4.136,0-7.5-3.364-7.5-7.5    c0-4.136,3.364-7.5,7.5-7.5c4.136,0,7.5,3.364,7.5,7.5C25,21.636,21.636,25,17.5,25z"></path></svg><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" class="nightIcon" x="0px" y="0px" viewBox="0 0 100 100" style="enable-background:new 0 0 100 100" xml:space="preserve" aria-label="Light mode"><title>Light mode</title><path d="M96.76,66.458c-0.853-0.852-2.15-1.064-3.23-0.534c-6.063,2.991-12.858,4.571-19.655,4.571  C62.022,70.495,50.88,65.88,42.5,57.5C29.043,44.043,25.658,23.536,34.076,6.47c0.532-1.08,0.318-2.379-0.534-3.23  c-0.851-0.852-2.15-1.064-3.23-0.534c-4.918,2.427-9.375,5.619-13.246,9.491c-9.447,9.447-14.65,22.008-14.65,35.369  c0,13.36,5.203,25.921,14.65,35.368s22.008,14.65,35.368,14.65c13.361,0,25.921-5.203,35.369-14.65  c3.872-3.871,7.064-8.328,9.491-13.246C97.826,68.608,97.611,67.309,96.76,66.458z"></path></svg></button></div></div><div class="explorer" data-behavior="link" data-collapsed="collapsed" data-savestate="false" data-data-fns="{&quot;order&quot;:[&quot;filter&quot;,&quot;map&quot;,&quot;sort&quot;],&quot;sortFn&quot;:&quot;(a,b)=>{let order=[\&quot;DomainMaps\&quot;,\&quot;Papers\&quot;,\&quot;Topics\&quot;,\&quot;Ideas\&quot;,\&quot;Projects\&quot;],aIdx=order.indexOf(a.displayName),bIdx=order.indexOf(b.displayName);return aIdx!==-1&amp;&amp;bIdx!==-1?aIdx-bIdx:aIdx!==-1?-1:bIdx!==-1?1:a.slug?.startsWith(\&quot;Papers/\&quot;)&amp;&amp;b.slug?.startsWith(\&quot;Papers/\&quot;)?b.displayName.localeCompare(a.displayName):a.displayName.localeCompare(b.displayName)}&quot;,&quot;filterFn&quot;:&quot;node=>node.slugSegment!==\&quot;tags\&quot;&quot;,&quot;mapFn&quot;:&quot;node=>{node.isFolder||(node.displayName=node.slugSegment)}&quot;}"><button type="button" class="explorer-toggle mobile-explorer hide-until-loaded" data-mobile="true" aria-controls="explorer-1346"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide-menu"><line x1="4" x2="20" y1="12" y2="12"></line><line x1="4" x2="20" y1="6" y2="6"></line><line x1="4" x2="20" y1="18" y2="18"></line></svg></button><button type="button" class="title-button explorer-toggle desktop-explorer" data-mobile="false" aria-expanded="true"><h2>Explorer</h2><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="5 8 14 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="fold"><polyline points="6 9 12 15 18 9"></polyline></svg></button><div id="explorer-1346" class="explorer-content" aria-expanded="false" role="group"><ul class="explorer-ul overflow" id="list-0"><li class="overflow-end"></li></ul></div><template id="template-file"><li><a href="#"></a></li></template><template id="template-folder"><li><div class="folder-container"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="5 8 14 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="folder-icon"><polyline points="6 9 12 15 18 9"></polyline></svg><div><button class="folder-button"><span class="folder-title"></span></button></div></div><div class="folder-outer"><ul class="content"></ul></div></li></template></div><div class="sidebar-tags"><span class="sidebar-tags-title">Popular Tags</span><div class="sidebar-tag-cloud"><a href="/MCISLAB_DeepRead/tags/agentic-RL" class="sidebar-tag-pill">#agentic-RL</a><a href="/MCISLAB_DeepRead/tags/VLM" class="sidebar-tag-pill">#VLM</a><a href="/MCISLAB_DeepRead/tags/gui-agent" class="sidebar-tag-pill">#gui-agent</a><a href="/MCISLAB_DeepRead/tags/LLM" class="sidebar-tag-pill">#LLM</a><a href="/MCISLAB_DeepRead/tags/task-planning" class="sidebar-tag-pill">#task-planning</a><a href="/MCISLAB_DeepRead/tags/web-agent" class="sidebar-tag-pill">#web-agent</a><a href="/MCISLAB_DeepRead/tags/VLA" class="sidebar-tag-pill">#VLA</a><a href="/MCISLAB_DeepRead/tags/manipulation" class="sidebar-tag-pill">#manipulation</a><a href="/MCISLAB_DeepRead/tags/computer-use" class="sidebar-tag-pill">#computer-use</a><a href="/MCISLAB_DeepRead/tags/world-model" class="sidebar-tag-pill">#world-model</a></div></div></div><div class="center"><div class="page-header"><div class="popover-hint"><nav class="breadcrumb-container" aria-label="breadcrumbs"><div class="breadcrumb-element"><a href="../">Home</a><p> ❯ </p></div><div class="breadcrumb-element"><a href="../Papers/">Papers</a><p> ❯ </p></div><div class="breadcrumb-element"><a href>Self Supervised Visual On Policy Distillation</a></div></nav><h1 class="article-title">Self-Supervised Visual On-Policy Distillation</h1><div class="paper-meta"><span class="paper-venue">arXiv</span><span class="paper-institute"><span class="meta-sep">·</span>UC San Diego, University of Maryland, College Park, Georgia Institute of Technology, Johns Hopkins University, University of Oxford, Independent Researcher</span><span class="paper-authors"><span class="meta-sep">·</span>Yijiang Li <button class="et-al-btn" aria-expanded="false">et al.</button><span class="authors-full" style="display:none"><span>, Yijun Liang</span><span>, Yunjie Tian</span><span>, Bingyang Wang</span><span>, Ke Zhang</span><span>, Zhenfei Yin</span><span>, Di Fu</span><span>, Philip Torr</span><span>, Nuno Vasconcelos</span></span></span></div><p show-comma="true" class="content-meta"><time datetime="2026-11-09T08:49:19.997Z">Nov 09, 2026</time><span>13 min read</span></p><ul class="tags"><li><a href="../tags/VLM" class="internal tag-link">VLM</a></li></ul></div></div><article class="popover-hint"><h2 id="summary">Summary<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#summary" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p>S2VOPD 把 on-policy self-distillation 的 teacher–student 信息差反过来构造：不给 teacher 加 privileged 信息，而是让 student 在降质视图（默认下采样到 0.3–0.6× 再以 0.5 概率加 Gaussian noise）上 rollout，EMA teacher 在原图上对同一前缀打分，用 top-k generalized JSD 蒸馏，全程不需要标注、reward 或更强 teacher。Qwen3.5-4B 在 FineVision 12K 上训练后，6 个细粒度感知 benchmark 平均从 70.68% 升到 77.44%，与 Qwen3.5-397B 持平。在 Vision-OPD-6K 同数据对比中，4B 上感知与数学都优于 privileged 方法和 self-rewarding RL；9B 总均分 76.35，略低于 Vision-OPD 的 76.56。</p>
+<h2 id="problem--motivation">Problem &amp; Motivation<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#problem--motivation" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p>OPD / OPSD 的学习信号依赖 teacher–student 之间”有信息量的不对称”：要么来自更大的 teacher，要么让 teacher 看到 privileged 信息（参考答案、环境反馈、GT region of interest，如 Vision-OPD、ZwZ）。这些信号需要外部标注，模型能力越强越难获取。作者的问题是：没有任何 privileged 信息时，不对称从哪里来？答案借鉴 SSL（BYOL/DINO、FixMatch 的 weak→strong 增强）：从 student 那里减去信息，而不是给 teacher 加信息。</p>
+<h2 id="method">Method<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#method" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<ul>
+<li><strong>目标函数</strong>：student <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.5806em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.03588em;">π</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:-0.0359em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.02778em;">θ</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span> 在 <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6679em;"></span><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.6679em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathnormal">x</span></span><span style="top:-3.35em;"><span class="pstrut" style="height:3em;"></span><span class="accent-body" style="left:-0.2222em;"><span class="mord">~</span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">T</span><span class="mopen">(</span><span class="mord mathnormal">x</span><span class="mclose">)</span></span></span></span> 上采样 <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal">n</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">8</span></span></span></span> 条 rollout；EMA teacher <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7167em;vertical-align:-0.2861em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.03588em;">π</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:-0.0359em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">ϕ</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span></span></span></span>（<span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.625em;vertical-align:-0.1944em;"></span><span class="mord mathnormal" style="margin-right:0.03588em;">η</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0.05</span></span></span></span>，即 decay 0.95）在原图 <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal">x</span></span></span></span> 上对同一前缀给出 next-token 分布；逐 token 最小化 generalized JSD（<span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal" style="margin-right:0.0037em;">α</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0.5</span></span></span></span>），两个分布都截断到 teacher top-k 后重新归一化（Eq. 1–2）。</li>
+<li><strong>增强空间</strong>：四族算子：information reduction（downscale、blur、band-stop、noise、pixelation、visual-token drop）、geometric（rotation/translation/crop/zoom-out）、photometric、occlusion；用全局 Bernoulli <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.625em;vertical-align:-0.1944em;"></span><span class="mord mathnormal">p</span></span></span></span>、每个算子的概率 <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7167em;vertical-align:-0.2861em;"></span><span class="mord"><span class="mord mathnormal">ρ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.05724em;">j</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span></span></span></span> 加固定顺序复合来参数化（Eq. 3–5，Table 1）。</li>
+<li><strong>默认 recipe</strong>：<span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.625em;vertical-align:-0.1944em;"></span><span class="mord mathnormal">p</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span></span></span></span>，downscale <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal">s</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∼</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathcal" style="margin-right:0.09931em;">U</span><span class="mopen">(</span><span class="mord">0.3</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">0.6</span><span class="mclose">)</span></span></span></span> 且不 resize 回原尺寸（student 拿到的 visual token 更少，rollout 更便宜），再以 <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.625em;vertical-align:-0.1944em;"></span><span class="mord mathnormal">ρ</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0.5</span></span></span></span> 叠加一步 DDPM <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6151em;"></span><span class="mord mathnormal">t</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">200</span></span></span></span> 的噪声（<span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4831em;"></span><span class="mord mathnormal" style="margin-right:0.03588em;">σ</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≈</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0.11</span></span></span></span>）（Eq. 6）。</li>
+<li><strong>训练配置</strong>：Qwen3.5-4B/9B，batch 96 prompts，lr 2e-6，6K/12K 样本各训一个 epoch（65/130 step），response 上限 1,024 tokens。</li>
+</ul>
+<h2 id="key-results">Key Results<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#key-results" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<ul>
+<li><strong>主表（Table 2，FineVision-12K）</strong>：4B 感知 6 项均分 70.68 → 77.44；高于 Qwen3-VL-235B（75.75）、GPT-5.4（72.77）、Vision-OPD（77.07，该行数字与 Table 3 自训版本不同），与 Qwen3.5-397B（77.44）持平；低于 Gemini-3.5-Flash（79.24）和 Gemini-3.1-Pro（79.25）。</li>
+<li><strong>同数据对比（Table 3，Vision-OPD-6K，65 step）</strong>：4B 九项均分 75.33，Vision-OPD 74.77，TTRL 73.30（+2.0）；9B 为 76.35，Vision-OPD 76.56，Intuitor 75.65（+0.7）。按笔者从 Table 3 的计算，感知/数学增益在 4B 为 +5.7/+3.7，在 9B 为 +3.6/+3.2。self-rewarding RL 基线训练不稳定、会崩，报的是 13 个 checkpoint 里最好的那个，S2VOPD 报最后一个。</li>
+<li><strong>privileged 方法伤数学</strong>：Opsd 让 MathVision 在 4B 掉 9.3、9B 掉 7.9；ZwZ-4B 让 MathVerse 掉 27.1（67.56 → 40.48）。</li>
+<li><strong>增强分析（§4.3，2,048-token 评测协议，与主表不可直接比较）</strong>：base 70.58；对称自蒸馏（<span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">T</span></span></span></span>=identity）65.21；单族增强分别为 information reduction 75.65、photometric 74.40、geometric 74.30、occlusion 72.44。强度呈倒 U：downscale 75.25/75.65/75.05，blur 74.20→75.71→75.07；teacher–student JS gap 约 0.014 时最好。crop 随强度单调下降（71.53 → 68.76 → 67.44），最强 crop 产生的 gap 最大，但得分只略高于对称自蒸馏。</li>
+<li><strong>组件消融（Table 4，4B）</strong>：w/o Aug. 70.52（≈ base 70.68）；w/o EMA（冻结 base teacher）75.95，比默认低 0.40，作者称保留了 93% 的增益。EMA decay 0.95/0.99/0.999 → 76.35/75.56/76.00（Table 5）；divergence 消融 JSD 76.05 > reverse KL 75.49 > forward KL 74.74（Table 6）。</li>
+<li><strong>“恢复 96% privileged 增益”</strong>：只出现在 abstract，正文没有给出计算过程。按 Table 3 复算：若只看 6 项感知子均分、以 Vision-OPD 为 privileged 参照，4B 为 96.3%、9B 为 96.5%，与 96% 吻合；若按 9 项总均分算，4B 为 112.5%（S2VOPD 反超 Vision-OPD）、9B 为 94.2%。论文未说明用的是哪种口径。</li>
+</ul>
+<h2 id="evidence-ledger">Evidence Ledger<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#evidence-ledger" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="table-container"><table><thead><tr><th style="text-align:left;">Claim ID</th><th style="text-align:left;">Claim</th><th style="text-align:left;">Type</th><th style="text-align:left;">Source locator</th><th style="text-align:left;">Evidence excerpt</th><th style="text-align:left;">Status</th></tr></thead><tbody><tr><td style="text-align:left;">C1</td><td style="text-align:left;">S2VOPD 在 FineVision-12K 上训练后，Qwen3.5-4B 的 6 项感知均分从 70.68% 升到 77.44%</td><td style="text-align:left;">number</td><td style="text-align:left;">§4.2 Table 2 正文</td><td style="text-align:left;">”S2VOPD improves Qwen3.5-4B from 70.68% to 77.44% average accuracy, a gain of 6.76%“</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C2</td><td style="text-align:left;">S2VOPD-4B（77.44）超过 Qwen3-VL-Instruct-235B（75.75），与 Qwen3.5-397B（77.44）持平</td><td style="text-align:left;">comparison</td><td style="text-align:left;">§4.2 Table 2</td><td style="text-align:left;">”including Qwen3-VL-Instruct-235B ( 75.75% ), and matches the performance of Qwen3.5-397B ( 77.44% )“</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C3</td><td style="text-align:left;">S2VOPD-4B 超过 GPT-5.4（72.77），低于 Gemini-3.5-Flash（79.24）和 Gemini-3.1-Pro（79.25）</td><td style="text-align:left;">comparison</td><td style="text-align:left;">§4.2 Table 2</td><td style="text-align:left;">”outperforms the GPT-5 series and is on par with Gemini-3-Flash, trailing only Gemini-3.5-Flash and Gemini-3.1-Pro by less than 2%“</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C4</td><td style="text-align:left;">Table 2 中 Vision-OPD（4B）均分 77.07，低于 S2VOPD 的 77.44</td><td style="text-align:left;">comparison</td><td style="text-align:left;">Table 2</td><td style="text-align:left;">”Vision-OPD 4B 92.15 59.76 84.50 80.38 74.88 70.76 77.07”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C5</td><td style="text-align:left;">Table 3（Vision-OPD-6K）中 4B S2VOPD 九项均分 75.33，Vision-OPD 74.77，TTRL 73.30</td><td style="text-align:left;">number</td><td style="text-align:left;">Table 3</td><td style="text-align:left;">”S2VOPD (ours) 87.43 57.99 84.88 83.62 72.87 71.29 81.50 73.22 65.13 75.33”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C6</td><td style="text-align:left;">9B 上 S2VOPD 九项均分 76.35，低于 Vision-OPD 的 76.56</td><td style="text-align:left;">comparison</td><td style="text-align:left;">Table 3; §4.2</td><td style="text-align:left;">”at 9 B, it matches Vision-OPD as the runner-up overall while requiring no privileged annotations”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C7</td><td style="text-align:left;">S2VOPD 比最强 self-rewarding 基线高 +2.0（4B）和 +0.7（9B）</td><td style="text-align:left;">comparison</td><td style="text-align:left;">§4.2 Fair comparison</td><td style="text-align:left;">”improves over the strongest self-rewarding baseline by +2.0% at 4 B and by +0.7% at 9 B”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C8</td><td style="text-align:left;">self-rewarding RL 基线报的是 13 个 checkpoint 中最好的，S2VOPD 及其他方法报最后一个 checkpoint</td><td style="text-align:left;">benchmark-setting</td><td style="text-align:left;">§4.2 Fair comparison</td><td style="text-align:left;">”We therefore report their best performance across 13 checkpoints saved at 5-step intervals”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C9</td><td style="text-align:left;">感知/数学增益：4B +5.7/+3.7，9B +3.6/+3.2</td><td style="text-align:left;">number</td><td style="text-align:left;">§1 Introduction</td><td style="text-align:left;">”by +5.7% and +3.7% at 4 B ( +3.6% and +3.2% at 9 B)“</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C10</td><td style="text-align:left;">Opsd 让 MathVision 掉 9.3（4B）和 7.9（9B）；ZwZ 让 4B MathVerse 掉 27.1</td><td style="text-align:left;">number</td><td style="text-align:left;">§4.2; Table 3</td><td style="text-align:left;">”Opsd decreases MathVision performance by 9.3% at 4B and 7.9% at 9B, while ZwZ reduces MathVerse accuracy by 27.1%“</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C11</td><td style="text-align:left;">训练数据相同时，S2VOPD 恢复了 privileged 方法 96% 的增益（仅 abstract 声称；口径未说明）</td><td style="text-align:left;">number</td><td style="text-align:left;">Abstract only（正文无对应计算）</td><td style="text-align:left;">“While holding training data the same, it recovers 96% of the improvement achieved by methods with privileged information.”</td><td style="text-align:left;">abstract-only</td></tr><tr><td style="text-align:left;">C12</td><td style="text-align:left;">默认 T = downscale s~U(0.3,0.6)，不 resize 回原尺寸，再以概率 0.5 加 DDPM t=200 噪声（σ≈0.11）</td><td style="text-align:left;">benchmark-setting</td><td style="text-align:left;">§3.2 Best recipe, Eq. 6</td><td style="text-align:left;">”Downscaling is applied to every sample, whereas Gaussian noise is applied independently with probability ρnoise=0.5”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C13</td><td style="text-align:left;">§4.3 分析采用 2,048-token greedy 评测，与 4,096-token 主表数字不可直接比较</td><td style="text-align:left;">benchmark-setting</td><td style="text-align:left;">§4.3</td><td style="text-align:left;">”these analysis runs are evaluated with greedy decoding at a 2,048-token budget”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C14</td><td style="text-align:left;">§4.3 协议下 base 70.58，对称自蒸馏 65.21</td><td style="text-align:left;">number</td><td style="text-align:left;">§4.3</td><td style="text-align:left;">”the base model achieves 70.58%. Symmetric self-distillation with T equal to the identity reaches only 65.21%“</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C15</td><td style="text-align:left;">单族增强：information reduction 75.65、photometric 74.40、geometric 74.30、occlusion 72.44</td><td style="text-align:left;">number</td><td style="text-align:left;">§4.3; Figure 2(a)</td><td style="text-align:left;">“yields 75.65% for information reduction, 74.40% for photometric transformations, 74.30% for geometric transformations, and 72.44% for occlusion”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C16</td><td style="text-align:left;">teacher–student JS gap 约 0.014 前性能上升，之后下降</td><td style="text-align:left;">causal-mechanism</td><td style="text-align:left;">§4.3; Figure 2(b)</td><td style="text-align:left;">“performance increases with the gap up to a JS divergence of roughly 0.014, then declines beyond it”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C17</td><td style="text-align:left;">crop 随强度单调下降 71.53 → 68.76 → 67.44，最强 crop 的 gap 最大</td><td style="text-align:left;">number</td><td style="text-align:left;">§4.3; Figure 2(b)</td><td style="text-align:left;">“falling from 71.53% to 68.76% and then 67.44% across mild, moderate, and strong crops”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C18</td><td style="text-align:left;">去掉增强（w/o Aug.）后 4B 感知均分 70.52，与 base 70.68 基本持平</td><td style="text-align:left;">number</td><td style="text-align:left;">§4.4 Table 4</td><td style="text-align:left;">”70.52% against the base model’s 70.68% on the six perception benchmarks”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C19</td><td style="text-align:left;">冻结 teacher（w/o EMA）得 75.95，比默认 76.35 低 0.40，保留 93% 增益</td><td style="text-align:left;">number</td><td style="text-align:left;">§4.4 Table 4</td><td style="text-align:left;">”costs only 0.40%, still reaching 75.95%: a teacher that never improves still recovers 93% of the gain”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C20</td><td style="text-align:left;">EMA decay 0.95/0.99/0.999 对应均分 76.35/75.56/76.00，相差不超过 0.8</td><td style="text-align:left;">number</td><td style="text-align:left;">Table 5（正文误写为 Table 6）</td><td style="text-align:left;">“across decay values from 0.95 to 0.999 , the six-benchmark average remains within 0.8%“</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C21</td><td style="text-align:left;">Divergence 排序为 JSD 76.05 > reverse KL 75.49 > forward KL 74.74</td><td style="text-align:left;">number</td><td style="text-align:left;">Table 6</td><td style="text-align:left;">”0.5 (JSD) 74.15 71.34 76.05”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C22</td><td style="text-align:left;">作者解释 w/o Aug. 失败的原因是目标函数放大了 teacher 的 confident errors（只是解释，没有给出直接证据）</td><td style="text-align:left;">causal-mechanism</td><td style="text-align:left;">§4.4</td><td style="text-align:left;">”With no information gap, the objective amplifies the teacher’s confident errors instead of correcting the student’s.”</td><td style="text-align:left;">source-verified</td></tr><tr><td style="text-align:left;">C23</td><td style="text-align:left;">论文只给项目网站，正文未提供代码仓库链接</td><td style="text-align:left;">license-code</td><td style="text-align:left;">Abstract</td><td style="text-align:left;">”Website is at <a href="https://williamium3000.github.io/s2vopd" class="external">https://williamium3000.github.io/s2vopd<svg aria-hidden="true" class="external-icon" style="max-width:0.8em;max-height:0.8em;" viewBox="0 0 512 512"><path d="M320 0H288V64h32 82.7L201.4 265.4 178.7 288 224 333.3l22.6-22.6L448 109.3V192v32h64V192 32 0H480 320zM32 32H0V64 480v32H32 456h32V480 352 320H424v32 96H64V96h96 32V32H160 32z"></path></svg></a>”</td><td style="text-align:left;">source-verified</td></tr></tbody></table></div>
+<h2 id="strengths--weaknesses">Strengths &amp; Weaknesses<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#strengths--weaknesses" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<p><strong>Strengths</strong></p>
+<ul>
+<li>构造很干净：把 OPSD 的 privileged 信号从”给 teacher 加信息”换成”从 student 减信息”，一行增强代码就替代了 GT ROI 或参考答案，而且 student 用低分辨率输入，rollout 反而更便宜。这跟 FixMatch weak→strong 一脉相承，迁移到 token 级生成蒸馏上，方法本身是 simple &amp; scalable 的。</li>
+<li>有几条反直觉的诊断：对称自蒸馏会掉点（65.21 &lt; 70.58）；冻结 teacher 只损失 0.40。两者合起来说明信号主要来自视图不对称，而不是 teacher 的自我改进。crop 实验说明 gap 大不等于 gap 有用：student 输入变得无解时，discrepancy 是噪声。</li>
+<li>Table 3 同时报了感知和数学两类，揭示 privileged 感知蒸馏会显著伤数学推理（ZwZ-4B MathVerse −27.1），这是对 Vision-OPD/ZwZ 一类方法有价值的副作用证据。</li>
+</ul>
+<p><strong>Weaknesses</strong></p>
+<ul>
+<li><strong>benchmark 与增强高度同构</strong>：6 个感知 benchmark（V*、HR-Bench 4K/8K、ZoomBench、MME-RealWorld）都是高分辨率、找小目标类任务，默认 recipe 恰好是”降分辨率训练、全分辨率测试”。增益可能主要是 resolution robustness，而不是通用感知提升。文中没有在 OCR、chart、document、GUI 截图等文字密集任务上测，而这些任务里降采样最可能删掉问题相关证据（作者自己的 task-consistency 原则就预示了这种 failure）。</li>
+<li><strong>对比口径</strong>：主表把 4B 与 GPT-5.4、Qwen3-VL-235B 比较，但没有说明 API 模型是否用同一 greedy/4,096-token 协议。Vision-OPD 在 Table 2（V* 92.15）和 Table 3（V* 91.10）的数字不同，来源未解释。9B 上 S2VOPD 总均分其实低于 Vision-OPD（76.35 vs 76.56），“超过所有 privileged 方法”只在 4B 成立。</li>
+<li><strong>噪声水平未知</strong>：全文没有多 seed 或方差。Table 4 默认 76.35 与 Table 6 默认 JSD（<span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal" style="margin-right:0.0037em;">α</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0.5</span></span></span></span>）的 76.05 本应是同一配置，却差 0.30，与”w/o EMA 仅差 0.40”处在同一量级。所以”EMA 不重要”和”JSD 优于 reverse KL（差 0.56）“这类结论的统计强度不足。</li>
+<li><strong>对称自蒸馏的结论前后不一</strong>：§4.3 的 2,048-token 协议下是 65.21（明显掉点），Table 4 的 w/o Aug. 是 70.52（≈ 不变）；作者对”放大 confident errors”的解释没有直接证据。</li>
+<li>“96% recovery” 只出现在 abstract，正文没有计算，也没有说明分母用的是哪个方法、哪个尺度。</li>
+<li>隐含假设：teacher 在原图上的分布总比 student 在降质图上的好。对 base 模型本身就看错的样本，这个信号只能把 student 推向 teacher 的错误。所以方法的上限受 base 模型原图能力约束，本质是”把全分辨率能力迁移到低分辨率”，能否带来超出 teacher 的能力增长仍是未知；数学提升的机制也没有解释。</li>
+</ul>
+<h2 id="mind-map">Mind Map<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#mind-map" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<pre><button class="expand-button" aria-label="Expand mermaid diagram" data-view-component="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M3.72 3.72a.75.75 0 011.06 1.06L2.56 7h10.88l-2.22-2.22a.75.75 0 011.06-1.06l3.5 3.5a.75.75 0 010 1.06l-3.5 3.5a.75.75 0 11-1.06-1.06l2.22-2.22H2.56l2.22 2.22a.75.75 0 11-1.06 1.06l-3.5-3.5a.75.75 0 010-1.06l3.5-3.5z"></path></svg></button><code class="mermaid" data-clipboard="&quot;mindmap\n  root((S2VOPD))\n    Problem\n      OPD/OPSD 依赖 privileged 不对称\n      GT ROI 与参考答案难获取\n    Method\n      student 降质视图 rollout\n      EMA teacher 原图打分\n      top-k generalized JSD\n      downscale 0.3-0.6 加 noise\n    Results\n      4B 感知 70.68 到 77.44\n      同数据 4B 超 Vision-OPD，9B 略低\n      对称自蒸馏掉点\n      强度倒 U，crop 单调下降\n      冻结 teacher 仅降 0.40&quot;">mindmap
+  root((S2VOPD))
+    Problem
+      OPD/OPSD 依赖 privileged 不对称
+      GT ROI 与参考答案难获取
+    Method
+      student 降质视图 rollout
+      EMA teacher 原图打分
+      top-k generalized JSD
+      downscale 0.3-0.6 加 noise
+    Results
+      4B 感知 70.68 到 77.44
+      同数据 4B 超 Vision-OPD，9B 略低
+      对称自蒸馏掉点
+      强度倒 U，crop 单调下降
+      冻结 teacher 仅降 0.40
+</code><div id="mermaid-container" role="dialog"><div id="mermaid-space"><div class="mermaid-content"></div></div></div></pre>
+<h2 id="notes">Notes<a role="anchor" aria-hidden="true" tabindex="-1" data-no-popover="true" href="#notes" class="internal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a></h2>
+<ul>
+<li><a href="../Papers/2608-OPSA" class="internal" data-slug="Papers/2608-OPSA">2608-OPSA</a>：OPSA 发现固定负 advantage 就能复现 OPD 增益，质疑 OPD 是否真在”蒸馏”。S2VOPD 冻结 teacher 仍保留 93% 增益，两者都指向”teacher 质量不是主因”，可以对照检验 S2VOPD 的增益是否也来自压制低概率 token。</li>
+<li><a href="../Papers/2605-AntiSD" class="internal" data-slug="Papers/2605-AntiSD">2605-AntiSD</a>：AntiSD 指出无 gap 的 OPSD 存在结构性缺陷，且同样改用 JSD。S2VOPD 中对称自蒸馏掉点（65.21）与之一致，可作为外部旁证。</li>
+<li><a href="../Papers/2608-ROPSD" class="internal" data-slug="Papers/2608-ROPSD">2608-ROPSD</a>：在 GUI grounding 上做 test-time OPSD，privileged 信息来自 reflection。可以与 S2VOPD 的视图降质组合（无需 reflector），但 GUI 截图文字密集，降采样很可能违反 task-consistency，需要先验证。</li>
+<li><a href="../Papers/2610-Trinity" class="internal" data-slug="Papers/2610-Trinity">2610-Trinity</a>：同样用 policy 的 EMA 副本充当无监督信号源（verifier），与 S2VOPD 的 EMA teacher 是同一类 self-supervised VLM post-training 设计。</li>
+</ul></article><hr/><div class="page-footer"></div></div><div class="right sidebar"><div class="toc desktop-only"><button type="button" class="toc-header" aria-controls="toc-1144" aria-expanded="true"><h3>Table of Contents</h3><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="fold"><polyline points="6 9 12 15 18 9"></polyline></svg></button><ul id="list-1" class="toc-content overflow"><li class="depth-0"><a href="#summary" data-for="summary">Summary</a></li><li class="depth-0"><a href="#problem--motivation" data-for="problem--motivation">Problem &amp; Motivation</a></li><li class="depth-0"><a href="#method" data-for="method">Method</a></li><li class="depth-0"><a href="#key-results" data-for="key-results">Key Results</a></li><li class="depth-0"><a href="#evidence-ledger" data-for="evidence-ledger">Evidence Ledger</a></li><li class="depth-0"><a href="#strengths--weaknesses" data-for="strengths--weaknesses">Strengths &amp; Weaknesses</a></li><li class="depth-0"><a href="#mind-map" data-for="mind-map">Mind Map</a></li><li class="depth-0"><a href="#notes" data-for="notes">Notes</a></li><li class="overflow-end"></li></ul></div></div><footer class><p>Created with <a href="https://quartz.jzhao.xyz/">Quartz v4.5.2</a> © 2026</p><ul><li><a href="https://github.com/Kendrick-Stein/MCISLAB_DeepRead">GitHub</a></li></ul></footer></div></div></body><script type="application/javascript" data-persist="true">function n(){let t=this.parentElement;t.classList.toggle("is-collapsed");let e=t.getElementsByClassName("callout-content")[0];if(!e)return;let l=t.classList.contains("is-collapsed");e.style.gridTemplateRows=l?"0fr":"1fr"}function c(){let t=document.getElementsByClassName("callout is-collapsible");for(let e of t){let l=e.getElementsByClassName("callout-title")[0],s=e.getElementsByClassName("callout-content")[0];if(!l||!s)continue;l.addEventListener("click",n),window.addCleanup(()=>l.removeEventListener("click",n));let o=e.classList.contains("is-collapsed");s.style.gridTemplateRows=o?"0fr":"1fr"}}document.addEventListener("nav",c);
+</script><script type="module" data-persist="true">function E(a,e){if(!a)return;function t(o){o.target===this&&(o.preventDefault(),o.stopPropagation(),e())}function n(o){o.key.startsWith("Esc")&&(o.preventDefault(),e())}a?.addEventListener("click",t),window.addCleanup(()=>a?.removeEventListener("click",t)),document.addEventListener("keydown",n),window.addCleanup(()=>document.removeEventListener("keydown",n))}function f(a){for(;a.firstChild;)a.removeChild(a.firstChild)}var m=class{constructor(e,t){this.container=e;this.content=t;this.setupEventListeners(),this.setupNavigationControls(),this.resetTransform()}isDragging=!1;startPan={x:0,y:0};currentPan={x:0,y:0};scale=1;MIN_SCALE=.5;MAX_SCALE=3;cleanups=[];setupEventListeners(){let e=this.onMouseDown.bind(this),t=this.onMouseMove.bind(this),n=this.onMouseUp.bind(this),o=this.onTouchStart.bind(this),r=this.onTouchMove.bind(this),i=this.onTouchEnd.bind(this),s=this.resetTransform.bind(this);this.container.addEventListener("mousedown",e),document.addEventListener("mousemove",t),document.addEventListener("mouseup",n),this.container.addEventListener("touchstart",o,{passive:!1}),document.addEventListener("touchmove",r,{passive:!1}),document.addEventListener("touchend",i),window.addEventListener("resize",s),this.cleanups.push(()=>this.container.removeEventListener("mousedown",e),()=>document.removeEventListener("mousemove",t),()=>document.removeEventListener("mouseup",n),()=>this.container.removeEventListener("touchstart",o),()=>document.removeEventListener("touchmove",r),()=>document.removeEventListener("touchend",i),()=>window.removeEventListener("resize",s))}cleanup(){for(let e of this.cleanups)e()}setupNavigationControls(){let e=document.createElement("div");e.className="mermaid-controls";let t=this.createButton("+",()=>this.zoom(.1)),n=this.createButton("-",()=>this.zoom(-.1)),o=this.createButton("Reset",()=>this.resetTransform());e.appendChild(n),e.appendChild(o),e.appendChild(t),this.container.appendChild(e)}createButton(e,t){let n=document.createElement("button");return n.textContent=e,n.className="mermaid-control-button",n.addEventListener("click",t),window.addCleanup(()=>n.removeEventListener("click",t)),n}onMouseDown(e){e.button===0&&(this.isDragging=!0,this.startPan={x:e.clientX-this.currentPan.x,y:e.clientY-this.currentPan.y},this.container.style.cursor="grabbing")}onMouseMove(e){this.isDragging&&(e.preventDefault(),this.currentPan={x:e.clientX-this.startPan.x,y:e.clientY-this.startPan.y},this.updateTransform())}onMouseUp(){this.isDragging=!1,this.container.style.cursor="grab"}onTouchStart(e){if(e.touches.length!==1)return;this.isDragging=!0;let t=e.touches[0];this.startPan={x:t.clientX-this.currentPan.x,y:t.clientY-this.currentPan.y}}onTouchMove(e){if(!this.isDragging||e.touches.length!==1)return;e.preventDefault();let t=e.touches[0];this.currentPan={x:t.clientX-this.startPan.x,y:t.clientY-this.startPan.y},this.updateTransform()}onTouchEnd(){this.isDragging=!1}zoom(e){let t=Math.min(Math.max(this.scale+e,this.MIN_SCALE),this.MAX_SCALE),n=this.content.getBoundingClientRect(),o=n.width/2,r=n.height/2,i=t-this.scale;this.currentPan.x-=o*i,this.currentPan.y-=r*i,this.scale=t,this.updateTransform()}updateTransform(){this.content.style.transform=`translate(${this.currentPan.x}px, ${this.currentPan.y}px) scale(${this.scale})`}resetTransform(){let t=this.content.querySelector("svg").getBoundingClientRect(),n=t.width/this.scale,o=t.height/this.scale;this.scale=1,this.currentPan={x:(this.container.clientWidth-n)/2,y:(this.container.clientHeight-o)/2},this.updateTransform()}},T=["--secondary","--tertiary","--gray","--light","--lightgray","--highlight","--dark","--darkgray","--codeFont"],y;document.addEventListener("nav",async()=>{let e=document.querySelector(".center").querySelectorAll("code.mermaid");if(e.length===0)return;y||=await import("https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.esm.min.mjs");let t=y.default,n=new WeakMap;for(let r of e)n.set(r,r.innerText);async function o(){for(let s of e){s.removeAttribute("data-processed");let c=n.get(s);c&&(s.innerHTML=c)}let r=T.reduce((s,c)=>(s[c]=window.getComputedStyle(document.documentElement).getPropertyValue(c),s),{}),i=document.documentElement.getAttribute("saved-theme")==="dark";t.initialize({startOnLoad:!1,securityLevel:"loose",theme:i?"dark":"base",themeVariables:{fontFamily:r["--codeFont"],primaryColor:r["--light"],primaryTextColor:r["--darkgray"],primaryBorderColor:r["--tertiary"],lineColor:r["--darkgray"],secondaryColor:r["--secondary"],tertiaryColor:r["--tertiary"],clusterBkg:r["--light"],edgeLabelBackground:r["--highlight"]}}),await t.run({nodes:e})}await o(),document.addEventListener("themechange",o),window.addCleanup(()=>document.removeEventListener("themechange",o));for(let r=0;r<e.length;r++){let v=function(){let g=l.querySelector("#mermaid-space"),h=l.querySelector(".mermaid-content");if(!h)return;f(h);let w=i.querySelector("svg").cloneNode(!0);h.appendChild(w),l.classList.add("active"),g.style.cursor="grab",u=new m(g,h)},M=function(){l.classList.remove("active"),u?.cleanup(),u=null},i=e[r],s=i.parentElement,c=s.querySelector(".clipboard-button"),d=s.querySelector(".expand-button"),p=window.getComputedStyle(c),L=c.offsetWidth+parseFloat(p.marginLeft||"0")+parseFloat(p.marginRight||"0");d.style.right=`calc(${L}px + 0.3rem)`,s.prepend(d);let l=s.querySelector("#mermaid-container");if(!l)return;let u=null;d.addEventListener("click",v),E(l,M),window.addCleanup(()=>{u?.cleanup(),d.removeEventListener("click",v)})}});
+</script><script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/copy-tex.min.js" type="application/javascript" data-persist="true"></script><script src="../postscript.js" type="module" data-persist="true"></script></html>

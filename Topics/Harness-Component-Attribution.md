@@ -1,9 +1,9 @@
 ---
 title: "Agent Harness 的组件归因：外置 state、fresh-context 执行与独立验证，哪一个在起作用"
 tags: [survey, task-planning, LLM, computer-use]
-date_updated: "2026-08-05"
+date_updated: "2026-11-12"
 year_range: 2025-2026
-papers_analyzed: 17
+papers_analyzed: 19
 keywords: [agent harness, harness ablation, component attribution, role separation, independent verifier, verification gate, context reset, fresh context, progressive disclosure, compute-matched control, artifact creation]
 domain_map: GUI-Agent
 scope: methodology-focused
@@ -77,6 +77,8 @@ TeamBench 还量化了一个被忽略的失效：其 Verifier 的假接受率随
 规模会翻转结论：多书 K=20 时 Codex En.QA raw 0.257 对 flat 0.462，Zh.QA raw 塌到 0.043。反向失效同样存在——分层结构在单书上从不优于扁平，并把 Pi En.MC 从 0.9126 压到 0.6398。
 
 该研究的方法学缺口与本主题高度相关：**没有 token 预算匹配对照**。K=20 时 raw 每问题 68.3M token、flat 32.5M，更准且更省被作为两个共同观察到的事实报告，而非受控结果。[[Papers/2606-SkillMemoryBudget]] 在相邻问题上做了这个对照并得到否定结论——补上 token-matched vanilla 后，memory/skill 库的增益被追平或反超。
+
+[[Papers/2609-SoLPi]] 在 token 效率方向上给出同类的叠加证据。它把四个效率机制（其中 ObservationPack 把超过 10 KiB 的 tool 输出在后续请求里换成 handle 与短摘录，Online Context Compact 在 plan step 边界按成本闸门触发压缩）逐个加到 Pi 上，再与全栈对照。token 与成本两侧的削减幅度大：全栈相对 Pi 在 GPT-5.6 Sol 与 Opus 5 上分别少用 49.0% / 44.7% 的 token、成本低 33.2% / 33.5%。分数一侧则不可叠加：Opus 5 上单加 ObservationPack 为 \$1,176 / 47.05，全栈为 \$1,158 / 42.22，成本几乎持平而分数低 4.8 点。全文分数均为单次点估计、未报方差，4.8 点是否超出运行间噪声无法从原文判断；但"效率机制可叠加、能力效应不可叠加"的方向与 ProgressiveDisclosure、SkillMemoryBudget 的结果一致。
 
 ### 3.4 工具面是最常见的未受控变量
 
@@ -163,3 +165,12 @@ flowchart TD
 **后置 gap 检索**（3 query，1 轮，符合上限）发现两篇未收录的相关工作，留作后续：`2608.00017` Memory Reward Inflation in Self-Improving LLM Agents（直接对应 rubber-stamp 轴）、`2606.06741` OpenSkill。`2512.23760` 已收录为 [[Papers/2512-ASGSI]]。
 
 **建议加入 DomainMaps**：[[DomainMaps/GUI-Agent]] 的 `Pattern 4`（预算匹配对照是方法可信度的首要筛选条件）已覆盖预算维度，建议增补一条平行 Pattern——**组件收益与基线轨迹质量负相关**，证据为 TeamBench 五分位分层、LongHorizon-Harness 的 Desktop 域 mean score 反降、ProgressiveDisclosure 的 harness 交互三项，操作含义是本 domain 的自有实验须按基线分数分层报告增益，且分层观测须独立于差值观测以避免均值回归。另建议在 `Pattern 3`（Self-improving 验证偏差）下补记验证独立性的剂量阶梯与 StateAct 的 68/76 错放率。
+
+### 2026-11-12 survey-refresh 增量并入 2 篇
+
+- **来源**：`Workbench/survey-updates.json` 本 survey 的 pending 2 篇——[[Papers/2609-SoLPi]]（added 2026-09-21）、[[Papers/2608-AgenticArtifactCreation]]（added 2026-11-04）。
+- **结构变化**：无新增小节，Takeaway 与 §6 空白分层未改。两篇的主体落位在 commit bea5742c3（2026-11-09）中已写入正文但未更新 frontmatter：SoLPi 进 §2 证据矩阵一行与 §3.1"闸门只守得住自己度量的分布"一段；AgenticArtifactCreation 进 §3.2 理论边界段，明确标为引用综合而非实测。本次核对上述文字与两篇 Evidence Ledger 一致（SoLPi C1/C2/C3/C5/C7/C10/C19；AgenticArtifactCreation C22），并在 §3.3 补一段 SoLPi 单机制对全栈的非叠加证据（C1/C2/C10/C19），把它接到"context 管理不是可加项"的论断上。
+- **跳过**：无。AgenticArtifactCreation 主题为 artifact 生成而非 harness 组件归因，相关性弱，但其 §8.2 同源 judge 盲点论断直接对应 §3.2 的独立性剂量轴，保留为降级引用。
+- **证据边界**：两篇均为 `partial`。SoLPi 只用 source-verified 行；C4（每小时节省）为 abstract-only、未使用；Table 4 中除 C10 之外的单机制分数（如 Opus 5 + Action Fusion 50.48）不在 ledger 中单列，未引用。AgenticArtifactCreation 只用 C22，且写明作者未在 230 个系统上实测；C10（novelty 表述）为 contradicted，未使用。
+- **papers_analyzed 对账**：frontmatter 旧值 17 = 2026-08-05 版本的唯一 `Papers/` wikilink 数（`git show 6088130e1` 机械重数亦为 17）；bea5742c3 写入 SoLPi 与 AgenticArtifactCreation 两个新 wikilink 但未改 frontmatter，产生 +2 漂移；本次 §3.3 新增段只引用已有的 SoLPi，不增加唯一链接。`count_links.py` 机械重数 19（unresolved 0）= 17 + 2，与 pending 篇数吻合。
+- **status**：survey 状态不变；GRASP 仍为 legacy-unverified 承重证据，补做 source check 的需求仍在。

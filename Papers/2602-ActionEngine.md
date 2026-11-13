@@ -32,7 +32,7 @@ date_added: 2026-07-20
 
 - **State（节点）**：GUI 的 distinct "view"（如 Home Page、Forum List），由一组 *atoms*（原子出现的 UI 元素组）定义。
 - **Operation（边）**：UI manipulation operations（click/type/navigate，触发状态转移）与 data collection operations（读文本/抽取信息，自环）。
-- **防状态爆炸**：区分 static atoms（不变 UI）与 dynamic atoms（数据依赖），用类型化集合（如 `List[[PostDetails]]`）表示同结构的无界实例；Reddit 域最终仅约 20-30 states、100-150 transitions。
+- **防状态爆炸**：区分 static atoms（不变 UI）与 dynamic atoms（数据依赖），用类型化集合（如 `List[PostDetails]`）表示同结构的无界实例；Reddit 域最终仅约 20-30 states、100-150 transitions。
 - **构建**：从 seed home state 出发的半自动 pipeline；对 dynamic atoms 推断 selector-based rules 而非抽取活数据；operation 严格按 affordance（UI 结构）定义，不绑定任务语义；序列化为 YAML 供 planner 消费。
 
 **程序合成三阶段**：

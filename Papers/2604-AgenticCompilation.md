@@ -19,7 +19,7 @@ date_added: "2026-08-10"
 ---
 ## Summary
 
-把 web automation 的 LLM 用法从 per-step 连续推理改成"编译一次、确定性重放"：单次 LLM 调用读入 DOM Sanitization Module 压缩后的语义骨架与用户意图，产出 JSON workflow blueprint，随后由轻量 runtime 零推理执行，作者据此把推理成本从 O(M×N) 降为对 M 的 amortized O(1)。三个自定义企业任务上 zero-shot 编译成功率 80–94%，单次编译实测 $0.002–$0.092。但作为核心卖点的 "$150 → <$0.10" 对比里，$150 一侧是纯假设推出来的估计值——全文没有跑过任何 continuous agent baseline，也没有任何 blueprint 失效率或 recompilation 频率的测量。
+把 web automation 的 LLM 用法从 per-step 连续推理改成"编译一次、确定性重放"：单次 LLM 调用读入 DOM Sanitization Module 压缩后的语义骨架与用户意图，产出 JSON workflow blueprint，随后由轻量 runtime 零推理执行，作者据此把推理成本从 O(M×N) 降为对 M 的 amortized O(1)。三个自定义企业任务上 zero-shot 编译成功率 80–94%，单次编译实测 \$0.002–\$0.092。但作为核心卖点的 "\$150 → <\$0.10" 对比里，\$150 一侧是纯假设推出来的估计值——全文没有跑过任何 continuous agent baseline，也没有任何 blueprint 失效率或 recompilation 频率的测量。
 
 ## Problem & Motivation
 
@@ -27,7 +27,7 @@ date_added: "2026-08-10"
 
 论文的定位很明确：这不是 agent 智能问题，也不是任务难度问题，而是"把概率推理反复施加在确定性的、已解决的问题上"的结构性浪费（Sec 1.1）。作者主张业界把它误读为"API 降价就能解决的 pricing issue"，实则是架构缺陷（Sec 1.2）。
 
-值得注意的是，论文对这个动机的经验支撑很薄：Sec 1.2 引用"社区 benchmark 显示开源 continuous agent 单任务推理成本 $1.00–$3.20"，但没有给出任何引用来源；"工程团队因账单耗尽而放弃 continuous-loop 框架"也只是 industry discourse 层面的转述。这篇的立场更接近 systems position paper 而非实证研究。
+值得注意的是，论文对这个动机的经验支撑很薄：Sec 1.2 引用"社区 benchmark 显示开源 continuous agent 单任务推理成本 \$1.00–\$3.20"，但没有给出任何引用来源；"工程团队因账单耗尽而放弃 continuous-loop 框架"也只是 industry discourse 层面的转述。这篇的立场更接近 systems position paper 而非实证研究。
 
 ## Method
 
@@ -62,23 +62,23 @@ date_added: "2026-08-10"
 
 | 方案 | 推理成本 | 性质 |
 |:--|:--|:--|
-| Unoptimized continuous baseline（~2,500 次 API 调用） | **estimated** $150.00 | 假设推算，未实测 |
-| Optimized continuous baseline（90% caching / DOM-diffing） | **estimated** $15.00 | 假设推算，未实测 |
-| One-shot compilation | $0.002–$0.10 | 实测（Table 1） |
+| Unoptimized continuous baseline（~2,500 次 API 调用） | **estimated** \$150.00 | 假设推算，未实测 |
+| Optimized continuous baseline（90% caching / DOM-diffing） | **estimated** \$15.00 | 假设推算，未实测 |
+| One-shot compilation | \$0.002–\$0.10 | 实测（Table 1） |
 
 作者据此宣称最高 **1500× 成本削减**。
 
-**这里必须说清楚证据强度的不对称：$150 与 $15 是 estimate，$0.002–$0.092 是 measurement。** 论文从未给出所假设的 per-token 价格 `C_t`，从未指明 baseline 用的是哪个模型，也从未真正运行过任何一个 continuous agent。按其自述参数反推（2,500 次调用 × 20,000 token = 50M input token，$150 / 50M ≈ **$3.00 / 1M token**）——这个隐含单价大致对得上 Sonnet 级输入定价，属合理量级，但它是笔者的推算而非论文给出的。$15.00 更直接：就是 $150 × 0.1。因此"1500×"这个 headline 是「一个假设值 ÷ 一个实测值」。
+**这里必须说清楚证据强度的不对称：\$150 与 \$15 是 estimate，\$0.002–\$0.092 是 measurement。** 论文从未给出所假设的 per-token 价格 `C_t`，从未指明 baseline 用的是哪个模型，也从未真正运行过任何一个 continuous agent。按其自述参数反推（2,500 次调用 × 20,000 token = 50M input token，\$150 / 50M ≈ **\$3.00 / 1M token**）——这个隐含单价大致对得上 Sonnet 级输入定价，属合理量级，但它是笔者的推算而非论文给出的。\$15.00 更直接：就是 \$150 × 0.1。因此"1500×"这个 headline 是「一个假设值 ÷ 一个实测值」。
 
 **Table 1：五个 frontier model 的单次编译实测（OpenRouter，sanitized skeleton ≈10,000–12,000 token）**
 
 | Model | Input → Output tokens | Cost (USD) | Speed (TPS) | Result |
 |:--|:--|:--|:--|:--|
-| Claude Opus 4.6 | 11,628 → 1,340 | $0.0916 | 96.9 | Success |
-| Claude Sonnet 4.5 | 11,628 → 1,670 | $0.0599 | 98.6 | Success |
-| GPT-5.2-Codex | 9,951 → 1,447 | $0.0377 | 115.7 | Success |
-| Qwen3.5 397B | 10,738 → 3,000 | $0.0172 | 56.2 | Success |
-| Qwen3 Coder Next | 10,536 → 550 | $0.0020 | 131.6 | Success |
+| Claude Opus 4.6 | 11,628 → 1,340 | \$0.0916 | 96.9 | Success |
+| Claude Sonnet 4.5 | 11,628 → 1,670 | \$0.0599 | 98.6 | Success |
+| GPT-5.2-Codex | 9,951 → 1,447 | \$0.0377 | 115.7 | Success |
+| Qwen3.5 397B | 10,738 → 3,000 | \$0.0172 | 56.2 | Success |
+| Qwen3 Coder Next | 10,536 → 550 | \$0.0020 | 131.6 | Success |
 
 五个模型都产出了语法合法、可执行的 JSON blueprint。Gemini 2.5 Flash 与 Claude 3.5 Haiku 在预实验中因 schema-constrained generation 失败率过高被排除（作者强调是系统性编译失败，不是单纯因为便宜）。
 
@@ -106,10 +106,10 @@ date_added: "2026-08-10"
 
 | Claim ID | Claim | Type | Source locator | Evidence excerpt | Status |
 |:--|:--|:--|:--|:--|:--|
-| C1 | 论文称 5-step workflow 跑 500 iterations 的 continuous agent 推理成本约 $150.00，激进缓存下仍约 $15.00 | number | Abstract; Sec 4.2 | "a continuous agent incurs approximately $150.00 in inference costs; even with aggressive caching, this remains near $15.00" | source-verified |
-| C2 | $150.00 与 $15.00 均标为 "estimated"，建立在假设参数上（2,500 次 API 调用、每页 20,000 token 原始 DOM），论文未给出 per-token 价格 C_t，未指明 baseline 模型，也未运行任何 continuous agent | number / benchmark-setting | Sec 4.2 | "yields approximately 2,500 sequential API calls and an estimated total cost of $150.00" | source-verified |
-| C3 | 单次编译成本为实测值，跨 5 个模型经 OpenRouter 记录，范围 $0.0020（Qwen3 Coder Next）至 $0.0916（Claude Opus 4.6） | number | Table 1 (Sec 4.2) | "Table 1: One-shot compilation performance across leading LLMs (OpenRouter)" | source-verified |
-| C4 | "up to 1500×" 成本削减是 estimated $150 与 measured ~$0.10 之比，非两侧同口径实测 | number / comparison | Sec 4.2 | "a cost reduction of up to 1500× compared to un-optimized continuous agents under equivalent execution workloads" | source-verified |
+| C1 | 论文称 5-step workflow 跑 500 iterations 的 continuous agent 推理成本约 \$150.00，激进缓存下仍约 \$15.00 | number | Abstract; Sec 4.2 | "a continuous agent incurs approximately \$150.00 in inference costs; even with aggressive caching, this remains near \$15.00" | source-verified |
+| C2 | \$150.00 与 \$15.00 均标为 "estimated"，建立在假设参数上（2,500 次 API 调用、每页 20,000 token 原始 DOM），论文未给出 per-token 价格 C_t，未指明 baseline 模型，也未运行任何 continuous agent | number / benchmark-setting | Sec 4.2 | "yields approximately 2,500 sequential API calls and an estimated total cost of \$150.00" | source-verified |
+| C3 | 单次编译成本为实测值，跨 5 个模型经 OpenRouter 记录，范围 \$0.0020（Qwen3 Coder Next）至 \$0.0916（Claude Opus 4.6） | number | Table 1 (Sec 4.2) | "Table 1: One-shot compilation performance across leading LLMs (OpenRouter)" | source-verified |
+| C4 | "up to 1500×" 成本削减是 estimated \$150 与 measured ~\$0.10 之比，非两侧同口径实测 | number / comparison | Sec 4.2 | "a cost reduction of up to 1500× compared to un-optimized continuous agents under equivalent execution workloads" | source-verified |
 | C5 | 成本形式化为 Cost_cont = M × Σ[S_i × C_t]（O(M×N)）与 Cost_oneshot = 1×(S_compile×C_t) + C_exec（amortized O(1)），其中 C_exec 被断言可忽略 | causal-mechanism | Sec 4.1, Eq. (2)(3) | "its monetary cost is negligible relative to frontier API fees" | source-verified |
 | C6 | 论文自认 recompilation 的稀有性未被证明，O(R) 论证缺少纵向实证 | causal-mechanism | Sec 3.4 | "longitudinal empirical studies are required to mathematically prove the rarity of recompilation across the broader internet" | source-verified |
 | C7 | DSM 宣称压缩 token payload "up to 85%"（Intro 与 §3.1 各出现一次，均为裸断言），全文无任何测量。Table 1 的 9,951–11,628 token 是评测页的 sanitized skeleton，与 §4.2 假设的 20,000 token 并非同一页；若强行对照仅得 41.9%–50.2% | number | Sec 3.1; Table 1 | "these operations compress token payloads by up to 85%" | source-verified（原表述"约 42%"为单端点取值，已按独立 verifier 复算改为区间） |
@@ -118,9 +118,9 @@ date_added: "2026-08-10"
 | C10 | 论文未运行任何 continuous-agent baseline（成本与成功率皆无），未报告 blueprint 失效率、时间衰减或 recompilation 频率的任何测量 | benchmark-setting | Sec 4–5 全篇（缺失证据） | Tables 1–2 只含 one-shot 结果；Sec 5.2 仅为论证性文字 | source-verified |
 | C11 | §5.5 把 automated recompilation 列为 future work，而 §3.4 / §5.2 / §5.4 以现在时描述 selector healing 已在运行——论文内部对该机制是否已实现自相矛盾，无代码可核 | causal-mechanism | Sec 3.4; Sec 5.2; Sec 5.4 vs Sec 5.5 | "the execution engine halts and triggers the lazy replanning compiler" vs "First, automated recompilation … would partially recover the resilience advantages" | source-verified（原推断"已实现的是干净停机 + HITL"被独立 verifier 判为 unsupported，已改写为内部矛盾陈述） |
 | C12 | near-100% 可靠性依赖人工修补失败的 blueprint，不是自主达成 | comparison | Abstract; Sec 4.3 | "HITL gate allows operators to manually patch isolated failures ... enabling near-100% execution reliability" | source-verified |
-| C13 | "约 80% 的企业 workflow 具备稳定标准 HTML 结构"与"社区 benchmark 单任务 $1.00–$3.20"两项数字均无引用来源 | number | Sec 5.4; Sec 1.2 | "constrained to the approximately 80% of enterprise workflows characterized by stable, standard HTML structures" | source-verified |
+| C13 | "约 80% 的企业 workflow 具备稳定标准 HTML 结构"与"社区 benchmark 单任务 \$1.00–\$3.20"两项数字均无引用来源 | number | Sec 5.4; Sec 1.2 | "constrained to the approximately 80% of enterprise workflows characterized by stable, standard HTML structures" | source-verified |
 | C14 | 论文未提供代码链接，正文未给出 JSON blueprint 的 schema、语法或示例 | license-code | 全文（缺失） | 无 code/artifact 声明；Figure 2 仅以方框标注 "JSON Blueprint" | source-verified |
-| C15 | §4.2 把 Table 1 实测上限 $0.0916 上取整成 $0.10（1500× 由此得出），Abstract 与 §6 则写 $0.092——同一数字两种取整，1500× 依赖较宽松的那一版 | number | Sec 4.2 vs Abstract/Sec 6 | "Total inference cost ranges from $0.002 to $0.10" vs "per-compilation costs between $0.002 and $0.092" | source-verified（原表述"内部不一致"过强，已按独立 verifier 意见改为取整口径差异） |
+| C15 | §4.2 把 Table 1 实测上限 \$0.0916 上取整成 \$0.10（1500× 由此得出），Abstract 与 §6 则写 \$0.092——同一数字两种取整，1500× 依赖较宽松的那一版 | number | Sec 4.2 vs Abstract/Sec 6 | "Total inference cost ranges from \$0.002 to \$0.10" vs "per-compilation costs between \$0.002 and \$0.092" | source-verified（原表述"内部不一致"过强，已按独立 verifier 意见改为取整口径差异） |
 
 ## Strengths & Weaknesses
 
@@ -133,8 +133,8 @@ date_added: "2026-08-10"
 
 **Weaknesses**
 
-- **核心成本 claim 是算术，不是测量。** 论文最重要的一个数字（$150）没有跑过任何实验：没有 baseline agent、没有指定模型、没有写下 per-token 价格。"1500×"是「假设值 ÷ 实测值」。方向上我认为结论大概率成立——去掉 M 次推理确实省钱——但**量级完全没有证据支撑**，任何引用这篇的工作都不应该搬运 1500× 或 $150。
-- **成本对比把两个独立干预捆在一起。** baseline 假设 continuous agent 每步重发 20,000 token 的**原始** DOM，而编译路径用了 DSM 压缩后的骨架。这意味着节省里混了 (a) DOM sanitization 的上下文削减与 (b) 消除 per-step 推理两部分，论文从不拆分。公平的 ablation 应当给 continuous baseline 也配上 DSM——粗略推算这会让 baseline 立刻降约 45%，叠加 90% caching 后约 $8，headline 倍数随之从 1500× 掉到 ~80×。定性结论能活，量级不能。
+- **核心成本 claim 是算术，不是测量。** 论文最重要的一个数字（\$150）没有跑过任何实验：没有 baseline agent、没有指定模型、没有写下 per-token 价格。"1500×"是「假设值 ÷ 实测值」。方向上我认为结论大概率成立——去掉 M 次推理确实省钱——但**量级完全没有证据支撑**，任何引用这篇的工作都不应该搬运 1500× 或 \$150。
+- **成本对比把两个独立干预捆在一起。** baseline 假设 continuous agent 每步重发 20,000 token 的**原始** DOM，而编译路径用了 DSM 压缩后的骨架。这意味着节省里混了 (a) DOM sanitization 的上下文削减与 (b) 消除 per-step 推理两部分，论文从不拆分。公平的 ablation 应当给 continuous baseline 也配上 DSM——粗略推算这会让 baseline 立刻降约 45%，叠加 90% caching 后约 \$8，headline 倍数随之从 1500× 掉到 ~80×。定性结论能活，量级不能。
 - **最要命的缺口：适应性代价一个数都没有。** 编译式 workflow 是拿 adaptivity 换 cost，而论文**完全没有量化这笔交换**。没有 blueprint 失效率、没有随时间的成功率衰减曲线、没有 recompilation 频率、没有 selector healing 的成功率与成本、没有任何与 continuous agent 的成功率对照。Sec 5.2 "Cost-Resilience Trade-off" 整节是论证而非数据：结构性 UI 变更"每半年到一年一次"无引用，"recompilation 频率在运维上可忽略"是断言。作者自己在 Sec 3.4 承认这需要纵向研究来证明。**换言之，论文声称的 O(1) 实际是 O(S_compile × R)，而 R 从未被测量过。**如果目标站点的 R 随 M 增长（高频跑意味着更容易撞上部署窗口），O(1) 直接坍塌。
 - **Sec 3.4 / 5.2 / 5.4 与 Sec 5.5 口径打架。** 前三处用现在时把 selector healing 写成正在运行的机制，后者把 automated recompilation 列为 future work。读者无法判断自动 healing 到底建没建；无论如何它没有被评测，也没有代码可核。
 - **near-100% 是人机混合数字，不该与自主 agent 的成功率并列。** 它建立在人工修补失败 blueprint 之上。论文的 TCO 论证只记 API 美元，不记人工秒数与 HITL 审批环节的组织成本——而 HITL gate 是**每次编译**都必经的（Sec 3.3），不是仅在失败时触发。真实的 total cost 里有一项被系统性地记为零。
@@ -143,7 +143,7 @@ date_added: "2026-08-10"
 - **把 IR 当核心贡献却不公布 IR。** 没有 schema、没有示例、没有代码。这篇因此无法被复现，也无法被当作可依赖的工程参考——只能当作一个 framing 来引用。
 - **单作者、公司 email（Selfotix）、主分类 cs.DC。**读的时候应按 industry position paper 而非同行评审实证研究来定权重。
 
-**对领域的意义（个人判断）**：这篇的价值在命名和方程，不在数字。它把一个所有做 web agent 部署的人都遇到过、但很少被形式化的问题写成了可讨论的对象，并给出了一条清晰的架构分界线。但它同时是一个很好的反面教材：**当一篇论文的核心 claim 是成本削减时，"估算的 baseline vs 实测的 method"这种不对称会让整个数量级失去意义。**做 harness cost axis 的 survey 时，这篇应当被引为 framing 与 open problem 的来源，其 $150 / $15 / 1500× 一律不得作为经验数据转述。
+**对领域的意义（个人判断）**：这篇的价值在命名和方程，不在数字。它把一个所有做 web agent 部署的人都遇到过、但很少被形式化的问题写成了可讨论的对象，并给出了一条清晰的架构分界线。但它同时是一个很好的反面教材：**当一篇论文的核心 claim 是成本削减时，"估算的 baseline vs 实测的 method"这种不对称会让整个数量级失去意义。**做 harness cost axis 的 survey 时，这篇应当被引为 framing 与 open problem 的来源，其 \$150 / \$15 / 1500× 一律不得作为经验数据转述。
 
 ## Mind Map
 
@@ -216,6 +216,6 @@ mindmap
 
 **待查 / 存疑**
 
-- 隐含单价 $3.00 / 1M token 是我按论文自述参数反推的（2,500 × 20,000 = 50M token，$150 / 50M）。论文本身从未写出 C_t，若 verifier 能在正文找到显式定价说明，需修正 C2 的表述。
+- 隐含单价 \$3.00 / 1M token 是我按论文自述参数反推的（2,500 × 20,000 = 50M token，\$150 / 50M）。论文本身从未写出 C_t，若 verifier 能在正文找到显式定价说明，需修正 C2 的表述。
 - Sec 3.4 与 Sec 5.5 关于 automated recompilation 是否已实现的矛盾，值得在引用时明确标注为"实现状态不明"。
 - 无 code、无 schema，本篇不适合走 `repo-digest`。

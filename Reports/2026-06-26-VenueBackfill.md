@@ -30,7 +30,7 @@ tags: [report, venue-backfill, daily-papers]
 
 4. **VLA 从 reactive 转向 "think/affordance before act"**:affordance grounding(显式 contact point/trajectory:[[2606-AffordGen]]/[[2510-A0AnAffordance]]/[[2510-CoAVLA]]/[[2506-AffordDP]])与 reasoning/CoT/memory 增强([[2506-CoTVLA]]/[[2606-ACoTVLA]]/[[2606-TRMVLA]]/[[2606-AVAVLA]])是两条主线。共同假设:端到端 VLA 缺显式中间结构(affordance/CoT/3D)→ 加可解释中间表示提升 OOD 与 long-horizon。
 
-5. **直接强化 agenda 的 primary 方向(Agent-Facing Environment Runtime)**:[[2606-WebGym]](rubric verifier + async rollout 环境)、[[2606-OSOracle]](programmatic step-critic)、[[2606-Ego2Web]]/[[2510-UINavBench]](带 judge 的真实环境)共同印证"环境侧 verifier/critic/async 是 visual agent RL 的关键基建",可补进 [[Topics/AgentFriendlyEnvironment-Survey]] 与 [[Ideas/HybridVerifier-GUIRuntime]] 的证据链。
+5. **直接强化 agenda 的 primary 方向(Agent-Facing Environment Runtime)**:[[2606-WebGym]](rubric verifier + async rollout 环境)、[[2606-OSOracle]](programmatic step-critic)、[[2606-Ego2Web]]/[[2510-UINavBench]](带 judge 的真实环境)共同印证"环境侧 verifier/critic/async 是 visual agent RL 的关键基建",可补进 [[Topics/CUA-Survey]] 与 [[Ideas/HybridVerifier-GUIRuntime]] 的证据链。
 
 **诚实的边界**:这批是 CVF(CV 顶会)论文,天然偏 perception / spatial / VLA;纯 GUI-agent 论文较少(26 篇,且不少有 arxiv 版、autoresearch 已覆盖)。期刊几乎只拿到有 arxiv 版的(IEEE/Springer paywall),所以"期刊回填"实际贡献有限,主力是 CVF。rating 宽松 + codex 无人值守,个别笔记可能有 overclaim,引用前请核对正文证据。
 

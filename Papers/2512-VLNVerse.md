@@ -260,4 +260,4 @@ Map-history agent 在 fine-grained 任务上：Tel-Hop SR **25.53% → Strict 16
 - **为什么不是 1**：论文不是 incremental——Table 1 清晰展示了 VLN 领域过去多年 0 个新场景的贡献停滞，263 个 hand-crafted USD + 五任务统一 + Strict/Tel-Hop 对照 + CR metric 同时推进了多个维度；Strict 设置下 MLLM 的暴露是真正的 research insight 而非 benchmark puffery
 - **为什么还不是 3**：发布才 4 个月（2025-12-22），citation=1 + HF 未收录 + github 88⭐（对一个 Isaac-based benchmark 算中等），属于 early signal 阶段尚不足以判断是否会成为 de facto 标准；VLN-PE 等同类工作刚出来一年就进入了大家的讨论，VLNVerse 能否取代尚待观察；且目前主代码尚未完全开源（只放了 playground demo），完整 adoption 还需等待
 
-%% 发布 < 3 个月的特例处理：citation 绝对数不作为降档依据；influential_citations=0、HF 未收录、github 88⭐ 都是中性信号——Isaac-based VLN benchmark 本身是小众方向。等 6 个月后重新看 adoption 情况。%%
+- **新发布特例**：citation 绝对数不作为降档依据；influential_citations=0、HF 未收录、github 88⭐ 都是中性信号——Isaac-based VLN benchmark 本身是小众方向。等 6 个月后重新看 adoption 情况。

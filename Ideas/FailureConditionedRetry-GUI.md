@@ -3,7 +3,7 @@ title: "Failure-Conditioned Retry：GUI Agent 第二次尝试的接口定义、�
 tags: [gui-agent, computer-use, error-recovery, memory, retry, research-idea]
 status: raw
 linked_project:
-date_updated: "2026-11-03"
+date_updated: "2026-11-12"
 ---
 
 ## Hypothesis
@@ -78,9 +78,14 @@ attempt 1 fails → encode φ(τ₁) → reset ρ → attempt 2 → paired compa
 | VRL-Bench（[arXiv 2609.12404](https://arxiv.org/abs/2609.12404)） | 试错学习协议：T 次 trial、共享首次、retry 为强制 baseline、SR@T 与平均 trial 数 | MiniWoB 与 WebShop；只比较已有 verbal update，不拆内容形式，不做训练 |
 | RoboRetry（[项目页](https://jedward225.github.io/RoboRetry/)） | VLA 上 failure-conditioned retry 对 matched blind retry 的 paired protocol；slot 存在效应与内容效应分解 | 机器人 RLBench；无定位因子，无重置因子；GUI 的三个机制差异未检验 |
 | EvoSkill-GUI（[arXiv 2609.17653](https://arxiv.org/abs/2609.17653)） | GUI 上 reflect → revise → retry，信息隔离 critic，有 pass@3 对照 | 入口是 skill 文件而非策略条件；无定位、无前缀或快照复用；只有一种内容形式；无训练 |
-| CUADebug / CUAErrorBench（[arXiv 2608.02643](https://arxiv.org/abs/2608.02643)） | 204 条 OSWorld 失败轨迹的 root-cause step、corrective strategy 人工标注；ReAct 式 debugger | 只诊断不重试；本工作把它的标注直接当 oracle 定位臂与 localizer 训练标签 |
+| CUADebug / CUAErrorBench（[[Papers/2608-CUADebug]]，[arXiv 2608.02643](https://arxiv.org/abs/2608.02643)） | 204 条 OSWorld 失败轨迹的 root-cause step、corrective strategy 人工标注（step 一致率 85.8%）；ReAct 式 debugger。**并有 RCA-guided re-rollout 实验**：从 root-cause step 前一步重放并注入修复，固定预算，Claude 4.5 Sonnet 的 144 条失败上 Baseline（无提示重放）13.9 / Self-debug 15.3 / Machine RCA 28.5 / CUADebugger 29.9 / Human oracle 31.9；continual 变体（第 51 步起）12.5 / 13.9 / 21.5 / 25.7 / 29.2；machine RCA 的 step-exact 29.2%、±2 步 45.1% | 11-03 记为"只诊断不重试"是笔误（2026-11-12 核对改正）：它已做了 \(\rho=k-1\) 下盲重放 / A4 / A6 / A5 的比较。仍缺：从 \(s_0\) 的盲重试臂与 token 匹配臂；定位与纠正内容捆绑成 package 未拆开。同时它给出一条反向证据：step-exact 仅 29.2% 的 machine RCA 与人工 oracle 只差 3.5 pp，定位准确度的剂量效应可能很平（见 Risk） |
 | CUA-Recovery（[arXiv 2610.27645](https://arxiv.org/abs/2610.27645)） | 2,250 个自发错误状态、接管深度 0–25、root-cause 与首次可见步标注；恢复轨迹微调 | 从错误处不带提示继续，不研究第二次尝试条件于第一次 |
-| AnchorGUI（[arXiv 2609.15457](https://arxiv.org/abs/2609.15457)） | 跨 trial 蒸馏，非对称记忆只保留 mismatch 处截图，AndroidWorld 69.2%（+11.9） | 无盲重试对照；本工作可把它当作一种 \(\phi\) 纳入因子实验 |
+| On the Reliability of Computer Use Agents（[[Papers/2604-ReliabilityCUA]]，[arXiv 2604.17849](https://arxiv.org/abs/2604.17849)） | OSWorld，benchmark 评测器判失败后触发 Retry(Binary) 与 Retry(Clarify)，最多 5 次，是否重置到初始状态未写明；Pass^1 / Pass^3：GPT-5 .576/.454 → .645/.557 → .730/.632，Claude .702/.612 → .732/.668 → .774/.706，Kimi .508/.357 → .623/.496 → .727/.634，McNemar / Wilcoxon 检验 | A1（只给失败标志）臂在 OSWorld 已有数字且带显著性检验，但失败标志来自 oracle 评测器；Retry(Clarify) 的反馈方读得到评测器源码与期望文件，强于 A5。无成本记账、无 token 匹配、无内容形式分解 |
+| 代码域 placebo 对照（[arXiv 2607.26117](https://arxiv.org/abs/2607.26117)、[arXiv 2611.06863](https://arxiv.org/abs/2611.06863)、[arXiv 2607.28576](https://arxiv.org/abs/2607.28576)，2026-11-12 新增） | 预算匹配的 Resample / Placebo / Feedback / Reflect 臂；2607.26117 的 placebo 在 1.5B/3B 上 −6.1/−6.9 pp（anchoring）；2611.06863 Compiled 85.3 ≈ Different-Label 86.1 ≈ Fixed Template 86.1 ≫ Resample 68.3，Reflection 56.0，结论"匹配粗标签无额外收益"，并建议 mismatched-feedback 与 static-guidance 对照 | 非 GUI，但协议正是 Phase 2 要立的；其 null 结果（内容是否对应本次失败不重要）直接威胁 P2/P3。本工作应把 mismatched / static 臂设为必做臂 |
+| AgentRewind（[arXiv 2608.14380](https://arxiv.org/abs/2608.14380)）/ DART（[arXiv 2605.23311](https://arxiv.org/abs/2605.23311)）/ Recoverability（[arXiv 2609.13672](https://arxiv.org/abs/2609.13672)），2026-11-12 新增 | SWE/terminal 与 FSM 工具环境的回退到 checkpoint 重试；AgentRewind w/o Rewind Memory 51.2 vs 完整 87.8，Restart with Experiences 78.0 | 重置方式（重开 vs 回退）因子在非 GUI 已有数字，GUI 无；快照保真是 GUI 特有问题 |
+| [[Papers/2611-SCOPE]]（2026-11-12 新增） | web 文本环境训练期：restore-to-frontier + failure-conditioned action，再蒸馏为无条件 policy | 训练期、文本；无部署期 \(\Delta\) 与定位剂量实验；是 Phase 4a "条件化 vs 蒸馏为无条件"的直接对照先例，比 LaMer 更近 |
+| Self-Adaptive VLA（[arXiv 2609.30092](https://arxiv.org/abs/2609.30092)，2026-11-12 新增） | 真实机器人上以 AdaLN 上下文 token 接收先前尝试的信息 | 训练入口的非 GUI 先例；GUI 模型上仍未检索到 |
+| AnchorGUI（[arXiv 2609.15457](https://arxiv.org/abs/2609.15457)，ECCV 2026） | 跨 trial 蒸馏，非对称记忆只保留 mismatch 处截图。AndroidWorld、Qwen3-VL-8B、K=3、每次 trial 重置到同一初始状态、3 seeds temp 0.7。Table 3 自带配对基线（trial 1/2/3）：Memoryless Retry 57.3/61.2/62.9（+5.5）、Episodic Memory 57.3/60.5/62.6、Reflexion 57.3/63.1/64.4、Asymmetric Distillation 57.3/65.4/69.2（+11.9）；跨 trial token 24.4k vs Reflexion 66.5k | **已有盲重试对照**（11-03 记为"无盲重试对照"是笔误，2026-11-12 核对 Table 3 改正）。它已在 GUI 上配对比较了 A0、A2 的近似（Episodic）、A4 与自家 \(\phi\)。仍缺：总预算匹配臂 A0'（只报成本未配预算）、CI、定位因子、重置因子、Rescue/Harm 分解 |
 | [[Papers/2600-UiVoyagerSelfEvolving]] | GRSD 用 SSIM 在成功/失败组之间找 fork 点并蒸馏进权重 | 训练期、需多条轨迹；是 Phase 4a 的"蒸馏而不条件化"对照 |
 | [[Papers/2604-SOLAR-RL]] / [[Papers/2602-ProxMO]] | first failure point 与 state similarity 用于训练期 credit assignment | 用途不同：本工作是推理时单轨迹定位喂给第二次尝试；[[Ideas/ForkPoint-CreditAssignment-GUI]] 因与它们重叠暂停，这里的差异点是用途与对照，不是定位算法 |
 | [[Papers/2600-UiMemSelfEvolving]] / [[Papers/2606-NaiveVisualMemory]] | 失败模式模板与 correction guideline；独立 recovery memory | 均为 goal 检索的记忆系统，无 paired 对照；本工作把"定位后的纠正三元组"作为可控内容臂 |
@@ -89,18 +94,20 @@ attempt 1 fails → encode φ(τ₁) → reset ρ → attempt 2 → paired compa
 | [[Papers/2604-VeriGUI]] / [[Papers/2505-BacktrackAgent]] / [[Papers/2608-StepReflect]] | episode 内每步验证与回退一步 | 同一 episode 内的恢复，不涉及第二次尝试；可作 base agent 自带恢复的对照 |
 | [[Ideas/MismatchTriage-LongHorizonRecovery-GUI]] | 同 checkpoint 全分叉测恢复动作的 counterfactual value | 研究 episode 内第一次 alert 后选哪种恢复；本工作研究 episode 之间传什么。两者共用快照分叉装置与 Rescue/Harm 口径，定位结果可作 MismatchTriage selector 的输入 |
 
-**Novelty**: 3/5 — closest works: LaMer、PivoARL、RoboRetry、EvoSkill-GUI。失败条件化重试的形式定义、paired blind-retry 协议、slot 与内容分解、pivotal step 定位与前缀复用，在文本环境、VLA 和 GUI skill 系统里都分别有先例。可守的是三者交集：**真实 GUI 上同预算配对的 \(\Delta\) 四因子分解（slot、内容形式、定位准确度、重置方式）+ 定位主导的机制假设及其 GUI 特有理由 + 条件于上一次尝试的 GUI policy 训练与冻结注入的直接对比**。
+**Novelty（自评 2026-11-03；2026-11-12 idea-evaluate 下调至 2/5，见文末 Evaluation）**: 3/5 — closest works: LaMer、PivoARL、RoboRetry、EvoSkill-GUI。失败条件化重试的形式定义、paired blind-retry 协议、slot 与内容分解、pivotal step 定位与前缀复用，在文本环境、VLA 和 GUI skill 系统里都分别有先例。可守的是三者交集：**真实 GUI 上同预算配对的 \(\Delta\) 四因子分解（slot、内容形式、定位准确度、重置方式）+ 定位主导的机制假设及其 GUI 特有理由 + 条件于上一次尝试的 GUI policy 训练与冻结注入的直接对比**。
 
 更安全的 claim：
 
-> 据我们所知，尚无工作在真实 GUI 环境中，以同 task 同 seed 配对、总预算匹配的盲重试为对照，系统比较第二次尝试所接收的失败信息形式（标志、原始轨迹、自由反思、定位后的纠正）与重置方式（重开、快照恢复）对成功率的影响，也没有工作比较"训练出接收入口的 GUI 模型"与"向冻结模型 prompt 注入同样内容"。
+> 据我们所知，尚无工作在真实 GUI 环境中，以同 task 同 seed 配对、**总 token 预算匹配**的盲重试（A0'）为对照，把第二次尝试的增益拆成 Rescue 与 Harm，并同时操控失败信息形式、定位准确度（含扰动定位与 mismatched 纠正）与重置方式；也没有工作比较"训练出接收入口的 GUI 模型"与"向冻结模型 prompt 注入同样内容"。GUI 上已有的配对比较——AnchorGUI 的 Memoryless Retry / Episodic / Reflexion、2604.17849 的 Retry(Binary)、CUADebug 的 RCA-guided re-rollout——都未做预算匹配、未拆因子、未报 Harm。（2026-11-12 收窄；11-03 版本的"系统比较失败信息形式与重置方式"已被上述三项部分占住）
 
 不再声称：
 
 - 从自己的失败中学习第二次尝试无人研究；
 - GUI agent 完全没有跨尝试记忆；
 - pivotal step 定位本身是新方法；
-- pass@k 的提升证明或否定了学习。
+- pass@k 的提升证明或否定了学习；
+- GUI 上没有盲重试对照（AnchorGUI Table 3、2604.17849 已有）；
+- 推理时定位加重试在 GUI 上无人做过（CUADebug 已做 \(\rho=k-1\) 下的 oracle / machine 定位重放）。
 
 ## Prior-art 检索记录（2026-11-03）
 
@@ -112,6 +119,24 @@ attempt 1 fails → encode φ(τ₁) → reset ρ → attempt 2 → paired compa
 | cross-episode / in-context RL / meta-RL LLM agent | LaMer、MR-Search、2602.04089、MAGE | 入口需训练的证据在文本环境；无 GUI 模型 |
 | failure-conditioned retry interface, slot vs content | RoboRetry（VLA）、CCRM、AgentRewind | 分解与反面模型存在；GUI 无 |
 | GUI model fine-tuned to take previous failed trajectory as input | 未检索到 | 推测为空白，待 Phase 4a 前再核一次 |
+
+## Prior-art 检索记录（2026-11-12，idea-evaluate）
+
+反向检索：按 11-03 记录里每个"无 X"断言去找 X。命中均打开原文核对表格，不以摘要为准。
+
+| 查询 | 命中 | 判定 |
+|:--|:--|:--|
+| memoryless retry / reflexion baseline, AndroidWorld, multi-trial | AnchorGUI 2609.15457 Table 3 | **推翻** 11-03 的"无盲重试对照"：Memoryless Retry / Episodic / Reflexion 三个配对基线，重置到同一初始状态，3 seeds；无 A0'、无 CI |
+| root-cause guided re-rollout / replay from cutoff, OSWorld | CUADebug 2608.02643 §re-rollout（单次与 continual 两种） | **推翻** 11-03 的"只诊断不重试"：\(\rho=k-1\) 下 Baseline / Self-debug / Machine RCA / CUADebugger / Human oracle 五臂；无从 \(s_0\) 盲重试、无 token 匹配 |
+| retry on failure signal, pass^k, computer use reliability | On the Reliability of CUAs 2604.17849（[[Papers/2604-ReliabilityCUA]]） | A1 臂在 OSWorld 已有，含 McNemar / Wilcoxon；无成本与内容分解 |
+| budget-matched resample vs feedback, placebo feedback, code repair | 2607.26117、2611.06863、2607.28576 | 预算匹配 + placebo 协议成熟；2611.06863 的 label-mismatch null 直接威胁 P2/P3 |
+| rewind / restart from checkpoint, agent retry, recoverability | AgentRewind 2608.14380、DART 2605.23311、Recoverability 2609.13672、Fail-Fast Restart-Smart 2608.03222 | 重置因子在 SWE / FSM 工具环境已有数字；GUI 无 |
+| failure-conditioned policy, restore to frontier, distill to unconditional | [[Papers/2611-SCOPE]]、PivoARL、LaMer、MAGE、MR-Search | 训练期先例全在文本；SCOPE 是 Phase 4a 最近邻 |
+| conditioning on previous attempt, context token, VLA / robot retry | Self-Adaptive VLA 2609.30092、RoboRetry（CVPR 2026 workshop，FailureSlot 1,334 条，仍无 arXiv 号）、FAR、FLARE、ReCoVLA | 训练入口在机器人已有；GUI 模型未检索到（与 11-03 一致） |
+| GUI failure diagnosis then recovery, software evaluation | DiagEval 2605.17439（DiagEval×1 45.6–47.0% vs naive retry 17.5–46.2%）、REFLECT 2606.09071、EchoTrail-GUI 2512.19396 | 诊断引导重试在 GUI 软件评估场景有数字，对照不配预算 |
+| GUI model fine-tuned on previous failed trajectory as policy input | 仍未检索到（arXiv 直链核验 2026-11-12） | 空白维持；Phase 4a 前再核 |
+
+vault 覆盖：上表命中中 [[Papers/2611-SCOPE]]、[[Papers/2609-AnchorGUI]]、[[Papers/2608-CUADebug]]、[[Papers/2604-ReliabilityCUA]] 有 Papers 笔记（后三篇 2026-11-12 入库）；2611.06863、2607.26117、2608.14380、2605.23311、2609.30092 均无笔记，数字来自原文核对。
 
 ## Approach sketch
 
@@ -191,6 +216,8 @@ Phase 2 按 150 任务 × 10 臂 × 2 重置（仅定位臂）× 2 seed，约 4,
 - **快照不等价。** 远端后端、时间、网络、账号状态不在快照内。Phase 0 的 restore divergence 是前置 gate；不过关的任务剔除并报告比例。
 - **预算假象。** 条件化臂天然多消耗 token。A0' 必须有，并同时报告 cost-aware 与 success-only 两套结果。
 - **标注成本与一致率。** CUADebug 的 step 一致率 85.8% 是上界参考；若我们的一致率低于 75%，A5 不再是 oracle，改报 inter-annotator 区间。
+- **定位剂量效应可能很平（2026-11-12 新增）。** CUADebug 上 step-exact 29.2% 的 machine RCA 与 100% 的人工 oracle 只差 3.5 pp（28.5 vs 31.9）；2611.06863 在代码域发现匹配粗标签无额外收益。若 A7（扰动定位）≈ A5，P2 不成立，"定位主导"退为"任何结构化纠正提示都有效"。对策：A7 分 ±1 / ±3 / 随机步三档，并加 mismatched-feedback 臂（给另一任务或另一步的纠正三元组）与 static-template 臂。
+- **第一贡献的表述已被先例抵消（2026-11-12 新增）。** "GUI 上无盲重试对照"不成立（AnchorGUI、2604.17849、CUADebug）。第一贡献须改为预算匹配下 \(\Delta\) 的 Rescue/Harm 分解与定位剂量曲线，不是对照的存在性。
 - **功效不足被包装成负结果。** 预注册 \(\delta=3\)pp 的 practically meaningful margin，CI 横跨 3–8pp 记为 inconclusive，不记为 negative。
 - **Phase 4a 的分布偏移。** 训练后的模型只见过自己 base 的失败分布；做 leave-one-base-agent-out，不默认跨 agent 泛化。
 - **与 vault 既有 idea 的边界。** [[Ideas/ForkPoint-CreditAssignment-GUI]] 因训练期 credit assignment 赛道重叠暂停；本 idea 的定位用途是推理时喂给第二次尝试并有 oracle 与盲重试对照，若 Supervisor 认为仍属延伸，应在 Phase 2 前否决而非 Phase 4b 后。
@@ -206,9 +233,31 @@ Phase 2 按 150 任务 × 10 臂 × 2 重置（仅定位臂）× 2 seed，约 4,
 | Evidence | 3/5 | 定位难、原始轨迹有害、入口需训练三条都有间接证据，但均来自非 GUI 或非配对设置 |
 | **Total** | **16/25** | 建议：先做 Phase 0–3，约三到四周，再决定是否投入训练 |
 
+## Evaluation — 2026-11-12 (idea-evaluate, autoresearch round 1)
+
+| Dimension | Score | Notes |
+|:----------|:-----:|:------|
+| Novelty | 2/5 | 11-03 自评"可守交集"有两块已被 GUI 先例占住：AnchorGUI Table 3 在 AndroidWorld 上配对比较了 Memoryless Retry / Episodic Memory / Reflexion / 自家蒸馏（对应 A0 / A2 近似 / A4 / \(\phi\)）；2604.17849 在 OSWorld 上做了 Retry(Binary)（A1）；CUADebug 做了 \(\rho=k-1\) 下盲重放 / Self-debug / Machine RCA / Human oracle（A4 / A6 / A5）。剩余交集：总预算匹配 A0' + Rescue/Harm 配对分解 + 定位剂量（A7 扰动、mismatched 臂）+ 训练入口 vs 冻结注入 |
+| Feasibility | 4/5 | 不变。CUADebug 的 re-rollout 装置与 CUAErrorBench 标注可直接复用为 \(\rho=k-1\) 与 A5 臂；AnchorGUI 的 AndroidWorld 同初始状态重置协议可复用为 \(\rho=s_0\) 臂 |
+| Impact | 3/5 | 不变。预算匹配的 \(\Delta\) 分解仍是 GUI 上缺的数字；但若 P2 被证伪，结论退为"结构化纠正提示 > 原始轨迹"，这在 AnchorGUI / CUADebug 已可读出，增量变小 |
+| Risk | 2/5 | 下调。机制假设 P2"定位准确度主导"已有两条反向证据：CUADebug 上 step-exact 29.2% 的 machine RCA 与人工 oracle 只差 3.5 pp；2611.06863 在代码域发现匹配粗标签无额外收益。第一贡献"GUI 无盲重试对照"的表述已不成立 |
+| Evidence | 4/5 | 上调。P1 的排序（原始轨迹 ≈ 盲重试 < 反思 < 定位后纠正）现在有 GUI 直接数字：AnchorGUI Episodic 62.6 ≈ Memoryless 62.9 < Reflexion 64.4；CUADebug Self-debug 15.3 ≪ Machine RCA 28.5。仍缺预算匹配与 CI |
+| **Total** | **15/25** | 11-03 自评 16/25 → 15/25。建议 pivot 第一贡献，不淘汰 |
+
+**Novelty**: 2/5 — closest works: [[Papers/2609-EvoSkillGUI]]、[[Papers/2611-SCOPE]]、[[Papers/2600-UiVoyagerSelfEvolving]]、[[Papers/2606-NaiveVisualMemory]]（vault 内）；AnchorGUI [arXiv 2609.15457](https://arxiv.org/abs/2609.15457)、CUADebug [arXiv 2608.02643](https://arxiv.org/abs/2608.02643)、On the Reliability of CUAs [arXiv 2604.17849](https://arxiv.org/abs/2604.17849)、[arXiv 2611.06863](https://arxiv.org/abs/2611.06863)（vault 无笔记，原文核对）。Prior-art 状态：**PARTIALLY_ADDRESSED**——配对盲重试对照、失败标志臂、RCA 引导的 \(k-1\) 重放在 GUI 上均已有工作；未被占住的是预算匹配下的四因子 \(\Delta\) 分解、定位剂量响应与训练入口对比。
+
+**Reasoning**: 11-03 自评把 AnchorGUI 记成"无盲重试对照"、把 CUADebug 记成"只诊断不重试"，这两处错记直接撑起了"更安全的 claim"，核对原文后该 claim 必须收窄到预算匹配与因子分解。GUI 直接证据同时让 P1 更可信（原始轨迹记忆不优于盲重试、反思增益小、定位后纠正增益大）又让 P2 更可疑（人工 oracle 与 29% step-exact 的机器定位差距很小）。idea 仍值得做，但第一贡献须从"GUI 上第一个对照"改为"预算匹配下 \(\Delta\) 的 Rescue/Harm 分解与定位剂量曲线"，并把 2611.06863 式的 mismatched / static 对照臂设为必做臂，否则 Phase 2 的正结果无法区分"定位"与"任何纠正模板"。
+
+**Suggestions**:
+1. Phase 2 臂表新增 A8 mismatched-feedback（另一任务或另一步的纠正三元组）与 A9 static-template（固定的"检查上一步是否点错"提示）；A7 扰动定位分 ±1 / ±3 / 随机步三档。P2 判据改为 A5 − A8 与 A5 − A7 随扰动幅度的斜率，而非 A5 − A2。
+2. 第一个实验不做全因子：在 CUADebug 公开的 144 条 Claude 4.5 Sonnet 失败子集上复现其 Baseline / Machine RCA / Human oracle 三臂，补 A0' 与 A8，六臂约 900 次 rollout，直接检验"定位主导"。
+3. paper-digest AnchorGUI（2609.15457，已入库 [[Papers/2609-AnchorGUI]]）、CUADebug（2608.02643，已入库 [[Papers/2608-CUADebug]]）、On the Reliability of CUAs（2604.17849，已入库 [[Papers/2604-ReliabilityCUA]]）进 Papers/；[[Topics/CUA-Survey]] §6.10 与 §10.11 D2 当前只有间接证据，这三篇是 D2 的直接数据点。
+4. Phase 4a 的对照先例改为 [[Papers/2611-SCOPE]]（条件化 → 蒸馏为无条件）与 Self-Adaptive VLA 2609.30092（AdaLN 上下文 token），LaMer 退为文本域背景。
+5. 若 Supervisor 接受 pivot，status 可转 developing；若坚持原第一贡献表述，建议淘汰。
+
 ## Evidence boundary / 待核查
 
-- 本文引用的 LaMer、PivoARL、PivotOPD、VRL-Bench、RoboRetry、AnchorGUI、CCRM、EvoSkill-GUI、CUADebug、CUA-Recovery、AgentRewind、Terminal-Bench RSI 2608.24876 均为网络核对，vault 尚无 Papers 笔记，建议先 paper-digest 后再引用进 survey。RoboRetry 目前只有项目页，无 arXiv 号。
+- 本文引用的 LaMer、PivoARL、PivotOPD、VRL-Bench、RoboRetry、CCRM、EvoSkill-GUI、CUA-Recovery、AgentRewind、Terminal-Bench RSI 2608.24876 均为网络核对，vault 尚无 Papers 笔记，建议先 paper-digest 后再引用进 survey（AnchorGUI、CUADebug、2604.17849 已于 2026-11-12 入库）。RoboRetry 目前只有项目页，无 arXiv 号（2026-11-12 再核：CVPR 2026 workshop，仍无 arXiv 号）。2026-11-12 新增引用的 2604.17849、2611.06863、2607.26117、2607.28576、2608.14380、2605.23311、2609.13672、2609.30092、2605.17439、2606.09071 同样无 Papers 笔记，数字为原文核对。
 - MemGUI-Bench 的 61.6% 是任务难度同质假设下的独立重采样上界，不是期望值；用于说明 pass@k 不能归因，不用于证明"没有学习"。
 - CUA-Recovery 的 15.6% 对 12.2% 是 agent 自己察觉与否的分组，不是外部告知的 slot 实验；GUI 上 slot 存在效应尚无任何数字。
 - 相关 survey 位置：[[Topics/CUA-Survey]] §6.9 Memory、§6.10 Verification and Error Recovery、§10.11 D2；[[Topics/SelfEvolvingAgents-Survey]] §5 Memory/Context Evolution。

@@ -44,7 +44,7 @@ WebRetriever Protocol III 要求 agent 从 entry URL 出发，只能通过网站
 - **Enter 漏发**：356 次 `type` 调用中 79 次（22%）以 `\n` 结尾却从未被提交。
 - **负结果**：仅加"no detectable change" feedback note，10 个 idle-looping 任务仍为 0/10、总步数同为 400（模型在 thought 中承认了 note 却继续重复）；启发式 idle breaker 误杀一个本可成功的任务；`read_text` 在 6 个目标任务中被用了 5 次但一个也没修好；早期 40→65 step limit 实验无增益，在新代码上重做 40→80 则 8 个任务从 0–1 升到 4。
 - **失败分析**（100 个公开任务，跨所有 run 的最佳结果，属于上界；作者标注为近似分桶、可重叠）：55 个答对，13 个参考答案已过时或定义不同，16 个站点从作者网络不可达，其余是结构性障碍（CAPTCHA、canvas-only UI 等）、capability gap 与决策错误。
-- **成本**：平均每步约 10.6k input / 127 output tokens，一次 100 任务评测约 $170–230，大部分 input 来自每步重发 5 张截图。
+- **成本**：平均每步约 10.6k input / 127 output tokens，一次 100 任务评测约 \$170–230，大部分 input 来自每步重发 5 张截图。
 
 ## Evidence Ledger
 
@@ -66,7 +66,7 @@ WebRetriever Protocol III 要求 agent 从 entry URL 出发，只能通过网站
 | C14 | 第二次提交 +10 中约 7 分来自完成更多任务（首轮仅完成 79/100），约 3 分来自准确率 | causal-mechanism | §5.2 | roughly 7 of the 10 points came from completing more tasks and about 3 from answering more accurately | source-verified |
 | C15 | holdout30（25 可评分）本地 52.0% vs hidden 46.0；16/100 站点不可达 | number | §5.1 | these 25 tasks scored 52.0% locally, and the hidden set scored 46.0 officially | source-verified |
 | C16 | 100 公开任务最佳结果：55 答对（上界）、13 参考答案过时、16 不可达（表注为近似，桶可重叠） | number | Table 6; §5.5 | Reference answer outdated or defined differently 13 ... Site unreachable from our network 16 | source-verified |
-| C17 | 每步约 10.6k input / 127 output tokens；100 任务约 $170–230 | number | §5.6 | average step consumed about 10.6k input and 127 output tokens ... cost about $170–230 | source-verified |
+| C17 | 每步约 10.6k input / 127 output tokens；100 任务约 \$170–230 | number | §5.6 | average step consumed about 10.6k input and 127 output tokens ... cost about \$170–230 | source-verified |
 | C18 | 参考实现从未提交 hidden set；31.0 起点已含修复；参考实现+同模型 10 任务子集 0 解 | benchmark-setting | §6.2 (ii) | the 31.0 starting point already includes several of our fixes | source-verified |
 | C19 | Table 1 leaderboard 基线任务集不同，不可直接比较（如 claude-4-8-opus CU 47%，不在 approved list） | benchmark-setting | §2; Table 1 | evaluated on a different task set with human verification, so they are not directly comparable | source-verified |
 | C20 | 主办方 manual review 未扣分 | number | Table 4 caption; §4.6 | Manual review deducted no points from the final submission. | source-verified |

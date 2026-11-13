@@ -38,7 +38,7 @@ GUI agent 的性能很大程度由 runtime harness 决定（Agent S 系列已经
 - **WAA 迁移（50 步，无 WAA 优化，只换平台 adapter）**：Qwen3-VL-32B 38.21→44.68（+6.47），GPT-5 50.88→64.75（+13.87）。
 - **消融（Qwen3-VL-32B，Test/Full）**：去视觉证据 44.54/40.69（掉得最多），去 Clusterer 45.66/42.13，单次执行证据 47.44/43.12，仅 hard gate 49.36/48.08（跑了 9 轮反而选出更差的 harness），完整版 53.18/50.94。
 - **重复次数 K**：K=1 选出的 harness Full 43.1%，K=3 为 50.9%，K=5 为 49.7%（成本更高但不更好）；SE 从 1.61 降到 0.93。
-- **推理成本（只算目标模型推理，不含优化过程）**：GPT-5 15 步 harness 62.4% / 约 $72，对比 Agent S3 100 步 62.6% / 约 $260（后者由 published 每题成本 $0.72 乘题数重构；两者步数和协议不同，属 source-reported operating point 对比）。冻结 harness 的配对成本：Qwen3-VL-32B $27.3→$34.2（上升），GPT-5 $78.6→$72.3，Gemini $140.0→$92.4（下降）。
+- **推理成本（只算目标模型推理，不含优化过程）**：GPT-5 15 步 harness 62.4% / 约 \$72，对比 Agent S3 100 步 62.6% / 约 \$260（后者由 published 每题成本 \$0.72 乘题数重构；两者步数和协议不同，属 source-reported operating point 对比）。冻结 harness 的配对成本：Qwen3-VL-32B \$27.3→\$34.2（上升），GPT-5 \$78.6→\$72.3，Gemini \$140.0→\$92.4（下降）。
 
 ## Evidence Ledger
 
@@ -54,8 +54,8 @@ GUI agent 的性能很大程度由 runtime harness 决定（Agent S 系列已经
 | C8 | 消融 Test/Full：去视觉证据 44.54/40.69，去 Clusterer 45.66/42.13，单次执行 47.44/43.12，仅 hard gate 49.36/48.08 | number | Table 3; §4.5 | Removing visual evidence produces the largest drop, to 44.54% and 40.69% | source-verified |
 | C9 | baseline 下 11.8–20.4% 任务在 3 次执行中 flip，Qwen3-VL-32B 最高 20.4% | number | App. C, Table 8 | Depending on the backbone, 11.8–20.4% of tasks flip between zero and positive score across three executions. | source-verified |
 | C10 | 重复次数 K=1/3/5 选出的 harness Full 43.1/50.9/49.7；SE 1.61→0.93 | number | App. C.1, Figure 7 | lowers the standard error from 1.61 to 0.93... improves from 43.1%... to 50.9%... slightly weaker 49.7% harness | source-verified |
-| C11 | GPT-5 15 步 62.4%/约 $72 vs Agent S3 100 步 62.6%/约 $260（后者由 published 每题成本重构）；不含优化成本 | comparison | §4.4; App. F.1; App. G.10 | nearly matches Agent S3's accuracy (62.4% versus 62.6%) at approximately 72% lower full-suite API cost | source-verified |
-| C12 | 冻结 harness 推理成本：Qwen3-VL-32B $27.3→$34.2，GPT-5 $78.6→$72.3，Gemini $140.0→$92.4 | number | App. F.1, Figure 9 | cost increases from $27.3 to $34.2... GPT-5 moves from 55.2% at $78.6 to 62.4% at $72.3 | source-verified |
+| C11 | GPT-5 15 步 62.4%/约 \$72 vs Agent S3 100 步 62.6%/约 \$260（后者由 published 每题成本重构）；不含优化成本 | comparison | §4.4; App. F.1; App. G.10 | nearly matches Agent S3's accuracy (62.4% versus 62.6%) at approximately 72% lower full-suite API cost | source-verified |
+| C12 | 冻结 harness 推理成本：Qwen3-VL-32B \$27.3→\$34.2，GPT-5 \$78.6→\$72.3，Gemini \$140.0→\$92.4 | number | App. F.1, Figure 9 | cost increases from \$27.3 to \$34.2... GPT-5 moves from 55.2% at \$78.6 to 62.4% at \$72.3 | source-verified |
 | C13 | 四个 optimizer 角色均为 Claude Sonnet 5；Qwen/闭源从 Agent S3 + UI-TARS-1.5-7B grounder 起步；OpenCUA 用官方 runtime | benchmark-setting | §4.1; App. G.1 | All four optimizer roles in our algorithm use Claude Sonnet 5 with the same role prompts across backbones. | source-verified |
 | C14 | Task Card 含 feasibility 标注与公开 hint | benchmark-setting | §3.2 | a Task Card containing the instruction, domain, related applications, feasibility annotation, setup steps, and any published hint | source-verified |
 | C15 | 代码开源于 GaryYang12345/GUI-HARVEST | license-code | Abstract | The code is available at https://github.com/GaryYang12345/GUI-HARVEST. | source-verified |

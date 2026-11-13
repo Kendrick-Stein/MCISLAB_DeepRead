@@ -37,4 +37,4 @@ title: Ideas
 | [[Ideas/SelfInitiatedFork-GUI]] | veto | AgentRuntimePrimitives-Survey | ~~fork 作为可学习的 agent 动作~~（Supervisor 否决：LtE/PGTS 已覆盖调用学习，属延伸非空白） |
 | [[Ideas/ExecutionPriorDrift-BenignGate]] | raw | ExperienceSafetyRisks / GRASP | 良性经验的安全退化由执行倾向漂移中介，可用全良性探针在准入时预测并拦截（不接触 harmful probe；prior-art PARTIALLY_ADDRESSED，最近邻 FATE 2605.11882） |
 | [[Ideas/RestorationFidelity-BranchGains]] | veto | AgentRuntimePrimitives-Survey OP4 | ~~恢复保真度测量~~（Supervisor 否决：infra 测量问题非算法问题，无亮点） |
-| [[Ideas/FailureConditionedRetry-GUI]] | raw (16/25) | CUA-Survey §6.9/§6.10 / Supervisor 讨论 2026-11-03 | GUI agent 第二次尝试的增益由错误步定位准确度主导而非反思质量；GUI 模型无接收上一次失败的原生入口，训练出入口后同内容增益高于 prompt 注入（paired blind-retry 对照，slot/内容/定位/重置四因子） |
+| [[Ideas/FailureConditionedRetry-GUI]] | raw (15/25，11-12 idea-evaluate：PARTIALLY_ADDRESSED，建议 pivot 第一贡献) | CUA-Survey §6.9/§6.10 / Supervisor 讨论 2026-11-03 | GUI agent 第二次尝试的增益由错误步定位准确度主导而非反思质量；GUI 模型无接收上一次失败的原生入口，训练出入口后同内容增益高于 prompt 注入（paired blind-retry 对照，slot/内容/定位/重置四因子） |

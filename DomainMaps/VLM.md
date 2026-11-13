@@ -121,6 +121,9 @@ VLM 正从"看图说话"走向多模态 agent 的感知决策核心
 | 效率 | 测试 GUI-KV on grounding tasks |
 ## 近期格局变化
 
+- **2026-11-13｜encoder-free 视觉前端第一次有同规模 scaling 对照，结论是"规模够大才划算"而非无损替代**：[[Papers/2609-EncoderFreeScaling]] 用 11 对 MoE 实测 1e20–1e21 FLOPs 内同 loss 约需 1.25 倍算力；交叉点 6.1e21 是外推，GUI/OCR 追赶最晚（[[Topics/VLM-Survey]] §2.5）
+- **2026-11-13｜空间推理失败可以拆成"表征读得出"与"变换算不动"两段**：[[Papers/2610-SSpace]] 在中层找到 3 维可线性读出的空间子空间，但 SpinBench 视角变换要外部旋转 oracle 才从 60.96 到 91–95。07-21 记下的"decodable ≠ used"因此要再细分：读出诊断须同时报告可读性与变换能力，oracle 读数只是上界（[[Topics/VLM-Survey]] §2.8）
+- **2026-11-13｜免标注后训练多出"EMA 自副本 + 输入不对称"一支，信号来自视图不对称而非更强判定者**：[[Papers/2608-S2VOPD]] 冻结教师仍保住约 93% 增益；与 [[Papers/2610-Trinity]] 一样，上限被基座自身的感知能力封住（[[Topics/VLM-Survey]] §2.6）
 - **2026-07-21｜统一模型竞争焦点从架构转向 RL 后训练**：实验基座收敛到 BAGEL 系 hybrid AR-diffusion，reward 范式转向复用 MLLM 自身能力（reward-policy 对齐 > reward 规模）——[[Papers/2607-BRAID]]、[[Papers/2607-SpectraReward]]（[[Topics/VLM-Survey]]）
 - **2026-07-21｜"decodable ≠ used" 跨域收敛**：VLM 瓶颈从表征缺失转向读出通路，CoT 增益不来自持续回看图像——[[Papers/2607-VisualAccessBoundary]]、[[Papers/2606-Act2Answer]]；与 GUI grounding 线的 counterfactual 诊断 insight（已 validated）互为印证（[[Topics/VLM-Survey]]）
 - **2026-07-21｜GUI grounding 与端到端 agent 能力系统性解耦**：grounding 开源 SOTA 但 OSWorld 落后 RL 系近一倍，分辨率/数据配比对两者影响方向相反——[[Papers/2509-ScaleCUA]]（[[Topics/VLM-Survey]]）

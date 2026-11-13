@@ -223,9 +223,9 @@
 ### [2026-07-30] 预算/口径匹配对照正在系统性推翻 agent 增强方法的既有增益声明
 
 - **observation**: 本期出现一批以"补上对照"为核心贡献的工作，且结论高度一致——增强模块的报告增益有相当比例来自未被计入的额外预算或不可比的口径。SkillMemoryBudget 给 vanilla actor 等 token 预算（10→15 步 + 规则化 AXTree 剪枝），三模型 × 三 WebArena 域下 AWM/ASI/ReasoningBank 被全面追平或反超；AgentOccam 的 per-step token 反而高于 vanilla（2930.9 vs 2210.2），说明其增益来自动作空间对齐而非"省上下文"；AgentsThatMatter 指出不控 cost 时 retry 即可刷高 accuracy，HAL 用 21,730 rollout 证明最贵模型极少落在 accuracy–cost Pareto 前沿；GUIvsCLI 用 440 任务、同目标/同初态/同 verifier 的 matched 对照推翻"CLI/API 优于 GUI"这一高频主张；MuonAgenticRL 显示仅换 optimizer 就能在同一 ALFWorld/GiGPO 配置上把 final checkpoint 从 0.320 抬到 0.633（单 seed、0.5B），意味着跨论文比数字在优化器不统一时无效；TeachStop 直接指出多数 agentic RL 只报单次 run，无法与 data draw / seed / runtime nondeterminism 分离
-- **occurrences**: [[Workbench/logs/2026-07-22]] (AgentsThatMatter, HAL), [[Workbench/logs/2026-07-23]] (AgentOccam, TeachStop), [[Workbench/logs/2026-07-27]] (MuonAgenticRL 量纲警告写入 WebAgent-RL 报告), [[Workbench/logs/2026-07-28]] (SkillMemoryBudget, GUIvsCLI, ActiveContextCurator 的 token 计数未含 curator 自身开销)
-- **evidence**: token-matched vanilla 追平三种 online 增强；AgentOccam per-step token 2930.9 > 2210.2；GUI 59.1% vs CLI 48.2%（matched）→ verifier-guided skill 修补后 CLI 69.3%；Muon/AdamW matched run 0.633 vs 0.320
-- **source_ids**: `paper:arxiv:2606.15017` (SkillMemoryBudget), `paper:arxiv:2410.13825` (AgentOccam), `paper:arxiv:2606.24551` (GUIvsCLI), `paper:arxiv:2407.01502` (AgentsThatMatter), `paper:arxiv:2510.11977` (HAL), `paper:arxiv:2607.16169` (MuonAgenticRL), `paper:arxiv:2607.17136` (TeachStop), `paper:arxiv:2604.11462` (ActiveContextCurator)
+- **occurrences**: [[Workbench/logs/2026-07-22]] (AgentsThatMatter, HAL), [[Workbench/logs/2026-07-23]] (AgentOccam, TeachStop), [[Workbench/logs/2026-07-27]] (MuonAgenticRL 量纲警告写入 WebAgent-RL 报告), [[Workbench/logs/2026-07-28]] (SkillMemoryBudget, GUIvsCLI, ActiveContextCurator 的 token 计数未含 curator 自身开销), [[Workbench/logs/2026-11-06]] (NonInvasive-GUI-Scheduling 专题：三条调度线全部缺 budget-matched 对照), [[Workbench/logs/2026-11-09]] (GUIDE 无预算匹配、原始轨迹注入 −1.94 只是格式对照；EvoSkill-GUI 唯一同预算 pass@3 对照 62.8% 仍低于 69.5%；LocalCUAScaling H=8 / S=100 不再涨而 token 涨 3.6/5.5 倍), [[Workbench/logs/2026-11-12]] (CommitFlow 消融 Fresh Base 66.8 / +IK 69.0 / +Ours 80.0，零学习的 IK 层占增益 1/6；CUADebug 输入 token 272.7K vs 290.8K 是 GUI 上最接近预算可比的定位重试对照，但 RCA 臂另有视觉助手侧通道)
+- **evidence**: token-matched vanilla 追平三种 online 增强；AgentOccam per-step token 2930.9 > 2210.2；GUI 59.1% vs CLI 48.2%（matched）→ verifier-guided skill 修补后 CLI 69.3%；Muon/AdamW matched run 0.633 vs 0.320；EvoSkill-GUI 同预算 pass@3 62.8% < 69.5%（增益在对照下存活的 GUI 首例）；CommitFlow IK 行 +2.2 / 总 +13.2
+- **source_ids**: `paper:arxiv:2606.15017` (SkillMemoryBudget), `paper:arxiv:2410.13825` (AgentOccam), `paper:arxiv:2606.24551` (GUIvsCLI), `paper:arxiv:2407.01502` (AgentsThatMatter), `paper:arxiv:2510.11977` (HAL), `paper:arxiv:2607.16169` (MuonAgenticRL), `paper:arxiv:2607.17136` (TeachStop), `paper:arxiv:2604.11462` (ActiveContextCurator), `paper:arxiv:2609.17653` (EvoSkillGUI), `paper:arxiv:2603.26266` (GUIDEWebVideo), `paper:arxiv:2607.28573` (LocalCUAScaling), `paper:arxiv:2609.21908` (CommitFlow), `paper:arxiv:2608.02643` (CUADebug)
 - **confidence**: medium
 - **needs_verification**: no
 - **status**: → promoted to insight ([2026-07-30]，8 个独立 source、4 个独立日期)
@@ -233,9 +233,9 @@
 ### [2026-07-30] 上下文/观察表示的最优点是 backbone 能力 × 任务阶段的非单调函数，而非单调"越少越好"
 
 - **observation**: "压缩/削减观察普遍有益"在本期被三类独立实验否定，且否定方向一致地指向"条件化 + 非平稳"。ReadMoreThinkMore 在 WorkArena L1 上交叉 backbone × thinking budget：强模型用原始 HTML 反而大幅优于 a11y tree（gpt-5.1 high +17.5、claude-sonnet-4-6 +14.6），弱模型则严重退化（gpt-oss-20b −18.8、Llama-3.1-70B −14.6）；MaskingRegimeMap 用 9 个 backbone × 多 retriever 网格测出不对称倒 U——弱 retriever 下 +6.2~6.6、强 retriever × 中等模型达峰 +11.7、模型饱和时塌到 +0.1 甚至 live-web −4.8；FoldAct 显示 folding 策略在长程内部非平稳（step 173 处崩溃）；NaiveVisualMemory 拆出整屏视觉记忆降低 state-level 失败却放大 action-level 失败；HiViG 报告五种既有 critic 对强 policy 增益近零或为负。共同结构是：增益方向随"底座能力 / 检索质量 / 任务进行到第几步"翻转，任何只在单一 setting 报告的削减收益都不可外推
-- **occurrences**: [[Workbench/logs/2026-07-20]] (HiViG：既有 critic 对强 policy 近零/负增益), [[Workbench/logs/2026-07-23]] (ReadMoreThinkMore, NaiveVisualMemory, A11yCompressor 效率大而精度小且脆), [[Workbench/logs/2026-07-28]] (MaskingRegimeMap 倒 U 网格, FoldAct 非平稳崩溃, ActiveContextCurator 用分工替代统一动作空间)
+- **occurrences**: [[Workbench/logs/2026-07-20]] (HiViG：既有 critic 对强 policy 近零/负增益), [[Workbench/logs/2026-07-23]] (ReadMoreThinkMore, NaiveVisualMemory, A11yCompressor 效率大而精度小且脆), [[Workbench/logs/2026-07-28]] (MaskingRegimeMap 倒 U 网格, FoldAct 非平稳崩溃, ActiveContextCurator 用分工替代统一动作空间), [[Workbench/logs/2026-11-12]] (具身域同形：VLAProprioception raw 历史 K≈8 后退化 vs Long-WAM 因果预训练下 19.2 s 上下文 63.3%→78.7%、双向初始化下 61.7→64.1→61.6 不涨——历史长度的符号由上游预训练决定)
 - **evidence**: +17.5/−18.8 的同一干预反向；倒 U 从 +11.7 到 −4.8；FoldAct step 173 collapse
-- **source_ids**: `paper:arxiv:2604.01535` (ReadMoreThinkMore), `paper:arxiv:2606.00408` (MaskingRegimeMap), `paper:arxiv:2512.22733` (FoldAct), `paper:arxiv:2606.14106` (NaiveVisualMemory), `paper:arxiv:2606.11078` (HiViG), `paper:arxiv:2605.00551` (A11yCompressor), `paper:arxiv:2604.11462` (ActiveContextCurator)
+- **source_ids**: `paper:arxiv:2604.01535` (ReadMoreThinkMore), `paper:arxiv:2606.00408` (MaskingRegimeMap), `paper:arxiv:2512.22733` (FoldAct), `paper:arxiv:2606.14106` (NaiveVisualMemory), `paper:arxiv:2606.11078` (HiViG), `paper:arxiv:2605.00551` (A11yCompressor), `paper:arxiv:2604.11462` (ActiveContextCurator), `paper:arxiv:2608.03052` (VLAProprioception，具身域), `paper:arxiv:2610.10528` (LongWAM，具身域，partial 笔记仅取 source-verified 行)
 - **confidence**: medium
 - **needs_verification**: no
 - **status**: → promoted to insight ([2026-07-30]，7 个独立 source、3 个独立日期)
@@ -263,9 +263,40 @@
 ### [2026-07-30] 学术 preprint 的正文级数字错误与 overclaim 同样是常态，独立核验命中率稳定非零
 
 - **observation**: 本期例行 verifier pass 在学术 preprint（非工业技术报告）上持续命中论文自身正文的数字/表述缺陷，跨 4 个独立日期无一次空手：STLiteKV 的"7.3% average"实为单 cell 最大值；Prune4Web 把非可执行产物称作 "executable Python scripts"；OVOD-Agent 有 3 处内部数字互相矛盾；MetaTeam 有 4 处 contradicted（GAIA 实为 77.3 而非正文的 87.9）；ActiveContextCurator 域数自相矛盾（四域 vs 五域）且 token 计数未含 curator 开销；ElementOrdering 存在跨数据集过度推断；FoldAct 的 p_drop 消融非均匀。这是既有 insight"工业技术报告 headline 应默认降权"的**范围扩展**——错位不是工业报告独有，而是同行评议前文本的普遍状态，意味着 digest 流程里的独立核验步骤不是可选优化项
-- **occurrences**: [[Workbench/logs/2026-07-23]] (STLiteKV, Prune4Web；CUA-Survey codex 交叉核查另抓 9 处 overclaim), [[Workbench/logs/2026-07-24]] (OVOD-Agent 3 处), [[Workbench/logs/2026-07-28]] (ActiveContextCurator, ElementOrdering, FoldAct), [[Workbench/logs/2026-07-29]] (MetaTeam 4 处)
-- **evidence**: 7 篇被点名的正文级缺陷，全部由 digest 时的独立核验步骤而非作者声明发现
-- **source_ids**: `paper:arxiv:2603.00188` (STLiteKV), `paper:arxiv:2511.21398` (Prune4Web), `paper:arxiv:2511.21064` (OVOD-Agent), `paper:arxiv:2605.29790` (MetaTeam), `paper:arxiv:2604.11462` (ActiveContextCurator), `paper:arxiv:2409.12089` (ElementOrdering), `paper:arxiv:2512.22733` (FoldAct)
+- **occurrences**: [[Workbench/logs/2026-07-23]] (STLiteKV, Prune4Web；CUA-Survey codex 交叉核查另抓 9 处 overclaim), [[Workbench/logs/2026-07-24]] (OVOD-Agent 3 处), [[Workbench/logs/2026-07-28]] (ActiveContextCurator, ElementOrdering, FoldAct), [[Workbench/logs/2026-07-29]] (MetaTeam 4 处), [[Workbench/logs/2026-11-06]] (Agent S v1 四处内部不一致；GUIDE 三处：Impress 45 vs 47、域计数 359≠361、标注器三种说法), [[Workbench/logs/2026-11-09]] (SCOPE 的 WebRL 45.8 来源不可追溯→unsupported；LocalCUAScaling 正文"一致劣于"与图不符→contradicted), [[Workbench/logs/2026-11-12]] (AnchorGUI ReAct token 91.4k vs 32.4k 等三处；CUADebug New+Fixed 计数、40 vs 41、125 对 144 子集、作者数 11 vs 12；ReliabilityCUA §5.2 Δc_x 符号与 Table 4 相反、UI-TARS SD 0 应为 0.033、App. D.2 泄露评测器键值；MotorMind 240 episodes 对 200 configs、π0.5 checkpoint 未指明)
+- **evidence**: 7 篇被点名的正文级缺陷，全部由 digest 时的独立核验步骤而非作者声明发现；2026-11 三个日期再添 7 篇（Agent S、GUIDE、SCOPE、LocalCUAScaling、AnchorGUI、CUADebug、ReliabilityCUA、MotorMind），其中两篇的正文论断被独立 verifier 判 contradicted / unsupported
+- **source_ids**: `paper:arxiv:2603.00188` (STLiteKV), `paper:arxiv:2511.21398` (Prune4Web), `paper:arxiv:2511.21064` (OVOD-Agent), `paper:arxiv:2605.29790` (MetaTeam), `paper:arxiv:2604.11462` (ActiveContextCurator), `paper:arxiv:2409.12089` (ElementOrdering), `paper:arxiv:2512.22733` (FoldAct), `paper:arxiv:2410.08164` (AgentS), `paper:arxiv:2603.26266` (GUIDEWebVideo), `paper:arxiv:2611.03116` (SCOPE), `paper:arxiv:2607.28573` (LocalCUAScaling), `paper:arxiv:2609.15457` (AnchorGUI), `paper:arxiv:2608.02643` (CUADebug), `paper:arxiv:2604.17849` (ReliabilityCUA), `paper:arxiv:2609.38078` (MotorMind)
 - **confidence**: medium
 - **needs_verification**: no
+- **status**: → promoted to insight ([2026-11-12]，15 个独立 source、7 个独立日期)
 - **status**: 保留为 pattern——可操作结论已被既有 insight「工业技术报告 headline 降权」覆盖，本条只扩展其适用范围，暂不单独立 insight
+
+### [2026-11-12] 推理期向冻结 agent 注入外部知识的符号由注入粒度与时机决定：整体注入为零或负，按步按状态选片段为正
+
+- **observation**: 非侵入式调度（不训练 GUI 模型）三条线——知识注入、任务分解、诊断后重派——在三个日期的证据上收敛到同一个变量：决定增益符号的不是"注入了什么知识"而是"以什么粒度、在哪一步注入"。GUIDE 把 web 教程视频切成 plug-and-play 标注后 OSWorld +4.47–7.48（planning 通道占 86–91%），而整条原始轨迹前置注入为 −1.94；OnlineVideoLearning 每步只选至多一条带截图的短轨迹为正（41.0→43.1 / 47.3→51.5），三个整体注入消融变体全部低于不用视频的 base，整篇文本教程基线 46.8→44.0；MAGE 的 top-5 section 检索 +10.48，仅把整份手册交给 planner（PO）几乎无效（14.47→14.89）；AnchorGUI 把全视觉轨迹蒸馏（66.1）换成只留 mismatch 截图（69.2）反升且 token 65.3k→24.4k，整轨迹前置反思 ≈ 盲重试。Agent S v1 的文本教程为正，与 OnlineVideoLearning 的文本基线为负构成一处未裁决分歧（注入时机不同：Manager 规划时 vs 逐步）
+- **occurrences**: [[Workbench/logs/2026-11-06]] (NonInvasive-GUI-Scheduling 专题分析：整文档/整计划/整轨迹负例、按步按状态选片段稳定为正；Agent S、GUIDE digest), [[Workbench/logs/2026-11-09]] (OnlineVideoLearning 三消融均低于 base；MAGE 仅 PO 14.89；survey-refresh 把 Agent S 文本正向与新文负向并列为未裁决分歧), [[Workbench/logs/2026-11-12]] (AnchorGUI Table 4 行 4→5：只留 mismatch 截图 +3.1 且 token 减 62%)
+- **evidence**: [[Papers/2603-GUIDEWebVideo]], [[Papers/2511-OnlineVideoLearning]], [[Papers/2610-MAGEManuals]], [[Papers/2609-AnchorGUI]], [[Papers/2410-AgentS]], [[Topics/NonInvasive-GUI-Scheduling]]
+- **source_ids**: `paper:arxiv:2603.26266` (GUIDEWebVideo), `paper:arxiv:2511.04137` (OnlineVideoLearning), `paper:arxiv:2610.23012` (MAGEManuals), `paper:arxiv:2609.15457` (AnchorGUI), `paper:arxiv:2410.08164` (AgentS)
+- **confidence**: low
+- **needs_verification**: yes
+- **status**: → promoted to insight ([2026-11-12]，5 个独立 source、3 个独立日期)
+
+### [2026-11-12] 失败后重试的增益主要由"有无外部失败信号或诊断"决定，定位精度的边际价值只有 3–5 pp，自由反思式自诊接近无提示
+
+- **observation**: 三篇 GUI 工作在不同入口量到同一结构。CUADebug 在 144 条 Claude 4.5 Sonnet 失败上单次重放：Baseline 13.89 / Self-debug 15.28 / Machine RCA 28.47 / Human oracle 31.94——自诊只比盲重试高 1.4 pp，外部机器诊断高 14.6 pp，而机器诊断的 step-exact 定位率只有 29.2% 却与人工 oracle 只差 3.5 pp；AnchorGUI 的配对对照（同初始状态、3 seeds）Memoryless Retry 57.3–62.9、Episodic 62.6、Reflexion 64.4、Asymmetric 69.2，整轨迹反思与盲重试基本持平，按预期落空步定位的反思多 +3.1–4.8；ReliabilityCUA 在 OSWorld 上只给二值失败信号重试五次就把 GPT-5 Pass^1 从 .576 推到 .730（带 McNemar），信号来自 oracle 评测器。代码域的 2611.06863（无笔记）同向：Compiled 85.3 ≈ Different-Label 86.1 ≈ Fixed Template 86.1 ≫ Resample 68.3，反馈内容是否对应本次失败几乎不影响。合起来的读法是：重试增益的第一因子是失败信号的来源（oracle / 外部诊断 / 自诊），定位精度是第二因子且量级小一个数量级；这直接反驳 [[Ideas/FailureConditionedRetry-GUI]] 11-03 版的 P2"定位主导"
+- **occurrences**: [[Workbench/logs/2026-11-12]] (idea-evaluate round 1 五条核验要点；CUADebug digest 三处降级读法；ReliabilityCUA digest：Retry(Clarify) 实为近 oracle；survey-refresh §10.5 判断由"察觉≠修复"扩为"自诊≈无提示、外部诊断≈oracle")
+- **evidence**: [[Papers/2608-CUADebug]], [[Papers/2609-AnchorGUI]], [[Papers/2604-ReliabilityCUA]]；`paper:arxiv:2611.06863`（代码域，无笔记，低置信指针）
+- **source_ids**: `paper:arxiv:2608.02643` (CUADebug), `paper:arxiv:2609.15457` (AnchorGUI), `paper:arxiv:2604.17849` (ReliabilityCUA), `paper:arxiv:2611.06863` (unnoted)
+- **confidence**: low
+- **needs_verification**: yes
+- **status**: → promoted to insight ([2026-11-12]，3 个有笔记的独立 source、1 个日期；关联线索类——三篇互不引用、全部为 2026-11-12 当日核验)
+
+### [2026-11-12] 具身执行期闭环分化出四个互不替代的介入点，且"介入信号正确 ≠ 介入有效、介入成功 ≠ 任务成功"
+
+- **observation**: 此前路线 6 的执行期闭环只有一种形状（RobustExec / Zetta：chunk 级判定失败后切出 policy 换 recovery）。2026-09 的三篇把介入点移到三处新位置，全部冻结 base policy：VLA-Feedback 在去噪最后一步用 1.19M 参数模块以 2 ms 消费最新观测（动态任务 27.5%→85.0%，静态 LIBERO 持平或略降，速度 +40% 时降到 5%）；CommitFlow 在阶段转换处核验语义承诺并局部改写动作（π0.5 RoboTwin 2.0 Avg.10 53.2→75.9，IK 零学习层占增益 1/6）；SelfComp-VLA 把执行残差当自监督在线更新 LoRA（RoboStress 49.1→56.6）；VLAScope 在介入之前做滚动风险预测（第 60 步 ROC-AUC 0.8497，但七种偏移类型为闭集，固定阈值下误报率随步数在 12.5%–52% 间摆动）。两条反向读数把验收标准抬高：直接用残差修正动作得 23.6、远低于基线 41.7（SelfComp-VLA）；局部重抓恢复率 45.8% 只对应 18.1% 任务成功（CommitFlow）。四篇各用自建场景与自家 π0 / π0.5 基线，没有任何两篇互比，也都缺平凡规则对照。与 GUI 侧同日的"重试增益第一因子是信号来源"形成跨域呼应：两边都在问"介入点在哪一层"而不是"要不要介入"
+- **occurrences**: [[Workbench/logs/2026-11-12]] (survey-refresh EmbodiedAI-Survey 8 篇：路线 6 新小节、Key Takeaway #14、DomainMap 近期格局变化条目)
+- **evidence**: [[Papers/2609-CommitFlow]], [[Papers/2609-VLAFeedback]], [[Papers/2609-SelfCompVLA]], [[Papers/2609-VLAScope]]；对照线 [[Papers/2607-RobustExecAgenticRL]], [[Papers/2608-Zetta]]
+- **source_ids**: `paper:arxiv:2609.21908` (CommitFlow), `paper:arxiv:2609.21022` (VLAFeedback), `paper:arxiv:2609.37334` (SelfCompVLA), `paper:arxiv:2609.21246` (VLAScope)
+- **confidence**: low
+- **needs_verification**: yes
+- **status**: → promoted to insight ([2026-11-12]，4 个独立 source、1 个日期；关联线索类——四篇互不引用，跨论文 pattern 由 survey-refresh 首次写出)

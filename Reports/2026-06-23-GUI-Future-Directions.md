@@ -4,10 +4,10 @@ date: 2026-06-23
 tags: [report, gui-agent, future-directions, research-strategy]
 grounding: vault-only
 sources:
-  - "[[Topics/GUIAgent-Survey]]"
+  - "[[Topics/CUA-Survey]]"
   - "[[Topics/GUI-Environment-Survey]]"
-  - "[[Topics/ComputerUseAgents-Survey]]"
-  - "[[Topics/AgenticRL-Survey]]"
+  - "[[Topics/CUA-Survey]]"
+  - "[[Topics/CUA-Survey]]"
   - "[[Workbench/agenda]]"
 ---
 
@@ -31,7 +31,7 @@ GUI Agent 领域正在从 **model-first** 走向 **environment / verification / 
 
 ### 1. GUI 评测正在从 endpoint success 转向 process / trajectory diagnosis
 
-**已知**：[[Topics/GUIAgent-Survey]] 已总结 ProBench、MMBench-GUI、AutoGUI-v2、Odysseys 等工作推动评测从二元成功率转向过程级诊断。[[Workbench/memory/insights]] 中也已将 "binary success -> process-level multi-dimensional diagnosis" 标为 validated insight。
+**已知**：[[Topics/CUA-Survey]] 已总结 ProBench、MMBench-GUI、AutoGUI-v2、Odysseys 等工作推动评测从二元成功率转向过程级诊断。[[Workbench/memory/insights]] 中也已将 "binary success -> process-level multi-dimensional diagnosis" 标为 validated insight。
 
 **新增强化证据**：[[2606-WeaveBench]] 的 trajectory-aware judge 发现 outcome-only grading 系统性高估 10-20pp，且 35.2% 失败属于 reward hacking / alignment gap，而非能力不足。
 
@@ -49,7 +49,7 @@ GUI Agent 领域正在从 **model-first** 走向 **environment / verification / 
 
 **已知**：[[2606-WeaveBench]] 明确证明 GUI-only 和 CLI-only 在真实长程工作流中都崩溃，Hybrid 设置带来约 +30pp 以上收益。[[2605-OpenComputer]] 也观察到 CLI 更快但 GUI 更准，暗示两者互补。
 
-**已知**：[[Topics/ComputerUseAgents-Survey]] 和 [[2604-ClawGUI]] 都指出 API-GUI / CLI-GUI 统一是效率突破口。
+**已知**：[[Topics/CUA-Survey]] 和 [[2604-ClawGUI]] 都指出 API-GUI / CLI-GUI 统一是效率突破口。
 
 **推断**：未来 computer-use agent 会从 "像人一样点屏幕" 转向 "在 GUI、CLI、API、Code、文件系统之间学习路由"。GUI 不会消失，但会从唯一 action space 变成一个可互换的 interface channel。
 
@@ -57,13 +57,13 @@ GUI Agent 领域正在从 **model-first** 走向 **environment / verification / 
 
 **已知**：[[Workbench/agenda]] 当前 primary direction 是 GUI Grounding Robustness，证据包括 AutoGUI-v2 dichotomy、GUI-Actor coordinate-free、WindowsWorld 跨应用瓶颈、WorkspaceBench 异构文件理解。
 
-**已知**：[[Topics/ComputerUseAgents-Survey]] 指出数据质量、专业 icon、SoM annotation、token efficiency 对 grounding 影响巨大。[[2604-AutoGUIv2]] 进一步说明开源 agent-tuned 模型在 functional grounding 上强，但 deep functional understanding 仍弱。
+**已知**：[[Topics/CUA-Survey]] 指出数据质量、专业 icon、SoM annotation、token efficiency 对 grounding 影响巨大。[[2604-AutoGUIv2]] 进一步说明开源 agent-tuned 模型在 functional grounding 上强，但 deep functional understanding 仍弱。
 
 **推断**：grounding 不会只是点坐标；它会扩展成 "region function + action consequence + temporal transition" 的联合理解。只做静态 point-in-box accuracy 的空间会变窄，但 cross-resolution、dynamic、professional UI、region semantics 仍有空间。
 
 ### 5. RL 会继续主流化，但 credit assignment generic 赛道已经拥挤
 
-**已知**：[[Topics/AgenticRL-Survey]] 总结 GRPO / UI-R1 / MobileRL / ClawGUI 等证明 GUI agent RL 的数据效率。[[Workbench/agenda]] 也将 RL-based training 设为 secondary direction。
+**已知**：[[Topics/CUA-Survey]] 总结 GRPO / UI-R1 / MobileRL / ClawGUI 等证明 GUI agent RL 的数据效率。[[Workbench/agenda]] 也将 RL-based training 设为 secondary direction。
 
 **已知**：agenda 已判断 ForkPoint / generic credit assignment 与 SOLAR-RL、ProxMO、ADMIRE、GiGPO 等高度重叠，建议转向更底层的 rule-based reward design。
 
@@ -73,7 +73,7 @@ GUI Agent 领域正在从 **model-first** 走向 **environment / verification / 
 
 **已知**：[[2605-MobileWorldModelGUI]] 比较 delta text / full text / diffusion image / renderable code，发现 renderable code 分布内保真度最高，text feedback OOD 更鲁棒，world model 更适合做 training data augmentation / prior perception，而不是 post-hoc verifier。
 
-**对比**：[[Topics/WorldActionModel-Survey]] 和 [[2606-WLA]] 展示 embodied world/action model 的趋势，但物理世界重在 dynamics 和 control，GUI 世界更重在 symbolic state、rendered layout、hidden app state、interaction transition。
+**对比**：[[Topics/WorldModel-Survey]] 和 [[2606-WLA]] 展示 embodied world/action model 的趋势，但物理世界重在 dynamics 和 control，GUI 世界更重在 symbolic state、rendered layout、hidden app state、interaction transition。
 
 **推断**：GUI world model 不应照搬 WAM 的 video diffusion 叙事。更好的表述是 **Interface Dynamics Model**：预测 action 后的 UI state、可见区域、hidden state、可验证条件和风险副作用。
 

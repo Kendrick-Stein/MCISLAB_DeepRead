@@ -16,7 +16,7 @@ verification_status: source-checked
 date_added: "2026-11-06"
 ---
 ## Summary
-GUIDE（GUI Unbiasing via Instructional-Video Driven Expertise）是一个 training-free 的知识注入框架：对每个任务在测试时用 yt-dlp 搜 YouTube 教程视频，经字幕驱动的三段过滤选出至多 2 条，用 GPT-5.1 + OmniParser 对相邻关键帧做 pairwise annotation，再由 LLM 拆成 Planning 知识（coordinate-free 工作流）和 Grounding 知识（至多 k 个 UI 元素的外观/位置/功能描述），分别注入冻结 agent 的 planning prompt 与 grounding prompt。OSWorld 361 任务、50 步上限下，Seed-1.8 37.14→44.62（+7.48）、Qwen3-VL-8B 33.90→39.73（+5.83，baseline 取自 Qwen3-VL 技术报告而非同 harness 复跑）、AgentS3（GPT-5.2 Worker + Seed-1.8 Grounding）50.18→54.65（+4.47）；planning 通道贡献约 86–91%，grounding 在全集上只再加 +0.41～+0.80 且跨 domain 符号不定。同一批检索视频但以原始轨迹文本注入的 Watch & Learn 式对照反而降到 31.96（−1.94），全文没有 budget-matched 或"baseline 多给步数"的对照；检索约 $0.019/任务、标注约 $0.252/视频，全 benchmark 约 $114.6。
+GUIDE（GUI Unbiasing via Instructional-Video Driven Expertise）是一个 training-free 的知识注入框架：对每个任务在测试时用 yt-dlp 搜 YouTube 教程视频，经字幕驱动的三段过滤选出至多 2 条，用 GPT-5.1 + OmniParser 对相邻关键帧做 pairwise annotation，再由 LLM 拆成 Planning 知识（coordinate-free 工作流）和 Grounding 知识（至多 k 个 UI 元素的外观/位置/功能描述），分别注入冻结 agent 的 planning prompt 与 grounding prompt。OSWorld 361 任务、50 步上限下，Seed-1.8 37.14→44.62（+7.48）、Qwen3-VL-8B 33.90→39.73（+5.83，baseline 取自 Qwen3-VL 技术报告而非同 harness 复跑）、AgentS3（GPT-5.2 Worker + Seed-1.8 Grounding）50.18→54.65（+4.47）；planning 通道贡献约 86–91%，grounding 在全集上只再加 +0.41～+0.80 且跨 domain 符号不定。同一批检索视频但以原始轨迹文本注入的 Watch & Learn 式对照反而降到 31.96（−1.94），全文没有 budget-matched 或"baseline 多给步数"的对照；检索约 \$0.019/任务、标注约 \$0.252/视频，全 benchmark 约 \$114.6。
 
 ## Problem & Motivation
 作者把 GUI agent 在特定软件上的失败归结为 **domain bias**，并拆成两层：**planning-level**——不知道某应用的工作流（例如 GIMP 里调亮度走 Colors → Brightness-Contrast，而不是 Photoshop 习惯的 Image → Adjustments）；**grounding-level**——不熟悉该应用的布局与控件样式，找不到 Colors 菜单项或对话框里的那根 slider。论点是"模型不缺能力，缺的是领域知识"，所以手工标注、专家规则、领域微调这三条路成本高、覆盖窄、追不上软件界面更新。
@@ -30,7 +30,7 @@ GUIDE（GUI Unbiasing via Instructional-Video Driven Expertise）是一个 train
 
 **(3) Plug-and-Play Integration（§3.4，App. A）**。知识全是自然语言，prompt 明确写成 "reference, not directive"，与截图冲突时信截图。Mode A（AgentS3）：Planning 以 "Reference Plan from a Similar Task" 块插入 Worker 的 system prompt；Grounding 作为每次 grounding 查询的补充上下文发给 Grounding Agent。Mode B（Seed-1.8 / Qwen3-VL-8B 单模型）：两块合并进 system prompt 的 "External Knowledge" 节，并用强制 Thought 模板做 guided CoT：先判任务相似度 → 定位当前处于工作流哪一阶段 → 从 Planning 推下一子目标 → 用 Grounding 描述对照当前截图 → 出动作；只有一个通道时模板退化。K = 2 时两段知识分别编号拼接；任务没有检索到视频则整块省略，agent 按 baseline 运行。
 
-**成本核算（App. E）**。检索每任务约 18 次 API 调用、$0.0188；标注每视频 15 次帧对调用（30 关键帧，约 11 个 meaningful）+ 2 次拆解，133.56K/8.55K tokens，GPT-5.1 下 $0.252；复杂界面 regime 下 GPT-5.1 $0.301 / GPT-4.1-mini $0.048 / Seed-1.8 $0.029 / Qwen3-VL-8B $0.014。全 benchmark 361 任务、约 427 条视频，$114.6（标注占 94.1%）。Whisper 与 OmniParser 本地运行不计。
+**成本核算（App. E）**。检索每任务约 18 次 API 调用、\$0.0188；标注每视频 15 次帧对调用（30 关键帧，约 11 个 meaningful）+ 2 次拆解，133.56K/8.55K tokens，GPT-5.1 下 \$0.252；复杂界面 regime 下 GPT-5.1 \$0.301 / GPT-4.1-mini \$0.048 / Seed-1.8 \$0.029 / Qwen3-VL-8B \$0.014。全 benchmark 361 任务、约 427 条视频，\$114.6（标注占 94.1%）。Whisper 与 OmniParser 本地运行不计。
 
 ## Key Results
 **设置（§4.1，App. B）**：OSWorld 369 任务去掉 8 个 Google Drive 任务后 361 个、10 个 domain、每任务最多 50 步、1920×1080；Seed-1.8 与 Qwen3-VL-8B 均 temperature 1.0 + thinking mode；AgentS3 = GPT-5.2 Worker + Seed-1.8 Grounding，用 k = 5；单模型 agent 默认 k = 7。361 任务中 299（82.8%）检索到至少 1 条视频，其中 42.7% 得到 2 条；其余 62 个任务没有注入、按 baseline 运行。Practical Notes 承认 Seed-1.8 API 的反蒸馏措施会间歇产生畸形输出（做了轻量解析修复），Chrome 任务有网络问题压低所有配置的分数。
@@ -58,7 +58,6 @@ GUIDE（GUI Unbiasing via Instructional-Video Driven Expertise）是一个 train
 - **没有的对照**：Table 1/2/3/5/7 均无 seeds 与方差（只有 Table 4 报 3 seeds）；没有 budget-matched（同 token / 同延迟）对照，也没有"baseline 多给步数"对照；Qwen3-VL-8B 的 OSWorld baseline 是引用值；未报告 covered 299 任务子集上的增益（62 个未覆盖任务按 baseline 跑，把 per-task 效应稀释了约 17%）；未报告检索 + 标注的端到端 wall-clock；Table 5 与 Table 7 的两个"50 任务子集"domain 构成不同（Chrome 7 vs 6、Calc 6 vs 8、Impress 6 vs 5）。
 
 ## Evidence Ledger
-%% 只列高风险 claim：数字、SOTA/novelty、benchmark 可比性、license/code、因果或机制断言。Source locator 用 page/section/table/figure；Evidence excerpt 为原文短摘录（≤25 words）。Status 允许 source-verified / unsupported / contradicted / not-checkable / abstract-only。source-verified 仅表示 primary source 确实包含该信息，不表示结果已被独立复现。 %%
 
 | Claim ID | Claim | Type | Source locator | Evidence excerpt | Status |
 |:--|:--|:--|:--|:--|:--|
@@ -84,7 +83,7 @@ GUIDE（GUI Unbiasing via Instructional-Video Driven Expertise）是一个 train
 | C20 | Stage 1 GUI 分类（300 视频、3 标注者）precision 100%、recall 90.96%、F1 95.27%；topic extraction 均分 0.867、96% 可接受 | number | §4.5; Fig. 5 | "reaches 100% precision and 90.96% recall (F1 = 95.27%) … mean score is 0.867 with 96.00% acceptable topics" | source-verified |
 | C21 | Table 6 检索对照：Full 0.867/96.00%/77.33，Title-only 0.782/88.67%/67.67，Random 0.628/80.33%/45.33 | number | Table 6 | "Full GUIDE 300 0.867 96.00% 77.33 / 18.67 / 4.00; Title-only … 0.782 88.67% 67.67 …; Random … 0.628 80.33% 45.33" | source-verified |
 | C22 | Meaningful 过滤（4,500 帧）：1,227 无效帧中正确过滤 1,124、误滤 47 个有效帧；P 96.0 / R 91.6 / F1 93.7；非 GUI recall 98.8%、idle 53.6% | number | App. D; Table 8 | "correctly filters 1,124 invalid frames and mistakenly filters 47 valid GUI frames … 96.0% precision, 91.6% recall, and 93.7% F1 … 98.8% … 53.6%" | source-verified |
-| C23 | 成本：检索 $0.0188/任务；标注 $0.252/视频（133.56K in / 8.55K out，GPT-5.1）；全 benchmark ~427 视频、$114.6（标注 94.1%） | number | App. E Tables 9–11 | "retrieval stage costs about $0.0188 per task … one selected video costs about $0.252 … Total – $114.6 100%" | source-verified |
+| C23 | 成本：检索 \$0.0188/任务；标注 \$0.252/视频（133.56K in / 8.55K out，GPT-5.1）；全 benchmark ~427 视频、\$114.6（标注 94.1%） | number | App. E Tables 9–11 | "retrieval stage costs about \$0.0188 per task … one selected video costs about \$0.252 … Total – \$114.6 100%" | source-verified |
 | C24 | 失败案例：planning mismatch 浪费 8 步（ppi）与 13 步（darktable）；grounding mismatch 烧光 50 步（浏览器 detour）；幻灯片视频 13 个描述元素 0 个可用 | number | App. F Fig. 7–8 | "wasting 8 steps … exhausts all 50 steps in a fruitless detour … 13 steps are wasted on terminal commands … NONE of the 13 described grounding elements match" | source-verified |
 | C25 | 论文被 ECCV 2026 接收；arXiv v1 2026-03-27、v3 2026-06-30；代码/数据集在 github.com/sharryXR/GUIDE 与 HF sharryXR/GUIDE-dataset | license-code | arXiv abs page Comments; project page | "Accepted to ECCV 2026. 30 pages … Project page: https://sharryXR.github.io/GUIDE/" | source-verified |
 | C26 | novelty 主张：此前没有工作在测试时从开放网络检索并处理原始教程视频 | sota-novelty | §2 Retrieval-Augmented Generation for GUI Agents | "None of these retrieves and processes raw tutorial videos from the open web at test time—the core capability of Guide." | source-verified |
@@ -135,7 +134,7 @@ mindmap
       WAA +10.21 / +12.46
       k 扫描 50 任务 k=5 最高 无 seeds
       失败 检索错配 50 步烧光
-      成本 $114.6 全 benchmark
+      成本 \$114.6 全 benchmark
 ```
 
 ## Notes

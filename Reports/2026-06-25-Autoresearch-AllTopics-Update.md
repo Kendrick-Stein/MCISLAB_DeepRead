@@ -24,8 +24,8 @@ date_created: "2026-06-25"
 ### GUI Agent / Computer-Use
 
 - 新增 [[Papers/2606-AgentCIBench]]。
-- 更新 [[Topics/ComputerUseAgents-Survey]]：补充 “Personal CUA Safety 从 adversarial 转向 contextual disclosure”。
-- 更新 [[Topics/AgentFriendlyEnvironment-Survey]]：新增 least-disclosure affordance 原则。
+- 更新 [[Topics/CUA-Survey]]：补充 “Personal CUA Safety 从 adversarial 转向 contextual disclosure”。
+- 更新 [[Topics/CUA-Survey]]：新增 least-disclosure affordance 原则。
 - 对 agenda 的含义：primary direction 若继续从 pure grounding 扩展到 agent-facing runtime，那么 privacy-aware state API 必须成为一等约束，而不是后加 safety paragraph。
 
 ### VLM / Multimodal Grounding

@@ -13,7 +13,7 @@ sources:
   - "[[2606-WeaveBench]]"
   - "[[Reports/2026-06-23-WebGym-AsyncWebRL]]"
   - "[[Reports/2026-06-23-AgentFriendlyWebRuntime]]"
-  - "[[Topics/AgentFriendlyEnvironment-Survey]]"
+  - "[[Topics/CUA-Survey]]"
   - "Gym-Anything: https://arxiv.org/abs/2604.06126"
   - "Odysseys: https://arxiv.org/abs/2604.24964"
   - "[[2412-BrowserGymAgentLab]]"
@@ -33,7 +33,7 @@ sources:
 
 所以我们 pivot 到另一个方向：与其继续训练 agent 去适应普通 browser，不如构建 **agent-friendly browser / web server / environment**。同一个模型在 zero-training 下，如果获得 state-grounded、可执行、可恢复、可验证的环境 affordance，可能比在普通浏览器上完成得更好 [[Reports/2026-06-23-AgentFriendlyWebRuntime]]。
 
-最后我们把 browser 扩展成更一般的 **Agent-Friendly Environment**：Web / Mobile / Desktop / Tool-use 都可以被设计成 dual-interface runtime。人类仍看正常 UI，agent 则额外获得 task-agnostic、state-grounded、executable、recoverable、verifiable、safe、cost-efficient 的 affordances [[Topics/AgentFriendlyEnvironment-Survey]]。
+最后我们把 browser 扩展成更一般的 **Agent-Friendly Environment**：Web / Mobile / Desktop / Tool-use 都可以被设计成 dual-interface runtime。人类仍看正常 UI，agent 则额外获得 task-agnostic、state-grounded、executable、recoverable、verifiable、safe、cost-efficient 的 affordances [[Topics/CUA-Survey]]。
 
 2026-06-24 新增调研后，判断需要进一步细化：环境路线已经快速拥挤。[[2600-WebHarbor]] 做真实网站 Docker mirror，[[2606-CUAGym]] 做 verifiable RLVR tuple 合成，[[2605-SaaSBench]] 做真实 SaaS 长程评测，Gym-Anything / CUA-World 做任意软件环境化，Odysseys 做 live open-web 长程评测，BrowserGym 做 web agent harness 标准化。这说明“构建一个新环境”本身不再足够；更清晰的空白是 **agent-facing environment protocol**：把已有环境后端的 state/reset/verifier 能力，以非作弊方式变成 agent 可使用的 runtime affordance。
 

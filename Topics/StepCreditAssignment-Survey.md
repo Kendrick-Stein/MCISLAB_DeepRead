@@ -1,9 +1,9 @@
 ---
 title: "Step-Level Credit Assignment：从 trajectory-level reward 反推步级监督"
 tags: [survey, agentic-RL, gui-agent]
-date_updated: "2026-09-18"
+date_updated: "2026-11-12"
 year_range: 2023-2026
-papers_analyzed: 26
+papers_analyzed: 29
 keywords: [credit assignment, step-level reward, process reward, process reward model, critical step, step selection, dense reward, outcome reward, trajectory-level reward, loss masking, token weighting, self-distillation, hindsight distillation, advantage shaping]
 domain_map: AgenticRL
 ---
@@ -16,7 +16,7 @@ domain_map: AgenticRL
 
 - **打分信号从哪来**：语义判据 / prefix rollout 估值 / 终局回溯 / log-likelihood ratio / 外部 critic / 单点反事实干预 / 轨迹间结构对比。信号来源决定标注成本，也决定失效模式。
 - **信号衡量的是什么**：与目标的相关性、前缀的价值、该步的正确性、模型对该步的可学性、该步是否为失败的充分修复点。五者常被混用为同一个"step score"。
-- **信号如何被消费**：SFT 阶段的 loss mask 与 token 加权，RL 阶段的 reward shaping 与 advantage 重分配，或者不动参数、把分数变成对该步所用 prompt 的文本编辑。
+- **信号如何被消费**：SFT 阶段的 loss mask 与 token 加权，RL 阶段的 reward shaping 与 advantage 重分配，test-time 的 beam search 剪枝，或者不动参数、把分数变成对该步所用 prompt 的文本编辑。privileged self-distillation 一支还多一个通道选择：把特权 teacher 与 student 的差异蒸到 token 概率上，还是蒸到 hidden state 上。
 
 这三条轴不是正交的分类练习，而是决定一个方法能否回答"轨迹整体 reward=1、但其中若干步是错的，怎么办"这个具体问题。**SFT 侧的两条代表性选步工作并不回答它**：[[Papers/2503-ATLaS]] 用 GPT-4o 按 Plan Creation / Critical Observation / Critical Action / Self Correction 四类语义标准挑步，[[Papers/2605-Weasel]] 用 goal-state 语义相关度加两两差异度做固定预算的子集选择——两者的判据里都没有"这一步对不对"这一维，且都明确假设输入是专家轨迹。一个错误但与目标相关、且与其他步骤不重复的步骤，会被这两类选择器选中并加权。
 
@@ -52,6 +52,10 @@ Math-Shepherd 把 step quality 定义为"该步推出正确答案的潜力"，�
 
 [[Papers/2605-BetaPRM]] 针对的是这一族的统计缺陷：k/N 只是有限样本估计，把它当点目标回归会过拟合采样噪声，因此改用 Beta 分布同时建模 process reward 的均值与可靠性，并据此做自适应终止。这条改进方向与 Math-Shepherd 自己的观察吻合——SE 随 N 增大越来越贴近人工分布，但用 SE 或 HE 训出的 verifier 性能没有实质差别，说明点估计的精度不是瓶颈。
 
+[[Papers/2511-AgentPRM|AgentPRM]] 把这一族的标签来源从逐步 rollout 换成了时序差分自举。它的出发点是 agent 动作没有清晰的对错：点错页面可以撤回，绕路可能是必经之路。因此它有意不判正确性，而是让 PRM 同时回归 promise（该步的 Q value）与 progress（相邻两步的 Q 差，在确定性转移、中间步零奖励时恰等于 advantage）。标签不再从每一步出发做 N 次 completion，而是每条 query 采 16 条完整轨迹，用 TD 残差加 GAE 从模型自己上一步的预测自举，只有终步锚定环境 outcome。AgentGym 上 Qwen2.5-3B 的 beam search @8×8，WebShop 从同数据自训的 PVM 基线 54.5 提到 76.0，TextCraft 从 44.3 提到 56.7。与 Math-Shepherd 式 MC 标注对照，MC 消耗的标注 token 是 TD 的 1.9×（WebShop）与 2.8×（BabyAI），且 TD 在全部 18 个数值格上更高。
+
+这个对照混了两个变量。MC 一侧每条 query 只有 1 条种子轨迹、从每步再 rollout 16 次，TD 一侧是 16 条彼此独立的完整轨迹；"更便宜又更好"可能主要来自训练轨迹的多样性，而不是估计器本身。progress 项的推导同样有边界：V(s_t) = Q(s_{t−1}, a_{t−1}) 依赖确定性转移，在随机或部分可观测的 GUI / web 环境里不成立。三个验证环境都是文本观测，评测集每个任务只有 90–100 条 query，没有多 seed 或置信区间。
+
 ### 终局回溯：从答案反查哪一步提供了证据
 
 [[Papers/2608-ABSeeker]] 走的是另一条路：先从最终答案回溯出解题所需的线索，再按线索是否被某一步提供来给该步打分。评分是一套显式 rubric（+0.8 / +0.4 / −0.8 / +1.0 / −1.0，基准 1.0，裁剪到 [0, 2.0]），因而是这批工作里少数直接给出"这一步是错的"这一判定的。
@@ -67,6 +71,10 @@ ImplicitPRM 的结论是 credit 的分解可以是免费的：只要 reward 的�
 [[Papers/2608-GatedHindsight]] 属于同族但换了信息源：把训练时可见、推理时不可见的下一帧截图交给一个参数共享的 teacher，让它对 student 的 rollout 重新打分，只有当 student 失败且 teacher 的 top-1 恢复了示范动作时才放行该步的监督。AndroidLab 从 31.93 提到 43.10（7B）、37.43 提到 54.11（8B）。
 
 三者与 ImplicitPRM 的关系值得单独指出：同一个"policy 对参考模型的 log-prob 差"，在 ImplicitPRM 里被当作 Q value 读，在 Rho-1 里被当作可学性读，在 SEED / PCSD 里被当作 token 权重读。三种读法各自都有实验支撑，但没有工作比较过它们在同一批数据上给出的步骤排序是否一致。
+
+privileged self-distillation 在这一族里还暴露了两个此前被默认的前提。第一个是 token 通道的带宽。[[Papers/2609-PROPD|PR-OPD]] 先测了 skill 进入上下文后究竟改变了什么：Qwen2.5-3B 在 ALFWorld 的 GRPO step-100 checkpoint 上，带 skill 后不到四分之一的 response token 采样概率发生变化，action token 上几乎没有变化，而超过 80% 的 response token 的 hidden state 变了。它据此把蒸馏目标从 token 概率换成各层 hidden state：student 经一个 per-layer projector 后，与"带 hindsight skill 重读同一 response"的 stop-gradient 自身做归一化 L2 对齐，不保留任何 output-space 蒸馏项。最干净的证据是同一 warm start、同一批自生成 skill、只换通道的消融：3B ALFWorld 上 token-level OPD 比 GRPO 低 8.6，hidden-state 对齐高 6.3（不加 projector）或 4.7（完整版）。若这一读数成立，SEED / PCSD 用 token log-prob 差做权重，只覆盖了特权信息所影响的一小部分 token。反面证据出自同一篇：不加 projector 时，原始对齐 loss 在每个 run 里与初值相差不超过 0.01，却仍带来 +6.3。这更像通用的表示正则化，而不是 student 追上了 teacher 的表示；训练中也没有用无关文本或他人 skill 作 teacher context 的对照。主表上 skill 来源与蒸馏通道同时变化（基线用 SDAR 的手写 skill），所有数字来自单个训练 seed、128 episode 评测。
+
+第二个是 teacher 本身的稳定性。[[Papers/2609-ReSAIL|ReSAIL]] 研究"学生当下一轮老师"的迭代循环（OEL / offline SDPO：部署，抽经验摘要作特权信息，离线自蒸馏）。它用冻结 teacher 在带与不带特权信息两个视角下输出分布的 Jensen–Shannon divergence 给 step 打分，每次 update 只蒸馏 batch 内 top-ρ 的 step（ALFWorld ρ=0.05），并在全部 step 上加一项 KL，把学生的特权视角拉回当前轮次的冻结 teacher（Privileged Retention）。这是同一类分布差的又一种读法——"特权信息在哪一步改变了 teacher"——同样不涉及该步对错。保留项的动机来自一个直接测到的退化：在 OEL、Qwen3-4B、ALFWorld 的 128 个 OOD 任务上固定特权信息，不加保留项时特权视角成功率从 Cycle 1 的 61.5% 掉到 Cycle 3 的 44.8%，加上后从 58.9% 升到 70.3%。只训练普通视角的目标，会顺带改坏下一轮监督要用的那个视角。ALFWorld / TextCraft × Qwen3-4B / 8B 三轮后，Cycle 3 成功率相对 SDPO / OEL 本体平均高 22.5 个百分点（12 组对比），两个增强版在全部设定里三轮均值都不下降。这个 22.5 的分母是已经塌掉的基线：Qwen3-4B TextCraft 上 OEL 三轮是 62.0 → 54.7 → 43.7，已低于未训练的 ReAct 初始策略 61.3，而 OEL+ReSAIL 的 64.0 只比它高 2.7。该文证明的是迭代不再退化，还不是迭代持续变强。
 
 ### 外部 critic 与角色化归因
 
@@ -106,6 +114,8 @@ ImplicitPRM 的结论是 credit 的分解可以是免费的：只要 reward 的�
 
 数学域给出的是相反方向的读数。Math-Shepherd 的 step-by-step PPO 把 Mistral-7B 的 GSM8K 从 77.9 提到 84.1，但 ORM-PPO 已经拿到 81.8——步级粒度的净增量只有 +2.3（GSM8K）与 +1.7（MATH）。ImplicitPRM 补上了另一半：额外的 step label 对已经用 outcome-only 训好的模型没有增益。两条合起来说明在短链条推理上 outcome reward 已经接近够用，作者自己也把 GSM8K 上 PRM 与 ORM 的小差距归因于步数少。
 
+PRM 类工作的"用于 RL"实验，需要先核对分数是在哪一步被读出的。[[Papers/2511-AgentPRM|AgentPRM]] 的 PPO 实验在附录写明只把 PRM 在终步的预测作为整条轨迹的 reward，等于把它当一个学习型 ORM 用，progress 项与逐步 dense reward 都没有进入 RL 闭环；它的 best-of-N 同样只用终步分数。两种推理用法里只有 step-level beam search 真正消费了中间步分数，因此它的下游收益主要说明终步 value 估得好，不能直接读作步级 reward 对 RL 训练有效。
+
 ### 方法对照
 
 | 方法 | 打分信号来源 | 是否判断对错 | 标注/算力成本 | 消费方式 | 验证域 | 关键证据 |
@@ -128,13 +138,16 @@ ImplicitPRM 的结论是 credit 的分解可以是免费的：只要 reward 的�
 | [[Papers/2601-EvoCUA]] / [[Papers/2607-EvoCUA15]] | 首个分歧点 / STEPO 均分回传 | 部分 | 需成对轨迹 | step-level DPO / GRPO | OSWorld-Verified | 56.7% → 63.2% |
 | [[Papers/2509-TreeGRPO]] | 树采样中兄弟子树的回报差 | 部分 | 同预算下约 1.5× 样本 | GRPO advantage | 多跳 QA | 1/4 预算即超过 chain GRPO |
 | [[Papers/2606-ECPO]] | 对 anchor 内 advantage 做收缩与方差门控 | 不适用（校准既有信号） | +0.10% advantage 计算开销 | GRPO advantage 校准 | ALFWorld / WebShop | divergent anchor 占比 9%→28%；相对 GiGPO +5.2 / +7.3pp |
+| [[Papers/2511-AgentPRM]] | TD 残差 + GAE 自举的 Q 与相邻步 Q 差（promise + progress） | 否（有意改判价值与推进） | 每 query 16 条完整轨迹，无逐步 rollout | beam search 剪枝；BoN 与 PPO 只用终步分数 | WebShop / BabyAI / TextCraft / GSM8K | 3B WebShop @8×8 76.0 vs PVM 54.5；MC 标注 token 为 TD 的 1.9–2.8× |
+| [[Papers/2609-ReSAIL]] | 冻结 teacher 带 / 不带特权信息的输出分布 JSD | 否（衡量特权信息的影响） | Cycle 1 训练循环 1.23× OEL | 自蒸馏 step 选择 + 特权视角 KL 保留 | ALFWorld / TextCraft | 同 ρ 下 Top 62.2 / Random 49.7 / Bottom 40.1；Cycle 3 相对本体平均 +22.5pp |
+| [[Papers/2609-PROPD]] | 带 hindsight skill 重读同一 response 的自身 hidden state | 否 | 每 update 一次 teacher 前向 + per-layer projector | 全层 hidden-state 对齐，无 token 项 | ALFWorld / WebShop | 同 skill 下 token OPD −8.6 对 hidden +6.3（3B ALFWorld，单 seed） |
 
 ```mermaid
 flowchart LR
   R["trajectory-level reward = 1<br/>需要步级监督"]
 
   R --> A["1 语义与可学性打分<br/>不估值"]
-  R --> B["2 prefix rollout 估值"]
+  R --> B["2 前缀估值<br/>rollout 或 TD 自举"]
   R --> C["3 终局回溯"]
   R --> D["4 log-likelihood ratio"]
   R --> E["5 外部 critic 与角色归因"]
@@ -142,15 +155,15 @@ flowchart LR
   R --> F["7 轨迹间结构对比"]
 
   A --> A1["ATLaS / Weasel / Rho-1"]
-  B --> B1["Math-Shepherd / BetaPRM"]
+  B --> B1["Math-Shepherd / BetaPRM / AgentPRM"]
   C --> C1["ABSeeker"]
-  D --> D1["ImplicitPRM / SEED / PCSD / GatedHindsight"]
+  D --> D1["ImplicitPRM / SEED / PCSD / GatedHindsight<br/>ReSAIL / PR-OPD"]
   E --> E1["TRIAGE / ADMIRE / StepReflect / GUI-PRA / TGPO / MobileIPL"]
   G --> G1["AgentGrad"]
   F --> F1["SOLAR-RL / EvoCUA / TreeGRPO / ECPO / ProxMO"]
 
   A1 --> S1["判据不含正确性"]
-  B1 --> S2["每步 N 次 rollout"]
+  B1 --> S2["每步 N 次 rollout<br/>或依赖确定性转移"]
   C1 --> S3["判官本身未经人工验证"]
   D1 --> S4["前提在 GUI 轨迹上不成立"]
   E1 --> S5["判官可靠性即上限"]
@@ -169,6 +182,8 @@ flowchart LR
 | AgentGym / AgentTraj-L | 10 held-in + 4 held-out 任务 | 任务成功率均分 | ATLaS 65.91 / 38.36（Llama-3.1-8B） | 多为短程文本环境；held-out 是唯一能测选步泛化的一列 |
 | ALFWorld | 128 episode 评测集 | 成功率 | PCSD 90.6（Qwen2.5-3B） | 步级方法的主力测试床；1 分 ≈ 1.3 episode，小差距需谨慎解读 |
 | WebShop | — | 成功率 | SEED 88.5（Qwen2.5-3B） | 文本 web，与 ALFWorld 常成对报告 |
+| BabyAI | 90 条评测 query | reward | AgentPRM 89.8（Qwen2.5-3B, beam @8×8） | 网格导航，交互上限 20 轮；PRM 相对 PVM 的领先在此最小（+0.7） |
+| TextCraft | 97 条评测 query（AgentPRM） | 成功率 | OEL+ReSAIL 64.0（Qwen3-4B, Cycle 3）；AgentPRM 56.7（Qwen2.5-3B, beam @8×8） | 两者 backbone 与评测方式不同，不可直接比较；OEL 在此三轮内跌到未训练策略之下 |
 | WebArena-Lite / WebArena | — | 成功率 | Weasel 21.2 / 19.2（Qwen3-8B） | 强 backbone 上离线 SFT 本身几乎无净增益 |
 | MiniWob | — | 成功率 | Weasel 48.0（Qwen2.5-7B, AgentTrek） | 短程，对数据预处理极敏感 |
 | WorkArena L1 / L2 | — | 成功率 | Weasel 12.4 / 4.7（Qwen2.5-7B, AgentTrek） | L2 长程，绝对分极低，差异难以归因 |
@@ -185,13 +200,15 @@ flowchart LR
 
 **选择器的增益常常不来自"选对了"。** ATLaS 自己的 Random 对照最能说明问题：held-out 上 Random 30% 是 38.04、Critical 30% 是 38.36，只差 0.32；而 held-in 上是 59.90 对 65.91，差 6.01。selector 的语义判断主要在训练分布内兑现，分布外那点增益里绝大部分来自"只训 30% 步骤"这件事本身。Rho-1 给出同向的读数：去掉外部高质量语料、改用语料自身训 reference model 之后，增益从 +16.5 掉到 +2.4~+3.3，暗示大部分收益来自 reference model 携带的目标分布信息而非选择动作——但该消融同时换了打分函数，这一归因不能定量拆分。Weasel 的表里则藏着两处未被作者讨论的现象：单独做 pruning 在 Qwen3-8B 上把 MiniWob 从 59.4 打到 40.3、WorkArena L1 从 33.3 打到 15.5，是全表最差的一行，而加上 selection 之后又恢复到 61.9 / 38.8，一个破坏性的预处理为何在与选择组合后不再破坏，没有机制解释；同一 backbone 上 Pruning+LLM-Judge 的 WebArena-Lite 是 19.4、Weasel 是 21.2，而 Weasel 去掉 reasoning synthesis 后只有 17.0——把这个正交组件扣掉，"选择算法优于 LLM-judge 选择"这个结论在 Qwen3-8B 上不成立。
 
+这一读数有一个反例。[[Papers/2609-ReSAIL|ReSAIL]] 在同一选择比例（ρ=0.05，OEL、Qwen3-4B、ALFWorld、Cycle 1）下做了 Top / Random / Bottom 三档对照，ID / OOD 成功率依次是 62.2 / 57.3、49.7 / 45.8、40.1 / 40.4。按特权敏感度选步比随机高约 12 点，且差距在 OOD 上没有缩小；反向选择更差。它与 ATLaS 的分歧来源尚未被分离：两者的判据、设定（迭代自蒸馏对专家轨迹 SFT）与选择比例都不同。和 ATLaS 一样，ReSAIL 的判据也不判对错。它的 ρ 与保留项权重是在同一组 128 + 128 个评测 episode 上 sweep 的，没有独立 validation split，±5 点量级的差距应打折看待；12 点的 Top–Random 差距大致能承受这一偏差。
+
 **判官本身会失效，而多数方法没有测过自己的判官。** TRIAGE 的消融是这条最硬的证据：把判官的 thinking 去掉，regression-in-success 的 F1 从 86.1% 塌到 29.2%，整体表现随之跌到 GRPO 之下（76.8 对 79.6）——依赖 judge 的步级方法，其上限就是 judge 的上限。OSReward 把这件事横向测出来：27 个 judge 在 Hard 子集上最好只有 69.7%、均值约 52%，且共享一个宽松偏置，倾向采信 agent 的自述而非核对截图。ADMIRE 恰好落在这个偏置的射程内——它判定 milestone 命中的依据正是 agent 自己写的动作描述与 milestone 文本的 SBERT 余弦，构成一个未被测试的 reward hacking 通道。StepReflect 是少数正面报告判官准确率的工作（1,082 条人工核验 transition 上 82.16%）；ATLaS、TRIAGE、ADMIRE、ABSeeker 都没有在各自设置下报告这个数。
 
 **更密的 credit 未必更稳。** ECPO 指出在有限 rollout 下，同一 anchor 处罕见的幸运动作会按观测 return 拿到过大 advantage，这类 divergent anchor 在训练中从 9% 涨到 28%，是后期振荡的来源——"denser 即 better"在统计上不成立。PCSD 的表里则出现了 backbone 翻转：GRPO+OPSD 在 3B 上是 +6.2、在 1.7B 上是 −14.1；同时它的主结果是单次运行、128 episode 评测，PCSD 相对单点版本的差距折合 8 个 episode（3B）与 7 个（1.7B），约 1.5σ 与 0.9σ。Math-Shepherd 给出的是另一种不稳：PPO 之后单用它的 PRM 做 verifier，MATH500 上 41.1 反而不如纯 self-consistency 的 42.3 与 SC+ORM 的 43.1——为更弱模型训的 reward model 监督不了被它训强之后的模型。
 
 **增益高度依赖 headroom，而非方法本身。** [[Papers/2607-GRPONullWebAgent]] 用 18 组受控实验给出条件命题：当 SFT 已经掌握任务时 RL 没有增益，存在 headroom 时增益可达 22 分；中等学习率造成局部损伤，高学习率造成全局崩塌。Weasel 的最强 backbone 一列印证了同一件事——Qwen3-8B 未训练时 WebArena 18.0 / MiniWob 61.1 / WorkArena L1 35.2，全量 SFT 后是 18.2 / 59.4 / 33.3，训练把两项拉低了；Weasel 在这一列的主要成就是让 SFT 不再有害，而不是让 SFT 带来大幅提升。ABSeeker 的 ABC-SFT 在 xbench-2505 上从 73.0 掉到 72.0，属于同一类读数：高分基线上，重加权 SFT 的收益可能是负的。
 
-**报告增益的分母取决于基线有没有真正跑起来。** [[Papers/2609-AgentGrad]] 的 GPT-5-mini 主表里，TextGrad 在 IFBench 与 MATH 两格的数字连 standard error 都与不做优化的基线逐位相同（73.07±0.60 与 76.48±0.91），意味着这两格一次 prompt 更新都没被接受；迁移表的 IFEval 与 OlympiadBench 重复了同一现象，该文对这四处退化运行未作任何说明。这不动摇它的平均增益排序，但"相对 TextGrad 的平均差距"里有一部分来自基线没跑起来，而不是方法更强。这类检查在本节其他工作里几乎无法做：多数论文只报告基线的最终分数，不报告基线接受了多少次更新，于是"基线是否被合理调优"无法从论文内部证伪。该观察目前只有单一来源，尚未在其他工作上复核。
+**报告增益的分母取决于基线有没有真正跑起来。** [[Papers/2609-AgentGrad]] 的 GPT-5-mini 主表里，TextGrad 在 IFBench 与 MATH 两格的数字连 standard error 都与不做优化的基线逐位相同（73.07±0.60 与 76.48±0.91），意味着这两格一次 prompt 更新都没被接受；迁移表的 IFEval 与 OlympiadBench 重复了同一现象，该文对这四处退化运行未作任何说明。这不动摇它的平均增益排序，但"相对 TextGrad 的平均差距"里有一部分来自基线没跑起来，而不是方法更强。这类检查在本节其他工作里几乎无法做：多数论文只报告基线的最终分数，不报告基线接受了多少次更新，于是"基线是否被合理调优"无法从论文内部证伪。同类现象在另外两篇里也能读到。[[Papers/2609-PROPD|PR-OPD]] 的 OPSD 基线在 3B ALFWorld 上是 23.4，与未训练的 Vanilla 相同，说明这条 token-level 基线大概率没有调起来，不宜当作该路线的代表；[[Papers/2609-ReSAIL|ReSAIL]] 的平均 +22.5 个百分点相对的是第三轮已经塌掉的 SDPO / OEL，在 Qwen3-4B TextCraft 上增强版只比未训练策略高 2.7。三处的共同含义是：相对增益要同时对照一个未训练或不做优化的锚点来读。
 
 **训练信号质量的直接测量给出偏冷的结论。** [[Papers/2606-QVal]] 跨 4 个环境、7 个方法族、21 个方法、6 个 backbone 做了 1200 组以上实验，用 Q-alignment 相关性衡量各类步级信号的质量，结论是简单基线（直接 prompting、ranking）在多数格子里已具竞争力。但这一结论是环境条件的而非普遍的：FrozenLake 的 Q-value 文本设定下 codegen-avg 达 ρ=+0.939（直接 batched 只有 +0.430），OpenApps 的 Q-value 上 ΔBelief 在全部 6 个 backbone 上优于 ranking，而 TerminalBench 上 code 族强烈为负（codegen-avg −0.328）。它同时把 self-distillation 族测为中游、且发现特权信息对该族没有帮助——这与 SEED / PCSD / GatedHindsight 报告的大幅下游增益直接抵触，而 QVal 自陈没有做闭环实验。
 
@@ -203,16 +220,18 @@ flowchart LR
 | 成功轨迹含错步、失败轨迹含对步，规模约 4% 与 10% | single-source | [[Papers/2608-ABSeeker]] | ABSeeker Fig. 4 | 比例由同一套自动 rubric 产出，无人工验证；仅 deep-research 域 |
 | outcome-only 数据可零成本得到步级 Q value | source-verified，域受限 | [[Papers/2412-ImplicitPRM]] | ImplicitPRM C1、C2（Prop 3.1）、C24 | 仅 MATH-500 单轮、inference-time BoN，无 RL 实验；推导假设整条序列由 policy 生成，且 outcome label 无噪 |
 | MC prefix rollout 标签衡量价值而非正确性 | source-verified | [[Papers/2312-MathShepherd]] | MathShepherd C24（§3.3.1）、C13（§5.2 86%@N=4）、C25 | 唯一人工对照用 N=4 + LLaMA2-70B，与实际建库配置（N=8 + LLemma-7B）不同，后者标注质量未测 |
-| 步级粒度在短链条数学上的净增益很小 | consensus | [[Papers/2312-MathShepherd]]、[[Papers/2412-ImplicitPRM]] | MathShepherd C9/C10（Table 2 step-PPO 对 ORM-PPO）；ImplicitPRM C13（Table 2 加 step label 无增益） | 仅数学域；未在长轨迹上做同一对照 |
-| 选步方法的分布外增益主要不来自 selector | disputed（作者读法与数据不一致） | [[Papers/2503-ATLaS]] | ATLaS C4（Table 3：held-out 38.04 对 38.36） | 作者正文称 random 在所有比例上均不如 critical，held-out 列不支持该强度；held-in 差距 6.01 成立 |
+| 步级粒度在短链条数学上的净增益很小 | consensus | [[Papers/2312-MathShepherd]]、[[Papers/2412-ImplicitPRM]] | MathShepherd C9/C10（Table 2 step-PPO 对 ORM-PPO）；ImplicitPRM C13（Table 2 加 step label 无增益） | 仅数学域；[[Papers/2511-AgentPRM]] C16（Table 2：GSM8K beam @8×8 相对 ORM +1.5 / +0.5）与之一致，但其 agent 内部读数不随 horizon 单调（C4、C6：6 轮 WebShop 领先最大，20 轮 BabyAI 相对 PVM 仅 +0.7），且为 test-time search 而非训练增益 |
+| 选步方法的分布外增益主要不来自 selector | disputed（作者读法与数据不一致） | [[Papers/2503-ATLaS]] | ATLaS C4（Table 3：held-out 38.04 对 38.36） | 作者正文称 random 在所有比例上均不如 critical，held-out 列不支持该强度；held-in 差距 6.01 成立；反例 [[Papers/2609-ReSAIL]] C8（Table 3a，同 ρ=0.05 Cycle 1 ID/OOD：Top 62.2/57.3、Random 49.7/45.8、Bottom 40.1/40.4），但其 ρ 在评测集上 sweep（C14），设定为迭代自蒸馏而非专家轨迹 SFT |
 | 依赖 LLM judge 的步级方法上限即 judge 上限 | consensus | [[Papers/2606-TRIAGE]]、[[Papers/2607-OSReward]] | TRIAGE no-thinking 消融（F1 86.1%→29.2%，76.8 < GRPO 79.6）；OSReward C（Hard 最好 69.7% / 均值约 52%） | TRIAGE 笔记无 Evidence Ledger，按 legacy-unverified 处理，此处只用其方向性结论；OSReward 为 source-checked；[[Papers/2609-AgentGrad]] 给出判官之外的仲裁者（环境 reward），代价是要求 ground-truth 且只处理失败样本 |
 | 特权信息的价值在证据而非答案 | single-source | [[Papers/2608-GatedHindsight]] | GatedHindsight Table 4（+Action −0.43；screenshot-only +7.42；Full +5.62） | 单篇、Android 两个 benchmark；尚未见独立验证；[[Papers/2609-AgentGrad]] 把 ground-truth 注入被归因单元作探针、从行为差读标签，说明该结论只覆盖 teacher 直接产出标签的设计 |
 | 单点反事实干预可用环境 reward 而非模型判官定位责任单元 | single-source | [[Papers/2609-AgentGrad]] | AgentGrad C10（§4.1–4.2、Algorithm 1 行 9–14、Eq. 3）、C11（§4.1 Hint Construction） | 仅固定顺序流水线 MAS；需 ground-truth 构造 hint；只作用于失败集；逆序遍历依据无测量支撑；笔记为 partial 验证，仅引用 source-verified 行 |
-| prompt-optimizer 类比较的报告增益须逐格核对并检查基线是否退化 | single-source | [[Papers/2609-AgentGrad]] | AgentGrad C3（§5.2 正文对 Table 2 IFBench：TextGrad 42.52 > AgentGrad 41.42）、C13（Table 1 TextGrad 两格与 no-PO 基线逐位相同） | 单篇内部观察；未在其他 prompt optimizer 论文上复核 |
+| 报告增益须逐格核对，并对照未训练或不做优化的锚点检查基线是否退化 | source-verified（三篇各自的内部观察，方向一致） | [[Papers/2609-AgentGrad]]、[[Papers/2609-PROPD]]、[[Papers/2609-ReSAIL]] | AgentGrad C3（§5.2 正文对 Table 2 IFBench：TextGrad 42.52 > AgentGrad 41.42）、C13（Table 1 TextGrad 两格与 no-PO 基线逐位相同） | PR-OPD C6（OPSD 23.4 = Vanilla 23.4）；ReSAIL C6（4B TextCraft OEL 43.7 < ReAct 61.3，+ReSAIL 64.0） | 每处都是论文内部观察；ReSAIL 为 partial 验证，仅用 source-verified 行 |
 | 同一 rubric 在 RL 侧比在 SFT 侧净增益更大 | single-source | [[Papers/2608-ABSeeker]] | ABSeeker Table 3（SFT 28.5→30.8，xbench 73.0→72.0；GRPO 33.5→37.3） | 两个 GRPO 行同起于 ABC-SFT checkpoint，缺 Standard-SFT × ABC-GRPO 格；机制解释为推测 |
 | 更密的 step credit 在有限 rollout 下会引入系统性偏置 | source-verified | [[Papers/2606-ECPO]] | ECPO（divergent anchor 占比 9%→28%；相对 GiGPO +5.2 / +7.3pp） | 1.5B backbone、两个文本环境；未在 GUI 上复测 |
 | 简单基线的步级信号质量已具竞争力 | disputed（环境条件成立） | [[Papers/2606-QVal]] | QVal Appendix E（FrozenLake codegen-avg ρ=+0.939 对 direct-batched +0.430；OpenApps ΔBelief 6/6 优于 ranking；TerminalBench codegen-avg −0.328） | 笔记为 legacy-unverified；论文未做显著性检验，"简单基线获胜"不可读作跨环境普遍结论 |
 | self-distillation 族的信号质量与其下游增益不一致 | disputed | [[Papers/2606-QVal]] 对 [[Papers/2607-SEED]] / [[Papers/2608-PCSD]] / [[Papers/2608-GatedHindsight]] | QVal 将该族测为中游且特权信息无助；SEED 91.8 对 GRPO 75.0；PCSD 90.6 对 84.4 | QVal 自陈未做闭环实验；PCSD 为 partial 验证、单次运行、128 episode 评测 |
+| 特权 teacher 的差异主要落在 hidden state 而非 token 概率；同一 skill 下 hidden 通道优于 token 通道 | single-source | [[Papers/2609-PROPD]] | PR-OPD C2（<1/4 token 概率变化、>80% hidden state 变化）、C8（Table 2：token OPD −8.6，hidden +6.3 / +4.7）、C15（App H 无 projector 时 loss 变化 ≤0.01） | 单训练 seed、128 episode；无无关文本 / 他人 skill 作 teacher context 的对照；C15 提示增益可能来自表示正则化而非信息传递 |
+| 迭代自蒸馏中只训普通视角会顺带改坏 teacher 的特权视角，需显式维护 | single-source | [[Papers/2609-ReSAIL]] | ReSAIL C10（§4.3、Table 9：无保留 61.5→44.8；PR 58.9→70.3）、C7（Table 2 组件消融）、C4、C5 | 仅 OEL × Qwen3-4B × ALFWorld OOD；测的是 teacher 任务成功率而非步级分数准确性；笔记为 partial 验证，仅引用 source-verified 行 |
 | RL 增益条件于 SFT 未饱和 | source-verified | [[Papers/2607-GRPONullWebAgent]]、[[Papers/2605-Weasel]] | GRPONullWebAgent（18 组受控实验；饱和时无增益，有 headroom 时 +22）；Weasel Table 1 Qwen3-8B 列 | 前者为 MiniWob + Qwen3-VL 4B/8B；跨环境外推未验证 |
 
 ## Key Takeaways
@@ -221,7 +240,7 @@ flowchart LR
 
 2. **零成本的步级分解存在，但它的前提在 GUI 轨迹上不成立。** ImplicitPRM 证明只要 reward 参数化成 log-likelihood ratio，前缀 log-ratio 累加就是 Q value，不需要额外 rollout。它的两个隐含前提是 outcome label 近乎无噪、整条序列由 policy 自回归生成。GUI 轨迹两条都不满足：成败判定来自一个本身会错的 verifier，轨迹里穿插着截图与工具返回这类非 policy 生成的 token，而 log-ratio 在这些 token 上是否应计入 Q，原推导没有覆盖。
 
-3. **把"选择"这个动作单独隔离出来的对照，三处都显示大部分增益来自选择之外。** ATLaS 的 Random 30% 在 held-out 上只落后 0.32，Rho-1 去掉外部参考语料后增益从 +16.5 塌到 +2.4~+3.3，Weasel 的 pruning 单独用会把 MiniWob 从 59.4 打到 40.3、加上 selection 又恢复。三者机制不同，但共同的含义是：报告"选步带来 X 分提升"时，同预算随机对照和拆解消融应当是标配而不是附录。
+3. **把"选择"这个动作单独隔离出来的对照结论不一致：三处显示大部分增益来自选择之外，一处显示选择本身贡献约 12 点。** ATLaS 的 Random 30% 在 held-out 上只落后 0.32，Rho-1 去掉外部参考语料后增益从 +16.5 塌到 +2.4~+3.3，Weasel 的 pruning 单独用会把 MiniWob 从 59.4 打到 40.3、加上 selection 又恢复。反方向的证据来自 [[Papers/2609-ReSAIL|ReSAIL]]：同为 5% 的选择比例，按特权敏感度选的 step 比随机选高 11–13 点、比反向选高 17–22 点，OOD 上差距不缩小。两侧在判据、设定与选择比例上都不同，分歧来源尚未分离。可操作的结论不受影响：报告"选步带来 X 分提升"时，同预算随机对照和拆解消融应当是标配而不是附录——ReSAIL 的反例之所以可读，正是因为它做了这组对照。
 
 4. **当 teacher 的职责是产出标签时，特权信息的价值在于提供证据而不是提供答案。** GatedHindsight 的消融把这一点分离得很干净：把正确动作直接给 teacher 是 −0.43，只把下一帧截图给 teacher 是 +7.42，两者兼给是 +5.62——收益来源不是让教师知道该做什么，而是让教师能看到该步的后果。这条结论的适用面必须限定在这一种角色分工上：[[Papers/2609-AgentGrad]] 同样注入 ground-truth，但注入对象是被归因的单元本身，读出来的不是标签而是注入前后行为的差，答案在那里是探针而非监督目标。两种用法的失效方式不同，原结论只在前一种上成立。GatedHindsight 一侧仍只有单一来源，尚未见独立验证。
 
@@ -231,15 +250,15 @@ flowchart LR
 
 1. **步级信号与步骤正确性的一致性从未被直接测量。**（Validated Gap）Math-Shepherd 的 86% 是唯一的人工对照，但它用的是 N=4 + LLaMA2-70B completer，而真正用来建数据集的是 N=8 + LLemma-7B，后者的标注质量正文没有给出；ABSeeker 的 4% / 10% 量化了问题规模，但这两个比例本身由同一套自动 rubric 产出、无人工验证。一个直接的实验是在同一批 agent 轨迹上人工标注若干步的正确性，再看各族信号（rollout 估值、log-ratio、judge 分数、语义相关度）与它的排序相关性——这将同时回答"哪一族真的在判对错"和"几族之间是否只是同一个量的不同读法"。[[Papers/2609-AgentGrad]] 的单点干预提供了一个比人工标注便宜得多的参照轴：在某一步注入 ground-truth 后重跑，看结局是否翻转。它测的是"修这一步够不够"而非"这一步对不对"，两者在错误可被后续步骤纠正时会分叉，但它是环境仲裁的、每步只需一次重跑，比继续等人工标注可执行。
 
-2. **self-distillation 族的信号质量与下游增益互相矛盾。**（Observed Tension）QVal 把该族的 Q-alignment 测为中游，并发现给它特权信息没有帮助；而 SEED（ALFWorld 91.8 对 GRPO 75.0）、PCSD（90.6 对单点版 84.4）、GatedHindsight（AndroidLab 31.93→43.10）都报告大幅下游增益。QVal 自陈没有做闭环实验，两侧至今没有对账。可能的解释包括：Q-alignment 不是下游收益的正确代理；或者这几篇的增益来自权重分布的形状而非排序的准确性。两种解释指向完全不同的改进方向。
+2. **self-distillation 族的信号质量与下游增益互相矛盾。**（Observed Tension）QVal 把该族的 Q-alignment 测为中游，并发现给它特权信息没有帮助；而 SEED（ALFWorld 91.8 对 GRPO 75.0）、PCSD（90.6 对单点版 84.4）、GatedHindsight（AndroidLab 31.93→43.10）都报告大幅下游增益。QVal 自陈没有做闭环实验，两侧至今没有对账。可能的解释包括：Q-alignment 不是下游收益的正确代理；或者这几篇的增益来自权重分布的形状而非排序的准确性。两种解释指向完全不同的改进方向。[[Papers/2609-PROPD|PR-OPD]] 加入了第三种：特权 teacher 的优势大多不落在 token 概率上（加 skill 后不到四分之一的 response token 概率改变），token 级信号本来只看得到一小部分差异。但它自己的消融又显示，对齐 loss 几乎不下降时下游仍有 +6.3，增益也可能来自表示正则化而非信息传递。三种解释共享同一个缺失的对照：把 teacher 的特权上下文换成等长无关文本或其他轨迹的 skill，看下游增益还剩多少。
 
-3. **步级粒度的净增益在数学域很小、在 agent 域被报告为大，但没有工作在同一环境内改变 horizon 来验证。**（Observed Tension）Math-Shepherd 的 step-PPO 相对 ORM-PPO 只有 +2.3 / +1.7，ImplicitPRM 加 step label 完全无增益；而 TRIAGE 相对 GRPO 是 +7.9 / +7.1、ADMIRE 相对 outcome-only 约 +4.3。Math-Shepherd 自己把 GSM8K 上 PRM 与 ORM 的小差距归因于步数少，这提示 horizon 长度决定 outcome 信号被稀释的程度。但这两组数字来自不同环境、不同 backbone、不同算法，把差异归给 horizon 目前只是一个未经检验的猜测。
+3. **步级粒度的净增益在数学域很小、在 agent 域被报告为大，但没有工作在同一环境内改变 horizon 来验证。**（Observed Tension）Math-Shepherd 的 step-PPO 相对 ORM-PPO 只有 +2.3 / +1.7，ImplicitPRM 加 step label 完全无增益；而 TRIAGE 相对 GRPO 是 +7.9 / +7.1、ADMIRE 相对 outcome-only 约 +4.3。Math-Shepherd 自己把 GSM8K 上 PRM 与 ORM 的小差距归因于步数少，这提示 horizon 长度决定 outcome 信号被稀释的程度。但这两组数字来自不同环境、不同 backbone、不同算法，把差异归给 horizon 目前只是一个未经检验的猜测。[[Papers/2511-AgentPRM|AgentPRM]] 是少数在同一方法、同一 backbone 下同时报告数学与 agent 任务的工作：GSM8K 上 beam @8×8 相对 ORM 只领先 0.5–1.5，Qwen2.5-3B 的 WebShop 上领先 19.0。但它的 agent 内部读数不支持 horizon 解释：交互上限 6 轮的 WebShop 领先最大，20 轮上限的 BabyAI 相对 PVM 只有 +0.7。这些是 test-time search 的增益而非训练信号的增益，三个环境的指标与任务结构也不同，只能说明 horizon 至少不是唯一的变量。
 
-4. **判官的可靠性没有被纳入方法设计。**（Validated Gap）现有做法是把 judge 当作固定的信号源，用下游收益倒推它够不够好。OSReward 显示困难子集上判官均值约 52%，TRIAGE 显示判官退化会让整个方法跌破基线，BetaPRM 是少数显式给 process reward 建可靠性模型的工作，但它建的是采样噪声的可靠性、不是判官本身的可靠性。缺的是把 judge 置信度作为一等公民接入 credit 分配的设计——例如按判官在该类步骤上的历史准确率对其分数做收缩。
+4. **判官的可靠性没有被纳入方法设计。**（Validated Gap）现有做法是把 judge 当作固定的信号源，用下游收益倒推它够不够好。OSReward 显示困难子集上判官均值约 52%，TRIAGE 显示判官退化会让整个方法跌破基线，BetaPRM 是少数显式给 process reward 建可靠性模型的工作，但它建的是采样噪声的可靠性、不是判官本身的可靠性。缺的是把 judge 置信度作为一等公民接入 credit 分配的设计——例如按判官在该类步骤上的历史准确率对其分数做收缩。[[Papers/2609-ReSAIL|ReSAIL]] 在自蒸馏一侧给出了部分实现：它直接测量 teacher 特权视角的成功率随迭代轮次的变化（不维护时 61.5% → 44.8%），并用一项 KL 显式维护（58.9% → 70.3%），说明 teacher 可靠性可以作为训练中的状态变量来测与控。它测的是 teacher 的任务成功率，不是 teacher 给出的步级分数准不准，后者仍然缺位。
 
 5. **backbone 规模与 SFT 饱和度会翻转结论，而多数工作只报告单一规模。**（Observed Tension）PCSD 的 GRPO+OPSD 在 3B 上是 +6.2、在 1.7B 上是 −14.1；GRPONullWebAgent 的 18 组受控实验显示 SFT 已掌握的任务上 RL 没有增益、有 headroom 时可达 +22；Weasel 在最强 backbone 上的成就实际是"让 SFT 不再有害"。这意味着任何"方法 A 优于方法 B"的表述都需要附带 backbone 与饱和度条件，而目前这类条件极少被报告。
 
-6. **长轨迹上的步级监督缺少可比的成本口径。**（Validated Gap）Math-Shepherd 把 completion 算力列为第一条 limitation，却没有给出任何 wall-clock、GPU-hours、FLOPs 或总 rollout 数；ImplicitPRM 摘要中的 "1/38 训练数据" 实为含数据采集的 FLOPs 比、且随规模在 21.3×–146.5× 间摆动；ATLaS 的 6.5×10⁵ 次推理是长轨迹侧唯一可引用的估算，且是它为否定该路线而算的。结果是每篇声称"降低 X 倍标注成本"的工作都在用自建口径，横向不可比。[[Papers/2609-AgentGrad]] 说明报全数字也不等于可比：它是少数逐 benchmark 给出 wall-clock 的工作（平均 136 分钟，五个 benchmark 上均最快），但摘要里的 2.5× 是两列均值之比，按五个逐 benchmark 加速比取平均只有 2.24，而"vs. next-best"那一行的均值格填的仍是与 GEPA 的比值，尽管其中两个 benchmark 的 next-best 并非 GEPA；更要紧的是干预带来的额外系统重跑是否计入 rollout 预算全文未说明，而它展示 rollout 效率的那张图横轴正是 rollout 数。口径问题的核心不是没人报数，而是同一个"倍数"可以由均值之比或比值之均值得出、论文无须声明用的是哪一种，这里两者相差 0.23。
+6. **长轨迹上的步级监督缺少可比的成本口径。**（Validated Gap）Math-Shepherd 把 completion 算力列为第一条 limitation，却没有给出任何 wall-clock、GPU-hours、FLOPs 或总 rollout 数；ImplicitPRM 摘要中的 "1/38 训练数据" 实为含数据采集的 FLOPs 比、且随规模在 21.3×–146.5× 间摆动；ATLaS 的 6.5×10⁵ 次推理是长轨迹侧唯一可引用的估算，且是它为否定该路线而算的。结果是每篇声称"降低 X 倍标注成本"的工作都在用自建口径，横向不可比。[[Papers/2609-AgentGrad]] 说明报全数字也不等于可比：它是少数逐 benchmark 给出 wall-clock 的工作（平均 136 分钟，五个 benchmark 上均最快），但摘要里的 2.5× 是两列均值之比，按五个逐 benchmark 加速比取平均只有 2.24，而"vs. next-best"那一行的均值格填的仍是与 GEPA 的比值，尽管其中两个 benchmark 的 next-best 并非 GEPA；更要紧的是干预带来的额外系统重跑是否计入 rollout 预算全文未说明，而它展示 rollout 效率的那张图横轴正是 rollout 数。口径问题的核心不是没人报数，而是同一个"倍数"可以由均值之比或比值之均值得出、论文无须声明用的是哪一种，这里两者相差 0.23。[[Papers/2511-AgentPRM|AgentPRM]] 给出了这条线上少见的同文成本对照（MC 标注 token 为 TD 的 1.9× / 2.8×），但两侧的种子轨迹数不同（1 对 16）；它摘要里的"8× 计算效率"则是从 best-of-N 曲线上读出的倍数，正文没有定义口径。
 
 ## 调研日志
 
@@ -273,3 +292,24 @@ flowchart LR
 **被修正的既有结论**：Key Takeaway 4 由"对任何试图注入 privileged information 的设计"收窄为"当 teacher 的职责是产出标签时"，依据是 AgentGrad 把 ground-truth 注入被归因单元本身、从行为差而非答案读标签；Key Takeaway 5 保留原判断并补上唯一已实现的例外路径及其前置条件。两处均在正文标注 [[Papers/2609-AgentGrad]]。Open Problem 1 增加"以单点干预替代人工标注作参照轴"的可执行路线，Open Problem 6 增加"报全 wall-clock 仍不可比"的证据。
 
 **证据权限**：AgentGrad 笔记 `verification_status: partial`，本轮只引用其 Evidence Ledger 中 source-verified 的行；C3 作为"论文正文论断与自身表格不一致"的内部矛盾写入，未写成对该方法的否定结论。其 Qwen3-8B/IFBench 一格上"三个 prompt optimizer 有两个跌破不做优化的基线"这一读数，所依赖的单元格数值不在 source-verified 行内，未写入正文。
+
+---
+
+### 2026-11-12 survey-refresh 增量并入 3 篇
+
+**来源**：survey-updates.json 积压 3 篇（Supervisor 清积压模式），全部并入、跳过 0 篇——[[Papers/2609-ReSAIL]]（2026-10-08）、[[Papers/2511-AgentPRM]]（2026-10-13）、[[Papers/2609-PROPD]]（2026-10-14）。
+
+**落点**：
+- AgentPRM → 技术路线"Monte-Carlo prefix rollout"一节（TD + GAE 自举替代逐步 rollout，promise + progress）；消费端一节（PPO 与 BoN 只用终步分数）；方法对照表、Datasets（BabyAI / TextCraft 两行新增）；Open Problem 3（同方法同 backbone 的数学对 agent 读数，agent 内部不随 horizon 单调）、Open Problem 6（MC/TD token 倍数及其种子轨迹数混淆）。
+- PR-OPD → "隐式 credit"一节（token 通道带宽诊断 + 同 skill 只换通道的消融，及 App H 的正则化反证）；失败模式"基线退化"一条（OPSD = Vanilla）；Open Problem 2 第三种解释；方法对照表。
+- ReSAIL → "隐式 credit"一节（PI sensitivity JSD 选步 + Privileged Retention，teacher 特权视角退化的直接测量）；失败模式"选择器增益"一条（同 ρ Top/Random/Bottom 反例）与"基线退化"一条（+22.5pp 的分母是塌掉的基线）；Open Problem 4（teacher 可靠性作为状态变量）；方法对照表。
+
+**结构性变化**：Key Takeaway 3 由"三处都显示大部分增益来自选择之外"改为"对照结论不一致"，依据 [[Papers/2609-ReSAIL]] 同 ρ=0.05 下 Top 比 Random 高约 12 点且 OOD 不缩小；行动建议（同预算随机对照为标配）保留。失败模式"基线退化"一条由单一来源（AgentGrad）扩为三篇内部观察。Overview 第三条轴补 test-time 剪枝与蒸馏通道（token / hidden state）两种消费方式。分类图 B、D 两支节点更新。Key Evidence Matrix：改 3 行（选步分布外增益、步级粒度数学增益、基线退化），新增 2 行（hidden vs token 通道；迭代自蒸馏 teacher 视角退化）。无新增小节。
+
+**跳过**：无。三篇都直接处理"如何从终局信号得到步级/token 级监督或其消费"：AgentPRM 是 agent PRM 的标签估计，ReSAIL 是自蒸馏的步选择，PR-OPD 是特权自蒸馏的蒸馏通道。
+
+**证据边界**：AgentPRM、PR-OPD 为 source-checked，正文数字均取自其 source-verified 行。ReSAIL 为 partial：只用 source-verified 行（C4–C8、C10、C14）；C13（"主结果为单训练 seed"）为 unsupported，正文未写入该断言，只写 ρ/λ 在评测集上 sweep（C14）。ReSAIL AITZ 的 +1.06 结果（单 decoding seed、无迭代）未写入正文。PR-OPD 全部为单训练 seed、128 episode，正文已标注；其"hidden 优于 token"按 single-source 处理，并写出 App H 的正则化反证。AgentPRM 的"8× 计算效率"只作为口径不明的例子引用，未作成本结论。
+
+**papers_analyzed 对账**：旧值 26；并入前用 count_links.py 机械重数正文（## 调研日志 之前）唯一可解析 Papers wikilink 为 26，与旧值一致；并入后机械值 29（+3），无失效链接。
+
+**status**：完成；DomainMap 候选交由主会话处理。

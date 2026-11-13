@@ -64,7 +64,7 @@ graph LR
 
 把接口再往上推一层就是取消运行时决策。[[Papers/2605-PlanThenExecuteWeb]] 主张 web agent 默认采用 plan-then-execute 而非 ReAct，理由是信任边界：ReAct 把攻击者可控的 token 放在模型选择下一个动作的位置上，而 PTE 在观察任何不可信内容之前就固定了控制流图，运行时数据"不能增加步骤、删除步骤、插入新分支、选择新工具或触发重规划"。作者人工静态分类了 WebArena 全部 860 个任务：699 个（81.28%）是纯程序化的，161 个（18.72%）需要运行时 LLM 子过程但不改控制流，需要重规划的为 0，因此 100% 与 PTE 兼容。站点方差极大——Wikipedia 只有 8.70% 属纯程序化（2/23），GitLab 高达 90.69%（185/204）。真正决定这条路线可行性的不是 81.28% 而是另一个数字：WebArena 的 Postmill 只暴露 16 个 REST API，覆盖其 129 个任务中的 33%。论文本身没有跑 agent，全文不含任何成功率、token 或延迟数字，Appendix B 只有几段无量化的 planner 试用观察（Swagger 2.0 JSON 表示法优于 GraphQL）。
 
-[[Papers/2604-AgenticCompilation]] 把同一思路做成工程系统：DOM sanitization、一次性编译成 JSON blueprint、确定性 runtime 执行，每次编译都必过一道人工审核闸门。它的 framing（把连续 agent 的 O(M×N) 推理成本换成 amortized O(1)）值得记，数字不值得引用——$150 的连续 agent 基线是估算，从未运行，也从未给出 per-token 价格或 baseline 模型名；实测的只有编译侧的 $0.002 至 $0.0916；宣称的"1500× 成本削减"是一个假设值除以一个实测值。DOM 压缩宣称"up to 85%"，同样没有任何测量。
+[[Papers/2604-AgenticCompilation]] 把同一思路做成工程系统：DOM sanitization、一次性编译成 JSON blueprint、确定性 runtime 执行，每次编译都必过一道人工审核闸门。它的 framing（把连续 agent 的 O(M×N) 推理成本换成 amortized O(1)）值得记，数字不值得引用——\$150 的连续 agent 基线是估算，从未运行，也从未给出 per-token 价格或 baseline 模型名；实测的只有编译侧的 \$0.002 至 \$0.0916；宣称的"1500× 成本削减"是一个假设值除以一个实测值。DOM 压缩宣称"up to 85%"，同样没有任何测量。
 
 这条路线上还有一支把动作定义权交给 agent 自己：[[Papers/2504-SkillWeaver]] 让 agent 自主探索站点并把复用交互蒸馏成可执行 API，[[Papers/2409-AgentWorkflowMemory]] 从轨迹中归纳自然语言 workflow 注入 prompt。二者在各自论文中均报告显著相对提升（SkillWeaver WebArena +31.8%，AWM WebArena +51.1%）。[[Papers/2606-SkillMemoryBudget]] 在 token 对齐条件下重测这一族，结论相反：Vanilla-IB 在三个模型上全胜（Gemini 3 Flash 50.74% / 71.9K，对 AWM 44.98% / 102.0K、ReasoningBank 45.54% / 86.4K），并查出 AWM 有 49.5% 至 52.3% 的 workflow 来自失败轨迹、ReasoningBank 有 52.9% 至 59.5% 的"成功"条目实际来自失败轨迹。该反驳的适用范围限于在线按任务付费的场景，离线摊销不在其射程内。
 
@@ -102,7 +102,7 @@ graph LR
 | 推理期树搜索 | [[Papers/2407-TreeSearchLMAgents]] | 可 reset 并重放动作序列 | VWA 18.9 → 26.4 | 未做算力对齐；wall-clock 为模拟法的约 4 倍 |
 | 向前模拟 | [[Papers/2411-WebDreamer]] | 无（可跑真实站点） | VWA 17.7 → 23.6 | wall-clock 约为树搜索的 1/4 |
 | 显式回退 | [[Papers/2504-WebRollback]]、[[Papers/2505-BacktrackAgent]] | 状态可由 URL 恢复；或页面图为离线预抓 | live +3~6pp；Mobile3M +7.59 | BacktrackAgent 推理慢约 50% |
-| 控制流预固定 | [[Papers/2605-PlanThenExecuteWeb]]、[[Papers/2604-AgenticCompilation]] | 完整可信站点 API | 未跑 agent / 编译成功率 80~94% | PTE 无成本数字；编译侧 $0.002~$0.092 |
+| 控制流预固定 | [[Papers/2605-PlanThenExecuteWeb]]、[[Papers/2604-AgenticCompilation]] | 完整可信站点 API | 未跑 agent / 编译成功率 80~94% | PTE 无成本数字；编译侧 \$0.002~\$0.092 |
 | 管理-执行-审计 | [[Papers/2608-LongHorizonHarness]] | 环境状态可被独立读取核验 | WeaveBench 51.8 → 80.7 | WeaveBench 与 Terminal-Bench 对齐，OSWorld 不是工具对齐 |
 | 递归 harness | [[Papers/2606-RecursiveAgentHarness]] | 可执行代码、可隔离工作区 | Oolong 71.75 → 81.36 | 未测 token；基线为引用数字 |
 | per-step 预算路由 | [[Papers/2603-Ares]]、[[Papers/2602-CATTS]]、[[Papers/2603-AgentSwing]] | 无（Ares 需同模型多档 effort） | +1.5 / +4.7 / +7.5 | 见第 4 节，三者口径各有缺失 |
@@ -191,7 +191,7 @@ graph TB
 | [[Papers/2603-Ares]] | WebArena +1.5pp / −45.3% | always-high | no | router 自身 prefill 与 decode 无任何数字；相对 random 反而更贵 |
 | [[Papers/2603-AgentSwing]] | Pass@1 超最好静态策略 +7.5 | best static | no | 无任何 token 或算力对齐对照；每次触发 3×3 个额外真实轮次是否计入 400 轮预算未说明 |
 | [[Papers/2606-RecursiveAgentHarness]] | Oolong 71.75 → 81.36 | 引用的已发表数字 | no | 无消融、未测 token、基线未重跑 |
-| [[Papers/2604-AgenticCompilation]] | 1500× 成本削减 | 估算的连续 agent | no | $150 从未运行；DOM 压缩与消除推理两个干预捆绑 |
+| [[Papers/2604-AgenticCompilation]] | 1500× 成本削减 | 估算的连续 agent | no | \$150 从未运行；DOM 压缩与消除推理两个干预捆绑 |
 | [[Papers/2605-PlanThenExecuteWeb]] | 100% 任务与 PTE 兼容 | 无 | 不适用 | 未跑 agent；全文无成功率、token、延迟数字 |
 
 这张表的用法不是给论文排名，而是给引用设边界：判定为 no 的行，其效率数字不应被跨论文搬运；判定为 partial 的行，搬运时必须带上限定条件。
@@ -244,7 +244,7 @@ harness 研究用的评测基本沿用通用 web agent benchmark，没有专门�
 | CATTS 的 +9.1% 不是算力对齐的比较 | source-verified | [[Papers/2602-CATTS]] | C17（47.9 − 38.8 = 9.1）；C18（920K/405K = 2.27）；全文 compute-matched / iso- 零命中 | 同论文 Table 4 存在干净对照（always-arbitrate 762K/44.0 对 CATTS(H) 745K/47.9）；τ 在评测集上扫出，无 held-out 集，全阈值平均自报 45.6% 且无法由 Table 9 复算（复算为 46.17%） |
 | Ares 的 45.3% token 削减不含 router 自身开销 | source-verified | [[Papers/2603-Ares]] | C11（cost 定义为 agent 生成 token；全文无 router token/延迟/算力数字）；C9（相对 random 四设置 token 全部更高） | "router 无法复用 agent KV cache"是笔记推断，论文既未承认也未反驳；论文侧的事实只是不存在任何 router 成本数字 |
 | AgentSwing 的增益全部来自 k=3 前瞻，多候选并行本身贡献为负 | source-verified | [[Papers/2603-AgentSwing]] | C12（Table 3：random 51.0/56.5，w/o Lookahead 50.0/57.0，k=1 52.5/58.0，k=3 60.0/60.5）；C13 | k=1 在两个 backbone 上恰好持平各自最好静态策略；"看到下游反馈"与"多跑 9 个真实轮次"两种解释都符合该形状，论文未做隔离 |
-| Agentic Compilation 的 1500× 是估算除以实测 | source-verified | [[Papers/2604-AgenticCompilation]] | C2（$150 / $15 原文标 estimated，无 per-token 价格、无 baseline 模型名、无连续基线运行）；C4（150/0.10 = 1500） | 实测部分只有编译侧 $0.002~$0.0916；DOM 压缩宣称 "up to 85%" 无任何测量，强行对照 Table 1 只得 41.9%~50.2% |
+| Agentic Compilation 的 1500× 是估算除以实测 | source-verified | [[Papers/2604-AgenticCompilation]] | C2（\$150 / \$15 原文标 estimated，无 per-token 价格、无 baseline 模型名、无连续基线运行）；C4（150/0.10 = 1500） | 实测部分只有编译侧 \$0.002~\$0.0916；DOM 压缩宣称 "up to 85%" 无任何测量，强行对照 Table 1 只得 41.9%~50.2% |
 | token 对齐后，memory / workflow harness 不优于无 memory 基线 | single-source | [[Papers/2606-SkillMemoryBudget]] | Vanilla-IB 三模型全胜（Gemini 3 Flash 50.74/71.9K 对 AWM 44.98/102.0K）；资产污染比例 | 与 [[Papers/2409-AgentWorkflowMemory]]、[[Papers/2504-SkillWeaver]] 的原论文结论直接冲突；冲突来源是成本对齐口径，不是任务或指标 |
 | 真实站点不可 reset，因此树搜索类方法不能直接迁移 | consensus | [[Papers/2407-TreeSearchLMAgents]]、[[Papers/2411-WebDreamer]]、[[Papers/2505-BacktrackAgent]] | TreeSearch 的回溯实现为 reset + 重放；WebDreamer 明写 live 站点 reset/undo 不可行；BacktrackAgent 的两个 benchmark 均非 live | 三者独立且结论一致；[[Papers/2504-WebRollback]] 给出的中间点依赖状态可由 URL 恢复，不是通解 |
 

@@ -36,7 +36,7 @@ TeamBench 用 Docker bind mount 把 Planner / Executor / Verifier 的「读完�
 
 **五条件消融（Table 1）。** Solo（单 agent，全 spec + workspace + 四个 tool）/ Restricted（同一 agent，去掉 spec 访问）/ Full Team / Team-No-Plan / Team-No-Evaluate。由此定义 Teamwork Necessity Index：TNI = 团队从 Solo−Restricted 缺口中挽回的比例（ε=0.05 防止分母近零），并另报 Planning Value = S_full − S_no_plan、Verification Value = S_full − S_no_verify。
 
-**Cross-provider role mixing。** 把「哪个 provider 坐哪个角色」当实验变量，三家（Anthropic / Google / OpenAI）各出一个紧凑前沿模型，穷举 3³ = 27 种配置 × 25 任务 × 3 seed = 2,025 run，实测花费 $326.04。
+**Cross-provider role mixing。** 把「哪个 provider 坐哪个角色」当实验变量，三家（Anthropic / Google / OpenAI）各出一个紧凑前沿模型，穷举 3³ = 27 种配置 × 25 任务 × 3 seed = 2,025 run，实测花费 \$326.04。
 
 **评分。** 每个任务一个确定性 shell 脚本 grader（`grade.sh`），产出 [0,1] 的 partial score；binary pass 要求所有 check 通过（对齐 SWE-Bench / Terminal-Bench）。有一条 promotion rule：如果一次 run 的全部失败都来自 attestation check（即只是忘了写 attestation.json），则计为 pass，原始判定同时保留。所有 API call 用 temperature 0。
 
@@ -84,7 +84,7 @@ TeamBench 用 Docker bind mount 把 Planner / Executor / Verifier 的「读完�
 
 ### 4. Cross-provider mixing 改变成本-性能前沿
 
-25 任务网格、三 seed 汇总：PGEAVA（Google Planner + Anthropic Executor + Anthropic Verifier）26.7% @ $20.52，超过全 Anthropic 队（22.7% @ $39.58）4 个点且只花一半钱；POEOVA 以 $10.98 打平全 Anthropic；全 OpenAI 队 18.7% @ $2.09。成本跨度从 $0.65 到 $39.58（60.9×），而 pass rate 跨度只有 4 个点。Per-role marginal 显示 Executor 与 Verifier 的选择比 Planner 更重要（Planner 三家 CI 完全重叠）。作者诚实提示：细粒度配置排名跨 seed 不稳（Spearman 0.09–0.28，28.9% 的配置-任务对翻转），所以只该看 pooled role marginal。
+25 任务网格、三 seed 汇总：PGEAVA（Google Planner + Anthropic Executor + Anthropic Verifier）26.7% @ \$20.52，超过全 Anthropic 队（22.7% @ \$39.58）4 个点且只花一半钱；POEOVA 以 \$10.98 打平全 Anthropic；全 OpenAI 队 18.7% @ \$2.09。成本跨度从 \$0.65 到 \$39.58（60.9×），而 pass rate 跨度只有 4 个点。Per-role marginal 显示 Executor 与 Verifier 的选择比 Planner 更重要（Planner 三家 CI 完全重叠）。作者诚实提示：细粒度配置排名跨 seed 不稳（Spearman 0.09–0.28，28.9% 的配置-任务对翻转），所以只该看 pooled role marginal。
 
 ### 5. 信息中继确实很差
 
@@ -122,7 +122,7 @@ Planner→Executor 传递分析（792 run / 15 任务）：spec-critical token �
 | C18 | 每任务一个确定性 shell grader（grade.sh），partial score ∈ [0,1]；binary pass 需全 check 通过；仅 attestation 类失败被 promote 为 pass；API 全用 temperature 0 | benchmark-setting | App A.2；§3.1；Table 12 脚注；App D.2 | "counts a run as a pass if all failures are attestation-related"；"All API calls use temperature 0" | source-verified |
 | C19 | Grader 效度审计：三 LLM judge 在 285 tuple 上看得到判定时 Fleiss κ=0.74，藏起判定后 κ=0.07；作者宣布两者都不作 grader validation | benchmark-setting | App D；App D.1；Table 14 | "we report neither variant as independent grader validation" | source-verified |
 | C20 | 90 个 leaderboard 任务中 57 个（63.3%）过 TeamBench-Verified 门槛；"Verified" 指按适用支柱审计而非逐任务专家核定 | benchmark-setting | App D；Table 13 | "'Verified' means audited on the pillars that apply rather than expert-verified per task" | source-verified |
-| C21 | 13 模型 / 4 家族 / 90 任务分层 leaderboard；role-mixing 27×25×3 = 2,025 run @ $326.04；参照消融 1,165 run（gemini-3-flash-preview） | benchmark-setting | §3.1；Table 7（App C.1）；App D.2 | "reference ablation requires 1,165 task runs under gemini-3-flash-preview" | source-verified |
+| C21 | 13 模型 / 4 家族 / 90 任务分层 leaderboard；role-mixing 27×25×3 = 2,025 run @ \$326.04；参照消融 1,165 run（gemini-3-flash-preview） | benchmark-setting | §3.1；Table 7（App C.1）；App D.2 | "reference ablation requires 1,165 task runs under gemini-3-flash-preview" | source-verified |
 | C22 | 每轮输出预算 8,192 token，正文称 harness "uses capped turns"，但全文未给出具体 per-role turn cap / step limit / wall-clock timeout | benchmark-setting | App E.4；§4 | "exhaust the harness's per-turn output budget (8,192 tokens)"；"The current harness uses capped turns" | source-verified |
 | C23 | 角色权限由 Docker bind mount 强制；共四个 tool；Planner/Verifier 不能执行任意命令或改 workspace，Verifier 写权限仅限 attestation | causal-mechanism | Table 2（App A.1）；Table 23（App F.1） | "Role permissions enforced by Docker bind mounts"；write 行 Verifier "Attest. only" | source-verified |
 | C24 | Table 12 上 13 个模型里 6 个 Restricted（无 spec）pass rate 高于 Solo（有 spec），如 GPT-5.4 35.6 vs 12.2、Sonnet 4.6 27.8 vs 7.8、Haiku 4.5 31.1 vs 12.2 | number | Table 12 Solo/Restricted 列 | "GPT-5.4 12.2 35.6"；"Claude Sonnet 4.6 7.8 27.8"；"Claude Haiku 4.5 12.2 31.1" | source-verified |
@@ -258,7 +258,7 @@ LongHorizon-Harness 的核心机制主张是「read-only auditor 从 fresh conte
 - **TNI 的有效样本远小于任务数**。`shared/paper/ablation_summary.json` 的 aggregate 为 `count=155, valid_tni_count=37`——155 个任务里只有 37 个（23.9%）满足 gap 门槛而产出有效 TNI。同文件 `findings.total_runs=1427`，与论文 tex:1083 的 "1,165 task runs" 不同口径。
 - **prompt-only vs enforced 的 prompt 并非逐字相同**。`agent_interface.py:586-601` 的 docstring 称与 enforced 条件"identical in content"，`:610-613` 的注释自陈"only the role label and the workspace-access language differs"；实际 prompt-only 的 Planner 说 "You have shared workspace tools, but your job is to plan, not to implement"（`:622-628`），enforced 的 Planner 说 "You CANNOT execute commands or modify the workspace"（`:320-327`）。`experiments/role_enforcement_ablation/HYPOTHESIS.md:119-121` 已在预注册里明确承认这一差异属于"legitimate, pre-registered difference"，因此不算隐瞒，但它意味着该对照并非纯 enforcement 单变量——措辞差异与权限差异共变。
 
-**复现路径**：Python ≥ 3.10，核心依赖仅 `click` + `pyyaml`，provider SDK 走 extras（`pyproject.toml` 的 `gemini`/`openai`/`anthropic`/`all`），入口 `teambench = "harness.cli:main"`。主命令是 `python -m harness.ablation --model <m> --conditions oracle restricted full team_no_plan team_no_verify`（README:51/64），CLI 默认 `--max-turns 20`、`--max-remediation 2`、`--seeds 0 1 2`（`ablation.py:1520-1545`）。`--model mock` 可无 API key 跑通判分与沙箱管线（README:90-94），适合验证 grader 而非复现结论。`.env.example` 只有 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` / `OPENROUTER_API` 四个空占位（全仓 `sk-ant-`/`sk-proj-`/`AIza` 正则扫描零命中，无凭证泄漏）。任务数据完整开放：90 个 leaderboard 任务（`leaderboard/data/leaderboard_90_tasks.json`）逐一核对均有 `tasks/<ID>/` 目录与 `grade.sh`；seed 0–2 公开、seed ≥5 保留（tex:1086）。算力成本按论文口径为 role-mixing 网格 2,025 run / $326.04；`ablation.py:1365-1389` 的 append-only checkpoint 支持中断续跑。**不可复现的部分**：per-run trace（`turn_*.json` / `dialogue.jsonl`）与 role-mixing 逐条记录未发布，Table 18 的混淆矩阵与 49.4% 无法由发布物重算；README:152 注明 leaderboard 任务 `GH120_redis-py_3863` 正在重整、当前返回 0。
+**复现路径**：Python ≥ 3.10，核心依赖仅 `click` + `pyyaml`，provider SDK 走 extras（`pyproject.toml` 的 `gemini`/`openai`/`anthropic`/`all`），入口 `teambench = "harness.cli:main"`。主命令是 `python -m harness.ablation --model <m> --conditions oracle restricted full team_no_plan team_no_verify`（README:51/64），CLI 默认 `--max-turns 20`、`--max-remediation 2`、`--seeds 0 1 2`（`ablation.py:1520-1545`）。`--model mock` 可无 API key 跑通判分与沙箱管线（README:90-94），适合验证 grader 而非复现结论。`.env.example` 只有 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` / `OPENROUTER_API` 四个空占位（全仓 `sk-ant-`/`sk-proj-`/`AIza` 正则扫描零命中，无凭证泄漏）。任务数据完整开放：90 个 leaderboard 任务（`leaderboard/data/leaderboard_90_tasks.json`）逐一核对均有 `tasks/<ID>/` 目录与 `grade.sh`；seed 0–2 公开、seed ≥5 保留（tex:1086）。算力成本按论文口径为 role-mixing 网格 2,025 run / \$326.04；`ablation.py:1365-1389` 的 append-only checkpoint 支持中断续跑。**不可复现的部分**：per-run trace（`turn_*.json` / `dialogue.jsonl`）与 role-mixing 逐条记录未发布，Table 18 的混淆矩阵与 49.4% 无法由发布物重算；README:152 注明 leaderboard 任务 `GH120_redis-py_3863` 正在重整、当前返回 0。
 
 **Affordance 面**：
 

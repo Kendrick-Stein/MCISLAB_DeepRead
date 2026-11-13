@@ -35,7 +35,7 @@ CUA 训练需要大量可执行、多样、可靠的软件环境。作者把现�
 - **训练数据来源消融（Table 3）**：OSWorld-only 在 OSWorld 61.48%、在 SoftwareGym-Bench 33.3%；SoftwareGym-only 为 56.97% / 40.0%；二者合并为 58.61% / 47.5%。两个单源数据集各自对齐到 3,715 条轨迹、55,263 序列化样本，合并组为二者直接拼接（并非三组对齐）；overlength 过滤后 49,445（SG）、49,496（OSWorld）、98,941（合并）。
 - **合成质量**：182 个应用；GUI 任务平均通过率 v1 54.9% → v2 81.1% → v3 91.5%。121 个应用（8 个与 OSWorld 对齐的类别）上，GUI 证据覆盖全部 49 个 major module 和平均 78.8% 的 concrete native function。
 - **消融**：Full Design vs simplified，macro 结构多样性 83.6 vs 4.9；GUI-guided repair 50.4% → 83.1%，source-only repair 50.4% → 48.8%（36 个应用，GUI-guided 在 36/36 个应用上胜出）。
-- **成本**：抽样 20 个应用，平均每个 237.3 分钟、14.8M tokens、1,718 次模型调用、约 $70.76。
+- **成本**：抽样 20 个应用，平均每个 237.3 分钟、14.8M tokens、1,718 次模型调用、约 \$70.76。
 
 ## Evidence Ledger
 | Claim ID | Claim | Type | Source locator | Evidence excerpt | Status |
@@ -58,7 +58,7 @@ CUA 训练需要大量可执行、多样、可靠的软件环境。作者把现�
 | C16 | GUI-guided repair 在 36/36 个应用上胜出，差距 34.3 点（95% CI 28.2-41.0） | number | App. C.2 | "GUI-guided repair wins on all 36 applications." | source-verified |
 | C17 | 结构化 style design 使 macro 多样性得分从 4.9 升到 83.6 | number | §4.3 Style Design; App. C.1 | "Full Design improves the macro-average diversity score from 4.9 to 83.6" | source-verified |
 | C18 | 121 个应用上 GUI 证据覆盖全部 49 个 major module 与平均 78.8% concrete native function | number | §4.2; Fig. 4(b) | "GUI evaluations cover all 49 major functional modules and 78.8% of concrete functions on average" | source-verified |
-| C19 | 每个应用平均 237.3 分钟、14.8M tokens、1,718 次调用、约 $70.76（20 个抽样应用） | number | §4.2; Fig. 5 | "Each application requires 237.3 minutes, 14.8 million tokens, 1,718 model calls, and an estimated $70.76 on average." | source-verified |
+| C19 | 每个应用平均 237.3 分钟、14.8M tokens、1,718 次调用、约 \$70.76（20 个抽样应用） | number | §4.2; Fig. 5 | "Each application requires 237.3 minutes, 14.8 million tokens, 1,718 model calls, and an estimated \$70.76 on average." | source-verified |
 | C20 | 合成使用 Codex CLI + GPT-5.5，GUI 评估由 Seed 2.1 Pro 执行，每用例最多 50 步，最多 3 个版本 | benchmark-setting | §4.1 Software Synthesis | "Seed 2.1 Pro evaluates each version through mouse-and-keyboard interaction for up to 50 steps per case" | source-verified |
 | C21 | 评测统一为 temperature 1、100 步预算、3 次独立 rollout，报告 Pass@3 | benchmark-setting | §4.1 Evaluation and Baselines | "We set the temperature to 1 and the interaction budget to 100 steps. Each task is evaluated with three independent rollouts." | source-verified |
 | C22 | 差异化论断：与 browser-hosted 合成方法不同，本文合成独立桌面应用 | sota-novelty | §2 | "SoftwareGym instead synthesizes standalone desktop applications." | source-verified |
@@ -79,7 +79,7 @@ CUA 训练需要大量可执行、多样、可靠的软件环境。作者把现�
 - **轨迹教师与蒸馏混淆**：正文未明确谁生成训练轨迹（附录只提 "teacher schema"，并由 GPT-5.5 judge 过滤）。若教师是 Seed 2.1 Pro 等强闭源模型，则增益部分来自蒸馏而不是环境本身。此点论文未交代，属于"不知道"。
 - **只做 SFT**：叫 "Gym" 却没有在环境里做 RL 或在线交互，未验证环境作为 RL 环境的价值（reward、可重置性、并行吞吐）；合成与评测用的 verifier 本身也由 LLM 驱动。
 - **可靠性定义内生**：91.5% 通过率是用同一个 GUI agent 与由 manual 生成的用例衡量，用例在 v1 后固定，存在"为通过测试而修"的风险；通过率不等于功能真实正确。
-- **成本**：约 $70.76/个应用、近 4 小时，整库 182 个应用约 $12.9k（由作者的单应用均值外推，非论文数字）；对比其声称的"远低于手工开发"未给人工开发成本数据。
+- **成本**：约 \$70.76/个应用、近 4 小时，整库 182 个应用约 \$12.9k（由作者的单应用均值外推，非论文数字）；对比其声称的"远低于手工开发"未给人工开发成本数据。
 - 单次运行、无多 seed 方差；多个对比（C8）差距在噪声内。
 
 ## Mind Map

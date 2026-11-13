@@ -31,8 +31,6 @@ date_added: 2026-04-21
 6. **Mitigation 远未成熟**: 现有方法（adversarial reward、decoupled approval、anomaly detection、SEAL 数据分析）多为方向性提案；RLHF 场景下没有 magic bullet。
 
 ---
-%% ═══ Body ═══ %%
-
 ## 1. Background：Reward function 与 Spurious correlation
 
 ### 1.1 Reward shaping 的"暗黑艺术"

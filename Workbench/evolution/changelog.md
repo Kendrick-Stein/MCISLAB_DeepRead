@@ -194,3 +194,14 @@
 - **promoted_by**: human（Supervisor 批准 queue `69262838`，prio 90）
 - **content**: 四条 matched-control 证据（SkillMemoryBudget token-matched vanilla 追平 AWM/ASI/ReasoningBank；GUIvsCLI 440 任务 matched 下 GUI 59.1% > CLI 48.2%；MuonAgenticRL 仅换 optimizer 0.320→0.633；AgentOccam 观察 token 反增仍拿 43.1%）+ 反例边界（MHLC −90.7% 成本下 0.47→0.60；verifier-guided skill 修补 CLI→69.3%）+ 对自有实验的操作含义（budget-matched arm、seed × data-draw 交叉）
 - **frontmatter**: `last_updated` 2026-04-28 → 2026-08-02
+
+### [2026-11-12] memory-distill
+
+- **period**: 2026-11-05 ~ 2026-11-12
+- **logs_processed**: 3（2026-11-06、2026-11-09、2026-11-12）
+- **new_patterns**: 3（知识注入粒度与时机决定符号；重试增益第一因子是失败信号来源；具身执行期闭环四个介入点）
+- **promoted_to_insight**: 4（L1 → L2：上述 3 条新 pattern + 既有 pattern「学术 preprint 正文级数字错误」）
+- **validated_insights**: 1（L2 → L3：「学术 preprint 正文级数字错误是常态」，15 source / 7 日期，confidence medium）
+- **queued_for_review**: 0（无 confidence: high 晋升）
+- **existing_updated**: 2（「预算匹配对照」validated insight +5 source、+1 存活反例；「上下文非单调」provisional insight +2 具身域旁证，status 维持）
+- **note**: 距上次蒸馏 07-30 已 105 天；08-01 ~ 11-04 的日志未纳入本期（默认 7 天窗口），若需补蒸馏请指定 period

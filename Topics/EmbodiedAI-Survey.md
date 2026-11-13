@@ -1,9 +1,9 @@
 ---
 title: Embodied AI Survey
 tags: [survey, VLA, manipulation, navigation, embodied-ai, robotics, embodied-reasoning, mobile-manipulation]
-date_updated: "2026-09-18"
+date_updated: "2026-11-13"
 year_range: 2023-2026
-papers_analyzed: 112
+papers_analyzed: 140
 keywords: [embodied ai, robot learning, manipulation, embodied reasoning, spatial reasoning, mobile manipulation, language-conditioned, instruction following, 3d scene, scene graph, slam, spatial memory, 3d reconstruction, real-to-sim, sim-to-real]
 domain_map: EmbodiedAI
 ---
@@ -33,6 +33,7 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 8. **接口成为独立于模型能力的竞争维度（2026-08）**：同一批能力可以挂在不同接口上，而接口选择正在产生比模型规模更大的性能差。动作侧，[[Papers/2608-GalaxeaG05|Galaxea G0.5]] 用跨本体 RVQ 把 27 维统一动作空间离散成与语言共享词表的 token、[[Papers/2608-Hydra0|Hydra-0]] 把动作写成图像平面上的稀疏点轨迹、[[Papers/2608-DreamXPhi|DreamX-Phi]] 按注意力头分组注入每臂 SE(3) 相对变换，与既有的 optical flow（FlowWAM）、3D point flow（PointWorld）构成五种互不兼容的取法。语义侧，指令可以走冻结文本编码器（GSR）、只读工具链注入（In-Context VLA）或检索来的示范前缀（[[Papers/2608-StellaVLA|StellaVLA]]），而 G0.5 反向主张连推理带动作都收进同一条自回归流。闭环治理侧，[[Papers/2608-Zetta|Zetta]] 与 [[Papers/2608-HyMeS|HyMeS]] 把 VLA 权重整体冻结、把可靠性逻辑挪到 harness 的代码空间（路线 6、8）。这些取法之间基本没有交叉实验（路线 3、Open Problem 6）。
 
 9. **判定者与评测口径本身进入评测范围（2026-09）**：被测对象从策略与世界模型继续上移到"谁来判定成功"以及"分数在什么口径下产生"。[[Papers/2609-FailBench|FailBench]] 把 14 个来源的 2,197 段操作视频统一成"这次操作是否成功"这一个判定任务，最好的通用模型只有 0.77 macro balanced accuracy，而五个专门训练的失败检测器全部低于各自的基座模型（最大差 −0.088）；[[Papers/2609-DroneCATS|DroneCATS]] 把"宣布任务完成"当成一项独立测量的能力，小模型能飞到目标却不会宣布、前沿模型在 0.20–0.39 的距离比上过早宣布。口径侧的碎片化同时发生：[[Papers/2609-LatentInterfaceTraining|LIT]] 记录 LIBERO-Plus 需要设置 `LIBERO_PLUS_FIX_LANG` 才可比、其 Overall 为七轴非加权均值（按实例加权低约 2pp），[[Papers/2609-PhysBrain15|PhysBrain 1.5]] 用自研 micro-F1 重跑 28 个 benchmark 建立了第二套互不兼容的口径，[[Papers/2609-OpenWAM|OpenWAM]] 同一篇论文里 Avg 一列在两个基准上加权、在另两个上不加权且未声明。数字的可排序性因此不再是默认属性，须与协议一同引用（路线 3、Datasets & Benchmarks、Open Problem 14）。
+10. **执行期闭环从"失败后切出"分化为四个介入点（2026-09/10）**：路线 6 的 RobustExec / Zetta 在 chunk 级判定失败并切出 policy，2026-09 的三篇把介入点移到了三处新位置——[[Papers/2609-VLAFeedback|VLA-Feedback]] 在去噪最后一步消费最新观测（动态任务 27.5% → 85.0%，静态持平），[[Papers/2609-CommitFlow|CommitFlow]] 在阶段转换处核验语义承诺（π0.5 在 RoboTwin 2.0 Avg.10 53.2 → 75.9），[[Papers/2609-SelfCompVLA|SelfComp-VLA]] 在动力学层用执行残差在线更新 LoRA（RoboStress 49.1 → 56.6，而直接用残差修正动作只得 23.6）；[[Papers/2609-VLAScope|VLAScope]] 则在介入之前做滚动风险预测（第 60 步 ROC-AUC 0.8497，但偏移类型是闭集）。四处全部冻结 base policy，全部缺少互比与平凡规则对照。同一时期 harness 自演化到达真机（[[Papers/2610-PhysEvo|PhysEvo]]，无权重更新，PiPER 五任务 84.00%，评分无噪声底），WAM 作为 policy 的上下文轴被证明与预训练方式绑定（[[Papers/2610-LongWAM|Long-WAM]]，因果预训练下 19.2 s 上下文 63.3% → 78.7%，双向初始化下不涨）（路线 2、3、6、8，Key Takeaway #14，Open Problem 9）。
 
 **核心挑战**：Embodied AI 面临四大关键瓶颈：
 
@@ -80,9 +81,13 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 
 结论：防遗忘机制（VQA co-training / representation anchoring）与 EmbodiedMidtrain 的 data alignment 指向同一命题——保留预训练表征与动作学习不冲突，应成 VLA 训练默认件。
 
+这条结论的一种具体手段需要加条件。[[Papers/2611-VLAGradientRouting|VLAGradientRouting]]（2026）检验的是 Knowledge Insulation（KI：对 VLM 主干 stop-gradient，动作只经离散 action token 的 CE 进入主干），把"是否加 action-token CE"与"隔离 vs 梯度耦合"做成 2×2，在驾驶与操作两类任务上测。同时训练（concurrent）时耦合一致更好：闭环 AlpaSim 上带 token 0.703 对隔离 0.600、不带 token 0.601 对 0.425；PolaRiS 操作上 π0.5 复现与 MolmoAct2 的耦合臂全部高于隔离臂，不带 FAST token 时差距最大（10.3 → 32.9、14.5 → 36.5）。只有在先训 VLM、再接动作的分阶段配方加 action token——也就是 KI 的原始配方——两者才打平（0.648 对 0.646），且耦合臂的责任碰撞更高。因此隔离的价值依附于"有离散动作 token 承担动作学习"与"分阶段训练"两个条件，不能作为普适默认件。边界有两处：全部结果为单 seed；VL 能力保持没有测，耦合是否以牺牲语言与 VQA 能力为代价——恰是 KI 要防的那一项——在该文里仍是空白。
+
 **效率端的反向证据——去 LLM 的 V+L→A 架构**：[[Papers/2607-TurboVLA|TurboVLA]]（2026）表明在闭集任务分布上，把 VLM backbone 整个移出执行路径不损失成功率。架构为 DINOv3 视觉编码 + BERT 文本编码 + 6 层双向 cross-attention（权重初始化自 Grounding DINO）+ ACT decoder；LIBERO 平均 97.7%，0.2B 参数 / 0.9GB 显存 / 31.2ms（32 Hz），RoboTwin 2.0 60.2%（0.4B / 43.4ms / ≈23 Hz），真机 AgileX Piper 四任务 92.5 / 80 / 90 / 87.5%。
 
 该结论的边界由论文自身的 ablation 划定：把语言指令替换成 task-ID embedding 只掉 2.3pp（97.7→95.4），说明 LIBERO 的语言条件接近闭集任务分类，并不构成对语义理解的真实要求。全文没有 OOD、指令改写或未见物体的泛化评测，因此可支持的命题是"闭集任务分布下 LLM 不是必需品"，而非"VLA 不需要语义先验"——后者才是路线 1 的 foundation model 主张，本文并未触及。其余待补：LIBERO-Long 94.2% 在其对比表中仅列第 6，延迟数字未声明分辨率、数值精度与编译设置，无 seed 与误差棒；表中 "Emb. PT ✗" 指未做具身预训练，不等于从零训练。
+
+TurboVLA 的 task-ID 读数被 [[Papers/2609-MINERVA|MINERVA]]（2026）推到极端：一个从零训练的小 CNN 加 task-ID embedding、完全不含语言编码器，0.54M 参数在 LIBERO 四个 suite 上得 95.05（2,000 次 rollout），1M 为 96.75、10M 为 97.45，与 π0.5 的 LeRobot 参考值 97.50（非同协议）相差不到 2.5 点。打乱 task ID 后 96.75 掉到 6.5%；参数降到 0.24M 才开始崩塌（88.6，Long suite 最先），seed 噪声带 ±1.08；flow 动作头相对 L1 回归没有优势，动作块长度才有影响。它把 LIBERO 的读法从"语言条件近似闭集分类"推进到"按任务索引的视觉运动记忆即可解"——在这个基准上，参数量、语言主干与生成式动作头都不是必需件。同一批小模型在 LIBERO-Plus 上只有 46.7 / 46.0 / 55.7（0.54M / 0.99M / 4.89M），光照轴不超过 6.5、相机轴 11.5–34.6，因此 LIBERO 上的差距应当到扰动集上去读。该文无真机，8.2 ms 的 GPU 延迟（π0.5 196 ms）只说明这一档任务分布下的成本下界。
 
 **语言鲁棒性：从数据覆盖问题重述为信息路由问题**。[[Papers/2608-GSRParaVLA|GSR / ParaVLA]]（2026）针对的是"指令换个说法 VLA 就崩"——SmolVLA 从 canonical Goal SR 72.0 掉到改写集 Full Para 4.47，VLA-Adapter 从 98.2 掉到 46.82。主流应对是扩语言数据（instruction relabeling、counterfactual 标注、consistency training），本文先追问这笔成本是否必要，并用两级实验把失效位置钉住：行为层探针固定观测、比对 paraphrase 与全部 canonical action chunk 的最近邻，Retrieval@1 为 0.675 / 0.516 / 0.941（chance 0.1），说明任务语义在语言主干里保留完好；因果干预只替换进入 VLA-Adapter 最后一个 Bridge-Attention block 的语言特征、视觉与状态一律不动，就消掉 96.8% 的动作差异，配对成功率 60%→96%。再往下两个控制实验定位漂移来源：把辅助分支的图像换成固定 dummy image（主视觉通路仍为真实观测）使 Full Para 46.82→61.58；用 5-fold task-disjoint 交叉验证估出的 32 个"措辞方向"删除后 action gap 0.4361→0.2282，而同范数随机方向只到 0.4386，闭环成功率 55%→90%。结论是**把动态图像与指令措辞喂进同一编码过程**才是漂移来源，措辞不破坏任务语义、只引入一个系统性且可分离的偏移。
 
@@ -152,14 +157,20 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 
 这篇在"离散统一接口能否承担 foundation 规模"这个问题上是一条**负面数据点而非支持证据**——接口被完整实现并训练到 8B，却拿不出执行侧数字。全文没有一处 ablation，因此统一词表这个核心假设未被检验；没有任何闭环成功率，动作侧只有以 ground-truth 前序 16 步 chunk 为条件的离线轨迹可视化与 action-token perplexity（分布内 17.12→5.07、留出 RoboDojo 12.39→6.57，而后者起点已低于前者，两条曲线跨源不可比），作者也主动写明"这是离线轨迹预测，不是闭环执行或整任务成功"。其 SFT understanding 混合里至少九个数据集是被测 benchmark 的官方训练集，而相对次优开源模型的 6.55 分总差中有 56% 集中在五项，其中四项的同族训练数据就在混合里；自相矛盾的反例是 RefSpatial-Bench 明明训练过 RefSpatial-Train 却只排开源第 6（50.9 对 63.2）。此外全文无方差、标准差或置信区间，而 0.5–0.8 分的差距承担着"与闭源持平"的论断；通用多模态 12 项 7 降 5 升（MME −62.6）。同系列前作 PhysBrain 1.0 在 [[Papers/2609-OpenWAM|OpenWAM]] 的附录里作为 VLA 基线在 RoboCasa-GR1 上有 64.5 的闭环数字，即 1.5 在执行证据上相对前作是回退。
 
+**同一条分支的第二个数据点：把动作单元参数化、把 VLM 完全冻结**。Show-Harness 的动作单元是离散的语义符号，[[Papers/2609-MotorMind|MotorMind]]（2026）把它改成带连续参数的 mid-level action，由一个确定性控制器执行；通用 VLM 不做任何微调，只在推理时提出参数，外围挂一个并发 Monitor、一份 Memory 与一个 Verifier，三者都是提示级组件。LIBERO-PRO 上零样本 66.7%（扰动设定 53.8%），同一评测里最好的零样本对照 CaP-X 只有 13.3 / 19.2；但微调过的 π0.5 为 98.3 / 63.3、MolmoAct2 100.0 / 62.9、OpenVLA-OFT 98.3 / 51.2，零样本方案在干净设定上落后 30pp 以上，只在扰动设定下把差距缩到 10pp 以内。分 suite 看，Goal / Spatial / Object 为 45.0 / 75.0 / 80.0，语言目标一类最弱。单集墙钟 223.4 / 248.5 s，对 π0.5 的 5.9 s，代价约 40×。真机 xArm6 五任务 120 次试验 95%。
+
+读数的边界有三条。其一，与 Show-Harness 一样，增益不能归到表示本身：异步调度（Monitor 并发、Verifier 事后）与 mid-level 参数化在该文里没有分开消融，"VLM 擅长提出参数"与"外围环路兜住了错误"两种解释并存。其二，Show-Harness 与 MotorMind 同在冻结 VLM 加解释器这条线上，却没有任何共同基准，两种动作粒度（离散符号 / 参数化原语）哪一种更能把 VLM 的常识接到执行上，目前只能各看各的真机成功率，而真机任务集完全不同；路线 8 的 [[Papers/2610-PhysEvo|PhysEvo]] 在同一问题上给出第三个数据点，且方向相反（关节级自由度 100 对 TCP 40）。其三，论文内部有两处口径不一致（240 episodes 与 200 configs 并存、π0.5 checkpoint 未指明），笔记记录在案。专题一的"推理与执行之间的 gap"在这里有一个具体落点：240 道本地诊断题上，动作推理一项 Qwen 36.25%、GPT-6 Astra 60.00%，提出参数这一步本身对 VLM 档次高度敏感，该差距如何传导到任务成功率尚无库内证据。
+
+冻结 VLM 并不是这条线的必要条件。[[Papers/2610-CaPtain|CaPtain]]（2026）训练一个 Qwen3.5-4B 直接写调用 22 个底层原语的代码（不提供 grasp / place 一类技能），先 SFT、再做多轮 RL；RL 阶段由一个读取仿真特权状态的 critic 按每次请求的 ΔV 分配 credit，测试时 critic 移除。在同 40 个任务、未见初始状态的 held-out LIBERO 上，未训练模型为 0，SFT 后 55.4、RL 后 73.8；LIBERO-PRO 三个 suite 78.5，LIBERO-Plus 48.6 → 66.1，SimplerEnv WidowX 零样本 83.3，每个 episode 约 \$0.03–0.06（对照 OpenRUA \$8–22）。它与 Show-Harness / MotorMind 的差别在于把"VLM 能否提出合适参数"从提示工程问题改成了可训练的量。边界有三处：没有只用 outcome reward 的端到端 GRPO 对照，特权 critic 的作用只有离线证据（梯度噪声尺度 9.0k → 6.7k）；RoboTwin Hard 上 22.6 低于 π0.5 的 46.0，双臂任务 0/35，说明 22 个单臂原语的词表在协同操作上直接失效；checkpoint 选择轻度依赖测试 seed。
+
 **优势**：Zero-shot/few-shot task generalization；可理解自然语言指令；利用 web knowledge（如 "how to use a tool"）。  
-**局限**：推理开销大；对 fine-grained manipulation（如 dexterous grasping）精度不足；real-time deployment 困难——但"大"是否为能力所必需，目前缺少能鉴别的评测（TurboVLA）。"VLM 编码器 + 独立动作专家"这一惯例本身也不再是唯一选项：[[Papers/2608-GalaxeaG05|G0.5]] 在同数据同算力的真机微调上以单条自回归流取得 76.7% 对 π0.5 的 53.3%，但其优势只在真机、BEHAVIOR 与 DROID 三个 regime 上有区分度，仿真两项落在饱和区。更极端的两种取法也各有真机数字：[[Papers/2609-ShowHarness|Show-Harness]] 用语义动作单元加确定性解释器在十个取放任务上拿到 86–89% 对 π₀.₅ 的 39%，而 [[Papers/2609-PhysBrain15|PhysBrain 1.5]] 把统一离散词表推到 8B 却没有给出任何闭环成功率——接口选择的收益目前只在低维离散化的任务族上被闭环验证过。
+**局限**：推理开销大；对 fine-grained manipulation（如 dexterous grasping）精度不足；real-time deployment 困难——但"大"是否为能力所必需，目前缺少能鉴别的评测（TurboVLA）。"VLM 编码器 + 独立动作专家"这一惯例本身也不再是唯一选项：[[Papers/2608-GalaxeaG05|G0.5]] 在同数据同算力的真机微调上以单条自回归流取得 76.7% 对 π0.5 的 53.3%，但其优势只在真机、BEHAVIOR 与 DROID 三个 regime 上有区分度，仿真两项落在饱和区。更极端的两种取法也各有真机数字：[[Papers/2609-ShowHarness|Show-Harness]] 用语义动作单元加确定性解释器在十个取放任务上拿到 86–89% 对 π₀.₅ 的 39%，而 [[Papers/2609-PhysBrain15|PhysBrain 1.5]] 把统一离散词表推到 8B 却没有给出任何闭环成功率——接口选择的收益目前只在低维离散化的任务族上被闭环验证过；把动作单元改成参数化原语、VLM 完全冻结的 [[Papers/2609-MotorMind|MotorMind]] 在 LIBERO-PRO 零样本 66.7% 对微调 π0.5 的 98.3%，说明冻结 VLM 这条线在干净设定上的代价仍是 30pp 量级，只在扰动设定下缩到 10pp 以内。训练过的代码策略（[[Papers/2610-CaPtain|CaPtain]]）在 LIBERO-PRO 三个 suite 上为 78.5，但在双臂 RoboTwin Hard 上不到 π0.5 的一半（22.6 对 46.0）；而 [[Papers/2609-MINERVA|MINERVA]] 的 0.54M task-ID 策略在 LIBERO 拿到 95.05，说明在这一基准上"大"不是能力所必需。
 
 ---
 
 ### 2. Diffusion Policy / Flow Matching 路线
 
-**代表论文**：Diffusion Policy (Chi et al., 2023)、SeedPolicy (2026)、Action Chunking with Transformers (ACT, 2023)
+**代表论文**：Diffusion Policy (Chi et al., 2023)、SeedPolicy (2026)、Action Chunking with Transformers (ACT, 2023)、VLA-Feedback (CoRL 2026)
 
 **核心思路**：将 action generation 建模为 diffusion process，通过 iterative denoising 生成 multimodal action sequences，解决 behavior cloning 中的 mode collapse 问题。
 
@@ -181,8 +192,15 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
    - Chunk action sequences而非 single step
    - Temporal attention 处理 observation history
 
+4. **[[Papers/2609-VLAFeedback|VLA-Feedback]]**（CoRL 2026）：
+   - 把去噪过程的最后一步当成反馈接口：冻结的 GR00T planner 在倒数第二步停下，1.19M 参数的 Feedback Denoising Module 用最新手部视角观测逐动作完成最后一步；planner 0.625 Hz、反馈模块 10 Hz，单次 2 ms（GR00T 一次前向 80 ms 加 8 ms × Δt），端到端环路 71.01 ms，其中相机占 62 ms；GPU 型号未报
+   - 动态 Robosuite 三任务 27.5% → 85.0%（GR00T 47.5 / 20 / 15 → 80 / 75 / 100）；LIBERO-Goal 92 持平、Object 97.5 → 95.5；未见变体 67.5 / 50 / 97.5 / 57.5（GR00T 60 / 0 / 2.5 / 0）；真机 Franka 三任务各 20 次 51% → 73%
+   - 物体速度 +30% 时 57.5%、+40% 时 5%——反应时间由 T̄_react = T_update + R/2·Δt 给出闭式上界，超出后增益消失
+
+**最后一步去噪作为反馈口：与路线 4 的分工**。VLA-Feedback 与 [[Papers/2609-RealTimeExpoFT|Real-Time EXPO-FT]]（路线 4）处理的是同一个问题——慢生成与快变化的环境之间的时间差——但介入的空间不同：前者在去噪空间、用监督学习补最后一步，后者在动作空间、用 critic 加 RL 选一个有界增量。两者都没有与 Real-Time Chunking 直接比过，也没有共同基准。VLA-Feedback 的静态任务读数（LIBERO 持平或略降）说明它买的是动态场景下的反应时间而非策略质量；与路线 6 的 [[Papers/2607-RobustExecAgenticRL|RobustExec]]（检测后切出）和 [[Papers/2609-CommitFlow|CommitFlow]]（阶段转换处语义核验）合起来，执行期闭环已有三个互不替代的介入点，见 Key Takeaway #14。
+
 **优势**：Multimodal action distribution modeling；适合 long-horizon tasks；无需 explicit reward function。  
-**局限**：推理需要 multiple denoising steps，latency 较高；对 observation horizon 敏感。
+**局限**：推理需要 multiple denoising steps，latency 较高；对 observation horizon 敏感。去噪步数带来的延迟也可以反过来被利用：把最后一步留给一个只看最新观测的轻量模块（[[Papers/2609-VLAFeedback|VLA-Feedback]]），动态任务上的收益远大于静态任务（27.5% → 85.0% 对 LIBERO 持平），代价是反应窗口有闭式上界（物体速度 +40% 时降到 5%）。
 
 ---
 
@@ -197,7 +215,7 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 | 角色 | 代表工作 | 定位 |
 |:-----|:---------|:-----|
 | Policy（WAM） | [[Papers/2607-FlowWAM|FlowWAM]]、[[Papers/2607-ABotM05|ABot-M0.5]]、[[Papers/2607-RynnWorld4D|RynnWorld-4D]]、[[Papers/2607-STWAM|ST-WAM]]、[[Papers/2608-MobileWAM|MobileWAM]] | world modeling 与 action generation 共享同一生成骨干，RoboTwin 2.0 上已超纯 VLA baseline；2026-08 起分化出"被预测的未来该用什么表示"的子问题 |
-| 训练期表征塑造（推理期删除） | [[Papers/2608-WorldTokens|World Tokens]]、[[Papers/2608-JEPAWAM|JEPA-WAM]]、[[Papers/2608-MobileWAM|MobileWAM]] | 预测性监督只经梯度改写 policy 消费的表征，未来分支在部署时整体移除，推理开销回到 VLA 量级 |
+| 训练期表征塑造（推理期删除） | [[Papers/2608-WorldTokens|World Tokens]]、[[Papers/2608-JEPAWAM|JEPA-WAM]]、[[Papers/2608-MobileWAM|MobileWAM]]、[[Papers/2610-UNITAS\|UNITAS]]（policy 模式跳过 flow 分支） | 预测性监督只经梯度改写 policy 消费的表征，未来分支在部署时整体移除，推理开销回到 VLA 量级 |
 | Planner / 搜索基底 | [[Papers/2607-WorldActionPlanner|WAP]]、[[Papers/2606-PointWorld|PointWorld]]、[[Papers/2608-DALeWM|DA-LeWM]] | 规划在想象中完成；policy 或降级为被调用的执行工具（WAP），或整个缺席、由 MPC 直接在预测的动力学上求解（PointWorld）。该角色对表征的要求也随之与其他角色分岔——planner 消费的是 latent 之间的距离，因此 latent 是否编码了任务量（信息充分性）与该距离能否把候选按真实进展排序（decision-metric alignment）是两条逻辑独立的性质（DA-LeWM） |
 | 数据引擎 | [[Papers/2607-RynnWorldTeleop|RynnWorld-Teleop]] | action-conditioned 实时视频生成替代真机采数（"数字遥操作"） |
 | Policy Evaluator | [[Papers/2607-GigaWorld1|GigaWorld-1]] | 以 evaluator-world outcome agreement 为标准的低成本 policy 评估 surrogate |
@@ -211,6 +229,10 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 
 - **[[Papers/2608-MobileWAM|MobileWAM]]**：把 WAM 配方从固定底座 tabletop 搬到 whole-body mobile manipulation。pretrained video DiT 与 action expert 做 layerwise joint attention，action expert 的每个 FFN 换成 shared / locomotion / manipulation 三专家软路由（Mobile MoE）；另加一条只在训练期存在的 Chain-of-Foresight——从 backbone 第 4/12/20/30 层取当前观测隐状态拼成初始 belief，深度专属 transformer 模块沿未来 latent 串行展开，belief 是相邻步之间唯一的通道。ManiSkill-HAB SetTable 七子任务平均 73.0%（对照的 AnchorVLA 64.0 只覆盖其中 6 项），真机 ARX Lift2 五任务 55/35/25/20/15% 对同数据微调 π0.5 的 35/25/10/10/0%；组件消融 WAM only 65.4 → +CoF 68.9 → +Mobile MoE 73.0，其中 CoF 使 Open Drawer 从 89.7 掉到 87.0。边界：真机未报 trial 数、评测场景在训练分布内而摘要写的是 strong generalization；全文无任何视频预测质量指标，用来解释 CoF 为何有效的是一张肉眼比对的定性图；Table 3–6 共用的参照点 58.2 在两张表里被分别标注为含 Mobile MoE 与不含，两种读法对 CoF 的归因完全不同，论文未澄清。
 
+**WAM 作为 policy 的第二条轴：上下文长度与自回归预训练绑在一起**。上面的 WAM 几乎都在单帧或短窗口上出 action chunk，[[Papers/2610-LongWAM|Long-WAM]]（2026）把"policy 能看多长的历史"当成自变量：先用因果式自回归视频模型（LongLive2.0-Robot，约 10,000 窗口等效小时）做预训练，再接一个预测未来 latent、由 IDM 解码的 causal action expert。RoboCasa GR-1 上上下文从 0.0 s 扫到 19.2 s，成功率 63.3% → 78.7%；同一架构换成双向（Wan2.2）初始化则 61.7 → 64.1 → 61.6，长上下文完全不带来收益——**长历史是否有用取决于预训练是否因果**，而不是上下文窗口本身。38.4 s 时回落到 75.2，作者归因于 80.4% 的 padding，未做验证。代价随上下文线性增长：RTX 5090 上 0 / 2.4 / 19.2 s 分别为 74.6 / 107.4 / 341.0 ms per chunk；NVFP4 量化把 19.2 s 压回 107.4 ms（BF16 356 ms，SR 94.4 → 93.5），异步执行（S=12 / R=24）在 IDM 解码下 94.4 → 94.2，而同样设定下 Fast-WAM 掉 15.4、LingBot-VA 掉 45.5。LIBERO-Long 2.4 s 上 94.5 → 99.5，RoboTwin 2.0 94.4（ABot-M0.5 94.1，噪声级）；RoboCasa365 Human300 31.4%，接 GPT-6 Astra 作 planner 后 54.4%。真机 G1 传送带四档速度 100 / 100 / 95 / 90%，对照 Fast-WAM 75 → 0、π0.5 15 → 0。
+
+这条读数与路线 8 的"长 raw 历史有害"（[[Papers/2608-VLAProprioception|VLAProprioception]]，K≈8 之后退化）方向相反，相反的来源可以指出：VLAProprioception 的历史是未经预训练的 raw 帧堆叠，Long-WAM 的历史经过了因果视频预训练——两者并不矛盾，合起来说明"历史长度"不是独立的设计轴，它的符号由上游预训练决定（路线 8，Open Problem 11）。与 [[Papers/2603-MEM|MEM]]、[[Papers/2607-LaMemVLA|LaMem-VLA]] 一类显式记忆模块相比，Long-WAM 用的是未压缩的 raw 前缀，两种取法尚未在同一基座上互比。笔记核查为 partial：一格数字（Table 1 为 95.8，笔记初稿误录 97.8）已改正；DOMINO 上只有 34.9% SR，长程任务上的绝对水平仍低；代码已开源（NVlabs/LongLive）。
+
 **训练期消费、推理期删除：world model 退回成一路梯度**。WAM 作为 policy 的部署阻力集中在一处——每出一个 action chunk 就要跑一次视频去噪。[[Papers/2607-STWAM|ST-WAM]] 已经给出过一个绕法：用不对称 cross-branch mask 保证 action token 从不读取未来流，于是两条未来 DiT 在推理时可整体移除。[[Papers/2608-WorldTokens|World Tokens]]、[[Papers/2608-JEPAWAM|JEPA-WAM]] 与 [[Papers/2608-MobileWAM|MobileWAM]] 把同一模板推到三种不同的接口上，共同点是 world modeling 的梯度只在训练期塑造 policy 消费的表征，未来分支在部署时不实例化：World Tokens 61.85 ms/chunk（π0.5 为 56.32，即 1.1× 以内，而 Cosmos Policy 610 / Fast-WAM 182 / DiT4DiT 136），JEPA-WAM 85 ms / 11.76 Hz（ABot-M0 为 125 ms），MobileWAM 938 ms（Motus 4950、LingBot-VA 8126）。
 
 三者接的位置各不相同。World Tokens 用 Perceiver 式 World Adapter（L=12，K=256，d=2048）把 VLM 的视觉-语言隐状态压成 256 个 world token，并规定这 256 个 token 是 action expert 唯一能看到的 VL 上下文，视频损失以 5× 权重压在这条通道上（L = L_act + 5·L_vid），首帧用 Canny 边缘而非 RGB 作锚。JEPA-WAM 冻结 V-JEPA 2.1 作 latent 目标，让一个共享的 predictor 同时回归当前帧与未来帧的 latent，tubelet=2 使双帧联合编码仍保住 24×24 空间网格，λ_wm=0.5。MobileWAM 把未来沿时间串成 belief 链，只从 4 个稀疏跨深度的 tap 层取信号。
@@ -220,6 +242,8 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 这与路线 9 已记的归因困难互补。[[Papers/2607-STWAM|ST-WAM]] 与 [[Papers/2607-N0TWAM|N0-TWAM]] 的消融说明新加的那条预测通路不是主要收益来源，上面三组则说明同一条通路的效果可以在净损与显著增益之间摆动，摆动幅度由排他性、目标是否保留空间对应、从哪些层取信号、承载递归的模块多宽决定。合起来的意思是：把"预测未来"当成一个可加模块来报告增益，在当前证据下不构成有效归因（见 Open Problem 11）。
 
 绝对分数不支持更强的说法。World Tokens 的 LIBERO 平均 98.2 是在 2B、无 embodied 预训练下取得，但并非表内最好（Cosmos Policy 98.5、DiT4DiT 98.6）；SIMPLER 上 WidowX 71.5 / GoogleRobot 82.1 领先 Qwen-GR00T 与 StarVLA，真机 Galaxea R1 Pro 96 trials 76.0% 对 59.4%，但无代码与模型发布。JEPA-WAM 的 LIBERO-Plus 79.2 是"不含大规模 robot-policy 预训练"这一档里最好，接到 π0.5 上把 84.5 提到 86.3 才是全表最好（迁移时 action token 被禁止 attend future token，隔离干净）；短板同样清楚——逐列读 Table 2，Language 扰动一列只有 68.2，明显低于 ResVLA 88.5 与 RoVLA 92.9，平均分掩盖了这个 tradeoff（论文正文未讨论该列，其 task-shared 目标与语言无关是作者自陈的结构性局限）；RoboTwin 2.0 Random 上 π0.5 加与不加该分支是 37.5 对 37.2，在这一档难度上没有效果。三篇各出自一个团队，主评测基准两两不重合，无交叉复现，消融全部在各自的 in-domain 设定内完成；World Tokens 无代码，JEPA-WAM 的仓库标 "Coming soon"。
+
+**训练期辅助监督与推理期显式条件化：增益主要在前者**。2026-09/10 的四篇在各自的消融表里回答了同一个问题——世界模型的预测是要在推理时喂给动作专家，还是只作训练期的辅助损失。读数方向一致：最大的受控效应来自训练期监督，显式条件化只再加几个点。[[Papers/2610-WAVE0|WAVE-0]]（2026）在 π0.5 上挂一个 257M、在冻结 SigLIP 空间里预测未来的 latent world model（只用带 GT 动作的示范训练，配反事实排序损失），推理时把预测的未来 token 作为动作专家的条件。RoboTwin 2.0 上 π0.5 为 80.38，只把 WM 当辅助损失已到 89.51，再加显式条件化只多 +1.98 / +1.94（clean / randomized）；完整模型 91.47 仍低于同表 ImageWAM 93.38、AHA-WAM 92.80、LingBot-VA 92.20 与 Fast-WAM 91.83。排序损失有一条干净的必要性证据——去掉后动作敏感度差值从 0.1648 塌到 0.0020，零样本 LIBERO-Plus 从 88.0 降到 85.4；真机 3 任务 × 20 次 38.3 → 73.3 的增益则混入了数据量差异（WM 用全部 600 条示范，基线每任务 200 条）。[[Papers/2609-FOCAL-VLA|FOCAL-VLA]]（2026）沿用同一结构，把未来换成几何与运动：两组各 8 个 query 在子任务实体掩码内蒸馏 VGGT 几何与 Track4World 运动，latent 作为动作专家的条件，推理时不运行 teacher。RoboCasa Atomic-24（Human-50 设定，同设定重跑）上 π0.5 55.2 → 63.4，其中只监督、latent 不进条件为 58.5，条件化本身贡献 +4.9；子任务级掩码比任务级只多 1.5，约一个标准误。它缺一条"保留 query 与语义损失、去掉蒸馏"的对照，因此 +8.2 中有多少来自 VGGT / Track4World 的知识、多少来自多出的 query 容量尚不可分。[[Papers/2610-UNITAS|UNITAS]]（2026）在 policy 模式下让 action chunk 不 attend flow token、推理时跳过 flow 分支；其 LIBERO-Plus 消融（无预训练）里 scene-flow 损失只加 +0.73（85.74 → 86.47），承重的是 3D 位置编码（去掉后 81.35，相机轴 79.11 → 66.73）、action-flow 损失（去掉后 78.89）与历史（75.92），三者全去为 67.58。[[Papers/2609-WorldAgen|WorldAgen]]（2026）给出同一判断的另一面：去掉 world modeling 让 CALVIN 平均长度从 3.87 掉到 2.96，这是与 GR-1 / Seer 一致的训练期辅助效应；而它主打的测试时训练（在探索数据上做一步 LoRA 重建更新）只把 3.87 抬到 3.93，与 LoRA 秩扫描的 0.012 离散度同量级，LIBERO-10 的 75.5 → 79.0 集中在两个任务、另有一个任务掉 10 点，无 placebo 更新对照，"sim-to-real"实验只是加高斯噪声，文内数字也有多处前后不一致。四篇合起来的推论是：在操作基准上，世界模型的价值目前主要以训练期表征塑造的形式兑现，推理期把预测显式喂给动作专家是二阶项。这与 Key Takeaway #11 的"收益归接口形状"同向，也给 Open Problem 4 中"训练期塑造能否替代推理期显式前瞻"提供了第一批同 backbone 读数；四篇都只在自家基准上做，无交叉复现。
 
 **设计空间被拆成受控变量之后，三条通行说法反转**。上面这些接法各自在自家基准上做消融，[[Papers/2609-OpenWAM|OpenWAM]]（2026）把 World-Action Model 的设计空间写成 `C(E, S, M)`——冻结视觉编码器、流骨干、可见性掩码——配一条无参数的组合规则、统一训练器与 WebSocket 评测协议，实现 6 种架构变体，并把参考实现 OpenWAM-α（Wan2.2-TI2V-5B + 1B ActionDiT，双系统联合自注意力加互相可见掩码，518.5M 帧 / 6,369 小时，80 维统一动作空间，128×H200 训约 7 天）与全部消融臂的 46 个 checkpoint 一并发布。
 
@@ -250,6 +274,8 @@ Embodied AI 是指让 AI 系统在物理或仿真环境中执行感知、决策�
 三处边界必须与数字一起传播。其一，**论文自陈全文没有 matched ablation**——PRoPE、robot-only flow、depth 分支、SAM3 重加权、V-JEPA 关系损失、DMD 蒸馏六个组件一个都没被隔离，因此"结构化几何接口优于 token 化接口"这一最响亮的方法论主张目前只有整系统的 leaderboard 名次作支撑。其二，WorldArena 的分数必须连版本与快照一起引用：WA2.0 在聚合前按 ground-truth 参考值对 Dynamic Degree、Flow Score、Motion Smoothness 三项封顶（原文明载），而同一模型这两项在 WA1.0 下是 88.71 / 100.00、在 WA2.0 下变成 22.90 / 5.81；库内另有一处口径分歧的直接观察——FlowWAM 笔记记录的 WorldArena EWMScore 与 DreamX-Phi 表中同名条目相差 3.5–3.7 分，而两边的 Trajectory Accuracy 完全一致（CtrlWorld 48.20、IRASim 35.92），说明同一 benchmark 名下至少流通着两套聚合口径。跨版本或跨论文直接比 EWMScore 因此不成立（"WA1.0 与 WA2.0 不可比"是库内对上述封顶事实的推断，论文未作此陈述）。其三，Track 2 对 world model 质量的区分度明显低于 Track 1：Track 1 上 15.68 分的 EWMScore-P 差距只换来 Track 2 上 5.86 个百分点的策略成功率差距，而 Track 1 垫底的 IRASim 仍能拿到 61.33%——用 leaderboard 名次论证"该 world model 可作 policy 训练环境"需要格外小心。相机静止也是隐含前提：intrinsic 置为 identity 后通道里没有为相机运动留位置，移动/手眼相机未验证。笔记核查为 partial，其"WA1.0 与 WA2.0 不可比"一条标 `unsupported`，本 survey 只按上述方式记为操作建议。
 
 这四种接口之间没有任何交叉实验——没有一篇在固定骨干、固定数据、固定评测的条件下把两种动作表示放在一起比。合起来的状态是**开放分歧而非收敛**：PointWorld 的 gripper-only flow 优于 whole-body flow、Hydra-0 的 gripper EPE 偏袒 flow 条件、DreamX-Phi 把 flow 降为辅助通道，三处读数指向的设计方向并不一致，而衡量它们的指标本身还未中立（见 Open Problem 6、7）。
+
+2026-10 又出现一种取法：[[Papers/2610-UNITAS|UNITAS]] 把动作与场景变化都写成世界坐标系下的 3D 点轨迹（action flow / scene flow），配 world-aligned 3D 位置编码。1.7B 模型在 LIBERO 99.8、零样本 LIBERO-Plus 89.1（π0.5 85.7；相机轴 82.1）、RoboTwin 2.0 Clean 92.94 / Randomized 93.04（LingBot-VA 92.93 / 91.55），VLABench 成功率 56.2 但 IS 指标不是最好，真机两任务 90% / 80%。它相对 [[Papers/2606-PointWorld|PointWorld]] 的场景预测优势应读 Moving ADE（0.427 对 0.656），头条的"49%"来自 Static ADE；与视频 WAM 比 3D 轨迹精度时，后者经 SpatialTrackerV2 抬升到 3D，误差里含重建误差（最好的视频 WAM 为 Motus+STv2，Acc@1cm 35.66）。这组比较度量的因此是"原生 3D 接口"与"视频接口 + 外挂重建"的合成差，而非接口本身的差；多数基线数字的来源也未说明。另一条进路不换接口，而是在上下文里校准动作语义：[[Papers/2609-SyncWorld|SyncWorld]]（2026）在 Wan2.2-5B 动作条件视频世界模型前加 60 帧视觉校准前缀，再把校准蒸馏回历史，未见 LIBERO 场景上 LPIPS 0.049（不校准）/ 0.035（校准）对 Ctrl-World 0.137。差距的大头在不校准时就已存在，测试时校准只多 PSNR 0.4–1.0，训练时去掉校准的变体与 Ctrl-World 相当，骨干与数据的差异没有被分开；Met3R 的 Real 一列上 IRASim 反而最好。下游用途同样窄：GPC-Rank 策略改进只在按 oracle 余量挑出的 3 个任务上有效（π0 0.52 / 0.56 / 0.48 → 0.58 / 0.72 / 0.60，oracle 仿真器为 0.60 / 0.80 / 0.66），另外 3 个任务持平或变差（Ketchup −0.08），每段生成 15.6 s。两篇与 [[Papers/2609-H3World|H3-World]] 的冻结骨干下界是同一类问题：接口或校准主张都需要同骨干对照才能成立。
 
 **这些接口主张共同缺一个下界**。[[Papers/2609-H3World|H3-World]]（2026）把 33B 的 MiniMax-H3 视频生成器改造成可交互世界模型，全程不加任何动作模块——8 个按键加 1 个相机速度标志被渲染成表驱动的英文复合从句（135 种合法组合），配单向出口的非对称注意力路由与 rank-32 LoRA（可训练参数占 0.199%，10,000 步，7,872 段片段约为其基础语料的 2%）。它最该被记住的不是这套改造，而是它自己跑的那个对照：**恒定动作下，冻结的 H3 加一句全局提示与适配后的 H3-World 给出几乎相同的方向分离度（301.8 对 300.5）**，适配买到的是时间上的绑定而非方向跟随——在切换调度下，冻结版的累计水平光流为 0.0 / −17.3，零 LoRA 版为 −0.1 / 0.0，而 H3-World 为 +52.7 / −106.0 且方向取反时对称翻转（−11.9 / +24.1、无响应、−58.7 / +121.0）。
 
@@ -283,6 +309,8 @@ judge 的判定规则本身也参与结果。在 750 个人工标注 rollout 上
 
 两篇的问题是同一个：**长篇论证了表示的选择，却一个表示对照实验都没做**。CodeAsWorld 的 §2 系统论证代码优于像素、3D 与语言，而全文没有任何表示对比，几篇最相关的代码化世界工作也不在对照表里；发现循环的收益从未与下游分数连起来，正文的发现分析用的还是运动学回放的动画引擎，物理引擎被放进附录。ProgrammableWM 全文零消融，而它那些稠密的像素对齐控制图本身已经编码了"哪个实体在哪里、是否已死亡"，因此头条表度量的是 ControlNet 有没有跟随自己的条件，而不是显式引擎是否优于隐式状态——一个不含任何引擎、直接喂同样手写 OBB 序列的系统会得到相同分数。其分母也需要看清：Count 摊在 400 帧上，State 摊在 50 次死亡事件上（最小增量因此是 2pp，98 对 58 实为 49 次对 29 次），四项 VBench 指标里有两项基本持平。两篇里真正耐久的是 ProgrammableWM §2 的一条论证——训练期可以从已实现的动力学里抽取表示，推理期却必须从一个状态转移主动构造它，因此"训练时可得"不等于"推理时可写"——而这条论证全文未做实验检验，应记为待检假设。两篇的核查状态均有内部不一致：CodeAsWorld 的 Table 4 宏平均实为 51.9 而正文印 50.9，正文自称的 56.8 与两张表的 55.4 不符。
 
+同一取法的第三个实例把引擎与渲染器的分工写得更干净，但把评测重心移到了 agent 侧。[[Papers/2610-AgentGarten|AgentGarten]]（2026）由代码引擎持有显式状态与规则，一个共享的神经渲染器（Cosmos 3-Nano 加 Adversarial Forcing）把引擎输出的深度与法线渲染成第一人称帧，单张 H100 上 36.5 FPS（每 16 帧块 438.8 ms）；回放一致性只给了 L2 误差（SGF 3.99% 对 SDPA 的 0），没有任何定量视觉指标。agent 侧的证据是捉迷藏：一个带 Markdown playbook 的预训练 agent 在第 4 轮学会搭掩体、第 10 轮学会用斜坡，论文把它与 OpenAI 2019 年需要约 25M / 100M episode 的 RL 结果并列——但两者的学习对象不同（playbook 文本对策略权重），这不是一个样本效率比。另外四个世界各只跑 4 轮 × 1 episode（牧犬 13 → 19、搭桥 71 → 41 s、牧羊 60 → 88.3、采石 30 → 90.9），单 episode 读数无法与噪声区分。它与 [[Papers/2604-AgenticWorldModel|AgenticWorldModel]] 的 L2+L3 提示级演化、[[Papers/2511-DreamGym|DreamGym]] 的合成经验在问题设定上相邻，三者没有互相对照；CodeAsWorld / ProgrammableWM 共同缺的那个表示对照在这里同样缺席，渲染器被 agent 利用的风险也未被测量。
+
 对象中心动力学模型这一侧则给出一份可直接复用的对照清单。[[Papers/2609-SparseResidualWM|SparseResidualWM]] 用逐物体变化门加残差增量头对抗单体 MLP，在 3–8 物体的 MuJoCo 桌面推动上整体 L2 好 2.5–4.6 倍、参数少 8.6–11.1 倍；但作者自己把误差拆成"变化的"与"不变的"之后，优势几乎全部来自不污染静止物体——只看被推动物体，N=8 时稀疏模型 0.466 对 no-op 的 0.470（差 0.9%），N=5 为 0.426 对 0.446，而整体 L2 在 N=8 时稀疏模型的 0.081 与 no-op 的 0.081 完全相同；H=20 的展开在每个 N 上都劣于 no-op。稀疏性也不是涌现的，而是由特权仿真掩码监督出来的（λ_s 扫描显示稀疏 F1 在 λ_s=0 时最高），效率是参数意义上的而非墙钟意义上的（稠密模型的 CPU 延迟反而更低，0.04 对 0.19–0.20 ms）。它留下的五条检查清单可以照搬到任何结构化动力学模型上：报 no-op 基线、把误差按"是否变化"分解、给离散组件做 oracle 诊断（此处喂入真值掩码几乎不改变被推动物体的误差，0.466→0.474，说明瓶颈在增量回归而不在变化检测）、给规划报随机动作下界并给出逐 seed 数字、给学出来的判别组件配一个零参数的平凡规则对照。
 
 **关键工作**：
@@ -304,7 +332,7 @@ judge 的判定规则本身也参与结果。在 750 个人工标注 rollout 上
    - 400+ 工作综合分析
 
 **优势**：减少 real-world interaction cost；支持 counterfactual planning；可用于 safety verification。  
-**局限**：Model accuracy 限制 planning horizon；多 Agent 交互建模复杂；WAM 推理开销大且普遍回避报告（RynnWorld-4D 前向 890ms / 9Hz，FlowWAM 无 latency 数字）——"训练期消费、推理期删除"的接法已给出一条可行答案（World Tokens 61.85 ms、JEPA-WAM 85 ms、MobileWAM 938 ms），代价是放弃推理期的想象与搜索；action 与 imagination 的同步性可被攻击（[[Papers/2607-BadWAM|BadWAM]]，见路线 6）；evaluator 用途下对 contact-sensitive failure 有 optimistic bias（GigaWorld-1）；planner 用途下增益尚未与特权信息（URDF / 相机标定 / 硬编码抓放原语）分离（[[Papers/2607-WorldActionPlanner|WAP]]）；生成保真与物理判别可在同一模型上背离（[[Papers/2607-PhiZero|Phi-Zero]] 于 Physics-IQ 领先却在 IntPhys2 Hard 接近随机）；视觉观感与控制/反应能力在跨范式 20 模型规模上解耦，且 contact 与场景反应是共同失效点（[[Papers/2608-WorldExam|WorldExam]]）；**动作是否被忠实实现是比"世界是否反应"更靠前的一层，且同样在退化**——动作偏离熟悉轨迹时六个 ACWM 一致滑回运动先验（[[Papers/2608-WorldSimProbe|WorldSimProbe]]，ρ=−0.433 / late-early 10.8–16.1），而 contact 失效的**方向**在库内存有争议（WorldExam 记录 omission，WorldSimProbe 的 audit 是 50/50 全为 hallucination，两者的 case 构造只允许各自看见一半）；自动判定规则本身影响结论（VLM 二元 action-following 判断对 91.7% 的样本判正，人类 42.2%）；**新增预测通道的边际收益归因不清**——[[Papers/2607-STWAM|ST-WAM]]（DINO 未来）与 [[Papers/2607-N0TWAM|N0-TWAM]]（触觉未来）的消融同向显示新加的那条预测通路不是主要收益来源（见路线 9）；**动作以什么坐标进入视频骨干仍是开放分歧**，optical flow、3D point flow、图像平面稀疏点轨迹与每臂 SE(3) 四种接口之间无任何固定骨干、固定数据的交叉实验，且衡量它们的指标本身偏向特定接口（[[Papers/2608-Hydra0|Hydra-0]] 的零样本轨迹条件模型在 gripper EPE 上优于精调的原生动作 baseline 一个数量级，说明该列主要度量"有没有照抄条件"），[[Papers/2608-DreamXPhi|DreamX-Phi]] 更是自陈零 ablation、五个组件的贡献一个都未隔离；planner 用途下还多一层要求——latent 编码了任务量不蕴含 planner 消费的那个距离能把候选按真实进展排序，而现有的 linear probe 只对彻底坍缩有反应（[[Papers/2608-DALeWM|DA-LeWM]]：四个非坍缩变体 probe R² 差异 ≤0.03，online success 跨 43pp）。~~与 VLA 结合的方式仍 unclear~~——2026 年已由 WAM 路线给出可行答案，RoboTwin 2.0 上 WAM（ABot-M0.5 94.1 / FlowWAM 92.9）超过纯 VLA baseline。2026-09 又添三条方法论层面的限制：**小预算下选出的设计未必外推**（[[Papers/2609-OpenWAM|OpenWAM]] 的最优可见性掩码在具身预训练前后翻转，而全部反转依赖 ≤0.72pp 的单次运行差值）；**动作接口类工作普遍缺一条冻结基线**（[[Papers/2609-H3World|H3-World]] 的恒定动作对照里冻结骨干加一句提示即得 301.8 对适配后的 300.5）；**把世界状态搬进代码的两篇都没做表示对照**（[[Papers/2608-CodeAsWorld|CodeAsWorld]] 零表示对比、[[Papers/2609-ProgrammableWM|ProgrammableWM]] 零消融且其控制图已编码答案），而对象中心动力学一侧连 no-op 基线都能追平结构化模型在被推动物体上的误差（[[Papers/2609-SparseResidualWM|SparseResidualWM]] 0.466 对 0.470）。
+**局限**：Model accuracy 限制 planning horizon；多 Agent 交互建模复杂；WAM 推理开销大且普遍回避报告（RynnWorld-4D 前向 890ms / 9Hz，FlowWAM 无 latency 数字）——"训练期消费、推理期删除"的接法已给出一条可行答案（World Tokens 61.85 ms、JEPA-WAM 85 ms、MobileWAM 938 ms），代价是放弃推理期的想象与搜索；action 与 imagination 的同步性可被攻击（[[Papers/2607-BadWAM|BadWAM]]，见路线 6）；evaluator 用途下对 contact-sensitive failure 有 optimistic bias（GigaWorld-1）；planner 用途下增益尚未与特权信息（URDF / 相机标定 / 硬编码抓放原语）分离（[[Papers/2607-WorldActionPlanner|WAP]]）；生成保真与物理判别可在同一模型上背离（[[Papers/2607-PhiZero|Phi-Zero]] 于 Physics-IQ 领先却在 IntPhys2 Hard 接近随机）；视觉观感与控制/反应能力在跨范式 20 模型规模上解耦，且 contact 与场景反应是共同失效点（[[Papers/2608-WorldExam|WorldExam]]）；**动作是否被忠实实现是比"世界是否反应"更靠前的一层，且同样在退化**——动作偏离熟悉轨迹时六个 ACWM 一致滑回运动先验（[[Papers/2608-WorldSimProbe|WorldSimProbe]]，ρ=−0.433 / late-early 10.8–16.1），而 contact 失效的**方向**在库内存有争议（WorldExam 记录 omission，WorldSimProbe 的 audit 是 50/50 全为 hallucination，两者的 case 构造只允许各自看见一半）；自动判定规则本身影响结论（VLM 二元 action-following 判断对 91.7% 的样本判正，人类 42.2%）；**新增预测通道的边际收益归因不清**——[[Papers/2607-STWAM|ST-WAM]]（DINO 未来）与 [[Papers/2607-N0TWAM|N0-TWAM]]（触觉未来）的消融同向显示新加的那条预测通路不是主要收益来源（见路线 9）；**动作以什么坐标进入视频骨干仍是开放分歧**，optical flow、3D point flow、图像平面稀疏点轨迹与每臂 SE(3) 四种接口之间无任何固定骨干、固定数据的交叉实验，且衡量它们的指标本身偏向特定接口（[[Papers/2608-Hydra0|Hydra-0]] 的零样本轨迹条件模型在 gripper EPE 上优于精调的原生动作 baseline 一个数量级，说明该列主要度量"有没有照抄条件"），[[Papers/2608-DreamXPhi|DreamX-Phi]] 更是自陈零 ablation、五个组件的贡献一个都未隔离；planner 用途下还多一层要求——latent 编码了任务量不蕴含 planner 消费的那个距离能把候选按真实进展排序，而现有的 linear probe 只对彻底坍缩有反应（[[Papers/2608-DALeWM|DA-LeWM]]：四个非坍缩变体 probe R² 差异 ≤0.03，online success 跨 43pp）。~~与 VLA 结合的方式仍 unclear~~——2026 年已由 WAM 路线给出可行答案，RoboTwin 2.0 上 WAM（ABot-M0.5 94.1 / FlowWAM 92.9）超过纯 VLA baseline。2026-09 又添三条方法论层面的限制：**小预算下选出的设计未必外推**（[[Papers/2609-OpenWAM|OpenWAM]] 的最优可见性掩码在具身预训练前后翻转，而全部反转依赖 ≤0.72pp 的单次运行差值）；**动作接口类工作普遍缺一条冻结基线**（[[Papers/2609-H3World|H3-World]] 的恒定动作对照里冻结骨干加一句提示即得 301.8 对适配后的 300.5）；**把世界状态搬进代码的两篇都没做表示对照**（[[Papers/2608-CodeAsWorld|CodeAsWorld]] 零表示对比、[[Papers/2609-ProgrammableWM|ProgrammableWM]] 零消融且其控制图已编码答案），而对象中心动力学一侧连 no-op 基线都能追平结构化模型在被推动物体上的误差（[[Papers/2609-SparseResidualWM|SparseResidualWM]] 0.466 对 0.470）。上下文长度是 WAM 作为 policy 的另一条代价轴——per-chunk 延迟按 74.6 → 341.0 ms 随历史线性增长，而长历史的收益只在因果预训练下出现（[[Papers/2610-LongWAM|Long-WAM]]）。推理期显式条件化的边际收益普遍只有数个点（[[Papers/2610-WAVE0|WAVE-0]] 约 +2、[[Papers/2609-FOCAL-VLA|FOCAL-VLA]] +4.9），而训练期辅助监督已拿走大头，因此为推理期世界模型支付的延迟（WAVE-0 +18.8 ms，287.1 → 305.9 ms）需要单独核算。
 
 ---
 
@@ -334,8 +362,10 @@ judge 的判定规则本身也参与结果。在 750 个人工标注 rollout 上
 
 最硬的一条读数不在摘要里：**延迟无感知的 RL（EXPO-FT 18.8/30）与一个只加了实时动作分块的无 RL 策略（SFT w/RTC 18.0/30）基本打平**，因此在动态任务上延迟感知是 RL 能起作用的前提，而不是叠加在 RL 之上的增量；该文自身的新机制在延迟感知基线之上再加 +4.0/30。三处边界须一起记：摘要所称"在 10 个环境中全部最优"只在一条排除了 BC 与实时分块基线的 0.95× 容差带下成立，逐格严格取最大值是 6/10（含全部列）或 7/10（只比 RL 方法），笔记据此标 `contradicted`；其编辑策略的 Markovian 性质只有一句断言、无推导也无条件，编辑幅度 β 从未扫描；Kinetix 一侧根本没有 VLA，基础策略是基于状态的流匹配策略，四个真机任务中有三个在 67 ms 之上人为再加了 100 ms 延迟。单格 30 次试验、无 seed、无误差棒、无代码。
 
+世界模型也可以充当 RL 后训练的想象环境，而增益几乎全部来自"在哪里想象"。[[Papers/2609-WISE|WISE]]（2026）用一个冻结的动作条件多视角世界模型（Open-Sora 骨干、DROID 训练），由 DINOv2 特征上的调度器只在与交互相关的状态触发想象，每处展开 M 个候选、由三头奖励模型打分，再把组内相对优势加权到第一段真实上下文 chunk 的 flow 损失上。MimicGen 五任务上 π0 49.7 → 59.5（DPO 53.8），π0.5 52.3 → 60.2。承重的是调度消融（同三任务）：在全部 138 个状态上想象只得 60.4，与基座 57.8 相近；均匀或随机选 28 个状态为 61.1 / 59.1；WISE 的调度在同样 28 个状态上 68.3，GPU 时 2.61 对全量想象的 11.45。任何简化版奖励都只在基座的 0–2 点内。缺失的对照恰好落在承重处——没有按夹爪开合一类零成本规则选状态的调度器，基线的计算预算也未报告；真机 π0 Gen 四任务 × 20 次 42.5 → 68.8。长程 credit 的另一种来源见路线 1 的 [[Papers/2610-CaPtain|CaPtain]]：用仿真特权状态 critic 逐请求分配 ΔV，测试时移除。两者分别依赖世界模型保真度与仿真特权信息，都缺 outcome-only 的同预算对照。
+
 **优势**：直接优化 long-horizon success；credit assignment 更准确；适应 distribution shift。  
-**局限**：需要大量 online interaction；RL training stability challenges；reward design sensitive。延迟与 RL 不是两条独立的轴——在动态真机任务上，不处理推理延迟的 RL 后训练与完全不做 RL 的策略成绩相当（[[Papers/2609-RealTimeExpoFT|Real-Time EXPO-FT]] 18.8/30 对 18.0/30），因此"RL 带来多少增益"这一问题在未声明延迟处理方式时无法回答。
+**局限**：需要大量 online interaction；RL training stability challenges；reward design sensitive。延迟与 RL 不是两条独立的轴——在动态真机任务上，不处理推理延迟的 RL 后训练与完全不做 RL 的策略成绩相当（[[Papers/2609-RealTimeExpoFT|Real-Time EXPO-FT]] 18.8/30 对 18.0/30），因此"RL 带来多少增益"这一问题在未声明延迟处理方式时无法回答。延迟的另一种处理方式留在策略结构内部——路线 2 的 [[Papers/2609-VLAFeedback|VLA-Feedback]] 用去噪最后一步在 2 ms 内消费最新观测，与此处的动作空间编辑解决同一个时间差问题，两者尚无共同基准。
 
 ---
 
@@ -407,6 +437,18 @@ judge 的判定规则本身也参与结果。在 750 个人工标注 rollout 上
 
 该结果不支持"增益来自闭环治理"这一归因。两张成功率表里唯一的非 Zetta 行就是自家的 frozen base policy，既没有把自己降级成 episode 级反思跑一遍，也没有任何既有 open-loop harness 入表；三条 loop 一条都没有单独消融，全文无 ablation 章节。更关键的是没有 budget-matched 对照：Zetta 相对 pure VLA 至少多了额外执行步数与 bounded retry、以及 base policy 之外的外部工具（GraspGen 抓取位姿、CAP 稳定放置、motion planner、segmentation），baseline 一样都没拿到，而演化消耗的 rollout 数、agent 调用数与 wall-clock 一概未报。摘要标的 90.8% 是 Goal 两个 setting 的均值，全量口径 71.13% 写在正文里；本该最能证明这套方法的 LIBERO-10 恰恰最弱（S setting 40.0%，四对任务从 0% 停在 0%）。还有一处决定它能否离开 simulator 的设定：critic 监控的信号包含 benchmark 提供的官方谓词（official grasp predicate），成功判定直接查 official task predicate——这些量在真机上不存在，而把 critic 换成纯感知估计后会掉多少，论文没有讨论。可带走的是那个 formulation——把在线可靠性检查编译成廉价代码谓词、把大模型赶到离线，从而让延迟与可靠性解耦——而不是那两个百分点数。与路线 8 的 [[Papers/2608-HyMeS|HyMeS]] 合看，两者共享同一结构（技能留在冻结权重里、治理逻辑活在代码空间），分歧在接管方式：HyMeS 以梯度注入速度场做连续 steering，Zetta 直接切断 VLA 换成 recovery skill。
 
+**执行期闭环的介入点在分化，而它们之间没有一个共同基准**。RobustExec 与 Zetta 都在 chunk 级调度——判定失败、切出 policy、换 recovery。2026-09 的三篇把介入点推到了三个不同的位置，方向上互不替代。
+
+语义前置核验：[[Papers/2609-CommitFlow|CommitFlow]]（2026）不等失败发生，而是在阶段转换处核验"语义承诺"——Semantic Commitment Monitor 按（时间步，通道）对动作加门，BoundaryFlow 用低秩残差改写边界处的动作，RGC 取最小可行增益；base policy 不动。RoboTwin 2.0 Avg.10 上 π0.5 53.2 → 75.9（+22.7），Avg.11 上 π0 36.5 → 52.9、π0.5 49.4 → 72.8、LingBot-VA 81.4 → 86.6（Object Scale 一项 96 → 93 反降）；真机 π0.5 两任务 50 → 63、40 → 50。消融 Fresh Base 66.8 / +IK 69.0 / +Ours 80.0，即约六分之一的增益来自 IK 层这一零学习组件。SCM 自身只报了阶段 Macro-F1 88.98 与事件 94.89，没有违约检测的 precision / recall，也没有误阻率。最硬的一条是天花板读数：局部重抓的恢复率 45.8% 对应最终任务成功 18.1%（π0），66.7% 对 46.7%（π0.5）——**局部恢复成功远不等于任务成功**，这与 Open Problem 9 的"回滚不恢复世界状态"是同一处的两种表述。RDT / TACO / CAPS 三行基线引自 CAPS 论文而非重跑；笔记里一条"+12.5 / +13.2 分解"属笔记作者推算，未采用。
+
+运行时失败预测：[[Papers/2609-VLAScope|VLAScope]]（2026）在冻结 OpenVLA 上接两级 logistic regression——第一级判 ID / OOD 并分类偏移类型（ROC-AUC 0.9454、类型准确率 91.00%，但七种偏移类型全部在训练集中出现过，是闭集），第二级用 53 维特征（类型 one-hot、14 个动作统计量、累计隐状态的 32 维 PCA）滚动输出失败风险。LIBERO-Spatial 1,400 次 OOD rollout（751 成功 / 649 失败）上第 60 步 ROC-AUC 0.8497，对照 ActProbe 0.8132、SAFE-MLP 0.8055、SAFE-LSTM 0.7414，CPU 0.893 ms。消融里去掉累计表示掉 0.0591，偏移类型单独只贡献约 0.015。固定阈值 τ=0.5 下误报率随步数剧烈变化（第 10 步 36.09%、第 60 步 12.52%、第 160 步 52.00%），因此"预测准"与"及时报警"是两件事，后者需要 lead-time 一类指标，该文未给；只有第 10 / 30 / 60 步共享同一 cohort，基于进度的读数要求总步数已知。库内没有 SAFE / FAIL-Detect / ActProbe / Sentinel / FIPER 任何一篇的笔记，这些对照数字均为转引。它与 FailBench 的"判定器本身不可靠"是同一条问题的两端：FailBench 测的是事后判成功，VLAScope 测的是事中判风险。
+
+动力学级自补偿：[[Papers/2609-SelfCompVLA|SelfComp-VLA]]（2026）把介入点压到策略下方——命令动作与实际执行动作之间的 proprioception 残差作为自监督，在线更新 action expert 的 LoRA，不改任何上层判据。其 RoboStress 把摩擦、齿隙、柔顺、重力补偿误差四类退化组合成 7 个场景；LIBERO 均值（不含 Clean）π0.5 Base 49.1 / DR 51.0 / RobustVLA 49.8 / Ours 56.6，π0 41.7 / 39.8 / 38.8 / 44.2，Clean 上 π0.5 97.0 → 95.8、π0 91.1 → 92.6。最有信息量的是负面消融：**直接用残差校正动作得 23.6，远低于 Base 的 41.7**——残差信号本身是对的，把它当成即时修正量却是灾难性的，只有经 LoRA 吸收进策略参数才有效；η^obs=0 为 40.8、无 anchor 为 41.8，两条都退回基线。真机两台 AgileX Piper 每任务 25 次：π0.5 43 → 76（RobustVLA 52）、π0 40 → 72，第二台 43 → 74、38 → 71；对照 DOB 56 对 84；未见物体 64% 对 16%。与路线 1 的 CofactVLA 共享 π0.5 加 Piper 这一组合与小 OOD 预算，两者未互比。
+
+把这四处（含路线 2 的 [[Papers/2609-VLAFeedback|VLA-Feedback]]）放在一起看：检测后截断（RobustExec / Zetta）、执行中改写（VLA-Feedback）、语义前置核验（CommitFlow）、动力学补偿（SelfComp-VLA）各有一套自建场景与各自的 π0 / π0.5 基线，没有任何两篇在同一基准上比过；每一篇都省掉了"去掉学习组件、只留平凡规则"的对照（CommitFlow 的 IK 行是唯一例外，而它恰好说明零学习组件能拿走一部分增益）。它们共同的隐含假设是 base policy 的失败在介入点处可识别——VLAScope 的闭集偏移类型与 CommitFlow 缺失的误阻率都说明这一假设尚未被测。
+
+第五个介入点是动作出手之前的候选重排。[[Papers/2610-DiVeR|DiVeR]]（2026）对 VLA 做 Best-of-N：用 K=32 次策略采样下 action expert 表征的方差识别决策关键状态，并据此给验证器打分加权。RoboCasa 18 个 atomic 任务、N=16 时 π0 32.2 → 38.1、π0.5 43.1 → 54.7，其中加权本身相对均匀加权贡献 +3.2 / +4.1；LIBERO-Long 上 π0.5 93.5 → 97.5（SVM 97.0）；Franka 真机 4 任务 × 24 次为 Base 58.3 / Uniform 65.6 / DiVeR 71.9。关键状态代理与 oracle 关键性的 Spearman 只有 0.493，超参在 RoboCasa π0.5 配置上调定，相对 RoboMeter 的"700×"效率比较双方所用信息不对等。[[Papers/2609-EmbodiedSkills|EmbodiedSkills]]（2026）在同一介入点用 3 个基于 V-JEPA 2 特征的 latent WAM 给 5 个候选打分（均值减标准差聚合 + 比较头）：MT50（π0.5）76.28 → 78.64，但按任务簇 bootstrap 的区间 [−1.32, 6.16] 跨零，而免训练的 KeyStone 已到 78.20、只差 11 个 episode；CLIPort 33.94 → 36.83 只是对第一个 primitive 的离线重排，CALVIN SR5 77.10 → 77.90。它最可靠的一条读数是聚合方式：均值减标准差把有害替换从 71 次降到 37 次，比较头只多 2 次成功；训练需要仿真里的同状态恢复，超参可能在评测集上选定。两篇合看，重排的收益更多取决于何时重排（DiVeR 的加权）与如何保守地聚合（EmbodiedSkills 的 mean−std），而不是打分器学得多好；EmbodiedSkills 被免训练基线几乎追平，是 Key Takeaway #13 那条零成本对照的又一处读数。
+
 **Open Problems**（Survey 提出）：
 - Certified robustness for VLA
 - Physically realizable defense
@@ -417,6 +459,8 @@ judge 的判定规则本身也参与结果。在 750 个人工标注 rollout 上
 - Runtime 谓词的去特权化（[[Papers/2608-Zetta|Zetta]] 补充：code-space critic 目前读的是 simulator 提供的官方 grasp / success 谓词，这类量在真机上不存在；把判据换成纯感知估计后系统掉多少，是这类 harness 能否离开仿真的前置问题）
 - 后门审计的可鉴别指标（[[Papers/2608-TrapVLA|TrapVLA]] 补充：干净任务成功率下降落在种子噪声内，因此它不能作为验收判据；需要能直接检测"失效形状被参数化"的审计量，而文本触发器已使 ONION 与零样本 LLM 判别同时失效）
 - 成功判定器本身的可靠性（[[Papers/2609-FailBench|FailBench]] 补充：runtime monitor 与自动课程都建在"这次操作是否成功"这一判定上，而该判定在 14 个来源上的天花板只有 0.77 macro balanced accuracy，且专门微调会降低而非提升它）
+- 介入点之间的可比性（[[Papers/2609-CommitFlow|CommitFlow]] / [[Papers/2609-VLAScope|VLAScope]] / [[Papers/2609-SelfCompVLA|SelfComp-VLA]] 补充：chunk 级截断、去噪末步改写、阶段级语义核验、动力学级 LoRA 补偿四种介入点各用自建场景，缺一个共享的扰动集与一条"平凡规则"对照；局部恢复率与任务成功率之间的落差（45.8% 对 18.1%）说明介入成功本身不是合格的指标）
+- 候选重排的打分器是否需要学习（[[Papers/2610-DiVeR|DiVeR]] / [[Papers/2609-EmbodiedSkills|EmbodiedSkills]] 补充：决策关键状态代理与 oracle 的秩相关只有 0.493；学习式 WAM 打分器在 MT50 上被免训练的 KeyStone 追到 0.44 点以内且区间跨零；缺同 N、同候选集下的随机选择与平凡启发式对照）
 
 ---
 
@@ -435,10 +479,13 @@ judge 的判定规则本身也参与结果。在 750 个人工标注 rollout 上
 | [[Papers/2607-RynnWorldTeleop|RynnWorld-Teleop]] | world model 合成 | 40+ FPS 实时生成 | 数字遥操作（hand-pose 驱动视频生成） | π₀ 零样本迁移真机；数据饥饿任务 +20pts |
 | [[Papers/2608-ZimaBlue\|ZimaBlue]] | 无动作标注视频 + 少量动作数据 | 120K 小时视频 / 6K 小时动作 | 三阶段：动作无关视频预训练 → 统一 100 维状态-动作接口上的视频-动作中期训练（无 latent action、无逆动力学）→ Slow(5B)/Fast(0.5B) 异步蒸馏 | 同一后训练下真机 12 个留出任务 36.1 → 46.1（+6K 小时动作）→ 66.9（+60K 小时视频）→ 77.8（+120K 小时视频） |
 | [[Papers/2608-ZeroWAM\|Zero-WAM]] | 人类视频作运行时任务规格 | HumanGen 74.2K 对 / 8.6K 任务 | 人类视频以 in-context 方式指定任务；Intra-Frame Perturbation 抑制机器人历史捷径（推理时移除） | RoboTwin 2.0 的 43/7 划分上 46.95%±0.72，对照 17.45% / 10.98% |
+| [[Papers/2609-DEXTERA\|DEXTERA]] | 单张真实图像重建的仿真场景 + 少量 VR 示范 | 每任务 10 条 VR 示范扩增为 300 条合成轨迹；2 个灵巧手平台 / 13 个任务-本体组合 | 现成模型把单张图像重建为 Isaac Lab 场景，在仿真中扩增示范，再与真机数据 1:1 联合训练 | 仿真成功轨迹真机开环重放 343/390（87.95%）；6 个组合子集上仅仿真 29.2 → 每组合加 30 条真机轨迹 61.9（无仅真机一臂） |
 
 **视频小时数与动作小时数买到的不是同一种能力**。[[Papers/2608-ZimaBlue|ZimaBlue]]（2026）在同一套后训练下把三个预训练规模摆成一条阶梯，而两段增量的性质截然不同：6K 小时动作数据买到的是执行本身（微波炉任务从 0/10 到 9/10），视频小时数买到的是分布偏移下的稳健性——60K 到 120K 只把标准条件抬高 5.0，却把扰动条件抬高 22.5。Slow/Fast 异步蒸馏把延迟从 449.6 ms 压到 33.0 ms（13.6×），代价 2.8pp。这条阶梯的说服力受一个缺口限制：**全文没有任何小时数对齐或算力对齐的对照**，因此"视频比动作便宜"只是相对自家的绝对量而言。分轴还有一处反向读数——LIBERO-Plus 零样本 86.7 的总分下 Camera 一轴只有 58.1，低于 π0.5 的 78.4 与对照模型的 83.1，须经 SFT 才升到 95.4，而 SFT 在全部四个 suite 上都拉低了 Robot Initial States（Object 一项 −16.8）。RoboCasa365 上它的 49.5 与 Composite-Unseen 16.5 也低于用 100K 小时真实轨迹训练的 [[Papers/2607-XiaomiRobotics1|Xiaomi-Robotics-1]]（57.4 / 32.1），即视频路线尚未在长程组合泛化上超过真机数据路线。
 
 同一批人类视频还可以不作为训练数据、而作为运行时的任务规格。[[Papers/2608-ZeroWAM|Zero-WAM]]（2026）把一段人类演示当作 in-context 的任务说明喂给 world-action model，RoboTwin 2.0 的 43/7 划分上 46.95%±0.72 对两个基线的 17.45% 与 10.98%，真机双臂 Franka 三任务为 53.3 / 33.3 / 16.7 对 43.3 / 10.0 / 0.0。但消融把这笔增益切开了：**只用文本、不给人类视频的变体已经拿到 39.44%**，即 +29.50 的总增量里约 22pp 来自任务均衡重采样而非那条 in-context 接口，真正归属于该接口的是剩下的约 7.5pp（Intra-Frame Perturbation 一项则把 28.55 抬到 46.95，是全文最大的单因素）。仿真评测的提示词与训练数据出自同一条生成管线，两个任务的成功判据被修改过，因此其绝对值不宜与其他 RoboTwin 2.0 记录并排。
+
+仿真数据的另一种来源是从单张真实图像重建任务。[[Papers/2609-DEXTERA|DEXTERA]]（2026）用现成模型把一张图像变成 Isaac Lab 场景，每个任务采 10 条 VR 示范、在仿真中扩增到 300 条，覆盖两个灵巧手平台、13 个任务-本体组合；仿真成功轨迹在真机上开环重放的成功率为 343/390（87.95%），说明重建出的资产几何与轨迹适配在开环下大体一致。下游读数要弱得多：在 ACT / DP / π0.5 × 6 个组合的子集上，只用仿真数据训练的真机成功率为 29.2，每组合再加 30 条真机轨迹联合训练后为 61.9——但没有"只用这 30 条真机轨迹"的一臂，也没有组件消融，+32.7 中仿真数据与真机数据各占多少无法拆分。重放成功也不蕴含闭环策略迁移：只在仿真中训练的 PPO teacher–student 策略在 OpenArm 合盖任务上仿真 96%、真机 30%，而同任务开环重放为 30/30。real-to-sim 管线的验收因此不能停在仿真侧或重放侧。
 
 **一致发现**：
 
@@ -460,7 +507,9 @@ judge 的判定规则本身也参与结果。在 750 个人工标注 rollout 上
 - **Implicit 端——[[Papers/2607-LaMemVLA|LaMem-VLA]]**：把历史重构成 context-native latent memory token（short-term 视觉 vault + long-term 动作语义 vault，top-K 检索后压成定长 token）直接编织进 VLA embedding 序列参与 self-attention，而非 policy-side 外部条件；latent-native vs policy-side 对照 +2pt（73.9 vs 71.9，SimplerEnv-Bridge），LIBERO 均值 97.6%。边界：纯仿真无真机、离散 top-K 检索不可微、超参甜点窄。
 - **Explicit 端——[[Papers/2607-ABotAgentOS|ABot-AgentOS]]**：agent 系统层 typed graph memory（video/对话/session 统一 schema + hybrid retrieval + 子图扩展）+ verification-aware harness + split-wise gated self-evolution；EgoLifeQA 上 1 帧 65.4 击败 50 帧 EGAgent-Gemini2.5Pro（57.5），证明 graph memory 对长时程 egocentric 经验的结构化压缩有效。边界：full context 放得下时 memory pipeline 全面落后（Mem-Gallery 88.6 vs 92.6）；保守 gate 下 self-evolution 几乎不长肉（8 splits 仅 1 asset 存活）——安全 vs 演化效率 trade-off 的诚实数据点；零真机实验。
 
-**为什么必须压缩**：[[Papers/2608-VLAProprioception|VLAProprioception]] 不引入任何记忆机制，直接扫描 raw observation history 的深度（K=1→96），结果非单调——短历史优于单帧，更深的未压缩历史不再带来收益并最终损害控制，小工作空间高精度任务族退化最重、经 VLM prefix 注入时尤甚；作者取 K=8 为经验操作点而非普适最优。这把压缩式 memory 从"工程优化"改写成"避免退化的必需品"，也给下面的 crossover point 提供了一个量级参考：raw frame stack 在 K≈8 附近就已越过收益峰值。口径不同但方向一致的旁证来自专题二的 [[Papers/2603-SGVLA|SG-VLA]]——加入 temporal history 反而使 ManiSkill-HAB 从 0.73 掉到 0.49。边界是该证据只覆盖 raw 堆叠，"长 raw 历史有害"不等于"长历史无用"，压缩式记忆能否在更大 K 上保住收益尚未被测。
+**为什么必须压缩**：[[Papers/2608-VLAProprioception|VLAProprioception]] 不引入任何记忆机制，直接扫描 raw observation history 的深度（K=1→96），结果非单调——短历史优于单帧，更深的未压缩历史不再带来收益并最终损害控制，小工作空间高精度任务族退化最重、经 VLM prefix 注入时尤甚；作者取 K=8 为经验操作点而非普适最优。这把压缩式 memory 从"工程优化"改写成"避免退化的必需品"，也给下面的 crossover point 提供了一个量级参考：raw frame stack 在 K≈8 附近就已越过收益峰值。口径不同但方向一致的旁证来自专题二的 [[Papers/2603-SGVLA|SG-VLA]]——加入 temporal history 反而使 ManiSkill-HAB 从 0.73 掉到 0.49。边界是该证据只覆盖 raw 堆叠，"长 raw 历史有害"不等于"长历史无用"，压缩式记忆能否在更大 K 上保住收益尚未被测。反向的证据来自路线 3 的 [[Papers/2610-LongWAM|Long-WAM]]——经过因果视频预训练之后，raw 上下文一路拉到 19.2 s 仍在涨（RoboCasa GR-1 63.3% → 78.7%），而双向初始化下同样的上下文不涨（61.7 → 64.1 → 61.6）；因此"长 raw 历史有害"的适用条件是"历史未经因果预训练"，历史长度本身不是一条独立的设计轴，它的符号由上游预训练决定。
+
+历史经预训练通道进入时有收益，这一条在视频模态上也成立。[[Papers/2609-SimpleMemVLA|SimpleMemVLA]]（2026）不压缩、不检索，把带时间戳的原生视频历史按 Qwen3.5-4B 预训练时的格式直接放进上下文（如 60 秒、2 fps），由主干生成一句子任务作为通向 flow 动作头的唯一窄通道，动作执行期间预填共享历史前缀把决策延迟压到 0.68 s。四个记忆基准上它都是最高读数——RMBench 94.0、RoboMME 88.3、MIKASA-Robo 74.0、RoboMemArena TSR 63.6（+17.4）——遮蔽或替换历史中的证据会改变行为，说明历史确实被使用；常规基准上 LIBERO 97.5、LIBERO-Plus 78.4。它与 VLAProprioception 的"长 raw 历史有害"并不冲突，而与 Long-WAM 同向。"原生视频优于压缩记忆"的更强说法要打折：同栈的检索 / 压缩 / 循环变体在 RoboMME 上只有 31.5 / 22.6 / 20.6，而这三个变体按构造就弱（不带顺序与时间戳，只给 64 / 16 个 token）；部分领先幅度同时包含骨干差异；窗口长度按基准分别设定（MIKASA-Robo 3 s、RoboMemArena 126 s），等于用任务先验调了记忆预算；Qwen3.5 的 24 层线性注意力使"长上下文便宜"部分依赖这一特定骨干；真机实验没有基线。
 
 **中间形态：技能留在权重里，记忆策略活在代码空间**。[[Papers/2608-HyMeS|HyMeS]]（2026）既不给 VLA 加记忆模块，也不把记忆抬到 agent 系统层，而是按载体把两件事分开：运动技能留在冻结的 π0.5 权重里，记忆策略是一段可读代码，由 coding agent（Opus 4.8）经 heuristic learning 迭代得到（P^(n+1)=Edit(P^(n), ξ_n, b_n)），既不用梯度也不用 expert action label，评测时策略冻结。代码里的阶段约束不经 prompt 或额外 token 传给 policy，而是以梯度形式注入冻结 VLA 的 flow-matching velocity field（v̂ = v_θ* + λ_t ∇R），随 sigmoid 调度衰减，全程不更新权重；阶段何时推进由 PACE 判定——proprioception 判据或 Qwen3-VL-8B 多帧判断，最近 5 次里有 3 次同意才切换。
 
@@ -475,6 +524,8 @@ RoboMemArena 12 任务上 CSR 52.5→66.2、TSR 41.3→60.1，相对 PrediMem �
 **记忆整个搬到 agent 侧，策略刻意保持无状态**：[[Papers/2609-2AM|2AM]]（2026）把任务记忆全部留在多模态 agent 里，动作模型只吃 RGB 且逐 episode 无状态，两者之间是一份可组合的转向契约——子任务语言加上归一化到 [0,1000]² 的抓 / 放 / 移二维点，各字段允许独立缺省。监督由示范标注确定性反推，不需要 VLM 教师；训练期用条件丢弃、坐标高斯噪声与未来窗口时间抖动去匹配部署时的三种误差。LIBERO-Mem 十个任务上完成度 76.29% / 宽松成功率 63.00% / 严格成功率 11.83%，对照同篇对齐复现的 π0 为 70.79 / 37.42 / 12.25——**完成度与宽松成功率大幅上升（+5.50 / +25.58），严格成功率反而略降**，论文自己写明证据不支持成功率的一致提升。
 
 两处对照缺口决定了这笔增益该记到谁头上。其一，去掉点提示、只留语言的消融为 53.72 / 19.42 / 7.25，三项均低于同篇的 π0 复现（−17.07 / −18.00 / −5.00），即在这套设定下插入一个只会说话的 agent 比不插入更差；真正缺的对照是"同一动作模型、同样的条件化训练、不插入 agent"，全文没有。其二，摘要标的"相对最强已发表基线 14.8% 提升 61.5 点"建在已发表数字上，而同篇 §4.2 随即说明那些数字严重低估了策略，笔记据此标 `contradicted`。严格成功率的优势还高度集中——11.83 的总量里有 7.33 来自两个任务，关系型重排任务几乎未被触及（宽松成功率仅 10.0%）。单点估计、无 seed、无误差棒、无超参、无代码。
+
+**治理代码由 agent 自己改写，直到真机**。HyMeS、Zetta 与 PRACTICE 改的分别是记忆策略、critic 与技能库，[[Papers/2610-PhysEvo|PhysEvo]]（2026）把可改写的范围扩到整个 harness——一个冻结的 GPT-6 Astra 作 task agent，另一个同样冻结的 Astra 作 meta-agent，按执行结果编辑工具、技能与诊断程序，全程无权重更新。RoboDojo 42 任务上得分 68.14 / 成功率 62.00%，对照 RoboDawn 54.63 / 47.17%；但分项不同向——Memory 100 对 53.33、Precision 40 对 25，Generalization 却 45.00 对 50.00 反低。10 任务上 GPT-as-Policy 68.00% 对 Direct 26.00% / Hybrid 48.00%；8 个困难任务 55.00% 对官方 Astra 的 1.25%。接口自由度一项与路线 1 的 Show-Harness 答案相反：C.1 的 TCP / Joint / Both 为 40 / 100 / 55，关节级自由度最好——Show-Harness 在离散符号上拿到 86–89%，PhysEvo 在关节级上拿到 100，两者任务族不同，"该给 VLM 多大的动作自由度"于是有两个相反的数据点而无共同基准。真机 PiPER 五任务 84.00%（得分 90.60），部署后技能仍在继续被改写；标记重建中位误差 0.615 mm。边界：评分只有 score 一个口径，没有噪声底——同构的 [[Papers/2610-GUIHARVEST|GUIHARVEST]]（GUI 侧）至少配了硬门与软门，PhysEvo 没有，[[Papers/2609-RRSI|RRSI]] 一类的随机重跑波动在这里未知；meta-agent 改写 harness 的过程是否会触及评测谓词本身，未被审计。
 
 **Open question**：memory 的价值边界（context 多长时 memory 开始占优的 crossover point）未被系统刻画。"memory 应活在 embedding 空间还是符号空间"已不再是二选一——[[Papers/2608-HyMeS|HyMeS]] 的消费者仍是 action head，载体却是可读代码，两者靠梯度注入速度场连起来。代价随之明确：这种接法引入了一个判断"阶段是否推进"的外部环路，而 PACE 的单模态消融显示该环路正是系统最脆弱的一环。空白因此转移到获取端——符号策略依赖闭源 coding agent 产出，其成本、可复现性与在新任务族上的迁移都还没有独立评估。同一载体上还分出了第二种接管方式：[[Papers/2608-Zetta|Zetta]]（路线 6）同样把逻辑写成代码、把权重整个冻结，但不做连续 steering，而是逐 action chunk 判定后直接切出 VLA 换成 recovery skill，再按 re-entry contract 交还控制权。两者都没有与对方比过，也都没有把自己降级成 episode 级反思做对照，因此"代码空间的治理逻辑该以什么粒度介入 policy"目前没有可比证据。同一载体上已出现第三、第四种粒度：[[Papers/2608-PRACTICE|PRACTICE]] 把技能库的增删改合训练成一个可学习策略，[[Papers/2609-2AM|2AM]] 把整条记忆搬到 agent 侧、用一份二维点契约转向一个刻意无状态的动作模型。四者共同缺的那个对照是同一个——**把外部环路整个拿掉、只保留它带来的额外条件与额外执行步数**；PRACTICE 的阶段消融（非学习的 BPE 库 +16.4 对全部学习阶段 +9.0）与 2AM 的语言-only 行（三项均低于同篇 π0 复现）是目前最接近该对照的两处读数，方向都提示外部环路本身的贡献被高估。
 
@@ -503,25 +554,27 @@ RoboMemArena 12 任务上 CSR 52.5→66.2、TSR 41.3→60.1，相对 PrediMem �
 | **DROID** | Training Data | 多场景 manipulation demo | - | - | 多机构协作收集 |
 | **HiFi-UMI-2K** | Training Data | 2K 小时 / 482.1K+ episodes / 110+ scenes | - | [[Papers/2607-HiFiUMI|HiFi-UMI]] | CC BY 4.0；synchronized multi-view + calibrated bimanual trajectories，完整 processed corpus 为 20K+ 小时 |
 | **CALVIN** | Benchmark | Long-horizon manipulation | Success Rate, Sequence Length | - | Language-conditioned，要求 compositional reasoning |
-| **LIBERO** | Benchmark | Long-horizon manipulation | Success Rate, SPL | [[Papers/2608-GalaxeaG05\|G0.5]] 98.9；[[Papers/2608-StellaVLA\|StellaVLA]] 98.8；Xiaomi-Robotics-0 98.7 | 多 task suite；语言鉴别力存疑——把指令换成 task-ID embedding 仅掉 2.3pp（[[Papers/2607-TurboVLA\|TurboVLA]]），且 LIBERO-Goal 的 10 个任务共享同一视觉场景，句子编码器与 10 路任务码难以区分（[[Papers/2608-GSRParaVLA\|GSR]]）。榜首一档已挤进 98-99% 的 0.2pp 带宽内，名次不再承载信息量 |
+| **LIBERO** | Benchmark | Long-horizon manipulation | Success Rate, SPL | [[Papers/2610-UNITAS\|UNITAS]] 99.8；[[Papers/2608-GalaxeaG05\|G0.5]] 98.9；[[Papers/2608-StellaVLA\|StellaVLA]] 98.8；Xiaomi-Robotics-0 98.7 | 多 task suite；语言鉴别力存疑——把指令换成 task-ID embedding 仅掉 2.3pp（[[Papers/2607-TurboVLA\|TurboVLA]]），且 LIBERO-Goal 的 10 个任务共享同一视觉场景，句子编码器与 10 路任务码难以区分（[[Papers/2608-GSRParaVLA\|GSR]]）。榜首一档已挤进 98.7–99.8%，名次不再承载信息量；从零训练、不含语言编码器的 0.54M task-ID 策略已到 95.05，打乱 task ID 后掉到 6.5%（[[Papers/2609-MINERVA\|MINERVA]]），该基准测的主要是按任务索引的视觉运动记忆 |
 | **LIBERO-Para** | Benchmark | 4,092 改写 episode（870 Act / 259 Obj / 2,963 Comp） | Full Para SR / PRIDE | Full Para 76.0（Xiaomi-Robotics-0）；PRIDE 70.4（[[Papers/2608-GSRParaVLA\|GSR]]-π0.5） | 只改指令措辞，物理任务/初始状态/成功判据不变；主流 VLA 掉 19-68pp。测的是 paraphrastic invariance，不含新物体/新动作/新组合 |
-| **LIBERO-Plus** | Benchmark | LIBERO 的扰动泛化集，多轴（相机、光照、传感器噪声、语言改写等） | Zero-shot Success Rate | π0.5+[[Papers/2608-JEPAWAM\|JEPA-WAM]] 86.3；[[Papers/2608-ZimaBlue\|ZimaBlue]] 86.7（Camera 轴仅 58.1）；[[Papers/2608-StellaVLA\|StellaVLA]] 85.1（对照 StarVLA-OFT 75.0，增益集中在 Camera 轴 +23.5）；JEPA-WAM 79.2（不含大规模 robot-policy 预训练一档最好）；[[Papers/2607-STWAM\|ST-WAM]] 72.8（对照 Fast-WAM 51.5）；[[Papers/2608-CofactVLA\|CofactVLA]] 69.1；[[Papers/2609-OpenWAM\|OpenWAM]] 69.2（13 条目中第 11） | 平均分掩盖轴间 tradeoff：JEPA-WAM 的领先主要来自 Camera 一列，Language 一列只有 68.2（ResVLA 88.5 / RoVLA 92.9）；ZimaBlue 反向，Camera 58.1 低于 π0.5 的 78.4。用 appearance 类轴论证"预测未来带来鲁棒性"存在归因风险——DINO 类特征对这类扰动本就近似不变（ST-WAM）。**协议须随分数一起引用**：Overall 是七轴非加权均值，按实例加权约低 2pp；缺 `LIBERO_PLUS_FIX_LANG` 设置时每一轴都掉数点；不微调预训练 policy checkpoint 的工作（[[Papers/2609-LatentInterfaceTraining\|LIT]] 的 π0.5 79.67 / MolmoAct2 71.92）与微调档的数字不同 regime，不可排序。各文的 baseline 多为引用而非重跑，跨论文分数不可直接比 |
+| **LIBERO-Plus** | Benchmark | LIBERO 的扰动泛化集，多轴（相机、光照、传感器噪声、语言改写等） | Zero-shot Success Rate | [[Papers/2610-UNITAS\|UNITAS]] 89.1（π0.5 85.7）；[[Papers/2610-WAVE0\|WAVE-0]] 88.0（π0.5 84.5）；π0.5+[[Papers/2608-JEPAWAM\|JEPA-WAM]] 86.3；[[Papers/2608-ZimaBlue\|ZimaBlue]] 86.7（Camera 轴仅 58.1）；[[Papers/2608-StellaVLA\|StellaVLA]] 85.1（对照 StarVLA-OFT 75.0，增益集中在 Camera 轴 +23.5）；JEPA-WAM 79.2（不含大规模 robot-policy 预训练一档最好）；[[Papers/2607-STWAM\|ST-WAM]] 72.8（对照 Fast-WAM 51.5）；[[Papers/2608-CofactVLA\|CofactVLA]] 69.1；[[Papers/2609-OpenWAM\|OpenWAM]] 69.2（13 条目中第 11） | 平均分掩盖轴间 tradeoff：JEPA-WAM 的领先主要来自 Camera 一列，Language 一列只有 68.2（ResVLA 88.5 / RoVLA 92.9）；ZimaBlue 反向，Camera 58.1 低于 π0.5 的 78.4。用 appearance 类轴论证"预测未来带来鲁棒性"存在归因风险——DINO 类特征对这类扰动本就近似不变（ST-WAM）。**协议须随分数一起引用**：Overall 是七轴非加权均值，按实例加权约低 2pp；缺 `LIBERO_PLUS_FIX_LANG` 设置时每一轴都掉数点；不微调预训练 policy checkpoint 的工作（[[Papers/2609-LatentInterfaceTraining\|LIT]] 的 π0.5 79.67 / MolmoAct2 71.92）与微调档的数字不同 regime，不可排序。各文的 baseline 多为引用而非重跑，跨论文分数不可直接比（同为 π0.5，UNITAS 与 WAVE-0 两表分别记 85.7 与 84.5）。LIBERO 95.05 的 task-ID 小模型在此只有 46.7–55.7（[[Papers/2609-MINERVA\|MINERVA]]），这一落差是该扰动集鉴别力的直接证据 |
 | **LIBERO-Mem** | Benchmark | 10 个需要跨子任务记忆的长程任务 | Completion / Relaxed SR / Strict SR | [[Papers/2609-2AM\|2AM]] 76.29 / 63.00 / 11.83（同篇对齐复现的 π0 为 70.79 / 37.42 / 12.25） | 三档指标的分离本身是该基准的主要产出——宽松与严格成功率可以反向移动（+25.58 对 −0.42），只报其一会得到相反结论；严格成功率的绝对水平极低（11.83 中有 7.33 来自两个任务），关系型重排任务宽松成功率仅 10.0% |
 | **InstructMove** | Benchmark | Isaac Lab，1,757 精选资产 / 7 域 / 18 超类 / 103 类，四个任务族 | Reach / Success（按指令一致性判定） | [[Papers/2608-InstructMove\|InstructMove]] 报 π0.5 pick_category 0.74 / 0.48，pick_spatial Reach 0.46–0.51 | 本表中唯一以 **text-indispensability** 为构造要求的基准：场景中至少两个物理可执行候选、恰有一个与指令匹配，成功判据改为"命中与指令一致的那个"。反事实列是主要读数——泛指 / 空串 / 无关指令下 any-object Reach 仍为 1.00 / 1.00 / 0.99。缺"目标条件化但不给语言"的对照，因此该性质目前由构造保证而非测量得到 |
-| **LIBERO-Pro** | Benchmark | LIBERO 的 40 个 task-setting pair（Object / Spatial / Goal / Long × 多 setting） | Success Rate | [[Papers/2608-Zetta\|Zetta]] 71.13（冻结 π0.5 基座 32.00） | 分 setting 后鉴别力远高于原版 LIBERO；读数须认口径——Zetta 摘要标的 90.8% 只是 Goal 两个 setting 的均值，全量 40 对为 71.13，LIBERO-10 的 S setting 仅 40.0%（四对任务停在 0%） |
+| **LIBERO-Pro** | Benchmark | LIBERO 的 40 个 task-setting pair（Object / Spatial / Goal / Long × 多 setting） | Success Rate | [[Papers/2608-Zetta\|Zetta]] 71.13（冻结 π0.5 基座 32.00） | 分 setting 后鉴别力远高于原版 LIBERO；读数须认口径——Zetta 摘要标的 90.8% 只是 Goal 两个 setting 的均值，全量 40 对为 71.13，LIBERO-10 的 S setting 仅 40.0%（四对任务停在 0%）；零样本冻结 VLM 加确定性控制器（[[Papers/2609-MotorMind\|MotorMind]]）为 66.7 / 53.8（干净 / 扰动），同评测微调 π0.5 98.3 / 63.3，两套口径与 Zetta 的 40 对全量均值不互通 |
 | **VLA-Arena** | Benchmark | 分级泛化评测（含真机 OOD-L2 分级） | Normalized Score / Progress | [[Papers/2608-StellaVLA\|StellaVLA]] 0.63（π0.5 0.44、Evo-Depth 0.41、OpenVLA-OFT 0.39、LingBot-VLA 0.22） | 原文"超过 strong prior models"的表述以最低基线为参照；对次强基线的实质差距是 +0.19。真机 OOD-L2 一档所有方法都低（StellaVLA progress 1.9/4） |
 | **UniVTAC** | Benchmark | 视触觉操作，8 任务 | Success Rate | [[Papers/2607-N0TWAM\|N0-TWAM]] 84.5 / [[Papers/2607-N0VTLA\|N0-VTLA]] 83.1（InternVLA-A1 67.1） | 触觉路线唯一的第三方公开基准；两篇总分领先但均有任务级输给基线（N0-VTLA 输 3/8） |
 | **Physics-IQ / IntPhys2** | Benchmark | 视频物理一致性（生成 / 判别） | IQ-Score / Accuracy | [[Papers/2607-PhiZero|Phi-Zero]] 41.2（Physics-IQ） | 两类指标可给出相反排序：Phi-Zero 生成端第一，IntPhys2 Hard 52.38 却近随机基线 50 |
 | **RLBench** | Benchmark | 100+ manipulation tasks | Success Rate | Diffusion Policy, ACT | Simulation benchmark，多样化 task |
-| **RoboTwin 2.0** | Benchmark | 50 manipulation tasks | Success Rate | ABot-M0.5 94.1%；[[Papers/2608-GalaxeaG05\|G0.5]] 93.3（clean 93.7 / randomized 92.8，对次优 LingBot-VA 领先 1.1pp）；WAM 类 92-94% 已入饱和区 | Randomized settings，challenging；榜首一档的名次差已小于多数论文的 seed 抖动 |
-| **RoboCasa365** | Benchmark | 365 任务（Atomic + Composite） | Success Rate | Xiaomi-Robotics-1 57.4%（Composite-Unseen 32.1）；[[Papers/2608-ZimaBlue\|ZimaBlue]] 49.5（Composite-Unseen 16.5）；[[Papers/2608-Zeva\|Zeva]] Atomic5 76.8（对照 72.4） | Composite-Unseen 极难（SOTA 仅 32.1%），长程组合泛化探针；120K 小时无动作视频预训练的路线在此仍低于 100K 小时真实轨迹路线。受控研究常只取 45 atomic + 20 composite 子集并按族单训 category expert（[[Papers/2608-VLAProprioception\|VLAProprioception]]），该口径的分数与全 365 任务不可比 |
+| **RoboTwin 2.0** | Benchmark | 50 manipulation tasks | Success Rate | [[Papers/2610-LongWAM\|Long-WAM]] 94.4；[[Papers/2610-UNITAS\|UNITAS]] 92.94 / 93.04（clean / randomized）；[[Papers/2610-WAVE0\|WAVE-0]] 91.47（π0.5 80.38）；ABot-M0.5 94.1%；[[Papers/2608-GalaxeaG05\|G0.5]] 93.3（clean 93.7 / randomized 92.8，对次优 LingBot-VA 领先 1.1pp）；WAM 类 92-94% 已入饱和区 | Randomized settings，challenging；榜首一档的名次差已小于多数论文的 seed 抖动；饱和只在榜首档——[[Papers/2609-CommitFlow\|CommitFlow]] 不动 π0.5 权重、只外挂语义核验就把 Avg.10 从 53.2 抬到 75.9，基座档仍有 20pp 空间 |
+| **RoboCasa365** | Benchmark | 365 任务（Atomic + Composite） | Success Rate | Xiaomi-Robotics-1 57.4%（Composite-Unseen 32.1）；[[Papers/2608-ZimaBlue\|ZimaBlue]] 49.5（Composite-Unseen 16.5）；[[Papers/2608-Zeva\|Zeva]] Atomic5 76.8（对照 72.4） | Composite-Unseen 极难（SOTA 仅 32.1%），长程组合泛化探针；120K 小时无动作视频预训练的路线在此仍低于 100K 小时真实轨迹路线。受控研究常只取 45 atomic + 20 composite 子集并按族单训 category expert（[[Papers/2608-VLAProprioception\|VLAProprioception]]），该口径的分数与全 365 任务不可比。子集口径还在继续分裂：Atomic-24 Human-50（[[Papers/2609-FOCAL-VLA\|FOCAL-VLA]] 63.4 对 π0.5 55.2）、18 个 atomic 任务上的 Best-of-16（[[Papers/2610-DiVeR\|DiVeR]] π0.5 43.1 → 54.7）各成一套 |
 | **BEHAVIOR Challenge (2025)** | Benchmark | 50 个长程家务移动操作任务 | 第三方 ranking metric | [[Papers/2608-GalaxeaG05\|G0.5]] 0.3136（4 epoch）/ 0.2904（1 epoch）；π0.5 0.2626；挑战赛冠军 RLC 0.2605 | 少数几个未进饱和区、且带第三方评分口径的长程基准；1 个 post-training epoch 即超过四 checkpoint 的冠军方案，是预训练先验质量的外部信号 |
 | **WMBench** | Benchmark | 2,989 对 paired real/world-model rollouts | WMES / evaluator agreement | GigaWorld-1 | 首个以 evaluator-world outcome agreement 为标准的 world model 评测 |
 | **WorldExam** | Benchmark | 1,474 case / 8 任务 / 20 个视频世界模型 | 四层诊断分数（Visual Quality / Control Adherence / Spatial Consistency / World Reactivity） | 分范式两条 track，不出总榜 | 反应类任务只给触发控制、不写明该发生的反应；同一控制意图适配为 SE(3) 轨迹 / 离散动作 / 语言以跨范式可比；reactivity 层实际只有 9 个模型，Goal Completion 只有 7 个 |
 | **WorldSimProbe** | Benchmark | 18,608 controlled instances / 5 个 probe suite / 6 个开源 ACWM（RoboTwin 5,498 + ManiSkill 6,610 + LIBERO 6,500） | 按 Observable Simulator Contract 分解的 probe 分数（action-realization / interaction-response） | 无统一冠军：LingBot-VA 领先 RoboTwin 与 ManiSkill，Ctrl-World 领先 LIBERO | 把"动作是否被忠实实现"独立成层，是 world-model 评测里此前缺席的一环；六模型共享同一初始观测 / 动作流 / simulator seed / diffusion seed；跨平台排名一致性 ρ=0.695，但 suite 级排名与总分不一致；被测模型全为开源 ACWM，不含闭源与通用视频模型 |
 | **WorldArena** | Benchmark | 公开 leaderboard，Track 1 生成质量 + Track 2 下游 policy 成功率 | EWMScore-P / Trajectory Accuracy / 任务成功率 | Track 1 [[Papers/2608-DreamXPhi\|DreamX-Phi]] EWMScore-P 60.65（2026-08-12 快照，31 个参赛条目第 1）；Track 2 Adjust Bottle 67.19% 并列第 2 | 引用时必须带版本与快照日期：WA2.0 在聚合前用 ground truth 给 Dynamic Degree / Flow Score / Motion Smoothness 设上限，同一模型的两项分量从 WA1.0 的 88.71 / 100.00 变成 WA2.0 的 22.90 / 5.81；库内另观察到 [[Papers/2607-FlowWAM\|FlowWAM]] 记录的 EWMScore 与 DreamX-Phi 表中同名条目差 3.5–3.7 而 Trajectory Accuracy 完全一致（CtrlWorld 48.20、IRASim 35.92），即同一基准名下至少流通两套聚合口径。Track 2 的鉴别力远低于 Track 1——Track 1 上 15.68 的 EWMScore-P 差只换来 5.86pp 的 policy 成功率差，Track 1 垫底的 IRASim 在 Track 2 仍有 61.33% |
 | **LeWM 规划四件套（PushT / Reacher / Cube / TwoRoom）** | Benchmark | latent world model 的在线规划评测 | Online Success Rate | 已发表口径（Table 5，10 epoch）：[[Papers/2608-DALeWM\|DA-LeWM]] 98.7 / 87.3 / 80.7 / 96.0；LeWM 96 / 86 / 74 / 87；DINO-WM 74 / 79 / 86 / 100；PLDM 78 / 78 / 65 / 97 | 无单一冠军，四个环境上的排名互不一致；跨表读会碰到反例——DA-LeWM 自家 Table 1 里 LeWM 一 epoch 的 TwoRoom 98.0 就高于 DA-LeWM 十 epoch 的 96.0。已发表数字与同预算复跑混排是这套基准的主要口径风险 |
-| **RoboMemArena** | Benchmark | 12 任务（本文采用的协议） | CSR（累计阶段成功） / TSR（任务成功） | [[Papers/2608-HyMeS\|HyMeS]] 66.2 / 60.1（π0.5 52.5 / 41.3） | 按遮挡、计数等类别分组，能暴露"预测式记忆在某些类别上是净损"——PrediMem 遮挡类 CSR 38.3 低于纯反应式 π0.5 的 50.4；12 任务协议为该文自定，与 PrediMem 发表的 26 任务口径不可比 |
+| **RoboMemArena** | Benchmark | 12 任务（本文采用的协议） | CSR（累计阶段成功） / TSR（任务成功） | [[Papers/2608-HyMeS\|HyMeS]] 66.2 / 60.1（π0.5 52.5 / 41.3）；[[Papers/2609-SimpleMemVLA\|SimpleMemVLA]] TSR 63.6（对其表内最强基线 +17.4，Transferring 类不领先） | 按遮挡、计数等类别分组，能暴露"预测式记忆在某些类别上是净损"——PrediMem 遮挡类 CSR 38.3 低于纯反应式 π0.5 的 50.4；12 任务协议为该文自定，与 PrediMem 发表的 26 任务口径不可比；SimpleMemVLA 的对比行有一部分引自 leaderboard，与 HyMeS 的数字不宜直接排序 |
+| **RoboStress** | Benchmark | LIBERO 上叠加摩擦 / 齿隙 / 柔顺 / 重力补偿误差四类执行退化，7 个场景 | Success Rate | [[Papers/2609-SelfCompVLA\|SelfComp-VLA]] π0.5 56.6（Base 49.1 / DR 51.0 / RobustVLA 49.8，不含 Clean） | 退化落在执行层而非感知层，与 LIBERO-Plus 的视觉扰动正交；Clean 上方法基本无损（97.0 → 95.8） |
+| **RoboDojo** | Benchmark | 42 任务，按 Memory / Precision / Generalization 等分项计分 | Score / Success Rate | [[Papers/2610-PhysEvo\|PhysEvo]] 68.14 / 62.00%（RoboDawn 54.63 / 47.17%） | 只有一个 score 口径、无噪声底；分项不同向（Generalization 反低），总分不代表泛化 |
 | **SIMPLER / SimplerEnv** | Benchmark | WidowX + GoogleRobot 的真机对齐仿真评测 | Success Rate | [[Papers/2608-WorldTokens\|World Tokens]] WidowX 71.5 / GoogleRobot 82.1；Bridge 四任务 [[Papers/2608-GalaxeaG05\|G0.5]] 87.3（次优 Xiaomi-Robotics-0 79.2，G0.5 摘要只引 π0.5 的 57.1） | 各文所取任务子集与训练数据不同——World Tokens 用 BridgeV2+Fractal 训练，[[Papers/2608-InContextVLA\|In-Context VLA]] 报 4 个 held-out WidowX 任务均值 72.4 且其中 Carrot 一项 56.3 低于四个基线——跨论文分数不可比；专题一表内同名行的 56.2%（Embodied-R1）取自另一套任务子集 |
 | **REAL-Bench** | Benchmark | 241 任务 / 4 族（含用户交互） | Success Rate | REAL 8B（SUL 56.9%） | Privilege-free（无 oracle 感知 API）+ simulated user 模糊指令 |
 | **FailBench** | Benchmark | 2,197 段操作视频 / 14 个来源统一成单一判定任务 | Macro Balanced Accuracy | [[Papers/2609-FailBench\|FailBench]] 报最好通用模型 0.77 | 被测对象是**成功判定器**而非策略：五个专门训练的失败检测器全部低于各自的基座模型（最大差 −0.088），最高分的已发表检测器 0.806 与"一律答失败"的 0.797 几乎无差，即公开分数可由类别不平衡解释。跨表口径不自洽——Table 2 与 Table 8 在全部 14 个子集上不一致，摘要所称 0.60 的接触类天花板与自家表内的 0.608 / 0.652 相左，该文的核查状态为 partial |
@@ -551,6 +604,7 @@ RoboMemArena 12 任务上 CSR 52.5→66.2、TSR 41.3→60.1，相对 PrediMem �
 - 成功判据本身是可选的实验条件，而非基准的固有属性：DroneCATS 的审计显示换一条判据会翻转 182 次成功中的 95 次或 58 次，[[Papers/2608-ZeroWAM|Zero-WAM]] 修改了两个 RoboTwin 任务的成功判据，[[Papers/2608-InstructMove|InstructMove]] 则把 Reach 的判据从"命中任意目标"改成"命中与指令一致的目标"——后者是把判据当成构造工具的正面用法
 - 归一化与聚合口径已足以改变名次，须与分数一起引用：LIBERO-Plus 的 Overall 为七轴非加权均值（按实例加权约低 2pp）且需要 `LIBERO_PLUS_FIX_LANG` 才可比（[[Papers/2609-LatentInterfaceTraining|LIT]]）；[[Papers/2609-OpenWAM|OpenWAM]] 同一张表里 Avg 在两个基准上加权、另两个不加权且未声明；[[Papers/2609-PhysBrain15|PhysBrain 1.5]] 用自研 micro-averaged F1 重跑十个点定位基准并统一重评 28 个 benchmark，等于在既有口径之外另立一套
 - 基线档位也需要声明：不微调预训练 policy checkpoint 的工作（LIT）与微调档的绝对值处在不同 regime，混排会得到反向结论
+- 执行层退化（RoboStress）与感知层扰动（LIBERO-Plus）是两套正交的鲁棒性口径，一篇只报其一时不能推断另一侧；执行期介入方法（CommitFlow / VLA-Feedback / SelfComp-VLA）目前各用自建扰动集，跨篇数字不可排序
 
 ---
 
@@ -570,17 +624,18 @@ RoboMemArena 12 任务上 CSR 52.5→66.2、TSR 41.3→60.1，相对 PrediMem �
 
 7. **数据瓶颈的答案正收敛到 human/手持视频 + 强 curation + 可部署 fidelity**：[[Papers/2607-EgoSteer|EgoSteer]]（9.6K 小时 egocentric，scaling log-linear）与 [[Papers/2607-XiaomiRobotics1|Xiaomi-Robotics-1]]（100K+ 小时 UMI，data scale 边际收益大于 model size）给出 data scaling 直接证据；[[Papers/2607-HiFiUMI|HiFi-UMI]] 则表明 3 mm pose、原生双夹爪相对位姿、硬件同步与 wide FoV 的联合 fidelity 足以让 UMI 承担 target-task post-training。跨工作共同点不是“任意视频都可用”，而是 curation、表示一致性与 capture fidelity 共同构成数据引擎。
 
-8. **实时性与能力未必互斥，但现有 benchmark 对二者都在丧失鉴别力**：[[Papers/2607-TurboVLA|TurboVLA]] 移除 LLM 后以 0.2B / 32 Hz 在 LIBERO 拿到 97.7%，同时自证 LIBERO 的语言条件近似闭集分类（task-ID 替换仅 −2.3pp）；[[Papers/2607-PhiZero|Phi-Zero]] 在生成类物理 benchmark 领先而在 IntPhys2 Hard 接近随机。两处的共同含义是，饱和或低鉴别力的评测让"更快"与"更懂"都难以证伪；效率与物理理解的下一步进展，前置条件是先造出能区分它们的评测，而不是继续在现有 suite 上刷分。LIBERO-Para 给出了造这类评测的一个廉价样板——不动物理任务、只改指令措辞，就把同一批模型从 72-98% 打回 4-77%（[[Papers/2608-GSRParaVLA|GSR]]）；但它自身也划出边界：LIBERO-Goal 的 10 个任务共享同一视觉场景，它测出的是 paraphrastic invariance，仍不足以把"语言条件化"与"任务索引"分开。
+8. **实时性与能力未必互斥，但现有 benchmark 对二者都在丧失鉴别力**：[[Papers/2607-TurboVLA|TurboVLA]] 移除 LLM 后以 0.2B / 32 Hz 在 LIBERO 拿到 97.7%，同时自证 LIBERO 的语言条件近似闭集分类（task-ID 替换仅 −2.3pp）；[[Papers/2607-PhiZero|Phi-Zero]] 在生成类物理 benchmark 领先而在 IntPhys2 Hard 接近随机。两处的共同含义是，饱和或低鉴别力的评测让"更快"与"更懂"都难以证伪；效率与物理理解的下一步进展，前置条件是先造出能区分它们的评测，而不是继续在现有 suite 上刷分。LIBERO-Para 给出了造这类评测的一个廉价样板——不动物理任务、只改指令措辞，就把同一批模型从 72-98% 打回 4-77%（[[Papers/2608-GSRParaVLA|GSR]]）；但它自身也划出边界：LIBERO-Goal 的 10 个任务共享同一视觉场景，它测出的是 paraphrastic invariance，仍不足以把"语言条件化"与"任务索引"分开。[[Papers/2609-MINERVA|MINERVA]] 把这一点推到底：0.54M 参数、无语言编码器的 task-ID 小 CNN 在 LIBERO 拿到 95.05，打乱 task ID 掉到 6.5%，而 LIBERO-Plus 只有 46.7——LIBERO 测的是按任务索引的视觉运动记忆。
 
 9. **VLA 的语言鲁棒性首先是架构问题，不是数据问题**：[[Papers/2608-GSRParaVLA|GSR]] 用因果干预把失效位置定位到动作策略对 joint vision-language 编码漂移的敏感性——任务语义在语言主干里保留完好（Retrieval@1 0.941 / 0.675 / 0.516，chance 0.1），只替换最后一个融合 block 的语言特征即消除 96.8% 的动作差异；把指令语义改由一条不看图像的冻结文本编码器承担，只用 canonical demonstration 就把 SmolVLA 的 Full Para 从 4.47 提到 49.12。竞争解释（容量、多一个语言编码器）被三个落在同一数值上的对照排除。适用范围须同时记住：全部仿真证据来自 10 任务共享场景的闭集设定，且无统计区间与多 seed，因此这条结论支持的是"扩数据不是唯一解"，不是"语义泛化已被解决"。同一批现象还有第二种定位在竞争：[[Papers/2608-CofactVLA|CofactVLA]] 把病因写成 latent visual confounder 经 backdoor path 绕过语义意图直接决定动作，靠推理期的反事实分支做减法拿到零样本 LIBERO-Plus 69.1 与真机 OOD 75.8 对 π0.5 的 23.5。两者的证据强度并不对称——GSR 有行为层探针与因果干预直接支持其定位，而 CofactVLA 的 backdoor 假设全程未被经验检验，且其最弱的一列恰好是 Language（71.8，低于 OpenVLA-OFT_m 的 81.0）。最小鉴别实验是把 GSR 的行为层 Retrieval@1 探针搬到真机 OOD 设定下重跑。更靠前的一层问题由 [[Papers/2608-InstructMove|InstructMove]] 提出：在现有基准里语言常常根本不被需要——泛指、空串或完全无关的指令下 any-object Reach 仍有 1.00 / 1.00 / 0.99，18 次 Reach 失败里 15 次抓了与目标共享单个显著属性的干扰物，即策略响应的是指代短语中的一个属性而非整个短语。同向的第三处读数来自 [[Papers/2609-LatentInterfaceTraining|LIT]]：其视觉瓶颈在 LIBERO-Plus 的七轴中只在 Language Instructions 一轴出现退化（−2.11 / −0.92），可证伪的假设是位姿重建目标不要求区分物体身份，因而会挤掉指代信息——该假设尚无实验检验。
 
 10. **触觉进入 VLA 已成事实，但"预测式触觉"的收益归属未定**：[[Papers/2607-N0VTLA|N0-VTLA]] 把触觉做成预测目标并给出可信的表征探针（latent `z` 在 32 候选池 top-1 92.3，chance 3.2），[[Papers/2607-N0TWAM|N0-TWAM]] 的消融却显示去掉**反应式** observed 通路比去掉**预测式** predicted 通路损失更大，且最大单因素是预训练数据量而非任何触觉设计；N0-VTLA 自己的 ALTER 结果也显示 offline RL 是主导项、触觉预训练是二阶项。两篇同团队、共享私有数据与基准，本 survey 记为争议而非共识。与路线 3 的 [[Papers/2607-STWAM|ST-WAM]]（新增 DINO 未来分支，单独使用反而低于纯 VAE 基线）合看，2026-08 的两组证据指向同一个方法论问题：**给模型加一条"预测更多模态/更多表示的未来"的通路时，增益常常不来自"预测"这一半**。
 
-11. **"训练期消费、推理期删除"跑通了，而收益归接口形状、不归"预测未来"本身**：[[Papers/2608-WorldTokens|World Tokens]]、[[Papers/2608-JEPAWAM|JEPA-WAM]]、[[Papers/2608-MobileWAM|MobileWAM]] 三组各自采用同一模板——用注意力掩码或冻结目标切断 action 对未来 token 的可见性，使未来分支在部署时不实例化，推理开销退回到不含该分支的水平（61.85 ms 在 π0.5 的 1.1× 以内、85 ms 对 ABot-M0 的 125 ms、938 ms 对同类 WAM 的 4950/8126 ms）。三者的消融合起来给出比成功率更硬的读数：同一条预测通路的效果可以从净损摆到显著增益，取决于监督如何接进主干——World Tokens 把 world token 从排他上下文改成可旁路即 97.0→94.1（低于完全不做 world modeling 的 95.0），首帧锚点由 Canny 换成 RGB 更掉到 91.5；JEPA-WAM 取 backbone 全部隐藏层 73.1 低于只取 Lower-16 的 76.5；MobileWAM 把递归模块从 transformer 换成 MLP 得 46.3，低于完全不加 foresight 的 50.2，tap 层从均匀 4 层改成全部 30 层则 58.2 崩到 37.1。这与 #10 互补：不控制接口形状而报告"加了未来预测所以更好"，在当前证据下不构成有效归因。三篇各出自一个团队、主基准两两不重合、无交叉复现，消融均在各自 in-domain 设定内完成。被删掉的也不限于"未来"这一种东西：[[Papers/2608-StellaVLA|StellaVLA]] 把检索来的示范前缀与语言化的空间推理挂在一条只活在训练期的自回归分支上，推理时整条语言分支摘掉、示范前缀的 KV 缓存复用，单步从推理期联合解码语言的 3177 ms 回到 91 ms（约 36×）。代价是依赖被换到了检索端——去掉示范 LIBERO 从 98.8 掉到 62.4，给错任务的示范掉到 44.9，而同表的 StarVLA-OFT 在无示范设定下是 96.6。
+11. **"训练期消费、推理期删除"跑通了，而收益归接口形状、不归"预测未来"本身**：[[Papers/2608-WorldTokens|World Tokens]]、[[Papers/2608-JEPAWAM|JEPA-WAM]]、[[Papers/2608-MobileWAM|MobileWAM]] 三组各自采用同一模板——用注意力掩码或冻结目标切断 action 对未来 token 的可见性，使未来分支在部署时不实例化，推理开销退回到不含该分支的水平（61.85 ms 在 π0.5 的 1.1× 以内、85 ms 对 ABot-M0 的 125 ms、938 ms 对同类 WAM 的 4950/8126 ms）。三者的消融合起来给出比成功率更硬的读数：同一条预测通路的效果可以从净损摆到显著增益，取决于监督如何接进主干——World Tokens 把 world token 从排他上下文改成可旁路即 97.0→94.1（低于完全不做 world modeling 的 95.0），首帧锚点由 Canny 换成 RGB 更掉到 91.5；JEPA-WAM 取 backbone 全部隐藏层 73.1 低于只取 Lower-16 的 76.5；MobileWAM 把递归模块从 transformer 换成 MLP 得 46.3，低于完全不加 foresight 的 50.2，tap 层从均匀 4 层改成全部 30 层则 58.2 崩到 37.1。这与 #10 互补：不控制接口形状而报告"加了未来预测所以更好"，在当前证据下不构成有效归因。三篇各出自一个团队、主基准两两不重合、无交叉复现，消融均在各自 in-domain 设定内完成。被删掉的也不限于"未来"这一种东西：[[Papers/2608-StellaVLA|StellaVLA]] 把检索来的示范前缀与语言化的空间推理挂在一条只活在训练期的自回归分支上，推理时整条语言分支摘掉、示范前缀的 KV 缓存复用，单步从推理期联合解码语言的 3177 ms 回到 91 ms（约 36×）。代价是依赖被换到了检索端——去掉示范 LIBERO 从 98.8 掉到 62.4，给错任务的示范掉到 44.9，而同表的 StarVLA-OFT 在无示范设定下是 96.6。2026-09/10 的四篇把这条判断推进到"推理期是否需要显式消费预测"：[[Papers/2610-WAVE0|WAVE-0]] 只把世界模型当辅助损失已把 RoboTwin 2.0 从 80.38 抬到 89.51，显式条件化再加约 2 点；[[Papers/2609-FOCAL-VLA|FOCAL-VLA]] 的条件化贡献 +4.9；[[Papers/2610-UNITAS|UNITAS]] 的 scene-flow 损失只有 +0.73，推理时整条 flow 分支跳过；[[Papers/2609-WorldAgen|WorldAgen]] 去掉 world modeling 掉 0.91 个 CALVIN 平均长度，测试时训练的增益却与噪声同量级。世界模型的收益目前主要以训练期监督兑现。
 
 12. **"VLM 编码器 + 独立动作专家"不再是唯一可行的 foundation 配方**：[[Papers/2608-GalaxeaG05|Galaxea G0.5]] 让单个 transformer decoder 在共享 token vocabulary 上以单一 next-token cross-entropy 同时产出 CoT 与离散动作码，在同数据、同算力、同控制栈的真机微调上拿到 76.7%，对照 π0.5 的 53.3% 与 GR00T-N1.7 的 24.4%；2025 BEHAVIOR Challenge 上 1 个 post-training epoch（0.2904）即超过四 checkpoint 的冠军方案（0.2605）。让这条路在 foundation 规模上可行的是三个组件而非架构本身——跨本体 RVQ action tokenizer（27 维统一动作空间 + active-part 预测）、原生 CoT 流、ViT 内插的 factorized spatio-temporal visual memory；单条自回归流带来的结构性红利也很具体：CoT 可在推理期换成本换收益、GRPO 无需改架构即可接入、零样本指令跟随有语言先验兜底。但它的区分度只在真机、BEHAVIOR 与 DROID 三个 regime 上成立，LIBERO 对次优 +0.2pp、RoboTwin 2.0 +1.1pp 都落在饱和带；原文"零样本指令跟随超过 post-train 过的 π0.5"这句与自家 Fig 10 相反（π0.5 在 50H post-training 下 68.8% 高于 G0.5 零样本 65.6%），本 survey 不采纳该表述；低对比度与半透明物体上 60% 对 π0.5 的 90%；模型只训了 2B 一个尺寸，无 scaling 证据。
 
-13. **零参数或冻结对照能吃掉相当一部分头条增益，而多数论文不报这条基线**：2026-08/09 的九处独立读数指向同一件事——[[Papers/2609-H3World|H3-World]] 的恒定动作对照里冻结骨干加一句提示得 301.8，适配后的模型 300.5；[[Papers/2609-SparseResidualWM|SparseResidualWM]] 的 no-op 基线在被推动物体上与结构化模型持平（0.470 对 0.466），整体 L2 在 N=8 时完全相同；[[Papers/2608-PRACTICE|PRACTICE]] 不含任何学习的 BPE 技能库贡献 +16.4，全部三个学习阶段合计只有 +9.0；[[Papers/2608-ZeroWAM|Zero-WAM]] 只用文本、不给人类视频的变体已拿到 39.44（完整模型 46.95）；[[Papers/2609-ShowHarness|Show-Harness]] 的任意符号加书面约定 19/20 与语义名称加约定 20/20 基本无差；[[Papers/2609-FailBench|FailBench]] 里得分最高的已发表失败检测器 0.806 与"一律答失败"的 0.797 几乎无差；[[Papers/2609-2AM|2AM]] 只留语言的消融三项均低于同篇 π0 复现；[[Papers/2609-RealTimeExpoFT|Real-Time EXPO-FT]] 的延迟无感知 RL 18.8/30 与无 RL 但带实时分块的 18.0/30 打平；[[Papers/2609-ProgrammableWM|ProgrammableWM]] 的像素对齐控制图本身已编码被计分的状态。可操作的推论是把这条基线升格为投稿前的必做项——**给每个"学出来的组件"配一个零参数的平凡对照，给每个"新增的外部环路"配一个只保留其额外条件与额外执行步数的对照**。[[Papers/2609-LatentInterfaceTraining|LIT]] 提供了正面模板：其消融表专门为三种最自然的竞争解释各配一行（纯 query 接口 65.70 / 分阶段训练 65.46 / 仅加 pose 监督 65.45），三行都停在离完整方法 6pp 以外，主张因此可被证伪地立住。
+13. **零参数或冻结对照能吃掉相当一部分头条增益，而多数论文不报这条基线**：2026-08/09 的九处独立读数指向同一件事——[[Papers/2609-H3World|H3-World]] 的恒定动作对照里冻结骨干加一句提示得 301.8，适配后的模型 300.5；[[Papers/2609-SparseResidualWM|SparseResidualWM]] 的 no-op 基线在被推动物体上与结构化模型持平（0.470 对 0.466），整体 L2 在 N=8 时完全相同；[[Papers/2608-PRACTICE|PRACTICE]] 不含任何学习的 BPE 技能库贡献 +16.4，全部三个学习阶段合计只有 +9.0；[[Papers/2608-ZeroWAM|Zero-WAM]] 只用文本、不给人类视频的变体已拿到 39.44（完整模型 46.95）；[[Papers/2609-ShowHarness|Show-Harness]] 的任意符号加书面约定 19/20 与语义名称加约定 20/20 基本无差；[[Papers/2609-FailBench|FailBench]] 里得分最高的已发表失败检测器 0.806 与"一律答失败"的 0.797 几乎无差；[[Papers/2609-2AM|2AM]] 只留语言的消融三项均低于同篇 π0 复现；[[Papers/2609-RealTimeExpoFT|Real-Time EXPO-FT]] 的延迟无感知 RL 18.8/30 与无 RL 但带实时分块的 18.0/30 打平；[[Papers/2609-ProgrammableWM|ProgrammableWM]] 的像素对齐控制图本身已编码被计分的状态。可操作的推论是把这条基线升格为投稿前的必做项——**给每个"学出来的组件"配一个零参数的平凡对照，给每个"新增的外部环路"配一个只保留其额外条件与额外执行步数的对照**。[[Papers/2609-LatentInterfaceTraining|LIT]] 提供了正面模板：其消融表专门为三种最自然的竞争解释各配一行（纯 query 接口 65.70 / 分阶段训练 65.46 / 仅加 pose 监督 65.45），三行都停在离完整方法 6pp 以外，主张因此可被证伪地立住。2026-09/10 又添三处：[[Papers/2609-EmbodiedSkills|EmbodiedSkills]] 的学习式 WAM 重排在 MT50 上 78.64，免训练的 KeyStone 78.20；[[Papers/2609-ReactHuman|ReactHuman]] 七个 MLLM 的平均 SAA 54.0 只比"一律躲开"高 3 点；[[Papers/2609-WISE|WISE]] 不加调度、在全部状态上想象只得 60.4，与基座 57.8 相近，而其调度器本身又缺一条按夹爪开合选状态的零成本对照。
+14. **执行期闭环已分化出五个互不替代的介入点，而它们之间没有共同基准（2026-09/11）**：chunk 级截断与换技能（[[Papers/2607-RobustExecAgenticRL|RobustExec]] / [[Papers/2608-Zetta|Zetta]]）、去噪末步改写（[[Papers/2609-VLAFeedback|VLA-Feedback]]，动态任务 27.5% → 85.0%）、阶段级语义前置核验（[[Papers/2609-CommitFlow|CommitFlow]]，π0.5 在 RoboTwin 2.0 Avg.10 53.2 → 75.9）、动力学级残差自补偿（[[Papers/2609-SelfCompVLA|SelfComp-VLA]]，RoboStress 49.1 → 56.6），以及介入之前的运行时风险预测（[[Papers/2609-VLAScope|VLAScope]]，第 60 步 ROC-AUC 0.8497）。四处都把 base policy 冻结、把改动放在外面，但各用自建场景与自家 π0 / π0.5 基线，没有任何两篇互比。两条反向读数应随结论一起传播：直接用残差修正动作得 23.6、远低于基线 41.7（SelfComp-VLA），局部恢复率 45.8% 只换来 18.1% 的任务成功（CommitFlow）——介入信号正确不等于介入有效，介入成功不等于任务成功。harness 侧出现了第一个到真机的无权重自演化（[[Papers/2610-PhysEvo|PhysEvo]]，PiPER 五任务 84.00%），其评分没有噪声底，而接口自由度一项（Joint 100 对 TCP 40）与 Show-Harness 的离散符号答案相反。第五个介入点是出手前的候选重排（[[Papers/2610-DiVeR|DiVeR]]，RoboCasa 18 个 atomic 任务上 π0.5 Best-of-16 43.1 → 54.7），同样只对自家基线报告；学习式 WAM 打分器在 MT50 上被免训练的 KeyStone 几乎追平（[[Papers/2609-EmbodiedSkills|EmbodiedSkills]] 78.64 对 78.20，区间跨零）。
 
 ---
 
@@ -594,7 +649,7 @@ RoboMemArena 12 任务上 CSR 52.5→66.2、TSR 41.3→60.1，相对 PrediMem �
 
 3. **Long-Horizon Credit Assignment**：Multi-step tasks 中 reward 稀疏，LongNav-R1 的 horizon-adaptive advantage 是有价值的尝试，但 generalizable solution 仍需更多验证。
 
-4. **Real-Time Inference Constraint**：VLA 模型推理开销大，diffusion policy 需要 multiple denoising steps。如何在保持 policy quality 的同时满足 sub-second latency 是 deployment bottleneck。WAM 路线加剧此矛盾——每次出 action chunk 需跑 5B 级视频去噪（RynnWorld-4D 890ms 前向 / 9Hz），且多数 WAM 论文回避报告 latency（FlowWAM）。反向证据来自 [[Papers/2607-TurboVLA|TurboVLA]]：完全不含 LLM 的 V+L→A 架构以 0.2B / 32 Hz 在 LIBERO 与 RoboTwin 2.0 保持竞争力，说明至少在闭集任务分布上 latency 与成功率不构成硬 trade-off。真正未解的是开放指令与 OOD 条件下这一 trade-off 是否重新出现——该文没有相应实验，问题从"能不能又快又准"变成"快的代价落在哪类泛化上"。WAM 侧的部分答案已经出现：把 world modeling 降为训练期信号、推理时删除未来分支，可以把开销压回不含该分支的水平（[[Papers/2608-WorldTokens|World Tokens]] 61.85 ms、[[Papers/2608-JEPAWAM|JEPA-WAM]] 85 ms、[[Papers/2608-MobileWAM|MobileWAM]] 938 ms）。但这条答案是有代价的——推理期的想象、搜索与重规划一并被放弃，planner 与 evaluator 两个角色不能这样做；剩下的问题是"训练期塑造的表征"能否替代"推理期的显式前瞻"，目前没有任何工作在同一任务上直接对比这两种用法。同一 trade-off 的第三个落点是语言分支本身：[[Papers/2608-StellaVLA|StellaVLA]] 若在推理期联合解码语言，单步 3177 ms；把整条语言分支摘掉、只留它在训练期塑造出的动作表征，回到 91 ms（示范前缀 KV 缓存复用），代价约 36×。这与路线 1 的三行对照（生成并监督文本 / 注入但对证据计 loss / 注入且只监督 action token）指向同一个量——推理期生成文本的开销与它带来的动作增益至今没有在同一 backbone 上被正面核算过。
+4. **Real-Time Inference Constraint**：VLA 模型推理开销大，diffusion policy 需要 multiple denoising steps。如何在保持 policy quality 的同时满足 sub-second latency 是 deployment bottleneck。WAM 路线加剧此矛盾——每次出 action chunk 需跑 5B 级视频去噪（RynnWorld-4D 890ms 前向 / 9Hz），且多数 WAM 论文回避报告 latency（FlowWAM）。反向证据来自 [[Papers/2607-TurboVLA|TurboVLA]]：完全不含 LLM 的 V+L→A 架构以 0.2B / 32 Hz 在 LIBERO 与 RoboTwin 2.0 保持竞争力，说明至少在闭集任务分布上 latency 与成功率不构成硬 trade-off。真正未解的是开放指令与 OOD 条件下这一 trade-off 是否重新出现——该文没有相应实验，问题从"能不能又快又准"变成"快的代价落在哪类泛化上"。WAM 侧的部分答案已经出现：把 world modeling 降为训练期信号、推理时删除未来分支，可以把开销压回不含该分支的水平（[[Papers/2608-WorldTokens|World Tokens]] 61.85 ms、[[Papers/2608-JEPAWAM|JEPA-WAM]] 85 ms、[[Papers/2608-MobileWAM|MobileWAM]] 938 ms）。但这条答案是有代价的——推理期的想象、搜索与重规划一并被放弃，planner 与 evaluator 两个角色不能这样做；剩下的问题是"训练期塑造的表征"能否替代"推理期的显式前瞻"，目前没有任何工作在同一任务上直接对比这两种用法。同一 trade-off 的第三个落点是语言分支本身：[[Papers/2608-StellaVLA|StellaVLA]] 若在推理期联合解码语言，单步 3177 ms；把整条语言分支摘掉、只留它在训练期塑造出的动作表征，回到 91 ms（示范前缀 KV 缓存复用），代价约 36×。这与路线 1 的三行对照（生成并监督文本 / 注入但对证据计 loss / 注入且只监督 action token）指向同一个量——推理期生成文本的开销与它带来的动作增益至今没有在同一 backbone 上被正面核算过。延迟的第四个落点在去噪过程内部：[[Papers/2609-VLAFeedback|VLA-Feedback]] 让冻结 planner 在倒数第二步停下，由一个 1.19M 参数的模块以 2 ms 完成最后一步并消费最新观测，planner 0.625 Hz 与反馈 10 Hz 分频运行；收益只在动态任务上出现（27.5% → 85.0%），静态任务持平，反应窗口有闭式上界。上下文长度是另一条代价轴——[[Papers/2610-LongWAM|Long-WAM]] 的 per-chunk 延迟随历史从 74.6 ms 升到 341.0 ms（RTX 5090），NVFP4 量化可压回 107.4 ms 而成功率只降 0.9。"训练期塑造能否替代推理期显式前瞻"已有第一批同 backbone 读数（路线 3）：[[Papers/2610-WAVE0|WAVE-0]] 的显式条件化相对只做辅助损失多约 2 点、多付 18.8 ms，[[Papers/2609-FOCAL-VLA|FOCAL-VLA]] 多 4.9 点；planner 与 evaluator 两种角色上的同类对照仍然缺席。
 
 ### 数据与评测挑战
 
@@ -608,7 +663,7 @@ RoboMemArena 12 任务上 CSR 52.5→66.2、TSR 41.3→60.1，相对 PrediMem �
 
 8. **VLA Certified Robustness**：Adversarial attack 防护需要理论上可证明的 robustness bound，但 VLA 的 multi-modal input space 和 continuous action space 使 certified defense 困难。BadWAM 新增 WAM 特有攻击面：action 与 imagination 的同步性本身需要防护，"检查生成未来是否合理"不构成安全保障。
 
-9. **不可逆操作的风险控制**：Physical operation 一旦执行难以撤销。如何设计 safety-aware policy、runtime monitor、emergency intervention mechanism？RobustExec 的 {Execute, Retry, Repair, Reset} 调度是一次尝试，但回滚只恢复机器人不恢复世界状态，不可逆失效（液体、易碎物、物体位移）仍无解。
+9. **不可逆操作的风险控制**：Physical operation 一旦执行难以撤销。如何设计 safety-aware policy、runtime monitor、emergency intervention mechanism？RobustExec 的 {Execute, Retry, Repair, Reset} 调度是一次尝试，但回滚只恢复机器人不恢复世界状态，不可逆失效（液体、易碎物、物体位移）仍无解。2026-09 的三篇把介入点推到 chunk 级之外（路线 6）：[[Papers/2609-CommitFlow|CommitFlow]] 在阶段转换处核验语义承诺，[[Papers/2609-VLAScope|VLAScope]] 在执行中滚动预测失败风险，[[Papers/2609-SelfCompVLA|SelfComp-VLA]] 在动力学层用执行残差自补偿。CommitFlow 给出了这条问题最硬的一个数字——局部重抓恢复率 45.8% 对应的任务成功只有 18.1%（π0）——不可逆性不只来自物体状态，也来自"恢复了局部却回不到任务进度"。
 
 10. **开放场景的 Language Understanding**：用户指令可能模糊、不一致或超出 robot capability。如何 robustly parse and ground natural language in physical context？目前的位置比预想的靠后——连"同义改写"这一最弱的语言变化都尚未解决（主流 VLA 在 LIBERO-Para 上掉 19-68pp），而 [[Papers/2608-GSRParaVLA|GSR]] 的诊断表明瓶颈不在语言理解本身，而在动作策略与 joint V-L 编码之间的信息路由。这意味着"模糊指令""个性化偏好"这类更高阶目标的前置条件，是先把措辞不变性做成架构性质而非数据性质。更靠前的一层缺口由 [[Papers/2608-InstructMove|InstructMove]] 点出：现有基准里语言常常根本不被需要——泛指、空串或完全无关的指令下 any-object Reach 仍为 1.00 / 1.00 / 0.99，因此"语言鲁棒性"的分数在这类基准上先天缺少可解释性。它给出的构造要求（至少两个物理可执行候选、恰有一个与指令匹配，成功判据按指令一致性改写）是目前所见对这条空白最明确的成文解法，但它自己也没有报"目标条件化但不给语言"的对照，因此该性质仍是构造保证而非测量所得。
 
@@ -678,7 +733,9 @@ SMA 把这一格的问题换了个提法。它的 environment split 就是目标
 
 这个反问的证据强度受限于真正在做这个任务的只有一个模型：LLaVA-1.5-7B 的 relation baseline 24.82% 正压在 four-way 的 25% chance 上，所有 ΔRel. ≤0.40 是地板效应的产物，13B 的 40.23% 也只略高于 chance，承重的是 Qwen2.5-VL-7B 的 96.11%——而这个数贴着天花板，−1.32 难与噪声分开，全文未报任何显著性。更要紧的是 ablation 保留了物体的轮廓与位置：常量 embedding 覆盖的是按 segmentation mask 选出的连通区域，抹掉的是外观身份，"此处有一块统计异常区域"及其精确位置仍在，而这恰是它想否定的那个粗粒度 anchor；等量随机 token 对照散布全图，形状与位置都不匹配，缺的是一个形状匹配、位置平移的对照。position probe 解码的是每个 image token 的网格位置、训练在 ImageNet 上，与 [[Papers/2606-DecodableNotGrounded|Decodable ≠ Grounded]] 指出的是同一个陷阱。
 
-一致结论：**给 MLLM 显式结构化空间信息远优于让它从像素"猜"空间关系**——这条在任务成功率口径上不受挑战，上述四项工作分属导航与长程操作，增益都是端到端的。但"显式"要精确到什么粒度是另一个问题：在两物体关系判断上，物体级精确定位可以大幅退化而不伤关系准确率，承重的是周边布局。两条读数不冲突——前者说的是给不给结构化信息，后者说的是结构化到哪一层为止；后者只测过 What's Up 这一个单帧、两物体、无遮挡的 benchmark，能否外推到需要 metric 距离与 3D 关系的导航/操作场景未知。
+- **[[Papers/2610-SSpace|SSpace]]**（2026，机制侧第二处读数）：在 MLLM 中间层找到一个 3 维线性子空间，三个方向分别编码水平、垂直与距离。直接从该子空间读出的空间判断略低于模型直接作答（Molmo2-ER 第 22 层，CV-Bench / EmbSpatial / SpatialTunnel 上 91.92 / 86.92 / 96.50 对 94.40 / 90.42 / 97.83），说明所需信息在中层已基本具备。因果干预只在 Molmo2-ER 上做：沿子空间以 β=±30 推动后，绝对位置保留率 41.05%，对照的颜色属性为 78.13%。承重的是 SpinBench（146 题、无前提）：三个模型直接作答都是 60.96，在子空间上施加 oracle 旋转后到 94.52 / 91.10 / 95.21，CoT 只有 62.33（Qwen3.5-4B）/ 83.56（Qwen3.6-27B）。它把瓶颈定位在空间变换而非感知；但旋转由 oracle 给出，这组数字是上界而不是方法。
+
+一致结论：**给 MLLM 显式结构化空间信息远优于让它从像素"猜"空间关系**——这条在任务成功率口径上不受挑战，上述四项工作分属导航与长程操作，增益都是端到端的。但"显式"要精确到什么粒度是另一个问题：在两物体关系判断上，物体级精确定位可以大幅退化而不伤关系准确率，承重的是周边布局。两条读数不冲突——前者说的是给不给结构化信息，后者说的是结构化到哪一层为止；后者只测过 What's Up 这一个单帧、两物体、无遮挡的 benchmark，能否外推到需要 metric 距离与 3D 关系的导航/操作场景未知。SSpace 从另一侧补上同一判断：空间量在中层可线性读出，失败落在对它做视角旋转一类变换的环节，因此"显式"也可以指把变换本身外置，而不只是外置空间结构。
 
 ### A5. 主动感知与长时程探索（2026-09 新增）
 
@@ -692,6 +749,8 @@ A1–A4 的评测几乎都建在静态观测上——图像或场景图给定，
 
 三篇合起来给专题一补了一条此前缺席的轴：**推理质量的评测需要覆盖观测获取、整合与终止三个环节，而现有 embodied reasoning benchmark 基本只测中间那一环**。
 
+[[Papers/2609-ReactHuman|ReactHuman]]（2026）把这条轴延伸到有反应时限的决策：MLLM 作 G1 人形机器人的决策层，面对 17 类家居危险在接住、躲开、不动三者中选一（Genesis 仿真，306 个场景，7 个模型，单次运行）。七个模型的平均情境适宜动作率（SAA）为 54.0，只比"一律躲开"的 51.0 高 3 点，三个模型低于这条基线；多数投票 62.1 低于最好的单模型（GPT-5.5 63.7）；Dodge 场景中 35.9% 的决策违反安全。推理与动作之间的断层不止在选择上：对抗设定下 280 次决策无一质疑场景材料；动作选对时手部到撞击点的中位距离仍有 0.48 m（89% 够不到），这是几何测量而非执行结果；速度只按快慢二值处理，最慢一档有 42% 的决策是原地不动。Safety 一项可由一律躲开打满，因此该分数反映的是模型倾向而非能力。
+
 ### 专题一 Benchmarks
 
 | Benchmark | 来源 | 规模 | SOTA | 特点 |
@@ -703,13 +762,14 @@ A1–A4 的评测几乎都建在静态观测上——图像或场景图给定，
 | **SIMPLEREnv** | Sim | WidowX/Google Robot | 56.2% (Embodied-R1) | 标准评测平台 |
 | **What's Up** | Real（单帧图像） | 614 images / 两物体 / four-way 空间关系 | Qwen2.5-VL-7B 96.11%；LLaVA-1.5-13B 40.23%；LLaVA-1.5-7B 24.82% | 用于机制分析而非排名（[[Papers/2608-GroundingIsntKnowing\|Grounding Isn't Knowing]] 的 token ablation 载体）。作诊断基底时须注意两端都不可用：7B 压在 25% chance 的地板上、Qwen 贴在天花板上，中间没有第三个模型。无遮挡、无 3D、无时序 |
 | **空间 VQA 组合（RoboSpatial / ERQA / SAT / EmbSpatial / Omni3D，+附录 SITE-image / ViewSpatial）** | Sim+Real | 主表五项中有三项只有 175 / 200 / 250 题；附录两项 deployment split 为 2224 / 2856 | [[Papers/2608-SpatialMemoryAgent\|SMA]] 每个 base-model block macro 第一（122B 68.8 / 35B-A3B 66.7 / 27B 69.8 / 9B 63.5） | 读数须带两条限定：SMA 每个数字取 10 次 pass 的 best checkpoint 而 baseline 无同等规则；deployment split 最大的两个 benchmark 被放进附录，MemRL-GT 在 ViewSpatial 上两次反超 |
+| **[[Papers/2609-ReactHuman\|ReactHuman]]** | Sim（Genesis，G1 人形） | 306 个场景 / 17 类家居危险 / 7 个 MLLM，单次运行 | SAA：GPT-5.5 63.7、Gemma-3-27B 62.4；七模型均值 54.0 | 动作三选一（Catch / Dodge / No_Action）。"一律 Dodge"基线 SAA 51.0，三个模型低于它；Safety 可由一律 Dodge 打满，只反映倾向。多数投票 62.1 低于最好单模型；可达性（中位 0.48 m、89% 够不到）为几何测量而非执行结果 |
 
 ### 专题一 Open Problems
 
 1. **Real-world transfer gap**：18 篇中仅 3 篇有 real robot 实验，RL-based reasoning 的仿真优势能否迁移真实世界未知。
 2. **Reasoning 延迟 vs 实时控制**：fast/slow thinking trade-off 无系统性解法（DM0 Spatial Scaffolding、Embodied-R key-frame extraction 仅是缓解）。
 3. **Long-horizon multi-step reasoning**：EmbodiedBench 最佳仅 28.9%，跨数十步的 error-robust 推理链远未达到。2026-09 的三处读数把这条空白说得更具体：城市级长程导航上十个模型全部落在 0.0–3.8%（[[Papers/2608-UrbanGround|UrbanGround]]），而失败点被 [[Papers/2608-MNISTPro|MNIST-PRO]] 的离线画布反事实定位在观测整合而非注视点选择——延长探索只会累积无法被使用的观测；第三个环节"何时宣布完成"则在 [[Papers/2609-DroneCATS|DroneCATS]] 上呈现双向失效（小模型到了不宣布，前沿模型过早宣布）。需要的是把获取、整合、终止三个环节分开计分的评测，而现有 embodied reasoning benchmark 基本只测中间一环。
-4. **Reasoning 过程质量评估**：FoMER 揭示"猜对答案但推理错误"，仅看 final accuracy 不够，safety-critical 场景尤其危险。机制侧的工具已经出现——token ablation、attention knockout 与因果中介分析可以直接问"这一步中间量是不是必需的"，[[Papers/2608-GroundingIsntKnowing|Grounding Isn't Knowing]] 用它测出精确定位对关系判断并非必需。但这类方法的门槛在对照设计而非工具本身：等量随机 token 对照不匹配形状与位置，probe 又只证明"可解码"而非"被使用"（同 [[Papers/2606-DecodableNotGrounded|Decodable ≠ Grounded]]），而当前证据大多只在 2-3 个模型、单个 benchmark 上取得。
+4. **Reasoning 过程质量评估**：FoMER 揭示"猜对答案但推理错误"，仅看 final accuracy 不够，safety-critical 场景尤其危险。机制侧的工具已经出现——token ablation、attention knockout 与因果中介分析可以直接问"这一步中间量是不是必需的"，[[Papers/2608-GroundingIsntKnowing|Grounding Isn't Knowing]] 用它测出精确定位对关系判断并非必需。但这类方法的门槛在对照设计而非工具本身：等量随机 token 对照不匹配形状与位置，probe 又只证明"可解码"而非"被使用"（同 [[Papers/2606-DecodableNotGrounded|Decodable ≠ Grounded]]），而当前证据大多只在 2-3 个模型、单个 benchmark 上取得。[[Papers/2610-SSpace|SSpace]] 提供了第二种工具——找出编码空间量的线性子空间并沿其干预——但干预只在一个模型上做过，最强的读数又依赖 oracle 旋转，"子空间被使用"与"子空间可被利用"仍需分开举证。
 5. **Reasoning × world model**：从 reactive perception 走向 mental simulation（预测行动后果再推理）是关键方向——与总览路线 3 交汇。
 
 ---
@@ -781,7 +841,7 @@ A1–A4 的评测几乎都建在静态观测上——图像或场景图给定，
 - **RT-2**: "RT-2: Vision-Language-Action Models Transfer Web Knowledge to Robotic Control" (arXiv 2307.15818)
 - **RT-X**: "Open X-Embodiment: Robotic Learning Datasets and RT-X Models" (arXiv 2310.08864)
 - **OpenVLA**: "OpenVLA: An Open-Source Vision-Language-Action Model" (arXiv 2024)
-- [[Papers/2604-EmbodiedMidtrain]] - VLM→VLA Mid-training
+- [[Papers/Archive/2604-EmbodiedMidtrain]] - VLM→VLA Mid-training
 - [[Papers/2607-XiaomiRobotics1]] - 100K+ 小时 UMI data scaling
 - [[Papers/2405-VLASurvey]] - VLA Survey（TNNLS，三层 taxonomy 领域索引）
 - [[Papers/2607-AnchorAlignVLA]] - 表征锚定 + 语言-动作对齐
@@ -799,12 +859,18 @@ A1–A4 的评测几乎都建在静态观测上——图像或场景图给定，
 - [[Papers/2609-PhysBrain15]] - ActionPiece 动作词表 + VLM 到物理基础模型的整栈
 - [[Papers/2609-ShowHarness]] - 冻结 VLM agent 调用语义动作单元 + 确定性解释器
 - [[Papers/2609-ZETA]] - zero-shot 跨本体迁移的受控研究（tabletop）
+- [[Papers/2609-MotorMind]] - 冻结 VLM 提出参数化 mid-level 动作 + 确定性控制器 + 并发 Monitor / Verifier
+- [[Papers/2609-MINERVA]] - 0.54M task-ID 小 CNN 在 LIBERO 得 95.05：LIBERO 可由按任务索引的视觉运动记忆解出
+- [[Papers/2611-VLAGradientRouting]] - Knowledge Insulation 与梯度耦合的 2×2：同时训练下耦合更好
+- [[Papers/2610-CaPtain]] - 可训练的 code-as-policy：底层原语 + 特权状态 critic 的多轮 RL
+- [[Papers/2609-FOCAL-VLA]] - 子任务实体掩码内蒸馏几何与运动 latent 作为动作专家条件
 
 ### Diffusion Policy Papers
 
 - **Diffusion Policy**: "Diffusion Policy: Visuomotor Policy Learning via Action Diffusion" (Chi et al., arXiv 2303.04367)
 - [[Papers/2603-SeedPolicy- Horizon Scaling via Self-Evolving Diffusion Policy for Robot Manipulation]] - SeedPolicy with SEGA
 - **ACT**: "Action Chunking with transformers" (2023)
+- [[Papers/2609-VLAFeedback]] - 去噪最后一步作为反馈接口（冻结 planner + 1.19M 反馈去噪模块）
 
 ### World Model Papers
 
@@ -834,6 +900,13 @@ A1–A4 的评测几乎都建在静态观测上——图像或场景图给定，
 - [[Papers/2608-CodeAsWorld]] - agentic 搜索出可执行的世界表示（状态与规则写成代码）
 - [[Papers/2609-ProgrammableWM]] - 可编程世界模型（显式状态与规则接口）
 - [[Papers/2609-SparseResidualWM]] - object-centric 稀疏残差动力学（只建模发生变化的部分）
+- [[Papers/2610-LongWAM]] - 因果视频预训练下 WAM policy 的长上下文扩展（0 → 19.2 s）
+- [[Papers/2610-AgentGarten]] - 代码引擎持状态与规则 + 共享神经渲染器的 agent 训练场
+- [[Papers/2610-WAVE0]] - 冻结 SigLIP 空间的 latent world model 条件化 π0.5（辅助损失与显式条件化分离）
+- [[Papers/2610-UNITAS]] - 3D 原生 WAM：action flow / scene flow 写成世界坐标点轨迹
+- [[Papers/2609-WorldAgen]] - 联合动作与未来帧预测 + 测试时 LoRA 重建更新
+- [[Papers/2609-SyncWorld]] - 视觉校准前缀的动作条件视频世界模型
+- [[Papers/2609-EmbodiedSkills]] - latent WAM 集成对 VLA 候选做推理期重排
 
 ### 触觉 / 多模态感知 Papers
 
@@ -847,6 +920,7 @@ A1–A4 的评测几乎都建在静态观测上——图像或场景图给定，
 - [[Papers/2607-HiFiUMI]] - 高保真 UMI 从 pre-training 推进到 target-task post-training
 - [[Papers/2608-ZimaBlue]] - 可扩展视频预训练演进出的通才 world action model
 - [[Papers/2608-ZeroWAM]] - 人类视频上的 in-context world-action modeling
+- [[Papers/2609-DEXTERA]] - 单图 real-to-sim 灵巧操作数据管线与开环重放验证
 
 ### Memory & Agent 系统层 Papers
 
@@ -858,6 +932,8 @@ A1–A4 的评测几乎都建在静态观测上——图像或场景图给定，
 - [[Papers/2608-PRACTICE]] - 经验沉淀为专长的自演化具身 agent
 - [[Papers/2608-Zeva]] - in-context 因果学习驱动的可泛化操作
 - [[Papers/2609-2AM]] - agent 侧记忆作为可引导动作模型的外部 guidance
+- [[Papers/2610-PhysEvo]] - 冻结 VLM meta-agent 改写整套 harness 的无权重自演化（到真机）
+- [[Papers/2609-SimpleMemVLA]] - 原生带时间戳视频历史作为 VLA 记忆
 
 ### RL Papers
 
@@ -867,6 +943,7 @@ A1–A4 的评测几乎都建在静态观测上——图像或场景图给定，
 - [[Papers/2607-REAL]] - Privilege-free 具身 agent 的 SFT+GSPO 训练
 - [[Papers/2607-BRAID]] - 交错文-图推理的统一 RL（GRPO + DiffusionNFT）
 - [[Papers/2609-RealTimeExpoFT]] - 把推理延迟写进训练回路的实时 VLA RL 后训练
+- [[Papers/2609-WISE]] - 世界模型想象 + 交互相关状态调度的 VLA 后训练
 
 ### Navigation Papers
 
@@ -882,11 +959,16 @@ A1–A4 的评测几乎都建在静态观测上——图像或场景图给定，
 
 - [[Papers/2608-GroundingIsntKnowing]] - token ablation 检验"先定位再推关系"是否必经（侵蚀 / 膨胀的不对称响应）
 - [[Papers/2606-DecodableNotGrounded]] - 可解码 ≠ 被使用（probe 类证据的归因边界）
+- [[Papers/2610-SSpace]] - MLLM 中层 3 维空间子空间与 oracle 旋转上界
 
 ### Safety Papers
 
 - [[Papers/2604-VLASafety]] - VLA Safety Survey
 - [[Papers/2608-TrapVLA]] - 把 VLA 困在预设失败模式的后门威胁
+- [[Papers/2609-CommitFlow]] - 阶段转换处的语义承诺核验 + 低秩边界动作改写
+- [[Papers/2609-VLAScope]] - 冻结 VLA 隐状态上的两级运行时失败风险预测
+- [[Papers/2609-SelfCompVLA]] - 执行残差自监督的在线 LoRA 自补偿 + RoboStress
+- [[Papers/2610-DiVeR]] - 决策关键状态加权的 VLA Best-of-N 验证器
 
 ### Benchmark Papers
 
@@ -900,10 +982,26 @@ A1–A4 的评测几乎都建在静态观测上——图像或场景图给定，
 - [[Papers/2609-DroneCATS]] - 无人机控制的通才 VLA 评测（commanding / approaching / tracking / searching）
 - [[Papers/2608-MNISTPro]] - MNIST 改造成的部分可观测世界
 - [[Papers/2606-PanoEnv]] - 全景环境下 3D 空间智能的 RL 环境与基准
+- [[Papers/2609-ReactHuman]] - MLLM 作人形机器人决策层的危险反应基准
 
 ---
 
 ## 调研日志
+
+### 2026-11-13 survey-refresh 增量并入 15 篇
+- **来源**：[[Papers/2610-SSpace|SSpace]]、[[Papers/2610-WAVE0|WAVE-0]]、[[Papers/2610-CaPtain|CaPtain]]、[[Papers/2611-VLAGradientRouting|VLAGradientRouting]]、[[Papers/2609-SimpleMemVLA|SimpleMemVLA]]、[[Papers/2609-FOCAL-VLA|FOCAL-VLA]]、[[Papers/2610-DiVeR|DiVeR]]、[[Papers/2609-ReactHuman|ReactHuman]]、[[Papers/2609-DEXTERA|DEXTERA]]、[[Papers/2609-WISE|WISE]]、[[Papers/2609-EmbodiedSkills|EmbodiedSkills]]、[[Papers/2609-MINERVA|MINERVA]]、[[Papers/2609-WorldAgen|WorldAgen]]、[[Papers/2609-SyncWorld|SyncWorld]]（full-text / source-checked）；[[Papers/2610-UNITAS|UNITAS]]（full-text / partial）。
+- **结构变化**：路线 1 增补三处——VLAGradientRouting 给"保留预训练表征"加条件（Knowledge Insulation 只在分阶段训练加 action token 时与耦合打平），MINERVA 把 TurboVLA 的 task-ID 读数推到 0.54M 参数，CaPtain 把 code-as-policy 从冻结 VLM 推到可训练小模型；局限段增补。路线 3 新增「训练期辅助监督与推理期显式条件化：增益主要在前者」小节（WAVE-0 / FOCAL-VLA / UNITAS / WorldAgen），角色表"训练期表征塑造"行增 UNITAS，动作接口段增补 UNITAS 的 3D 点轨迹接口与 SyncWorld 的上下文校准，局限段增补。路线 4 并入 WISE（想象的增益来自调度）。路线 6 新增候选重排作为第五个介入点（DiVeR / EmbodiedSkills）与一条 Open Problem。路线 7 表新增 DEXTERA 行与配套段落。路线 8 并入 SimpleMemVLA。专题一 A4 并入 SSpace、"一致结论"段增补，A5 并入 ReactHuman，Benchmarks 表新增 ReactHuman 行，Open Problem 4 增补。Datasets 表更新 LIBERO / LIBERO-Plus / RoboTwin 2.0 / RoboCasa365 / RoboMemArena 五行。Key Takeaway 8 / 11 / 13 / 14 增补，Open Problem 4 增补。参考文献新增 15 条；Foundation 一节的 EmbodiedMidtrain 链接改指归档路径。
+- **跳过**：[[Papers/2609-ExpActivator|ExpActivator]]——个人 GUI agent 的经验激活，无具身内容，关键词误命中。
+- **证据边界**：全部为原文一致性核查，非独立复现，尚未见任一篇的第三方复现。UNITAS 为 partial，只采用 source-verified 行，视频 WAM 的最好 Acc@1cm 按改正后的 Motus+STv2 35.66 记。WAVE-0 真机增益混入示范数量差异；FOCAL-VLA 缺"去掉蒸馏"对照；CaPtain 缺 outcome-only GRPO 对照，critic 证据只有离线量；WISE 缺零成本调度对照、基线预算未报；EmbodiedSkills 的 MT50 区间跨零；WorldAgen 的测试时训练增益与噪声同量级且文内数字多处不一致，只采用其去掉 world modeling 的消融；SyncWorld 骨干与数据未分开；DEXTERA 无仅真机一臂；SimpleMemVLA 的同栈记忆变体按构造偏弱；ReactHuman 单次运行、可达性为几何测量；SSpace 的 SpinBench 读数依赖 oracle 旋转，因果干预只做了一个模型；VLAGradientRouting 单 seed、未测 VL 能力保持；MINERVA 与 π0.5 的对比非同协议、无真机。
+- **papers_analyzed 对账**：旧值 126 = 124 可解析 + 1 已归档链接 + 1 历史累加误差；并入后机械值 140（124 + 归档链接改指后可解析的 1 + 新并入 15）。
+- **status**: success
+
+### 2026-11-12 survey-refresh 增量并入 8 篇
+- **来源**：[[Papers/2609-CommitFlow|CommitFlow]]、[[Papers/2609-VLAScope|VLAScope]]、[[Papers/2609-VLAFeedback|VLA-Feedback]]、[[Papers/2609-MotorMind|MotorMind]]、[[Papers/2610-PhysEvo|PhysEvo]]、[[Papers/2610-AgentGarten|AgentGarten]]、[[Papers/2609-SelfCompVLA|SelfComp-VLA]]（full-text / source-checked）；[[Papers/2610-LongWAM|Long-WAM]]（full-text / partial）。
+- **结构变化**：Overview 新增第 10 条（执行期闭环分化为四个介入点）。路线 1 的 Show-Harness 分支增补 MotorMind（参数化 mid-level 动作、VLM 冻结）并重写局限句；路线 2 增 VLA-Feedback 条目与「最后一步去噪作为反馈口」小节，局限段增补；路线 3 新增「WAM 作为 policy 的第二条轴：上下文长度与自回归预训练绑在一起」小节（Long-WAM），「可执行的世界表示」小节增补 AgentGarten，局限段增补；路线 4 局限段补与 VLA-Feedback 的分工；路线 6 新增「执行期闭环的介入点在分化」小节（CommitFlow / VLAScope / SelfComp-VLA）与一条 Open Problem；路线 8 新增「治理代码由 agent 自己改写，直到真机」（PhysEvo），「为什么必须压缩」段补 Long-WAM 的反向读数。Datasets 表增 RoboStress、RoboDojo 两行，RoboTwin 2.0 与 LIBERO-Pro 行更新，演进趋势补一条；Key Takeaway 新增第 14 条；Open Problem 4、9 增补；参考文献增 8 条。
+- **跳过**：无。
+- **证据边界**：全部为原文一致性核查，非独立复现；库内暂无任一篇的第三方复现。Long-WAM 为 partial，一格数字按 Table 1 改正（95.8 而非 97.8）后采用。CommitFlow 的 RDT / TACO / CAPS 三行基线引自 CAPS 论文而非重跑，笔记里一条由笔记作者推算的增益分解（+12.5 / +13.2）标为 unsupported、未采用。VLAScope 的七种偏移类型均在训练集中出现（闭集），对照方法 SAFE / ActProbe 等库内无笔记、数字为转引。MotorMind 有两处文档口径不一致（240 episodes 对 200 configs、π0.5 checkpoint 未指明）。AgentGarten 的四个附加世界每轮仅 1 个 episode，读数不与噪声区分。PhysEvo 的评分无噪声底。
+- **status**: success
 
 ### 2026-09-18 survey-refresh 增量并入 24 篇、跳过 1 篇
 - **来源**：[[Papers/2606-PanoEnv|PanoEnv]]、[[Papers/2608-CodeAsWorld|CodeAsWorld]]、[[Papers/2608-InstructMove|InstructMove]]、[[Papers/2608-LightNav0|LightNav-0]]、[[Papers/2608-MNISTPro|MNIST-PRO]]、[[Papers/2608-PRACTICE|PRACTICE]]、[[Papers/2608-TrapVLA|TrapVLA]]、[[Papers/2608-UrbanGround|UrbanGround]]、[[Papers/2608-ZeroWAM|Zero-WAM]]、[[Papers/2608-ZimaBlue|ZimaBlue]]、[[Papers/2609-2AM|2AM]]、[[Papers/2609-DroneCATS|DroneCATS]]、[[Papers/2609-H3World|H3-World]]、[[Papers/2609-LatentInterfaceTraining|LIT]]、[[Papers/2609-PhysBrain15|PhysBrain 1.5]]、[[Papers/2609-ProgrammableWM|ProgrammableWM]]、[[Papers/2609-RealTimeExpoFT|Real-Time EXPO-FT]]、[[Papers/2609-SparseResidualWM|SparseResidualWM]]、[[Papers/2609-ZETA|ZETA]]（full-text / source-checked）；[[Papers/2510-VQVLA|VQ-VLA]]、[[Papers/2608-Zeva|Zeva]]、[[Papers/2609-FailBench|FailBench]]、[[Papers/2609-OpenWAM|OpenWAM]]、[[Papers/2609-ShowHarness|Show-Harness]]（full-text / **partial**，仅采用 source-verified 行）。

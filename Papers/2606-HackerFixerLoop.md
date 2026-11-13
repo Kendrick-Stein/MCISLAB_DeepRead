@@ -60,6 +60,6 @@ mindmap
 ```
 
 ## Notes
-- 与 [[2605-RolloutCards]]（评测报告规则漂移）、[[2604-WebForge]]（anti-cheating 机制内建于生成环境）同属 agent 评测可信性主线：WebForge 在生成时防作弊，本文在事后对抗加固，Rollout Cards 让证据可审计。
+- 与 Rollout Cards（2605，vault 无笔记）（评测报告规则漂移）、[[2604-WebForge]]（anti-cheating 机制内建于生成环境）同属 agent 评测可信性主线：WebForge 在生成时防作弊，本文在事后对抗加固，Rollout Cards 让证据可审计。
 - 对 GUI/Web benchmark 的启示：GUI verifier（截图比对、DOM 断言、LLM judge）的攻击面审计尚无对应工作，本文方法论可迁移。
 - 值得记住的机制细节：judge 过滤后 75% 的"通过"轨迹是 hack——意味着无 judge 的 pass rate 统计会严重高估任务健壮性。

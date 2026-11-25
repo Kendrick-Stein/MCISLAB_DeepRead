@@ -1,6 +1,6 @@
 ---
 title: Topics
-last_updated: "2026-11-06"
+last_updated: "2026-11-25"
 ---
 
 ## 研究主题
@@ -48,6 +48,7 @@ last_updated: "2026-11-06"
 |:--|:--|:--|
 | [[Topics/EmbodiedAI-Survey]] | Embodied AI 总览 + Embodied Reasoning + Mobile Manipulation | [[DomainMaps/EmbodiedAI]] |
 | [[Topics/VLA-Survey]] | VLA 全景：action representation × data recipe | [[DomainMaps/EmbodiedAI]] |
+| [[Topics/AgenticRobotArm-Survey]] | Agentic 机械臂闭环控制、GUI 与数字—物理任务评测 | [[DomainMaps/EmbodiedAI]] |
 | [[Topics/VLN-Survey]] | Vision-Language Navigation | [[DomainMaps/EmbodiedAI]] |
 
 ### World Model / 其他

@@ -11,6 +11,8 @@ domain_map: EmbodiedAI
 
 # Agentic Robot Arm：GUI、VLA 与机械臂闭环控制
 
+Agent 通过接口调用机器人执行物理任务的研究见 [[Topics/RobotUseAgents-Survey]]。
+
 ## Overview
 
 Agentic 机械臂的核心问题是如何用动作后的观测维持任务进度。

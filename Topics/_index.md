@@ -48,6 +48,7 @@ last_updated: "2026-11-25"
 |:--|:--|:--|
 | [[Topics/EmbodiedAI-Survey]] | Embodied AI 总览 + Embodied Reasoning + Mobile Manipulation | [[DomainMaps/EmbodiedAI]] |
 | [[Topics/VLA-Survey]] | VLA 全景：action representation × data recipe | [[DomainMaps/EmbodiedAI]] |
+| [[Topics/RobotUseAgents-Survey]] | 通用 Agent 调用机器人执行物理任务，涵盖接口、反馈、训练与真机评测 | [[DomainMaps/EmbodiedAI]] |
 | [[Topics/AgenticRobotArm-Survey]] | Agentic 机械臂闭环控制、GUI 与数字—物理任务评测 | [[DomainMaps/EmbodiedAI]] |
 | [[Topics/VLN-Survey]] | Vision-Language Navigation | [[DomainMaps/EmbodiedAI]] |
 
